@@ -9,21 +9,27 @@ describe('Conductor State Slice', () => {
     });
 
     it('should update state via UPDATE_CONDUCTOR_STATE', () => {
-        conductorReducer(ACTIONS.UPDATE_CONDUCTOR_STATE, {
-            targetIntensity: 0.8,
+        conductorReducer({
+            type: ACTIONS.UPDATE_CONDUCTOR_STATE,
+            payload: {
+                targetIntensity: 0.8,
+            },
         });
         expect(conductor.targetIntensity).toBe(0.8);
     });
 
     it('should reset state via RESET_STATE', () => {
         // First mutate
-        conductorReducer(ACTIONS.UPDATE_CONDUCTOR_STATE, {
-            targetIntensity: 0.9,
-            loopCount: 10,
+        conductorReducer({
+            type: ACTIONS.UPDATE_CONDUCTOR_STATE,
+            payload: {
+                targetIntensity: 0.9,
+                loopCount: 10,
+            },
         });
 
         // Then reset
-        conductorReducer(ACTIONS.RESET_STATE);
+        conductorReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
 
         expect(conductor.targetIntensity).toBe(0.35);
         expect(conductor.loopCount).toBe(0);

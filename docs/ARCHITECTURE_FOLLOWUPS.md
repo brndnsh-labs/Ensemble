@@ -69,11 +69,15 @@ One quirk worth noting: a small inline `copyStaticAssets` plugin in `vite.config
 
 ---
 
-## 6. Discriminated `dispatch` action types 🟡 PARTIAL
+## 6. Discriminated `dispatch` action types ✅ DONE (May 2026)
 
-**Done so far:** `ActionPayloadMap` exists in `types.ts` covering all 51 actions, plus 14 distinct `ActionPayload*` interfaces and 3 `ActionPayloadUpdate*` type aliases. `dispatch` in `state.ts:253` has a typed generic overload `<T extends keyof ActionPayloadMap>(action: T, payload: ActionPayloadMap[T])` so call sites get IntelliSense on payloads. A loose `(action: string, payload?: any)` overload remains as a fallback.
+A new discriminated union `Action` (mapped over `ActionPayloadMap`) was added to `types.ts`. `dispatch` in `state.ts` bundles `{ type, payload }` into an `Action` and passes a single arg to each reducer. All 7 per-slice reducers (`playback`, `instruments`, `groove`, `arranger`, `conductor`, `midi`, `visualizer`) were retyped from `(action: string, payload?: any)` to `(action: Action)` (`grooveReducer` preserves its 3rd `playback: GlobalContext` arg). Inside each switch, `case ACTIONS.FOO:` now narrows `action.payload` automatically.
 
-**Still open:** Reducers (the per-slice files under `public/state/`) all still take `(action: string, payload?: any)` — no exhaustiveness check at the switch level. To finish, retype each reducer to discriminate on `ActionPayloadMap` keys (or convert the per-slice subsets to their own union) so missing cases fail `tsc`. Sonnet per-slice job once Opus picks the pattern.
+Also consolidated: the 14 loose `dispatch('STRING_LITERAL')` call sites scattered across components, state-effects, state-hydration, instrument-controller, scheduler-core, and chords-engine now use `ACTIONS.X` — and `ACTIONS` gained explicit entries for the 12 notification-only signal keys (`HYDRATE`, `TOAST_EXPIRED`, `FLASH_EXPIRED`, `KEY_CHANGE`, `TIME_SIG_CHANGE`, `GROUPING_CHANGE`, `REL_KEY_TOGGLE`, `TRANSPOSE`, `VIS_RESET`, `VIS_UPDATE`, `PROG_VALIDATED`, `DRUM_PRESET_LOADED`) that already lived in `ActionPayloadMap`. The `state-integrity` audit was updated to recognize these as listener-observed (no reducer case expected).
+
+A few reducers needed minimal `as any` casts where the new strict payload types collided with `Object.entries`/`for-in` write paths in the `UPDATE_*` and `SET_PARAM` cases — those are localized and consistent with similar casts already present on the write side.
+
+**Future #6.1 (deferred):** Per-slice exhaustiveness — split `Action` into per-slice unions (e.g., `PlaybackAction`) and route `dispatch` by ownership so each reducer must handle every action it owns. Would require a centralized slice-ownership map and a non-broadcast dispatch shape. Strictly bigger surgery than the type narrowing this item delivered; valuable if future regressions show missing-case bugs.
 
 ---
 

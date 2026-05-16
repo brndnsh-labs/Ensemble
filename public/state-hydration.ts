@@ -303,7 +303,7 @@ export function hydrateState(): void {
     } else {
         dispatch(ACTIONS.RESET_STATE);
     }
-    dispatch('HYDRATE');
+    dispatch(ACTIONS.HYDRATE);
 }
 
 export function loadFromUrl(): void {

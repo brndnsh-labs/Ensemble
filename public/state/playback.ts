@@ -1,5 +1,5 @@
 import { deepSignal } from 'deepsignal';
-import type { ModalsState, PlaybackIntent } from '../types.js';
+import type { Action, ModalsState, PlaybackIntent } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export interface GlobalContext {
@@ -229,8 +229,8 @@ export const playback = deepSignal<GlobalContext>({
     },
 });
 
-export function playbackReducer(action: string, payload?: any): boolean {
-    switch (action) {
+export function playbackReducer(action: Action): boolean {
+    switch (action.type) {
         case ACTIONS.RESET_STATE:
             playback.bpm = 100;
             playback.theme = 'auto';
@@ -247,7 +247,7 @@ export function playbackReducer(action: string, payload?: any): boolean {
             playback.updateAvailable = false;
             return true;
         case ACTIONS.SET_UPDATE_AVAILABLE:
-            playback.updateAvailable = !!payload;
+            playback.updateAvailable = !!action.payload;
             return true;
         case ACTIONS.TOGGLE_PLAY:
             playback.isPlaying = !playback.isPlaying;
@@ -260,46 +260,46 @@ export function playbackReducer(action: string, payload?: any): boolean {
             }
             return true;
         case ACTIONS.SET_BPM:
-            playback.bpm = Math.max(40, Math.min(240, parseInt(payload, 10)));
+            playback.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
             return true;
         case ACTIONS.SET_MODAL_OPEN:
-            if (Object.hasOwn(playback.modals, payload.modal)) {
-                (playback.modals as any)[payload.modal] = !!payload.open;
+            if (Object.hasOwn(playback.modals, action.payload.modal)) {
+                (playback.modals as any)[action.payload.modal] = !!action.payload.open;
                 return true;
             }
             return false;
         case ACTIONS.SET_PARAM:
-            if (payload.module === 'playback') {
-                (playback as any)[payload.param] = payload.value;
+            if (action.payload.module === 'playback') {
+                (playback as any)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
         case ACTIONS.SET_BAND_INTENSITY:
-            playback.bandIntensity = Math.max(0, Math.min(1, payload));
+            playback.bandIntensity = Math.max(0, Math.min(1, action.payload));
             return true;
         case ACTIONS.SET_COMPLEXITY:
-            playback.complexity = Math.max(0, Math.min(1, payload));
+            playback.complexity = Math.max(0, Math.min(1, action.payload));
             return true;
         case ACTIONS.SET_AUTO_INTENSITY:
-            playback.autoIntensity = !!payload;
+            playback.autoIntensity = !!action.payload;
             return true;
         case ACTIONS.SET_METRONOME:
-            playback.metronome = payload;
+            playback.metronome = action.payload;
             return true;
         case ACTIONS.SET_PRESET_SETTINGS_MODE:
-            playback.applyPresetSettings = payload;
+            playback.applyPresetSettings = action.payload;
             return true;
         case ACTIONS.SET_SONG_MODE:
-            playback.songMode = !!payload;
+            playback.songMode = !!action.payload;
             return true;
         case ACTIONS.SET_SESSION_TIMER:
-            playback.sessionTimer = payload;
+            playback.sessionTimer = action.payload;
             return true;
         case ACTIONS.SET_STOP_AT_END:
-            playback.stopAtEnd = payload;
+            playback.stopAtEnd = action.payload;
             return true;
         case ACTIONS.SET_ENDING_PENDING:
-            playback.isEndingPending = payload;
+            playback.isEndingPending = action.payload;
             return true;
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
             if (playback.scheduleAheadTime < 0.4) {
@@ -314,38 +314,41 @@ export function playbackReducer(action: string, payload?: any): boolean {
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (payload.velocity) {
-                playback.conductorVelocity = payload.velocity;
+            if (action.payload.velocity) {
+                playback.conductorVelocity = action.payload.velocity;
             }
-            if (payload.lyricalBias !== undefined) {
-                playback.lyricalBias = payload.lyricalBias;
+            if (action.payload.lyricalBias !== undefined) {
+                playback.lyricalBias = action.payload.lyricalBias;
             }
-            if (payload.intent) {
-                if (payload.intent.syncopation !== undefined) {
-                    playback.intent.syncopation = payload.intent.syncopation;
+            if (action.payload.intent) {
+                if (action.payload.intent.syncopation !== undefined) {
+                    playback.intent.syncopation = action.payload.intent.syncopation;
                 }
-                if (payload.intent.anticipation !== undefined) {
-                    playback.intent.anticipation = payload.intent.anticipation;
+                if (action.payload.intent.anticipation !== undefined) {
+                    playback.intent.anticipation = action.payload.intent.anticipation;
                 }
-                if (payload.intent.layBack !== undefined) {
-                    playback.intent.layBack = payload.intent.layBack;
+                if (action.payload.intent.layBack !== undefined) {
+                    playback.intent.layBack = action.payload.intent.layBack;
                 }
-                if (payload.intent.density !== undefined) {
-                    playback.intent.density = payload.intent.density;
+                if (action.payload.intent.density !== undefined) {
+                    playback.intent.density = action.payload.intent.density;
                 }
             }
             break;
         case ACTIONS.SHOW_TOAST: {
-            const id = payload.id || Math.random().toString(36).substr(2, 9);
-            const message = payload.message || payload;
+            const p = action.payload;
+            const id =
+                (typeof p === 'object' ? p.id : undefined) ||
+                Math.random().toString(36).substr(2, 9);
+            const message = String((typeof p === 'object' ? p.message : undefined) || p);
             playback.toasts = [...playback.toasts, { id, message }];
             return true;
         }
         case 'TOAST_EXPIRED':
-            playback.toasts = playback.toasts.filter((t: any) => t.id !== payload);
+            playback.toasts = playback.toasts.filter((t: any) => t.id !== action.payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
-            playback.flashIntensity = payload || 0.25;
+            playback.flashIntensity = action.payload || 0.25;
             return true;
         case 'FLASH_EXPIRED':
             playback.flashIntensity = 0;

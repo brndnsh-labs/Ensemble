@@ -1,5 +1,5 @@
 import { deepSignal } from 'deepsignal';
-import type { Chord } from '../types.js';
+import type { Action, Chord } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export interface Section {
@@ -80,11 +80,11 @@ export const arranger = deepSignal<ArrangerState>({
     isDirty: false,
 });
 
-export function arrangerReducer(action: string, payload?: any): boolean {
-    switch (action) {
+export function arrangerReducer(action: Action): boolean {
+    switch (action.type) {
         case ACTIONS.SET_PARAM:
-            if (payload.module === 'arranger') {
-                (arranger as any)[payload.param] = payload.value;
+            if (action.payload.module === 'arranger') {
+                (arranger as any)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
@@ -107,23 +107,23 @@ export function arrangerReducer(action: string, payload?: any): boolean {
             arranger.grouping = null;
             return true;
         case ACTIONS.SET_NOTATION:
-            arranger.notation = payload;
+            arranger.notation = action.payload;
             return true;
         case ACTIONS.SET_TIME_SIGNATURE:
-            arranger.timeSignature = payload;
+            arranger.timeSignature = action.payload;
             return true;
         case ACTIONS.SET_KEY:
-            arranger.key = payload;
+            arranger.key = action.payload;
             return true;
         case ACTIONS.LOAD_TEMPLATE:
-            arranger.sections = payload.sections;
-            if (payload.isMinor !== undefined) {
-                arranger.isMinor = payload.isMinor;
+            arranger.sections = action.payload.sections;
+            if (action.payload.isMinor !== undefined) {
+                arranger.isMinor = action.payload.isMinor;
             }
             arranger.isDirty = true;
             return true;
         case ACTIONS.SET_ARRANGEMENT:
-            arranger.sections = payload;
+            arranger.sections = action.payload;
             return true;
     }
     return false;

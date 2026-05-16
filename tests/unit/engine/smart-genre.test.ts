@@ -12,12 +12,13 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         // Wrap dispatch to avoid handleEffects during tests
         dispatch: vi.fn((action, payload) => {
             // Only perform state updates, skip handleEffects side-effects
-            actual.playbackReducer(action, payload);
-            actual.arrangerReducer(action, payload);
-            actual.instrumentReducer(action, payload);
-            actual.grooveReducer(action, payload, actual.playback);
-            actual.midiReducer(action, payload);
-            actual.vizReducer(action, payload);
+            const a = { type: action, payload };
+            actual.playbackReducer(a);
+            actual.arrangerReducer(a);
+            actual.instrumentReducer(a);
+            actual.grooveReducer(a, actual.playback);
+            actual.midiReducer(a);
+            actual.vizReducer(a);
         }),
     };
 });

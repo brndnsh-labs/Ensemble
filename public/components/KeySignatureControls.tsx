@@ -3,6 +3,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { arranger } from '../state.js';
+import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
@@ -39,7 +40,7 @@ function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[
     arranger.key = newKey;
     validateAndAnalyze();
     saveCurrentState();
-    dispatch('KEY_CHANGE');
+    dispatch(ACTIONS.KEY_CHANGE);
 }
 
 function updateTimeSignature(
@@ -54,7 +55,7 @@ function updateTimeSignature(
     }
     validateAndAnalyze();
     saveCurrentState();
-    dispatch('TIME_SIG_CHANGE');
+    dispatch(ACTIONS.TIME_SIG_CHANGE);
 }
 
 function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
@@ -71,7 +72,7 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
     flushBuffers();
     syncWorker();
     saveCurrentState();
-    dispatch('GROUPING_CHANGE');
+    dispatch(ACTIONS.GROUPING_CHANGE);
 }
 
 export function TimeSignatureControl() {
@@ -194,7 +195,7 @@ export function KeySignatureMenuControl({
                     aria-label={getRelativeKeyActionLabel(isMinor)}
                     onClick={() => {
                         switchToRelativeKey();
-                        dispatch('REL_KEY_TOGGLE' as any);
+                        dispatch(ACTIONS.REL_KEY_TOGGLE);
                     }}
                 >
                     {getRelativeKeyActionLabel(isMinor)}
@@ -213,7 +214,7 @@ export function KeySignatureMenuControl({
                             aria-label="Transpose Down"
                             onClick={() => {
                                 transposeKey(-1);
-                                dispatch('TRANSPOSE' as any);
+                                dispatch(ACTIONS.TRANSPOSE);
                             }}
                         >
                             ♭ Down
@@ -227,7 +228,7 @@ export function KeySignatureMenuControl({
                             aria-label="Transpose Up"
                             onClick={() => {
                                 transposeKey(1);
-                                dispatch('TRANSPOSE' as any);
+                                dispatch(ACTIONS.TRANSPOSE);
                             }}
                         >
                             ♯ Up

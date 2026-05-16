@@ -4,20 +4,20 @@ import { ACTIONS } from '../../../public/types.js';
 
 describe('Arranger Reducer', () => {
     beforeEach(() => {
-        arrangerReducer(ACTIONS.RESET_STATE);
+        arrangerReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
     });
 
     it('should reset to default values', () => {
         arranger.key = 'Eb';
         arranger.notation = 'name';
-        arrangerReducer(ACTIONS.RESET_STATE);
+        arrangerReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(arranger.key).toBe('C');
         expect(arranger.notation).toBe('roman');
         expect(arranger.sections.length).toBe(1);
     });
 
     it('should set notation style', () => {
-        arrangerReducer(ACTIONS.SET_NOTATION, 'nns');
+        arrangerReducer({ type: ACTIONS.SET_NOTATION, payload: 'nns' });
         expect(arranger.notation).toBe('nns');
     });
 
@@ -26,7 +26,7 @@ describe('Arranger Reducer', () => {
             { id: '1', label: 'Verse', value: 'I' },
             { id: '2', label: 'Chorus', value: 'IV' },
         ];
-        arrangerReducer(ACTIONS.SET_ARRANGEMENT, newSections);
+        arrangerReducer({ type: ACTIONS.SET_ARRANGEMENT, payload: newSections });
         expect(arranger.sections).toEqual(newSections);
     });
 
@@ -53,7 +53,10 @@ describe('Arranger Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                arrangerReducer(ACTIONS.SET_PARAM, { module: 'arranger', param, value });
+                arrangerReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'arranger', param, value },
+                });
                 expect((arranger as any)[param]).toEqual(value);
             }
         });

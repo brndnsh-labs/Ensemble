@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal';
+import type { Action } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export interface ConductorState {
@@ -22,23 +23,23 @@ export const conductor = deepSignal<ConductorState>({
     formIteration: 0,
 });
 
-export function conductorReducer(action: string, payload?: any): boolean {
-    switch (action) {
+export function conductorReducer(action: Action): boolean {
+    switch (action.type) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:
-            if (payload.targetIntensity !== undefined) {
-                conductor.targetIntensity = payload.targetIntensity;
+            if (action.payload.targetIntensity !== undefined) {
+                conductor.targetIntensity = action.payload.targetIntensity;
             }
-            if (payload.stepSize !== undefined) {
-                conductor.stepSize = payload.stepSize;
+            if (action.payload.stepSize !== undefined) {
+                conductor.stepSize = action.payload.stepSize;
             }
-            if (payload.form !== undefined) {
-                conductor.form = payload.form;
+            if (action.payload.form !== undefined) {
+                conductor.form = action.payload.form;
             }
-            if (payload.loopCount !== undefined) {
-                conductor.loopCount = payload.loopCount;
+            if (action.payload.loopCount !== undefined) {
+                conductor.loopCount = action.payload.loopCount;
             }
-            if (payload.formIteration !== undefined) {
-                conductor.formIteration = payload.formIteration;
+            if (action.payload.formIteration !== undefined) {
+                conductor.formIteration = action.payload.formIteration;
             }
             return true;
         case ACTIONS.RESET_STATE:

@@ -6,7 +6,7 @@ import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
 import { vizReducer, vizState } from './state/visualizer.js';
-import type { ActionPayloadMap, EnsembleState } from './types.js';
+import type { Action, ActionPayloadMap, EnsembleState } from './types.js';
 
 /** @deprecated Use EnsembleState directly */
 export type StateMap = EnsembleState;
@@ -215,16 +215,20 @@ export function dispatch(action: any, payload?: any): void {
     // Accessing deepSignal property directly works like a getter
     const oldBpm = playback.bpm;
 
-    // Delegate to Reducers
-    playbackReducer(action, payload);
-    arrangerReducer(action, payload);
-    conductorReducer(action, payload);
-    instrumentReducer(action, payload);
-    grooveReducer(action, payload, playback);
-    midiReducer(action, payload);
-    vizReducer(action, payload);
+    // Bundle into a discriminated Action; reducers switch on action.type.
+    // Unmapped string actions still flow through — they hit each reducer's default arm.
+    const a = { type: action, payload } as Action;
 
-    // Notify listeners
+    // Delegate to Reducers
+    playbackReducer(a);
+    arrangerReducer(a);
+    conductorReducer(a);
+    instrumentReducer(a);
+    grooveReducer(a, playback);
+    midiReducer(a);
+    vizReducer(a);
+
+    // Notify listeners (legacy two-arg shape preserved)
     listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));
 }
 

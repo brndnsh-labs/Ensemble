@@ -10,64 +10,73 @@ import { ACTIONS } from '../../../public/types.js';
 
 describe('Instrument Reducer', () => {
     beforeEach(() => {
-        instrumentReducer(ACTIONS.RESET_STATE);
+        instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
     });
 
     it('should reset all instruments to default values', () => {
         soloist.enabled = true;
         soloist.volume = 0.9;
-        instrumentReducer(ACTIONS.RESET_STATE);
+        instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(soloist.enabled).toBe(false);
         expect(soloist.volume).toBe(1.0);
     });
 
     it('should return false for SET_MODAL_OPEN', () => {
-        const result = instrumentReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
+        const result = instrumentReducer({
+            type: ACTIONS.SET_MODAL_OPEN,
+            payload: { modal: 'settings', open: true },
+        });
         expect(result).toBe(false);
     });
 
     it('should set style for modules', () => {
-        instrumentReducer(ACTIONS.SET_STYLE, { module: 'bass', style: 'funk' });
+        instrumentReducer({ type: ACTIONS.SET_STYLE, payload: { module: 'bass', style: 'funk' } });
         expect(bass.style).toBe('funk');
 
         // Invalid module
-        instrumentReducer(ACTIONS.SET_STYLE, { module: 'invalid', style: 'funk' });
+        instrumentReducer({
+            type: ACTIONS.SET_STYLE,
+            payload: { module: 'invalid', style: 'funk' },
+        });
     });
 
     it('should set density for chords', () => {
-        instrumentReducer(ACTIONS.SET_DENSITY, 'rich');
+        instrumentReducer({ type: ACTIONS.SET_DENSITY, payload: 'rich' });
         expect(chords.density).toBe('rich');
     });
 
     it('should set volume and reverb for modules', () => {
-        instrumentReducer(ACTIONS.SET_VOLUME, { module: 'chords', value: 0.8 });
+        instrumentReducer({ type: ACTIONS.SET_VOLUME, payload: { module: 'chords', value: 0.8 } });
         expect(chords.volume).toBe(0.8);
-        instrumentReducer(ACTIONS.SET_REVERB, { module: 'harmony', value: 0.2 });
+        instrumentReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'harmony', value: 0.2 } });
         expect(harmony.reverb).toBe(0.2);
     });
 
     it('should set soloist mode and preset', () => {
-        instrumentReducer(ACTIONS.SET_SOLOIST_MODE, 'guitar');
+        instrumentReducer({ type: ACTIONS.SET_SOLOIST_MODE, payload: 'guitar' });
         expect(soloist.mode).toBe('guitar');
-        instrumentReducer(ACTIONS.SET_SOLOIST_PRESET, 'neo');
+        instrumentReducer({ type: ACTIONS.SET_SOLOIST_PRESET, payload: 'neo' });
         expect(soloist.preset).toBe('neo');
     });
 
     it('should handle session resets', () => {
         soloist.sessionSteps = 100;
-        instrumentReducer(ACTIONS.RESET_SESSION);
+        instrumentReducer({ type: ACTIONS.RESET_SESSION, payload: undefined });
         expect(soloist.sessionSteps).toBe(0);
     });
 
     it('should update conductor decisions', () => {
-        instrumentReducer(ACTIONS.UPDATE_CONDUCTOR_DECISION, { density: 'thin', hookProb: 0.9 });
+        instrumentReducer({
+            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
+            payload: { density: 'thin', hookProb: 0.9 },
+        });
         expect(chords.density).toBe('thin');
         expect(soloist.hookRetentionProb).toBe(0.9);
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {
         const payload = { chord: 'pad', bass: 'slap', soloist: 'shred', harmony: 'strings' };
-        instrumentReducer(ACTIONS.SET_GENRE_FEEL, payload);
+        instrumentReducer({ type: ACTIONS.SET_GENRE_FEEL, payload });
         expect(chords.style).toBe('pad');
         expect(bass.style).toBe('slap');
         expect(soloist.style).toBe('shred');
@@ -75,14 +84,14 @@ describe('Instrument Reducer', () => {
     });
 
     it('should update HB and SB state', () => {
-        instrumentReducer(ACTIONS.UPDATE_HB, { style: 'horns' });
+        instrumentReducer({ type: ACTIONS.UPDATE_HB, payload: { style: 'horns' } });
         expect(harmony.style).toBe('horns');
-        instrumentReducer(ACTIONS.UPDATE_SB, { tension: 0.5 });
+        instrumentReducer({ type: ACTIONS.UPDATE_SB, payload: { tension: 0.5 } });
         expect(soloist.tension).toBe(0.5);
     });
 
     it('should return false for unknown actions', () => {
-        const result = instrumentReducer('UNKNOWN_ACTION', {});
+        const result = instrumentReducer({ type: 'UNKNOWN_ACTION', payload: {} });
         expect(result).toBe(false);
     });
 
@@ -94,7 +103,10 @@ describe('Instrument Reducer', () => {
                 instrument: 'Wurlitzer',
             };
             for (const [p, v] of Object.entries(params)) {
-                instrumentReducer(ACTIONS.SET_PARAM, { module: 'chords', param: p, value: v });
+                instrumentReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'chords', param: p, value: v },
+                });
                 expect((chords as any)[p]).toBe(v);
             }
         });
@@ -106,7 +118,10 @@ describe('Instrument Reducer', () => {
                 instrument: 'Synth',
             };
             for (const [p, v] of Object.entries(params)) {
-                instrumentReducer(ACTIONS.SET_PARAM, { module: 'bass', param: p, value: v });
+                instrumentReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'bass', param: p, value: v },
+                });
                 expect((bass as any)[p]).toEqual(v);
             }
         });
@@ -118,7 +133,10 @@ describe('Instrument Reducer', () => {
                 instrument: 'Sax',
             };
             for (const [p, v] of Object.entries(params)) {
-                instrumentReducer(ACTIONS.SET_PARAM, { module: 'soloist', param: p, value: v });
+                instrumentReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'soloist', param: p, value: v },
+                });
                 expect((soloist as any)[p]).toEqual(v);
             }
         });
@@ -130,16 +148,22 @@ describe('Instrument Reducer', () => {
                 instrument: 'Trumpet',
             };
             for (const [p, v] of Object.entries(params)) {
-                instrumentReducer(ACTIONS.SET_PARAM, { module: 'harmony', param: p, value: v });
+                instrumentReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'harmony', param: p, value: v },
+                });
                 expect((harmony as any)[p]).toEqual(v);
             }
         });
 
         it('should alias harmonies module to harmony', () => {
-            instrumentReducer(ACTIONS.SET_PARAM, {
-                module: 'harmonies',
-                param: 'volume',
-                value: 0.8,
+            instrumentReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: {
+                    module: 'harmonies',
+                    param: 'volume',
+                    value: 0.8,
+                },
             });
             expect(harmony.volume).toEqual(0.8);
         });

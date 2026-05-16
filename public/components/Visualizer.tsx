@@ -260,7 +260,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                         param: 'lastActiveChordIndex',
                         value: null,
                     });
-                    dispatch('VIS_RESET' as any);
+                    dispatch(ACTIONS.VIS_RESET);
                 }
                 if (enabled && vizRef.current) {
                     vizRef.current.clear();
@@ -306,7 +306,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                             param: 'lastActiveChordIndex',
                             value: ev.index,
                         });
-                        dispatch('VIS_UPDATE' as any, { type: 'chord', index: ev.index });
+                        dispatch(ACTIONS.VIS_UPDATE, { type: 'chord', index: ev.index });
                     }
                     if (enabled && playback.isDrawing && vizRef.current) {
                         ev.notes = ev.chordNotes;

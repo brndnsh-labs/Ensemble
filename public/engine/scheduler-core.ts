@@ -120,7 +120,7 @@ export function togglePlay(
             dispatch(ACTIONS.SET_STOP_AT_END, false);
         }
         if (dispatch) {
-            dispatch('VIS_RESET');
+            dispatch(ACTIONS.VIS_RESET);
         }
         killAllNotes(state);
         stopMidiTransport(state, playback.audio?.currentTime || 0);

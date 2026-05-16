@@ -4,13 +4,15 @@ import { ACTIONS } from '../../../public/types.js';
 
 describe('Visualizer State Reducer', () => {
     it('should handle generic SET_PARAM action', () => {
-        vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param: 'showGrid', value: true });
+        vizReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'vizState', param: 'showGrid', value: true },
+        });
         expect((vizState as any).showGrid).toBe(true);
 
-        const result = vizReducer(ACTIONS.SET_PARAM, {
-            module: 'other',
-            param: 'showGrid',
-            value: false,
+        const result = vizReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'other', param: 'showGrid', value: false },
         });
         expect(result).toBe(false);
     });
@@ -29,7 +31,10 @@ describe('Visualizer State Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                vizReducer(ACTIONS.SET_PARAM, { module: 'vizState', param, value });
+                vizReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'vizState', param, value },
+                });
                 expect((vizState as any)[param]).toBe(value);
             }
         });

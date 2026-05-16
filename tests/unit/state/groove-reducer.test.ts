@@ -2,64 +2,70 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
 import { ACTIONS } from '../../../public/types.js';
 
-// Tests call grooveReducer with 1-2 args; production signature requires 3.
-const grooveReducer = grooveReducerImpl as (action: string, payload?: any, playback?: any) => any;
+// Tests call grooveReducer with 1-2 args; production signature requires 2 (action object + optional playback).
+const grooveReducer = grooveReducerImpl as (action: any, playback?: any) => any;
 
 describe('Groove Reducer', () => {
     beforeEach(() => {
-        grooveReducer(ACTIONS.RESET_STATE);
+        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
     });
 
     it('should reset to default values and clear instruments', () => {
         groove.volume = 0.9;
         groove.instruments[0].steps[0] = 1;
-        grooveReducer(ACTIONS.RESET_STATE);
+        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(groove.volume).toBe(1.0);
         expect(groove.genreFeel).toBe('Rock');
         expect(groove.instruments[0].steps[0]).toBe(0);
     });
 
     it('should set active measure', () => {
-        grooveReducer(ACTIONS.SET_ACTIVE_MEASURE, 2);
+        grooveReducer({ type: ACTIONS.SET_ACTIVE_MEASURE, payload: 2 });
         expect(groove.currentMeasure).toBe(2);
     });
 
     it('should set swing and subdivision', () => {
-        grooveReducer(ACTIONS.SET_SWING, 25);
+        grooveReducer({ type: ACTIONS.SET_SWING, payload: 25 });
         expect(groove.swing).toBe(25);
-        grooveReducer(ACTIONS.SET_SWING_SUB, '16th');
+        grooveReducer({ type: ACTIONS.SET_SWING_SUB, payload: '16th' });
         expect(groove.swingSub).toBe('16th');
     });
 
     it('should set humanize', () => {
-        grooveReducer(ACTIONS.SET_HUMANIZE, 40);
+        grooveReducer({ type: ACTIONS.SET_HUMANIZE, payload: 40 });
         expect(groove.humanize).toBe(40);
     });
 
     it('should set volume and reverb via module actions', () => {
-        grooveReducer(ACTIONS.SET_VOLUME, { module: 'groove', value: 0.7 });
+        grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module: 'groove', value: 0.7 } });
         expect(groove.volume).toBe(0.7);
-        grooveReducer(ACTIONS.SET_REVERB, { module: 'drum', value: 0.3 });
+        grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'drum', value: 0.3 } });
         expect(groove.reverb).toBe(0.3);
 
-        const result = grooveReducer(ACTIONS.SET_VOLUME, { module: 'other', value: 0.1 });
+        const result = grooveReducer({
+            type: ACTIONS.SET_VOLUME,
+            payload: { module: 'other', value: 0.1 },
+        });
         expect(result).toBe(false);
     });
 
     it('should set creativity and countdown', () => {
-        grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param: 'creativity', value: true });
+        grooveReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'groove', param: 'creativity', value: true },
+        });
         expect(groove.creativity).toBe(true);
-        grooveReducer(ACTIONS.SET_GENRE_COUNTDOWN, 4);
+        grooveReducer({ type: ACTIONS.SET_GENRE_COUNTDOWN, payload: 4 });
         expect(groove.genreSwitchCountdown).toBe(4);
 
         // Setting same value returns false
-        const result = grooveReducer(ACTIONS.SET_GENRE_COUNTDOWN, 4);
+        const result = grooveReducer({ type: ACTIONS.SET_GENRE_COUNTDOWN, payload: 4 });
         expect(result).toBe(false);
     });
 
     it('should trigger drum fills', () => {
         const payload = { steps: { 0: 1 }, startStep: 16, length: 16, crash: true };
-        grooveReducer(ACTIONS.TRIGGER_FILL, payload);
+        grooveReducer({ type: ACTIONS.TRIGGER_FILL, payload });
         expect(groove.fillActive).toBe(true);
         expect((groove.fillSteps as any)[0]).toBe(1);
         expect(groove.pendingCrash).toBe(true);
@@ -69,7 +75,7 @@ describe('Groove Reducer', () => {
         const playbackMock = { isPlaying: false };
         const payload = { feel: 'Jazz', genreName: 'Jazz', swing: 50, sub: '16th' };
 
-        grooveReducer(ACTIONS.SET_GENRE_FEEL, payload, playbackMock);
+        grooveReducer({ type: ACTIONS.SET_GENRE_FEEL, payload }, playbackMock);
 
         expect(groove.genreFeel).toBe('Jazz');
         expect(groove.swing).toBe(50);
@@ -81,14 +87,14 @@ describe('Groove Reducer', () => {
         const playbackMock = { isPlaying: true };
         const payload = { feel: 'Jazz', genreName: 'Jazz' };
 
-        grooveReducer(ACTIONS.SET_GENRE_FEEL, payload, playbackMock);
+        grooveReducer({ type: ACTIONS.SET_GENRE_FEEL, payload }, playbackMock);
 
         expect(groove.genreFeel).toBe('Rock'); // Still Rock
         expect(groove.pendingGenreFeel).toEqual(payload);
     });
 
     it('should return false for unknown actions', () => {
-        const result = grooveReducer('UNKNOWN', {}, {});
+        const result = grooveReducer({ type: 'UNKNOWN', payload: {} }, {});
         expect(result).toBe(false);
     });
 
@@ -119,7 +125,10 @@ describe('Groove Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                grooveReducer(ACTIONS.SET_PARAM, { module: 'groove', param, value }, {});
+                grooveReducer(
+                    { type: ACTIONS.SET_PARAM, payload: { module: 'groove', param, value } },
+                    {},
+                );
                 expect((groove as any)[param]).toEqual(value);
             }
         });

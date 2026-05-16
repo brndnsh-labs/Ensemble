@@ -5,7 +5,7 @@ import { ACTIONS } from '../../../public/types.js';
 describe('MIDI State Reducer', () => {
     it('should update configuration via ACTIONS.SET_MIDI_CONFIG', () => {
         const payload = { enabled: true, selectedOutputId: 'port-1' };
-        midiReducer(ACTIONS.SET_MIDI_CONFIG, payload);
+        midiReducer({ type: ACTIONS.SET_MIDI_CONFIG, payload });
         expect(midi.enabled).toBe(true);
         expect(midi.selectedOutputId).toBe('port-1');
     });
@@ -27,7 +27,7 @@ describe('MIDI State Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(params)) {
-                midiReducer(ACTIONS.SET_PARAM, { module: 'midi', param, value });
+                midiReducer({ type: ACTIONS.SET_PARAM, payload: { module: 'midi', param, value } });
                 expect((midi as any)[param]).toEqual(value);
             }
         });

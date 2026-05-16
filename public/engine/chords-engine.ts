@@ -7,6 +7,7 @@ import {
     TIME_SIGNATURES,
 } from '../config.js';
 import type { Chord, ChordNamePart, FormattedChordNames } from '../types.js';
+import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { getBassSpaceFloor } from './voicing-policy.js';
 
@@ -916,7 +917,7 @@ export function validateProgression(
     Object.assign(arranger, { progression: allChords });
     updateProgressionCache(state);
     if (dispatch) {
-        dispatch('PROG_VALIDATED'); // Notify Preact
+        dispatch(ACTIONS.PROG_VALIDATED); // Notify Preact
     }
     if (renderCallback) {
         renderCallback();

@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal';
+import type { Action } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export interface MidiOutput {
@@ -60,18 +61,18 @@ export const midi = deepSignal<MidiState>({
     velocitySensitivity: 1.0,
 });
 
-export function midiReducer(action: string, payload?: any): boolean {
-    switch (action) {
+export function midiReducer(action: Action): boolean {
+    switch (action.type) {
         case ACTIONS.SET_PARAM:
-            if (payload.module === 'midi') {
-                (midi as any)[payload.param] = payload.value;
+            if (action.payload.module === 'midi') {
+                (midi as any)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
         case ACTIONS.SET_MIDI_CONFIG:
-            for (const key in payload) {
+            for (const key in action.payload) {
                 if (Object.hasOwn(midi, key)) {
-                    (midi as any)[key] = payload[key];
+                    (midi as any)[key] = action.payload[key as keyof typeof action.payload];
                 }
             }
             return true;

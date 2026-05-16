@@ -65,7 +65,7 @@ export async function loadDrumPreset(name: string): Promise<void> {
         value: p.sub || groove.swingSub,
     });
 
-    dispatch('DRUM_PRESET_LOADED');
+    dispatch(ACTIONS.DRUM_PRESET_LOADED);
 }
 
 let tapTimes: number[] = [];

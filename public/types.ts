@@ -302,6 +302,16 @@ export interface ActionPayloadMap {
     DRUM_PRESET_LOADED?: undefined;
 }
 
+/**
+ * Discriminated union over all known actions. Each reducer's switch on
+ * `action.type` narrows `action.payload` to the matching payload type.
+ * Loose `dispatch(action: string, payload?: any)` calls still flow through
+ * the same shape — unmapped strings fall to each reducer's default arm.
+ */
+export type Action = {
+    [K in keyof ActionPayloadMap]-?: { type: K; payload: ActionPayloadMap[K] };
+}[keyof ActionPayloadMap];
+
 export const ACTIONS = {
     // --- Global / Conductor ---
     SET_PARAM: 'SET_PARAM',
@@ -364,4 +374,18 @@ export const ACTIONS = {
     SET_MIDI_CONFIG: 'SET_MIDI_CONFIG',
     RESTORE_GAINS: 'RESTORE_GAINS',
     INIT_AUDIO: 'INIT_AUDIO',
+
+    // --- Signal-only / Lifecycle (payload-less notifications) ---
+    HYDRATE: 'HYDRATE',
+    TOAST_EXPIRED: 'TOAST_EXPIRED',
+    FLASH_EXPIRED: 'FLASH_EXPIRED',
+    KEY_CHANGE: 'KEY_CHANGE',
+    TIME_SIG_CHANGE: 'TIME_SIG_CHANGE',
+    GROUPING_CHANGE: 'GROUPING_CHANGE',
+    REL_KEY_TOGGLE: 'REL_KEY_TOGGLE',
+    TRANSPOSE: 'TRANSPOSE',
+    VIS_RESET: 'VIS_RESET',
+    VIS_UPDATE: 'VIS_UPDATE',
+    PROG_VALIDATED: 'PROG_VALIDATED',
+    DRUM_PRESET_LOADED: 'DRUM_PRESET_LOADED',
 } as const;

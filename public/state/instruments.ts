@@ -1,5 +1,6 @@
 import { deepSignal } from 'deepsignal';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
+import type { Action } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { groove } from './groove.js';
 
@@ -352,12 +353,13 @@ const instrumentStateMap: Record<string, any> = {
     groove,
 };
 
-export function instrumentReducer(action: string, payload?: any): boolean {
-    switch (action) {
+export function instrumentReducer(action: Action): boolean {
+    switch (action.type) {
         case ACTIONS.SET_PARAM: {
-            const modKey = payload.module === 'harmonies' ? 'harmony' : payload.module;
+            const modKey =
+                action.payload.module === 'harmonies' ? 'harmony' : action.payload.module;
             if (instrumentStateMap[modKey]) {
-                instrumentStateMap[modKey][payload.param] = payload.value;
+                instrumentStateMap[modKey][action.payload.param] = action.payload.value;
                 return true;
             }
             break;
@@ -432,68 +434,68 @@ export function instrumentReducer(action: string, payload?: any): boolean {
             harmony.complexity = 0.5;
             return true;
         case ACTIONS.SET_STYLE:
-            if (instrumentStateMap[payload.module]) {
-                instrumentStateMap[payload.module].style = payload.style;
+            if (instrumentStateMap[action.payload.module]) {
+                instrumentStateMap[action.payload.module].style = action.payload.style;
             }
             return true;
         case ACTIONS.SET_DENSITY:
-            chords.density = payload;
+            chords.density = action.payload;
             return true;
         case ACTIONS.SET_VOLUME:
-            if (instrumentStateMap[payload.module]) {
-                instrumentStateMap[payload.module].volume = payload.value;
+            if (instrumentStateMap[action.payload.module]) {
+                instrumentStateMap[action.payload.module].volume = action.payload.value;
             }
             return true;
         case ACTIONS.SET_REVERB:
-            if (instrumentStateMap[payload.module]) {
-                instrumentStateMap[payload.module].reverb = payload.value;
+            if (instrumentStateMap[action.payload.module]) {
+                instrumentStateMap[action.payload.module].reverb = action.payload.value;
             }
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
-            soloist.mode = resolveSoloistMode(payload);
+            soloist.mode = resolveSoloistMode(action.payload);
             return true;
         case ACTIONS.SET_SOLOIST_SEED:
-            soloist.seed = payload;
+            soloist.seed = action.payload;
             return true;
         case ACTIONS.SET_SOLOIST_PRESET:
-            soloist.preset = payload;
+            soloist.preset = action.payload;
             return true;
         case ACTIONS.RESET_SESSION:
             soloist.sessionSteps = 0;
             return true;
         case ACTIONS.SET_GENRE_FEEL:
-            if (payload.chord) {
-                chords.style = payload.chord;
+            if (action.payload.chord) {
+                chords.style = action.payload.chord;
             }
-            if (payload.bass) {
-                bass.style = payload.bass;
+            if (action.payload.bass) {
+                bass.style = action.payload.bass;
             }
-            if (payload.soloist) {
-                soloist.style = payload.soloist;
+            if (action.payload.soloist) {
+                soloist.style = action.payload.soloist;
             }
-            if (payload.harmony) {
-                harmony.style = payload.harmony;
+            if (action.payload.harmony) {
+                harmony.style = action.payload.harmony;
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (payload.density) {
-                chords.density = payload.density;
+            if (action.payload.density) {
+                chords.density = action.payload.density;
             }
-            if (payload.hookProb) {
-                soloist.hookRetentionProb = payload.hookProb;
+            if (action.payload.hookProb) {
+                soloist.hookRetentionProb = action.payload.hookProb;
             }
             return true;
         case ACTIONS.UPDATE_HB:
-            for (const key in payload) {
+            for (const key in action.payload) {
                 if (Object.hasOwn(harmony, key)) {
-                    (harmony as any)[key] = payload[key];
+                    (harmony as any)[key] = (action.payload as any)[key];
                 }
             }
             return true;
         case ACTIONS.UPDATE_SB:
-            for (const key in payload) {
+            for (const key in action.payload) {
                 if (Object.hasOwn(soloist, key)) {
-                    (soloist as any)[key] = payload[key];
+                    (soloist as any)[key] = (action.payload as any)[key];
                 }
             }
             return true;

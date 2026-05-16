@@ -4,100 +4,105 @@ import { ACTIONS } from '../../../public/types.js';
 
 describe('Playback Reducer', () => {
     beforeEach(() => {
-        playbackReducer(ACTIONS.RESET_STATE);
+        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         vi.useFakeTimers();
     });
 
     it('should reset to default values', () => {
         playback.bpm = 150;
         playback.bandIntensity = 0.8;
-        playbackReducer(ACTIONS.RESET_STATE);
+        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
         expect(playback.bpm).toBe(100);
         expect(playback.bandIntensity).toBe(0.35);
     });
 
     it('should set update available', () => {
-        playbackReducer(ACTIONS.SET_UPDATE_AVAILABLE, true);
+        playbackReducer({ type: ACTIONS.SET_UPDATE_AVAILABLE, payload: true });
         expect(playback.updateAvailable).toBe(true);
     });
 
     it('should set BPM with clamping', () => {
-        playbackReducer(ACTIONS.SET_BPM, 300);
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: 300 });
         expect(playback.bpm).toBe(240);
-        playbackReducer(ACTIONS.SET_BPM, 20);
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: 20 });
         expect(playback.bpm).toBe(40);
     });
 
     it('should toggle playing state', () => {
-        playbackReducer(ACTIONS.TOGGLE_PLAY);
+        playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
         expect(playback.isPlaying).toBe(true);
-        playbackReducer(ACTIONS.TOGGLE_PLAY);
+        playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
         expect(playback.isPlaying).toBe(false);
     });
 
     it('should set various playback flags and params', () => {
-        playbackReducer(ACTIONS.SET_BAND_INTENSITY, 0.9);
+        playbackReducer({ type: ACTIONS.SET_BAND_INTENSITY, payload: 0.9 });
         expect(playback.bandIntensity).toBe(0.9);
 
-        playbackReducer(ACTIONS.SET_COMPLEXITY, 0.1);
+        playbackReducer({ type: ACTIONS.SET_COMPLEXITY, payload: 0.1 });
         expect(playback.complexity).toBe(0.1);
 
-        playbackReducer(ACTIONS.SET_AUTO_INTENSITY, false);
+        playbackReducer({ type: ACTIONS.SET_AUTO_INTENSITY, payload: false });
         expect(playback.autoIntensity).toBe(false);
 
-        playbackReducer(ACTIONS.SET_METRONOME, true);
+        playbackReducer({ type: ACTIONS.SET_METRONOME, payload: true });
         expect(playback.metronome).toBe(true);
 
-        playbackReducer(ACTIONS.SET_PRESET_SETTINGS_MODE, true);
+        playbackReducer({ type: ACTIONS.SET_PRESET_SETTINGS_MODE, payload: true });
         expect(playback.applyPresetSettings).toBe(true);
 
-        playbackReducer(ACTIONS.SET_SONG_MODE, false);
+        playbackReducer({ type: ACTIONS.SET_SONG_MODE, payload: false });
         expect(playback.songMode).toBe(false);
 
-        playbackReducer(ACTIONS.SET_SESSION_TIMER, 10);
+        playbackReducer({ type: ACTIONS.SET_SESSION_TIMER, payload: 10 });
         expect(playback.sessionTimer).toBe(10);
 
-        playbackReducer(ACTIONS.SET_STOP_AT_END, true);
+        playbackReducer({ type: ACTIONS.SET_STOP_AT_END, payload: true });
         expect(playback.stopAtEnd).toBe(true);
 
-        playbackReducer(ACTIONS.SET_ENDING_PENDING, true);
+        playbackReducer({ type: ACTIONS.SET_ENDING_PENDING, payload: true });
         expect(playback.isEndingPending).toBe(true);
     });
 
     it('should handle modal opening/closing for valid modals only (line 168)', () => {
         // Valid modal
-        const result = playbackReducer(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
+        const result = playbackReducer({
+            type: ACTIONS.SET_MODAL_OPEN,
+            payload: { modal: 'settings', open: true },
+        });
         expect(result).toBe(true);
         expect(playback.modals.settings).toBe(true);
 
         // Invalid modal (hits line 168)
-        const invalidResult = playbackReducer(ACTIONS.SET_MODAL_OPEN, {
-            modal: 'invalid_modal',
-            open: true,
+        const invalidResult = playbackReducer({
+            type: ACTIONS.SET_MODAL_OPEN,
+            payload: { modal: 'invalid_modal', open: true },
         });
         expect(invalidResult).toBe(false);
     });
 
     it('should handle generic SET_PARAM action and break for other modules (line 174)', () => {
-        playbackReducer(ACTIONS.SET_PARAM, { module: 'playback', param: 'theme', value: 'dark' });
+        playbackReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'playback', param: 'theme', value: 'dark' },
+        });
         expect(playback.theme).toBe('dark');
 
         // Other module (hits line 174)
-        const result = playbackReducer(ACTIONS.SET_PARAM, {
-            module: 'not_playback',
-            param: 'theme',
-            value: 'light',
+        const result = playbackReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'not_playback', param: 'theme', value: 'light' },
         });
         expect(result).toBe(false);
     });
 
     it('should handle emergency lookahead doubling', () => {
         playback.scheduleAheadTime = 0.2;
-        playbackReducer(ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD);
+        playbackReducer({ type: ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD, payload: undefined });
         expect(playback.scheduleAheadTime).toBe(0.4);
 
         // Should not double again if already >= 0.4
-        playbackReducer(ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD);
+        playbackReducer({ type: ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD, payload: undefined });
         expect(playback.scheduleAheadTime).toBe(0.4);
 
         // Should reset after 10s
@@ -106,19 +111,22 @@ describe('Playback Reducer', () => {
     });
 
     it('should show toasts and auto-remove them', () => {
-        playbackReducer(ACTIONS.SHOW_TOAST, { id: 'test-id', message: 'Hello World' });
+        playbackReducer({
+            type: ACTIONS.SHOW_TOAST,
+            payload: { id: 'test-id', message: 'Hello World' },
+        });
         expect(playback.toasts.length).toBe(1);
         expect(playback.toasts[0].message).toBe('Hello World');
 
-        playbackReducer('TOAST_EXPIRED', 'test-id');
+        playbackReducer({ type: ACTIONS.TOAST_EXPIRED, payload: 'test-id' as any });
         expect(playback.toasts.length).toBe(0);
     });
 
     it('should trigger flash and auto-reset', () => {
-        playbackReducer(ACTIONS.TRIGGER_FLASH, 0.5);
+        playbackReducer({ type: ACTIONS.TRIGGER_FLASH, payload: 0.5 });
         expect(playback.flashIntensity).toBe(0.5);
 
-        playbackReducer('FLASH_EXPIRED');
+        playbackReducer({ type: ACTIONS.FLASH_EXPIRED, payload: undefined });
         expect(playback.flashIntensity).toBe(0);
     });
 
@@ -128,7 +136,7 @@ describe('Playback Reducer', () => {
             lyricalBias: 0.3,
             intent: { density: 0.8 },
         };
-        playbackReducer(ACTIONS.UPDATE_CONDUCTOR_DECISION, payload);
+        playbackReducer({ type: ACTIONS.UPDATE_CONDUCTOR_DECISION, payload });
         expect(playback.conductorVelocity).toBe(0.7);
         expect(playback.lyricalBias).toBe(0.3);
         expect(playback.intent.density).toBe(0.8);
@@ -203,7 +211,10 @@ describe('Playback Reducer', () => {
             };
 
             for (const [param, value] of Object.entries(allParams)) {
-                playbackReducer(ACTIONS.SET_PARAM, { module: 'playback', param, value });
+                playbackReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'playback', param, value },
+                });
                 expect((playback as any)[param]).toEqual(value);
             }
         });

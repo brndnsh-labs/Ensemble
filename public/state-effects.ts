@@ -154,14 +154,14 @@ export function handleEffects(
             const toastId = stateMap.playback.toasts[stateMap.playback.toasts.length - 1]?.id;
             if (toastId) {
                 setTimeout(() => {
-                    dispatch('TOAST_EXPIRED', toastId);
+                    dispatch(ACTIONS.TOAST_EXPIRED, toastId);
                 }, 2000);
             }
             break;
         }
         case ACTIONS.TRIGGER_FLASH: {
             setTimeout(() => {
-                dispatch('FLASH_EXPIRED');
+                dispatch(ACTIONS.FLASH_EXPIRED);
             }, 50);
             break;
         }
