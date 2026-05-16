@@ -15,27 +15,27 @@ The Phase 8 TS migration validated a strong working pattern: **Opus plans and re
 
 Fast mode (Opus 4.6) is a good choice for the design/iteration phases when turnaround matters more than depth.
 
----
+### Tracking completed items
 
-## 1. Break the worst circular dependency: `state` ↔ `scheduler-core`
+When an item ships, **update its heading in the same commit that completes it**, using one of these markers:
 
-**Why first:** Small, contained, and unblocks cleaner module boundaries elsewhere. Doing this before #2 (Chord type) means the chord refactor doesn't have to navigate cycles.
+- `## N. Title ✅ DONE (Month YYYY)` — fully complete; replace the body with a 1–2 sentence summary, the commit SHA, and any deferred sub-pieces.
+- `## N. Title 🟡 PARTIAL (Month YYYY)` — main intent done but meaningful follow-up remains; keep the original body and add a "**Done so far:**" / "**Still open:**" pair.
+- `## N. Title ⏸ DEFERRED (Month YYYY)` — explicitly de-prioritized; note the reason and what would change to revive it.
 
-`npm run depcheck` reports ~20 cycle warnings. The worst is `conductor → form-analysis → state → scheduler-core → conductor`. The cycles don't crash (module hoisting saves them) but they make init order fragile and constrain how modules can split.
-
-Most likely cut: extract the small piece of `state.ts` that `scheduler-core.ts` imports into a low-level module both can depend on without re-entering the cycle. Re-run `npm run depcheck` to confirm the warning count drops.
-
-**Approach:** Opus end-to-end. Single-author work — the cycles are interconnected and benefit from one consistent mental model. No parallelization win here.
+The convention is for the *author of the work* to mark it. If you find an item that's already been done in code but not marked here (look at git log for `Items #N` or feature commits that touch the item's files), update the heading and link the commit — even if you didn't do the work. Items #1–3 were retroactively marked this way.
 
 ---
 
-## 2. Canonical `Chord` type
+## 1. Break the worst circular dependency: `state` ↔ `scheduler-core` ✅ DONE (May 2026)
 
-**Why second:** Single biggest source of `any` debt; the benefit ripples across every engine. Doing this after #1 means a cleaner dependency graph to work in; doing it before #4 (soloist refactor) means the soloist work inherits the tighter types.
+Done in commit `522aaa82`. `form-analysis.ts` no longer imports `state.ts` (only the `ArrangerState` type). `analyzeForm` takes the arranger as a parameter; the four callers (main, arranger-controller, conductor, midi-worker-logic) pass it from their existing state references. The named cycle `conductor → form-analysis → state → scheduler-core → conductor` is gone. Depcheck warning count dropped from 20 → 19; the remaining cycles all involve `state.ts` ↔ `scheduler-core.ts` directly and are smaller in scope. **Open follow-up:** sweep the remaining 19 cycles when there's appetite — none are individually as load-bearing as the form-analysis one.
 
-Across `chords-engine`, `accompaniment`, `bass-engine`, `harmonies`, `soloist`, `tick-logic`: `chord` is sometimes a string (`"Cmaj7"`), sometimes a parsed object, sometimes an object with fields tacked on (`sectionId`, `keyIsMinor`, `localIndex`). Almost every engine file casts through `any`. A canonical `Chord` discriminated union with a single parse boundary would eliminate dozens of casts and tighten engine APIs. Same pattern at smaller scale for `coordination` and `tsConfig`.
+---
 
-**Approach:** Opus designs the discriminated union and picks the parse boundary (likely `chords-engine.ts` or a new `chord-type.ts`). Then 4–6 Sonnet subagents in parallel, one per major consuming module (`accompaniment`, `bass-engine`, `harmonies`, `soloist`, `tick-logic`, `scheduler-core`). Each replaces `any` casts with the new type. Main thread runs `npm run typecheck` between batches and commits per-engine.
+## 2. Canonical `Chord` type ✅ DONE (May 2026)
+
+Done in commit `522aaa82`. `ParsedChord` (formerly local to `chords-engine`) was promoted to `Chord` in `types.ts` as the canonical parsed-chord type. `arranger.progression` is `Chord[]` and `stepMap[].chord` is `Chord` (both were `object`). `getChordAtStep` returns the new `ChordAtStep`. Six engines (accompaniment, bass-engine, harmonies, soloist, tick-logic, scheduler-core, midi-worker-logic) now type their chord parameters as `Chord` and have had their chord-related `as any` casts removed. Drive-by fix: `form-analysis.ts` was reading a `chord.value` field the parser never sets (now reads `chord.absName`).
 
 ---
 
@@ -72,13 +72,11 @@ Custom bash + sed + esbuild works but is brittle — the `sw.ts` placeholder bug
 
 ---
 
-## 6. Discriminated `dispatch` action types
+## 6. Discriminated `dispatch` action types 🟡 PARTIAL
 
-**Why sixth:** Lower impact than the previous items; it's a nice ergonomics win that doesn't unblock anything.
+**Done so far:** `ActionPayloadMap` exists in `types.ts` covering all 51 actions, plus 14 distinct `ActionPayload*` interfaces and 3 `ActionPayloadUpdate*` type aliases. `dispatch` in `state.ts:253` has a typed generic overload `<T extends keyof ActionPayloadMap>(action: T, payload: ActionPayloadMap[T])` so call sites get IntelliSense on payloads. A loose `(action: string, payload?: any)` overload remains as a fallback.
 
-`dispatch` is typed `(action: any, payload?: any)`. A discriminated union keyed on `ACTIONS` would give exhaustiveness checking in reducers and proper IntelliSense on payloads.
-
-**Approach:** Opus defines `ActionPayloadMap` over the ~50+ actions and picks the dispatch signature (overloaded vs. generic). Sonnet then applies the typed signature across reducers and dispatch call sites in parallel batches grouped by state slice.
+**Still open:** Reducers (the per-slice files under `public/state/`) all still take `(action: string, payload?: any)` — no exhaustiveness check at the switch level. To finish, retype each reducer to discriminate on `ActionPayloadMap` keys (or convert the per-slice subsets to their own union) so missing cases fail `tsc`. Sonnet per-slice job once Opus picks the pattern.
 
 ---
 
@@ -102,13 +100,9 @@ A central `/// <reference lib="dom" />` (or just relying on tsconfig's default l
 
 ---
 
-## 9. Coverage scope sanity-check
+## 9. Coverage scope sanity-check ✅ DONE (May 2026)
 
-**Why now (or whenever):** Trivial. Verify what the coverage glob actually captures.
-
-`vitest.config.js` `coverage.include` was scanning only the old `.js` glob for most of the migration — coverage reports were ~empty. Fixed in the migration cleanup commit, but worth a second look at the include/exclude globs to confirm the desired report granularity.
-
-**Approach:** Haiku. Read `vitest.config.js`, run `npx vitest run --coverage`, inspect the HTML report, adjust globs if anything looks off.
+`vitest.config.ts` now has `coverage.include: ['public/**/*.{ts,tsx}']` (TS-only glob) with appropriate excludes for `components/**`, `data/**`, `sw.ts`, `main.ts`, `ui-root.tsx`, `App.tsx`. The original `.js`-only glob that produced empty reports is gone. **Open follow-up if curious:** run `npx vitest run --coverage` and inspect the HTML report to confirm the chosen excludes still match intent — but no known issue.
 
 ---
 
