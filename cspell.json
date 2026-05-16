@@ -202,7 +202,9 @@
         "stdev",
         "flatlines",
         "beatstarts",
-        "Questlove"
+        "Questlove",
+        "undercounted",
+        "callsite"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

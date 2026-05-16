@@ -68,7 +68,9 @@ describe('Bossa Nova Bassist Critique', () => {
     };
 
     it('should implement the authentic Bossa rhythm (1, &2, 3, &4)', () => {
-        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.5 } });
+        const performance = simulatePerformance(16, {
+            playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 120 },
+        });
 
         let correctSteps = 0;
         performance.forEach((p) => {
@@ -81,7 +83,10 @@ describe('Bossa Nova Bassist Critique', () => {
         const ratio = correctSteps / performance.length;
         console.log(`[Bossa Critique] Rhythmic Accuracy: ${(ratio * 100).toFixed(1)}%`);
 
-        expect(ratio).toBeGreaterThan(0.9);
+        // Bossa active pattern hard-codes steps 0, 6, 8, 14 (bass-styles.ts:31-39).
+        // Engine returns null on every other step. Deterministic 100%.
+        expect(ratio).toBe(1.0);
+        expect(performance.length).toBe(64); // 4 hits/bar × 16 bars
     });
 
     it('should alternate Root and Fifth between downbeats and upbeats', () => {
@@ -143,12 +148,36 @@ describe('Bossa Nova Bassist Critique', () => {
     });
 
     it('should implement "Lay-back" timing (positive timingOffset)', () => {
-        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.8 } });
+        const performance = simulatePerformance(16, {
+            playback: { bandIntensity: 0.8, complexity: 0.5, bpm: 120 },
+        });
 
         const lagNotes = performance.filter((p) => p.note.timingOffset > 0);
         const ratio = lagNotes.length / performance.length;
 
         console.log(`[Bossa Critique] Lay-back Consistency: ${(ratio * 100).toFixed(1)}%`);
-        expect(ratio).toBeGreaterThan(0.9);
+        // lag = 0.01 + intensity * 0.005 is always strictly positive. Deterministic.
+        expect(ratio).toBe(1.0);
+    });
+
+    it('should scale velocity and lay-back with intensity', () => {
+        // Bossa keeps density constant across intensity (always 4 hits/bar).
+        // The intensity axis is loudness (1.1 + intensity*0.1 on downbeats,
+        // 1.0 + intensity*0.15 on offbeats) and lay-back (0.01 + intensity*0.005).
+        const low = simulatePerformance(8, {
+            playback: { bandIntensity: 0.2, complexity: 0.5, bpm: 120 },
+        });
+        const high = simulatePerformance(8, {
+            playback: { bandIntensity: 0.95, complexity: 0.5, bpm: 120 },
+        });
+
+        expect(low.length).toBe(high.length); // density constant
+        const avgVel = (perf) => perf.reduce((s, p) => s + p.note.velocity, 0) / perf.length;
+        const avgLag = (perf) => perf.reduce((s, p) => s + p.note.timingOffset, 0) / perf.length;
+        console.log(
+            `[Bossa Critique] Intensity scaling: vel low=${avgVel(low).toFixed(2)} high=${avgVel(high).toFixed(2)}, lag low=${avgLag(low).toFixed(3)} high=${avgLag(high).toFixed(3)}`,
+        );
+        expect(avgVel(high)).toBeGreaterThan(avgVel(low) * 1.05);
+        expect(avgLag(high)).toBeGreaterThan(avgLag(low));
     });
 });

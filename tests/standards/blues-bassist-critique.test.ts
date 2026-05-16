@@ -58,8 +58,15 @@ describe('Blues Bassist Critique', () => {
                     {},
                     info,
                 );
-                performance.push({ step: globalStep, loopStep: globalStep % 16, info, note });
-                prevFreq = note.freq;
+                if (note) {
+                    performance.push({
+                        step: globalStep,
+                        loopStep: globalStep % 16,
+                        info,
+                        note,
+                    });
+                    prevFreq = note.freq;
+                }
             }
         }
         return performance;
@@ -100,9 +107,10 @@ describe('Blues Bassist Critique', () => {
             `[Bassist Critique] Lope hits: ${lopeHits.length}, Quarter hits: ${quarterHits.length}`,
         );
 
-        // At high intensity, we expect a significant amount of shuffle "ah" hits
-        expect(lopeHits.length).toBeGreaterThan(50);
-        expect(quarterHits.length).toBeGreaterThan(100);
+        // shuffleProb = 0.9^1.2 + 0.9*0.3 = 1.15 → 100% offbeat fire (4/bar × 32 = 128).
+        // Quarter notes always fire via isQuarter branch (4/bar × 32 = 128).
+        expect(quarterHits.length).toBe(128);
+        expect(lopeHits.length).toBe(128);
     });
 
     it('should strictly repeat pitch on the shuffle upbeat', () => {
@@ -120,7 +128,9 @@ describe('Blues Bassist Critique', () => {
                 }
             }
         });
-        expect(checked).toBeGreaterThan(20);
+        // Engine reality at intensity 0.9: 64 offbeats over 16 bars, each preceded by
+        // a quarter-note hit. Tighten to assert nearly all pairs were validated.
+        expect(checked).toBeGreaterThan(60);
     });
 
     it('should maintain consistent duration ratios (long-short)', () => {
@@ -149,8 +159,12 @@ describe('Blues Bassist Critique', () => {
             `[Bassist Critique] Avg Long Duration: ${avgLong.toFixed(2)}, Avg Short: ${avgShort.toFixed(2)}`,
         );
 
-        expect(avgLong).toBeGreaterThan(1.5); // Adjusted for the new 0.45 duration
-        expect(avgShort).toBeLessThan(1.0);
+        // Engine reality: quarter dur = stepsPerBeat * 0.45 = 1.8; upbeat dur = 0.8.
+        // Tighten the ratios with documented expectations.
+        expect(avgLong).toBeGreaterThan(1.75);
+        expect(avgLong).toBeLessThan(1.85);
+        expect(avgShort).toBeGreaterThan(0.75);
+        expect(avgShort).toBeLessThan(0.85);
     });
 
     it('should remain strictly quarter-note based at low intensity', () => {
@@ -162,7 +176,29 @@ describe('Blues Bassist Critique', () => {
 
         console.log(`[Bassist Critique] Low Intensity Lope hits: ${lopeHits.length}`);
 
-        // At low intensity, shuffle hits should be rare or zero
-        expect(lopeHits.length).toBeLessThan(25);
+        // bass-styles.ts:140 hard-gates `bandIntensity < 0.3` → returns false. Deterministic 0.
+        expect(lopeHits.length).toBe(0);
+    });
+
+    it('should scale offbeat lope hits monotonically with intensity', () => {
+        // shuffleProb = bandIntensity^1.2 + complexity*0.3, gated at intensity >= 0.3.
+        // Expect: 0 at 0.1, partial at 0.5, full at 0.9.
+        const trials = [
+            { intensity: 0.1, complexity: 0.3 },
+            { intensity: 0.5, complexity: 0.3 },
+            { intensity: 0.9, complexity: 0.3 },
+        ];
+        const counts = trials.map(({ intensity, complexity }) => {
+            const perf = simulatePerformance(32, {
+                playback: { bandIntensity: intensity, complexity },
+            });
+            return perf.filter((p) => p.info.isOffbeat).length;
+        });
+
+        console.log(`[Bassist Critique] Lope scaling: ${counts.join(' → ')}`);
+        expect(counts[0]).toBe(0);
+        expect(counts[1]).toBeGreaterThan(40); // ~0.5^1.2+0.09 = 0.52 → ~67/128
+        expect(counts[1]).toBeLessThan(90);
+        expect(counts[2]).toBeGreaterThan(120); // ~full
     });
 });

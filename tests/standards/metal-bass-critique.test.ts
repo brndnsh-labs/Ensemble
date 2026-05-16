@@ -69,7 +69,7 @@ describe('Metal Bassist Critique', () => {
 
     it('should implement the "Gallop" (16-16-8) at medium-high intensity', () => {
         const performance = simulatePerformance(16, {
-            playback: { bandIntensity: 0.75, complexity: 0.7 },
+            playback: { bandIntensity: 0.75, complexity: 0.7, bpm: 140 },
         });
 
         let gallopCount = 0;
@@ -86,28 +86,33 @@ describe('Metal Bassist Critique', () => {
         });
 
         console.log(`[Metal Critique] Gallop Motifs Detected: ${gallopCount}`);
-        expect(gallopCount).toBeGreaterThan(5);
+        // 64 beats × gallopProb_active(0.5+0.28=0.78) × gallopProb_pitch ≈ 38 expected.
+        // Observed 14-22 across 10 runs; tighten from >5 to >10 with 4pt margin.
+        expect(gallopCount).toBeGreaterThan(10);
     });
 
-    it('should stay grounded in roots and fifths', () => {
+    it('should stay grounded on the root at medium intensity', () => {
+        // At intensity 0.6 the metal engine returns root on every fired step
+        // (chromatic neighbors only fire at intensity > 0.75, fills at > 0.9).
         const performance = simulatePerformance(16);
 
-        let rootOrFifthHits = 0;
+        let rootHits = 0;
         performance.forEach((p) => {
             const pc = p.note.midi % 12;
-            if (pc === 0 || pc === 7) {
-                rootOrFifthHits++;
+            if (pc === 0) {
+                rootHits++;
             }
         });
 
-        const ratio = rootOrFifthHits / (performance.length || 1);
-        console.log(`[Metal Critique] Root/Fifth Grounding: ${(ratio * 100).toFixed(1)}%`);
-        expect(ratio).toBeGreaterThan(0.8);
+        const ratio = rootHits / (performance.length || 1);
+        console.log(`[Metal Critique] Root Grounding: ${(ratio * 100).toFixed(1)}%`);
+        // Deterministic 100% at intensity 0.6 (no chromatic/fill branches active).
+        expect(ratio).toBe(1.0);
     });
 
     it('should implement dense 16th note chugs at maximum intensity', () => {
         const performance = simulatePerformance(16, {
-            playback: { bandIntensity: 0.95, complexity: 0.9 },
+            playback: { bandIntensity: 0.95, complexity: 0.9, bpm: 140 },
         });
 
         const totalSteps = 16 * 16;
@@ -116,6 +121,27 @@ describe('Metal Bassist Critique', () => {
         console.log(
             `[Metal Critique] Hit Density at Max Intensity: ${(hitDensity * 100).toFixed(1)}%`,
         );
-        expect(hitDensity).toBeGreaterThan(0.6);
+        // Engine fires 100% of 8ths + ~86% of 16ths × ~91% (chord/fill firing) = ~78-83% avg.
+        // Observed 77.7-84.8% across 10 runs; tighten from >0.6 to >0.72.
+        expect(hitDensity).toBeGreaterThan(0.72);
+    });
+
+    it('should scale density with intensity', () => {
+        // At intensity 0.3, checkBassActiveStyle returns is8th + (random < 0.1+0.4*complexity).
+        // At intensity 0.95, returns is8th + (random < 0.5+0.4*complexity).
+        // High should produce noticeably more notes than low.
+        const low = simulatePerformance(16, {
+            playback: { bandIntensity: 0.3, complexity: 0.3, bpm: 140 },
+        });
+        const high = simulatePerformance(16, {
+            playback: { bandIntensity: 0.95, complexity: 0.9, bpm: 140 },
+        });
+        const ratio = high.length / low.length;
+        console.log(
+            `[Metal Critique] Density scaling: low=${low.length} high=${high.length} ratio=${ratio.toFixed(2)}`,
+        );
+        // High should be at least 1.6x denser than low (low: ~8ths only with sparse gallops,
+        // high: ~8ths + ~86% of 16ths).
+        expect(ratio).toBeGreaterThan(1.6);
     });
 });
