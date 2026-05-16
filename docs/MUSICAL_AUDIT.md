@@ -2,7 +2,14 @@
 
 A running log of musicality findings surfaced from reading the critique suite (`tests/standards/`) and the engines it covers. The audit's goal is to keep the suite **honestly enforcing** the musical claims its test names make — and to surface engine bugs hiding behind tests that pass for the wrong reason.
 
-Started: 2026-05-16. Archive when the "Open findings" section is empty.
+Started: 2026-05-16. Archive when the "Open findings" and "Queued" sections are empty.
+
+## Status (2026-05-16)
+
+- **Shipped:** 13 fixes across 8 commits (working tree clean, 8 commits ahead of `origin/main`)
+- **Queued (verified, ready to fix):** 4 critique-test rewrites in the same shape as prior passes — see "Queued" below
+- **Open (engine-side):** 1 finding — soloist has no phrase-end-specific resolution bias
+- **Future passes:** placeholder-threshold sweep, velocity-as-gain naming, re-enable types in `tests/standards/`, harness-silencing audit (new meta-pattern below)
 
 ## Methodology
 
@@ -10,7 +17,13 @@ The recurring pattern that lets musical bugs hide:
 
 > A test's *name* asserts a musical claim, but its *implementation* either (a) computes the expected pattern by replaying the engine's own predicates (tautology), (b) uses a threshold below the random-baseline (passes with any output), or (c) measures a different quantity than the name implies.
 
-The audit looks for any of those three smells per test file, then verifies the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
+Two additional smells discovered during the May 2026 audit pass:
+
+> (d) **Report/assertion mismatch** — `console.log` shows "Target: >30%" but `expect(...)` asserts `>15%`. The logged target is aspirational; the assertion is what actually guards. Check that every "Target: X" in the report is the value being asserted.
+>
+> (e) **Harness silences engine path** — the test passes an incomplete `stepInfo` object (e.g. just `{ isBeatStart: ... }`) when the engine checks other properties (`isBackbeat`, `isOffbeat`, `isMeasureStart`, `isPulseStart`). The engine's relevant lane never fires, so the test measures only the fallback lane while looking healthy. Fix: build stepInfo via `getStepInfo` from `public/utils.ts`, or construct an object containing every property the engine reads. Subtle and high-impact — already caught in `reggae-piano-critique` and `funk-drummer-critique`.
+
+The audit looks for any of these five smells per test file, then verifies the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
 
 ## Shipped
 
@@ -32,6 +45,38 @@ The audit looks for any of those three smells per test file, then verifies the e
 | 2026-05-16 | `soloist-jazz-critique.test.ts:146` logged a chromatism target but never asserted it | Report claimed "Chromatism Ratio Target: >5%" but no `expect(chromaticRatio)...` existed. A completely diatonic jazz soloist (no chromaticism — the heart of bebop) would have passed the test. The note-density assertion was also looser than the logged target (logged 8-16/bar, asserted `>6.5`). | Added `chromaticRatio > 0.15` assertion (engine delivers ~26%). Reconciled note-density report to match engine reality (6-12/bar) and tightened the smoothness assertion (engine ~2.3 semitones; tightened `<9.0` → `<5.0`). Engine pushing toward Kenny-Dorham-density 12+/bar queued as a future engine task, not papered over here. |
 | 2026-05-16 | `neo-soul-bass-critique.test.ts:99` "syncopated hammer-ons" measured "any non-beat-start note" | Metric `p.info.mStep % 4 !== 0` counted all upbeat hits — a root on step 6 and a hammer-on on step 6 both incremented the same counter. Threshold `>5` over 16 bars was 0.3 syncopated notes/bar, effectively trivial. The genre-defining hammer-on ornament (`baseRoot + 2` with shortened duration, fired at `complexity > 0.7`, see `bass-engine.ts:414`) was never measured. | Split the claim into both halves: (a) note lands on a syncopated 8th-note offbeat (steps 2/6/10/14), and (b) pitch is a half or whole step above the chord root. Threshold `hammerOnsPerBar > 0.5` and `hammerOnRate > 0.15` with documented engine-probability math. Engine delivers 0.95 hammer-ons/bar at 27.5% of syncopated hits. |
 
+## Queued (verified, ready to fix)
+
+Four critique-test smells diagnosed and verified during the May 2026 scout pass but not yet shipped. Same thematic shape as prior `refactor(tests): rewrite critique metrics...` commits — recommend one combined commit. Each finding's diagnosis was confirmed by reading the actual file; the engine numbers cited below were not yet captured (next session should run each test once with `--reporter=verbose` to set honest thresholds with documented headroom).
+
+### Q1. `funk-drummer-critique.test.ts:144` — harness silences syncopation check
+- **Test claim:** `should pass an authenticity critique for a 128-bar Funk performance` (the "Kick Syncopation" branch)
+- **Smell:** (e) harness bug
+- **Evidence:** Metric reads `!stepData.isPulseStart` but the harness at lines 43-52 only sets `isDownbeat`, `isPulse`, `isBeatStart`, `isBackbeat`, `isOffbeat` on `stepData`. The `isPulseStart` property is never assigned, so `!undefined === true` and every kick hit gets counted as syncopated. Threshold `totalSyncopatedKickHits / totalBars > 0.5` passes trivially since the engine emits well above 0.5 kicks/bar.
+- **Fix:** Replace the predicate. Real "syncopated kick" is a kick on a position that isn't a strong beat — `stepData.instruments.Kick && !stepData.isBeatStart` (or tighter: `!stepData.isDownbeat && !stepData.isBackbeat`).
+
+### Q2. `hiphop-drummer-critique.test.ts:118-126` — missing assertion + loose threshold
+- **Test claim:** `should pass an authenticity critique for a 128-bar Hip Hop performance`
+- **Smell:** (d) report/assertion mismatch + (5) missing assertion + (2) loose threshold
+- **Evidence:** `[HiHat Density]` is logged but never asserted; report says "Backbeat Target: 100%" but assertion is `>0.95`; `syncopatedKickRatio > 0.5/bar` is trivial for hiphop (genre is heavily syncopated — engine likely runs 4-8× that).
+- **Fix:** Add a HiHat density assertion at the engine's real output; tighten `syncopatedKickRatio` to a real headroom value after measuring; reconcile the backbeat target log with the assertion.
+
+### Q3. `rock-drummer-critique.test.ts:148-171` — multiple mismatches in one test
+- **Test claim:** `should pass an authenticity critique for a 128-bar Rock performance`
+- **Smell:** (d) report/assertion mismatch + (2) wrong divisor
+- **Evidence:**
+  - `_backbeatScore = backbeatHits / (totalBars * 1)` is computed and prefixed-unused. The `* 1` divisor encodes "1 backbeat per bar" but rock has 2 (beats 2 and 4); the dead code documents the wrong model.
+  - Report says "Eighth Note Pulse Target: >95%" → asserts `>0.9`.
+  - Report says "Kick Solidity Target: 100%" → asserts `>0.9`.
+  - `backbeatHits > totalBars` = ">1 per bar" — passes if the engine produces just over 1 backbeat per bar when rock should reliably deliver ~2.
+- **Fix:** Restore the `_backbeatScore` metric with the right divisor (`totalBars * 2`), assert at >0.95 with documented headroom; reconcile both "Target" logs with the assertions.
+
+### Q4. `soloist-musicality.test.ts:80` — sub-baseline chord-tone threshold
+- **Test claim:** `should statistically resolve to chord tones in the Conclusion phase`
+- **Smell:** (2) below random baseline
+- **Evidence:** Chord is a 4-tone (`[0, 4, 7, 11]`); random pitch over 12 chromatic semitones gives 4/12 ≈ 33% chord tones. Assertion `expect(ratio).toBeGreaterThan(0.15)` allows the engine to be *worse than random*. The test name claims "statistically resolves" but the threshold allows statistical noise.
+- **Fix:** Measure engine output, set threshold above the 33% random baseline with real headroom (likely `>0.5` based on similar tests in the suite).
+
 ## Open findings
 
 Items surfaced by the initial pass but not yet investigated/fixed. Listed in rough priority order.
@@ -44,11 +89,20 @@ Items surfaced by the initial pass but not yet investigated/fixed. Listed in rou
 
 ## Future passes
 
-Lower-priority sweeps to consider once the open findings list is empty:
+Lower-priority sweeps to consider once the queued + open findings lists are empty:
 
+- **Harness-silencing audit**: grep `tests/standards/` for `simulatePerformance` helpers (or equivalents) that construct `stepData`/`stepInfo` objects by hand instead of calling `getStepInfo`. Each one is a candidate for the smell (e): the engine reads a property the harness never sets, and the corresponding lane is silently never tested. Already caught twice (reggae-piano, funk-drummer); likely 2-4 more lurking.
 - **Placeholder-threshold sweep**: find every `> 0.01`, `> 1%`, `> 0.15` (suspiciously below uniform-random baseline), or `* 0.95` style assertion across `tests/standards/` and tighten to honest values.
 - **Velocity-as-gain naming**: drum and bass engines treat the `velocity` field as a multiplicative gain coefficient that can exceed 1.0 (capped at 1.2–1.25 in places). Naming is misleading; reports like `Avg Kick Downbeat: 1.16` look invalid to a reader. Consider renaming `velocity → gain` or splitting accent boost into a separate field.
 - **Critique-test typechecking**: most files in `tests/standards/` start with `// @ts-nocheck`. They're the gatekeepers of musicality but the least-typechecked code in the repo. Re-enable types when the state shape stabilizes.
+- **Remaining unverified candidates from earlier scout passes** (low priority — would need musical research to set proper thresholds): `country-drummer` velocity tiering ratio (loose at `>2.0×`); `neo-soul-drummer` pocket-width 5ms / 15ms placeholders; `minimal-drummer` 0.5-8 hits/bar range (16× wide); `funk-bass` ghost ratio at `>0.15`.
+
+## Handoff notes for the next session
+
+1. **Repo state:** working tree is clean; 8 audit commits ahead of `origin/main`. No pending changes to land.
+2. **Recommended pickup:** ship Q1-Q4 as one thematic commit following the pattern of commit `7822cad3` (`refactor(tests): rewrite four critique metrics to match named claims`). Each Q-finding above has a diagnosed fix; verify engine output with `npx vitest run tests/standards/<file>.test.ts --reporter=verbose` to capture honest threshold values before writing the assertion.
+3. **After Q1-Q4:** the natural next move is either (a) close the single Open finding (phrase-end resolution asymmetry — biggest single-fix musical value, now with a clean architectural attachment after the device-gate work) or (b) run the **harness-silencing audit** sweep listed in Future passes — likely to surface 2-4 more findings in the same vein as reggae-piano + funk-drummer.
+4. **Listen-test:** the user listened to playback during this session and confirmed the device-gate fix sounded great. Worth re-listening after Q1-Q4 if any engine-side changes get queued.
 
 ## Related
 
