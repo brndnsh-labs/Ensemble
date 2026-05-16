@@ -123,28 +123,49 @@ describe('Reggae Drummer Critique', () => {
         expect(snareOnBackbeat).toBe(backbeatCount);
     });
 
-    it('should implement "Steppers" feel at high intensity', () => {
+    it('should drive the kick on most pulses across high-intensity motif rotation', () => {
+        // At high intensity the reggae motif selector rotates through all four
+        // patterns based on per-bar sectionSeed (reggae.ts getMotif):
+        //   Steppers (~50%) and Rockers (~25%) both hit every pulse
+        //   Dub (~15%) hits beat 1 only on pulse positions
+        //   One Drop (~10%) hits only the backbeat pulses
+        // So we expect a majority of bars to have full pulse coverage, not all of them.
         const performance = simulatePerformance(16, { playback: { bandIntensity: 0.9 } });
 
-        let kickHits = 0;
-        let pulseCount = 0;
+        let totalKickPulses = 0;
+        let totalPulses = 0;
+        let fullCoverageBars = 0; // bars where every pulse has a kick (Steppers / Rockers)
+
         performance.forEach((bar) => {
+            let pulsesInBar = 0;
+            let kicksOnPulseInBar = 0;
             bar.forEach((stepData) => {
                 if (stepData.isPulseStart) {
-                    pulseCount++;
+                    pulsesInBar++;
+                    totalPulses++;
                     if (stepData.instruments.Kick) {
-                        kickHits++;
+                        kicksOnPulseInBar++;
+                        totalKickPulses++;
                     }
                 }
             });
+            if (pulsesInBar > 0 && kicksOnPulseInBar === pulsesInBar) {
+                fullCoverageBars++;
+            }
         });
 
-        const kickScore = kickHits / pulseCount;
+        const overallDensity = totalKickPulses / totalPulses;
+        const fullCoverageRatio = fullCoverageBars / performance.length;
+
         console.log(
-            `[Reggae Critique] Steppers Kick Consistency: ${(kickScore * 100).toFixed(1)}%`,
+            `[Reggae Critique] Pulse kick density: ${(overallDensity * 100).toFixed(1)}%, ` +
+                `full-coverage bars: ${fullCoverageBars}/${performance.length}`,
         );
 
-        // Steppers: 4-on-the-floor kick
-        expect(kickScore).toBeGreaterThan(0.8);
+        // Most bars (Steppers + Rockers ≈ 75% by distribution) should drive every pulse.
+        // Allow margin for 16-bar sampling variance and the One Drop / Dub minority.
+        expect(fullCoverageRatio).toBeGreaterThan(0.6);
+        // Overall pulse-kick density should be well above One Drop alone (50%).
+        expect(overallDensity).toBeGreaterThan(0.75);
     });
 });

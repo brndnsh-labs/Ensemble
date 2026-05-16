@@ -106,7 +106,12 @@ describe('Jazz Harmony Critique', () => {
         expect(avgVoiceLeadingJump).toBeLessThan(3.0);
     });
 
-    it('should thin out voicings when the soloist is busy', () => {
+    it('should yield space to the soloist by tier: defaults thin for jazz, thins further when crowded', () => {
+        // The harmony engine (getHarmonyNotes) is the band's harmony-pad/shadow layer,
+        // NOT the piano comp (that's getAccompanimentNotes, tested elsewhere). For Jazz
+        // it starts at rootless guide-tone shells (2 notes) by default — that's already
+        // tasteful comping. It only thins further when the band is genuinely crowded:
+        // soloist busy AND another accompaniment voice is hitting the same step.
         const chord = {
             rootMidi: 60,
             quality: 'maj7',
@@ -114,11 +119,11 @@ describe('Jazz Harmony Critique', () => {
             sectionId: 'A',
         };
 
-        // Scenario 1: Soloist Resting
+        // Scenario 1: Soloist resting — default jazz comp shell.
         mockState.soloist.session.phrasing.isResting = true;
         const notesQuiet = getHarmonyNotes(getState(), chord, null, 0, 64, 'smart', 0, null, {});
 
-        // Scenario 2: Soloist Busy
+        // Scenario 2: Soloist busy, no crowding — should not exceed quiet, and should drop tensions.
         mockState.soloist.session.phrasing.isResting = false;
         mockState.soloist.session.currentPhrase.notesInPhrase = 5;
         const notesBusy = getHarmonyNotes(
@@ -130,18 +135,39 @@ describe('Jazz Harmony Critique', () => {
             'smart',
             0,
             { midi: 72 },
-            { soloistActive: true },
+            { soloistActive: true, soloistBusy: true },
+        );
+
+        // Scenario 3: Crowded — soloist busy AND another accompaniment voice is hitting.
+        // This is the path that actually thins the harmony pad below guide-tone shells.
+        const notesCrowded = getHarmonyNotes(
+            getState(),
+            chord,
+            null,
+            0,
+            64,
+            'smart',
+            0,
+            { midi: 72 },
+            { soloistActive: true, soloistBusy: true, accompanimentHit: true },
         );
 
         console.log(
-            `[Coordination] Quiet polyphony: ${notesQuiet.length}, Busy polyphony: ${notesBusy.length}`,
+            `[Coordination] Quiet: ${notesQuiet.length}, Busy: ${notesBusy.length}, Crowded: ${notesCrowded.length}`,
         );
-        expect(notesBusy.length).toBeLessThanOrEqual(notesQuiet.length);
 
-        // Verify that high extensions are dropped when busy
-        const hasHighExtension = notesBusy.some((n) =>
-            [2, 9].includes(((n.midi % 12) - 0 + 12) % 12),
+        // Default jazz comp shell is non-empty and tasteful.
+        expect(notesQuiet.length).toBeGreaterThan(0);
+        expect(notesQuiet.length).toBeLessThanOrEqual(3);
+
+        // Busy must not exceed quiet, and must not include 9th/13th extensions.
+        expect(notesBusy.length).toBeLessThanOrEqual(notesQuiet.length);
+        const busyHasHighExtension = notesBusy.some((n) =>
+            [2, 9].includes(((n.midi % 12) - (chord.rootMidi % 12) + 12) % 12),
         );
-        expect(hasHighExtension).toBe(false);
+        expect(busyHasHighExtension).toBe(false);
+
+        // Crowded must thin strictly below busy (the engine's real coordination path).
+        expect(notesCrowded.length).toBeLessThan(notesBusy.length);
     });
 });

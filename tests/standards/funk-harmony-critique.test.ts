@@ -39,13 +39,18 @@ describe('Funk Harmony Critique', () => {
         const totalMeasures = 128;
         const totalSteps = totalMeasures * 16;
 
-        let syncopatedHits = 0; // Hits on "e" or "a" (steps 1, 3, 5, 7...)
-        let downbeatHits = 0;
+        // "The One Solidity" measures whether the harmony engine hits step 0 of every bar —
+        // the *per-bar lock rate*, not the proportion of stabs that happen to land on the One.
+        // The old metric (downbeatHits / totalStabs) was mathematically suppressed by the very
+        // syncopation that makes Funk feel funky: a busier groove pushed the score down even
+        // when The One was hit on every bar. The new metric reflects the actual musical claim.
+        const barsWithDownbeat = new Set();
+        let syncopatedHits = 0; // Hits on "e" or "a" within a bar
         let totalStabs = 0;
 
         for (let i = 0; i < totalSteps; i++) {
             const stepInMeasure = i % 16;
-            const stepInTwoBars = i % 32;
+            const barIndex = Math.floor(i / 16);
             const notes = getHarmonyNotes(
                 getState(),
                 chordC,
@@ -60,26 +65,27 @@ describe('Funk Harmony Critique', () => {
 
             if (notes.length > 0) {
                 totalStabs++;
-                if (stepInTwoBars === 0 || stepInTwoBars === 16) {
-                    downbeatHits++;
-                } else if (stepInTwoBars % 2 !== 0) {
+                if (stepInMeasure === 0) {
+                    barsWithDownbeat.add(barIndex);
+                } else if (stepInMeasure % 2 !== 0) {
                     syncopatedHits++;
                 }
             }
         }
 
-        const downbeatScore = downbeatHits / totalStabs;
+        const downbeatLockRate = barsWithDownbeat.size / totalMeasures;
         const syncopationScore = syncopatedHits / totalStabs;
 
         console.log(
             '\n--- FUNK HARMONY CRITIQUE REPORT ---\n' +
-                `[The One Solidity]      ${(downbeatScore * 100).toFixed(1)}% (Target: >15%)\n` +
-                `[16th Syncopation]      ${(syncopationScore * 100).toFixed(1)}% (Target: >30%)\n` +
+                `[The One Solidity]      ${(downbeatLockRate * 100).toFixed(1)}% of bars (Target: >95%)\n` +
+                `[16th Syncopation]      ${(syncopationScore * 100).toFixed(1)}% of stabs (Target: >30%)\n` +
                 `[Rhythmic Density]      ${(totalStabs / totalMeasures).toFixed(2)} hits/bar\n` +
                 '------------------------------------\n',
         );
 
-        expect(downbeatScore).toBeGreaterThan(0.15);
+        // Funk's One is non-negotiable: every bar should have a stab on step 0.
+        expect(downbeatLockRate).toBeGreaterThan(0.95);
         expect(syncopationScore).toBeGreaterThan(0.3);
     });
 });
