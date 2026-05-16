@@ -7,6 +7,8 @@ import { getBassNote } from '../../public/engine/bass-engine.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 const { chords, groove } = getState();
 
 // Mock state
@@ -25,7 +27,7 @@ vi.mock('../../public/state.js', () => {
         },
         chords: { enabled: true, style: 'strum-country' },
         bass: { enabled: true, pocketOffset: 0 },
-        soloist: { enabled: true, tension: 0, busySteps: 0, motifBuffer: [] },
+        soloist: makeSoloistMock({ enabled: true, tension: 0, busySteps: 0, motifBuffer: [] }),
         harmony: { enabled: false },
         playback: {
             bandIntensity: 0.5,

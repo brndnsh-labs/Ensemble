@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 const { mockArranger, stepMap, TOTAL_SECTIONS, STEPS_PER_SECTION } = vi.hoisted(() => {
     const stepMap = [];
     const TOTAL_SECTIONS = 1000;
@@ -47,12 +49,12 @@ vi.mock('../../public/state.js', () => {
             buffer: new Map(),
             style: 'smart',
         },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             tension: 0,
             buffer: new Map(),
-        },
+        }),
         groove: {
             genreFeel: 'Rock',
             measures: 1,

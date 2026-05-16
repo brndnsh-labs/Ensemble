@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Define OscillatorNode for instanceof checks
 global.OscillatorNode = class OscillatorNode {
     constructor() {
@@ -54,10 +58,10 @@ vi.mock('../../../public/state.js', () => {
         },
         soloistGain: { connect: vi.fn() },
     };
-    const mockSoloist = {
+    const mockSoloist = makeSoloistMock({
         activeVoices: [],
         mode: 'monophonic',
-    };
+    });
     const mockHarmony = {
         activeVoices: [],
     };
@@ -97,7 +101,7 @@ const { playback, soloist } = getState();
 describe('Soloist Synthesis', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        soloist.activeVoices = [];
+        soloist.audio.activeVoices = [];
         soloist.mode = 'monophonic';
         soloist.preset = 'saxophone';
         playback.audio.currentTime = 10;
@@ -108,7 +112,7 @@ describe('Soloist Synthesis', () => {
         playSoloNote(getState(), 880, 11, 1.0); // New note should kill previous
 
         // The first note's gain should have been told to ramp to 0
-        const _firstVoiceGain = soloist.activeVoices[0].gain.gain;
+        const _firstVoiceGain = soloist.audio.activeVoices[0].gain.gain;
         // In the code, voices are shifted out of activeVoices.
         // We can check if the first created gain node was cancelled.
         const mockGains = playback.audio.createGain.mock.results;
@@ -120,7 +124,7 @@ describe('Soloist Synthesis', () => {
         playSoloNote(getState(), 440, 10, 1.0);
         playSoloNote(getState(), 554, 10, 1.0); // Same time, double stop
 
-        expect(soloist.activeVoices.length).toBe(2);
+        expect(soloist.audio.activeVoices.length).toBe(2);
     });
 
     it('should apply pitch bends when bendStartInterval is provided', () => {
@@ -191,7 +195,7 @@ describe('Soloist Synthesis', () => {
         }
 
         // Only 1 voice should be active at the end since they are all new gestures
-        expect(soloist.activeVoices.length).toBe(1);
+        expect(soloist.audio.activeVoices.length).toBe(1);
 
         const voiceSteals = playback.audio.createGain.mock.results.filter((result) =>
             result.value.gain.setTargetAtTime.mock.calls.some(
@@ -225,13 +229,13 @@ describe('Soloist Synthesis', () => {
         });
 
         it('should apply blues style vibrato (lines 761, 770)', () => {
-            soloist.phraseContext = { profile: 'gilmour' }; // Covers profile branch
+            soloist.session.currentPhrase.context = { profile: 'gilmour' }; // Covers profile branch
             // function signature: playSoloNote(getState(), freq, time, duration, vol = 0.5, bendStartInterval = 0, style = null, forceVibrato = false)
             playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'blues', true); // forceVibrato = true
         });
 
         it('should apply neo style vibrato (lines 763, 772)', () => {
-            soloist.phraseContext = { profile: 'slash' }; // Covers profile branch
+            soloist.session.currentPhrase.context = { profile: 'slash' }; // Covers profile branch
             playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'neo', true);
         });
 

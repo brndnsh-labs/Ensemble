@@ -4,6 +4,7 @@ import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { generateRhythmPlan } from '../../../public/engine/soloist-rhythm-engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
     const style = 'rock';
@@ -19,11 +20,11 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
     describe('Rhythmic Entropy & Mutation', () => {
         it('should change note density when rhythmicEntropy is mutated', () => {
-            const soloistState = {
+            const soloistState = makeSoloistMock({
                 sessionSteps: 64,
                 phraseCount: 1,
                 rhythmicEntropy: -1.0, // Suppress
-            };
+            });
 
             // Force random to 0.5 to make attackProb changes deterministic
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -41,7 +42,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 null,
             );
 
-            soloistState.rhythmicEntropy = 1.0; // Boost
+            soloistState.session.rhythm.entropy = 1.0; // Boost
             const planHigh = generateRhythmPlan(
                 0,
                 512,
@@ -64,11 +65,11 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
         });
 
         it('should drift toward syncopation during Syncopation Drift cycles', () => {
-            const soloistState = {
+            const soloistState = makeSoloistMock({
                 sessionSteps: 0,
                 phraseCount: 1,
                 rhythmicEntropy: 0,
-            };
+            });
 
             const getSyncopationRatio = (plan) => {
                 if (plan.length === 0) {
@@ -94,7 +95,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 null,
             );
 
-            soloistState.sessionSteps = 128;
+            soloistState.session.sessionSteps = 128;
             const planDrift = generateRhythmPlan(
                 512,
                 512,
@@ -122,7 +123,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
     describe('Strategic Sustain Strategy', () => {
         it('should produce longer durations for blues style than funk', () => {
-            const soloistState = { sessionSteps: 64 }; // Warmed up
+            const soloistState = makeSoloistMock({ sessionSteps: 64 }); // Warmed up
 
             // Force low random to trigger sustains reliably
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
@@ -166,7 +167,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
         });
 
         it('should suppress subsequent notes when a sustain is triggered', () => {
-            const soloistState = { sessionSteps: 0 };
+            const soloistState = makeSoloistMock({ sessionSteps: 0 });
             const plan = generateRhythmPlan(
                 0,
                 64,
@@ -214,8 +215,8 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );
 
-                if (soloist.phraseContext.profile) {
-                    influencesSeen.add(soloist.phraseContext.profile);
+                if (soloist.session.currentPhrase.context.profile) {
+                    influencesSeen.add(soloist.session.currentPhrase.context.profile);
                 }
             }
 
@@ -240,11 +241,11 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 { sectionStart, sectionEnd, bypassRhythm: true },
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
-            const initialProfile = soloist.phraseContext.profile;
+            const initialProfile = soloist.session.currentPhrase.context.profile;
 
             for (let i = 16; i < 64; i += 16) {
-                soloist.isResting = true;
-                soloist.restSteps = 0;
+                soloist.session.phrasing.isResting = true;
+                soloist.session.phrasing.restSteps = 0;
 
                 getSoloistNote(
                     getState(),
@@ -259,7 +260,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );
 
-                expect(soloist.phraseContext.profile).toBe(initialProfile);
+                expect(soloist.session.currentPhrase.context.profile).toBe(initialProfile);
             }
         });
 
@@ -269,11 +270,11 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             playback.bandIntensity = 0.66; // Just above 0.65 threshold
 
             // Test Gilmour
-            soloist.phraseContext.profile = 'gilmour';
-            soloist.isResting = false;
-            soloist.activeSteps = 10000;
-            soloist.sessionSteps = 512; // Warmed up
-            soloist.rhythmPlan = undefined;
+            soloist.session.currentPhrase.context.profile = 'gilmour';
+            soloist.session.phrasing.isResting = false;
+            soloist.session.phrasing.activeSteps = 10000;
+            soloist.session.sessionSteps = 512; // Warmed up
+            soloist.session.rhythm.plan = undefined;
 
             let gilmourNotes = 0;
             for (let i = 0; i < 5000; i++) {
@@ -287,11 +288,11 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             }
 
             // Test EVH
-            soloist.phraseContext.profile = 'evh';
-            soloist.isResting = false;
-            soloist.activeSteps = 10000;
-            soloist.sessionSteps = 512; // Warmed up
-            soloist.rhythmPlan = undefined;
+            soloist.session.currentPhrase.context.profile = 'evh';
+            soloist.session.phrasing.isResting = false;
+            soloist.session.phrasing.activeSteps = 10000;
+            soloist.session.sessionSteps = 512; // Warmed up
+            soloist.session.rhythm.plan = undefined;
 
             let evhNotes = 0;
             for (let i = 0; i < 5000; i++) {
@@ -313,7 +314,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7] };
             const { soloist, playback } = getState();
             playback.bandIntensity = 1.0;
-            soloist.sessionSteps = 64; // Warmed up
+            soloist.session.sessionSteps = 64; // Warmed up
 
             let notesFound = 0;
             for (let i = -16; i < 0; i++) {
@@ -346,7 +347,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 { sectionStart: 0, sectionEnd: 64, bypassRhythm: true },
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
-            const firstInfluence = soloist.phraseContext.profile;
+            const firstInfluence = soloist.session.currentPhrase.context.profile;
 
             let rotated = false;
             for (let i = 0; i < 20; i++) {
@@ -362,7 +363,7 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                     { sectionStart: 0, sectionEnd: 64, bypassRhythm: true },
                     { mStep: 0, isMeasureStart: true, isBeatStart: true },
                 );
-                if (soloist.phraseContext.profile !== firstInfluence) {
+                if (soloist.session.currentPhrase.context.profile !== firstInfluence) {
                     rotated = true;
                     break;
                 }

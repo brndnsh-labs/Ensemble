@@ -1,4 +1,7 @@
 // @ts-nocheck
+
+const { makeSoloistMock } = await vi.hoisted(async () => await import('./utils/mock-soloist.js'));
+
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../public/config.js';
 import { applyGrooveOverrides } from '../public/engine/groove-engine.js';
@@ -24,7 +27,7 @@ describe('Rock Snare Density Reproduction', () => {
                 sectionMap: [{ id: 'test', start: 0, end: numBars * 16, label: 'Test' }],
                 stepMap: [{ start: 0, end: numBars * 16, chord: { sectionId: 'test' } }],
             },
-            soloist: { enabled: false, busySteps: 0 },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         };
         getState.mockReturnValue(mockState);
 

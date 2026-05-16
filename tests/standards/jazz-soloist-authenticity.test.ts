@@ -20,8 +20,8 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         let responseCount = 0;
 
         for (let i = 0; i < 500; i += 16) {
-            if (soloist.isResting) {
-                soloist.restSteps = 0;
+            if (soloist.session.phrasing.isResting) {
+                soloist.session.phrasing.restSteps = 0;
             }
             getSoloistNote(
                 getState(),
@@ -36,14 +36,14 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 { mStep: 0 },
             );
 
-            if (soloist.phraseContext.role === 'call') {
+            if (soloist.session.currentPhrase.context.role === 'call') {
                 callCount++;
             } else {
                 responseCount++;
             }
 
-            soloist.activeSteps = 0;
-            soloist.isResting = true;
+            soloist.session.phrasing.activeSteps = 0;
+            soloist.session.phrasing.isResting = true;
         }
 
         console.log(`[Jazz Audit] Calls: ${callCount}, Responses: ${responseCount}`);
@@ -75,8 +75,8 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
                 { mStep: 0, isMeasureStart: true, isBeatStart: true },
             );
 
-            if (soloist.phraseContext.profile) {
-                profilesSeen.add(soloist.phraseContext.profile);
+            if (soloist.session.currentPhrase.context.profile) {
+                profilesSeen.add(soloist.session.currentPhrase.context.profile);
             }
         }
 
@@ -91,8 +91,8 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 64 };
         const { soloist } = getState();
 
-        soloist.phraseContext.profile = 'evans';
-        soloist.phraseContext.role = 'call';
+        soloist.session.currentPhrase.context.profile = 'evans';
+        soloist.session.currentPhrase.context.role = 'call';
 
         let extensionCount = 0;
         let totalNotes = 0;

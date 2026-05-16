@@ -6,6 +6,10 @@ import * as pitchEngine from '../../../public/engine/soloist-pitch-engine.js';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: {
@@ -16,7 +20,7 @@ vi.mock('../../../public/state.js', () => {
             intent: { soloistMod: 0 },
         },
         groove: { genreFeel: 'Jazz', pocket: 0 },
-        soloist: {
+        soloist: makeSoloistMock({
             mode: 'guitar',
             isResting: true,
             busySteps: 0,
@@ -40,7 +44,7 @@ vi.mock('../../../public/state.js', () => {
             activeSteps: 100,
             restSteps: 0,
             doubleStopProb: 0.1,
-        },
+        }),
         arranger: { timeSignature: '4/4', totalSteps: 16, stepMap: [], key: 'C', isMinor: false },
         chords: {},
         bass: {},
@@ -144,11 +148,11 @@ describe('Soloist Engine', () => {
         mockState = getState();
         mockState.playback.currentLoopCount = 0;
         mockState.playback.bandIntensity = 0.5;
-        mockState.soloist.isResting = true;
-        mockState.soloist.busySteps = 0;
-        mockState.soloist.lastAttackStep = -100;
-        mockState.soloist.deviceBuffer = [];
-        mockState.soloist.notesInPhrase = 0;
+        mockState.soloist.session.phrasing.isResting = true;
+        mockState.soloist.session.phrasing.busySteps = 0;
+        mockState.soloist.session.phrasing.lastAttackStep = -100;
+        mockState.soloist.session.rhythm.deviceBuffer = [];
+        mockState.soloist.session.currentPhrase.notesInPhrase = 0;
     });
 
     describe('Head Mode (Loop 0) & Seed Following', () => {
@@ -195,7 +199,7 @@ describe('Soloist Engine', () => {
         it('should use themed improvisation on Loop 1 at medium intensity', () => {
             mockState.playback.currentLoopCount = 1;
             mockState.playback.bandIntensity = 0.5;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.phrasing.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
             getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
@@ -212,7 +216,7 @@ describe('Soloist Engine', () => {
         it('should attach paraphrase response hints to loop-1 head bypass notes', () => {
             mockState.playback.currentLoopCount = 1;
             mockState.playback.bandIntensity = 0.5;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.phrasing.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0);
             getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
@@ -232,7 +236,7 @@ describe('Soloist Engine', () => {
         it('should keep loop 1 tied to the theme even when anchor-scale randomness would fail', () => {
             mockState.playback.currentLoopCount = 1;
             mockState.playback.bandIntensity = 0.5;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.phrasing.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0.99);
             getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
@@ -249,7 +253,7 @@ describe('Soloist Engine', () => {
         it('should keep seeded anchor moments theme-aware on later loops', () => {
             mockState.playback.currentLoopCount = 3;
             mockState.playback.bandIntensity = 0.85;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.phrasing.isResting = false;
 
             const randomMock = vi.spyOn(Math, 'random').mockReturnValue(0.99);
             getSoloistNote(mockState, chordC, null, 0, 261.63, 72, 'scalar', 0, {});
@@ -267,7 +271,7 @@ describe('Soloist Engine', () => {
     describe('Core Generation & Phrasing', () => {
         it('should generate a note object when playing in generative mode', () => {
             mockState.playback.currentLoopCount = 3;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.phrasing.isResting = false;
             let note = null;
             for (let i = 0; i < 100; i++) {
                 note = getSoloistNote(mockState, chordC, null, i * 4, 440, 72, 'scalar', 0, {
@@ -282,7 +286,7 @@ describe('Soloist Engine', () => {
 
         it('should respect the note budget', () => {
             mockState.playback.currentLoopCount = 3;
-            mockState.soloist.notesInPhrase = 20;
+            mockState.soloist.session.currentPhrase.notesInPhrase = 20;
             let rests = 0;
             for (let i = 0; i < 100; i++) {
                 if (!getSoloistNote(mockState, chordC, null, i + 32, 440, 72, 'scalar', i % 4)) {
@@ -298,8 +302,8 @@ describe('Soloist Engine', () => {
             mockState.playback.currentLoopCount = 3;
             const durations = [];
             for (let i = 0; i < 200; i++) {
-                mockState.soloist.busySteps = 0;
-                mockState.soloist.lastAttackStep = -100;
+                mockState.soloist.session.phrasing.busySteps = 0;
+                mockState.soloist.session.phrasing.lastAttackStep = -100;
                 const result = getSoloistNote(mockState, chordC, null, i * 4, 440, 72, 'bird', 0, {
                     bypassRhythm: true,
                 });
@@ -318,8 +322,8 @@ describe('Soloist Engine', () => {
             let shortNotes = 0;
             let played = 0;
             for (let i = 0; i < 100; i++) {
-                mockState.soloist.busySteps = 0;
-                mockState.soloist.lastAttackStep = -100;
+                mockState.soloist.session.phrasing.busySteps = 0;
+                mockState.soloist.session.phrasing.lastAttackStep = -100;
                 const noteResult = getSoloistNote(
                     mockState,
                     chordC,
@@ -352,14 +356,14 @@ describe('Soloist Engine', () => {
 
     describe('Scale Selection & Harmonic Integrity', () => {
         it('should select Altered scale when tension is high', () => {
-            mockState.soloist.tension = 0.8;
+            mockState.soloist.session.tension = 0.8;
             expect(getScaleForChord(mockState, chordC, null, 'bird')).toEqual([
                 0, 1, 3, 4, 6, 8, 10,
             ]);
         });
 
         it('should select Phrygian Dominant for V7 to an explicitly minor tonicization', () => {
-            mockState.soloist.tension = 0;
+            mockState.soloist.session.tension = 0;
             // G7 (67) to Cm (60). 60 - 67 = -7 = +5 semitones.
             const G7 = { rootMidi: 67, intervals: [0, 4, 7, 10], quality: '7' };
             const Cm = {
@@ -380,8 +384,8 @@ describe('Soloist Engine', () => {
             mockState.soloist.doubleStopProb = 1.0;
             let arrayFound = false;
             for (let i = 0; i < 2000; i++) {
-                mockState.soloist.busySteps = 0;
-                mockState.soloist.lastAttackStep = -100;
+                mockState.soloist.session.phrasing.busySteps = 0;
+                mockState.soloist.session.phrasing.lastAttackStep = -100;
                 const res = getSoloistNote(mockState, chordC, null, i * 4, 440, 72, 'blues', 0, {
                     bypassRhythm: true,
                 });

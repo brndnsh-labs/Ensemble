@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
     const mockAudio = {
@@ -76,11 +80,11 @@ vi.mock('../../../public/state.js', () => {
     };
 
     // We mock soloist state and will mutate it in tests
-    const mockSoloist = {
+    const mockSoloist = makeSoloistMock({
         activeVoices: [],
         mode: 'monophonic',
         preset: 'neo',
-    };
+    });
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -109,7 +113,7 @@ describe('Soloist Presets', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        soloist.activeVoices = [];
+        soloist.audio.activeVoices = [];
         soloist.preset = 'neo';
         soloist.mode = 'monophonic';
         playback.audio.currentTime = 10;
@@ -121,7 +125,7 @@ describe('Soloist Presets', () => {
 
         // 2 Oscs + 2 LFOs + 1 Vibrato + 1 DepthMod = 6 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(6);
-        expect(soloist.activeVoices.length).toBe(1);
+        expect(soloist.audio.activeVoices.length).toBe(1);
     });
 
     it('should play Vowel Lead (Parallel Filters + LFO)', () => {
@@ -145,7 +149,7 @@ describe('Soloist Presets', () => {
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         // 1 Lowpass + 1 Peaking + 1 Highshelf = 3 filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
-        expect(soloist.activeVoices.length).toBe(1);
+        expect(soloist.audio.activeVoices.length).toBe(1);
     });
 
     it('should play Saxophone preset (Saw/Tri + Breath LFO)', () => {
@@ -156,7 +160,7 @@ describe('Soloist Presets', () => {
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
         // 2 Bandpass filters
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(2);
-        expect(soloist.activeVoices.length).toBe(1);
+        expect(soloist.audio.activeVoices.length).toBe(1);
     });
 
     it('should play Shred preset (High-gain Saw + Noise)', () => {
@@ -167,14 +171,14 @@ describe('Soloist Presets', () => {
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
         // 1 Resonant filter
         expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(1);
-        expect(soloist.activeVoices.length).toBe(1);
+        expect(soloist.audio.activeVoices.length).toBe(1);
     });
 
     it('should kill active voices properly', () => {
         soloist.preset = 'neo';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        const voice = soloist.activeVoices[0];
+        const voice = soloist.audio.activeVoices[0];
         const gainNode = voice.gain;
         const oscillators = voice.nodes.filter((n) => n.frequency); // Filter for things with frequency params
 
@@ -187,14 +191,14 @@ describe('Soloist Presets', () => {
             expect(osc.stop).toHaveBeenCalled();
         });
 
-        expect(soloist.activeVoices.length).toBe(0);
+        expect(soloist.audio.activeVoices.length).toBe(0);
     });
 
     it('should manage voice stealing with complex nodes', () => {
         soloist.preset = 'neo';
         playSoloNote(getState(), 440, 10, 1.0);
 
-        const firstVoice = soloist.activeVoices[0];
+        const firstVoice = soloist.audio.activeVoices[0];
 
         // Play another note immediately (stealing the first)
         playSoloNote(getState(), 880, 10.1, 1.0);

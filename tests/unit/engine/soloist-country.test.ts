@@ -2,11 +2,15 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
-        soloist: {
+        soloist: makeSoloistMock({
             busySteps: 0,
             tension: 0,
             mode: 'guitar',
@@ -14,7 +18,7 @@ vi.mock('../../../public/state.js', () => {
             pitchHistory: [],
             motifBuffer: [],
             deviceBuffer: [],
-        },
+        }),
         groove: { genreFeel: 'Country' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
@@ -43,14 +47,14 @@ describe('Country Soloist Overhaul', () => {
     const chordAm = { rootMidi: 57, intervals: [0, 3, 7], quality: 'minor', beats: 4 };
 
     beforeEach(() => {
-        soloist.isResting = false;
+        soloist.session.phrasing.isResting = false;
         soloist.currentPhraseSteps = 1;
         soloist.srdcState = 'Statement';
-        soloist.notesInPhrase = 0;
-        soloist.busySteps = 0;
-        soloist.rhythmPlan = undefined;
-        soloist.activeSteps = 100;
-        soloist.deviceBuffer = [];
+        soloist.session.currentPhrase.notesInPhrase = 0;
+        soloist.session.phrasing.busySteps = 0;
+        soloist.session.rhythm.plan = undefined;
+        soloist.session.phrasing.activeSteps = 100;
+        soloist.session.rhythm.deviceBuffer = [];
         soloist.pitchHistory = [];
         groove.genreFeel = 'Country';
     });
@@ -63,7 +67,7 @@ describe('Country Soloist Overhaul', () => {
         });
 
         it('should use Major Pentatonic + b3 if tension is high', () => {
-            soloist.tension = 0.8;
+            soloist.session.tension = 0.8;
             const scale = getScaleForChord(getState(), chordC, null, 'country');
             expect(scale).toEqual([0, 2, 3, 4, 7, 9]);
         });
@@ -79,14 +83,14 @@ describe('Country Soloist Overhaul', () => {
         it('should trigger countryBend device', () => {
             let triggered = false;
             for (let i = 0; i < 1000; i++) {
-                soloist.deviceBuffer = [];
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.rhythm.deviceBuffer = [];
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
@@ -106,14 +110,14 @@ describe('Country Soloist Overhaul', () => {
             getState().playback.currentLoopCount = 3;
             let triggered = false;
             for (let i = 0; i < 1000; i++) {
-                soloist.deviceBuffer = [];
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.rhythm.deviceBuffer = [];
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
@@ -136,20 +140,20 @@ describe('Country Soloist Overhaul', () => {
         it('should trigger banjoRoll device', () => {
             let triggered = false;
             for (let i = 0; i < 1000; i++) {
-                soloist.deviceBuffer = [];
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.rhythm.deviceBuffer = [];
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
                     bypassRhythm: true,
                 });
-                if (soloist.deviceBuffer.length === 3) {
+                if (soloist.session.rhythm.deviceBuffer.length === 3) {
                     // 4 note roll, 1 returned, 3 in buffer
                     triggered = true;
                     break;
@@ -161,14 +165,14 @@ describe('Country Soloist Overhaul', () => {
         it('should trigger graceSlide device', () => {
             let triggered = false;
             for (let i = 0; i < 1000; i++) {
-                soloist.deviceBuffer = [];
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.rhythm.deviceBuffer = [];
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
@@ -188,13 +192,13 @@ describe('Country Soloist Overhaul', () => {
             let sixths = 0;
             let totalDS = 0;
             for (let i = 0; i < 1000; i++) {
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {
@@ -218,10 +222,10 @@ describe('Country Soloist Overhaul', () => {
             let doubleStops = 0;
             let total = 0;
             for (let i = 0; i < 2000; i++) {
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 1;
                 soloist.pitchHistory = [];
 
@@ -243,13 +247,13 @@ describe('Country Soloist Overhaul', () => {
             let colorTones = 0;
             let total = 0;
             for (let i = 0; i < 1000; i++) {
-                soloist.busySteps = 0;
-                soloist.rhythmPlan = undefined;
-                soloist.activeSteps = 100;
-                soloist.isResting = false;
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.rhythm.plan = undefined;
+                soloist.session.phrasing.activeSteps = 100;
+                soloist.session.phrasing.isResting = false;
                 soloist.currentPhraseSteps = 0;
-                soloist.notesInPhrase = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.currentPhrase.notesInPhrase = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 soloist.pitchHistory = [];
 
                 const res = getSoloistNote(getState(), chordC, null, i * 4, 440, 72, 'country', 0, {

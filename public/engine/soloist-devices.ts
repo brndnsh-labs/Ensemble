@@ -469,7 +469,7 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
     if (deviceBuffer.length > 0) {
         const firstNote = Array.isArray(deviceBuffer[0]) ? deviceBuffer[0][0] : deviceBuffer[0];
         const startMidi = firstNote.midi;
-        const targetMidi = soloist.isResting ? dynamicCenter : lastMidi;
+        const targetMidi = soloist.session.phrasing.isResting ? dynamicCenter : lastMidi;
         const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
 
         return deviceBuffer.map((n: any) => {

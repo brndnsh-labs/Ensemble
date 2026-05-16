@@ -6,6 +6,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -16,7 +20,7 @@ vi.mock('../../../public/state.js', () => {
         arranger: {},
         chords: {},
         bass: {},
-        soloist: {},
+        soloist: makeSoloistMock({}),
         groove: {},
         vizState: {},
         storage: {},

@@ -26,8 +26,8 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         // Simulate many phrases
         for (let i = 0; i < 1000; i += 16) {
             // Force start of new phrase if resting
-            if (soloist.isResting) {
-                soloist.restSteps = 0;
+            if (soloist.session.phrasing.isResting) {
+                soloist.session.phrasing.restSteps = 0;
             }
             getSoloistNote(
                 getState(),
@@ -42,15 +42,18 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 { mStep: 0 },
             );
 
-            if (soloist.phraseContext && soloist.phraseContext.role === 'call') {
+            if (
+                soloist.session.currentPhrase.context &&
+                soloist.session.currentPhrase.context.role === 'call'
+            ) {
                 callCount++;
-            } else if (soloist.phraseContext) {
+            } else if (soloist.session.currentPhrase.context) {
                 responseCount++;
             }
 
             // Fast forward past phrase
-            soloist.activeSteps = 0;
-            soloist.isResting = true;
+            soloist.session.phrasing.activeSteps = 0;
+            soloist.session.phrasing.isResting = true;
         }
 
         console.log(`[Blues Audit] Calls: ${callCount}, Responses: ${responseCount}`);
@@ -93,12 +96,15 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 const rel = ((lastNote.midi % 12) - (chord.rootMidi % 12) + 12) % 12;
                 const isRes = [0, 4, 7].includes(rel);
 
-                if (soloist.phraseContext && soloist.phraseContext.role === 'call') {
+                if (
+                    soloist.session.currentPhrase.context &&
+                    soloist.session.currentPhrase.context.role === 'call'
+                ) {
                     if (isRes) {
                         callResScore++;
                     }
                     callTotal++;
-                } else if (soloist.phraseContext) {
+                } else if (soloist.session.currentPhrase.context) {
                     if (isRes) {
                         respResScore++;
                     }
@@ -121,11 +127,11 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         const { soloist } = getState();
 
         // Setup state to ensure selectPitchAndDevices is called
-        soloist.rhythmPlan = [{ stepTarget: 100, durationSteps: 1, velocity: 1.0 }];
-        soloist.isResting = false;
-        soloist.activeSteps = 100;
-        soloist.embellishmentBuffer = [];
-        soloist.deviceBuffer = [];
+        soloist.session.rhythm.plan = [{ stepTarget: 100, durationSteps: 1, velocity: 1.0 }];
+        soloist.session.phrasing.isResting = false;
+        soloist.session.phrasing.activeSteps = 100;
+        soloist.session.rhythm.embellishmentBuffer = [];
+        soloist.session.rhythm.deviceBuffer = [];
 
         // Force high probability for device triggering
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
@@ -144,9 +150,9 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         );
 
         console.log(
-            `[Blues Audit] Embellishment Buffer Size: ${soloist.embellishmentBuffer.length}`,
+            `[Blues Audit] Embellishment Buffer Size: ${soloist.session.rhythm.embellishmentBuffer.length}`,
         );
-        expect(soloist.embellishmentBuffer.length).toBeGreaterThan(0);
+        expect(soloist.session.rhythm.embellishmentBuffer.length).toBeGreaterThan(0);
 
         randomSpy.mockRestore();
     });

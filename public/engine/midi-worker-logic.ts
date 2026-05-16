@@ -194,7 +194,7 @@ export class ExportProcessor {
             groove: groove.enabled,
             intensity: playback.bandIntensity,
             mode: soloist.mode,
-            sessionSteps: soloist.sessionSteps,
+            sessionSteps: soloist.session.sessionSteps,
             currentLoopCount: playback.currentLoopCount,
         };
 
@@ -259,7 +259,7 @@ export class ExportProcessor {
         const pulse = this.toPulses(stepTimeS);
 
         const intensityCC = Math.floor((playback.bandIntensity || 0.5) * 127);
-        const soloistTensionCC = Math.floor((soloist.tension || 0) * 127);
+        const soloistTensionCC = Math.floor((soloist.session.tension || 0) * 127);
 
         // Expression (CC 11) for all pitched instruments
         this.soloistTrack.cc(pulse, midi.soloistChannel - 1, 11, intensityCC);
@@ -815,7 +815,8 @@ export class ExportProcessor {
             (groove as Mutable<typeof groove>).enabled = this.prevStates.groove; // @worker-mutation
             (playback as Mutable<typeof playback>).bandIntensity = this.prevStates.intensity; // @worker-mutation
             (soloist as Mutable<typeof soloist>).mode = this.prevStates.mode; // @worker-mutation
-            (soloist as Mutable<typeof soloist>).sessionSteps = this.prevStates.sessionSteps; // @worker-mutation
+            (soloist.session as Mutable<typeof soloist.session>).sessionSteps =
+                this.prevStates.sessionSteps; // @worker-mutation
             (playback as Mutable<typeof playback>).currentLoopCount =
                 this.prevStates.currentLoopCount; // @worker-mutation
         }

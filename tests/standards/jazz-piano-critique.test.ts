@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -16,7 +18,7 @@ describe('Jazz Piano Critique', () => {
         mockState = {
             playback: { bandIntensity: 0.6, complexity: 0.5, step: 0, intent: {} },
             groove: { genreFeel: 'Jazz', pocket: 0, instruments: [] },
-            soloist: { enabled: true, busySteps: 0, lastFreq: 0 },
+            soloist: makeSoloistMock({ enabled: true, busySteps: 0, lastFreq: 0 }),
             bass: { enabled: true, lastFreq: 110 }, // A2 (MIDI 45)
             harmony: { enabled: false },
             chords: { enabled: true, style: 'smart', density: 'balanced' },
@@ -104,7 +106,7 @@ describe('Jazz Piano Critique', () => {
         mockState.arranger.progression = [chord];
 
         // Scenario 1: Soloist Resting
-        mockState.soloist.busySteps = 0;
+        mockState.soloist.session.phrasing.busySteps = 0;
         const notesQuiet = getAccompanimentNotes(
             getState(),
             chord,
@@ -116,7 +118,7 @@ describe('Jazz Piano Critique', () => {
         );
 
         // Scenario 2: Soloist Busy
-        mockState.soloist.busySteps = 10;
+        mockState.soloist.session.phrasing.busySteps = 10;
         const notesBusy = getAccompanimentNotes(
             getState(),
             chord,

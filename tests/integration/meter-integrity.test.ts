@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 describe('Meter Integrity & Musicality', () => {
     const defaultState = {
-        soloist: { enabled: true, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: true, busySteps: 0 }),
         arranger: {
             timeSignature: '6/8',
             sectionMap: [{ start: 0, end: 128, label: 'Verse' }],

@@ -6,6 +6,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Global Mocks
 vi.stubGlobal('window', {
     addEventListener: vi.fn(),
@@ -80,7 +84,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         buffer: new Map(),
     };
     const mockMidi = { enabled: false };
-    const mockSoloist = { style: 'scalar', enabled: false, buffer: new Map() };
+    const mockSoloist = makeSoloistMock({ style: 'scalar', enabled: false, buffer: new Map() });
     const mockVizState = { enabled: false };
     const mockBass = { enabled: false, buffer: new Map() };
     const mockChords = { enabled: false, buffer: new Map() };
@@ -213,7 +217,7 @@ describe('Scheduler Core System', () => {
         groove.buffer = new Map();
         bass.buffer = new Map();
         bass.enabled = true;
-        soloist.buffer = new Map();
+        soloist.audio.buffer = new Map();
         soloist.enabled = true;
         chords.buffer = new Map();
         chords.enabled = true;
@@ -376,7 +380,7 @@ describe('Scheduler Core System', () => {
             vizState.enabled = true;
             playback.viz = { pushNote: vi.fn(), truncateNotes: vi.fn() };
 
-            soloist.buffer.set(0, [{ freq: 880, velocity: 0.9, durationSteps: 4 }]);
+            soloist.audio.buffer.set(0, [{ freq: 880, velocity: 0.9, durationSteps: 4 }]);
             harmony.buffer.set(0, [{ freq: 440, velocity: 0.5, durationSteps: 4 }]);
 
             scheduleGlobalEvent(getState(), 0, 10.0);
@@ -479,7 +483,7 @@ describe('Scheduler Core System', () => {
         it('should handle MIDI automation (lines 1144-1153)', () => {
             midi.enabled = true;
             midi.selectedOutputId = 'mock-output';
-            soloist.tension = 0.5;
+            soloist.session.tension = 0.5;
 
             // Step 0 is Beat Start
             scheduleGlobalEvent(getState(), 0, 0);

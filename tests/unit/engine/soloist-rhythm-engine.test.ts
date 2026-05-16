@@ -1,15 +1,16 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateRhythmPlan } from '../../../public/engine/soloist-rhythm-engine.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 function createSoloistState(mode) {
-    return {
+    return makeSoloistMock({
         mode,
         phraseContext: null,
         sessionSeed: null,
         rhythmicEntropy: 0,
         transitionState: 'playing',
-    };
+    });
 }
 
 describe('Soloist rhythm engine phrasing modes', () => {
@@ -82,8 +83,8 @@ describe('Soloist rhythm engine phrasing modes', () => {
     it('turns response signatures into paraphrase plans with timing metadata', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
         const soloistState = createSoloistState('monophonic');
-        soloistState.sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
-        soloistState.phraseContext = {
+        soloistState.session.seed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+        soloistState.session.currentPhrase.context = {
             role: 'response',
             responseMode: 'paraphrase',
             responseSource: 'recent',
@@ -140,8 +141,8 @@ describe('Soloist rhythm engine phrasing modes', () => {
             .mockReturnValueOnce(0.2)
             .mockReturnValueOnce(0.9);
         const soloistState = createSoloistState('monophonic');
-        soloistState.sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
-        soloistState.phraseContext = {
+        soloistState.session.seed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+        soloistState.session.currentPhrase.context = {
             role: 'response',
             responseMode: 'paraphrase',
             responseSource: 'section',
@@ -181,8 +182,8 @@ describe('Soloist rhythm engine phrasing modes', () => {
     it('treats form recall as a softer spaced response than same-loop section recall', () => {
         const buildState = (responseSource) => {
             const soloistState = createSoloistState('monophonic');
-            soloistState.sessionSeed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
-            soloistState.phraseContext = {
+            soloistState.session.seed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
+            soloistState.session.currentPhrase.context = {
                 role: 'response',
                 responseMode: 'paraphrase',
                 responseSource,

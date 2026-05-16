@@ -1,10 +1,12 @@
 // @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -33,7 +35,7 @@ vi.mock('../../public/state.js', () => {
                 sectionLabel: null,
                 sectionOccurrence: 0,
             },
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
@@ -97,17 +99,17 @@ describe('Soloist Performance Benchmark', () => {
         const chordC = { rootMidi: 60, intervals: [0, 4, 7, 10], quality: '7', beats: 4 };
 
         // Ensure we hit the logic path by resetting busySteps
-        soloist.busySteps = 0;
-        soloist.deviceBuffer = [];
-        soloist.isResting = false;
+        soloist.session.phrasing.busySteps = 0;
+        soloist.session.rhythm.deviceBuffer = [];
+        soloist.session.phrasing.isResting = false;
         soloist.currentPhraseSteps = 10;
 
         const start = performance.now();
 
         for (let i = 0; i < iterations; i++) {
             // Reset state that might cause early exits or skipping the heavy logic
-            soloist.busySteps = 0;
-            soloist.deviceBuffer = [];
+            soloist.session.phrasing.busySteps = 0;
+            soloist.session.rhythm.deviceBuffer = [];
 
             getSoloistNote(getState(), chordC, null, i, 440, 72, 'scalar', i % 16);
         }

@@ -198,7 +198,7 @@ export function selectPitchAndDevices(
         ? Math.round(rhythmNode.targetMidi)
         : null;
     const seedNote = rhythmNode.seedNote || null;
-    const sessionSeed = soloistState.sessionSeed;
+    const sessionSeed = soloistState.session.seed;
     const loopCount = playback.currentLoopCount || 0;
     const soloistMode = resolveSoloistMode(soloistState.mode);
     const isGuitarMode = isSoloistGuitarMode(soloistMode);
@@ -234,13 +234,14 @@ export function selectPitchAndDevices(
 
     const minMidi = registerProfile.liveFloor;
     const maxMidi = registerProfile.liveCeiling;
-    const lastMidi = soloistState.lastMidiPlayed || 72;
+    const lastMidi = soloistState.audio.lastMidiPlayed || 72;
 
     // Determine context
     const remainingSteps = coordination.sectionEnd - step;
     const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
     const isSectionDownbeat =
-        step === coordination.sectionStart && soloistState.transitionState === 'lead_in';
+        step === coordination.sectionStart &&
+        soloistState.session.phrasing.transitionState === 'lead_in';
     const isBeatStart = isStrongBeat;
     const isProtectedSeedTone = Boolean(
         seedNote?.isAnchor ||
@@ -273,11 +274,11 @@ export function selectPitchAndDevices(
         }
         const primary = Array.isArray(res) ? res[res.length - 1] : res;
 
-        soloistState.lastMidiPlayed = primary.midi; // @worker-mutation
+        soloistState.audio.lastMidiPlayed = primary.midi; // @worker-mutation
 
         // Store interval for call & response tracking
-        if (activeStyle === 'blues' && soloistState.phraseContext) {
-            soloistState.phraseContext.lastInterval =
+        if (activeStyle === 'blues' && soloistState.session.currentPhrase.context) {
+            soloistState.session.currentPhrase.context.lastInterval =
                 ((primary.midi % 12) - (currentChord.rootMidi % 12) + 12) % 12; // @worker-mutation
         }
 
@@ -287,8 +288,8 @@ export function selectPitchAndDevices(
         timingOffset += calculateTimingOffset('soloist', groove.pocket, intensity);
 
         // --- Greats Profiles: Timing ---
-        if (activeStyle === 'blues' && soloistState.phraseContext?.profile) {
-            const profile = soloistState.phraseContext.profile;
+        if (activeStyle === 'blues' && soloistState.session.currentPhrase.context?.profile) {
+            const profile = soloistState.session.currentPhrase.context.profile;
             if (profile === 'armstrong' && isBeatStart) {
                 timingOffset += 0.015; // Louis drags behind the beat
             }
@@ -329,7 +330,7 @@ export function selectPitchAndDevices(
         }
 
         if (!primary.isDoubleStop) {
-            soloistState.lastFreq = getFrequency(primary.midi); // @worker-mutation
+            soloistState.audio.lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
         applyBluesBends(primary, activeStyle, currentChord);
@@ -340,7 +341,7 @@ export function selectPitchAndDevices(
     // Harmonic Anticipation for final measures
     if (
         isFinalMeasure &&
-        soloistState.transitionState === 'lead_in' &&
+        soloistState.session.phrasing.transitionState === 'lead_in' &&
         remainingSteps <= 2 &&
         coordination.stepCoordination?.upcomingSectionFirstChord
     ) {
@@ -384,13 +385,15 @@ export function selectPitchAndDevices(
     const isAlteredHookQuality = targetChord.quality === '7alt' || targetChord.quality === '7#9';
     const responseConfig = config.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
-    const responseSignature = soloistState.phraseContext?.responseSignature || null;
+    const responseSignature = soloistState.session.currentPhrase.context?.responseSignature || null;
     const responseMode =
         rhythmNode.responseMode ||
-        soloistState.phraseContext?.responseMode ||
+        soloistState.session.currentPhrase.context?.responseMode ||
         (isHeadBypass && loopCount > 0 ? (loopCount === 1 ? 'paraphrase' : 'development') : 'free');
     const responseSource =
-        rhythmNode.responseSource || soloistState.phraseContext?.responseSource || 'free';
+        rhythmNode.responseSource ||
+        soloistState.session.currentPhrase.context?.responseSource ||
+        'free';
     const responsePitchClass = Number.isInteger(rhythmNode.responsePitchClass)
         ? rhythmNode.responsePitchClass
         : null;
@@ -410,15 +413,16 @@ export function selectPitchAndDevices(
         hasDynamicHeadSeed &&
             responseConfig?.enabled &&
             (responsePitchClass !== null || isResponseEntryTarget || isResponseCadenceTarget) &&
-            ((soloistState.phraseContext?.role === 'response' &&
+            ((soloistState.session.currentPhrase.context?.role === 'response' &&
                 responseSignature?.notes?.length) ||
                 isMotivicHeadBypass),
     );
     const isRecallSource = responseSource === 'section' || responseSource === 'form';
 
-    const hasGreatsProfile = isGreatsProfileEnabled && soloistState.phraseContext?.profile;
+    const hasGreatsProfile =
+        isGreatsProfileEnabled && soloistState.session.currentPhrase.context?.profile;
     const isCallResponse =
-        isGreatsProfileEnabled && soloistState.phraseContext?.role === 'response';
+        isGreatsProfileEnabled && soloistState.session.currentPhrase.context?.role === 'response';
     const _isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
 
     // Optimization: Pre-compute chord tones into a bitmask to avoid O(N) .some() checks and closure creation in hot loop
@@ -480,7 +484,7 @@ export function selectPitchAndDevices(
 
         // --- Greats Stylistic Profiles ---
         if (hasGreatsProfile) {
-            const profile = soloistState.phraseContext.profile;
+            const profile = soloistState.session.currentPhrase.context.profile;
             switch (profile) {
                 case 'srv':
                     // SRV: High energy, favors pentatonic/blues notes
@@ -577,7 +581,7 @@ export function selectPitchAndDevices(
             if (isResolutionTone) {
                 weight *= 8.0; // Aggressively favor strong resolution
             }
-            if (interval === soloistState.phraseContext.lastInterval) {
+            if (interval === soloistState.session.currentPhrase.context.lastInterval) {
                 weight *= 0.5; // Avoid stagnation
             }
         }
@@ -669,7 +673,7 @@ export function selectPitchAndDevices(
             : coordination.stepCoordination?.upcomingSectionFirstChord;
         if (
             (isFinalMeasure || isSectionDownbeat) &&
-            (soloistState.transitionState === 'lead_in' || isSectionDownbeat) &&
+            (soloistState.session.phrasing.transitionState === 'lead_in' || isSectionDownbeat) &&
             resolutionChord
         ) {
             const upcomingRoot = resolutionChord.rootMidi;
@@ -725,7 +729,7 @@ export function selectPitchAndDevices(
             weight += 80;
             if (interval === 3) {
                 // Temper the minor 3rd during responses to allow for clearer resolution to Root/5th
-                if (soloistState.phraseContext?.role === 'response') {
+                if (soloistState.session.currentPhrase.context?.role === 'response') {
                     weight += 100;
                 } else {
                     weight += 500;
@@ -734,7 +738,7 @@ export function selectPitchAndDevices(
         }
 
         // --- Dynamic Head: Pitch Weighting (Thematic Consistency) ---
-        const seed = soloistState.sessionSeed;
+        const seed = soloistState.session.seed;
         if (seed?.notes && seed.notes.length > 0) {
             const { notes, loopLengthSteps } = seed;
             const loopCount = playback.currentLoopCount || 0;
@@ -897,8 +901,8 @@ export function selectPitchAndDevices(
     ) {
         const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);
         if (res) {
-            soloistState.embellishmentBuffer = res.buffer; // @worker-mutation
-            soloistState.busySteps = res.busySteps; // @worker-mutation
+            soloistState.session.rhythm.embellishmentBuffer = res.buffer; // @worker-mutation
+            soloistState.session.phrasing.busySteps = res.busySteps; // @worker-mutation
             return finalizeNote(res.first);
         }
     }
@@ -963,9 +967,9 @@ export function selectPitchAndDevices(
                 activeStyle === 'jazz' ||
                 activeStyle === 'rock' ||
                 activeStyle === 'scalar') &&
-            soloistState.phraseContext?.profile
+            soloistState.session.currentPhrase.context?.profile
         ) {
-            const profile = soloistState.phraseContext.profile;
+            const profile = soloistState.session.currentPhrase.context.profile;
             const relativeInterval = (selectedMidi - targetChord.rootMidi + 120) % 12;
 
             if (
@@ -1005,8 +1009,8 @@ export function selectPitchAndDevices(
         if (deviceType) {
             const res = applyDeviceBuffer(deviceType, deviceContextOptions);
             if (res) {
-                soloistState.deviceBuffer = res.buffer; // @worker-mutation
-                soloistState.busySteps = res.busySteps; // @worker-mutation
+                soloistState.session.rhythm.deviceBuffer = res.buffer; // @worker-mutation
+                soloistState.session.phrasing.busySteps = res.busySteps; // @worker-mutation
                 return finalizeNote(res.first);
             }
         }

@@ -3,6 +3,8 @@ import { scheduler } from '../../public/engine/scheduler-core.js';
 import { dispatch, getState } from '../../public/state.js';
 import { requestResolution } from '../../public/worker-client.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock State
 vi.mock('../../public/state.js', () => {
     const mockState = {
@@ -65,7 +67,7 @@ vi.mock('../../public/state.js', () => {
             instruments: [],
             buffer: new Map(),
         },
-        soloist: { enabled: false, buffer: new Map() },
+        soloist: makeSoloistMock({ enabled: false, buffer: new Map() }),
         chords: { enabled: false, buffer: new Map() },
         bass: { enabled: false, buffer: new Map() },
         harmony: { enabled: false, buffer: new Map() },

@@ -2,13 +2,22 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5, bpm: 120 },
         groove: { genreFeel: 'Rock' },
         harmony: { enabled: true, style: 'smart', volume: 0.5, complexity: 0.5, lastMidis: [] },
-        soloist: { enabled: false, busySteps: 0, notesInPhrase: 0, isResting: true },
+        soloist: makeSoloistMock({
+            enabled: false,
+            busySteps: 0,
+            notesInPhrase: 0,
+            isResting: true,
+        }),
         bass: { enabled: true },
         arranger: { timeSignature: '4/4' },
         chords: {},
@@ -430,7 +439,7 @@ describe('Harmony Engine Logic', () => {
     describe('Soloist Hook Reinforcement', () => {
         it('should reinforce (latch onto) the soloist hook at high intensity in Ska', () => {
             _soloist.enabled = true;
-            _soloist.sharedHookBuffer = [{ step: 0 }];
+            _soloist.session.memory.sharedHookBuffer = [{ step: 0 }];
             _groove.genreFeel = 'Ska-Punk';
             _playback.bandIntensity = 0.8;
 
@@ -455,7 +464,7 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.sessionSeed = {
+            _soloist.session.seed = {
                 notes: [{ step: 0, midi: 72, isAnchor: true }],
                 loopLengthSteps: 16,
             };
@@ -478,7 +487,7 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.sessionSeed = {
+            _soloist.session.seed = {
                 notes: [{ step: 0, midi: 72, isAnchor: true }],
                 loopLengthSteps: 16,
             };
@@ -513,7 +522,7 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.sessionSeed = {
+            _soloist.session.seed = {
                 notes: [{ step: 8, midi: 72, isAnchor: true }], // Anchor on beat 3
                 loopLengthSteps: 16,
             };

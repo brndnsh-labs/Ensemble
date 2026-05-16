@@ -5,6 +5,8 @@ import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -28,7 +30,7 @@ describe('Rock Bassist Critique', () => {
                 totalSteps: numBars * 16,
                 stepMap: [],
             },
-            soloist: { enabled: false, busySteps: 0 },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
             ...stateOverrides,
         };
 

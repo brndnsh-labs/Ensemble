@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock dependencies
 vi.mock('../../../public/state.js', () => ({
     getState: vi.fn(),
@@ -29,7 +33,7 @@ describe('Soloist Blues Logic', () => {
                 complexity: 0.5,
             },
             groove: { genreFeel: 'Blues', pocket: 0 },
-            soloist: {
+            soloist: makeSoloistMock({
                 mode: 'guitar',
                 srdcState: 'Statement',
                 qaState: 'Question',
@@ -42,7 +46,7 @@ describe('Soloist Blues Logic', () => {
                 motifBuffer: [],
                 busySteps: 0,
                 pitchHistory: [],
-            },
+            }),
             harmony: { enabled: false },
             arranger: { timeSignature: '4/4' },
         };
@@ -59,12 +63,12 @@ describe('Soloist Blues Logic', () => {
         // We try many times to trigger the probabilistic device generation
         while (!lickFound && attempts < 1000) {
             // Reset state
-            mockState.soloist.deviceBuffer = [];
-            mockState.soloist.busySteps = 0;
-            mockState.soloist.isResting = false;
+            mockState.soloist.session.rhythm.deviceBuffer = [];
+            mockState.soloist.session.phrasing.busySteps = 0;
+            mockState.soloist.session.phrasing.isResting = false;
             mockState.soloist.currentPhraseSteps = 0;
-            mockState.soloist.notesInPhrase = 0;
-            mockState.soloist.lastAttackStep = -100;
+            mockState.soloist.session.currentPhrase.notesInPhrase = 0;
+            mockState.soloist.session.phrasing.lastAttackStep = -100;
 
             // Call getSoloistNote
             // Use attempts * 4 to ensure step % 16 == 0 regularly
@@ -72,7 +76,7 @@ describe('Soloist Blues Logic', () => {
                 bypassRhythm: true,
             });
 
-            if (mockState.soloist.deviceBuffer.length >= 2) {
+            if (mockState.soloist.session.rhythm.deviceBuffer.length >= 2) {
                 lickFound = true;
             }
             attempts++;

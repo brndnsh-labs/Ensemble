@@ -115,7 +115,7 @@ export function getScaleForChord(
         }
         // Signature Country: Pure Major Pentatonic
         // We add 3 (blue note) only if tension is high, but default to the sweet sound.
-        if (soloist.tension > 0.7) {
+        if (soloist.session.tension > 0.7) {
             return [0, 2, 3, 4, 7, 9].sort((a, b) => a - b);
         }
         return SCALE_INTERVALS.MAJOR_PENTATONIC;
@@ -177,7 +177,7 @@ export function getScaleForChord(
         }
 
         // High Tension / Altered Dominants
-        if (soloist.tension > 0.7 && !['rock', 'scalar', 'country'].includes(style)) {
+        if (soloist.session.tension > 0.7 && !['rock', 'scalar', 'country'].includes(style)) {
             if (style === 'funk' || style === 'blues') {
                 return SCALE_INTERVALS.BLUES;
             }

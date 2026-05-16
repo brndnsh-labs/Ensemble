@@ -3,10 +3,12 @@
 // cspell:ignore Emaj Ebdim Yelverton Gershwin Pachelbel Coltrane
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -22,7 +24,7 @@ vi.mock('../../public/state.js', () => {
             hookRetentionProb: 0.5,
             mode: 'guitar',
             sessionSteps: 1000,
-        },
+        }),
         chords: { enabled: true, octave: 60, density: 'standard' },
         playback: {
             bandIntensity: 0.5,
@@ -552,9 +554,9 @@ describe('Standards Compliance Test Suite', () => {
             arranger.isMinor = true;
             arranger.sections = [{ id: 'Main', label: 'Main', value: 'i | bVII | bVI | V' }];
             validateProgression(getState());
-            soloist.isResting = false;
+            soloist.session.phrasing.isResting = false;
             soloist.currentPhraseSteps = 0;
-            soloist.notesInPhrase = 0;
+            soloist.session.currentPhrase.notesInPhrase = 0;
             groove.genreFeel = 'Rock';
         });
 
@@ -594,9 +596,9 @@ describe('Standards Compliance Test Suite', () => {
                 },
             ];
             validateProgression(getState());
-            soloist.isResting = false;
+            soloist.session.phrasing.isResting = false;
             soloist.currentPhraseSteps = 0;
-            soloist.notesInPhrase = 0;
+            soloist.session.currentPhrase.notesInPhrase = 0;
             groove.genreFeel = 'Blues';
         });
 
@@ -616,9 +618,9 @@ describe('Standards Compliance Test Suite', () => {
             let blueNoteCount = 0;
             let lastFreq = 440;
             for (let i = 0; i < 400; i++) {
-                soloist.isResting = false;
-                soloist.busySteps = 0;
-                soloist.lastAttackStep = -100;
+                soloist.session.phrasing.isResting = false;
+                soloist.session.phrasing.busySteps = 0;
+                soloist.session.phrasing.lastAttackStep = -100;
                 const result = getSoloistNote(
                     getState(),
                     arranger.progression[0],

@@ -996,7 +996,8 @@ export function getAccompanimentNotes(
 
     // Rhythmic Yielding (Contract Compliance)
     const isSoloistBusy =
-        coordination?.soloistBusy || (soloist.enabled && (soloist.busySteps || 0) > 0);
+        coordination?.soloistBusy ||
+        (soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0);
     updateRhythmicIntent(state, step, isSoloistBusy, spm, chord.sectionId);
 
     if (isSoloistBusy && !stepInfo.isMeasureStart && Math.random() < 0.7) {
@@ -1303,7 +1304,7 @@ export function getAccompanimentNotes(
         if (
             isHit &&
             playback.complexity > 0.7 &&
-            (soloist.busySteps || 0) > 0 &&
+            (soloist.session.phrasing.busySteps || 0) > 0 &&
             Math.random() < 0.4
         ) {
             isHit = false;
@@ -1430,7 +1431,7 @@ export function getAccompanimentNotes(
         // Conversational Displacement for Jazz/Blues
         if (
             isHit &&
-            (soloist.busySteps || 0) > 0 &&
+            (soloist.session.phrasing.busySteps || 0) > 0 &&
             playback.complexity > 0.6 &&
             Math.random() < 0.3
         ) {
@@ -1593,7 +1594,7 @@ export function getAccompanimentNotes(
         }
 
         // --- Frequency Slotting & Soloist Pocket ---
-        const lastSolFreq = soloist.lastFreq || 0;
+        const lastSolFreq = soloist.audio.lastFreq || 0;
         const soloistMidi = soloist.enabled ? getMidi(lastSolFreq) : 0;
         const useClarity = (soloistMidi || 0) > 72;
         if (chords.style === 'smart') {

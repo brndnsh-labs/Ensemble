@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { WORKER_MSG, WORKER_RESP } from '../../public/worker-types.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 // Setup mocks before importing the worker
 const mockPostMessage = vi.fn();
@@ -48,7 +49,7 @@ describe('Logic Worker Integration', () => {
                             sectionMap: [],
                         },
                         playback: { bandIntensity: 0.5, bpm: 120 },
-                        soloist: { enabled: false },
+                        soloist: makeSoloistMock({ enabled: false }),
                         bass: { enabled: false },
                         chords: { enabled: false },
                         harmony: { enabled: false },
@@ -81,19 +82,19 @@ describe('Logic Worker Integration', () => {
     it('should handle SYNC_STATE and PROTECT generative state keys', () => {
         const state = getState();
         const originalResting = true;
-        state.soloist.isResting = originalResting;
+        state.soloist.session.phrasing.isResting = originalResting;
 
         self.onmessage({
             data: {
                 type: WORKER_MSG.SYNC_STATE,
                 data: {
-                    soloist: { isResting: false },
+                    soloist: makeSoloistMock({ isResting: false }),
                 },
             },
         });
 
         // Should STILL be originalResting because isResting is in WORKER_MANAGED_KEYS
-        expect(state.soloist.isResting).toBe(originalResting);
+        expect(state.soloist.session.phrasing.isResting).toBe(originalResting);
     });
 
     it('should handle FLUSH and reset buffer heads', () => {
@@ -106,7 +107,7 @@ describe('Logic Worker Integration', () => {
                 data: {
                     step: testStep,
                     syncData: {
-                        soloist: { enabled: true, style: 'rock' },
+                        soloist: makeSoloistMock({ enabled: true, style: 'rock' }),
                         bass: { enabled: true, style: 'rock' },
                         chords: { enabled: true },
                         playback: { bandIntensity: 1.0 },

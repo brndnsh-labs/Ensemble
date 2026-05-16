@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 const capturedMessages = [];
 const { mockNoteOn, noteOnEvents } = vi.hoisted(() => ({
     mockNoteOn: vi.fn(),
@@ -38,7 +42,7 @@ vi.stubGlobal('self', {
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             lastFreq: 440,
             busySteps: 0,
@@ -51,7 +55,7 @@ vi.mock('../../../public/state.js', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         chords: { enabled: true, octave: 60, density: 'standard' },
         bass: { enabled: true, lastFreq: 110, pocketOffset: 0, octave: 36, style: 'smart' },
         harmony: {

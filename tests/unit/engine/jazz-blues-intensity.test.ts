@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/engine/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 const { arranger, playback, groove, conductor } = getState();
 
 import { ACTIONS } from '../../../public/types.js';
@@ -34,7 +38,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     const mockHarmony = { enabled: false, buffer: new Map() };
     const mockChords = { ...actual.chords };
     const mockBass = { ...actual.bass };
-    const mockSoloist = { ...actual.soloist };
+    const mockSoloist = makeSoloistMock({ ...actual.soloist });
 
     const mockStateMap = {
         playback: mockPlayback,

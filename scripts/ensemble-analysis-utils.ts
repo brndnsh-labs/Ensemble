@@ -403,7 +403,7 @@ export async function bootstrapEnsembleAudit({
           )
         : null;
 
-    state.soloist.sessionSeed = sessionSeed;
+    state.soloist.session.seed = sessionSeed;
 
     const sectionSeedMap = buildSectionSeedMap(state.arranger.sectionMap, seed);
     const orchestrationMap = includeDrums

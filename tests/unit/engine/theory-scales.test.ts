@@ -1,6 +1,10 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // cspell:ignore Bdim tonicization tonicized
 
 // --- Global Mocks ---
@@ -14,9 +18,9 @@ const { mockState } = vi.hoisted(() => ({
         groove: {
             genreFeel: 'Jazz',
         },
-        soloist: {
+        soloist: makeSoloistMock({
             tension: 0,
-        },
+        }),
     },
 }));
 
@@ -42,7 +46,7 @@ describe('Music Theory: Scale Correctness', () => {
         mockState.arranger.key = 'C';
         mockState.arranger.isMinor = false;
         mockState.groove.genreFeel = 'Jazz';
-        mockState.soloist.tension = 0;
+        mockState.soloist.session.tension = 0;
     });
 
     describe('Diatonic Mode Selection', () => {
@@ -142,7 +146,7 @@ describe('Music Theory: Scale Correctness', () => {
         });
 
         it('preserves explicit 7#11 quality even when tension is high', () => {
-            mockState.soloist.tension = 0.8;
+            mockState.soloist.session.tension = 0.8;
             const chord7sharp11 = { rootMidi: 67, quality: '7#11', intervals: [0, 4, 7, 10, 18] };
             expect(getScaleForChord(mockState, chord7sharp11)).toEqual([0, 2, 4, 6, 7, 9, 10]);
         });
@@ -241,7 +245,7 @@ describe('Music Theory: Scale Correctness', () => {
 
         it('assigns Major Blues to Country Major chords at high tension', () => {
             mockState.groove.genreFeel = 'Country';
-            mockState.soloist.tension = 0.8;
+            mockState.soloist.session.tension = 0.8;
             const chordC = { rootMidi: 60, quality: 'major', intervals: [0, 4, 7] };
             expect(getScaleForChord(mockState, chordC, null, 'smart')).toEqual([0, 2, 3, 4, 7, 9]);
         });

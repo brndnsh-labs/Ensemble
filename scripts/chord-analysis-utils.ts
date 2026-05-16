@@ -278,10 +278,10 @@ function getScenarioState(state, scenario, measureIndex, stepInfo) {
 
     state.bass.lastFreq = getFrequency(bassMidi);
     state.soloist.enabled = soloistBusy;
-    state.soloist.busySteps = soloistBusy
+    state.soloist.session.phrasing.busySteps = soloistBusy
         ? stepInfo.tsConfig.beats * stepInfo.tsConfig.stepsPerBeat
         : 0;
-    state.soloist.lastFreq = soloistBusy ? getFrequency(79) : 0;
+    state.soloist.audio.lastFreq = soloistBusy ? getFrequency(79) : 0;
 
     return {
         name: normalized,

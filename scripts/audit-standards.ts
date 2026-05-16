@@ -101,7 +101,7 @@ async function runAudit(target = 'stella') {
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
 
-    soloist.sessionSeed = generateSessionSeed(
+    soloist.session.seed = generateSessionSeed(
         state,
         arranger,
         'jazz',

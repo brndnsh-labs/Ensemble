@@ -379,7 +379,7 @@ export function getBassNote(
         };
     };
 
-    const isSoloistBusy = (soloist.busySteps || 0) > 0;
+    const isSoloistBusy = (soloist.session.phrasing.busySteps || 0) > 0;
 
     const withOctaveJump = (note: number): number => {
         if (isSoloistBusy || intensity < 0.4) {
@@ -570,7 +570,10 @@ export function getBassNote(
         const targetRoot = normalizeToRange(nextTarget);
         let chromaticProb =
             (isSoloistBusy ? 0.4 : 0.6) +
-            ((soloist.tension || 0) + intensity * 0.3 + (playback.complexity || 0.5) * 0.2) * 0.3;
+            ((soloist.session.tension || 0) +
+                intensity * 0.3 +
+                (playback.complexity || 0.5) * 0.2) *
+                0.3;
         if (intensity > 0.75 && ['Jazz', 'Blues'].includes(groove.genreFeel)) {
             chromaticProb = 0.95;
         }
@@ -578,7 +581,7 @@ export function getBassNote(
         if (
             Math.random() < chromaticProb &&
             (['Jazz', 'Blues'].includes(groove.genreFeel) ||
-                (soloist.tension || 0) + intensity * 0.3 > 0.7)
+                (soloist.session.tension || 0) + intensity * 0.3 > 0.7)
         ) {
             const choices = [
                 { midi: targetRoot - 5, weight: 0.5 },

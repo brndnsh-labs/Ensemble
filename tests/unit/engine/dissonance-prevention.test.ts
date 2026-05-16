@@ -9,7 +9,7 @@ describe('Dissonance Prevention', () => {
         arranger.key = 'C';
         arranger.isMinor = false;
         groove.genreFeel = 'Rock';
-        soloist.tension = 0;
+        soloist.session.tension = 0;
     });
 
     it('should return Ionian/Lydian for F Major even if global key is C Minor (State Leak)', () => {

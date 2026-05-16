@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
@@ -76,7 +80,7 @@ vi.mock('../../../public/state.js', () => {
         arranger: {},
         chords: {},
         bass: {},
-        soloist: {},
+        soloist: makeSoloistMock({}),
         vizState: {},
         storage: {},
         midi: {},
@@ -329,7 +333,7 @@ describe('Drum Synthesis', () => {
             bass: { enabled: true },
             chords: { enabled: true },
             harmony: { enabled: false },
-            soloist: { enabled: false },
+            soloist: makeSoloistMock({ enabled: false }),
         };
         const rockState = {
             playback: { bandIntensity: 0.35 },
@@ -337,7 +341,7 @@ describe('Drum Synthesis', () => {
             bass: { enabled: true },
             chords: { enabled: true },
             harmony: { enabled: false },
-            soloist: { enabled: false },
+            soloist: makeSoloistMock({ enabled: false }),
         };
 
         expect(getCymbalMixScale(jazzState, 'Ride')).toBeGreaterThan(
@@ -353,7 +357,7 @@ describe('Drum Synthesis', () => {
             bass: { enabled: true },
             chords: { enabled: true },
             harmony: { enabled: false },
-            soloist: { enabled: false },
+            soloist: makeSoloistMock({ enabled: false }),
         };
         const ride = getCymbalVoiceConfig('Ride', 1.0, 0.45);
         const crash = getCymbalVoiceConfig('Crash', 1.0, 0.45);
@@ -372,14 +376,14 @@ describe('Drum Synthesis', () => {
             bass: { enabled: true },
             chords: { enabled: false },
             harmony: { enabled: false },
-            soloist: { enabled: false },
+            soloist: makeSoloistMock({ enabled: false }),
         };
         const fullBandState = {
             playback: { bandIntensity: 0.95 },
             bass: { enabled: true },
             chords: { enabled: true },
             harmony: { enabled: true },
-            soloist: { enabled: true },
+            soloist: makeSoloistMock({ enabled: true }),
         };
 
         expect(getCymbalMixScale(fullBandState, 'Crash')).toBeLessThan(
@@ -396,7 +400,7 @@ describe('Drum Synthesis', () => {
             bass: { enabled: true },
             chords: { enabled: true },
             harmony: { enabled: true },
-            soloist: { enabled: true },
+            soloist: makeSoloistMock({ enabled: true }),
         };
 
         expect(getCymbalMixScale(fullBandState, 'Ride')).toBeGreaterThan(0.74);

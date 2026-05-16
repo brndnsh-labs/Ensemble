@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearHarmonyMemory, getHarmonyNotes } from '../../public/engine/harmonies.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 /**
  * Melodic Harmony Support: Behavioral Integrity Tests
  *
@@ -14,7 +16,13 @@ const mockState: any = {
     groove: { genreFeel: 'Jazz' },
     harmony: { enabled: true, style: 'smart', volume: 0.5, complexity: 0.5, lastMidis: [] },
     chords: { enabled: true, octave: 60 },
-    soloist: { enabled: true, busySteps: 0, notesInPhrase: 0, isResting: false, sessionSeed: null },
+    soloist: makeSoloistMock({
+        enabled: true,
+        busySteps: 0,
+        notesInPhrase: 0,
+        isResting: false,
+        sessionSeed: null,
+    }),
     bass: { enabled: true },
     arranger: { timeSignature: '4/4' },
 };
@@ -37,7 +45,7 @@ describe('Melodic Harmony Support (Behavioral)', () => {
         clearHarmonyMemory(mockState);
         mockState.playback.currentLoopCount = 0;
         mockState.playback.bandIntensity = 0.5;
-        mockState.soloist.sessionSeed = {
+        mockState.soloist.session.seed = {
             notes: [
                 { step: 0, midi: 72, isAnchor: true, durationSteps: 4 },
                 { step: 8, midi: 74, isAnchor: true, durationSteps: 2 },

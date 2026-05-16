@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: () => ({
         playback: { bandIntensity: 0.7, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         groove: { genreFeel: 'Rock' },
-        soloist: {
+        soloist: makeSoloistMock({
             sessionSteps: 100,
             pitchHistory: [],
             notesInPhrase: 2,
@@ -23,7 +25,7 @@ vi.mock('../../public/state.js', () => ({
             mode: 'monophonic',
             tension: 0.5,
             currentCell: [1, 1, 1, 1],
-        },
+        }),
         harmony: { enabled: true, rhythmicMask: 0, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: {
             timeSignature: '4/4',

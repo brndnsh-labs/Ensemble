@@ -5,6 +5,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
@@ -19,7 +23,7 @@ vi.mock('../../../public/state.js', () => {
     };
     const mockGroove = { enabled: true, swing: 0, humanize: 0, instruments: [] };
     const mockBass = { enabled: true, buffer: new Map() };
-    const mockSoloist = { enabled: true, buffer: new Map() };
+    const mockSoloist = makeSoloistMock({ enabled: true, buffer: new Map() });
     const mockHarmony = { enabled: false, buffer: new Map() };
     const mockChords = { enabled: true, buffer: new Map() };
     const mockArranger = {

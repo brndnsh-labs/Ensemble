@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock State
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -13,7 +17,7 @@ vi.mock('../../../public/state.js', () => {
             sessionTimer: 0,
             complexity: 1.0,
         },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -28,7 +32,7 @@ vi.mock('../../../public/state.js', () => {
             lastAttackStep: -100,
             isPhraseActive: true,
             doubleStopProb: 10.0, // Force double stops for tests
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         arranger: { timeSignature: '4/4' },
         harmony: { enabled: false },
@@ -119,26 +123,26 @@ describe('Soloist Mode Differentiation Logic', () => {
     const resetModeTestState = () => {
         state.playback.currentLoopCount = 0;
         state.soloist.mode = 'monophonic';
-        state.soloist.busySteps = 0;
+        state.soloist.session.phrasing.busySteps = 0;
         state.soloist.currentPhraseSteps = 0;
-        state.soloist.notesInPhrase = 0;
+        state.soloist.session.currentPhrase.notesInPhrase = 0;
         state.soloist.qaState = 'Question';
-        state.soloist.isResting = false;
+        state.soloist.session.phrasing.isResting = false;
         state.soloist.motifBuffer = [];
         state.soloist.pitchHistory = [];
-        state.soloist.deviceBuffer = [];
-        state.soloist.embellishmentBuffer = [];
-        state.soloist.rhythmPlan = [];
-        state.soloist.sessionSeed = null;
-        state.soloist.lastAttackStep = -100;
-        state.soloist.lastMidiPlayed = 72;
-        state.soloist.phraseContext = createPhraseContext();
-        state.soloist.phraseCount = 0;
-        state.soloist.activeSteps = 0;
-        state.soloist.restSteps = 0;
-        state.soloist.phrasingState = 'active';
-        state.soloist.isYielding = false;
-        state.soloist.transitionState = null;
+        state.soloist.session.rhythm.deviceBuffer = [];
+        state.soloist.session.rhythm.embellishmentBuffer = [];
+        state.soloist.session.rhythm.plan = [];
+        state.soloist.session.seed = null;
+        state.soloist.session.phrasing.lastAttackStep = -100;
+        state.soloist.audio.lastMidiPlayed = 72;
+        state.soloist.session.currentPhrase.context = createPhraseContext();
+        state.soloist.session.phraseCount = 0;
+        state.soloist.session.phrasing.activeSteps = 0;
+        state.soloist.session.phrasing.restSteps = 0;
+        state.soloist.session.phrasing.state = 'active';
+        state.soloist.session.phrasing.isYielding = false;
+        state.soloist.session.phrasing.transitionState = null;
     };
 
     beforeEach(() => {
@@ -171,7 +175,7 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         // Try up to 1000 times to get a double stop (usually takes ~10-20)
         while (attempts < 1000) {
-            state.soloist.busySteps = 0;
+            state.soloist.session.phrasing.busySteps = 0;
             note = getSoloistNote(
                 getState(),
                 currentChord,
@@ -205,7 +209,7 @@ describe('Soloist Mode Differentiation Logic', () => {
     it('keeps loop-0 guitar head notes monophonic without explicit support metadata', () => {
         state.soloist.mode = 'guitar';
         state.playback.currentLoopCount = 0;
-        state.soloist.sessionSeed = {
+        state.soloist.session.seed = {
             loopLengthSteps: 16,
             notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
         };
@@ -218,7 +222,7 @@ describe('Soloist Mode Differentiation Logic', () => {
     it('lets loop-0 guitar head notes realize optional support metadata as double stops', () => {
         state.soloist.mode = 'guitar';
         state.playback.currentLoopCount = 0;
-        state.soloist.sessionSeed = {
+        state.soloist.session.seed = {
             loopLengthSteps: 16,
             notes: [
                 {
@@ -251,7 +255,7 @@ describe('Soloist Mode Differentiation Logic', () => {
     it('keeps guitar support notes shorter than the lead on anchor-style head voicings', () => {
         state.soloist.mode = 'guitar';
         state.playback.currentLoopCount = 0;
-        state.soloist.sessionSeed = {
+        state.soloist.session.seed = {
             loopLengthSteps: 16,
             notes: [
                 {
@@ -282,7 +286,7 @@ describe('Soloist Mode Differentiation Logic', () => {
     it('treats deprecated piano mode as monophonic on loop-0 head notes', () => {
         state.soloist.mode = 'piano';
         state.playback.currentLoopCount = 0;
-        state.soloist.sessionSeed = {
+        state.soloist.session.seed = {
             loopLengthSteps: 16,
             notes: [{ step: 0, midi: 72, isAnchor: true, durationSteps: 4, velocity: 0.9 }],
         };
@@ -295,7 +299,7 @@ describe('Soloist Mode Differentiation Logic', () => {
     it('ignores deprecated piano support metadata and keeps the lead monophonic', () => {
         state.soloist.mode = 'piano';
         state.playback.currentLoopCount = 0;
-        state.soloist.sessionSeed = {
+        state.soloist.session.seed = {
             loopLengthSteps: 16,
             notes: [
                 {
@@ -330,7 +334,7 @@ describe('Soloist Mode Differentiation Logic', () => {
         let attempts = 0;
         let foundHendrixInt = false;
         while (attempts < 1000) {
-            state.soloist.busySteps = 0;
+            state.soloist.session.phrasing.busySteps = 0;
             const note = getSoloistNote(
                 getState(),
                 currentChord,
@@ -371,8 +375,8 @@ describe('Soloist Mode Differentiation Logic', () => {
             resetModeTestState();
             state.soloist.mode = 'guitar';
             state.playback.currentLoopCount = 3;
-            state.soloist.activeSteps = 8;
-            state.soloist.rhythmPlan = [
+            state.soloist.session.phrasing.activeSteps = 8;
+            state.soloist.session.rhythm.plan = [
                 {
                     stepTarget: 4,
                     durationSteps: 4,

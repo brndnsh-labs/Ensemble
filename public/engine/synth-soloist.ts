@@ -25,7 +25,7 @@ interface VibratoNodes {
 export function killSoloistNote(state: EnsembleState): void {
     const { playback, soloist } = state;
     if (playback.audio) {
-        killActiveVoices(soloist.activeVoices, playback.audio.currentTime, 0.01);
+        killActiveVoices(soloist.audio.activeVoices, playback.audio.currentTime, 0.01);
     }
 }
 
@@ -64,7 +64,7 @@ export function playSoloNote(
     }
 
     // Voice Management
-    manageVoices(playTime, soloist);
+    manageVoices(playTime, soloist.audio, soloist.mode);
 
     const isPiano = isSoloistPianoMode(soloist.mode);
     if (isPiano) {
@@ -85,8 +85,8 @@ export function playSoloNote(
     const voiceObj: SoloistVoice = { gain, time: playTime, duration, nodes: [gain, pan] };
 
     // Retrieve last frequency for portamento
-    const prevFreq = soloist.lastRenderedFreq || freq;
-    (soloist as Mutable<typeof soloist>).lastRenderedFreq = freq; // @direct-mutation
+    const prevFreq = soloist.audio.lastRenderedFreq || freq;
+    (soloist.audio as Mutable<typeof soloist.audio>).lastRenderedFreq = freq; // @direct-mutation
 
     switch (preset) {
         case 'neo':
@@ -193,38 +193,39 @@ export function playSoloNote(
             break;
     }
 
-    (soloist as Mutable<typeof soloist>).activeVoices.push(voiceObj); // @direct-mutation
+    (soloist.audio as Mutable<typeof soloist.audio>).activeVoices.push(voiceObj); // @direct-mutation
 }
 
 /**
  * Manages active voices for the soloist synthesizer.
  */
-function manageVoices(playTime: number, soloist: SoloistState): void {
-    if (!soloist.activeVoices) {
-        (soloist as Mutable<typeof soloist>).activeVoices = []; // @direct-mutation
+function manageVoices(playTime: number, audio: SoloistState['audio'], mode: string): void {
+    const mAudio = audio as Mutable<typeof audio>;
+    if (!audio.activeVoices) {
+        mAudio.activeVoices = []; // @direct-mutation
     }
 
     // Clean up finished voices (in-place mutation to satisfy state checks)
-    for (let i = soloist.activeVoices.length - 1; i >= 0; i--) {
-        const v = soloist.activeVoices[i];
+    for (let i = audio.activeVoices.length - 1; i >= 0; i--) {
+        const v = audio.activeVoices[i];
         if (v.time + v.duration + 1.0 <= playTime) {
-            soloist.activeVoices.splice(i, 1);
+            audio.activeVoices.splice(i, 1);
         }
     }
 
-    const VOICE_LIMIT = getSoloistVoiceLimit(soloist.mode);
+    const VOICE_LIMIT = getSoloistVoiceLimit(mode);
 
     // Check if the current note is part of the same "simultaneous" attack (polyphonic cluster)
     const isPolyphonicCluster =
-        soloist.activeVoices.length > 0 &&
-        Math.abs(playTime - soloist.activeVoices[soloist.activeVoices.length - 1].time) < 0.002;
+        audio.activeVoices.length > 0 &&
+        Math.abs(playTime - audio.activeVoices[audio.activeVoices.length - 1].time) < 0.002;
 
-    if (!isPolyphonicCluster && soloist.activeVoices.length >= VOICE_LIMIT) {
+    if (!isPolyphonicCluster && audio.activeVoices.length >= VOICE_LIMIT) {
         // Only kill enough voices to stay under the limit for the NEW gesture
-        const voicesToKill = soloist.activeVoices.length - VOICE_LIMIT + 1;
+        const voicesToKill = audio.activeVoices.length - VOICE_LIMIT + 1;
         const killed: SoloistVoice[] = [];
         for (let i = 0; i < voicesToKill; i++) {
-            const oldest = soloist.activeVoices.shift();
+            const oldest = audio.activeVoices.shift();
             if (oldest) {
                 killed.push(oldest);
             }
@@ -814,7 +815,7 @@ function createVibrato(
         depthFactor = 0.004;
     }
 
-    const profile = soloist.phraseContext?.profile;
+    const profile = soloist.session.currentPhrase.context?.profile;
     if (profile === 'gilmour') {
         depthFactor *= 1.3;
     } else if (profile === 'slash') {

@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../../public/engine/soloist.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 const { soloist } = getState();
 
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
-        soloist: {
+        soloist: makeSoloistMock({
             busySteps: 0,
             tension: 0,
             mode: 'monophonic',
@@ -23,7 +27,7 @@ vi.mock('../../../public/state.js', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Rock' },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
         chords: {},
@@ -67,14 +71,14 @@ describe('Soloist Range Constraints', () => {
     const chordC = { rootMidi: 60, intervals: [0, 4, 7, 10], quality: '7', beats: 4 };
 
     beforeEach(() => {
-        soloist.isResting = false;
+        soloist.session.phrasing.isResting = false;
         soloist.currentPhraseSteps = 1;
-        soloist.notesInPhrase = 0;
-        soloist.busySteps = 0;
-        soloist.deviceBuffer = [];
+        soloist.session.currentPhrase.notesInPhrase = 0;
+        soloist.session.phrasing.busySteps = 0;
+        soloist.session.rhythm.deviceBuffer = [];
         soloist.lastInterval = 0;
-        soloist.sessionSteps = 1000;
-        soloist.tension = 0;
+        soloist.session.sessionSteps = 1000;
+        soloist.session.tension = 0;
         soloist.currentCell = [1, 1, 1, 1]; // Always play 16ths
     });
 

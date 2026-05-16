@@ -2,10 +2,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock dependencies
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: { tension: 0.5 },
+        soloist: makeSoloistMock({ tension: 0.5 }),
         chords: { density: 'standard', octave: 60 },
         playback: { bandIntensity: 0.5, bpm: 120 },
         arranger: {

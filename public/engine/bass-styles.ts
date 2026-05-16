@@ -503,7 +503,8 @@ export function getBassNoteStyle(
 
         // 3. Syncopated "Pushes" & "Gallops" (16ths)
         if (stepInBeat % 2 !== 0) {
-            const isSoloistBusyLocal = soloist.enabled && (soloist.busySteps || 0) > 0;
+            const isSoloistBusyLocal =
+                soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0;
 
             // High complexity "Pop" on the 'a'
             if (
@@ -872,7 +873,8 @@ export function getBassNoteStyle(
                 ? nextChord.bassMidi
                 : nextChord.rootMidi;
         const targetRoot = normalizeToRange(nextTarget);
-        const pullTension = (soloist.tension || 0) + intensity * 0.3 + playback.complexity * 0.2;
+        const pullTension =
+            (soloist.session.tension || 0) + intensity * 0.3 + playback.complexity * 0.2;
         let chromaticProb = (isSoloistBusy ? 0.4 : 0.6) + pullTension * 0.3;
 
         // Force very high probability for Jazz/Blues at high levels

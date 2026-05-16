@@ -268,15 +268,15 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     }
 
     // B. Shared Hook Reinforcement (Ska-Punk)
-    if (feel === 'Ska-Punk' && soloist.sharedHookBuffer) {
-        const hookMatch = soloist.sharedHookBuffer.find((h: any) => h.step === step);
+    if (feel === 'Ska-Punk' && soloist.session.memory.sharedHookBuffer) {
+        const hookMatch = soloist.session.memory.sharedHookBuffer.find((h: any) => h.step === step);
         if (hookMatch) {
             return { type: 'reinforce', isLatched: true, duration: 1 };
         }
     }
 
     // C. Melodic Shadowing
-    const seed = soloist.sessionSeed;
+    const seed = soloist.session.seed;
     if (seed?.notes && seed.notes.length > 0) {
         const stepInLoop = step % seed.loopLengthSteps;
         const seedNote = seed.notes.find((n: any) => n.step === stepInLoop);
@@ -328,7 +328,8 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
 function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
     const { step, motif, playback, coordination, ts, measureStep, soloist } = context;
 
-    const isSoloistBusy = coordination.soloistBusy || (soloist.enabled && !soloist.isResting);
+    const isSoloistBusy =
+        coordination.soloistBusy || (soloist.enabled && !soloist.session.phrasing.isResting);
 
     // Coordination: Yield to soloist if not reinforcing
     if (lastPlayedStep !== -1 && step === lastPlayedStep + 1 && coordination.soloistActive) {
@@ -420,7 +421,9 @@ function finalizeHarmonyNotes(
 
     const isSoloistBusy =
         coordination.soloistBusy ||
-        (soloist.enabled && (!soloist.isResting || soloist.notesInPhrase > 3));
+        (soloist.enabled &&
+            (!soloist.session.phrasing.isResting ||
+                soloist.session.currentPhrase.notesInPhrase > 3));
     const accompanimentCrowding = coordination.accompanimentHit && !isLatched && !isBloom;
 
     // --- VOICING REFINEMENT (Musical Taste) ---
@@ -440,7 +443,7 @@ function finalizeHarmonyNotes(
     if (!groundingRequired && (isSoloistBusy || coordination.accompanimentHit)) {
         intervals = getSafeVoicings(intervals, rootlessComping);
         if (
-            soloist.notesInPhrase > 3 ||
+            soloist.session.currentPhrase.notesInPhrase > 3 ||
             coordination.accompanimentHit ||
             harmony.complexity < 0.4
         ) {

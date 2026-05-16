@@ -6,6 +6,10 @@ import { generateShareUrl, shareProgression } from '../../../public/sharing.js';
 import { getState } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -26,7 +30,7 @@ describe('Sharing Deep Dive', () => {
             playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5 },
             chords: { enabled: true, volume: 0.5, reverb: 0.2 },
             bass: { enabled: true, volume: 0.5, reverb: 0.2 },
-            soloist: { enabled: true, volume: 0.5, reverb: 0.2 },
+            soloist: makeSoloistMock({ enabled: true, volume: 0.5, reverb: 0.2 }),
             harmony: { enabled: true, volume: 0.5, reverb: 0.2, complexity: 0.5 },
             groove: {
                 enabled: true,

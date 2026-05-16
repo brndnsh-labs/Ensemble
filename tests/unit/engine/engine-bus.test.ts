@@ -12,6 +12,10 @@ import {
     restoreGains,
 } from '../../../public/engine/engine.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock synthesis functions
 vi.mock('../../../public/engine/synth-bass.js', () => ({
     killBassNote: vi.fn(),
@@ -63,7 +67,7 @@ describe('Engine Bus Management', () => {
             },
             chords: { enabled: true, volume: 1.0 },
             bass: { enabled: true, volume: 1.0 },
-            soloist: { enabled: true, volume: 1.0 },
+            soloist: makeSoloistMock({ enabled: true, volume: 1.0 }),
             harmony: { enabled: true, volume: 1.0 },
             groove: { enabled: true, volume: 1.0 },
             midi: { enabled: false, muteLocal: false },

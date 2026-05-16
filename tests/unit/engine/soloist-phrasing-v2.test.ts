@@ -5,6 +5,10 @@ import { generateRhythmPlan } from '../../../public/engine/soloist-rhythm-engine
 import * as stateModule from '../../../public/state.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js');
 vi.mock('../../../public/config.js', () => ({
     TIME_SIGNATURES: { '4/4': { beats: 4, stepsPerBeat: 4 } },
@@ -36,7 +40,7 @@ vi.mock('../../../public/utils.js', () => ({
 
 describe('Soloist Phrasing Refinements v2.7.1', () => {
     const createMockState = () => ({
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             phrasingState: 'call',
@@ -51,7 +55,7 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
             sessionSteps: 100,
             lastMidiPlayed: 72,
             phraseStartStep: 0,
-        },
+        }),
         groove: { genreFeel: 'Funk' },
         playback: {
             bandIntensity: 0.5,
@@ -68,12 +72,12 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
 
         const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         localState.playback.bandIntensity = 0.5;
-        localState.soloist.sessionSteps = 0;
-        localState.soloist.notesInPhrase = 5; // Bypass urgency boost
+        localState.soloist.session.sessionSteps = 0;
+        localState.soloist.session.currentPhrase.notesInPhrase = 5; // Bypass urgency boost
 
         // Random 0.99 > attackProb -> null
         randomSpy.mockReturnValue(0.99);
-        localState.soloist.rhythmPlan = undefined;
+        localState.soloist.session.rhythm.plan = undefined;
         const planA = generateRhythmPlan(
             16,
             16,
@@ -89,8 +93,8 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         expect(planA.length).toBe(0);
 
         // Now move sessionSteps to 64 (end of warmup)
-        localState.soloist.sessionSteps = 64;
-        localState.soloist.rhythmPlan = undefined;
+        localState.soloist.session.sessionSteps = 64;
+        localState.soloist.session.rhythm.plan = undefined;
         const planB = generateRhythmPlan(
             16,
             16,
@@ -114,18 +118,24 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99); // No attack by default
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
-        localState.soloist.phrasingState = 'IMPROV';
+        localState.soloist.session.phrasing.state = 'IMPROV';
+        // The legacy flat-state engine inferred isResting from phrasingState
+        // when undefined. With the C2 restructure both fields are concrete
+        // defaults; set isResting explicitly to keep this behavioral test
+        // exercising the active->rest transition rather than the rest branch.
+        localState.soloist.session.phrasing.isResting = false;
 
         // Step 1: Not an end of measure
-        localState.soloist.activeSteps = 1; // Will decrement to 0, but not rest
+        localState.soloist.session.phrasing.activeSteps = 1; // Will decrement to 0, but not rest
         getSoloistNote(getState(), chord, null, 1, 440, 60, 'funk', 1);
-        expect(localState.soloist.phrasingState).toBe('IMPROV');
+        expect(localState.soloist.session.phrasing.state).toBe('IMPROV');
 
         // Step 15: End of measure transition point
-        localState.soloist.activeSteps = 1; // Force expiration exactly on resolution
+        localState.soloist.session.phrasing.activeSteps = 1; // Force expiration exactly on resolution
+        localState.soloist.session.phrasing.isResting = false;
         randomSpy.mockReturnValue(0.01); // Force attack
         getSoloistNote(getState(), chord, null, 15, 440, 60, 'funk', 15);
-        expect(localState.soloist.phrasingState).toBe('rest');
+        expect(localState.soloist.session.phrasing.state).toBe('rest');
 
         randomSpy.mockRestore();
     });
@@ -136,28 +146,28 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5); // Fixed random
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
-        localState.soloist.phrasingState = 'IMPROV';
-        localState.soloist.activeSteps = 0;
-        localState.soloist.notesInPhrase = 100; // Extreme fatigue
+        localState.soloist.session.phrasing.state = 'IMPROV';
+        localState.soloist.session.phrasing.activeSteps = 0;
+        localState.soloist.session.currentPhrase.notesInPhrase = 100; // Extreme fatigue
         localState.playback.bandIntensity = 0.5;
 
         // Force resolution
         randomSpy.mockReturnValue(0.01);
         getSoloistNote(getState(), chord, null, 15, 440, 60, 'funk', 15);
 
-        const highFatigueRest = localState.soloist.restSteps;
+        const highFatigueRest = localState.soloist.session.phrasing.restSteps;
 
         // Compare with low-heat phrase
-        localState.soloist.phrasingState = 'IMPROV';
-        localState.soloist.activeSteps = 0;
-        localState.soloist.notesInPhrase = 0;
+        localState.soloist.session.phrasing.state = 'IMPROV';
+        localState.soloist.session.phrasing.activeSteps = 0;
+        localState.soloist.session.currentPhrase.notesInPhrase = 0;
         localState.playback.bandIntensity = 0.5;
 
         // Ensure Math.random() gives same deterministic output
         randomSpy.mockReturnValue(0.01); // Force attack probability to pass
         getSoloistNote(getState(), chord, null, 31, 440, 60, 'funk', 15);
 
-        const lowFatigueRest = localState.soloist.restSteps;
+        const lowFatigueRest = localState.soloist.session.phrasing.restSteps;
         expect(highFatigueRest).toBeGreaterThanOrEqual(lowFatigueRest);
 
         randomSpy.mockRestore();
@@ -168,12 +178,13 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
-        localState.soloist.phrasingState = 'rest';
-        localState.soloist.restSteps = 10;
+        localState.soloist.session.phrasing.state = 'rest';
+        localState.soloist.session.phrasing.isResting = true;
+        localState.soloist.session.phrasing.restSteps = 10;
 
         getSoloistNote(getState(), chord, null, 100, 440, 72, 'funk', 4);
 
-        expect(localState.soloist.restSteps).toBe(9);
+        expect(localState.soloist.session.phrasing.restSteps).toBe(9);
     });
 
     it('should maintain liveness even with extreme intensity modifiers', () => {

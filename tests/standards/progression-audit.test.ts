@@ -2,10 +2,12 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -25,7 +27,7 @@ vi.mock('../../public/state.js', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         chords: { enabled: true, octave: 60, density: 'standard' },
         playback: {
             bandIntensity: 0.5,
@@ -105,12 +107,12 @@ describe('Progression Audit: Verifying All Library Presets', () => {
     const allTemplates = [...CHORD_PRESETS, ...SONG_TEMPLATES];
 
     beforeEach(() => {
-        soloist.isResting = false;
+        soloist.session.phrasing.isResting = false;
         soloist.currentPhraseSteps = 0;
-        soloist.notesInPhrase = 0;
-        soloist.busySteps = 0;
+        soloist.session.currentPhrase.notesInPhrase = 0;
+        soloist.session.phrasing.busySteps = 0;
         soloist.motifBuffer = [];
-        soloist.hookBuffer = [];
+        soloist.session.memory.hookBuffer = [];
         soloist.activeBuffer = null;
         soloist.isReplayingMotif = false;
     });
@@ -145,7 +147,7 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             // Audit Harmonic Cohesion: Accompanist vs Soloist
             // We specifically check if 'Rich' density extensions clash with the soloist's scale
             arranger.progression.forEach((chord) => {
-                soloist.tension = 0; // Reset tension to avoid triggering Altered scale logic during basic audit
+                soloist.session.tension = 0; // Reset tension to avoid triggering Altered scale logic during basic audit
                 const soloistScale = getScaleForChord(getState(), chord, null, 'smart');
                 const accompanistIntervals = chord.intervals;
 
@@ -170,9 +172,9 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             });
 
             // Audit Phrase Generation
-            soloist.isResting = false;
+            soloist.session.phrasing.isResting = false;
             soloist.currentPhraseSteps = 0;
-            soloist.notesInPhrase = 0;
+            soloist.session.currentPhrase.notesInPhrase = 0;
 
             const ts = TIME_SIGNATURES['4/4'];
             const spm = getStepsPerMeasure(ts);

@@ -536,79 +536,64 @@ export interface SoloistPhraseContext {
     sectionOccurrence: number;
 }
 
-export interface SoloistState {
-    /** Whether the soloist is active. */
-    readonly enabled: boolean;
-    /** Mix volume (0.0 - 1.0). */
-    readonly volume: number;
-    /** Reverb level. */
-    readonly reverb: number;
-    /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
-    readonly preset: string;
-    /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
-    readonly mode: string;
-    /** Thematic seed for deterministic generation. */
-    readonly seed: string;
-    /** Slider for how dynamic/articulated the phrasing is. */
-    readonly phrasingIntensity: number;
-    /** Probability of retaining a hook motif. */
-    readonly hookRetentionProb: number;
-    /** Seed melody for the current session. */
-    readonly sessionSeed: SoloistSessionSeed | null;
-    /** Planned rhythmic phrase. */
-    readonly rhythmPlan: RhythmNode[];
-    /** Buffer of melodic devices (bends, grace notes, rolls) queued for upcoming steps. */
-    readonly deviceBuffer: SoloistBufferedEvent[];
-    /** Buffer of melodic embellishments queued for upcoming steps. */
-    readonly embellishmentBuffer: SoloistBufferedEvent[];
-    /** Short term hook memory (currently always reset to `[]` — kept for future reintroduction). */
-    readonly hookBuffer: SoloistHook[];
-    /** Hooks shared from other instruments (e.g. Ska-Punk harmonies echoing the soloist). */
-    readonly sharedHookBuffer: SoloistHook[];
-    /** Total steps played in current session. */
-    readonly sessionSteps: number;
-    /** Mode for trading fours ('manual', 'auto'). */
-    readonly tradeMode: string;
+/**
+ * Phrasing-FSM sub-slice of `SoloistSession`. Tracks the wake/sleep cycle and
+ * coordination flags the engine reads each step to decide whether to attack,
+ * sustain, or rest.
+ */
+export interface SoloistPhrasing {
+    /** Current state in the phrasing lifecycle. */
+    readonly state: string;
+    /** Whether currently resting (i.e. not actively phrasing). */
+    readonly isResting: boolean;
+    /** Phrasing transition state at structural boundaries ('lead_in' | 'rest' | null). */
+    readonly transitionState: string | null;
+    /** Steps the soloist has been resting. */
+    readonly restSteps: number;
+    /** Steps the soloist has been active. */
+    readonly activeSteps: number;
+    /** Counter for "busy" playing periods (sustained notes that block the next attack). */
+    readonly busySteps: number;
     /** Whether waiting to start a phrase. */
     readonly isWaitingForEntry: boolean;
     /** Whether yielding space to other instruments. */
     readonly isYielding: boolean;
-    /** Whether tracking motifs is enabled. */
-    readonly motifTracking: boolean;
-    /** Total phrases played. */
-    readonly phraseCount: number;
-    /** Number of notes played in the current phrase. */
-    readonly notesInPhrase: number;
-    /** Entropy level of the current rhythm. */
-    readonly rhythmicEntropy: number;
-    /** Last frequency played. */
-    readonly lastFreq: number | null;
-    /** Last frequency sent to visualizer. */
-    readonly lastPlayedFreq: number | null;
-    /** Last frequency sent to visualizer. */
-    readonly lastRenderedFreq: number | null;
-    /** Current melodic tension level. */
-    readonly tension: number;
-    /** Steps the soloist has been active. */
-    readonly activeSteps: number;
-    /** Steps the soloist has been resting. */
-    readonly restSteps: number;
-    /** Whether currently resting. */
-    readonly isResting: boolean;
-    /** Steps matching current melodic trend. */
-    readonly contourSteps: number;
-    /** Current contour direction ('Up', 'Down', 'Static'). */
-    readonly melodicTrend: string;
-    /** Melodic direction multiplier. */
-    readonly direction: number;
-    /** Local complexity level. */
-    readonly complexity: number;
     /** Step of the last note attack. */
     readonly lastAttackStep: number;
-    /** Current state in the phrasing lifecycle. */
-    readonly phrasingState: string;
+}
+
+/**
+ * Tracks the currently-being-performed phrase: when it started, where in the
+ * form it lives, and the response context for motivic memory.
+ */
+export interface SoloistCurrentPhrase {
+    /** Step when the current phrase started. */
+    readonly startStep: number | null;
+    /** Loop index captured for the active phrase. */
+    readonly loopCount: number | null;
+    /** Section label captured for the active phrase. */
+    readonly sectionLabel: string | null;
+    /** Section occurrence captured for the active phrase. */
+    readonly sectionOccurrence: number;
+    /** Number of notes played in the current phrase. */
+    readonly notesInPhrase: number;
+    /** Context data for the current phrase. */
+    readonly context: SoloistPhraseContext;
+}
+
+/**
+ * Cross-phrase / cross-loop memory used for motivic response and form-arc
+ * recall. None of these fields are persisted — they're rebuilt each playback.
+ */
+export interface SoloistMemory {
+    /** Recently played notes. Used for signature building and direction tracking. */
+    readonly recentNotes: RecentSoloistNote[];
+    /** Short term hook memory (currently always reset to `[]` — kept for future reintroduction). */
+    readonly hookBuffer: SoloistHook[];
+    /** Hooks shared from other instruments (e.g. Ska-Punk harmonies echoing the soloist). */
+    readonly sharedHookBuffer: SoloistHook[];
     /** Cached motif data. Initialized to null; not yet repopulated by the active pipeline. */
-    // TODO(soloist-session): once the motif-cache pipeline is reintroduced, type this as MotifEntry | null.
+    // TODO(soloist-session): once the motif-cache pipeline is reintroduced, type as MotifEntry | null.
     readonly motifCache: unknown;
     /** Current rhythmic motif (subset of the active rhythm plan retained across phrases). */
     readonly rhythmicMotif: RhythmNode[];
@@ -618,44 +603,126 @@ export interface SoloistState {
      */
     // TODO(soloist-session): type as SoloistLick[] when the lick pipeline lands.
     readonly lickDictionary: unknown[];
-    /** Recently played notes. Used for signature building and direction tracking. */
-    readonly recentNotes: RecentSoloistNote[];
-    /** Step when the current phrase started. */
-    readonly phraseStartStep: number | null;
-    /** Loop index captured for the active phrase. */
-    readonly phraseLoopCount: number | null;
-    /** Section label captured for the active phrase. */
-    readonly phraseSectionLabel: string | null;
-    /** Section occurrence captured for the active phrase. */
-    readonly phraseSectionOccurrence: number;
     /** Per-loop section signatures keyed by section label. */
     readonly sectionRecall: Record<string, SectionRecallEntry>;
     /** Loop number currently represented in sectionRecall. */
     readonly sectionRecallLoop: number | null;
     /** Cross-loop section signatures keyed by section label. */
     readonly formArcRecall: Record<string, FormArcEntry>;
-    /** Context data for the current phrase. */
-    readonly phraseContext: SoloistPhraseContext;
-    /** Probability of playing double stops. */
-    readonly doubleStopProb: number;
-    /** Active polyphonic voices. */
-    readonly activeVoices: SoloistVoice[];
-    /** Last MIDI note value played. */
-    readonly lastMidiPlayed: number | null;
-    /** Optional playing style. */
-    readonly style?: string;
-    /** Map of scheduled notes from the worker. */
-    readonly buffer: Map<number, any>;
-    /** Base MIDI octave. */
-    readonly octave: number;
-    /** Last note end time. */
-    readonly lastNoteEnd: number;
-    /** Optional busy steps counter. */
-    readonly busySteps: number;
-    /** Phrasing transition state. */
-    readonly transitionState: string | null;
+}
+
+/**
+ * Rhythm-planning sub-slice — the planned events the soloist will play this
+ * phrase, plus the buffers from device/embellishment selection.
+ */
+export interface SoloistRhythm {
+    /** Planned rhythmic phrase. */
+    readonly plan: RhythmNode[];
+    /** Entropy level of the current rhythm (mutated at section boundaries). */
+    readonly entropy: number;
+    /** Buffer of melodic devices (bends, grace notes, rolls) queued for upcoming steps. */
+    readonly deviceBuffer: SoloistBufferedEvent[];
+    /** Buffer of melodic embellishments queued for upcoming steps. */
+    readonly embellishmentBuffer: SoloistBufferedEvent[];
+}
+
+/**
+ * Melodic-contour tracker used by the pitch engine to bias the next note's
+ * direction. Updated each commit.
+ */
+export interface SoloistContour {
+    /** Current contour direction ('Up', 'Down', 'Static'). */
+    readonly trend: string;
+    /** Melodic direction multiplier (-1 | 0 | 1). */
+    readonly direction: number;
+    /** Steps matching the current melodic trend. */
+    readonly steps: number;
+}
+
+/**
+ * Per-playback engine runtime. Reset by `resetSoloistState()`; never persisted.
+ * Holds the SRDC head seed plus the five FSM/memory sub-slices the engine
+ * mutates each tick.
+ */
+export interface SoloistSession {
+    /** Seed melody for the current session (the SRDC "Head" set once per playback). */
+    readonly seed: SoloistSessionSeed | null;
+    /** Total steps played in the current session. */
+    readonly sessionSteps: number;
+    /** Total phrases played. */
+    readonly phraseCount: number;
+    /** Current melodic tension level. */
+    readonly tension: number;
     /** Last active smart style. */
     readonly lastSmartStyle: string;
+
+    readonly phrasing: SoloistPhrasing;
+    readonly currentPhrase: SoloistCurrentPhrase;
+    readonly memory: SoloistMemory;
+    readonly rhythm: SoloistRhythm;
+    readonly contour: SoloistContour;
+}
+
+/**
+ * Main-thread synth/voice tracking. Lives on the audio thread (not the worker)
+ * and is mutated by the synth layer. Not persisted, not synced to the worker
+ * (the worker computes its own `lastFreq` for engine reads).
+ */
+export interface SoloistAudio {
+    /** Active polyphonic voices. */
+    readonly activeVoices: SoloistVoice[];
+    /** Map of scheduled notes from the worker. */
+    readonly buffer: Map<number, any>;
+    /** Last frequency played. */
+    readonly lastFreq: number | null;
+    /** Last MIDI note value played. */
+    readonly lastMidiPlayed: number | null;
+    /** Last frequency actually rendered by the synth (used for portamento). */
+    readonly lastRenderedFreq: number | null;
+    /** Last frequency sent to the visualizer. */
+    readonly lastPlayedFreq: number | null;
+    /** Last note end time. */
+    readonly lastNoteEnd: number;
+}
+
+export interface SoloistState {
+    // === Configuration (user-settable, persisted) — flat at the top of the
+    // slice to preserve persistence / hydration / UI / worker-sync compat.
+
+    /** Whether the soloist is active. */
+    readonly enabled: boolean;
+    /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
+    readonly preset: string;
+    /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
+    readonly mode: string;
+    /** Optional playing style (e.g. 'jazz', 'blues', 'smart'). */
+    readonly style?: string;
+    /** Base MIDI octave. */
+    readonly octave: number;
+    /** Mix volume (0.0 - 1.0). */
+    readonly volume: number;
+    /** Reverb level. */
+    readonly reverb: number;
+    /** Local complexity level. */
+    readonly complexity: number;
+    /** Slider for how dynamic/articulated the phrasing is. */
+    readonly phrasingIntensity: number;
+    /** Probability of retaining a hook motif. */
+    readonly hookRetentionProb: number;
+    /** Probability of playing double stops. */
+    readonly doubleStopProb: number;
+    /** Mode for trading fours ('manual', 'auto'). */
+    readonly tradeMode: string;
+    /** Whether tracking motifs is enabled. */
+    readonly motifTracking: boolean;
+    /** Thematic seed for deterministic generation. */
+    readonly seed: string;
+
+    // === Engine runtime (per-playback, transient) ===
+    readonly session: SoloistSession;
+
+    // === Main-thread synth / voice tracking ===
+    readonly audio: SoloistAudio;
 }
 
 export interface HarmonyState {
@@ -1025,7 +1092,89 @@ export interface ActionPayloadUpdateConductorState {
 }
 
 export type ActionPayloadUpdateHB = Partial<HarmonyState>;
-export type ActionPayloadUpdateSB = Partial<SoloistState>;
+
+/**
+ * UPDATE_SB payload — flat-keyed for worker-wire and conductor compatibility.
+ * The reducer (`applySoloistPayload`) routes each flat key to its actual
+ * nested location under `session` / `audio`. Accepts the union of:
+ *
+ * - Top-level config fields (Partial<SoloistState>'s flat shape).
+ * - Flat engine-runtime aliases: `sessionSeed`, `sessionSteps`, `phraseCount`,
+ *   `tension`, `lastSmartStyle`, `phrasingState`, `isResting`, `transitionState`,
+ *   `restSteps`, `activeSteps`, `busySteps`, `isWaitingForEntry`, `isYielding`,
+ *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
+ *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
+ *   `hookBuffer`, `sharedHookBuffer`, `motifCache`, `rhythmicMotif`,
+ *   `lickDictionary`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
+ *   `rhythmPlan`, `rhythmicEntropy`, `deviceBuffer`, `embellishmentBuffer`,
+ *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
+ *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
+ *   `lastNoteEnd`.
+ *
+ * The full alias union is left as a loose `Record` to keep the contract simple.
+ * Unknown keys fall through to a top-level write on the slice (preserves the
+ * pre-restructure `instrumentStateMap[mod][param] = v` semantics that a handful
+ * of ad-hoc scripts and the `instrument-reducer` test rely on).
+ */
+export type ActionPayloadUpdateSB = Partial<{
+    enabled: boolean;
+    preset: string;
+    mode: string;
+    style: string;
+    octave: number;
+    volume: number;
+    reverb: number;
+    complexity: number;
+    phrasingIntensity: number;
+    hookRetentionProb: number;
+    doubleStopProb: number;
+    tradeMode: string;
+    motifTracking: boolean;
+    seed: string;
+    sessionSeed: SoloistSessionSeed | null;
+    sessionSteps: number;
+    phraseCount: number;
+    tension: number;
+    lastSmartStyle: string;
+    phrasingState: string;
+    isResting: boolean;
+    transitionState: string | null;
+    restSteps: number;
+    activeSteps: number;
+    busySteps: number;
+    isWaitingForEntry: boolean;
+    isYielding: boolean;
+    lastAttackStep: number;
+    phraseStartStep: number | null;
+    phraseLoopCount: number | null;
+    phraseSectionLabel: string | null;
+    phraseSectionOccurrence: number;
+    notesInPhrase: number;
+    phraseContext: SoloistPhraseContext;
+    recentNotes: RecentSoloistNote[];
+    hookBuffer: SoloistHook[];
+    sharedHookBuffer: SoloistHook[];
+    motifCache: unknown;
+    rhythmicMotif: RhythmNode[];
+    lickDictionary: unknown[];
+    sectionRecall: Record<string, SectionRecallEntry>;
+    sectionRecallLoop: number | null;
+    formArcRecall: Record<string, FormArcEntry>;
+    rhythmPlan: RhythmNode[];
+    rhythmicEntropy: number;
+    deviceBuffer: SoloistBufferedEvent[];
+    embellishmentBuffer: SoloistBufferedEvent[];
+    melodicTrend: string;
+    direction: number;
+    contourSteps: number;
+    activeVoices: SoloistVoice[];
+    buffer: Map<number, any>;
+    lastFreq: number | null;
+    lastMidiPlayed: number | null;
+    lastRenderedFreq: number | null;
+    lastPlayedFreq: number | null;
+    lastNoteEnd: number;
+}>;
 export type ActionPayloadUpdateGB = Partial<GrooveState>;
 
 export interface ActionPayloadMap {

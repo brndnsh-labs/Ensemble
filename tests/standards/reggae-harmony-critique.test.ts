@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -25,7 +27,7 @@ describe('Reggae Harmony Critique', () => {
                     soloistGravity: 1,
                 },
             },
-            soloist: { enabled: true, isResting: true, notesInPhrase: 0 },
+            soloist: makeSoloistMock({ enabled: true, isResting: true, notesInPhrase: 0 }),
             harmony: { enabled: true, complexity: 0.5, lastMidis: [], rhythmicMask: 0 },
             arranger: { timeSignature: '4/4' },
         };

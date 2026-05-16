@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { debounceSaveState, saveCurrentState } from '../../../public/persistence.js';
 import { getState, storage } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js', () => ({
     getState: vi.fn(),
     storage: { save: vi.fn() },
@@ -17,7 +21,7 @@ describe('Persistence Deep Dive', () => {
             playback: { theme: 'dark' },
             chords: {},
             bass: {},
-            soloist: {},
+            soloist: makeSoloistMock({}),
             harmony: {},
             groove: { instruments: [] },
             vizState: {},

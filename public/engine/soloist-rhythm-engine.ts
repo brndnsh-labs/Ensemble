@@ -178,13 +178,15 @@ export function generateRhythmPlan(
     const plan: any[] = [];
     const _config = (STYLE_CONFIG as any)[style] || STYLE_CONFIG.scalar;
     const responseConfig = _config.motivicResponse || null;
-    const hasDynamicHeadSeed = Boolean(soloistState.sessionSeed?.notes?.length);
+    const hasDynamicHeadSeed = Boolean(soloistState.session.seed?.notes?.length);
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
     const isMonophonicMode = isSoloistMonophonicMode(soloistState.mode);
     const minPhraseNotes = Math.max(0, _config.minNotesPerPhrase || 0);
-    const responseSignature = soloistState.phraseContext?.responseSignature;
-    const responseMode = (soloistState.phraseContext?.responseMode || 'free') as ResponseMode;
-    const responseSource = (soloistState.phraseContext?.responseSource || 'free') as ResponseSource;
+    const responseSignature = soloistState.session.currentPhrase.context?.responseSignature;
+    const responseMode = (soloistState.session.currentPhrase.context?.responseMode ||
+        'free') as ResponseMode;
+    const responseSource = (soloistState.session.currentPhrase.context?.responseSource ||
+        'free') as ResponseSource;
 
     let notesInPhrase = 0;
 
@@ -192,7 +194,7 @@ export function generateRhythmPlan(
     if (
         hasDynamicHeadSeed &&
         responseConfig?.enabled &&
-        soloistState.phraseContext?.role === 'response' &&
+        soloistState.session.currentPhrase.context?.role === 'response' &&
         (responseSignature?.notes?.length ?? 0) > 0
     ) {
         plan.push(
@@ -210,11 +212,11 @@ export function generateRhythmPlan(
         );
     } else if (
         ['blues', 'jazz', 'rock', 'scalar'].includes(style) &&
-        soloistState.phraseContext?.role === 'response' &&
-        soloistState.phraseContext?.skeleton?.length > 0 &&
+        soloistState.session.currentPhrase.context?.role === 'response' &&
+        soloistState.session.currentPhrase.context?.skeleton?.length > 0 &&
         Math.random() < 0.8 // 80% chance to follow skeleton for response
     ) {
-        for (const relStep of soloistState.phraseContext.skeleton) {
+        for (const relStep of soloistState.session.currentPhrase.context.skeleton) {
             const stepTarget = startStep + relStep;
             if (stepTarget >= startStep + activeSteps) {
                 continue;
@@ -275,7 +277,8 @@ export function generateRhythmPlan(
             const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
             const isSectionDownbeat =
-                step === coordination.sectionStart && soloistState.transitionState === 'lead_in';
+                step === coordination.sectionStart &&
+                soloistState.session.phrasing.transitionState === 'lead_in';
 
             // Meter-Aware Emphasis
             const emphasisIdx = Math.floor((measureStep / stepsPerMeasure) * 16) % 16;
@@ -326,7 +329,7 @@ export function generateRhythmPlan(
 
             // --- Rock Profile Bursts (EVH / Beck) ---
             if ((style === 'rock' || style === 'scalar') && intensity > 0.65) {
-                const profile = soloistState.phraseContext?.profile;
+                const profile = soloistState.session.currentPhrase.context?.profile;
                 if (profile === 'evh' || profile === 'beck') {
                     if (stepInBeat % 2 !== 0) {
                         attackProb *= 1.6; // Boost 16ths for shreddy/unpredictable feel
@@ -335,10 +338,10 @@ export function generateRhythmPlan(
             }
 
             // Apply persistent rhythmic entropy if set
-            if (soloistState.rhythmicEntropy !== undefined) {
+            if (soloistState.session.rhythm.entropy !== undefined) {
                 // rhythmicEntropy ranges roughly from -1.0 to 1.0.
                 // Using multiplicative scaling to keep bounds somewhat reasonable.
-                attackProb *= 1.0 + soloistState.rhythmicEntropy * 0.5;
+                attackProb *= 1.0 + soloistState.session.rhythm.entropy * 0.5;
             }
 
             // Syncopation Arc: gently favor syncopation as the session progresses
@@ -385,7 +388,7 @@ export function generateRhythmPlan(
             }
 
             // --- Dynamic Head: Rhythmic Seeding ---
-            const sessionSeed = soloistState.sessionSeed;
+            const sessionSeed = soloistState.session.seed;
             if (sessionSeed && sessionSeed.notes.length > 0) {
                 const { notes, loopLengthSteps } = sessionSeed;
                 const stepInLoop = step % loopLengthSteps;
@@ -395,12 +398,12 @@ export function generateRhythmPlan(
                 }
             }
 
-            if (isFinalMeasure && soloistState.transitionState === 'lead_in') {
+            if (isFinalMeasure && soloistState.session.phrasing.transitionState === 'lead_in') {
                 attackProb *= 1.5;
             }
 
             // PRE-HEAT: Boost density during count-in (negative steps)
-            if (step < 0 && soloistState.transitionState === 'lead_in') {
+            if (step < 0 && soloistState.session.phrasing.transitionState === 'lead_in') {
                 attackProb *= 1.8;
             }
 
@@ -432,7 +435,7 @@ export function generateRhythmPlan(
 
             // --- Jazz Specifics ---
             if (isLineStyle) {
-                const profile = soloistState.phraseContext?.profile;
+                const profile = soloistState.session.currentPhrase.context?.profile;
                 // Double-time bursts for Bird/Coltrane
                 if ((profile === 'bird' || profile === 'coltrane') && intensity > 0.7) {
                     if (isSixteenthSubdivision) {
@@ -456,8 +459,8 @@ export function generateRhythmPlan(
                 silenceSteps = 0;
                 const isBebopStyle =
                     style === 'bird' ||
-                    soloistState.phraseContext?.profile === 'bird' ||
-                    soloistState.phraseContext?.profile === 'coltrane';
+                    soloistState.session.currentPhrase.context?.profile === 'bird' ||
+                    soloistState.session.currentPhrase.context?.profile === 'coltrane';
 
                 let stepVelocity = 0.6 + intensity * 0.4;
                 if (isDownbeat) {
@@ -490,14 +493,14 @@ export function generateRhythmPlan(
 
                 // 3. Dynamic Contrast: Sparse sections favor holding notes
                 if (
-                    soloistState.rhythmicEntropy !== undefined &&
-                    soloistState.rhythmicEntropy < -0.3
+                    soloistState.session.rhythm.entropy !== undefined &&
+                    soloistState.session.rhythm.entropy < -0.3
                 ) {
                     finalSustainProb += 0.2;
                 }
 
                 // 4. Greats Profiles: Gilmour-specific lyrical sustain
-                if (soloistState.phraseContext?.profile === 'gilmour') {
+                if (soloistState.session.currentPhrase.context?.profile === 'gilmour') {
                     finalSustainProb += 0.2;
                 }
 

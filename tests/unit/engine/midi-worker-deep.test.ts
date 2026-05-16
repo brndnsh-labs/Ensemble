@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExportProcessor } from '../../../public/engine/midi-worker-logic.js';
 import { generateResolutionNotes } from '../../../public/engine/resolution.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // We need to mock worker-utils because getChordAtStep is used in processStep
 vi.mock('../../../public/engine/worker-utils.js', () => ({
     getChordAtStep: vi.fn(() => ({
@@ -33,7 +37,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
             },
             chords: { enabled: true, style: 'Standard', volume: 0.5, octave: 0 },
             bass: { enabled: true, style: 'Standard', volume: 0.5, octave: 0 },
-            soloist: {
+            soloist: makeSoloistMock({
                 enabled: true,
                 style: 'Standard',
                 volume: 0.5,
@@ -46,7 +50,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
                     lastInterval: null,
                     profile: 'srv',
                 },
-            },
+            }),
             harmony: { enabled: true, style: 'Standard', volume: 0.5, octave: 0, complexity: 0.5 },
             groove: {
                 enabled: true,

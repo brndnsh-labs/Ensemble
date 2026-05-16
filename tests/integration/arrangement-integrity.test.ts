@@ -3,6 +3,8 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state and global modules
 vi.mock('../../public/state.js', () => {
     const mockArranger = {
@@ -19,7 +21,7 @@ vi.mock('../../public/state.js', () => {
         intent: { soloistMod: 0, anticipation: 0, syncopation: 0, layBack: 0 },
     };
     const mockGroove = { genreFeel: 'Jazz', pocket: 'ahead', instruments: [] };
-    const mockSoloist = {
+    const mockSoloist = makeSoloistMock({
         enabled: true,
         busySteps: 0,
         lastFreq: 440,
@@ -29,7 +31,7 @@ vi.mock('../../public/state.js', () => {
             lastInterval: null,
             profile: 'srv',
         },
-    };
+    });
     const mockBass = { enabled: true, lastFreq: 110 };
     const mockChords = { enabled: true, rhythmicMask: 0, style: 'smart' };
     const mockHarmony = { enabled: true, rhythmicMask: 0 };
@@ -115,7 +117,7 @@ describe('Arrangement Integrity & Clutter Audit', () => {
                 chord,
                 null,
                 s,
-                state.soloist.lastFreq,
+                state.soloist.audio.lastFreq,
                 60,
                 'smart',
                 s,

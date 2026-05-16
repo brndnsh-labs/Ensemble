@@ -1,6 +1,10 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state and global config
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -13,12 +17,12 @@ vi.mock('../../../public/state.js', () => {
             buffer: new Map(),
             style: 'smart',
         },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             tension: 0,
             buffer: new Map(),
-        },
+        }),
         groove: {
             genreFeel: 'Funk',
             measures: 1,

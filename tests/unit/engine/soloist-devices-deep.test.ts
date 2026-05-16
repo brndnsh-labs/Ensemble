@@ -4,6 +4,7 @@ import {
     generateExtraNotes,
     generateMelodicDevice,
 } from '../../../public/engine/soloist-devices.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 describe('Soloist Melodic Devices Deep Dive', () => {
     let ctx;
@@ -22,7 +23,7 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             maxMidi: 100,
             lastMidi: 60,
             playback: { bpm: 120 },
-            soloist: { mode: 'monophonic', isResting: false },
+            soloist: makeSoloistMock({ mode: 'monophonic', isResting: false }),
             isPolyphonic: true,
             isPiano: false,
             dynamicCenter: 60,
@@ -175,7 +176,7 @@ describe('Soloist Melodic Devices Deep Dive', () => {
         });
 
         it('should handle soloist resting octave shift', () => {
-            ctx.soloist.isResting = true;
+            ctx.soloist.session.phrasing.isResting = true;
             ctx.dynamicCenter = 72;
             const device = generateMelodicDevice('graceNote', ctx);
             expect(device[0].midi).toBeGreaterThanOrEqual(60);

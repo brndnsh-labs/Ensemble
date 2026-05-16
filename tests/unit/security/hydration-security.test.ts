@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as stateModule from '../../../public/state.js';
 import { hydrateState } from '../../../public/state-hydration.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Consolidated State and Storage Mock
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -20,7 +24,7 @@ vi.mock('../../../public/state.js', () => {
         },
         chords: { enabled: true, volume: 0.5, reverb: 0.3 },
         bass: { enabled: true, volume: 0.5, reverb: 0.05 },
-        soloist: { enabled: false, volume: 0.5, reverb: 0.6 },
+        soloist: makeSoloistMock({ enabled: false, volume: 0.5, reverb: 0.6 }),
         harmony: { enabled: false, volume: 0.4, reverb: 0.4 },
         vizState: { enabled: false },
         midi: { enabled: false },
@@ -126,7 +130,7 @@ describe('Security: Hydration & Storage Resilience', () => {
                     volume: 2,
                     reverb: 8,
                 },
-                soloist: { reverb: 5.5 },
+                soloist: makeSoloistMock({ reverb: 5.5 }),
                 harmony: { reverb: 7 },
                 groove: {
                     genreFeel: 'MaliciousScript',
@@ -191,7 +195,7 @@ describe('Security: Hydration & Storage Resilience', () => {
         it('should treat retired classic soloist preset values as unsupported', () => {
             const payload = {
                 sections: [{ id: '1', label: 'A', value: 'I' }],
-                soloist: { preset: 'classic' },
+                soloist: makeSoloistMock({ preset: 'classic' }),
             };
             localStorage.setItem('ensemble_currentState', JSON.stringify(payload));
 

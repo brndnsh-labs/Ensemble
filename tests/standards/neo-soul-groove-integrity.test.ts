@@ -5,6 +5,8 @@ import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-e
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -23,7 +25,7 @@ describe('Neo-Soul Groove Integrity', () => {
             instruments: [],
             sectionSeedMap: { 1: 0.5 },
         },
-        soloist: { enabled: false, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         arranger: {
             timeSignature: '4/4',
             sectionMap: [{ start: 0, end: 64 }],

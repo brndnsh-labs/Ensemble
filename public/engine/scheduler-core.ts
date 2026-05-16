@@ -194,7 +194,7 @@ function triggerResolution(state: EnsembleState, time: number, dispatch?: Dispat
     // 0. Clear all buffers to prevent "double hits" from pre-fetched notes
     // The worker might have already sent normal notes for the wrap-around step.
     bass.buffer.clear();
-    soloist.buffer.clear();
+    soloist.audio.buffer.clear();
     chords.buffer.clear();
     harmony.buffer.clear();
     groove.buffer.clear();
@@ -460,7 +460,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
         firstChord,
         firstChord,
         pickupStep,
-        soloist.lastFreq as any,
+        soloist.audio.lastFreq as any,
         soloist.octave,
         soloist.style as any,
         0,
@@ -730,8 +730,8 @@ function scheduleSoloist(
     playTime: number,
 ): void {
     const { soloist, playback, vizState } = state;
-    const notes = soloist.buffer.get(step);
-    soloist.buffer.delete(step);
+    const notes = soloist.audio.buffer.get(step);
+    soloist.audio.buffer.delete(step);
 
     if (notes && notes.length > 0) {
         // Optimization: Avoid allocation if we only play one note (Common case)
@@ -765,7 +765,7 @@ function scheduleSoloist(
                 const offsetS = timingOffset || 0;
 
                 if (!noteEntry.isDoubleStop) {
-                    (soloist as Mutable<typeof soloist>).lastPlayedFreq = freq; // @direct-mutation
+                    (soloist.audio as Mutable<typeof soloist.audio>).lastPlayedFreq = freq; // @direct-mutation
                 }
 
                 const midiNum = noteEntry.midi || getMidi(freq || 0) || 0;
@@ -819,7 +819,7 @@ function scheduleSoloist(
                         noteType,
                     });
                 }
-                (soloist as Mutable<typeof soloist>).lastNoteEnd = finalTime + duration; // @direct-mutation
+                (soloist.audio as Mutable<typeof soloist.audio>).lastNoteEnd = finalTime + duration; // @direct-mutation
             }
         });
     }
@@ -1213,7 +1213,7 @@ function syncAndFlushWorker(
             style: soloist.style,
             octave: soloist.octave,
             enabled: soloist.enabled,
-            lastFreq: soloist.lastFreq,
+            lastFreq: soloist.audio.lastFreq,
             volume: soloist.volume,
             mode: soloist.mode,
         },
@@ -1253,7 +1253,7 @@ function syncAndFlushWorker(
 
     chords.buffer.clear();
     bass.buffer.clear();
-    soloist.buffer.clear();
+    soloist.audio.buffer.clear();
     harmony.buffer.clear();
     if (dispatch) {
         dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });

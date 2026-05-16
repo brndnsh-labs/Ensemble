@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as stateModule from '../../../public/state.js';
 import { hydrateState, loadFromUrl } from '../../../public/state-hydration.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock dependencies
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -12,7 +16,7 @@ vi.mock('../../../public/state.js', () => {
         groove: { genreFeel: 'Rock', instruments: [] },
         chords: {},
         bass: {},
-        soloist: {},
+        soloist: makeSoloistMock({}),
         harmony: {},
         midi: {},
         vizState: {},

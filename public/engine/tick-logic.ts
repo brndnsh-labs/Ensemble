@@ -249,7 +249,7 @@ export function generateNotesForStep(
                 chord || null,
                 nextChordData?.chord || null,
                 step,
-                (soloist.lastFreq || null) as any,
+                (soloist.audio.lastFreq || null) as any,
                 soloist.octave,
                 soloist.style || '',
                 stepInChord,
@@ -266,7 +266,9 @@ export function generateNotesForStep(
                             res.midi = getMidi(res.freq);
                         }
                         // Enforce Contract: Register Slotting (with smooth octave shift)
-                        const lastSoloMidi = soloist.lastFreq ? getMidi(soloist.lastFreq) : null;
+                        const lastSoloMidi = soloist.audio.lastFreq
+                            ? getMidi(soloist.audio.lastFreq)
+                            : null;
                         res.midi = enforceRegisterSlotting(
                             'soloist',
                             res.midi,
@@ -278,7 +280,7 @@ export function generateNotesForStep(
                             res.freq = getFrequency(res.midi);
                         }
                         if (!res.isDoubleStop) {
-                            (soloist as Mutable<typeof soloist>).lastFreq = res.freq; // @worker-mutation
+                            (soloist.audio as Mutable<typeof soloist.audio>).lastFreq = res.freq; // @worker-mutation
                         }
                         notesToMain.push({ ...res, step, module: 'soloist' });
                     }

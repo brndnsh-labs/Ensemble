@@ -4,10 +4,12 @@ import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
     mockState: {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -24,7 +26,7 @@ const { mockState } = vi.hoisted(() => ({
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4' },
@@ -58,7 +60,7 @@ import { describe, it } from 'vitest';
 describe('Soloist Smart Genre Statistics', () => {
     function runGenreSimulation(genreName, measures = 200, intensity = 0.8) {
         // Reset State
-        mockState.soloist = {
+        mockState.soloist = makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -75,7 +77,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
         mockState.groove.genreFeel = genreName;
         mockState.playback.bandIntensity = intensity;
         mockState.playback.complexity = intensity;
@@ -123,7 +125,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 }
             }
 
-            if (mockState.soloist.isResting) {
+            if (mockState.soloist.session.phrasing.isResting) {
                 restSteps++;
                 if (!previousWasResting && currentPhraseLength > 0) {
                     phrases.push(currentPhraseLength);
@@ -137,7 +139,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 notesInCurrentMeasure = 0;
             }
 
-            previousWasResting = mockState.soloist.isResting;
+            previousWasResting = mockState.soloist.session.phrasing.isResting;
         }
 
         // Metrics from measure list
@@ -191,7 +193,7 @@ describe('Soloist Smart Genre Statistics', () => {
             mockState.playback.currentLoopCount = 0; // Start at loop 0
 
             // Reset soloist state
-            mockState.soloist = {
+            mockState.soloist = makeSoloistMock({
                 enabled: true,
                 isResting: true,
                 pitchHistory: [],
@@ -204,7 +206,7 @@ describe('Soloist Smart Genre Statistics', () => {
                     lastInterval: null,
                     profile: 'srv',
                 },
-            };
+            });
 
             let headNotes = 0;
             let soloNotes = 0;
@@ -258,7 +260,7 @@ describe('Soloist Smart Genre Statistics', () => {
         mockState.playback.complexity = 0.8;
         mockState.playback.currentLoopCount = 2; // Full solo mode
 
-        mockState.soloist = {
+        mockState.soloist = makeSoloistMock({
             enabled: true,
             isResting: true,
             pitchHistory: [],
@@ -271,7 +273,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
 
         const phraseLengths = [];
         const restGaps = [];
@@ -292,7 +294,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 s % 16,
             );
 
-            const isRestingNow = mockState.soloist.isResting;
+            const isRestingNow = mockState.soloist.session.phrasing.isResting;
 
             if (isRestingNow) {
                 currentRestSteps++;
@@ -344,7 +346,7 @@ describe('Soloist Smart Genre Statistics', () => {
             mockState.playback.bandIntensity = 0.8;
             mockState.playback.complexity = 0.8;
             mockState.playback.currentLoopCount = 2;
-            mockState.soloist = {
+            mockState.soloist = makeSoloistMock({
                 enabled: true,
                 isResting: true,
                 pitchHistory: [],
@@ -358,7 +360,7 @@ describe('Soloist Smart Genre Statistics', () => {
                     profile: 'srv',
                 },
                 evolutionEnabled: false, // Disable replaying motifs for this test
-            };
+            });
 
             let lastMidi = 60;
             let lastFreq = 261.63; // C4
@@ -370,7 +372,7 @@ describe('Soloist Smart Genre Statistics', () => {
             const pitchSet = new Set();
 
             for (let s = 0; s < totalMeasures * 16; s++) {
-                const wasResting = mockState.soloist.isResting;
+                const wasResting = mockState.soloist.session.phrasing.isResting;
                 const res = getSoloistNote(
                     getState(),
                     { rootMidi: 60, intervals: [0, 4, 7] },
@@ -399,7 +401,7 @@ describe('Soloist Smart Genre Statistics', () => {
                 }
 
                 // Phrase end detection
-                if (!wasResting && mockState.soloist.isResting) {
+                if (!wasResting && mockState.soloist.session.phrasing.isResting) {
                     phraseEndMidis.push(lastMidi);
                 }
             }
@@ -465,7 +467,7 @@ describe('Soloist Smart Genre Statistics', () => {
             mockState.groove.genreFeel = genre;
             mockState.playback.bandIntensity = 0.8;
             mockState.playback.complexity = 0.8;
-            mockState.soloist = {
+            mockState.soloist = makeSoloistMock({
                 enabled: true,
                 isResting: true,
                 pitchHistory: [],
@@ -478,7 +480,7 @@ describe('Soloist Smart Genre Statistics', () => {
                     lastInterval: null,
                     profile: 'srv',
                 },
-            };
+            });
 
             let count = 0;
             const measuresToRun = 128;

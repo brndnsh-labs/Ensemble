@@ -189,7 +189,7 @@ export function applyGrooveOverrides(
         isFirstStepOfNewBar,
         sectionSeed,
         isTurnaround,
-        isSoloistBusy: soloist.enabled && soloist.busySteps > 0,
+        isSoloistBusy: soloist.enabled && soloist.session.phrasing.busySteps > 0,
     };
 
     if (strategy) {

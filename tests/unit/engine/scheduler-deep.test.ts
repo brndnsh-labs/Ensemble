@@ -8,6 +8,10 @@ import {
 import { ACTIONS } from '../../../public/types.js';
 import { triggerFlash } from '../../../public/ui.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock high-level dependencies
 vi.mock('../../../public/worker-client.js', () => ({
     stopWorker: vi.fn(),
@@ -135,7 +139,7 @@ describe('Scheduler Core Deep Dive', () => {
                 humanize: 0,
                 genreFeel: 'Rock',
             },
-            soloist: { buffer: new Map(), tension: 0.5 },
+            soloist: makeSoloistMock({ buffer: new Map(), tension: 0.5 }),
             bass: { buffer: new Map() },
             harmony: { buffer: new Map() },
             midi: { enabled: true, selectedOutputId: 'out-1' },

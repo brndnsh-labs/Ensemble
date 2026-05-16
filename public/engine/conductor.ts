@@ -35,7 +35,7 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
 
     // --- 3. Musical Conversation (Soloist Density) ---
     // If soloist is active, the accompanist should "listen" and back off.
-    const isSoloistBusy = soloist.enabled && (soloist.busySteps || 0) > 0;
+    const isSoloistBusy = soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0;
     const targetIntentDensity = isSoloistBusy ? 0.3 * (1 - complexity) : 0.5 + intensity * 0.4;
 
     // --- 4. Harmony Evolution ---

@@ -3,10 +3,12 @@ import { vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
     mockState: {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -23,7 +25,7 @@ const { mockState } = vi.hoisted(() => ({
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4' },
@@ -59,7 +61,7 @@ describe('Soloist Phrasing Debugger', () => {
         mockState.playback.bandIntensity = 0.8;
 
         // Reset state
-        mockState.soloist = {
+        mockState.soloist = makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -76,7 +78,7 @@ describe('Soloist Phrasing Debugger', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
 
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         const totalSteps = measures * 16;
@@ -97,7 +99,7 @@ describe('Soloist Phrasing Debugger', () => {
                 stepInMeasure,
             );
 
-            const status = mockState.soloist.isResting ? 'REST' : 'PLAY';
+            const status = mockState.soloist.session.phrasing.isResting ? 'REST' : 'PLAY';
             const noteChar = res ? '♫' : '.';
 
             // Log every step where something happens, or every 4 steps for rhythm
@@ -107,7 +109,7 @@ describe('Soloist Phrasing Debugger', () => {
                 const m_b = `${measure + 1}:${beat}`.padEnd(5);
 
                 console.log(
-                    `${m_b} | ${status} | ${String(mockState.soloist.notesInPhrase).padStart(13)} | ${String(mockState.soloist.currentPhraseSteps).padStart(11)} | ${noteChar}`,
+                    `${m_b} | ${status} | ${String(mockState.soloist.session.currentPhrase.notesInPhrase).padStart(13)} | ${String(mockState.soloist.currentPhraseSteps).padStart(11)} | ${noteChar}`,
                 );
             }
 

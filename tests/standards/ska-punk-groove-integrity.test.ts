@@ -5,6 +5,8 @@ import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-e
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -22,7 +24,7 @@ describe('Ska-Punk Groove Integrity', () => {
             lastDrumPreset: 'Ska-Punk',
             instruments: [],
         },
-        soloist: { enabled: false, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
     };
 
     it('should assign valid Ska-Punk Motifs', () => {

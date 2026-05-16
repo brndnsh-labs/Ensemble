@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveCurrentState } from '../../../public/persistence.js';
 import { getState, storage } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock storage
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
@@ -25,7 +29,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         },
         chords: { ...actual.chords, enabled: true },
         bass: { ...actual.bass, enabled: true },
-        soloist: { ...actual.soloist, enabled: true },
+        soloist: makeSoloistMock({ ...actual.soloist, enabled: true }),
         harmony: { ...actual.harmony, enabled: false },
         vizState: { ...actual.vizState },
         midi: { ...actual.midi },

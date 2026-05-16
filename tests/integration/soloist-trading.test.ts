@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../public/engine/conductor.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock State
 vi.mock('../../public/state.js', () => {
     const mockState = {
@@ -25,14 +27,23 @@ vi.mock('../../public/state.js', () => {
                 { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'A' } },
             ],
         },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             tradeMode: 'sections',
             activeTab: 'smart',
-            isResting: false,
+            session: {
+                phrasing: {
+                    isResting: false,
+                    isYielding: false,
+                    isWaitingForEntry: false,
+                    activeSteps: 0,
+                    restSteps: 0,
+                    busySteps: 0,
+                },
+            },
             currentPhraseSteps: 10,
             srdcState: 'Statement',
-        },
+        }),
         groove: { enabled: true, genreFeel: 'Jazz' },
         conductor: {
             targetIntensity: 0.35,
@@ -47,7 +58,34 @@ vi.mock('../../public/state.js', () => {
                     mockState[payload.module][payload.param] = payload.value;
                 }
             } else if (action === 'UPDATE_SB') {
-                Object.assign(mockState.soloist, payload);
+                // Route flat aliases to their nested home (mirrors the prod
+                // reducer in public/state/instruments.ts).
+                const routes: Record<string, string[]> = {
+                    isYielding: ['session', 'phrasing', 'isYielding'],
+                    isWaitingForEntry: ['session', 'phrasing', 'isWaitingForEntry'],
+                    isResting: ['session', 'phrasing', 'isResting'],
+                    activeSteps: ['session', 'phrasing', 'activeSteps'],
+                    restSteps: ['session', 'phrasing', 'restSteps'],
+                    busySteps: ['session', 'phrasing', 'busySteps'],
+                    sessionSeed: ['session', 'seed'],
+                    sessionSteps: ['session', 'sessionSteps'],
+                    tension: ['session', 'tension'],
+                };
+                for (const [k, v] of Object.entries(payload)) {
+                    const route = routes[k];
+                    if (route) {
+                        let target: any = mockState.soloist;
+                        for (let i = 0; i < route.length - 1; i++) {
+                            if (!target[route[i]]) {
+                                target[route[i]] = {};
+                            }
+                            target = target[route[i]];
+                        }
+                        target[route[route.length - 1]] = v;
+                    } else {
+                        mockState.soloist[k] = v;
+                    }
+                }
             }
         }),
     };
@@ -106,17 +144,17 @@ describe('Soloist Trading Logic', () => {
         // Transition 1: A -> B (at step 16 triggers for end at 32)
         checkSectionTransition(state, 16, stepsPerMeasure, state.dispatch);
         expect(state.soloist.enabled).toBe(false);
-        expect(state.soloist.isYielding).toBe(true);
+        expect(state.soloist.session.phrasing.isYielding).toBe(true);
 
         // Transition 2: B -> C (at step 48 triggers for end at 64)
         checkSectionTransition(state, 48, stepsPerMeasure, state.dispatch);
         expect(state.soloist.enabled).toBe(true);
-        expect(state.soloist.isYielding).toBe(false);
-        expect(state.soloist.isWaitingForEntry).toBe(true);
+        expect(state.soloist.session.phrasing.isYielding).toBe(false);
+        expect(state.soloist.session.phrasing.isWaitingForEntry).toBe(true);
 
         // Transition 3: C -> A (at step 80 triggers for end at 96)
         checkSectionTransition(state, 80, stepsPerMeasure, state.dispatch);
         expect(state.soloist.enabled).toBe(false);
-        expect(state.soloist.isYielding).toBe(true);
+        expect(state.soloist.session.phrasing.isYielding).toBe(true);
     });
 });

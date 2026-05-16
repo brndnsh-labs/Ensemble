@@ -10,6 +10,101 @@ import { resetSoloistState } from './engine/soloist.js';
 import { fillBuffers } from './engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from './engine/worker-orchestrator.js';
 import { recursiveSafeSync, resetCursors } from './engine/worker-utils.js';
+import type { SoloistState } from './types.js';
+
+/**
+ * Translate a flat-wire-shaped soloist payload into the nested
+ * `session` / `audio` layout the worker's local mirror uses.
+ *
+ * The worker contract still receives flat keys (config + flat aliases for the
+ * engine-runtime fields the worker actually reads — see `getSyncState()` in
+ * `state.ts`). This keeps the wire format unchanged through the C2 restructure;
+ * a follow-up may mirror the restructure on the worker side and drop this
+ * translation.
+ */
+function syncSoloistFromWire(target: SoloistState, source: any): void {
+    if (!source || typeof source !== 'object') {
+        return;
+    }
+    const t = target as any;
+    for (const key of Object.keys(source)) {
+        const v = source[key];
+        switch (key) {
+            // Config (flat, unchanged)
+            case 'enabled':
+            case 'preset':
+            case 'mode':
+            case 'style':
+            case 'octave':
+            case 'volume':
+            case 'reverb':
+            case 'complexity':
+            case 'phrasingIntensity':
+            case 'hookRetentionProb':
+            case 'doubleStopProb':
+            case 'tradeMode':
+            case 'motifTracking':
+            case 'seed':
+                t[key] = v;
+                break;
+            // Session top-level
+            case 'sessionSeed':
+                t.session.seed = v;
+                break;
+            case 'sessionSteps':
+                t.session.sessionSteps = v;
+                break;
+            case 'phraseCount':
+                t.session.phraseCount = v;
+                break;
+            case 'tension':
+                t.session.tension = v;
+                break;
+            case 'lastSmartStyle':
+                t.session.lastSmartStyle = v;
+                break;
+            // Phrasing FSM (flat aliases routed to session.phrasing)
+            case 'phrasingState':
+                t.session.phrasing.state = v;
+                break;
+            case 'isResting':
+                t.session.phrasing.isResting = v;
+                break;
+            case 'transitionState':
+                t.session.phrasing.transitionState = v;
+                break;
+            case 'restSteps':
+                t.session.phrasing.restSteps = v;
+                break;
+            case 'activeSteps':
+                t.session.phrasing.activeSteps = v;
+                break;
+            case 'busySteps':
+                t.session.phrasing.busySteps = v;
+                break;
+            case 'isWaitingForEntry':
+                t.session.phrasing.isWaitingForEntry = v;
+                break;
+            case 'isYielding':
+                t.session.phrasing.isYielding = v;
+                break;
+            case 'lastAttackStep':
+                t.session.phrasing.lastAttackStep = v;
+                break;
+            // Audio
+            case 'lastFreq':
+                t.audio.lastFreq = v;
+                break;
+            case 'lastMidiPlayed':
+                t.audio.lastMidiPlayed = v;
+                break;
+            default:
+                // Drop unknown keys to keep the worker mirror consistent.
+                break;
+        }
+    }
+}
+
 import { getState } from './state.js';
 import type { EnsembleState } from './types.js';
 import { getStepInfo } from './utils.js';
@@ -52,7 +147,7 @@ function processMessage(type: string, data: any, startTime: number): void {
                 }
                 recursiveSafeSync(chords, data.chords, 'chords');
                 recursiveSafeSync(bass, data.bass, 'bass');
-                recursiveSafeSync(soloist, data.soloist, 'soloist');
+                syncSoloistFromWire(soloist, data.soloist);
                 recursiveSafeSync(harmony, data.harmony, 'harmony');
                 recursiveSafeSync(groove, data.groove, 'groove');
                 recursiveSafeSync(midi, data.midi, 'midi');
@@ -73,7 +168,7 @@ function processMessage(type: string, data: any, startTime: number): void {
                     }
                     recursiveSafeSync(chords, syncData.chords, 'chords');
                     recursiveSafeSync(bass, syncData.bass, 'bass');
-                    recursiveSafeSync(soloist, syncData.soloist, 'soloist');
+                    syncSoloistFromWire(soloist, syncData.soloist);
                     recursiveSafeSync(harmony, syncData.harmony, 'harmony');
                     recursiveSafeSync(groove, syncData.groove, 'groove');
                     if (syncData.playback) {

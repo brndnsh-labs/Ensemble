@@ -4,10 +4,14 @@ import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getState } from '../../../public/state.js';
 import { getStepInfo } from '../../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        soloist: { enabled: false, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         groove: {
             creativity: false,
             genreFeel: 'Rock',

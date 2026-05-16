@@ -7,6 +7,10 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock dependencies
 const mockUseEnsembleState = vi.fn();
 
@@ -68,9 +72,9 @@ describe('ChordVisualizer Component', () => {
                 chords: {
                     lastActiveChordIndex: 0,
                 },
-                soloist: {
+                soloist: makeSoloistMock({
                     style: 'scalar',
-                },
+                }),
                 vizState: {},
                 ...overrides,
             };

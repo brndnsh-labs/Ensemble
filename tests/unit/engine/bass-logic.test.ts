@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -12,7 +16,7 @@ vi.mock('../../../public/state.js', () => {
             instruments: [{ name: 'Kick', steps: [] }],
         },
         bass: { style: 'smart', octave: 38, lastFreq: null, enabled: true, pocketOffset: 0 },
-        soloist: { busySteps: 0, tension: 0 },
+        soloist: makeSoloistMock({ busySteps: 0, tension: 0 }),
         arranger: {
             timeSignature: '4/4',
             totalSteps: 64,
@@ -78,8 +82,8 @@ describe('Bass Engine Logic', () => {
 
     beforeEach(() => {
         bass.busySteps = 0;
-        soloist.busySteps = 0;
-        soloist.tension = 0;
+        soloist.session.phrasing.busySteps = 0;
+        soloist.session.tension = 0;
         playback.bandIntensity = 0.5;
         groove.genreFeel = 'Rock';
         groove.instruments[0].steps.fill(0);
@@ -150,7 +154,7 @@ describe('Bass Engine Logic', () => {
         it('should reduce complexity when the soloist is busy', () => {
             groove.genreFeel = 'Funk';
             soloist.enabled = true;
-            soloist.busySteps = 4;
+            soloist.session.phrasing.busySteps = 4;
             expect(
                 getBassNote(getState(), chordC, null, 0.25, 110, 38, 'funk', 0, 1, 1),
             ).toBeNull();

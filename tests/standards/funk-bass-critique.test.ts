@@ -4,12 +4,14 @@ import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getFrequency } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: () => ({
         playback: { bandIntensity: 0.9, bpm: 110, complexity: 0.8 },
         groove: { genreFeel: 'Funk', pocket: 0 },
-        soloist: { busySteps: 0 },
+        soloist: makeSoloistMock({ busySteps: 0 }),
         arranger: { timeSignature: '4/4', totalSteps: 1000 },
     }),
 }));

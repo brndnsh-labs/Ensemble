@@ -5,6 +5,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const playback = { bpm: 100, bandIntensity: 0.5, audio: { currentTime: 0 } };
@@ -19,7 +23,7 @@ vi.mock('../../../public/state.js', () => {
     };
     const chords = { enabled: true, style: 'smart', octave: 0, density: 0.5, volume: 1.0 };
     const bass = { enabled: true, style: 'basic', octave: 0, volume: 1.0 };
-    const soloist = {
+    const soloist = makeSoloistMock({
         enabled: true,
         style: 'jazz',
         octave: 0,
@@ -27,7 +31,7 @@ vi.mock('../../../public/state.js', () => {
         mode: 'monophonic',
         sessionSteps: 0,
         hookRetentionProb: 0.5,
-    };
+    });
     const harmony = { enabled: true, style: 'pad', octave: 0, volume: 1.0, complexity: 0.5 };
     const groove = {
         enabled: true,

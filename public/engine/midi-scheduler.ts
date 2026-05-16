@@ -144,7 +144,7 @@ export function dispatchMidiAutomation(
     const { midi, playback, soloist } = state;
     if (midi.enabled && midi.selectedOutputId && stepInfo.isBeatStart) {
         const intensityCC = Math.floor(playback.bandIntensity * 127);
-        const soloistTensionCC = Math.floor(soloist.tension * 127);
+        const soloistTensionCC = Math.floor(soloist.session.tension * 127);
 
         sendMIDICC(midi.soloistChannel, 1, soloistTensionCC, swungTime);
         sendMIDICC(midi.soloistChannel, 11, intensityCC, swungTime);

@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 // Mock state.js
 vi.mock('../../public/state.js', () => ({
@@ -23,7 +24,7 @@ describe('Soloist Expansion Critique', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
 
-        soloistState = {
+        soloistState = makeSoloistMock({
             enabled: true,
             style: 'smart',
             mode: 'monophonic',
@@ -52,7 +53,7 @@ describe('Soloist Expansion Critique', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
     });
 
     const simulatePerformance = (numBars, genreFeel) => {
@@ -105,7 +106,7 @@ describe('Soloist Expansion Critique', () => {
                         chordRoot: chord.rootMidi,
                     });
                 }
-                soloistState.sessionSteps++;
+                soloistState.session.sessionSteps++;
             }
         }
         return history;

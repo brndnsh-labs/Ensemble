@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 // Mock state.js
 vi.mock('../../public/state.js', () => ({
@@ -23,7 +24,7 @@ describe('Soloist Jazz Critique', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
 
-        soloistState = {
+        soloistState = makeSoloistMock({
             enabled: true,
             style: 'jazz',
             mode: 'monophonic',
@@ -52,7 +53,7 @@ describe('Soloist Jazz Critique', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
 
         getState.mockReturnValue({
             playback: {
@@ -103,7 +104,7 @@ describe('Soloist Jazz Critique', () => {
                         chord,
                     });
                 }
-                soloistState.sessionSteps++;
+                soloistState.session.sessionSteps++;
             }
         }
         return history;

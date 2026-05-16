@@ -997,7 +997,7 @@ export function bootstrapSoloistAudit({
         quietSeedLogs,
     );
 
-    state.soloist.sessionSeed = sessionSeed;
+    state.soloist.session.seed = sessionSeed;
 
     return {
         state,
@@ -1012,8 +1012,9 @@ export function simulateSoloistLoops({ state, arrangement, loops = 3, style = 's
     const analysisSeed = state.soloist.analysisSeed || 'SOLOIST_ANALYSIS';
 
     return withSeededRandom(analysisSeed, () => {
-        const seedLoopLength = state.soloist.sessionSeed?.loopLengthSteps || arrangement.totalSteps;
-        const stepLookup = buildSeedLookups(state.soloist.sessionSeed, seedLoopLength);
+        const seedLoopLength =
+            state.soloist.session.seed?.loopLengthSteps || arrangement.totalSteps;
+        const stepLookup = buildSeedLookups(state.soloist.session.seed, seedLoopLength);
         const events = [];
         const stepsPerMeasure = arrangement.stepsPerMeasure;
 
@@ -1100,10 +1101,12 @@ export function simulateSoloistLoops({ state, arrangement, loops = 3, style = 's
                         stepInMeasure: stepInLoop % stepsPerMeasure,
                         chord: currentEntry.chord,
                         sectionLabel: currentSection?.label || 'Main',
-                        role: state.soloist.phraseContext?.role || '-',
-                        profile: state.soloist.phraseContext?.profile || '-',
-                        responseMode: state.soloist.phraseContext?.responseMode || 'free',
-                        responseSource: state.soloist.phraseContext?.responseSource || 'free',
+                        role: state.soloist.session.currentPhrase.context?.role || '-',
+                        profile: state.soloist.session.currentPhrase.context?.profile || '-',
+                        responseMode:
+                            state.soloist.session.currentPhrase.context?.responseMode || 'free',
+                        responseSource:
+                            state.soloist.session.currentPhrase.context?.responseSource || 'free',
                         note,
                         seedNote,
                         isSeedStep: Boolean(seedNote),
@@ -1119,7 +1122,7 @@ export function simulateSoloistLoops({ state, arrangement, loops = 3, style = 's
 
         return {
             arrangement,
-            seed: state.soloist.sessionSeed,
+            seed: state.soloist.session.seed,
             seedLoopLength,
             events,
             stepsPerMeasure,

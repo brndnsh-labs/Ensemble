@@ -100,7 +100,7 @@ export function flushBuffers(): void {
     const { playback, bass, soloist, chords, harmony } = getState();
     // 1. Clear local buffers
     bass.buffer.clear();
-    soloist.buffer.clear();
+    soloist.audio.buffer.clear();
     chords.buffer.clear();
     harmony.buffer.clear();
 
@@ -136,10 +136,11 @@ function flushBuffer(type: string): void {
         killBassBus(stateMap);
     }
     if (type === 'soloist' || type === 'all') {
-        if (soloist.lastPlayedFreq !== null) {
-            (soloist as Mutable<typeof soloist>).lastFreq = soloist.lastPlayedFreq; // @worker-mutation
+        if (soloist.audio.lastPlayedFreq !== null) {
+            (soloist.audio as Mutable<typeof soloist.audio>).lastFreq =
+                soloist.audio.lastPlayedFreq; // @worker-mutation
         }
-        soloist.buffer.clear();
+        soloist.audio.buffer.clear();
         killSoloistNote(stateMap);
         killSoloistBus(stateMap);
     }

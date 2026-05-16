@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
     mockState: {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -25,7 +27,7 @@ const { mockState } = vi.hoisted(() => ({
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Blues' },
         playback: {
             bandIntensity: 0.7,
@@ -105,7 +107,7 @@ vi.mock('../../public/engine/theory-scales.js', () => ({
 describe('Soloist Phrasing Analysis', () => {
     function runSimulation(measures = 128, intensity = 0.7) {
         // Reset State
-        mockState.soloist = {
+        mockState.soloist = makeSoloistMock({
             enabled: true,
             busySteps: 0,
             activeSteps: 0,
@@ -123,7 +125,7 @@ describe('Soloist Phrasing Analysis', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
         mockState.playback.bandIntensity = intensity;
         mockState.playback.complexity = intensity;
         mockState.playback.sessionStartTime = Date.now();
@@ -150,17 +152,17 @@ describe('Soloist Phrasing Analysis', () => {
         for (let s = 0; s < totalSteps; s++) {
             const stepInMeasure = s % 16;
             mockState.playback.currentLoopCount = Math.floor(s / stepsPerLoop);
-            mockState.soloist.sessionSteps = s;
+            mockState.soloist.session.sessionSteps = s;
 
             // Handle busySteps decrement manually as worker would
-            if (mockState.soloist.busySteps > 0) {
-                mockState.soloist.busySteps--;
+            if (mockState.soloist.session.phrasing.busySteps > 0) {
+                mockState.soloist.session.phrasing.busySteps--;
                 results.stepsPlaying++;
                 currentPhrase.steps++;
                 continue;
             }
 
-            const wasResting = mockState.soloist.phrasingState === 'rest';
+            const wasResting = mockState.soloist.session.phrasing.state === 'rest';
             // Force wakeup at start
             const coordination = s === 0 ? { bypassRhythm: true } : {};
             const res = getSoloistNote(
@@ -174,7 +176,7 @@ describe('Soloist Phrasing Analysis', () => {
                 stepInMeasure,
                 coordination,
             );
-            const isResting = mockState.soloist.phrasingState === 'rest';
+            const isResting = mockState.soloist.session.phrasing.state === 'rest';
 
             if (!isResting) {
                 results.stepsPlaying++;
@@ -190,7 +192,7 @@ describe('Soloist Phrasing Analysis', () => {
                     // Soloist.js sets busySteps based on duration
                     const primary = notes[notes.length - 1];
                     if (primary.durationSteps > 1) {
-                        mockState.soloist.busySteps = primary.durationSteps - 1;
+                        mockState.soloist.session.phrasing.busySteps = primary.durationSteps - 1;
                     }
                 }
                 currentPhrase.steps++;

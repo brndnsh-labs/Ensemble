@@ -5,6 +5,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Unified mock for state and context
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
@@ -55,7 +59,7 @@ vi.mock('../../../public/state.js', () => {
         measureMap: [],
     };
     const mockBass = { enabled: true, buffer: new Map(), octave: 38 };
-    const mockSoloist = { enabled: true, buffer: new Map(), octave: 72 };
+    const mockSoloist = makeSoloistMock({ enabled: true, buffer: new Map(), octave: 72 });
     const mockChords = { enabled: true, buffer: new Map(), octave: 60 };
     const mockHarmony = { enabled: true, buffer: new Map(), octave: 60 };
     const mockMidi = { enabled: false };
@@ -129,7 +133,7 @@ describe('Long-Session Stress & Endurance', () => {
         playback.drawQueue = [];
         playback.isPlaying = true;
         bass.buffer.clear();
-        soloist.buffer.clear();
+        soloist.audio.buffer.clear();
         chords.buffer.clear();
 
         global.requestAnimationFrame = vi.fn();
@@ -147,7 +151,7 @@ describe('Long-Session Stress & Endurance', () => {
             playback.audio.currentTime += secondsPerStep;
 
             bass.buffer.set(playback.step, { freq: 100, durationSteps: 1 });
-            soloist.buffer.set(playback.step, [{ freq: 400, durationSteps: 1 }]);
+            soloist.audio.buffer.set(playback.step, [{ freq: 400, durationSteps: 1 }]);
             chords.buffer.set(playback.step, [{ freq: 300, durationSteps: 1 }]);
 
             scheduler(getState());
@@ -155,7 +159,7 @@ describe('Long-Session Stress & Endurance', () => {
             if (i % 100 === 0) {
                 // The draw logic shifted to the React component, so we just check buffer cleanup
                 expect(bass.buffer.size).toBeLessThan(10);
-                expect(soloist.buffer.size).toBeLessThan(10);
+                expect(soloist.audio.buffer.size).toBeLessThan(10);
                 expect(chords.buffer.size).toBeLessThan(10);
             }
         }

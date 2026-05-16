@@ -5,6 +5,8 @@ import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-e
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -32,7 +34,7 @@ describe('Rock Groove Integrity', () => {
         const mockState = {
             playback: { bandIntensity: 0.8, bpm: 120, songMode: false },
             groove: { genreFeel: 'Rock', creativity: true, lastDrumPreset: 'Rock' },
-            soloist: { enabled: false, busySteps: 0 },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
             arranger: { sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
         };
 

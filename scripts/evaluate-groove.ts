@@ -193,7 +193,7 @@ function bootstrapDrumAudit({
     state.arranger.totalSteps = arrangement.totalSteps;
     state.playback.currentLoopCount = 0;
     state.soloist.enabled = false;
-    state.soloist.busySteps = 0;
+    state.soloist.session.phrasing.busySteps = 0;
 
     const sectionSeedMap = Object.fromEntries(
         arrangement.sectionMap.map((section) => [

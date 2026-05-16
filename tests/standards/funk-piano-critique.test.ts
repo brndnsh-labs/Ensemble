@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -16,7 +18,7 @@ describe('Funk Piano Critique', () => {
         mockState = {
             playback: { bandIntensity: 0.7, complexity: 0.7, step: 0, intent: {} },
             groove: { genreFeel: 'Funk', pocket: 0, instruments: [] },
-            soloist: { enabled: true, busySteps: 0, lastFreq: 0 },
+            soloist: makeSoloistMock({ enabled: true, busySteps: 0, lastFreq: 0 }),
             bass: { enabled: true, lastFreq: 110 },
             harmony: { enabled: false },
             chords: { enabled: true, style: 'smart', density: 'balanced' },

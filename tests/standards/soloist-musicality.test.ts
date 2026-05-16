@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Define mockState in a way that vi.mock can capture it
 const { testState } = vi.hoisted(() => ({
     testState: {
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: {}, lyricalBias: 0.5 },
         groove: { genreFeel: 'Jazz', pocket: 0 },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             style: 'smart',
             mode: 'monophonic',
@@ -34,7 +36,7 @@ const { testState } = vi.hoisted(() => ({
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         harmony: { enabled: false },
         arranger: { timeSignature: '4/4' },
     },

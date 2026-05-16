@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { generateRhythmPlan } from '../../../public/engine/soloist-rhythm-engine.js';
 import * as stateModule from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js');
 
 // 1. Mock Config AND Style Maps to ensure complete isolation from other tests
@@ -24,7 +28,7 @@ vi.mock('../../../public/soloist-config.js', () => ({
 
 describe('Soloist Rhythmic Reactive Alignment', () => {
     const createMockState = () => ({
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             phrasingState: 'call',
@@ -42,7 +46,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
             sessionSteps: 0,
             style: 'funk',
             phraseStartStep: 0,
-        },
+        }),
         groove: { genreFeel: 'Funk' },
         playback: {
             bandIntensity: 0.5,
@@ -61,7 +65,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         // 1. Setup: bypass rhythm to ensure it works
         const contextBypass = { stepCoordination: { kickHit: true }, bypassRhythm: true };
-        localState.soloist.rhythmPlan = undefined;
+        localState.soloist.session.rhythm.plan = undefined;
 
         const planBypass = generateRhythmPlan(
             0,
@@ -81,17 +85,17 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         // At intensity 0.05: intensityScale = 0.6. emphasis[0] = 1.0. attackProb = 0.6.
         // With kickHit (+0.2): attackProb = 0.8.
         localState.playback.bandIntensity = 0.05;
-        localState.soloist.busySteps = 0;
-        localState.soloist.rhythmPlan = undefined;
+        localState.soloist.session.phrasing.busySteps = 0;
+        localState.soloist.session.rhythm.plan = undefined;
 
-        localState.soloist.sessionSteps = 64; // Bypass warm-up scaling
+        localState.soloist.session.sessionSteps = 64; // Bypass warm-up scaling
 
         // Force random to 0.99 for all calls so breathing offset doesn't trigger random attacks
         randomSpy.mockReturnValue(0.99);
 
         // WITHOUT drum hit: 0.99 > 0.6 (FALSE)
-        localState.soloist.busySteps = 0;
-        localState.soloist.rhythmPlan = undefined;
+        localState.soloist.session.phrasing.busySteps = 0;
+        localState.soloist.session.rhythm.plan = undefined;
         const contextWithout = { stepCoordination: { kickHit: false } };
         const planWithout = generateRhythmPlan(
             32,
@@ -154,8 +158,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         randomSpy.mockReturnValue(0.2); // allow downbeat (prob 0.364) to pass
 
         for (let i = 0; i < iterations; i++) {
-            localState.soloist.busySteps = 0;
-            localState.soloist.rhythmPlan = undefined;
+            localState.soloist.session.phrasing.busySteps = 0;
+            localState.soloist.session.rhythm.plan = undefined;
 
             // Test step 3 (16th syncopation). Emphasis 1.0, but penalized heavily at 0.01 intensity!
             const planNormal = generateRhythmPlan(
@@ -174,8 +178,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
                 hitsNormal++;
             }
 
-            localState.soloist.busySteps = 0;
-            localState.soloist.rhythmPlan = undefined;
+            localState.soloist.session.phrasing.busySteps = 0;
+            localState.soloist.session.rhythm.plan = undefined;
 
             // Test step 0 (downbeat). Emphasis 0.7. Prob ~ 0.364. 0.2 < 0.364 -> PLAY!
             const planDownbeat = generateRhythmPlan(

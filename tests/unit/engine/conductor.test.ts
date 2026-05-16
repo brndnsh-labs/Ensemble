@@ -10,6 +10,10 @@ import {
 } from '../../../public/engine/conductor.js';
 import { dispatch, getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = (await importOriginal()) as any;
 
@@ -24,7 +28,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         formIteration: 0,
     };
     const mockGroove = { ...actual.groove };
-    const mockSoloist = { ...actual.soloist };
+    const mockSoloist = makeSoloistMock({ ...actual.soloist });
     const mockHarmony = { ...actual.harmony, enabled: false, buffer: new Map() };
     const mockChords = { ...actual.chords };
     const mockBass = { ...actual.bass };
@@ -142,7 +146,7 @@ describe('Conductor Logic', () => {
 
         it('should yield intent density when soloist is busy', () => {
             soloist.enabled = true;
-            soloist.busySteps = 5; // Busy
+            soloist.session.phrasing.busySteps = 5; // Busy
             playback.complexity = 0.8;
 
             applyConductor(getState(), dispatch);

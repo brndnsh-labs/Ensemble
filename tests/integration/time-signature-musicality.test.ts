@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 describe('Time Signature Musicality Audit', () => {
     const genres = ['Jazz', 'Rock', 'Funk'];
@@ -14,11 +15,11 @@ describe('Time Signature Musicality Audit', () => {
         const spm = getStepsPerMeasure(tsName);
         const totalSteps = spm * 16; // 16 bars
         return {
-            soloist: {
+            soloist: makeSoloistMock({
                 enabled: true,
                 busySteps: 0,
                 phraseContext: { role: 'call', profile: 'srv' },
-            },
+            }),
             arranger: {
                 timeSignature: tsName,
                 sectionMap: [{ start: 0, end: totalSteps, label: 'Verse' }],

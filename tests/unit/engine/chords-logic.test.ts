@@ -3,6 +3,10 @@
 // cspell:ignore iidim Emaj
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock dependencies
 vi.mock('../../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
@@ -20,7 +24,7 @@ vi.mock('../../../public/state.js', () => {
         groove: { genreFeel: 'Rock' },
         bass: { enabled: true },
         harmony: { enabled: false },
-        soloist: {},
+        soloist: makeSoloistMock({}),
         vizState: {},
         midi: {},
         storage: {},

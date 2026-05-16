@@ -157,7 +157,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                             chord,
                             null,
                             step,
-                            soloist.lastFreq,
+                            soloist.audio.lastFreq,
                             72,
                             soloist.style,
                             stepInChord,
@@ -218,7 +218,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                             const primary = Array.isArray(soloNote)
                                 ? soloNote[soloNote.length - 1]
                                 : soloNote;
-                            soloist.lastFreq = primary.freq;
+                            soloist.audio.lastFreq = primary.freq;
                         }
 
                         // 3. Accompaniment Check

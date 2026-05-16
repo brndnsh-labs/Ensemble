@@ -2,14 +2,16 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // Mock state and global config
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             lastFreq: 440,
-        },
+        }),
         chords: {
             enabled: true,
             style: 'smart',
@@ -127,7 +129,7 @@ describe('Jazz Comping Integrity', () => {
         groove.genreFeel = 'Jazz';
         chords.style = 'smart';
         playback.bandIntensity = 0.5;
-        soloist.busySteps = 0;
+        soloist.session.phrasing.busySteps = 0;
         bass.enabled = true;
         bass.lastFreq = 65.41; // C2 (Midi 36)
 
@@ -180,7 +182,7 @@ describe('Jazz Comping Integrity', () => {
         };
 
         // Soloist is shredding
-        soloist.busySteps = 16;
+        soloist.session.phrasing.busySteps = 16;
         chords.style = 'smart';
 
         // We'll try many times to see if suppression hits
@@ -214,7 +216,7 @@ describe('Jazz Comping Integrity', () => {
 
         // 1. Soloist was busy
         compingState.soloistActivity = 1;
-        soloist.busySteps = 0; // But now they stopped
+        soloist.session.phrasing.busySteps = 0; // But now they stopped
 
         compingState.lockedUntil = 0;
         getAccompanimentNotes(getState(), chord, 16, 0, 0, { isBeatStart: true });

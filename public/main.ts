@@ -74,15 +74,18 @@ function init() {
                         bass.buffer.get(n.step).push(n);
                     } else if (n.module === 'soloist') {
                         // ENFORCE MONOPHONIC: If mode is monophonic, skip additional notes for the same step
-                        if (isSoloistMonophonicMode(soloist.mode) && soloist.buffer.has(n.step)) {
+                        if (
+                            isSoloistMonophonicMode(soloist.mode) &&
+                            soloist.audio.buffer.has(n.step)
+                        ) {
                             return;
                         }
 
                         if (!sbUpdatedSteps.has(n.step)) {
-                            soloist.buffer.set(n.step, []);
+                            soloist.audio.buffer.set(n.step, []);
                             sbUpdatedSteps.add(n.step);
                         }
-                        soloist.buffer.get(n.step).push(n);
+                        soloist.audio.buffer.get(n.step)?.push(n);
                     } else if (n.module === 'harmony') {
                         if (!harmony.buffer.has(n.step)) {
                             harmony.buffer.set(n.step, []);

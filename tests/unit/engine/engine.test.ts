@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
 import { _resetChromiumCheck, getVisualTime, initAudio } from '../../../public/engine/engine.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state.js
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -18,7 +22,7 @@ vi.mock('../../../public/state.js', () => {
         groove: { audioBuffers: {} },
         chords: { enabled: true, volume: 0.5, reverb: 0.5 },
         bass: { enabled: true, volume: 0.5, reverb: 0.5 },
-        soloist: { enabled: true, volume: 0.5, reverb: 0.5 },
+        soloist: makeSoloistMock({ enabled: true, volume: 0.5, reverb: 0.5 }),
         harmony: { enabled: true, volume: 0.5, reverb: 0.5 },
         midi: { enabled: false },
     };

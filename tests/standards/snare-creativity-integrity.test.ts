@@ -5,6 +5,8 @@ import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
@@ -23,7 +25,7 @@ describe('Snare Creativity Integrity', () => {
             instruments: [],
         },
         arranger: { timeSignature: '4/4', stepMap: [] },
-        soloist: { enabled: false, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
     };
 
     it('should have a reasonable number of snare hits in Blues even with creativity enabled', () => {

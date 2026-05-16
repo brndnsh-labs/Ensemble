@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SOLOIST_INTENTS } from '../../../public/engine/soloist-config.js';
 import { selectPitchAndDevices } from '../../../public/engine/soloist-pitch-engine.js';
 import { getState } from '../../../public/state.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 describe('Soloist Pitch Engine Deep Dive', () => {
     let args;
@@ -18,7 +19,12 @@ describe('Soloist Pitch Engine Deep Dive', () => {
             0, // stepInChord
             {}, // coordination
             { currentLoopCount: 0 }, // playback
-            { mode: 'monophonic', tension: 0.5, lastMidiPlayed: 60, dynamicCenter: 60 }, // soloistState
+            makeSoloistMock({
+                mode: 'monophonic',
+                tension: 0.5,
+                lastMidiPlayed: 60,
+                dynamicCenter: 60,
+            }), // soloistState
             { pocket: 0 }, // groove
             {}, // _arranger
             16, // stepsPerMeasure
@@ -63,7 +69,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const state = getState();
         args[4] = 'rock';
         for (let i = 0; i < iterations; i++) {
-            args[9].lastMidiPlayed = 60; // Force back to 60
+            args[9].audio.lastMidiPlayed = 60; // Force back to 60
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 60) {
                 repeats++;
@@ -80,7 +86,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         let dissonantRepeats = 0;
         const iterations = 100;
         for (let i = 0; i < iterations; i++) {
-            args[9].lastMidiPlayed = 61; // Force back to dissonant 61
+            args[9].audio.lastMidiPlayed = 61; // Force back to dissonant 61
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 61) {
                 dissonantRepeats++;
@@ -98,7 +104,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const iterations = 100;
         const state = getState();
         for (let i = 0; i < iterations; i++) {
-            args[9].lastMidiPlayed = 61; // Force back to 61
+            args[9].audio.lastMidiPlayed = 61; // Force back to 61
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 61) {
                 repeats++;
@@ -120,12 +126,12 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         };
         args[4] = 'scalar';
         args[8] = { currentLoopCount: 2 };
-        args[9] = {
+        args[9] = makeSoloistMock({
             mode: 'monophonic',
             tension: 0.5,
             lastMidiPlayed: 65,
             deviceBuffer: [],
-        };
+        });
         args[14] = SOLOIST_INTENTS.EXPLORATORY;
 
         randomSpy.mockReturnValueOnce(0.05).mockReturnValueOnce(0);
@@ -133,7 +139,7 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const result = selectPitchAndDevices(getState(), ...args);
 
         expect(result).toBeDefined();
-        expect(args[9].deviceBuffer.length).toBeGreaterThan(0);
+        expect(args[9].session.rhythm.deviceBuffer.length).toBeGreaterThan(0);
         randomSpy.mockRestore();
     });
 
@@ -158,12 +164,12 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         args[4] = 'scalar';
         args[5] = 1;
         args[8] = { currentLoopCount: 0 };
-        args[9] = {
+        args[9] = makeSoloistMock({
             mode: 'monophonic',
             tension: 0.5,
             lastMidiPlayed: 65,
             deviceBuffer: [],
-        };
+        });
         args[10] = { pocket: null };
 
         const result = selectPitchAndDevices(getState(), ...args);

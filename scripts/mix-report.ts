@@ -392,9 +392,11 @@ async function renderSceneReports({ scenes, seeds }) {
                                 activeVoices: [],
                                 motifBuffer: [...(liveState.soloist.motifBuffer || [])],
                                 pitchHistory: [...(liveState.soloist.pitchHistory || [])],
-                                deviceBuffer: [...(liveState.soloist.deviceBuffer || [])],
+                                deviceBuffer: [
+                                    ...(liveState.soloist.session.rhythm.deviceBuffer || []),
+                                ],
                                 phraseContext: {
-                                    ...(liveState.soloist.phraseContext || {}),
+                                    ...(liveState.soloist.session.currentPhrase.context || {}),
                                 },
                                 lastFreq: null,
                                 lastPlayedFreq: null,

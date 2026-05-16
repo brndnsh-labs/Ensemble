@@ -3,10 +3,12 @@ import { vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // --- MOCKS ---
 const { mockState } = vi.hoisted(() => ({
     mockState: {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -23,7 +25,7 @@ const { mockState } = vi.hoisted(() => ({
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: { soloistMod: 0 } },
         arranger: { timeSignature: '4/4' },
@@ -67,7 +69,7 @@ import { describe, it } from 'vitest';
 describe('Soloist Density Analysis', () => {
     function runSimulation(style, intensity, measures = 100) {
         // Reset State
-        mockState.soloist = {
+        mockState.soloist = makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -84,7 +86,7 @@ describe('Soloist Density Analysis', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        };
+        });
         mockState.playback.bandIntensity = intensity;
 
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
@@ -106,7 +108,7 @@ describe('Soloist Density Analysis', () => {
                 attacks++;
                 activeSteps++; // Count the attack step itself
                 notes.push({ step: s, dur: res.durationSteps || 1 });
-            } else if (mockState.soloist.busySteps > 0) {
+            } else if (mockState.soloist.session.phrasing.busySteps > 0) {
                 activeSteps++;
             }
         }

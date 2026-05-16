@@ -60,9 +60,9 @@ describe('Instrument Reducer', () => {
     });
 
     it('should handle session resets', () => {
-        soloist.sessionSteps = 100;
+        soloist.session.sessionSteps = 100;
         instrumentReducer({ type: ACTIONS.RESET_SESSION, payload: undefined });
-        expect(soloist.sessionSteps).toBe(0);
+        expect(soloist.session.sessionSteps).toBe(0);
     });
 
     it('should update conductor decisions', () => {
@@ -87,7 +87,7 @@ describe('Instrument Reducer', () => {
         instrumentReducer({ type: ACTIONS.UPDATE_HB, payload: { style: 'horns' } });
         expect(harmony.style).toBe('horns');
         instrumentReducer({ type: ACTIONS.UPDATE_SB, payload: { tension: 0.5 } });
-        expect(soloist.tension).toBe(0.5);
+        expect(soloist.session.tension).toBe(0.5);
     });
 
     it('should return false for unknown actions', () => {

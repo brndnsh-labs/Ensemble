@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+
 // 1. Mock the State with mutable properties using vi.hoisted
 const { soloistState } = vi.hoisted(() => ({
     playbackState: {
@@ -35,7 +37,7 @@ const { soloistState } = vi.hoisted(() => ({
 
 vi.mock('../../public/state.js', () => {
     const mockState = {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             currentPhraseSteps: 0,
@@ -57,7 +59,7 @@ vi.mock('../../public/state.js', () => {
                 lastInterval: null,
                 profile: 'srv',
             },
-        },
+        }),
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },
         arranger: { timeSignature: '4/4', totalSteps: 64 },
@@ -108,14 +110,14 @@ function runSimulation(bpm, steps = 256) {
     // Reset State properly via the mock accessor
     const state = getState();
     state.playback.bpm = bpm;
-    state.soloist.busySteps = 0;
-    state.soloist.activeSteps = 0;
-    state.soloist.restSteps = 0;
+    state.soloist.session.phrasing.busySteps = 0;
+    state.soloist.session.phrasing.activeSteps = 0;
+    state.soloist.session.phrasing.restSteps = 0;
     state.soloist.pitchHistory = [];
-    state.soloist.sessionSteps = 0;
-    state.soloist.deviceBuffer = [];
-    state.soloist.isResting = true;
-    state.soloist.lastFreq = 261.63; // Middle C
+    state.soloist.session.sessionSteps = 0;
+    state.soloist.session.rhythm.deviceBuffer = [];
+    state.soloist.session.phrasing.isResting = true;
+    state.soloist.audio.lastFreq = 261.63; // Middle C
 
     // Reset local test state tracking
     soloistState.lastFreq = 261.63;

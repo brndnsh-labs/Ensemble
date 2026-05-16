@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { getChordDetails, getIntervals } from '../../../public/engine/chords-engine.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state
 vi.mock('../../../public/state.js', () => {
     const mockState = {
@@ -10,7 +14,7 @@ vi.mock('../../../public/state.js', () => {
         arranger: { timeSignature: '4/4', key: 'C', isMinor: false, notation: 'roman' },
         groove: { genreFeel: 'Rock' },
         bass: { enabled: true },
-        soloist: {},
+        soloist: makeSoloistMock({}),
         harmony: {},
         vizState: {},
         midi: {},

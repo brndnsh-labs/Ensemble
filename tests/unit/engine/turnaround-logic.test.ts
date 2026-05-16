@@ -3,9 +3,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getState } from '../../../public/state.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        soloist: { enabled: false, busySteps: 0 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         chords: { enabled: false },
         bass: { enabled: false },
         harmony: { enabled: false },

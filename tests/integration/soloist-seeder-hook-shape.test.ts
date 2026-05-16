@@ -14,14 +14,15 @@ import {
     buildSeedSweepSummary,
     simulateSoloistLoops,
 } from '../../scripts/soloist-analysis-utils.js';
+import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 function createHookSeedState(arrangement) {
     return {
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             busySteps: 0,
             phraseContext: { role: 'call', profile: 'srv' },
-        },
+        }),
         arranger: {
             timeSignature: arrangement.timeSignature,
             sectionMap: arrangement.sectionMap,

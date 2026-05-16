@@ -9,6 +9,10 @@ import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 import * as WorkerClient from '../../../public/worker-client.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 vi.mock('../../../public/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
     killBassBus: vi.fn(),
@@ -81,7 +85,7 @@ vi.mock('../../../public/state.js', () => {
             volume: 0.5,
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         },
-        soloist: {
+        soloist: makeSoloistMock({
             style: 'scalar',
             octave: 4,
             enabled: true,
@@ -91,7 +95,7 @@ vi.mock('../../../public/state.js', () => {
             mode: 'auto',
             sessionSteps: 0,
             buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
-        },
+        }),
         harmony: {
             style: 'smart',
             octave: 4,

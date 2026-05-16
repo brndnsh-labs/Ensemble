@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
 import { WORKER_MSG, WORKER_RESP } from '../../../public/worker-types.js';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Setup global mocks BEFORE importing the worker
 const mockPostMessage = vi.fn();
 vi.stubGlobal('postMessage', mockPostMessage);
@@ -53,7 +57,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         },
         chords: { enabled: true, volume: 0.5, style: 'smart', buffer: new Map() },
         bass: { enabled: true, volume: 0.5, style: 'smart', buffer: new Map() },
-        soloist: {
+        soloist: makeSoloistMock({
             enabled: true,
             volume: 0.5,
             style: 'smart',
@@ -63,7 +67,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
             activeSteps: 0,
             restSteps: 0,
             sessionSteps: 0,
-        },
+        }),
         harmony: { enabled: true, volume: 0.5, style: 'smart', buffer: new Map() },
         groove: {
             enabled: true,

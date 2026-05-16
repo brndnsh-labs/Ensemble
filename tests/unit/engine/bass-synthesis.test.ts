@@ -2,6 +2,10 @@
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { makeSoloistMock } = await vi.hoisted(
+    async () => await import('../../utils/mock-soloist.js'),
+);
+
 // Mock state and global modules
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
@@ -67,7 +71,7 @@ vi.mock('../../../public/state.js', () => {
         getState: () => mockStateMap,
         arranger: {},
         chords: {},
-        soloist: {},
+        soloist: makeSoloistMock({}),
         vizState: {},
         storage: {},
         midi: {},

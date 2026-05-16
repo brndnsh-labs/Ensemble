@@ -142,7 +142,7 @@ describe('Ska-Punk Genre Integrity', () => {
         // 1. Prime the hook by simulating a motif replay
         // We set isReplayingMotif to FALSE to test the specific Ska-Punk sharedHookBuffer logic
         soloist.isReplayingMotif = false;
-        soloist.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
+        soloist.session.memory.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
 
         // 2. Harmony should now latch to this step even if it's not a standard stab step
         // Bypass the 85% dropout by mocking Math.random
