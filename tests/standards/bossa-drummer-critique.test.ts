@@ -84,23 +84,64 @@ describe('Bossa Nova Drummer Critique', () => {
         return history;
     };
 
-    it('should implement an authentic 2-bar Clave pattern', () => {
+    it('should implement an authentic 3-2 son clave pattern', () => {
         const performance = simulatePerformance(16, { playback: { bandIntensity: 0.5 } });
 
-        let patternA = '';
-        let patternB = '';
+        // Authentic 3-2 son clave on a 16th-note grid:
+        //   3-side (odd bars): steps 0, 6, 12   → "X.....X.....X..."
+        //   2-side (even bars): steps 4, 8      → "....X...X......."
+        const threeSide = new Set([0, 6, 12]);
+        const twoSide = new Set([4, 8]);
 
-        // Check first 2 bars of the 16
-        for (let s = 0; s < 16; s++) {
-            patternA += performance[0][s].instruments.Snare ? 'X' : '.';
-            patternB += performance[1][s].instruments.Snare ? 'X' : '.';
+        const renderPattern = (bar) => {
+            let p = '';
+            for (let s = 0; s < 16; s++) {
+                p += bar[s].instruments.Snare ? 'X' : '.';
+            }
+            return p;
+        };
+
+        console.log(`[Bossa Critique] Bar 1 Clave: ${renderPattern(performance[0])}`);
+        console.log(`[Bossa Critique] Bar 2 Clave: ${renderPattern(performance[1])}`);
+
+        // Verify the 2-bar clave is stable across all 16 bars (no drift, no skipped hits)
+        let threeSideHits = 0;
+        let twoSideHits = 0;
+        let threeSideStrays = 0; // hits on 3-side bars at non-clave positions
+        let twoSideStrays = 0;
+
+        for (let bar = 0; bar < performance.length; bar++) {
+            const isThreeSide = bar % 2 === 0;
+            for (let s = 0; s < 16; s++) {
+                const hit = !!performance[bar][s].instruments.Snare;
+                if (!hit) {
+                    continue;
+                }
+                if (isThreeSide) {
+                    if (threeSide.has(s)) {
+                        threeSideHits++;
+                    } else {
+                        threeSideStrays++;
+                    }
+                } else {
+                    if (twoSide.has(s)) {
+                        twoSideHits++;
+                    } else {
+                        twoSideStrays++;
+                    }
+                }
+            }
         }
 
-        console.log(`[Bossa Critique] Bar 1 Clave: ${patternA}`);
-        console.log(`[Bossa Critique] Bar 2 Clave: ${patternB}`);
+        const threeSideBars = Math.ceil(performance.length / 2);
+        const twoSideBars = Math.floor(performance.length / 2);
 
-        // Authentic Bossa Clave: They should be DIFFERENT (2-bar pattern)
-        expect(patternA).not.toBe(patternB);
+        // CRITICAL: every 3-side bar contributes exactly 3 clave hits, every 2-side bar contributes 2.
+        // No strays at intensity 0.5 (embellishment gate is drumComplexity > 0.7 && intensity > 0.6).
+        expect(threeSideHits).toBe(threeSideBars * 3);
+        expect(twoSideHits).toBe(twoSideBars * 2);
+        expect(threeSideStrays).toBe(0);
+        expect(twoSideStrays).toBe(0);
     });
 
     it('should emphasize non-downbeat pulses in the Kick pattern (Surdo feel)', () => {

@@ -97,37 +97,16 @@ describe('Latin Groove Integrity', () => {
                 return;
             }
 
-            const ts44 = TIME_SIGNATURES['4/4'];
-
-            // Bar 1 (3-side): In 4/4, the 3 clave hits occur on Downbeat, Beat 2 offbeat, Beat 4 start
-            const bar1ExpectedSteps = [];
-            for (let step = 0; step < 16; step++) {
-                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-                if (
-                    info.isMeasureStart ||
-                    (info.beatIndex === 1 && info.isOffbeat) ||
-                    (info.beatIndex === 3 && info.isBeatStart)
-                ) {
-                    bar1ExpectedSteps.push(barIndexMotif0 * 16 + step);
-                }
-            }
+            // Authentic 3-2 son clave on a 16th-note grid:
+            //   3-side (bar 1): beat 1, "& of 2", beat 4 → steps 0, 6, 12
+            //   2-side (bar 2): beat 2, beat 3          → steps 4, 8
+            const bar1ExpectedSteps = [0, 6, 12].map((s) => barIndexMotif0 * 16 + s);
+            const bar2ExpectedSteps = [4, 8].map((s) => (barIndexMotif0 + 1) * 16 + s);
 
             for (const step of bar1ExpectedSteps) {
                 const result = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
                 expect(result.shouldPlay).toBe(true);
                 expect(result.soundName).toBe('Sidestick');
-            }
-
-            // Bar 2 (2-side): In 4/4, the 2 clave hits occur on Downbeat offbeat, Beat 3 start
-            const bar2ExpectedSteps = [];
-            for (let step = 0; step < 16; step++) {
-                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-                if (
-                    (info.isMeasureStart && info.isOffbeat) ||
-                    (info.beatIndex === 2 && info.isBeatStart)
-                ) {
-                    bar2ExpectedSteps.push((barIndexMotif0 + 1) * 16 + step);
-                }
             }
 
             for (const step of bar2ExpectedSteps) {

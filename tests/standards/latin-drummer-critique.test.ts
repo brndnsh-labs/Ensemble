@@ -94,25 +94,11 @@ describe('Latin Drummer Critique', () => {
         let shakerHits = 0;
         const totalBars = performance.length;
 
-        const ts44 = TIME_SIGNATURES['4/4'];
-        const CLAVE_3_2_BAR1 = [];
-        const CLAVE_3_2_BAR2 = [];
-        for (let step = 0; step < 16; step++) {
-            const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-            if (
-                info.isMeasureStart ||
-                (info.isOffbeat && !info.isBackbeat && !info.isMeasureStart) ||
-                (info.isBeatStart && info.isBackbeat)
-            ) {
-                CLAVE_3_2_BAR1.push(step);
-            }
-            if (
-                (info.isMeasureStart && info.isOffbeat) ||
-                (info.isBeatStart && !info.isBackbeat && !info.isMeasureStart)
-            ) {
-                CLAVE_3_2_BAR2.push(step);
-            }
-        }
+        // Authentic 3-2 son clave on a 16th-note grid:
+        //   3-side (bar 1): beat 1, "& of 2", beat 4 → steps 0, 6, 12
+        //   2-side (bar 2): beat 2, beat 3          → steps 4, 8
+        const CLAVE_3_2_BAR1 = [0, 6, 12];
+        const CLAVE_3_2_BAR2 = [4, 8];
 
         performance.forEach((bar, bIdx) => {
             const snareSteps = bar.filter((s) => s.instruments.Snare).map((s) => s.loopStep);

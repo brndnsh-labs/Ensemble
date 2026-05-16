@@ -83,23 +83,23 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // 2-Bar Clave Logic
         const barIndex = Math.floor(step / context.stepsPerBar);
         const isBar1 = barIndex % 2 === 0;
+        const stepInBar = step % context.stepsPerBar;
 
         if (activeMotif === 0 || activeMotif === 1) {
-            // Authentic 3-2 Bossa Clave
+            // Authentic 3-2 Son Clave (Cuban origin, foundational for bossa sidestick)
+            // 3-side (bar 1): beat 1, "& of 2", beat 4 → 16th steps 0, 6, 12
+            // 2-side (bar 2): beat 2, beat 3        → 16th steps 4, 8
             if (isBar1) {
-                if (
-                    isDownbeat ||
-                    (isOffbeat && !isBackbeat && !isDownbeat) ||
-                    (isBeatStart && isBackbeat)
-                ) {
+                if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
                     shouldPlay = true;
                 }
             } else {
-                if ((isOffbeat && isDownbeat) || (isBeatStart && !isBackbeat && !isDownbeat)) {
+                if (stepInBar === 4 || stepInBar === 8) {
                     shouldPlay = true;
                 }
             }
 
+            // High-complexity embellishments: occasional offbeat ghost between clave hits
             if (!shouldPlay && drumComplexity > 0.7 && intensity > 0.6) {
                 if (isOffbeat && roll(0.3)) {
                     shouldPlay = true;
