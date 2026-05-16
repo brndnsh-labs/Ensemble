@@ -92,7 +92,15 @@ function normalizeLoopStep(step: number, loopLength: number): number {
 function getSectionContext(
     arranger: any,
     step: number,
-): { label: string; occurrence: number; totalOccurrences: number; isRestatement: boolean } {
+): {
+    label: string;
+    occurrence: number;
+    totalOccurrences: number;
+    isRestatement: boolean;
+    isLastSection: boolean;
+    sectionStart: number;
+    sectionEnd: number;
+} {
     const sectionMap = arranger?.sectionMap;
     if (!Array.isArray(sectionMap) || sectionMap.length === 0) {
         return {
@@ -100,6 +108,9 @@ function getSectionContext(
             occurrence: 1,
             totalOccurrences: 1,
             isRestatement: false,
+            isLastSection: true,
+            sectionStart: 0,
+            sectionEnd: 0,
         };
     }
 
@@ -132,7 +143,36 @@ function getSectionContext(
         occurrence: occurrence || 1,
         totalOccurrences: totalOccurrences || 1,
         isRestatement: (occurrence || 1) > 1,
+        isLastSection: currentSection === sectionMap[sectionMap.length - 1],
+        sectionStart: currentSection?.start ?? 0,
+        sectionEnd: currentSection?.end ?? 0,
     };
+}
+
+// SRDC phase derivation (Statement / Restatement / Departure / Conclusion).
+// Mirrors the seeder's logic at soloist-seeder.ts:1602-1603 so live phrase
+// pitch selection and the seeded head motif agree on where in the form we are.
+// Departure categories follow soloist-seeder.ts:isDepartureCategory.
+const DEPARTURE_LABEL_KEYWORDS = ['chorus', 'bridge', 'prechorus', 'drop'];
+function deriveSrdcPhase(
+    sectionContext: ReturnType<typeof getSectionContext>,
+    step: number,
+    stepsPerMeasure: number,
+): 'statement' | 'restatement' | 'departure' | 'conclusion' {
+    const label = (sectionContext.label || '').toLowerCase();
+    const isOutro = label.includes('outro') || label.includes('end');
+    const isLastMeasureOfSection =
+        sectionContext.sectionEnd > 0 && sectionContext.sectionEnd - step <= stepsPerMeasure * 2;
+    if (isOutro || (sectionContext.isLastSection && isLastMeasureOfSection)) {
+        return 'conclusion';
+    }
+    if (DEPARTURE_LABEL_KEYWORDS.some((k) => label.includes(k))) {
+        return 'departure';
+    }
+    if (sectionContext.isRestatement) {
+        return 'restatement';
+    }
+    return 'statement';
 }
 
 function ensureSectionRecallLoop(soloist: SoloistState, loopCount: number): void {
@@ -632,6 +672,11 @@ function preparePhraseResponseContext(
         nextRole === 'response' ? (loopCount <= 1 ? 'paraphrase' : 'development') : 'free'; // @worker-mutation
     soloist.session.currentPhrase.context.sectionLabel = sectionContext.label; // @worker-mutation
     soloist.session.currentPhrase.context.sectionOccurrence = sectionContext.occurrence; // @worker-mutation
+    soloist.session.currentPhrase.context.srdcState = deriveSrdcPhase(
+        sectionContext,
+        step,
+        stepsPerMeasure,
+    ); // @worker-mutation
 
     const lastSignature = soloist.session.currentPhrase.context.signature;
     const formArcSignature = formArcCandidate?.signature || null;

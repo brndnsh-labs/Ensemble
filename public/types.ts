@@ -534,6 +534,13 @@ export interface SoloistPhraseContext {
     responseSource: 'free' | 'form' | 'seed' | 'section' | 'recent';
     sectionLabel: string | null;
     sectionOccurrence: number;
+    /**
+     * SRDC arc position (Statement / Restatement / Departure / Conclusion).
+     * Derived per phrase from sectionContext + section labels in soloist.ts
+     * (`deriveSrdcPhase`). Read by the pitch picker to bias chord-tone weight
+     * — Conclusion lifts, Departure depresses. Lowercase canonical form.
+     */
+    srdcState: 'statement' | 'restatement' | 'departure' | 'conclusion';
 }
 
 /**

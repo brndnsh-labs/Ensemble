@@ -458,6 +458,32 @@ export function selectPitchAndDevices(
         isGreatsProfileEnabled && soloistState.session.currentPhrase.context?.role === 'response';
     const _isFunkOrSka = activeStyle === 'funk' || activeStyle === 'ska';
 
+    // SRDC phase multiplier on chord-tone weight. Lets the soloist resolve
+    // harder during Conclusion and explore further during Departure, while
+    // Statement / Restatement keep the baseline behavior. Production wiring
+    // writes phase into phrase.context.srdcState (see deriveSrdcPhase in
+    // soloist.ts); tests can also drop a top-level `srdcState` on the mock
+    // soloist to drive this code path. Closes Open finding #1 in
+    // docs/MUSICAL_AUDIT.md (the pitch engine previously had no phase
+    // awareness — Conclusion and Departure got identical chord-tone pull).
+    // Top-level srdcState wins over the nested phrase-context srdcState so
+    // tests can drop an explicit phase on the mock soloist without the
+    // production derivation overwriting it. Production code only writes
+    // the nested location (via deriveSrdcPhase in soloist.ts).
+    const srdcPhase: string = (
+        soloistState.srdcState ||
+        soloistState.session?.currentPhrase?.context?.srdcState ||
+        'statement'
+    ).toLowerCase();
+    const srdcChordToneMult =
+        srdcPhase === 'conclusion'
+            ? 1.5
+            : srdcPhase === 'departure'
+              ? 0.45
+              : srdcPhase === 'restatement'
+                ? 1.15
+                : 1.0;
+
     // Optimization: Pre-compute chord tones into a bitmask to avoid O(N) .some() checks and closure creation in hot loop
     let chordMask = 0;
     for (let i = 0; i < targetChord.intervals.length; i++) {
@@ -715,6 +741,19 @@ export function selectPitchAndDevices(
             if (!isChordTone) {
                 weight += 100; // boost scale notes that aren't chord tones
             }
+        }
+
+        // SRDC phase tilt: applied after all additive chord-tone bonuses so
+        // it dominates other simultaneous factors (SRV pentatonic boost,
+        // common-tone reward, etc). Conclusion lifts chord tones; Departure
+        // depresses them and boosts non-chord scale tones so the soloist
+        // actually picks extensions during exploration. Values chosen so
+        // Departure stays above the random baseline (real soloists still
+        // touch chord tones during a chorus) but clearly trails Conclusion.
+        if (isChordTone) {
+            weight *= srdcChordToneMult;
+        } else if (isScaleTone && srdcPhase === 'departure') {
+            weight *= 2.0;
         }
         if (isMonophonicMode) {
             if (supportRole === 'pickup' || supportRole === 'line') {

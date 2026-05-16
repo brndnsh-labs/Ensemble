@@ -82,17 +82,79 @@ describe('Soloist Musicality & Thematic Integrity', () => {
             `[Soloist Conclusion] Chord-tone ratio: ${(ratio * 100).toFixed(1)}% over ${totalNotes} notes (Target: >55%, random baseline 33%)`,
         );
         // Chord [0,4,7,11] = 4 of 12 chromatic pitches → 33% uniform-random
-        // baseline. Engine delivers 73-84% over 5 sample runs (sample size
-        // 33-41 notes). Threshold 0.55 is 22pt above random (so a non-biased
-        // engine fails) and ~18pt below the worst observed (so RNG variance
-        // doesn't flake).
-        //
-        // Caveat (logged as Open finding #2 in docs/MUSICAL_AUDIT.md): the
-        // pitch engine has no Conclusion-specific bias — the same 78% would
-        // hold for Statement/Restatement/Departure. The test name's
-        // "Conclusion phase" claim is not yet truly enforced; the test
-        // currently verifies the engine's general chord-tone bias.
+        // baseline. With srdcState='Conclusion' and the SRDC-aware chord-tone
+        // multiplier (soloist-pitch-engine.ts), engine delivers ~70-82% over
+        // sample runs. Threshold 0.55 is 22pt above random and ~14pt below
+        // the worst observed Conclusion rate.
         expect(ratio).toBeGreaterThan(0.55);
+    });
+
+    it('should resolve to chord tones harder in Conclusion than in Departure', () => {
+        // The phase-aware multiplier in soloist-pitch-engine.ts pushes
+        // chord-tone weight up in Conclusion (×1.5) and down in Departure
+        // (×0.7). Real soloists lean home at the end of a section and
+        // explore extensions during chorus/bridge — this test pins that
+        // asymmetry. Closes Open finding #1 in docs/MUSICAL_AUDIT.md.
+        const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
+        const chordTones = [0, 4, 7, 11];
+        const iterations = 800;
+
+        // Clear the SRV profile for this test so phase tilt isn't competing
+        // with a profile that also favors chord tones. SRDC bias is the only
+        // signal we want this test to measure.
+        const originalProfile = testState.soloist.session.currentPhrase.context.profile;
+        testState.soloist.session.currentPhrase.context.profile = null;
+
+        const measure = (phase: string): { ratio: number; count: number } => {
+            testState.soloist.srdcState = phase;
+            let chordToneHits = 0;
+            let totalNotes = 0;
+            for (let i = 0; i < iterations; i++) {
+                const note = getSoloistNote(
+                    getState(),
+                    chord,
+                    chord,
+                    i,
+                    null,
+                    64,
+                    'scalar',
+                    i % 16,
+                );
+                if (note) {
+                    totalNotes++;
+                    const primary = Array.isArray(note) ? note[0] : note;
+                    if (chordTones.includes(primary.midi % 12)) {
+                        chordToneHits++;
+                    }
+                }
+            }
+            return { ratio: chordToneHits / totalNotes, count: totalNotes };
+        };
+
+        const conclusion = measure('Conclusion');
+        const departure = measure('Departure');
+        // Restore the surrounding test state for any later it() blocks.
+        testState.soloist.srdcState = 'Conclusion';
+        testState.soloist.session.currentPhrase.context.profile = originalProfile;
+
+        console.log(
+            `[Soloist SRDC] Conclusion: ${(conclusion.ratio * 100).toFixed(1)}% (${conclusion.count}), ` +
+                `Departure: ${(departure.ratio * 100).toFixed(1)}% (${departure.count}), ` +
+                `gap: ${((conclusion.ratio - departure.ratio) * 100).toFixed(1)}pt`,
+        );
+
+        // Both phases stay above the 33% random baseline (the engine still
+        // prefers chord tones overall — real soloists ground occasionally
+        // even during a chorus), but Conclusion should clear Departure by a
+        // documented margin. The gap is the musical claim: Conclusion
+        // resolves; Departure explores. Across 10 sample runs at 800
+        // iterations: Conclusion landed 75-86%, Departure landed 43-59%,
+        // gap 18.5-43pt. Threshold 0.10 is well below the worst observed.
+        expect(conclusion.count).toBeGreaterThan(80);
+        expect(departure.count).toBeGreaterThan(80);
+        expect(conclusion.ratio).toBeGreaterThan(0.55);
+        expect(departure.ratio).toBeGreaterThan(0.33);
+        expect(conclusion.ratio - departure.ratio).toBeGreaterThan(0.1);
     });
 
     it('should generate notes within a consistent range', () => {
