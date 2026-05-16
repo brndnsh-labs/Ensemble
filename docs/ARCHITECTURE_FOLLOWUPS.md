@@ -59,6 +59,8 @@ Also surfaced and **deferred**: the Playwright e2e suite had 38 pre-existing fai
 
 **Approach:** Opus, end-to-end. **Do not delegate mechanically.** This is exactly the kind of work where domain understanding has to live in the same context as the refactor — 7,000 lines of musical state with subtle semantics. Once `SoloistSession` is defined and the seams are clear, specific extractions can fan out to Sonnet, but the bulk should stay with the model that designed the shape.
 
+**In progress (May 16 2026):** staged as 5 commits — C1 (types, no runtime change), C2 (restructure `SoloistState` into `{ flat config, session, audio }`), C3 (sweep 107 engine mutations to new paths), C4 (external readers + worker sync), C5 (cleanup TODOs + mark DONE). **C1 shipped** in `ca1cd8c6` + `ffbac6da`: promoted `SeedNote`, `SoloistVoice` from engine files to `types.ts`; defined `MotifSignature` / `MotifSignatureNote`, `RhythmNode`, `SoloistDeviceEvent` / `SoloistBufferedEvent`, `RecentSoloistNote`, `SectionRecallEntry`, `FormArcEntry` / `FormArcOccurrenceEntry`, `SoloistHook`; narrowed 14 `any`/`any[]` fields on `SoloistState` and the 4 `any` fields inside `SoloistPhraseContext`. Caught and fixed a misnamed type: `phraseContext.skeleton` is `number[]` (step offsets), not `SeedNote[]`. `motifCache` and `lickDictionary` left as `unknown` / `unknown[]` with `TODO(soloist-session)` markers — their producer pipelines aren't currently wired.
+
 ---
 
 ## 5. Build pipeline rewrite — migrate to Vite ✅ DONE (May 2026)
