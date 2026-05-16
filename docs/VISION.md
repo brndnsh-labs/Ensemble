@@ -61,7 +61,7 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 - Plain text chord chart editing
 - Sophisticated musical engine: voice leading, modal theory, genre-aware groove, motivic soloist
 - URL-based sharing with no backend required
-- Mature dev dependencies and toolchain (Biome, Vitest, Playwright, esbuild)
+- Mature dev dependencies and toolchain (Biome, Vitest, Playwright, Vite)
 - Large test suite
 
 ### What needs work

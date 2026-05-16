@@ -103,7 +103,7 @@ npm run validate
 - **UI**: Preact
 - **State**: deep-signal domain slices
 - **Audio and generation**: WebAudio plus worker-driven logic
-- **Build**: esbuild
+- **Build**: Vite (with `vite-plugin-pwa` for the service worker)
 - **Testing**: Vitest and Playwright
 
 ## Repository layout
