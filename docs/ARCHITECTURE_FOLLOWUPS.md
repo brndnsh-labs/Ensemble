@@ -29,7 +29,7 @@ The convention is for the *author of the work* to mark it. If you find an item t
 
 ## 1. Break the worst circular dependency: `state` ↔ `scheduler-core` ✅ DONE (May 2026)
 
-Done in commit `522aaa82`. `form-analysis.ts` no longer imports `state.ts` (only the `ArrangerState` type). `analyzeForm` takes the arranger as a parameter; the four callers (main, arranger-controller, conductor, midi-worker-logic) pass it from their existing state references. The named cycle `conductor → form-analysis → state → scheduler-core → conductor` is gone. Depcheck warning count dropped from 20 → 19; the remaining cycles all involve `state.ts` ↔ `scheduler-core.ts` directly and are smaller in scope. **Open follow-up:** sweep the remaining 19 cycles when there's appetite — none are individually as load-bearing as the form-analysis one.
+Done in commit `522aaa82`. `form-analysis.ts` no longer imports `state.ts` (only the `ArrangerState` type). `analyzeForm` takes the arranger as a parameter; the four callers (main, arranger-controller, conductor, midi-worker-logic) pass it from their existing state references. The named cycle `conductor → form-analysis → state → scheduler-core → conductor` is gone. Depcheck warning count dropped from 20 → 19; #10 later dropped it again from 19 → 9 by moving the engine-loading edges out of `state.ts`. **Open follow-up:** sweep the remaining 9 cycles when there's appetite — they're all the same shape (`state/<slice>.ts → types.ts → state/<slice>.ts`), so likely solvable by moving one symbol out of `types.ts` into a slice-owned file.
 
 ---
 
