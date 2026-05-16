@@ -40,15 +40,15 @@ describe('Funk Drummer Critique', () => {
                     [],
                     TIME_SIGNATURES,
                 );
+                // Spread the full stepInfo so test metrics see every flag
+                // the engine reads (isPulseStart, isEOfBeat, isAOfBeat, etc.).
+                // Cherry-picking previously silenced the syncopated-kick check.
                 const stepData = {
+                    ...info,
                     step: bar * 16 + step,
                     loopStep: step,
                     instruments: {},
                     isDownbeat: info.isMeasureStart,
-                    isPulse: info.isPulse,
-                    isBeatStart: info.isBeatStart,
-                    isBackbeat: info.isBackbeat,
-                    isOffbeat: info.isOffbeat,
                 };
                 for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
                     const params = {
@@ -178,8 +178,11 @@ describe('Funk Drummer Critique', () => {
         expect(ghostToBackbeatRatio).toBeGreaterThan(0.1);
         expect(ghostToBackbeatRatio).toBeLessThan(0.7); // Increased from 0.45 to allow dense ghosting
 
-        // MUSICAL: Kick should be syncopated
-        expect(totalSyncopatedKickHits / totalBars).toBeGreaterThan(0.5);
+        // MUSICAL: Funk kick is the engine of the groove — most hits land off
+        // the four beats. Engine delivers ~3.0/bar; threshold sits at 2.0 so a
+        // single mechanical lane (kick on every beat with no syncopation)
+        // would fail.
+        expect(totalSyncopatedKickHits / totalBars).toBeGreaterThan(2.0);
     });
 
     it('should increase 16th note activity with intensity', () => {

@@ -62,7 +62,9 @@ describe('Soloist Musicality & Thematic Integrity', () => {
         // and checking for chord tone bias
         let chordToneHits = 0;
         let totalNotes = 0;
-        const iterations = 200;
+        // Engine returns null on many steps (rests / busy-step gating); push
+        // iterations high enough that totalNotes lands ~150+ for a tight CI.
+        const iterations = 800;
 
         for (let i = 0; i < iterations; i++) {
             const note = getSoloistNote(getState(), chord, chord, i, null, 64, 'scalar', i % 16);
@@ -76,8 +78,21 @@ describe('Soloist Musicality & Thematic Integrity', () => {
         }
 
         const ratio = chordToneHits / totalNotes;
-        // Even with random elements, it should be significantly biased towards chord tones
-        expect(ratio).toBeGreaterThan(0.15);
+        console.log(
+            `[Soloist Conclusion] Chord-tone ratio: ${(ratio * 100).toFixed(1)}% over ${totalNotes} notes (Target: >55%, random baseline 33%)`,
+        );
+        // Chord [0,4,7,11] = 4 of 12 chromatic pitches → 33% uniform-random
+        // baseline. Engine delivers 73-84% over 5 sample runs (sample size
+        // 33-41 notes). Threshold 0.55 is 22pt above random (so a non-biased
+        // engine fails) and ~18pt below the worst observed (so RNG variance
+        // doesn't flake).
+        //
+        // Caveat (logged as Open finding #2 in docs/MUSICAL_AUDIT.md): the
+        // pitch engine has no Conclusion-specific bias — the same 78% would
+        // hold for Statement/Restatement/Departure. The test name's
+        // "Conclusion phase" claim is not yet truly enforced; the test
+        // currently verifies the engine's general chord-tone bias.
+        expect(ratio).toBeGreaterThan(0.55);
     });
 
     it('should generate notes within a consistent range', () => {

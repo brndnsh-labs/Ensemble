@@ -144,28 +144,38 @@ describe('Rock Drummer Critique', () => {
         });
 
         const totalBars = performance.length;
-        // In Rock, we expect at least 2 snare hits per bar (standard or half-time)
-        const _backbeatScore = backbeatHits / (totalBars * 1); // Minimum 1 per bar (half-time)
+        // Rock backbeat = snare on beats 2 AND 4 every bar → 2 strong hits/bar
+        // is the genre's defining feature. Half-time would still hit beat 3
+        // with full force; either way the floor is "≈2 strong snare hits per
+        // bar on average."
+        const backbeatScore = backbeatHits / (totalBars * 2);
         const eighthHatScore = eighthNoteHats / (eighthNoteHats + nonEighthNoteHats);
 
         const kickScore = kickSolidHits / (totalBars * 2);
 
         console.log('\n--- ROCK DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Backbeat Authority]   ${backbeatHits} strong hits over ${totalBars} bars`);
+        console.log(
+            `[Backbeat Authority]   ${backbeatHits} strong hits over ${totalBars} bars (${(backbeatScore * 100).toFixed(1)}%, Target: >95%)`,
+        );
         console.log(`[Eighth Note Pulse]    ${(eighthHatScore * 100).toFixed(1)}% (Target: >95%)`);
         console.log(`[Kick Solidity]        ${(kickScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log(`[Ghost Note Density]   ${(snareGhostHits / totalBars).toFixed(2)} hits/bar`);
         console.log(`[Ride Participation]   ${rideHits} hits (at 0.75 intensity)`);
         console.log('------------------------------------\n');
 
-        // CRITICAL: Rock drummer MUST have strong backbeats.
-        expect(backbeatHits).toBeGreaterThan(totalBars);
+        // CRITICAL: Rock drummer MUST hit the backbeat on 2 AND 4. Engine
+        // delivers 100% (256/128/2); 0.95 is the floor that still requires
+        // the engine to land both snare anchors on essentially every bar.
+        expect(backbeatScore).toBeGreaterThan(0.95);
 
-        // CRITICAL: Kick should ground the 1 and 3 in most motifs.
-        expect(kickScore).toBeGreaterThan(0.9);
+        // CRITICAL: Kick grounds beats 1 and 3 ("the foundation"). Engine
+        // delivers 100%; 0.99 is the floor.
+        expect(kickScore).toBeGreaterThan(0.99);
 
-        // MUSICAL: Rock hats/ride should be consistent eighth notes.
-        expect(eighthHatScore).toBeGreaterThan(0.9);
+        // MUSICAL: Rock hats/ride drive consistent eighth-note pulse. Engine
+        // delivers 100%; tightened from >0.9 to >0.95 to match the logged
+        // target.
+        expect(eighthHatScore).toBeGreaterThan(0.95);
 
         // MUSICAL: Snare extra hits (ghosting) should be minimal.
         expect(snareGhostHits / totalBars).toBeLessThan(2.0);

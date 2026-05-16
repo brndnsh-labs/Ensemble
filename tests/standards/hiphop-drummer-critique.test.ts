@@ -114,14 +114,32 @@ describe('Hip Hop Drummer Critique', () => {
 
         const backbeatScore = backbeatHits / (totalBars * 2);
         const syncopatedKickRatio = syncopatedKickHits / totalBars;
+        const hiHatDensity = hiHatHits / totalBars;
 
         console.log('\n--- HIP HOP DRUMMER CRITIQUE REPORT ---');
         console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}% (Target: 100%)`);
-        console.log(`[Kick Syncopation]      ${syncopatedKickRatio.toFixed(2)} hits/bar`);
-        console.log(`[HiHat Density]         ${(hiHatHits / totalBars).toFixed(2)} hits/bar`);
+        console.log(
+            `[Kick Syncopation]      ${syncopatedKickRatio.toFixed(2)} hits/bar (Target: >1.5)`,
+        );
+        console.log(`[HiHat Density]         ${hiHatDensity.toFixed(2)} hits/bar (Target: >10.0)`);
         console.log('---------------------------------------\n');
 
-        expect(backbeatScore).toBeGreaterThan(0.95);
-        expect(syncopatedKickRatio).toBeGreaterThan(0.5); // Should have some syncopation
+        // CRITICAL: Snare lands on beats 2 and 4 every bar — the genre's spine.
+        // Engine delivers 100%; threshold pinned at 0.99 so a single missed
+        // backbeat would fail.
+        expect(backbeatScore).toBeGreaterThan(0.99);
+
+        // MUSICAL: Hip hop kicks anchor beats 1/3 and weave around the rest.
+        // Engine delivers ~2.3 syncopated kicks/bar at intensity 0.8 (trap
+        // motif); 1.5 is the floor that still requires the engine to do more
+        // than just kick on the anchors.
+        expect(syncopatedKickRatio).toBeGreaterThan(1.5);
+
+        // MUSICAL: Hi-hats are the engine of hip hop. Engine delivers ~15/bar
+        // (near-continuous 16ths in trap mode at intensity 0.8). Threshold
+        // pinned at 10/bar so the engine still has to drive eighth-or-faster
+        // motion — boom-bap eighths (8/bar) would fail, but that's correct:
+        // the test runs at high intensity where dense hihat is the claim.
+        expect(hiHatDensity).toBeGreaterThan(10.0);
     });
 });

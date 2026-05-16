@@ -6,9 +6,9 @@ Started: 2026-05-16. Archive when the "Open findings" and "Queued" sections are 
 
 ## Status (2026-05-16)
 
-- **Shipped:** 13 fixes across 8 commits (working tree clean, 8 commits ahead of `origin/main`)
-- **Queued (verified, ready to fix):** 4 critique-test rewrites in the same shape as prior passes — see "Queued" below
-- **Open (engine-side):** 1 finding — soloist has no phrase-end-specific resolution bias
+- **Shipped:** 17 fixes across 9 commits (working tree clean after the Q1-Q4 bundled commit)
+- **Queued:** empty — the May 2026 scout-pass queue is drained
+- **Open (engine-side):** 2 findings — (1) soloist has no phrase-end-specific resolution bias; (2) soloist pitch engine has no SRDC-phase-specific bias (Conclusion gets the same chord-tone pull as Departure)
 - **Future passes:** placeholder-threshold sweep, velocity-as-gain naming, re-enable types in `tests/standards/`, harness-silencing audit (new meta-pattern below)
 
 ## Methodology
@@ -44,38 +44,10 @@ The audit looks for any of these five smells per test file, then verifies the en
 | 2026-05-16 | `reggae-piano-critique.test.ts:61` measured "not silent on steps 0 or 8" instead of "skanks on real reggae positions" | Code comment labeled the right positions ("Skanks (4, 12) or Bubbles") but the check was exclusion-based: a stab on step 5 (no reggae meaning) counted equally with a stab on step 4 (the actual skank). Compounding the bug, the test passed `{ isBeatStart: ... }` as the stepInfo object — the engine's skank lane checks `isBackbeat`, which was missing, so the skank lane was silenced entirely and the test only ever saw the bubble lane. | Use `getStepInfo` for proper stepInfo; replace exclusion metric with explicit skank-position (`[4, 12]`), bubble-position (`[2, 6, 10, 14]`), and off-genre-position tracking. Engine now reports 100% skank coverage, 100% both-skank bars, 0% off-genre — was hidden behind the original test. |
 | 2026-05-16 | `soloist-jazz-critique.test.ts:146` logged a chromatism target but never asserted it | Report claimed "Chromatism Ratio Target: >5%" but no `expect(chromaticRatio)...` existed. A completely diatonic jazz soloist (no chromaticism — the heart of bebop) would have passed the test. The note-density assertion was also looser than the logged target (logged 8-16/bar, asserted `>6.5`). | Added `chromaticRatio > 0.15` assertion (engine delivers ~26%). Reconciled note-density report to match engine reality (6-12/bar) and tightened the smoothness assertion (engine ~2.3 semitones; tightened `<9.0` → `<5.0`). Engine pushing toward Kenny-Dorham-density 12+/bar queued as a future engine task, not papered over here. |
 | 2026-05-16 | `neo-soul-bass-critique.test.ts:99` "syncopated hammer-ons" measured "any non-beat-start note" | Metric `p.info.mStep % 4 !== 0` counted all upbeat hits — a root on step 6 and a hammer-on on step 6 both incremented the same counter. Threshold `>5` over 16 bars was 0.3 syncopated notes/bar, effectively trivial. The genre-defining hammer-on ornament (`baseRoot + 2` with shortened duration, fired at `complexity > 0.7`, see `bass-engine.ts:414`) was never measured. | Split the claim into both halves: (a) note lands on a syncopated 8th-note offbeat (steps 2/6/10/14), and (b) pitch is a half or whole step above the chord root. Threshold `hammerOnsPerBar > 0.5` and `hammerOnRate > 0.15` with documented engine-probability math. Engine delivers 0.95 hammer-ons/bar at 27.5% of syncopated hits. |
-
-## Queued (verified, ready to fix)
-
-Four critique-test smells diagnosed and verified during the May 2026 scout pass but not yet shipped. Same thematic shape as prior `refactor(tests): rewrite critique metrics...` commits — recommend one combined commit. Each finding's diagnosis was confirmed by reading the actual file; the engine numbers cited below were not yet captured (next session should run each test once with `--reporter=verbose` to set honest thresholds with documented headroom).
-
-### Q1. `funk-drummer-critique.test.ts:144` — harness silences syncopation check
-- **Test claim:** `should pass an authenticity critique for a 128-bar Funk performance` (the "Kick Syncopation" branch)
-- **Smell:** (e) harness bug
-- **Evidence:** Metric reads `!stepData.isPulseStart` but the harness at lines 43-52 only sets `isDownbeat`, `isPulse`, `isBeatStart`, `isBackbeat`, `isOffbeat` on `stepData`. The `isPulseStart` property is never assigned, so `!undefined === true` and every kick hit gets counted as syncopated. Threshold `totalSyncopatedKickHits / totalBars > 0.5` passes trivially since the engine emits well above 0.5 kicks/bar.
-- **Fix:** Replace the predicate. Real "syncopated kick" is a kick on a position that isn't a strong beat — `stepData.instruments.Kick && !stepData.isBeatStart` (or tighter: `!stepData.isDownbeat && !stepData.isBackbeat`).
-
-### Q2. `hiphop-drummer-critique.test.ts:118-126` — missing assertion + loose threshold
-- **Test claim:** `should pass an authenticity critique for a 128-bar Hip Hop performance`
-- **Smell:** (d) report/assertion mismatch + (5) missing assertion + (2) loose threshold
-- **Evidence:** `[HiHat Density]` is logged but never asserted; report says "Backbeat Target: 100%" but assertion is `>0.95`; `syncopatedKickRatio > 0.5/bar` is trivial for hiphop (genre is heavily syncopated — engine likely runs 4-8× that).
-- **Fix:** Add a HiHat density assertion at the engine's real output; tighten `syncopatedKickRatio` to a real headroom value after measuring; reconcile the backbeat target log with the assertion.
-
-### Q3. `rock-drummer-critique.test.ts:148-171` — multiple mismatches in one test
-- **Test claim:** `should pass an authenticity critique for a 128-bar Rock performance`
-- **Smell:** (d) report/assertion mismatch + (2) wrong divisor
-- **Evidence:**
-  - `_backbeatScore = backbeatHits / (totalBars * 1)` is computed and prefixed-unused. The `* 1` divisor encodes "1 backbeat per bar" but rock has 2 (beats 2 and 4); the dead code documents the wrong model.
-  - Report says "Eighth Note Pulse Target: >95%" → asserts `>0.9`.
-  - Report says "Kick Solidity Target: 100%" → asserts `>0.9`.
-  - `backbeatHits > totalBars` = ">1 per bar" — passes if the engine produces just over 1 backbeat per bar when rock should reliably deliver ~2.
-- **Fix:** Restore the `_backbeatScore` metric with the right divisor (`totalBars * 2`), assert at >0.95 with documented headroom; reconcile both "Target" logs with the assertions.
-
-### Q4. `soloist-musicality.test.ts:80` — sub-baseline chord-tone threshold
-- **Test claim:** `should statistically resolve to chord tones in the Conclusion phase`
-- **Smell:** (2) below random baseline
-- **Evidence:** Chord is a 4-tone (`[0, 4, 7, 11]`); random pitch over 12 chromatic semitones gives 4/12 ≈ 33% chord tones. Assertion `expect(ratio).toBeGreaterThan(0.15)` allows the engine to be *worse than random*. The test name claims "statistically resolves" but the threshold allows statistical noise.
-- **Fix:** Measure engine output, set threshold above the 33% random baseline with real headroom (likely `>0.5` based on similar tests in the suite).
+| 2026-05-16 | `funk-drummer-critique.test.ts:144` (Q1) harness silenced syncopation check | Harness cherry-picked 5 fields onto `stepData`; the syncopated-kick metric read `!stepData.isPulseStart` which evaluated `!undefined === true` — every kick counted as syncopated, threshold `>0.5/bar` passed trivially. Same "harness silences engine path" pattern as the May 2026 reggae-piano + funk gates. | Spread the full `getStepInfo` return into `stepData` so every flag the engine reads is available. Closes smell-(e) for this file in one stroke (also future-proofs other metrics that may want `isEOfBeat`/`isAOfBeat`). With the harness fixed, engine delivers 3.02 syncopated kicks/bar at intensity 0.8; threshold tightened to `>2.0` with documented headroom. |
+| 2026-05-16 | `hiphop-drummer-critique.test.ts:115-126` (Q2) missing + loose assertions | HiHat density logged at line 121 with no `expect()`. Report "Backbeat Target: 100%" but assertion `>0.95`. Kick-syncopation assertion `>0.5/bar` trivial against trap kick density. | Added HiHat density assertion. Engine delivers Backbeat 100%, Kick syncopation 2.32/bar, HiHat 15/bar at intensity 0.8 (trap motif). Tightened: backbeat `>0.99`, kick syncopation `>1.5/bar`, HiHat `>10/bar` — all with documented headroom and musical reasoning (10/bar floor still requires eighth-or-faster motion at high intensity, which is the trap claim). |
+| 2026-05-16 | `rock-drummer-critique.test.ts:148-171` (Q3) dead metric + wrong divisor + log/assert mismatch | `_backbeatScore = backbeatHits / (totalBars * 1)` was dead + encoded "1 backbeat per bar" (rock has 2). Real assertion `backbeatHits > totalBars` passed at >1.01/bar when the engine should deliver ~2. Eighth pulse "Target: >95%" → asserts `>0.9`. Kick solidity "Target: 100%" → asserts `>0.9`. | Replaced with real `backbeatScore = backbeatHits / (totalBars * 2)`, asserted `>0.95`. Tightened eighth pulse `>0.95`, kick solidity `>0.99`. Engine delivers 100% on all three metrics (256 strong snare hits over 128 bars). |
+| 2026-05-16 | `soloist-musicality.test.ts:80` (Q4) sub-baseline chord-tone threshold | Test asserted `ratio > 0.15` against a 4/12=33% random baseline — engine could deliver *worse than random* and pass. Also low iteration count (200) produced flake-prone sample sizes (~30 notes). | Bumped iterations 200→800 (sample size now 126-162 notes per run). Engine delivers 68-80% across 10 sample runs. Threshold tightened to `>0.55` with documented headroom: 22pt above random baseline, ~13pt below worst observation. Surfaces Open finding #2 below — the engine's Conclusion-phase resolution is not actually phase-specific. |
 
 ## Open findings
 
@@ -86,6 +58,12 @@ Items surfaced by the initial pass but not yet investigated/fixed. Listed in rou
 - **Test status:** Test no longer asserts directionality — both rates are above the 33% baseline, that's what the engine reliably delivers. Directional gap removed from the assertions to avoid flakes.
 - **Root cause located:** `soloist-pitch-engine.ts:578-587` applies an 8× resolution-tone weight uniformly across every note of a call-response phrase. There is no separate phrase-end-specific kicker, and Call phrase endings get the same resolution pull as Response endings (musically they should pull in opposite directions: Call leaves the question open, Response answers it).
 - **Fix idea:** Two paths converge here. (a) Smallest: add a phrase-end pitch-weight boost on the last 1-2 notes of a phrase, asymmetric by role — Response gets stronger resolution pull (root/3rd/5th), Call gets *negative* resolution pull (favor 2/4/6 suspended tones). (b) Cleaner: now that devices are gated against the rhythm plan (2026-05-16 fix), the planner is a much better home for "this attack is the phrase-end resolution cell" markers — the planner can mark a `kind: 'resolution-cell'` node on the last attack of Response phrases and route pitch selection through a phrase-end-aware path. Once the engine reliably produces e.g. ≥10pt Response>Call gap, re-enable the directional assertion in the blues test.
+
+### 2. Soloist pitch engine has no SRDC-phase-specific bias
+- **Symptom:** `soloist-musicality.test.ts:57` claims "should statistically resolve to chord tones in the Conclusion phase" but the same chord-tone ratio (68-80%) would hold if `srdcState` were set to `Statement`, `Restatement`, or `Departure` — the pitch engine doesn't read the phase. Musically, Conclusion should resolve *harder* than the others, not at the same rate.
+- **Test status:** Threshold set above the engine's general chord-tone bias (`>0.55`) — the test currently verifies "the engine prefers chord tones in general," which is true. The phase-specific claim is acknowledged in an inline comment but not enforced.
+- **Root cause located:** `soloist-pitch-engine.ts:461-475` builds a chord-mask weight that fires the same way on every note. There is no `srdcState === 'Conclusion'` branch in the pitch picker. SRDC-aware logic does exist in `soloist-seeder.ts:1600-1623` but only applies to the final note of the section's seed motif, not to live pitch selection during a Conclusion phrase.
+- **Fix idea:** Add a phase-aware multiplier in `soloist-pitch-engine.ts` chord-tone weighting — Conclusion gets a `chordToneWeight *= 1.5` boost, Departure gets `chordToneWeight *= 0.8` (or a parallel non-chord-tone boost). Then re-enable a phase-comparison assertion: render notes in each of the four phases, assert Conclusion's chord-tone ratio exceeds Departure's by a documented margin. This naturally pairs with Open finding #1 since both ask the same question (does the engine know where in the phrase/section it is) at different scopes (phrase vs section).
 
 ## Future passes
 
@@ -99,10 +77,10 @@ Lower-priority sweeps to consider once the queued + open findings lists are empt
 
 ## Handoff notes for the next session
 
-1. **Repo state:** working tree is clean; 8 audit commits ahead of `origin/main`. No pending changes to land.
-2. **Recommended pickup:** ship Q1-Q4 as one thematic commit following the pattern of commit `7822cad3` (`refactor(tests): rewrite four critique metrics to match named claims`). Each Q-finding above has a diagnosed fix; verify engine output with `npx vitest run tests/standards/<file>.test.ts --reporter=verbose` to capture honest threshold values before writing the assertion.
-3. **After Q1-Q4:** the natural next move is either (a) close the single Open finding (phrase-end resolution asymmetry — biggest single-fix musical value, now with a clean architectural attachment after the device-gate work) or (b) run the **harness-silencing audit** sweep listed in Future passes — likely to surface 2-4 more findings in the same vein as reggae-piano + funk-drummer.
-4. **Listen-test:** the user listened to playback during this session and confirmed the device-gate fix sounded great. Worth re-listening after Q1-Q4 if any engine-side changes get queued.
+1. **Repo state:** the May 2026 Queued list is drained. Working tree should be clean after the bundled Q1-Q4 commit lands.
+2. **Recommended pickup:** the two open findings are now structurally related (#1 phrase-end resolution asymmetry, #2 SRDC-phase chord-tone bias) — both ask "does the soloist's pitch picker know where in the phrase/section it is?" at different scopes. A single engine-side change in `soloist-pitch-engine.ts:461-475` that takes a `phasePosition` / `srdcPhase` parameter could close both at once. After the device-gate fix shipped earlier this session, the rhythm planner is now the natural place to mark "this attack is the resolution cell" markers, and the pitch picker can read from those markers.
+3. **Alternative pickup:** run the **harness-silencing audit** sweep listed in Future passes — Q1 fixed one such case in `funk-drummer-critique`. Likely 2-4 more lurking. Pattern: any test that hand-builds `stepData`/`stepInfo` instead of spreading `getStepInfo()`'s full return.
+4. **Listen-test:** the user listened to playback during the prior session and confirmed the device-gate fix sounded great. The Q1-Q4 changes are tests-only and won't change audible output; re-listening is only needed if Open finding #1 or #2 gets fixed (those will change soloist behavior).
 
 ## Related
 
