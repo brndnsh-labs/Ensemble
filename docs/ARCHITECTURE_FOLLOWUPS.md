@@ -90,13 +90,9 @@ Custom bash + sed + esbuild works but is brittle — the `sw.ts` placeholder bug
 
 ---
 
-## 8. Web Audio types reference
+## 8. Web Audio types reference ✅ DONE (May 2026)
 
-**Why now (or whenever):** Trivial. Just makes type availability explicit.
-
-A central `/// <reference lib="dom" />` (or just relying on tsconfig's default lib) would make Web Audio type availability explicit rather than implicit across many files.
-
-**Approach:** Haiku. One-line tsconfig or reference comment. Five minutes.
+`tsconfig.json` now declares `"lib": ["ES2022", "DOM", "DOM.Iterable"]` explicitly instead of relying on the implicit default for `target: ES2022`. Web Audio types (`AudioContext`, `GainNode`, `BiquadFilterNode`, etc.) live in the DOM lib and are now visibly part of the project's type surface. Workers keep their per-file `/// <reference lib="webworker" />` comments; scripts and tests inherit the DOM lib via the root tsconfig (they import from DOM-typed `public/` modules).
 
 ---
 
