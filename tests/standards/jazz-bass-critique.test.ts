@@ -49,7 +49,14 @@ describe('Jazz Bass Critique', () => {
 
         let quarterNoteHits = 0;
         let stepwiseMotion = 0;
-        let chromaticApproaches = 0;
+        // "Chromatic approach" is a phrase-end phenomenon: the "& of 4" of the bar before a
+        // chord change leans into the next bar's root by a semitone. The previous metric
+        // sampled every "& of beat" (2/6/10/14) — 4× more positions than musically meaningful —
+        // and a 1-of-12 random pick gives ~8% as a baseline, so the engine's >1% threshold
+        // guarded nothing. We now restrict detection to step 14 ahead of a real chord change
+        // and report the per-chord-change rate, which is what the name actually claims.
+        let chromaticApproachesToChordChange = 0;
+        let chordChangesObserved = 0;
         let rootResolutions = 0;
         let lastMidi = null;
         let totalTransitions = 0;
@@ -104,13 +111,17 @@ describe('Jazz Bass Critique', () => {
                             stepwiseMotion++;
                         }
 
-                        // Verify chromatic approach
-                        if ([2, 6, 10, 14].includes(stepInMeasure)) {
-                            const targetStep = i + 2;
-                            const targetChord = progression[Math.floor(targetStep / 16) % 4];
-                            const diff = Math.abs((midi % 12) - (targetChord.rootMidi % 12));
-                            if (diff === 1 || diff === 11) {
-                                chromaticApproaches++;
+                        // Chromatic approach to a chord change: only the "& of 4" (step 14)
+                        // ahead of a bar where the chord actually changes counts.
+                        if (stepInMeasure === 14) {
+                            const nextMeasure = (measure + 1) % progression.length;
+                            const targetChord = progression[nextMeasure];
+                            if (targetChord.rootMidi !== currentChord.rootMidi) {
+                                chordChangesObserved++;
+                                const diff = Math.abs((midi % 12) - (targetChord.rootMidi % 12));
+                                if (diff === 1 || diff === 11) {
+                                    chromaticApproachesToChordChange++;
+                                }
                             }
                         }
                     }
@@ -122,20 +133,26 @@ describe('Jazz Bass Critique', () => {
         const quarterNoteRatio = quarterNoteHits / (totalMeasures * 4);
         const rootResRatio = rootResolutions / totalMeasures;
         const stepwiseRatio = stepwiseMotion / (totalTransitions || 1);
-        const chromaticRatio = chromaticApproaches / (totalMeasures * 4);
+        const chromaticApproachRate =
+            chromaticApproachesToChordChange / (chordChangesObserved || 1);
 
         console.log(
             '\n--- JAZZ BASS CRITIQUE REPORT ---\n' +
                 `[Pulse Consistency]    ${(quarterNoteRatio * 100).toFixed(1)}% (Target: >95%)\n` +
                 `[The One (Root)]       ${(rootResRatio * 100).toFixed(1)}% (Target: >80%)\n` +
                 `[Stepwise Motion]      ${(stepwiseRatio * 100).toFixed(1)}% (Target: >35%)\n` +
-                `[Chromatic Approaches] ${(chromaticRatio * 100).toFixed(1)}% (Target: >1%)\n` +
+                `[Chromatic Approach]   ${(chromaticApproachRate * 100).toFixed(1)}% of ${chordChangesObserved} chord changes (Target: >50%)\n` +
                 '------------------------------------\n',
         );
 
         expect(quarterNoteRatio).toBeGreaterThan(0.95);
         expect(rootResRatio).toBeGreaterThan(0.8);
         expect(stepwiseRatio).toBeGreaterThan(0.35);
-        expect(chromaticRatio).toBeGreaterThan(0.01);
+        expect(chordChangesObserved).toBeGreaterThan(50);
+        // Real jazz walking bass chromatically approaches the majority of chord changes.
+        // Threshold reflects the engine's intended Jazz/high-intensity behavior (chromaticProb
+        // 0.95 × ~80% of choices being chromatic ≈ 76% expected); a >50% floor still allows
+        // headroom for the engine's diatonic-fifth alternative without being a placeholder.
+        expect(chromaticApproachRate).toBeGreaterThan(0.5);
     });
 });
