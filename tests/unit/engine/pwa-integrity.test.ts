@@ -6,34 +6,14 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('PWA Offline Asset Integrity', () => {
-    it('should verify all assets listed in sw.ts exist on disk', () => {
+    it('should reference the Workbox precache manifest in sw.ts', () => {
+        // The hand-maintained ASSETS array was replaced by vite-plugin-pwa's
+        // injectManifest pass (May 2026): Workbox scans dist/ at build time
+        // and rewrites `self.__WB_MANIFEST` with the real revisioned list.
         const swPath = path.resolve(__dirname, '../../../public/sw.ts');
         const swContent = fs.readFileSync(swPath, 'utf8');
-
-        // Extract ASSETS array using regex
-        const match = swContent.match(/const ASSETS(?::[^=]+)?\s*=\s*\[([\s\S]*?)\];/);
-        expect(match).not.toBeNull();
-
-        const assetsRaw = match[1];
-        const assets = assetsRaw
-            .split(',')
-            .map((s) => s.trim().replace(/['"[\]]/g, ''))
-            .filter((s) => s && s !== './' && !s.includes('ASSETS_PLACEHOLDER'));
-
-        const publicDir = path.resolve(__dirname, '../../../public');
-
-        const missingFiles = [];
-        assets.forEach((asset) => {
-            const filePath = path.join(publicDir, asset.replace('./', ''));
-            if (!fs.existsSync(filePath)) {
-                missingFiles.push(asset);
-            }
-        });
-
-        expect(
-            missingFiles,
-            `Missing assets in public/ directory: ${missingFiles.join(', ')}`,
-        ).toEqual([]);
+        expect(swContent).toContain('self.__WB_MANIFEST');
+        expect(swContent).toContain('precacheAndRoute');
     });
 
     it('should verify manifest.json points to valid icons', () => {

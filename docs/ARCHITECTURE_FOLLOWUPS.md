@@ -59,16 +59,13 @@ Also surfaced and **deferred**: the Playwright e2e suite has 38 pre-existing fai
 
 ---
 
-## 5. Build pipeline rewrite — and consider Vite
+## 5. Build pipeline rewrite — migrate to Vite ✅ DONE (May 2026)
 
-**Why fifth:** Independent quality-of-life improvement. The current deploy scripts work; this is hygiene plus a possible HMR upgrade.
+Replaced the bash + esbuild + sed pipeline with `vite.config.ts`. `npm run dev` is now a real Vite dev server with HMR on port 5173 (no more rebuild-and-serve loop). `npm run build` calls `vite build --mode test`; `deploy-test.sh` / `deploy-prod.sh` shrunk to ~15-line wrappers around `vite build` + `rsync`. Worker bootstrap (`worker-client.ts`, `visualizer-proxy.ts`) uses `new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })`; the `WORKER_PATH` / `VIZ_WORKER_PATH` `--define` injections are gone. Service worker rewritten with `vite-plugin-pwa` in `injectManifest` mode — Workbox now generates the precache list at build time from `__WB_MANIFEST`, replacing the brittle `sed`-replaced `'ASSETS_PLACEHOLDER'` string. Per-env cache prefix (`ensemble-test-*` vs `ensemble-*`) preserved via `workbox-core`'s `setCacheNameDetails` driven by `import.meta.env.MODE`.
 
-Custom bash + sed + esbuild works but is brittle — the `sw.ts` placeholder bug surfaced this during Phase 8. Replacing the two deploy shell scripts (`scripts/deploy-test.sh` and `scripts/deploy-prod.sh`) with a ~100-line TypeScript build script using esbuild's API + metafile would be more robust, testable, and would make the precache asset list strongly typed instead of a string list assembled by `sed`. Also: `npm run dev` lacks HMR — every change requires a full rebuild. Migrating to Vite (which Vitest already uses) would be a quality-of-life win.
+One quirk worth noting: a small inline `copyStaticAssets` plugin in `vite.config.ts` copies `manifest.json`, `icon-*.png`, `icon.svg`, and `MANUAL.md` to `dist/` verbatim, then rewrites the hashed manifest/icon hrefs Vite emits in `index.html` back to the unhashed paths. This is needed because the PWA manifest references icons by their bare filenames; if Vite hashed them, the lookups would 404.
 
-**Approach:** Two flavors depending on appetite.
-
-- **Small win:** Sonnet ports the existing bash logic to a TS build script using esbuild's API and metafile.
-- **Bigger investment:** Migrate to Vite for HMR + toolchain alignment with Vitest. Opus should evaluate the migration cost (custom esbuild flags, deploy hashing, service worker compile) vs. benefit before committing; if go, Sonnet executes with Opus reviewing.
+**Open follow-up:** the entry filename is now `index.<rev>.js` (Vite uses the HTML basename) instead of `main.<rev>.js`. Cosmetic only — nothing in the repo relies on the old name, but any external monitoring that watches for `main-*.js` URLs in logs would need updating.
 
 ---
 

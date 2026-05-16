@@ -8,8 +8,6 @@ interface WorkerLike {
     terminate(): void;
 }
 
-declare const VIZ_WORKER_PATH: string | undefined;
-
 export class UnifiedVisualizer {
     canvas: HTMLCanvasElement;
     staticCanvas: HTMLCanvasElement;
@@ -36,11 +34,9 @@ export class UnifiedVisualizer {
             return;
         }
 
-        // In production, VIZ_WORKER_PATH is injected by esbuild --define
-        const workerPath =
-            typeof VIZ_WORKER_PATH !== 'undefined' ? VIZ_WORKER_PATH : 'visualizer-worker.js';
-
-        this.worker = new Worker(workerPath, { type: 'module' });
+        this.worker = new Worker(new URL('./visualizer-worker.ts', import.meta.url), {
+            type: 'module',
+        });
 
         const offscreen = canvas.transferControlToOffscreen();
         const staticOffscreen = staticCanvas.transferControlToOffscreen();

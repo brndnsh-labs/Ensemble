@@ -1,7 +1,6 @@
 {
     "$schema": "https://unpkg.com/knip@5/schema.json",
     "entry": [
-        "public/main.ts",
         "public/sw.ts",
         "public/logic-worker.ts",
         "public/ui-types.ts",
@@ -11,7 +10,6 @@
         "tests/scripts/*.ts"
     ],
     "project": ["public/**/*.{ts,tsx}", "scripts/*.ts", "tests/**/*.{ts,tsx}"],
-    "ignoreDependencies": ["esbuild"],
     "ignoreExportsUsedInFile": true,
     "ignore": ["public/engine/grooves/*.ts"]
 }

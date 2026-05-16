@@ -2,8 +2,6 @@ import { getState, getSyncState } from './state.js';
 import type { EnsembleState } from './types.js';
 import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
 
-declare const WORKER_PATH: string;
-
 const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 
@@ -31,9 +29,7 @@ export function initWorker(
     schedulerRequestHandler = onSchedulerRequest;
     notesReceivedHandler = onNotesReceived;
 
-    // In production, WORKER_PATH is injected by esbuild --define
-    const workerPath = typeof WORKER_PATH !== 'undefined' ? WORKER_PATH : 'logic-worker.js';
-    timerWorker = new Worker(workerPath, { type: 'module' });
+    timerWorker = new Worker(new URL('./logic-worker.ts', import.meta.url), { type: 'module' });
 
     timerWorker.onmessage = (e) => {
         const { type, notes, data, requestTimestamp, workerProcessTime } = e.data;

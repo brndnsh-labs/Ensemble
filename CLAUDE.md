@@ -28,8 +28,8 @@ If any guide drifts from live code/config, prefer live and update the docs.
 ## Commands
 
 ```bash
-npm run dev          # build dist/ and serve on http://localhost:5173 (not hot-reload)
-npm run build        # dry-run production bundle into dist/
+npm run dev          # Vite dev server on http://localhost:5173 with HMR
+npm run build        # production bundle into dist/ via Vite (mode=test)
 npm run lint         # Biome lint + format check
 npm run format       # Biome write fixes
 npm run lint:docs    # repo-specific docs validation
@@ -53,7 +53,7 @@ npx playwright test -g "@ipad" --project="Mobile Safari"
 npx playwright test -g "@mobile"
 ```
 
-Local-dev note: `npm run dev` is **not** Vite HMR. It rebuilds `dist/` and serves it on port 5173; browser checks reflect the current build.
+Local-dev note: `npm run dev` runs Vite's dev server with HMR on port 5173. The build pipeline lives in `vite.config.ts`; deploy scripts are thin wrappers around `vite build` + `rsync`.
 
 ## Architecture
 

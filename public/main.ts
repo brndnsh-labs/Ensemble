@@ -1,3 +1,4 @@
+import './styles.css';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
