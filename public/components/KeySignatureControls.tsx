@@ -2,6 +2,7 @@ import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arrang
 import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
+import { arranger } from '../state.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
@@ -35,12 +36,10 @@ function getRelativeKeyActionLabel(isMinor: boolean) {
 }
 
 function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[]) => void) {
-    import('../state.js').then(({ arranger }) => {
-        arranger.key = newKey;
-        validateAndAnalyze();
-        saveCurrentState();
-        dispatch('KEY_CHANGE');
-    });
+    arranger.key = newKey;
+    validateAndAnalyze();
+    saveCurrentState();
+    dispatch('KEY_CHANGE');
 }
 
 function updateTimeSignature(
@@ -48,16 +47,14 @@ function updateTimeSignature(
     lastDrumPreset: string | null,
     dispatch: (action: any, ...args: any[]) => void,
 ) {
-    import('../state.js').then(({ arranger }) => {
-        arranger.timeSignature = timeSignature;
-        arranger.grouping = null;
-        if (lastDrumPreset) {
-            loadDrumPreset(lastDrumPreset);
-        }
-        validateAndAnalyze();
-        saveCurrentState();
-        dispatch('TIME_SIG_CHANGE');
-    });
+    arranger.timeSignature = timeSignature;
+    arranger.grouping = null;
+    if (lastDrumPreset) {
+        loadDrumPreset(lastDrumPreset);
+    }
+    validateAndAnalyze();
+    saveCurrentState();
+    dispatch('TIME_SIG_CHANGE');
 }
 
 function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
@@ -66,17 +63,15 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
         return;
     }
 
-    import('../state.js').then(({ arranger }) => {
-        const current = arranger.grouping || (TIME_SIGNATURES as any)[timeSignature].grouping;
-        const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
-        const nextIndex = (currentIndex + 1) % options.length;
+    const current = arranger.grouping || (TIME_SIGNATURES as any)[timeSignature].grouping;
+    const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
+    const nextIndex = (currentIndex + 1) % options.length;
 
-        arranger.grouping = options[nextIndex];
-        flushBuffers();
-        syncWorker();
-        saveCurrentState();
-        dispatch('GROUPING_CHANGE');
-    });
+    arranger.grouping = options[nextIndex];
+    flushBuffers();
+    syncWorker();
+    saveCurrentState();
+    dispatch('GROUPING_CHANGE');
 }
 
 export function TimeSignatureControl() {

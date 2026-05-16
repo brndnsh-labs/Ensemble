@@ -55,12 +55,10 @@ export function GlobalShortcuts() {
         const handleOpenEditor = (e: Event) => {
             const { sectionId } = (e as CustomEvent).detail || {};
             if (sectionId) {
-                import('../state.js').then(() => {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'arranger',
-                        param: 'lastInteractedSectionId',
-                        value: sectionId,
-                    });
+                dispatch(ACTIONS.SET_PARAM, {
+                    module: 'arranger',
+                    param: 'lastInteractedSectionId',
+                    value: sectionId,
                 });
             }
             dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });

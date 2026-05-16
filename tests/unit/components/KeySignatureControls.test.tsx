@@ -62,13 +62,14 @@ vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn(),
 }));
 
-// Mock state (dynamic import)
-const mockArranger = {
-    key: 'C',
-    timeSignature: '4/4',
-    isMinor: false,
-    grouping: null,
-};
+const { mockArranger } = vi.hoisted(() => ({
+    mockArranger: {
+        key: 'C',
+        timeSignature: '4/4',
+        isMinor: false,
+        grouping: null,
+    },
+}));
 vi.mock('../../../public/state.js', () => ({
     arranger: mockArranger,
 }));

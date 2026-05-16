@@ -1,4 +1,5 @@
 import './styles.css';
+import { applyTheme } from './app-controller.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
@@ -20,10 +21,7 @@ function init() {
         hydrateState();
         loadFromUrl();
 
-        // Initial Theme Application
-        import('./app-controller.js').then(({ applyTheme }) => {
-            applyTheme(playback.theme);
-        });
+        applyTheme(playback.theme);
 
         validateProgression(getState(), (a: any, p: any) =>
             (window as any).ensemble?.dispatch(a, p),
