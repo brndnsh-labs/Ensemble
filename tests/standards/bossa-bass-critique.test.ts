@@ -92,7 +92,6 @@ describe('Bossa Nova Bassist Critique', () => {
 
         performance.forEach((p) => {
             const pc = p.note.midi % 12;
-            console.log(`Step ${p.loopStep}, PC ${pc}, MIDI ${p.note.midi}`);
             if (p.loopStep === 0 || p.loopStep === 8) {
                 if (pc === 0) {
                     rootHits++;
@@ -108,8 +107,39 @@ describe('Bossa Nova Bassist Critique', () => {
             `[Bossa Critique] Root Consistency: ${rootHits}/32, Fifth Consistency: ${fifthHits}/32`,
         );
 
-        expect(rootHits).toBeGreaterThan(14);
-        expect(fifthHits).toBeGreaterThan(14);
+        // Pitch class on the named positions should be stable across all 16 bars
+        // (octave displacement preserves PC; only the voicing breathes).
+        expect(rootHits).toBe(32);
+        expect(fifthHits).toBe(32);
+    });
+
+    it('should breathe across bars rather than repeating a single voicing for 16 bars', () => {
+        // Real bossa players octave-displace the root or fifth occasionally so the line
+        // doesn't read as "MIDI demo file." The engine should produce more than one distinct
+        // bar-shape over a 16-bar static-chord stretch.
+        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.8 } });
+
+        // Group notes into bars (loopStep 0–15) and stringify each bar's MIDI sequence.
+        const barShapes = new Map(); // step→midi signature per bar
+        performance.forEach((p) => {
+            const barIdx = Math.floor(p.step / 16);
+            if (!barShapes.has(barIdx)) {
+                barShapes.set(barIdx, []);
+            }
+            barShapes.get(barIdx).push(`${p.loopStep}:${p.note.midi}`);
+        });
+        const distinctShapes = new Set();
+        for (const seq of barShapes.values()) {
+            distinctShapes.add(seq.join(','));
+        }
+
+        console.log(
+            `[Bossa Critique] Distinct bar shapes over ${barShapes.size} bars: ${distinctShapes.size}`,
+        );
+
+        // At least 3 distinct shapes across 16 bars — a meaningful amount of variation
+        // without losing the bossa identity. Anything ≤ 1 means the bass is mechanical.
+        expect(distinctShapes.size).toBeGreaterThanOrEqual(3);
     });
 
     it('should implement "Lay-back" timing (positive timingOffset)', () => {

@@ -446,7 +446,10 @@ export function getBassNoteStyle(
     if (style === 'bossa') {
         const root = baseRoot;
         const hasFlat5 = chord.quality.includes('dim') || chord.quality.includes('halfdim');
-        const fifth = clampAndNormalize(root + (hasFlat5 ? 6 : 7));
+        const fifthInterval = hasFlat5 ? 6 : 7;
+        const fifthUp = clampAndNormalize(root + fifthInterval);
+        const fifthDown = clampAndNormalize(root - (12 - fifthInterval)); // same pitch class, octave lower
+        const rootOctaveUp = clampAndNormalize(root + 12);
 
         // 1. Foundation: 1, 2&, 3, 4&
         const isOne = isBeatStart && intBeat === 0;
@@ -459,18 +462,41 @@ export function getBassNoteStyle(
         // Bossa Timing: Subtle lay-back
         const lag = 0.01 + intensity * 0.005;
 
-        // Note Logic: Root on downbeats, Fifth on upbeats
-        if (isOne || isThree) {
-            // Warm, long sustained root
+        // Per-bar voicing variation: real bossa players octave-displace the root or fifth
+        // every few bars even on a static chord, so the line breathes rather than looping.
+        // Deterministic from barIndex per CLAUDE.md (no raw Math.random) so loops stay coherent
+        // and critique tests don't depend on RNG. Pitch classes are preserved, only octave shifts.
+        const barIndex = Math.floor(step / stepsPerMeasure);
+        const variationSeed = ((barIndex * 37 + 13) % 100) / 100;
+        const useOctaveUpOnThree = variationSeed < 0.2; // ~20% of bars: beat-3 root jumps up an octave
+        const useDeepFifthOnTwoAnd = variationSeed >= 0.35 && variationSeed < 0.5; // ~15%: deeper pedal "& of 2"
+        const useDeepFifthOnFourAnd = variationSeed >= 0.7 && variationSeed < 0.85; // ~15%: deeper pedal "& of 4"
+
+        // Note Logic: Root on downbeats, Fifth on upbeats (with octave variations)
+        if (isOne) {
             const res = result(getFrequency(root), ts.stepsPerBeat * 0.6, 1.1 + intensity * 0.1);
             res.timingOffset += lag;
             return res;
         }
 
-        if (isOffbeatTwo || isOffbeatFour) {
-            // Punchy, short fifth on the 'and'
-            const res = result(getFrequency(fifth), 0.8, 1.0 + intensity * 0.15);
+        if (isThree) {
+            const pitch = useOctaveUpOnThree ? rootOctaveUp : root;
+            const res = result(getFrequency(pitch), ts.stepsPerBeat * 0.6, 1.1 + intensity * 0.1);
+            res.timingOffset += lag;
+            return res;
+        }
+
+        if (isOffbeatTwo) {
+            const pitch = useDeepFifthOnTwoAnd ? fifthDown : fifthUp;
+            const res = result(getFrequency(pitch), 0.8, 1.0 + intensity * 0.15);
             res.timingOffset += lag + 0.005; // Upbeats often lag even more
+            return res;
+        }
+
+        if (isOffbeatFour) {
+            const pitch = useDeepFifthOnFourAnd ? fifthDown : fifthUp;
+            const res = result(getFrequency(pitch), 0.8, 1.0 + intensity * 0.15);
+            res.timingOffset += lag + 0.005;
             return res;
         }
 
