@@ -6,6 +6,7 @@ import type {
     FormArcEntry,
     FormArcOccurrenceEntry,
     Mutable,
+    SectionRecallEntry,
     StepInfo,
 } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
@@ -165,7 +166,7 @@ function storeSectionRecallSignature(
     signature.sectionLabel = label;
     signature.sectionOccurrence = occurrence;
 
-    const existingEntry =
+    const existingEntry: SectionRecallEntry =
         soloist.sectionRecall && typeof soloist.sectionRecall[label] === 'object'
             ? soloist.sectionRecall[label]
             : {};

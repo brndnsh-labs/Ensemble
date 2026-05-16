@@ -445,8 +445,10 @@ export interface RhythmNode {
     durationSteps: number;
     isSustained: boolean;
     vibrato: boolean;
-    tripletPlacement: 't1' | 't2' | null;
-    timingOffset: number;
+    /** Omitted by several producers; consumers use `|| null` fallbacks. */
+    tripletPlacement?: 't1' | 't2' | null;
+    /** Omitted by several producers; consumers use `|| 0` fallbacks. */
+    timingOffset?: number;
     responseEntryTarget?: boolean;
     responseCadenceTarget?: boolean;
     responseSource?: 'section' | 'form' | 'recent' | 'seed' | 'free';
@@ -469,6 +471,8 @@ export interface SoloistDeviceEvent {
     velocity: number;
     durationSteps: number;
     style: string;
+    /** Device kind tag stamped by `soloist-devices.ts` (e.g. 'quartal', 'graceNote'). */
+    device?: string;
     bendStartInterval?: number;
     isDoubleStop?: boolean;
 }
