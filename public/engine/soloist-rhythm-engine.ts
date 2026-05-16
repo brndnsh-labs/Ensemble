@@ -193,7 +193,7 @@ export function generateRhythmPlan(
         hasDynamicHeadSeed &&
         responseConfig?.enabled &&
         soloistState.phraseContext?.role === 'response' &&
-        responseSignature?.notes?.length > 0
+        (responseSignature?.notes?.length ?? 0) > 0
     ) {
         plan.push(
             ...buildResponsePlanFromSignature(

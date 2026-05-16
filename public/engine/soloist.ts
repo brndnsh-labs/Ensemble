@@ -1,6 +1,13 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { SoloistState } from '../state/instruments.js';
-import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
+import type {
+    Chord,
+    EnsembleState,
+    FormArcEntry,
+    FormArcOccurrenceEntry,
+    Mutable,
+    StepInfo,
+} from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
     INFLUENCE_POOLS,
@@ -188,18 +195,18 @@ function storeFormArcRecallSignature(
     const label = soloist.phraseSectionLabel;
     const occurrence = Math.max(1, soloist.phraseSectionOccurrence || 1);
     const loop = Number.isFinite(sourceLoop) ? sourceLoop : 0;
-    const existingEntry =
+    const existingEntry: FormArcEntry =
         soloist.formArcRecall && typeof soloist.formArcRecall[label] === 'object'
             ? soloist.formArcRecall[label]
-            : {};
-    const byOccurrence =
+            : { byOccurrence: {} };
+    const byOccurrence: Record<string, FormArcOccurrenceEntry> =
         existingEntry.byOccurrence &&
         typeof existingEntry.byOccurrence === 'object' &&
         !Array.isArray(existingEntry.byOccurrence)
             ? existingEntry.byOccurrence
             : {};
     const occurrenceKey = String(occurrence);
-    const occurrenceEntry =
+    const occurrenceEntry: FormArcOccurrenceEntry =
         byOccurrence[occurrenceKey] && typeof byOccurrence[occurrenceKey] === 'object'
             ? byOccurrence[occurrenceKey]
             : {};
@@ -249,28 +256,40 @@ function getFormArcRecallCandidate(
             ? labelEntry.byOccurrence[occurrenceKey]
             : null;
 
-    if (occurrenceEntry?.latestSignature?.notes?.length && occurrenceEntry.latestLoop < loopCount) {
+    if (
+        occurrenceEntry?.latestSignature?.notes?.length &&
+        (occurrenceEntry.latestLoop ?? Infinity) < loopCount
+    ) {
         return {
             signature: occurrenceEntry.latestSignature,
             source: 'form',
             sameOccurrence: true,
         };
     }
-    if (occurrenceEntry?.firstSignature?.notes?.length && occurrenceEntry.firstLoop < loopCount) {
+    if (
+        occurrenceEntry?.firstSignature?.notes?.length &&
+        (occurrenceEntry.firstLoop ?? Infinity) < loopCount
+    ) {
         return {
             signature: occurrenceEntry.firstSignature,
             source: 'form',
             sameOccurrence: true,
         };
     }
-    if (labelEntry.latestSignature?.notes?.length && labelEntry.latestLoop < loopCount) {
+    if (
+        labelEntry.latestSignature?.notes?.length &&
+        (labelEntry.latestLoop ?? Infinity) < loopCount
+    ) {
         return {
             signature: labelEntry.latestSignature,
             source: 'form',
             sameOccurrence: false,
         };
     }
-    if (labelEntry.firstSignature?.notes?.length && labelEntry.firstLoop < loopCount) {
+    if (
+        labelEntry.firstSignature?.notes?.length &&
+        (labelEntry.firstLoop ?? Infinity) < loopCount
+    ) {
         return {
             signature: labelEntry.firstSignature,
             source: 'form',
@@ -863,14 +882,14 @@ export function getSoloistNote(
     if (soloist.embellishmentBuffer && soloist.embellishmentBuffer.length > 0) {
         const embNote = soloist.embellishmentBuffer.shift();
         const primaryNote = Array.isArray(embNote) ? embNote[0] : embNote;
-        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote?.durationSteps || 1) - 1; // @worker-mutation
         logDebug(`Playing embellishment note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(embNote);
     }
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
-        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote?.durationSteps || 1) - 1; // @worker-mutation
         logDebug(`Playing device note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(devNote);
     }

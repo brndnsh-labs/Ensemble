@@ -311,18 +311,221 @@ export interface BassState {
     readonly lastBassGain: GainNode | null;
 }
 
+/**
+ * The melodic job a seed note plays inside the SRDC head. Used by the
+ * arrangement layer to decide which notes get accompaniment / phrasing support.
+ */
+export type SeedSupportRole = 'pickup' | 'line' | 'accent' | 'anchor' | 'cadence' | 'sustain';
+
+/** Guitar-specific realization hints attached to each seed note. */
+export interface SeedGuitarSupportHint {
+    allowDoubleStop: boolean;
+    intervalPalette: 'tight' | 'open' | 'blues';
+    preferBelow: boolean;
+}
+
+/** Hints used by accompaniment instruments to support the seed melody without crowding it. */
+export interface SeedSupportHints {
+    role: SeedSupportRole;
+    sustainBias: number;
+    guitar: SeedGuitarSupportHint;
+}
+
+/**
+ * One note in the SRDC head produced by `generateSessionSeed()`. The full session
+ * seed is the canonical "Head melody" the soloist re-performs on Loop 0 and
+ * paraphrases on later loops.
+ */
+export interface SeedNote {
+    /** Global step target within the loop. */
+    step: number;
+    /** MIDI note value. */
+    midi: number;
+    /** True if it's a structural anchor (downbeat / phrase start). */
+    isAnchor: boolean;
+    /** Suggested duration in steps. */
+    durationSteps: number;
+    /** Suggested velocity (0.0 - 1.0). */
+    velocity: number;
+    /** Optional micro-timing offset in seconds for off-grid phrasing. */
+    timingOffset?: number;
+    /** Optional triplet slot tag for audits and playback. */
+    tripletPlacement?: 't1' | 't2';
+    /** Optional accompaniment hints that keep the melody primary. */
+    supportHints?: SeedSupportHints;
+}
+
 export interface SoloistSessionSeed {
-    notes: any[];
+    notes: SeedNote[];
     loopLengthSteps: number;
+}
+
+/**
+ * One note inside a `MotifSignature`. Captures pitch, position relative to the
+ * phrase start, and the cues the response engine needs to paraphrase it.
+ */
+export interface MotifSignatureNote {
+    stepOffset: number;
+    durationSteps: number;
+    pitchClass: number;
+    midi: number;
+    velocity: number;
+    isStrongBeat: boolean;
+    tripletPlacement: 't1' | 't2' | null;
+    timingOffset: number;
+    /** -1 | 0 | 1 — melodic direction from the previous note. */
+    direction: number;
+    isAnchor: boolean;
+}
+
+/**
+ * A captured phrase signature used for motivic response (sectionRecall, formArc)
+ * and for the soloist's call/response logic across loops. Built by
+ * `buildPhraseSignatureFromEvents` / `buildSeedPhraseSignature`.
+ */
+export interface MotifSignature {
+    sourceKind: 'performed' | 'seed';
+    sourceLoop: number;
+    spanSteps: number;
+    entryPitchClass: number;
+    cadencePitchClass: number;
+    anchorPitchClasses: number[];
+    tripletCarry: boolean;
+    notes: MotifSignatureNote[];
+    /** Tagged on by sectionRecall / formArc bookkeeping. */
+    sectionLabel?: string;
+    sectionOccurrence?: number;
+}
+
+/**
+ * Per-section memory used to repeat a phrase shape inside the same loop
+ * (e.g. the answer to a Restatement section that already played once).
+ */
+export interface SectionRecallEntry {
+    firstSignature?: MotifSignature;
+    firstOccurrence?: number;
+    latestSignature?: MotifSignature;
+    latestOccurrence?: number;
+}
+
+/** One occurrence-bucket inside a FormArcEntry (occurrence index → loop history). */
+export interface FormArcOccurrenceEntry {
+    firstSignature?: MotifSignature;
+    firstLoop?: number;
+    latestSignature?: MotifSignature;
+    latestLoop?: number;
+}
+
+/**
+ * Cross-loop section memory. Lets later loops echo a phrase shape that played
+ * during the same section in an earlier loop.
+ */
+export interface FormArcEntry {
+    byOccurrence: Record<string, FormArcOccurrenceEntry>;
+    firstSignature?: MotifSignature;
+    firstLoop?: number;
+    firstOccurrence?: number;
+    latestSignature?: MotifSignature;
+    latestLoop?: number;
+    latestOccurrence?: number;
+}
+
+/**
+ * A planned rhythmic event produced by `generateRhythmPlan()` (and consumed by
+ * the pitch engine to decide what to play at that step).
+ *
+ * Two kinds of node share the field set: response-derived (carrying
+ * `responseSource` etc.) and seed-derived (carrying `seedNote` / `responseSource:
+ * 'seed'`). Optional fields cover the union.
+ */
+export interface RhythmNode {
+    stepTarget: number;
+    velocity: number;
+    isStrongBeat: boolean;
+    durationSteps: number;
+    isSustained: boolean;
+    vibrato: boolean;
+    tripletPlacement: 't1' | 't2' | null;
+    timingOffset: number;
+    responseEntryTarget?: boolean;
+    responseCadenceTarget?: boolean;
+    responseSource?: 'section' | 'form' | 'recent' | 'seed' | 'free';
+    responsePitchClass?: number;
+    responseDirection?: number;
+    /** Present on seed-derived nodes. */
+    seedNote?: SeedNote;
+}
+
+/**
+ * A short-lived musical "event" buffered for a future step — e.g. a chromatic
+ * fall, a grace note pair, a banjo roll. Produced by `soloist-devices.ts` and
+ * popped by the pitch engine.
+ *
+ * Some devices produce double-stop pairs; those are represented as
+ * `SoloistDeviceEvent[]` (a tuple of simultaneous notes) inside the buffer.
+ */
+export interface SoloistDeviceEvent {
+    midi: number;
+    velocity: number;
+    durationSteps: number;
+    style: string;
+    bendStartInterval?: number;
+    isDoubleStop?: boolean;
+}
+
+/** Single event or a double-stop pair. */
+export type SoloistBufferedEvent = SoloistDeviceEvent | SoloistDeviceEvent[];
+
+/**
+ * Short-term note memory the soloist uses to decide upcoming pitch direction,
+ * detect repetition, and build signatures. Pushed each time a note is committed.
+ */
+export interface RecentSoloistNote {
+    step: number;
+    durationSteps: number;
+    midi: number;
+    velocity: number;
+    isStrongBeat: boolean;
+    tripletPlacement: 't1' | 't2' | null;
+    timingOffset: number;
+    isAnchor: boolean;
+}
+
+/**
+ * A short motif retained across phrases — used by groove engines (e.g. Ska-Punk
+ * harmony in `harmonies.ts`) to echo soloist hooks. The shape is intentionally
+ * loose because producers add genre-specific fields.
+ */
+export interface SoloistHook {
+    step: number;
+    [key: string]: unknown;
+}
+
+/**
+ * One active polyphonic voice in the main-thread synth layer. Tracked so the
+ * voice manager can release voices when their duration expires.
+ */
+export interface SoloistVoice {
+    gain: GainNode;
+    time: number;
+    duration: number;
+    nodes: AudioNode[];
 }
 
 export interface SoloistPhraseContext {
     role: string;
-    skeleton: any[];
-    lastInterval: any;
+    /**
+     * Step-offset skeleton for the active phrase — each entry is a `stepTarget - phraseStartStep`
+     * captured from the rhythm plan. Later loops follow this shape when paraphrasing.
+     */
+    skeleton: number[];
+    /** Direction + interval from the previous note; null until the first note plays. */
+    lastInterval: { semitones: number; direction: 1 | -1 } | null;
     profile: string;
-    signature: any;
-    responseSignature: any;
+    /** The signature currently being tracked for this phrase (committed at phrase end). */
+    signature: MotifSignature | null;
+    /** The signature being answered, if any (set when this is a response phrase). */
+    responseSignature: MotifSignature | null;
     responseMode: 'free' | 'paraphrase' | 'development';
     responseSource: 'free' | 'form' | 'seed' | 'section' | 'recent';
     sectionLabel: string | null;
@@ -349,15 +552,15 @@ export interface SoloistState {
     /** Seed melody for the current session. */
     readonly sessionSeed: SoloistSessionSeed | null;
     /** Planned rhythmic phrase. */
-    readonly rhythmPlan: any[];
-    /** Buffer for melodic embellishments. */
-    readonly deviceBuffer: any[];
-    /** Buffer for melodic embellishments. */
-    readonly embellishmentBuffer: any[];
-    /** Short term hook memory. */
-    readonly hookBuffer: any[];
-    /** Hooks shared from other instruments. */
-    readonly sharedHookBuffer: any[];
+    readonly rhythmPlan: RhythmNode[];
+    /** Buffer of melodic devices (bends, grace notes, rolls) queued for upcoming steps. */
+    readonly deviceBuffer: SoloistBufferedEvent[];
+    /** Buffer of melodic embellishments queued for upcoming steps. */
+    readonly embellishmentBuffer: SoloistBufferedEvent[];
+    /** Short term hook memory (currently always reset to `[]` — kept for future reintroduction). */
+    readonly hookBuffer: SoloistHook[];
+    /** Hooks shared from other instruments (e.g. Ska-Punk harmonies echoing the soloist). */
+    readonly sharedHookBuffer: SoloistHook[];
     /** Total steps played in current session. */
     readonly sessionSteps: number;
     /** Mode for trading fours ('manual', 'auto'). */
@@ -400,14 +603,19 @@ export interface SoloistState {
     readonly lastAttackStep: number;
     /** Current state in the phrasing lifecycle. */
     readonly phrasingState: string;
-    /** Cached motif data. */
-    readonly motifCache: any;
-    /** Current rhythmic motif. */
-    readonly rhythmicMotif: any[];
-    /** Dictionary of loaded licks. */
-    readonly lickDictionary: any[];
-    /** Recently played notes. */
-    readonly recentNotes: any[];
+    /** Cached motif data. Initialized to null; not yet repopulated by the active pipeline. */
+    // TODO(soloist-session): once the motif-cache pipeline is reintroduced, type this as MotifEntry | null.
+    readonly motifCache: unknown;
+    /** Current rhythmic motif (subset of the active rhythm plan retained across phrases). */
+    readonly rhythmicMotif: RhythmNode[];
+    /**
+     * Dictionary of loaded licks. Producer not currently wired in this codebase
+     * — left permissive until the lick library lands.
+     */
+    // TODO(soloist-session): type as SoloistLick[] when the lick pipeline lands.
+    readonly lickDictionary: unknown[];
+    /** Recently played notes. Used for signature building and direction tracking. */
+    readonly recentNotes: RecentSoloistNote[];
     /** Step when the current phrase started. */
     readonly phraseStartStep: number | null;
     /** Loop index captured for the active phrase. */
@@ -417,17 +625,17 @@ export interface SoloistState {
     /** Section occurrence captured for the active phrase. */
     readonly phraseSectionOccurrence: number;
     /** Per-loop section signatures keyed by section label. */
-    readonly sectionRecall: Record<string, any>;
+    readonly sectionRecall: Record<string, SectionRecallEntry>;
     /** Loop number currently represented in sectionRecall. */
     readonly sectionRecallLoop: number | null;
     /** Cross-loop section signatures keyed by section label. */
-    readonly formArcRecall: Record<string, any>;
+    readonly formArcRecall: Record<string, FormArcEntry>;
     /** Context data for the current phrase. */
     readonly phraseContext: SoloistPhraseContext;
     /** Probability of playing double stops. */
     readonly doubleStopProb: number;
     /** Active polyphonic voices. */
-    readonly activeVoices: any[];
+    readonly activeVoices: SoloistVoice[];
     /** Last MIDI note value played. */
     readonly lastMidiPlayed: number | null;
     /** Optional playing style. */

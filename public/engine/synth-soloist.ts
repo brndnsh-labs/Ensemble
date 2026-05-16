@@ -1,4 +1,4 @@
-import type { EnsembleState, Mutable } from '../types.js';
+import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
@@ -9,12 +9,7 @@ import {
 } from './soloist-mode-policy.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
-export interface SoloistVoice {
-    gain: GainNode;
-    time: number;
-    duration: number;
-    nodes: AudioNode[];
-}
+export type { SoloistVoice } from '../types.js';
 
 type SoloistState = EnsembleState['soloist'];
 

@@ -1,54 +1,28 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { ArrangerState } from '../state/arranger.js';
-import type { EnsembleState } from '../types.js';
+import type {
+    EnsembleState,
+    SeedGuitarSupportHint,
+    SeedNote,
+    SeedSupportHints,
+    SeedSupportRole,
+} from '../types.js';
 import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './soloist-config.js';
 import { getScaleForChord } from './theory-scales.js';
 
-export type SeedSupportRole = 'pickup' | 'line' | 'accent' | 'anchor' | 'cadence' | 'sustain';
-
-export interface SeedGuitarSupportHint {
-    /** Whether guitar mode may add a supporting note here. */
-    allowDoubleStop: boolean;
-    /** Which grip family best supports the note. */
-    intervalPalette: 'tight' | 'open' | 'blues';
-    /** Whether the supporting note should live below the melody. */
-    preferBelow: boolean;
-}
-
-export interface SeedSupportHints {
-    /** The melodic job of this note inside the head. */
-    role: SeedSupportRole;
-    /** Higher values invite more ringing support than moving lines. */
-    sustainBias: number;
-    /** Guitar-specific realization hints for this melody note. */
-    guitar: SeedGuitarSupportHint;
-}
+export type {
+    SeedGuitarSupportHint,
+    SeedNote,
+    SeedSupportHints,
+    SeedSupportRole,
+} from '../types.js';
 
 export interface SeedSupportHintOverrides {
     role?: SeedSupportRole;
     sustainBias?: number;
     guitar?: Partial<SeedGuitarSupportHint>;
-}
-
-export interface SeedNote {
-    /** Global step target within the loop. */
-    step: number;
-    /** MIDI note value. */
-    midi: number;
-    /** True if it's a structural anchor (downbeat / phrase start). */
-    isAnchor: boolean;
-    /** Suggested duration in steps. */
-    durationSteps: number;
-    /** Suggested velocity (0.0 - 1.0). */
-    velocity: number;
-    /** Optional micro-timing offset in seconds for off-grid phrasing. */
-    timingOffset?: number;
-    /** Optional triplet slot tag for audits and playback. */
-    tripletPlacement?: 't1' | 't2';
-    /** Optional accompaniment hints that keep the melody primary. */
-    supportHints?: SeedSupportHints;
 }
 
 /**
