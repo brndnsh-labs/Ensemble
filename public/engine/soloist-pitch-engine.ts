@@ -3,7 +3,7 @@ import type { EnsembleState } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import type { SoloistIntent } from './soloist-config.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
-import { generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
+import { DEVICE_SPAN_STEPS, generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
 import {
     allowsSoloistPolyphony,
     isSoloistGuitarMode,
@@ -16,6 +16,39 @@ export interface DeviceBufferResult {
     buffer: any[];
     first: any;
     busySteps: number;
+}
+
+/**
+ * Decide whether `deviceType` fits at `currentStep` given the rhythm plan ahead.
+ *
+ * Devices have their own internal `durationSteps` budgets (see DEVICE_SPAN_STEPS).
+ * When a long device fires mid-phrase, the plan consumer in soloist.ts silently
+ * shifts off any planned attack inside the device's span — a real soloist would
+ * never plan five attacks and then accidentally play a five-note lick on attack
+ * two. The gate keeps long, phrase-substitute devices to positions where the
+ * plan has space, and limits medium devices to swallowing at most one planned
+ * attack (so they read as expanded ornaments).
+ */
+function deviceFitsHere(deviceType: string, soloistState: any, currentStep: number): boolean {
+    const span = DEVICE_SPAN_STEPS[deviceType] ?? 4;
+    if (span <= 3) {
+        return true; // Ornaments: always fine
+    }
+    const plan = soloistState.session?.rhythm?.plan;
+    if (!Array.isArray(plan) || plan.length === 0) {
+        return true; // No plan ahead — device can run freely
+    }
+    let buriedAttacks = 0;
+    for (const node of plan) {
+        const offset = (node?.stepTarget ?? -Infinity) - currentStep;
+        if (offset > 0 && offset < span) {
+            buriedAttacks++;
+        }
+    }
+    if (span >= 6) {
+        return buriedAttacks === 0; // Long devices: only fire when plan is clear
+    }
+    return buriedAttacks <= 1; // Medium devices: act like one-attack expansion
 }
 
 /**
@@ -1004,8 +1037,18 @@ export function selectPitchAndDevices(
             allowed = prioritized;
         }
 
+        // Gate device choice by how it fits the planned phrase ahead. Long licks
+        // (bluesLick, etc.) only get to fire when the plan has space; medium
+        // devices swallow at most one planned attack. Without this, a mid-phrase
+        // bluesLick silently eats 3-4 plan attacks via the consumer's `step >
+        // stepTarget` shift in soloist.ts.
+        const fittedAllowed = allowed.filter((device) =>
+            deviceFitsHere(device, soloistState, step),
+        );
         const deviceType =
-            allowed.length > 0 ? allowed[Math.floor(Math.random() * allowed.length)] : null;
+            fittedAllowed.length > 0
+                ? fittedAllowed[Math.floor(Math.random() * fittedAllowed.length)]
+                : null;
         if (deviceType) {
             const res = applyDeviceBuffer(deviceType, deviceContextOptions);
             if (res) {

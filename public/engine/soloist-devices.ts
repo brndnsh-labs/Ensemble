@@ -11,6 +11,44 @@ const HIGH_ENERGY_GUITAR_STYLES = new Set(['metal', 'shred', 'scalar']);
  */
 
 /**
+ * Worst-case step span for each melodic device. Used by the pitch engine to gate
+ * device firings against the rhythm plan: a 12-step `bluesLick` dropped onto a
+ * planned phrase with attacks 3 steps apart silently buries 3-4 planned attacks
+ * (the consumer at soloist.ts:1497 shifts them off as "step > stepTarget"). The
+ * gate keeps long, phrase-substitute devices to positions where the plan has
+ * room for them instead of letting them eat the rest of the phrase.
+ *
+ * Spans are upper bounds across the device's branches (e.g. `bluesLick` has a
+ * 3-note short branch and a 5-note long branch; we use the long branch).
+ */
+export const DEVICE_SPAN_STEPS: Record<string, number> = {
+    // Ornaments (≤ 3 steps): expand a single attack — fire freely
+    chickenPick: 1,
+    quartal: 1,
+    guitarDouble: 1,
+    slide: 2,
+    graceSlide: 2,
+    graceNote: 3,
+    run: 3,
+    enclosure: 3,
+    // Medium (4-5 steps): borderline. Allowed to bury at most one planned attack
+    // so they read as "expanded ornament," not a full sub-phrase.
+    bluesCurl: 4,
+    chromaticEnclosure: 4,
+    banjoRoll: 4,
+    birdFlurry: 4,
+    bebopScale: 4,
+    quartalStack: 4,
+    sheetsOfSound: 4,
+    countryBend: 4,
+    chromaticFall: 5,
+    // Phrase substitutes (≥ 6 steps): only fire when the plan is clear ahead.
+    // `bluesTurnaround` is already gated to turnaround steps in a separate path.
+    bluesLick: 12,
+    bluesTurnaround: 16,
+};
+
+/**
  * Computes a bitmask of intervals present in the current chord.
  */
 export function getChordMask(currentChord: any): number {

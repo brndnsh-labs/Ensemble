@@ -167,6 +167,77 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         expect(respEndRate).toBeGreaterThan(0.33);
     });
 
+    it('should not bury planned attacks when a device fires mid-phrase', () => {
+        // Long melodic devices (bluesLick spans up to 12 steps) used to fire mid-phrase
+        // and silently consume the next several planned attacks via the plan consumer's
+        // `while (step > plan[0].stepTarget) plan.shift()` discard loop. Audibly: phrases
+        // lost their planned shape after a device appeared. We now gate device firing on
+        // whether the device's span fits the plan ahead — long devices only fire when
+        // they bury zero plan attacks, medium devices allow at most one. See
+        // docs/MUSICAL_AUDIT.md and soloist-pitch-engine.ts:deviceFitsHere.
+        const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 1024 };
+        const { soloist, playback } = getState();
+        playback.bandIntensity = 0.85; // high intensity → frequent device attempts
+
+        const ts = TIME_SIGNATURES['4/4'];
+
+        let totalDeviceFirings = 0;
+        let buryingDeviceFirings = 0;
+
+        for (let i = 0; i < 8000; i++) {
+            const info = getStepInfo(i, ts, [], TIME_SIGNATURES);
+
+            // Snapshot plan attacks ahead of the call so we can detect any that the
+            // call discards without playing them.
+            const planBefore = (soloist.session.rhythm.plan || []).map((n) => n.stepTarget);
+            const deviceBufferBefore = soloist.session.rhythm.deviceBuffer?.length || 0;
+
+            getSoloistNote(
+                getState(),
+                chord,
+                null,
+                i,
+                440,
+                0,
+                'blues',
+                info.mStep,
+                { sectionStart: 0, sectionEnd: 8000 },
+                info,
+            );
+
+            const deviceBufferAfter = soloist.session.rhythm.deviceBuffer?.length || 0;
+            const deviceJustFired = deviceBufferAfter > deviceBufferBefore;
+
+            if (deviceJustFired) {
+                totalDeviceFirings++;
+                // A device that fires AT step `i` claims the soloist through
+                // `i + busySteps + deviceBuffer.length`. Any plan attack strictly
+                // between `i` and the device's end would be silently discarded.
+                const span = soloist.session.phrasing.busySteps + deviceBufferAfter + 1;
+                const buriedAttacksAhead = planBefore.filter(
+                    (target) => target > i && target < i + span,
+                ).length;
+                if (buriedAttacksAhead > 1) {
+                    buryingDeviceFirings++;
+                }
+            }
+        }
+
+        const buryRate = buryingDeviceFirings / (totalDeviceFirings || 1);
+        console.log(
+            `[Blues Audit] Device firings: ${totalDeviceFirings}, attack-burying firings: ` +
+                `${buryingDeviceFirings} (${(buryRate * 100).toFixed(1)}%)`,
+        );
+
+        // Devices fired plenty of times — confirms the gate doesn't suppress them entirely.
+        expect(totalDeviceFirings).toBeGreaterThan(10);
+        // Almost no firing should bury more than one planned attack (medium devices may
+        // legitimately swallow one as an "expanded ornament"; long devices should bury
+        // zero). A few stragglers are tolerated because plan regeneration mid-phrase can
+        // briefly produce overlap, but the rate should be near zero, not the pre-fix flood.
+        expect(buryRate).toBeLessThan(0.05);
+    });
+
     it('should trigger bluesTurnaround device during turnaround steps', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 128 };
         const { soloist } = getState();
