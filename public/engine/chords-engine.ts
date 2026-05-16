@@ -914,7 +914,6 @@ export function validateProgression(
     });
 
     (arranger as Mutable<typeof arranger>).progression = allChords; // @direct-mutation
-    Object.assign(arranger, { progression: allChords });
     updateProgressionCache(state);
     if (dispatch) {
         dispatch(ACTIONS.PROG_VALIDATED); // Notify Preact
