@@ -90,7 +90,6 @@ npm run validate
 - [`public/MANUAL.md`](public/MANUAL.md) — the in-app manual, including generated reference tables.
 - [`CLAUDE.md`](CLAUDE.md) — operational rules and architectural overview for AI-assisted work. (`AGENTS.md` points here.)
 - [`AI_MAP.md`](AI_MAP.md) — a navigation map for the codebase.
-- [`docs/ARCHITECTURE_FOLLOWUPS.md`](docs/ARCHITECTURE_FOLLOWUPS.md) — known architectural debt.
 - [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) — contributor workflow and validation expectations.
 - [`.github/SECURITY.md`](.github/SECURITY.md) — private vulnerability reporting.
 - [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md) — community standards.

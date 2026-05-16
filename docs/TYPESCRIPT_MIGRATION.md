@@ -307,7 +307,7 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 
 **Migration is COMPLETE.** Zero `.js` source files remain in `public/`.
 
-**Whole-repo finish (May 15 2026):** commits `0fe217f8` (test(ts): bench/e2e/test-utils) and `ff52a9e9` (chore(ts): scripts/configs/docs) converted the remaining 51 `.js` files outside `public/`. Only `.dependency-cruiser.cjs` remains as JS (must stay CJS for dependency-cruiser). New `tsconfig.scripts.json` typechecks `scripts/` under Node types; `tsconfig.tests.json` no longer excludes `tests/bench` or `tests/e2e`. See `docs/ARCHITECTURE_FOLLOWUPS.md` item #3 for the deferred CLI-script breakage that surfaced during this finish.
+**Whole-repo finish (May 15 2026):** commits `0fe217f8` (test(ts): bench/e2e/test-utils) and `ff52a9e9` (chore(ts): scripts/configs/docs) converted the remaining 51 `.js` files outside `public/`. Only `.dependency-cruiser.cjs` remains as JS (must stay CJS for dependency-cruiser). New `tsconfig.scripts.json` typechecks `scripts/` under Node types; `tsconfig.tests.json` no longer excludes `tests/bench` or `tests/e2e`. See `docs/archive/ARCHITECTURE_FOLLOWUPS.md` item #3 for the deferred CLI-script breakage that surfaced during this finish.
 
 ---
 

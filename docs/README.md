@@ -8,7 +8,6 @@ This folder groups the living documentation for Ensemble.
 - [`CLAUDE.md`](../CLAUDE.md) — primary operational guide for AI-assisted work. (`AGENTS.md` points here.)
 - [`AI_MAP.md`](../AI_MAP.md) — source and module map.
 - [`docs/VISION.md`](VISION.md) — product direction, open work, and roadmap context.
-- [`docs/ARCHITECTURE_FOLLOWUPS.md`](ARCHITECTURE_FOLLOWUPS.md) — known architectural debt and improvement opportunities.
 - [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — contributor workflow.
 - [`.github/CODE_OF_CONDUCT.md`](../.github/CODE_OF_CONDUCT.md) — community expectations.
 - [`.github/SECURITY.md`](../.github/SECURITY.md) — vulnerability reporting.

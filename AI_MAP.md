@@ -6,7 +6,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 - Start here when you need file ownership, entrypoints, or likely edit locations.
 - Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
-- Use `docs/README.md` for the docs index; `docs/ARCHITECTURE_FOLLOWUPS.md` for known architectural debt.
+- Use `docs/README.md` for the docs index.
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture

@@ -8,7 +8,7 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 - **AI_MAP.md** — file-by-file navigation index. Every path in it must exist on disk (enforced by `npm run lint:docs`).
 - **docs/README.md** — living documentation index.
 - **docs/VISION.md** — product direction and open work.
-- **docs/ARCHITECTURE_FOLLOWUPS.md** — known architectural debt and improvement opportunities.
+- **docs/archive/ARCHITECTURE_FOLLOWUPS.md** — archived (May 2026): the TS-migration follow-up tracker, all items shipped. Useful historical context for *why* recent architectural decisions were made.
 - **docs/guides/** — deep-dive guides (worker contract, register slotting, performance, reference tuning).
 
 If any guide drifts from live code/config, prefer live and update the docs.
@@ -170,4 +170,4 @@ Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): 
 
 ## Active Product Direction
 
-See `docs/VISION.md` for current priorities and open work; `docs/ARCHITECTURE_FOLLOWUPS.md` for known architectural debt.
+See `docs/VISION.md` for current priorities and open work.
