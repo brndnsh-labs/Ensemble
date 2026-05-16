@@ -51,15 +51,18 @@ Also surfaced and **deferred**: the Playwright e2e suite had 38 pre-existing fai
 
 ---
 
-## 4. Soloist subsystem refactor — typed `SoloistSession`
+## 4. Soloist subsystem refactor — typed `SoloistSession` ✅ DONE (May 2026)
 
-**Why fourth:** Most complex item on the list. Benefits from cleaner `Chord` types (#2) being in place; doesn't block anything below it.
+`SoloistState` was restructured into a hybrid shape — config fields stay flat at the top (preserving persistence, UI, share-URL, and the worker-sync wire contract); per-playback engine runtime moves under `session: SoloistSession` with sub-objects `phrasing` / `currentPhrase` / `memory` / `rhythm` / `contour`; main-thread synth state moves under `audio: SoloistAudio`. Concrete types were introduced for the previously-`any` domain (SeedNote, MotifSignature, MotifSignatureNote, RhythmNode, SoloistDeviceEvent, RecentSoloistNote, SoloistVoice, SectionRecallEntry, FormArcEntry/Occurrence, SoloistHook). Shipped across four commits: `ca1cd8c6` + `ffbac6da` (C1 types + review fixes), `43a1fe12` (C2/C3/C4 merged — shape + 100+ engine mutation sites + 25+ external readers + reducer routing + worker translator + 139 test files via new `tests/utils/mock-soloist.ts` helper), and `94238f4f` (C5 cleanup: simplified `resetSoloistState`, hoisted casts in `getSoloistNote`).
 
-~7,000 lines across 7 files (`soloist`, `soloist-config`, `soloist-devices`, `soloist-pitch-engine`, `soloist-rhythm-engine`, `soloist-seeder`, `synth-soloist`). Session-state objects are described as "sprawling" — there's a real domain model (SRDC structure, Dynamic Head, intent layers, register profiles) expressed via dynamically-grown plain objects. A typed `SoloistSession` with explicit phases would unlock simplifications throughout.
+The planned 5-commit split collapsed to 4 once it became clear the engine and external-reader sweeps couldn't be staged independently — 25+ external files (scheduler-core, accompaniment, bass-engine, harmonies, etc.) directly read soloist runtime fields, so a typecheck-clean intermediate commit wasn't achievable without duplicate flat+nested fields. The merged commit was reviewer-vetted by an independent Opus agent before landing.
 
-**Approach:** Opus, end-to-end. **Do not delegate mechanically.** This is exactly the kind of work where domain understanding has to live in the same context as the refactor — 7,000 lines of musical state with subtle semantics. Once `SoloistSession` is defined and the seams are clear, specific extractions can fan out to Sonnet, but the bulk should stay with the model that designed the shape.
+**Drive-by:** caught a misnamed type — `phraseContext.skeleton` is `number[]` (step offsets), not `SeedNote[]`.
 
-**In progress (May 16 2026):** staged as 5 commits — C1 (types, no runtime change), C2 (restructure `SoloistState` into `{ flat config, session, audio }`), C3 (sweep 107 engine mutations to new paths), C4 (external readers + worker sync), C5 (cleanup TODOs + mark DONE). **C1 shipped** in `ca1cd8c6` + `ffbac6da`: promoted `SeedNote`, `SoloistVoice` from engine files to `types.ts`; defined `MotifSignature` / `MotifSignatureNote`, `RhythmNode`, `SoloistDeviceEvent` / `SoloistBufferedEvent`, `RecentSoloistNote`, `SectionRecallEntry`, `FormArcEntry` / `FormArcOccurrenceEntry`, `SoloistHook`; narrowed 14 `any`/`any[]` fields on `SoloistState` and the 4 `any` fields inside `SoloistPhraseContext`. Caught and fixed a misnamed type: `phraseContext.skeleton` is `number[]` (step offsets), not `SeedNote[]`. `motifCache` and `lickDictionary` left as `unknown` / `unknown[]` with `TODO(soloist-session)` markers — their producer pipelines aren't currently wired.
+**Deferred sub-pieces:**
+- `motifCache` (`SoloistMemory.motifCache: unknown`) and `lickDictionary` (`SoloistMemory.lickDictionary: unknown[]`) — both fields exist in the slice but their producer pipelines aren't currently wired in code. Marked `TODO(soloist-session)` in `types.ts`; type them concretely (`MotifEntry | null` and `SoloistLick[]`) when those pipelines land.
+- Worker-side soloist state mirror stays flat — `logic-worker.ts` has a `syncSoloistFromWire()` translator that lifts the flat wire payload into a nested local. A follow-up could mirror the C2 restructure inside the worker and drop the translator.
+- `ActionPayloadUpdateSB` type is hand-enumerated; could in principle derive from `SOLOIST_FIELD_ROUTES` via `keyof typeof`, but deriving loses per-field value types — judged not worth the complexity loss.
 
 ---
 
