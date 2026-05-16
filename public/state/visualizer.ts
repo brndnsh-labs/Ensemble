@@ -1,11 +1,8 @@
 import { deepSignal } from 'deepsignal';
-import type { Action } from '../types.js';
+import type { Action, VisualizerState } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export interface VisualizerState {
-    /** Whether the advanced visualizer is active. */
-    enabled: boolean;
-}
+export type { VisualizerState };
 
 export const vizState = deepSignal<VisualizerState>({
     enabled: false,
