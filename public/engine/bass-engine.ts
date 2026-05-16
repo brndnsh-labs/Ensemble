@@ -16,6 +16,13 @@ import { getScaleForChord } from './theory-scales.js';
 import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
 import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 
+// why: Genres where bass-doubles-kick is the musical intent. Other styles
+// (jazz/dub/country/blues/bossa/acoustic/neo/walking-ska/hiphop/whole/half/arp)
+// phrase against the kick and choose their own active lane. Hip-hop is independent
+// — 808 sub-bass sustains across the kick pattern rather than re-articulating with
+// every hi-hat-locked kick burst.
+const KICK_LOCK_STYLES = new Set(['rock', 'funk', 'rocco', 'metal', 'disco']);
+
 /**
  * Resets the internal generative state of the bass.
  */
@@ -36,13 +43,14 @@ export function isBassActive(
 ): boolean {
     const { playback, groove, arranger } = state;
 
-    // Rhythmic Yielding: Lock to Kick if available
-    if (coordination?.kickHit) {
-        return true;
-    }
-
     if (style === 'smart') {
         style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
+    }
+
+    // Rhythmic Yielding: lock to kick only for styles where bass-doubles-kick
+    // is the musical intent. Independent styles must choose their own lane.
+    if (coordination?.kickHit && KICK_LOCK_STYLES.has(style)) {
+        return true;
     }
 
     const signatures: any = TIME_SIGNATURES;

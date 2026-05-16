@@ -166,18 +166,87 @@ describe('Ensemble Coordination Contract', () => {
     });
 
     describe('Rhythmic Yielding Hierarchy', () => {
-        it('Bass locks rhythm to Kick drum', () => {
+        it('Bass kick-lock is style-gated: kick-lock genres fire on every kick', () => {
             const context = { kickHit: true };
-            const isActive = isBassActive(
+
+            // 'rock' is an 8th-note style — step 1 is NOT an 8th-note position, so rock
+            // would not fire on its own. With kickHit set, the style-gated lock forces on.
+            const rockActive = isBassActive(
                 getState(),
-                'whole',
+                'rock',
+                1,
+                1,
+                { isBeatStart: false },
+                context,
+            );
+            expect(rockActive).toBe(true);
+
+            // Without kickHit, rock on step 1 must NOT fire (proves kick-lock is what
+            // activated the previous assertion, not the style's own logic).
+            const rockNoKick = isBassActive(
+                getState(),
+                'rock',
+                1,
+                1,
+                { isBeatStart: false },
+                { kickHit: false },
+            );
+            expect(rockNoKick).toBe(false);
+        });
+
+        it('Bass kick-lock is style-gated: independent genres phrase against the kick', () => {
+            const context = { kickHit: true };
+
+            // 'quarter' (Jazz walking) — step 1 is not a beat-start, so the style would
+            // not fire on its own. Kick-lock must NOT force it active.
+            const jazzActive = isBassActive(
+                getState(),
+                'quarter',
+                1,
+                1,
+                { isBeatStart: false, isOffbeat: false },
+                context,
+            );
+            expect(jazzActive).toBe(false);
+
+            // 'country' is half-note Two-Step (beats 1 and 3). Beat 2 (step 4) is not a
+            // country fire position — kick-lock must not override.
+            const countryActive = isBassActive(
+                getState(),
+                'country',
                 4,
                 4,
                 { isBeatStart: true },
                 context,
             );
+            expect(countryActive).toBe(false);
 
-            expect(isActive).toBe(true);
+            // 'dub' — step 1 is not a riddim position in any band. Kick-lock must not fire.
+            const dubActive = isBassActive(
+                getState(),
+                'dub',
+                1,
+                1,
+                { isBeatStart: false, mStep: 1 },
+                context,
+            );
+            expect(dubActive).toBe(false);
+        });
+
+        it('Bass independent styles fire on their own active lane without kick assistance', () => {
+            // Proves the dub active-lane works without coordination plumbing
+            // (Open Finding #2 resolution): One Drop riddim at low intensity fires
+            // deterministically on mStep 8 with kickHit absent.
+            dispatch(ACTIONS.UPDATE_PLAYBACK, { bandIntensity: 0.3, complexity: 0 });
+            const dubFires = isBassActive(
+                getState(),
+                'dub',
+                8,
+                8,
+                { isBeatStart: true, mStep: 8 },
+                { kickHit: false },
+            );
+            expect(dubFires).toBe(true);
         });
 
         it('Chords yield density to a busy Soloist', () => {

@@ -152,6 +152,24 @@ export function checkBassActiveStyle(
         }
         return is8th;
     }
+    if (style === 'dub') {
+        // why: dub fires at riddim positions selected by intensity. Same band thresholds
+        // as getBassNoteStyle:710 — keep both sites in sync. The one-drop silencer in
+        // getBassNoteStyle:696 thins beat 1 at low intensity AFTER the active-lane fires.
+        const intensity = playback.bandIntensity;
+        let selectedRiddim: keyof typeof REGGAE_RIDDIMS = 'One Drop';
+        if (intensity > 0.85) {
+            selectedRiddim = 'Steppers';
+        } else if (intensity > 0.65) {
+            selectedRiddim = 'Stalag';
+        } else if (intensity > 0.45) {
+            selectedRiddim = '54-46';
+        }
+        const riddim = REGGAE_RIDDIMS[selectedRiddim] as [number, number, number, number][];
+        const stepsPerBar = ts.beats * ts.stepsPerBeat;
+        const mStep = stepInfo ? stepInfo.mStep : step % stepsPerBar;
+        return riddim.some((r) => r[0] === mStep);
+    }
 
     return false;
 }

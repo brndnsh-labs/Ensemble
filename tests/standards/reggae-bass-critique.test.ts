@@ -16,11 +16,6 @@ describe('Reggae Bassist Critique', () => {
         vi.restoreAllMocks();
     });
 
-    // NOTE: checkBassActiveStyle has no 'dub' branch (bass-styles.ts) so isBassActive
-    // returns false unconditionally. Production fires reggae bass via coordination.kickHit
-    // (tick-logic.ts:230, bass-engine.ts:40). For these tests we bypass isBassActive and
-    // call getBassNote directly to observe the engine's riddim-driven pitch/rhythm logic.
-    // The missing dub active-lane is recorded as an Open Finding in MUSICAL_AUDIT.md.
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 },
@@ -47,11 +42,7 @@ describe('Reggae Bassist Critique', () => {
         let prevFreq = 0;
         for (let globalStep = 0; globalStep < numBars * 16; globalStep++) {
             const info = getStepInfo(globalStep, tsConfig, [], TIME_SIGNATURES);
-            // Force activation via the kick-lock path so the engine's dub-style branch
-            // in getBassNoteStyle actually runs.
-            const active = isBassActive(getState(), 'dub', globalStep, globalStep % 16, info, {
-                kickHit: true,
-            });
+            const active = isBassActive(getState(), 'dub', globalStep, globalStep % 16, info);
 
             if (active) {
                 const note = getBassNote(
