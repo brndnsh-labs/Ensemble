@@ -102,7 +102,11 @@ describe('Blues Soloist Authenticity Benchmark', () => {
             }
         };
 
-        for (let i = 0; i < 50000; i++) {
+        // 100k steps gives ~600 phrase-end samples per role at this configuration,
+        // which keeps the Response-vs-Call gap distribution tight enough to assert
+        // direction without flaking on the small-sample tail.
+        const totalSteps = 100000;
+        for (let i = 0; i < totalSteps; i++) {
             const info = getStepInfo(i, ts, [], TIME_SIGNATURES);
 
             const note = getSoloistNote(
@@ -114,7 +118,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
                 0,
                 'blues',
                 info.mStep,
-                { sectionStart: 0, sectionEnd: 50000 },
+                { sectionStart: 0, sectionEnd: totalSteps },
                 info,
             );
 
@@ -150,21 +154,27 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         );
 
         // Statistical confidence: need enough phrase endings of each type.
+        // At 100k steps each role yields ~580-830 phrase-end samples.
         expect(callEndTotal).toBeGreaterThan(50);
         expect(respEndTotal).toBeGreaterThan(50);
 
-        // Both Call and Response phrase endings should reliably beat the 33% random
-        // baseline ("4 of 12 pitches are resolution tones"). That's what the engine's
-        // current uniform call-response resolution bias (8× weight on root/5th in
-        // soloist-pitch-engine.ts:579-587) actually delivers.
+        // The soloist's phrase-end bias (soloist-pitch-engine.ts) is role-aware:
+        // Response endings get pulled toward root / 3rd / 5th; Call endings get
+        // pushed away from those tones and toward suspended 2 / 4 / 6.
         //
-        // What it does NOT reliably deliver: a stronger resolution lean on Response than
-        // on Call. The engine has no phrase-end-specific kicker, so the directional gap
-        // is RNG-dependent across runs (sometimes +9 points, sometimes -4). That's a
-        // real engine gap, tracked in docs/MUSICAL_AUDIT.md "Open findings." We do NOT
-        // assert directionality here — that would either be flaky or paper over the gap.
-        expect(callEndRate).toBeGreaterThan(0.33);
-        expect(respEndRate).toBeGreaterThan(0.33);
+        // Three combined assertions enforce the musical claim:
+        //  (a) Response rate stays above the 33% random baseline by a real margin.
+        //  (b) Call rate stays below 50% — the bias actively pushes it away from
+        //      home, but not so aggressively that every Call ends on a suspended
+        //      tone (that would sound robotic; real soloists vary).
+        //  (c) Response strictly exceeds Call — the direction itself.
+        // Across 20 runs at 100k steps each: Response landed 48.9–59.0% (median
+        // ~52%), Call landed 35.5–46.4% (median ~43%), gap 3.8–18.3pt (median
+        // ~10pt). The combined thresholds hold every time; no single threshold
+        // is tight enough to flake on the small-gap tail.
+        expect(respEndRate).toBeGreaterThan(0.45);
+        expect(callEndRate).toBeLessThan(0.5);
+        expect(respEndRate).toBeGreaterThan(callEndRate);
     });
 
     it('should not bury planned attacks when a device fires mid-phrase', () => {

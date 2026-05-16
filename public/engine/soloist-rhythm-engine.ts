@@ -533,6 +533,10 @@ export function generateRhythmPlan(
                     vibrato: isSustained,
                 });
                 if (shouldCreatePhraseBreath) {
+                    // The note we just pushed is the last attack before a rest
+                    // the pitch picker uses isPhraseEnd to bias the landing
+                    // tone by role (Response → root/5th; Call → suspended).
+                    plan[plan.length - 1].isPhraseEnd = true;
                     phraseCooldownSteps = Math.max(
                         phraseCooldownSteps,
                         Math.max(1, stepsPerBeat / 2),
@@ -621,6 +625,14 @@ export function generateRhythmPlan(
     }
 
     plan.sort((a, b) => a.stepTarget - b.stepTarget);
+
+    // The final node of every plan-build is a phrase end: the next plan-build
+    // call picks a new role, so this attack is musically the last note of the
+    // current role's phrase. Idempotent with the breath-mark above when they
+    // land on the same node.
+    if (plan.length > 0) {
+        plan[plan.length - 1].isPhraseEnd = true;
+    }
 
     // Default flags for mirroring or other paths
     plan.forEach((node) => {

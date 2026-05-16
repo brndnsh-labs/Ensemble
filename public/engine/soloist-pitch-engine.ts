@@ -619,6 +619,51 @@ export function selectPitchAndDevices(
             }
         }
 
+        // --- Phrase-End Resolution Asymmetry (role-aware) ---
+        // On the LAST attack of a phrase, role drives where we land:
+        //   Response = the answer → land at home (root/5th, any chord tone).
+        //   Call     = the question → leave it open (suspended 2/4/6, push
+        //              the root away so the listener feels the unfinished arc).
+        // Without this, every note in a phrase gets the same chord-tone pull
+        // and phrase endings don't actually differentiate role — the gap
+        // tracked in docs/MUSICAL_AUDIT.md "Open finding #1." Marks come from
+        // soloist-rhythm-engine.ts (isPhraseEnd on the last node of a phrase
+        // chunk or pre-breath).
+        if (rhythmNode?.isPhraseEnd === true) {
+            const phraseRole = soloistState.session.currentPhrase.context?.role;
+            if (phraseRole === 'response') {
+                // Land at home: bias toward root/5th, then 3rd, then any chord
+                // tone. Multiplicative only (no large additive floor) so real
+                // soloists still occasionally land on a 7th or 9th for color.
+                if (interval === 0 || interval === 7) {
+                    weight *= 4.0;
+                }
+                if (interval === 4 || interval === 3) {
+                    weight *= 2.5;
+                }
+                if (isChordTone) {
+                    weight *= 1.4;
+                }
+            } else if (phraseRole === 'call') {
+                // Leave the question open: push away from chord centers and
+                // toward suspended tones. Multipliers chosen so resolution
+                // tones can still win occasionally — Call phrases sometimes
+                // do land on root, just less often than Response.
+                if (interval === 0) {
+                    weight *= 0.3;
+                }
+                if (interval === 4 || interval === 3) {
+                    weight *= 0.55;
+                }
+                if (interval === 7) {
+                    weight *= 0.6;
+                }
+                if (interval === 2 || interval === 5 || interval === 9) {
+                    weight *= 2.5; // 2 / 4 / 6: suspended, "to be continued"
+                }
+            }
+        }
+
         if (isResponseGuided) {
             const responseReuseScale = responseMode === 'paraphrase' ? 1 : 0.78;
             if (responsePitchClass !== null && pc === responsePitchClass) {
