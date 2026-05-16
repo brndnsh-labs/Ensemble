@@ -55,7 +55,6 @@ const VALID_BARE_LINKS = new Set([
     'AI_MAP.md',
     'package.json',
     'package-lock.json',
-    'playwright.config.js',
     'playwright.config.ts',
 ]);
 

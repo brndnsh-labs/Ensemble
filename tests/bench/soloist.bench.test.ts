@@ -19,6 +19,20 @@ vi.mock('../../public/state.js', () => {
             lastFreq: 440,
             pitchHistory: [],
             deviceBuffer: [],
+            // Mirrors initial soloist phraseContext in public/state/instruments.ts
+            // so getSoloistNote can write skeleton/role/etc. without crashing.
+            phraseContext: {
+                role: 'call',
+                skeleton: [],
+                lastInterval: null,
+                profile: 'srv',
+                signature: null,
+                responseSignature: null,
+                responseMode: 'free',
+                responseSource: 'free',
+                sectionLabel: null,
+                sectionOccurrence: 0,
+            },
         },
         groove: { genreFeel: 'Jazz' },
         playback: { intent: { soloistMod: 0 }, bandIntensity: 0.5, bpm: 120 },

@@ -307,13 +307,13 @@ Split into 6 sub-batches by dependency order (leaves first). Worker files need `
 
 **Migration is COMPLETE.** Zero `.js` source files remain in `public/`.
 
+**Whole-repo finish (May 15 2026):** commits `0fe217f8` (test(ts): bench/e2e/test-utils) and `ff52a9e9` (chore(ts): scripts/configs/docs) converted the remaining 51 `.js` files outside `public/`. Only `.dependency-cruiser.cjs` remains as JS (must stay CJS for dependency-cruiser). New `tsconfig.scripts.json` typechecks `scripts/` under Node types; `tsconfig.tests.json` no longer excludes `tests/bench` or `tests/e2e`. See `docs/ARCHITECTURE_FOLLOWUPS.md` item #3 for the deferred CLI-script breakage that surfaced during this finish.
+
 ---
 
 ## Notes for Future Sessions
 
 - **Import paths stay `.js`** throughout the migration — `moduleResolution: Bundler` resolves them to the `.ts` source automatically.
-- **`checkJs: true` stays on** until all `.js` files are converted; it keeps the remaining JS files type-checked.
 - **State slices are done.** All `state/*.ts` files are converted; `EnsembleState` in `types.ts` now has real type imports.
 - **`tsConfig?: any`** in `StepInfo` — tighten once a proper time-signature config type is defined (likely in `engine/tick-logic` or `state/playback`).
 - **`responseMode`/`responseSource`** in `SoloistPhraseContext` are typed as narrow unions — if new values appear in engine files, expand the union rather than widening to `string`.
-- **`let responseSource`** in `engine/soloist.js` line 628 has a `@type` JSDoc narrowing it to the union — update when that file is converted.

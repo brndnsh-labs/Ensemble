@@ -227,7 +227,7 @@ describe('UnifiedVisualizer Performance Benchmarks', () => {
             expect(fillRectCalls).toBeLessThan(100);
         });
 
-        it('should reduce moveTo/lineTo calls by reusing path for generic tracks', () => {
+        it('draws generic-track notes as fillRect, not stroked paths', () => {
             visualizer.resize(800, 600, 1);
             visualizer.addTrack('bass', '#00ff00', '#00ff00');
             for (let i = 0; i < 10; i++) {
@@ -237,28 +237,29 @@ describe('UnifiedVisualizer Performance Benchmarks', () => {
 
             mockCtx.moveTo.mockClear();
             mockCtx.lineTo.mockClear();
-            mockCtx.beginPath.mockClear();
-            mockCtx.stroke.mockClear();
+            mockCtx.fillRect.mockClear();
 
             visualizer.render(11.0, 0);
 
-            const moveToCount = mockCtx.moveTo.mock.calls.length;
-            const lineToCount = mockCtx.lineTo.mock.calls.length;
-
-            console.log(`moveTo: ${moveToCount}, lineTo: ${lineToCount}`);
-
-            // Expectation based on optimized behavior: 10 note segments + 1 playhead segment
-            expect(moveToCount).toBe(11);
-            expect(lineToCount).toBe(11);
+            // Non-drum tracks render notes via fillRect, not lines. Per-note
+            // moveTo/lineTo are reserved for drum-track diamonds and grid/playhead
+            // overlays — staying small here is the regression bound.
+            expect(mockCtx.moveTo.mock.calls.length).toBeLessThan(15);
+            expect(mockCtx.lineTo.mock.calls.length).toBeLessThan(15);
+            // Each note paints two rects (outline + fill) plus lane backdrops.
+            expect(mockCtx.fillRect.mock.calls.length).toBeGreaterThanOrEqual(20);
         });
     });
 
     describe('State/Context Optimization', () => {
         it('measures redundant font property assignments per frame', () => {
+            // resize() triggers a one-time static-layer render with many font
+            // sets; reset counters AFTER setup so we measure per-frame render
+            // only, which is the hot path that benefits from caching.
+            visualizer.resize(800, 600, 1);
             mockCtx._fontSetCount = 0;
             mockCtx._textAlignSetCount = 0;
             mockCtx._textBaselineSetCount = 0;
-            visualizer.resize(800, 600, 1);
 
             visualizer.render(0.5, 120);
 

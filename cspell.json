@@ -4,6 +4,8 @@
     "words": [
         "Sidestick",
         "Unmaximize",
+        "transpiles",
+        "typechecks",
         "depcruise",
         "preact",
         "vitest",

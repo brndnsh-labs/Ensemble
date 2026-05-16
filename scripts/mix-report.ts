@@ -5,7 +5,10 @@ import http from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { chromium } from '@playwright/test';
+import playwright from '@playwright/test';
+
+const { chromium } = playwright;
+
 import {
     buildRenderedMixReport,
     DEFAULT_MIX_REPORT_SCENES,
@@ -270,6 +273,13 @@ async function renderSceneReports({ scenes, seeds }) {
         const browser = await chromium.launch({ headless: true });
         try {
             const page = await browser.newPage();
+            // tsx transpiles via esbuild with keepNames=true, which wraps named
+            // functions with `__name(fn, 'name')` calls in the page.evaluate body.
+            // That helper is undefined in the browser; inject a no-op shim onto
+            // window before navigation so all subsequent eval'd code finds it.
+            await page.addInitScript(() => {
+                (window as unknown as { __name: <T>(fn: T) => T }).__name = (fn) => fn;
+            });
             await page.goto(baseUrl, { waitUntil: 'networkidle' });
             await page.waitForFunction(
                 () =>

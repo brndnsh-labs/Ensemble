@@ -65,6 +65,9 @@ export class VisualizerEngine {
     lanes: Record<string, Lane>;
     categoryColors: string[];
     intervalColors: string[];
+    private _font = '';
+    private _textAlign = '';
+    private _textBaseline = '';
 
     constructor(
         canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -100,6 +103,21 @@ export class VisualizerEngine {
         this.intervalColors = [];
     }
 
+    private setTextStyle(font: string, align: string, baseline: string): void {
+        if (this._font !== font) {
+            this.ctx.font = font;
+            this._font = font;
+        }
+        if (this._textAlign !== align) {
+            this.ctx.textAlign = align as CanvasTextAlign;
+            this._textAlign = align;
+        }
+        if (this._textBaseline !== baseline) {
+            this.ctx.textBaseline = baseline as CanvasTextBaseline;
+            this._textBaseline = baseline;
+        }
+    }
+
     setTheme(themeCache: Record<string, unknown>): void {
         this.themeCache = themeCache;
         this.categoryColors = (themeCache.chordColors as string[]) || [
@@ -126,6 +144,7 @@ export class VisualizerEngine {
         this.canvas.height = height * dpr;
         this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
+        this._font = this._textAlign = this._textBaseline = '';
 
         this.staticCanvas.width = width * dpr;
         this.staticCanvas.height = height * dpr;
@@ -670,9 +689,7 @@ export class VisualizerEngine {
 
                 if (config.showLabels && ev.label && width > 28) {
                     ctx.fillStyle = labelColor;
-                    ctx.font = '11px sans-serif';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'top';
+                    this.setTextStyle('11px sans-serif', 'left', 'top');
                     ctx.fillText(ev.label, left + 4, lane.top + 6);
                 }
             });
@@ -792,9 +809,7 @@ export class VisualizerEngine {
 
             if (activeLabel) {
                 ctx.fillStyle = noteLabelColor;
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
+                this.setTextStyle('11px sans-serif', 'left', 'top');
                 ctx.fillText(activeLabel, 12, lane.top + 44);
             }
         }
