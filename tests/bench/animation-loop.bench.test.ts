@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it } from 'vitest';
 import { getStepsPerMeasure } from '../../public/utils.js';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 import { getState } from '../../public/state.js';
 
@@ -13,27 +14,30 @@ vi.mock('../../public/state.js', () => {
             currentTime: 0,
             createOscillator: vi.fn(() => ({
                 type: '',
-                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                detune: { setValueAtTime: vi.fn() },
-                setPeriodicWave: vi.fn(),
+                frequency: {
+                    setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                },
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
-                onended: null,
             })),
             createGain: vi.fn(() => ({
                 gain: {
                     value: 1,
                     setValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
+                    linearRampToValueAtTime: vi.fn(),
                     cancelScheduledValues: vi.fn(),
                 },
                 connect: vi.fn(),
             })),
             createBiquadFilter: vi.fn(() => ({
                 type: '',
-                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                Q: { setValueAtTime: vi.fn() },
+                frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                Q: { value: 0, setValueAtTime: vi.fn() },
                 connect: vi.fn(),
             })),
             createBufferSource: vi.fn(() => ({
@@ -42,14 +46,20 @@ vi.mock('../../public/state.js', () => {
                 start: vi.fn(),
                 stop: vi.fn(),
                 onended: null,
+                playbackRate: { value: 1 },
             })),
-            createPeriodicWave: vi.fn(() => ({})),
+            createBuffer: vi.fn(() => ({
+                getChannelData: vi.fn(() => new Float32Array(100)),
+            })),
+            sampleRate: 44100,
         },
-        chordsGain: { connect: vi.fn() },
-        sustainActive: false,
-        bandIntensity: 0.5,
+        drumsGain: { connect: vi.fn() },
     };
-    const mockGroove = { audioBuffers: { noise: {} } };
+    const mockGroove = {
+        humanize: 20,
+        audioBuffers: { noise: {} },
+        lastHatGain: null,
+    };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -66,27 +76,37 @@ vi.mock('../../public/state.js', () => {
     };
 });
 
-import { playNote } from '../../public/engine/synth-chords.js';
+import { playDrumSound } from '../../public/engine/synth-drums.js';
 
-describe('Synth Chords Performance', () => {
-    it('measures playNote high-intensity performance', () => {
-        const iterations = 2000;
+describe('Drum Synth Performance', () => {
+    it('measures playDrumSound loop performance', () => {
+        const iterations = 1000;
+        // Instruments that trigger the specific array check we are optimizing
+        const instruments = [
+            'HiHat',
+            'Open',
+            'Crash',
+            'Shaker',
+            'Agogo',
+            'Perc',
+            'Guiro',
+            'Clave',
+            'TomHigh',
+            'CongaHigh',
+            'BongoHigh',
+        ];
+
         const start = performance.now();
 
         for (let i = 0; i < iterations; i++) {
-            playNote(getState(), 440, 0, 1.0, {
-                vol: 0.8,
-                index: 0,
-                instrument: 'Piano',
-                muted: false,
-                numVoices: 3,
-            });
+            const name = instruments[i % instruments.length];
+            playDrumSound(getState(), name, 0, 1.0);
         }
 
         const end = performance.now();
         const duration = end - start;
 
-        console.log(`playNote (Intensity 0.9) x ${iterations} took ${duration.toFixed(2)}ms`);
+        console.log(`playDrumSound x ${iterations} took ${duration.toFixed(2)}ms`);
         expect(duration).toBeGreaterThan(0);
     });
 });

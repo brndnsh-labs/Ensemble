@@ -1,4 +1,6 @@
+// @ts-nocheck
 // cspell:ignore labelledby
+import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
 import {
     expectLocatorFitsViewport,
@@ -8,7 +10,7 @@ import {
 
 const { expect, test } = pkg;
 
-async function openLibraryFromArranger(page) {
+async function openLibraryFromArranger(page: Page): Promise<void> {
     const libraryButton = page.locator('#arrangerLibraryInlineBtn');
     if (await libraryButton.isVisible()) {
         await libraryButton.click();
@@ -18,7 +20,7 @@ async function openLibraryFromArranger(page) {
     throw new Error('Expected the arranger library button to be visible');
 }
 
-async function choosePresetFromLibrary(page, presetName) {
+async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
     const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }

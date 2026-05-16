@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { WORKER_MSG, WORKER_RESP } from '../../public/worker-types.js';
 

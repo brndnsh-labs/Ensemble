@@ -1,3 +1,4 @@
+// @ts-nocheck
 // @vitest-environment happy-dom
 import { beforeEach, describe, it, vi } from 'vitest';
 import { onSectionUpdate } from '../../public/arranger-controller.js';

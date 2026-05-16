@@ -1,8 +1,10 @@
+// @ts-nocheck
+import type { Locator, Page } from '@playwright/test';
 import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
-async function openLibraryFromArranger(page) {
+async function openLibraryFromArranger(page: Page): Promise<void> {
     const libraryButton = page.locator('#arrangerLibraryInlineBtn');
     if (await libraryButton.isVisible()) {
         await libraryButton.click();
@@ -12,12 +14,12 @@ async function openLibraryFromArranger(page) {
     throw new Error('Expected the arranger library button to be visible');
 }
 
-async function choosePresetFromLibrary(page, presetName) {
+async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
     const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-async function openEditorFromArranger(page) {
+async function openEditorFromArranger(page: Page): Promise<void> {
     const editButton = page.locator('#editArrangementBtn');
     if (await editButton.isVisible()) {
         await editButton.click();
@@ -27,7 +29,7 @@ async function openEditorFromArranger(page) {
     throw new Error('Expected the arranger edit button to be visible');
 }
 
-async function openEditorFromLibraryPreset(page) {
+async function openEditorFromLibraryPreset(page: Page): Promise<Locator> {
     await openLibraryFromArranger(page);
     await choosePresetFromLibrary(page, 'All The Things You Are');
     await openEditorFromArranger(page);

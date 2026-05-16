@@ -1,3 +1,4 @@
+// @ts-nocheck
 import pkg from '@playwright/test';
 
 const { expect, test } = pkg;

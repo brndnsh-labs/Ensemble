@@ -1,3 +1,4 @@
+// @ts-nocheck
 import pkg from '@playwright/test';
 import {
     expectNoHorizontalOverflow,

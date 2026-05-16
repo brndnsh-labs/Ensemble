@@ -1,8 +1,9 @@
+import type { Locator, Page } from '@playwright/test';
 import pkg from '@playwright/test';
 
 const { expect } = pkg;
 
-export async function expectWithinSurface(surface, control) {
+export async function expectWithinSurface(surface: Locator, control: Locator): Promise<void> {
     const [surfaceBox, controlBox] = await Promise.all([
         surface.boundingBox(),
         control.boundingBox(),
@@ -10,17 +11,21 @@ export async function expectWithinSurface(surface, control) {
 
     expect(surfaceBox).not.toBeNull();
     expect(controlBox).not.toBeNull();
-    expect(controlBox.x).toBeGreaterThanOrEqual(surfaceBox.x - 1);
-    expect(controlBox.x + controlBox.width).toBeLessThanOrEqual(
-        surfaceBox.x + surfaceBox.width + 1,
+    expect(controlBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+    expect(controlBox!.x + controlBox!.width).toBeLessThanOrEqual(
+        surfaceBox!.x + surfaceBox!.width + 1,
     );
-    expect(controlBox.y).toBeGreaterThanOrEqual(surfaceBox.y - 1);
-    expect(controlBox.y + controlBox.height).toBeLessThanOrEqual(
-        surfaceBox.y + surfaceBox.height + 1,
+    expect(controlBox!.y).toBeGreaterThanOrEqual(surfaceBox!.y - 1);
+    expect(controlBox!.y + controlBox!.height).toBeLessThanOrEqual(
+        surfaceBox!.y + surfaceBox!.height + 1,
     );
 }
 
-export async function expectLocatorFitsViewport(page, locator, overflowTarget = locator) {
+export async function expectLocatorFitsViewport(
+    page: Page,
+    locator: Locator,
+    overflowTarget: Locator = locator,
+): Promise<void> {
     await expect
         .poll(async () => {
             const viewport = page.viewportSize();
@@ -46,7 +51,7 @@ export async function expectLocatorFitsViewport(page, locator, overflowTarget = 
         .toBe(true);
 }
 
-export async function expectSurfaceFitsViewport(page, surface) {
+export async function expectSurfaceFitsViewport(page: Page, surface: Locator): Promise<void> {
     await expectLocatorFitsViewport(
         page,
         surface,
@@ -54,7 +59,7 @@ export async function expectSurfaceFitsViewport(page, surface) {
     );
 }
 
-export async function expectNoHorizontalOverflow(locator) {
+export async function expectNoHorizontalOverflow(locator: Locator): Promise<void> {
     const overflowMetrics = await locator.evaluate((el) => ({
         clientWidth: el.clientWidth,
         scrollWidth: el.scrollWidth,
@@ -63,13 +68,13 @@ export async function expectNoHorizontalOverflow(locator) {
     expect(overflowMetrics.scrollWidth).toBeLessThanOrEqual(overflowMetrics.clientWidth + 1);
 }
 
-export async function expectNoVerticalOverflow(locator, tolerance = 24) {
+export async function expectNoVerticalOverflow(locator: Locator, tolerance = 24): Promise<void> {
     await expect
         .poll(async () => locator.evaluate((el) => el.scrollHeight - el.clientHeight))
         .toBeLessThanOrEqual(tolerance);
 }
 
-export async function expectOwnsInteriorProbe(locator) {
+export async function expectOwnsInteriorProbe(locator: Locator): Promise<void> {
     const ownsInteriorProbe = await locator.evaluate((el) => {
         const rect = el.getBoundingClientRect();
         const x = Math.min(rect.left + 24, rect.right - 4);
@@ -81,7 +86,11 @@ export async function expectOwnsInteriorProbe(locator) {
     expect(ownsInteriorProbe).toBe(true);
 }
 
-export async function expectScrollsToRevealTarget(page, scrollContainer, target) {
+export async function expectScrollsToRevealTarget(
+    page: Page,
+    scrollContainer: Locator,
+    target: Locator,
+): Promise<void> {
     void page;
     const metrics = await scrollContainer.evaluate((el) => ({
         scrollHeight: el.scrollHeight,

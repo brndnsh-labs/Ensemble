@@ -1,12 +1,39 @@
+// @ts-nocheck
 /**
  * Analyzes a raw sequence of chords to find repeating structures and suggest sections.
  * Optimized for standard song forms (AABA, Blues) and "Lead Sheet" style organization.
- * @param {Array} beatData Array of { chord, energy } objects
- * @param {number|Object} beatsPerMeasure Number of beats per measure, or a pulse object containing beatsPerMeasure
  */
+
+interface BeatEntry {
+    beat: number;
+    chord: string;
+    energy: number;
+}
+
+interface PulseOptions {
+    beatsPerMeasure?: number;
+}
+
+interface FormSection {
+    value: string;
+    repeat: number;
+    energy: number;
+    startMeasureIndex: number;
+    lengthInMeasures: number;
+    label?: string;
+    startBeat: number;
+    loopLengthBeats: number;
+    endBeat: number;
+    blockEndBeat: number;
+    isLoop: boolean;
+}
+
 const CHORD_EXTENSION_PATTERN = /maj7|maj9|m7|m9|m6|m11|7|6|9|11|13|sus4|sus2|dim|aug|5/g;
 
-export function extractForm(beatData, options = 4) {
+export function extractForm(
+    beatData: BeatEntry[],
+    options: number | PulseOptions = 4,
+): FormSection[] {
     if (!beatData || beatData.length < 4) {
         return [];
     }

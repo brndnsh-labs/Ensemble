@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it } from 'vitest';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getState } from '../../public/state.js';

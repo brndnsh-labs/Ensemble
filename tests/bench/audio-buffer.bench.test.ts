@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it } from 'vitest';
 
 describe('Audio Buffer Management Performance', () => {

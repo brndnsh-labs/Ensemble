@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { beforeEach, describe, it } from 'vitest';
 import { getChordAtStep } from '../../public/engine/worker-utils.js';
 import { getState } from '../../public/state.js';

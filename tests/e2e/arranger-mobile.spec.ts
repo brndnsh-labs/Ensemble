@@ -1,21 +1,28 @@
+// @ts-nocheck
 // cspell:ignore labelledby
+
+import type { Locator, Page } from '@playwright/test';
 import pkg from '@playwright/test';
 import { expectLocatorFitsViewport, expectOwnsInteriorProbe } from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
-async function openLibraryFromArranger(page) {
+async function openLibraryFromArranger(page: Page): Promise<void> {
     const libraryButton = page.locator('#arrangerLibraryInlineBtn');
     await expect(libraryButton).toBeVisible();
     await libraryButton.click();
 }
 
-async function choosePresetFromLibrary(page, presetName) {
+async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
     const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-async function expectPanelAttachedToTrigger(_page, triggerLocator, panelLocator) {
+async function expectPanelAttachedToTrigger(
+    _page: Page,
+    triggerLocator: Locator,
+    panelLocator: Locator,
+): Promise<void> {
     const [triggerBox, panelBox] = await Promise.all([
         triggerLocator.boundingBox(),
         panelLocator.boundingBox(),
@@ -24,9 +31,9 @@ async function expectPanelAttachedToTrigger(_page, triggerLocator, panelLocator)
     expect(triggerBox).not.toBeNull();
     expect(panelBox).not.toBeNull();
     const openGap =
-        panelBox.y >= triggerBox.y
-            ? panelBox.y - (triggerBox.y + triggerBox.height)
-            : triggerBox.y - (panelBox.y + panelBox.height);
+        panelBox!.y >= triggerBox!.y
+            ? panelBox!.y - (triggerBox!.y + triggerBox!.height)
+            : triggerBox!.y - (panelBox!.y + panelBox!.height);
 
     expect(Math.abs(openGap)).toBeLessThanOrEqual(240);
 }
