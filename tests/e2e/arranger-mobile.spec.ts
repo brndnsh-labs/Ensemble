@@ -1,16 +1,15 @@
 // @ts-nocheck
 // cspell:ignore labelledby
 
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
-import { expectLocatorFitsViewport, expectOwnsInteriorProbe } from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
+// Opens the preset library via the overflow button (mobile pattern).
 async function openLibraryFromArranger(page: Page): Promise<void> {
-    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
-    await expect(libraryButton).toBeVisible();
-    await libraryButton.click();
+    await page.locator('.chart-surface__overflow-btn').click();
+    await page.getByRole('button', { name: 'Library' }).click();
 }
 
 async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
@@ -18,25 +17,11 @@ async function choosePresetFromLibrary(page: Page, presetName: string): Promise<
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-async function expectPanelAttachedToTrigger(
-    _page: Page,
-    triggerLocator: Locator,
-    panelLocator: Locator,
-): Promise<void> {
-    const [triggerBox, panelBox] = await Promise.all([
-        triggerLocator.boundingBox(),
-        panelLocator.boundingBox(),
-    ]);
-
-    expect(triggerBox).not.toBeNull();
-    expect(panelBox).not.toBeNull();
-    const openGap =
-        panelBox!.y >= triggerBox!.y
-            ? panelBox!.y - (triggerBox!.y + triggerBox!.height)
-            : triggerBox!.y - (panelBox!.y + panelBox!.height);
-
-    expect(Math.abs(openGap)).toBeLessThanOrEqual(240);
-}
+// Removed: workspace surface was eliminated by UI redesign
+// (tests "Compact mobile toolbar keeps key, library, share, and seed as direct controls"
+//  and "Tablet-sized viewport keeps the key menu fully visible" asserted on
+//  #arrangerLibraryInlineBtn, #soloistSeedMenuBtn, #editArrangementBtn, #arrangerOverflowBtn,
+//  #shareHubBtn and #arrangerKeyPanel pop-over behavior — all removed with the arranger surface)
 
 test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
     test.beforeEach(async ({ page }) => {
@@ -47,64 +32,8 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         });
     });
 
-    test('Compact mobile toolbar keeps key, library, share, and seed as direct controls', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await page.click('[data-workspace-nav="arranger"]');
-
-        await expect(page.locator('#keyMenuBtn')).toBeVisible();
-        await expect(page.locator('#arrangerLibraryInlineBtn')).toBeVisible();
-        await expect(page.locator('#shareHubBtn')).toBeVisible();
-        await expect(page.locator('#soloistSeedMenuBtn')).toBeVisible();
-
-        await page.locator('#keyMenuBtn').click();
-        const keyTrigger = page.locator('#keyMenuBtn');
-        const keyPanel = page.locator('#arrangerKeyPanel');
-        await expect(keyPanel).toBeVisible();
-        await expect(page.locator('#transDownBtn')).toBeVisible();
-        await expect(page.locator('#transUpBtn')).toBeVisible();
-        await expectPanelAttachedToTrigger(page, keyTrigger, keyPanel);
-        await expectLocatorFitsViewport(page, keyPanel);
-        await expectOwnsInteriorProbe(keyPanel);
-
-        await page.mouse.click(8, 8);
-        await expect(keyPanel).toBeHidden();
-
-        await page.locator('#soloistSeedMenuBtn').click();
-        const seedTrigger = page.locator('#soloistSeedMenuBtn');
-        const seedPanel = page.locator('#soloistSeedPanel');
-        await expect(seedPanel).toBeVisible();
-        await expectPanelAttachedToTrigger(page, seedTrigger, seedPanel);
-        await expectLocatorFitsViewport(page, seedPanel);
-        await expectOwnsInteriorProbe(seedPanel);
-
-        await page.mouse.click(8, 8);
-        await expect(page.locator('#editArrangementBtn')).toBeVisible();
-        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
-    });
-
-    test('Tablet-sized viewport keeps the key menu fully visible @mobile', async ({ page }) => {
-        await page.setViewportSize({ width: 768, height: 1024 });
-        await page.click('[data-workspace-nav="arranger"]');
-
-        const keyTrigger = page.locator('#keyMenuBtn');
-        const keyPanel = page.locator('#arrangerKeyPanel');
-        await expect(keyTrigger).toBeVisible();
-
-        await keyTrigger.click();
-        await expect(keyPanel).toBeVisible();
-        await expectPanelAttachedToTrigger(page, keyTrigger, keyPanel);
-        await expectLocatorFitsViewport(page, keyPanel);
-        await expectOwnsInteriorProbe(keyPanel);
-
-        await page.mouse.click(8, 8);
-        await expect(keyPanel).toBeHidden();
-    });
-
     test('Donna Lee renders cleanly in the mobile arranger viewport', async ({ page }) => {
         await page.setViewportSize({ width: 360, height: 640 });
-        await page.click('[data-workspace-nav="arranger"]');
         await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
@@ -169,7 +98,6 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
 
     test('Progression library uses a full-bleed compact sheet on mobile', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
-        await page.click('[data-workspace-nav="arranger"]');
         await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
@@ -200,48 +128,13 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await expect(modal.locator('.preset-library-section-header p').first()).toBeHidden();
     });
 
-    test('Tall mobile view stretches fit charts vertically without centering them', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 393, height: 852 });
-        await page.click('[data-workspace-nav="arranger"]');
-        await openLibraryFromArranger(page);
-        await choosePresetFromLibrary(page, 'Giant Steps');
-
-        const visualizer = page.locator('#chordVisualizer');
-        const firstChord = visualizer.locator('.chord-card').first();
-
-        await expect(visualizer).toBeVisible();
-        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
-        await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fill');
-        await expect
-            .poll(async () =>
-                firstChord.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-            )
-            .toBeGreaterThan(15);
-        const spacing = await visualizer.evaluate((el) => {
-            const rect = el.getBoundingClientRect();
-            const rows = Array.from(el.querySelectorAll('.lead-sheet-row'));
-            const first = rows[0]?.getBoundingClientRect();
-            const last = rows.at(-1)?.getBoundingClientRect();
-            return {
-                topGap: first ? first.top - rect.top : null,
-                bottomGap: last ? rect.bottom - last.bottom : null,
-            };
-        });
-        expect(spacing.topGap).not.toBeNull();
-        expect(spacing.bottomGap).not.toBeNull();
-        expect(spacing.topGap).toBeLessThan(60);
-        expect(spacing.bottomGap).toBeGreaterThan(spacing.topGap + 40);
-        await expect(visualizer).toHaveJSProperty(
-            'scrollHeight',
-            await visualizer.evaluate((el) => el.clientHeight),
-        );
-    });
+    // Removed: "Tall mobile view stretches fit charts vertically without centering them"
+    // The ChartSurface layout now uses `align-content: safe center` on the chart container,
+    // so short "fit" charts are vertically centered rather than top-aligned. The assertions
+    // (topGap < 60, bottomGap > topGap + 40) are incompatible with the current design.
 
     test('Long custom charts use guided internal scrolling on mobile', async ({ page }) => {
         await page.setViewportSize({ width: 360, height: 640 });
-        await page.click('[data-workspace-nav="arranger"]');
 
         await page.evaluate(async () => {
             const { ACTIONS, dispatch, validateProgression } = window.ensemble;

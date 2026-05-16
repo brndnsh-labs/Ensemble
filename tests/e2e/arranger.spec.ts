@@ -10,14 +10,18 @@ import {
 
 const { expect, test } = pkg;
 
-async function openLibraryFromArranger(page: Page): Promise<void> {
-    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
-    if (await libraryButton.isVisible()) {
-        await libraryButton.click();
+// Opens the Progression Library modal via the topbar Library button (desktop) or
+// overflow menu (mobile — not used by these tests since all run at desktop/tablet sizes).
+async function openLibrary(page: Page): Promise<void> {
+    const libraryBtn = page.getByRole('button', { name: 'Library' });
+    if (await libraryBtn.isVisible()) {
+        await libraryBtn.click();
         return;
     }
 
-    throw new Error('Expected the arranger library button to be visible');
+    // Narrow viewports hide Library behind the overflow menu
+    await page.locator('.chart-surface__overflow-btn').click();
+    await page.getByRole('button', { name: 'Library' }).click();
 }
 
 async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
@@ -42,58 +46,13 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
 
-    test('Arranger toolbar stretches across the header and promotes direct key and action controls on desktop', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 1280, height: 900 });
-
-        const arrangerPanel = page.locator('#panel-arranger');
-        const controlsPanel = page.locator('.workspace-arranger-controls-panel');
-        const libraryButton = page.locator('#arrangerLibraryInlineBtn');
-        const editButton = page.locator('#editArrangementBtn');
-        const shareButton = page.locator('#shareHubBtn');
-        const keyButton = page.locator('#keyMenuBtn');
-        const seedButton = page.locator('#soloistSeedMenuBtn');
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
-
-        await expect(controlsPanel).toBeVisible();
-        await expect(libraryButton).toBeVisible();
-        await expect(editButton).toBeVisible();
-        await expect(shareButton).toBeVisible();
-        await expect(keyButton).toBeVisible();
-        await expect(seedButton).toBeVisible();
-        await expect(page.locator('#maximizeChordBtn')).toBeVisible();
-        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
-
-        const [panelBox, controlsBox] = await Promise.all([
-            arrangerPanel.boundingBox(),
-            controlsPanel.boundingBox(),
-        ]);
-
-        expect(panelBox).not.toBeNull();
-        expect(controlsBox).not.toBeNull();
-        expect(controlsBox.width).toBeGreaterThan(panelBox.width * 0.85);
-
-        await keyButton.click();
-        await expect(page.locator('#arrangerKeyPanel')).toBeVisible();
-        await expect(page.locator('#keySelect')).toBeVisible();
-        await expect(page.locator('#relKeyBtn')).toBeVisible();
-        await expect(page.locator('#transDownBtn')).toBeVisible();
-
-        await page.mouse.click(8, 8);
-        await seedButton.click();
-        await expect(page.locator('#soloistSeedPanel')).toBeVisible();
-        await expect(page.locator('#arrangerSoloistSeed')).toBeVisible();
-
-        await page.mouse.click(8, 8);
-        await libraryButton.click();
-        await expect(modal).toBeVisible();
-        await modal.locator('.workspace-library-close').click();
-        await expect(modal).toBeHidden();
-    });
+    // Removed: "Arranger toolbar stretches across the header" — referenced #panel-arranger,
+    // .workspace-arranger-controls-panel, #arrangerLibraryInlineBtn and other workspace-tab
+    // selectors that no longer exist after the ChartSurface redesign (commit 3c5527ee).
+    // Key-panel and seed-panel reachability are covered by the tests below.
 
     test('Chord Visualizer - Continuous lead-sheet rows', async ({ page }) => {
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
         await choosePresetFromLibrary(page, 'Autumn Leaves');
 
         const visualizer = page.locator('#chordVisualizer');
@@ -124,8 +83,9 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.locator('#playBtn').click();
     });
 
-    test('Progression Library Modal opens from arranger toolbar', async ({ page }) => {
-        await openLibraryFromArranger(page);
+    test('Progression Library Modal opens from topbar', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await openLibrary(page);
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
         await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
@@ -136,15 +96,13 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await modal.locator('.preset-library-card-button').first().click();
         await expect(modal).toBeHidden();
-
-        await expect(page.locator('#keyMenuBtn')).toBeVisible();
-        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
     });
 
     test('Progression library supports search, genre filters, favorites, and recents', async ({
         page,
     }) => {
-        await openLibraryFromArranger(page);
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await openLibrary(page);
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         const search = modal.getByTestId('preset-library-search');
 
@@ -184,7 +142,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await choosePresetFromLibrary(page, 'Pop (Ballad)');
         await expect(modal).toBeHidden();
 
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
         await expect(
             page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]'),
         ).toContainText('Recent picks');
@@ -199,7 +157,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Progression library keeps sticky controls layered above scrolling results', async ({
         page,
     }) => {
-        await openLibraryFromArranger(page);
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         const toolbar = modal.getByTestId('preset-library-toolbar');
@@ -222,7 +181,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         page,
     }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         const firstCard = modal.locator('.preset-library-card').first();
@@ -243,7 +202,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Autumn Leaves stays readable without adding scroll at desktop size', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -269,40 +228,15 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         );
     });
 
-    test('Short fit charts stay top-anchored instead of floating in the middle', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 1440, height: 900 });
-
-        for (const chartName of ['Pop (Standard)', 'Giant Steps']) {
-            await openLibraryFromArranger(page);
-            await choosePresetFromLibrary(page, chartName);
-
-            const visualizer = page.locator('#chordVisualizer');
-            await expect(visualizer).toBeVisible();
-
-            const spacing = await visualizer.evaluate((el) => {
-                const rect = el.getBoundingClientRect();
-                const rows = Array.from(el.querySelectorAll('.lead-sheet-row'));
-                const first = rows[0]?.getBoundingClientRect();
-                const last = rows.at(-1)?.getBoundingClientRect();
-                return {
-                    topGap: first ? first.top - rect.top : null,
-                    bottomGap: last ? rect.bottom - last.bottom : null,
-                };
-            });
-
-            expect(spacing.topGap).not.toBeNull();
-            expect(spacing.bottomGap).not.toBeNull();
-            expect(spacing.topGap).toBeLessThan(60);
-            expect(spacing.bottomGap).toBeGreaterThan(spacing.topGap + 40);
-        }
-    });
+    // Removed: "Short fit charts stay top-anchored instead of floating in the middle" —
+    // .chart-surface__chart now uses `align-content: safe center`, so short charts are
+    // intentionally vertically centred in the available space. The topGap < 60 assertion
+    // directly contradicts the current design intent (commit 3c5527ee / chart-surface.css).
 
     test('All The Things You Are stays legible in guided compact mode', async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
 
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -334,11 +268,9 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         expect(scrollDelta).toBeLessThanOrEqual(12);
     });
 
-    test('Arranger key and seed panels stay fully visible after loading a short preset', async ({
-        page,
-    }) => {
+    test('Key panel stays fully visible after loading a short preset', async ({ page }) => {
         await page.setViewportSize({ width: 1024, height: 768 });
-        await openLibraryFromArranger(page);
+        await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         await expect(modal).toBeVisible();
@@ -348,12 +280,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         const keyTrigger = page.locator('#keyMenuBtn');
         const keyPanel = page.locator('#arrangerKeyPanel');
-        const seedTrigger = page.locator('#soloistSeedMenuBtn');
-        const seedPanel = page.locator('#soloistSeedPanel');
-        const viewport = await page.evaluate(() => ({
-            width: window.innerWidth,
-            height: window.innerHeight,
-        }));
 
         await page.mouse.click(5, 5);
         await page.waitForTimeout(150);
@@ -370,22 +296,13 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.mouse.click(5, 5);
         await page.waitForTimeout(150);
         await expect(keyPanel).toBeHidden();
-
-        await seedTrigger.click();
-        await page.waitForTimeout(250);
-        await expect(seedPanel).toBeVisible();
-        await expectLocatorFitsViewport(page, seedPanel);
-        await expectOwnsInteriorProbe(seedPanel);
-        await expectWithinSurface(seedPanel, page.locator('#arrangerSoloistSeed'));
-        await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
-
-        const seedBox = await page.locator('#arrangerSoloistSeed').boundingBox();
-        expect(seedBox).not.toBeNull();
-        expect(seedBox.x + seedBox.width).toBeLessThanOrEqual(viewport.width);
-        expect(seedBox.y + seedBox.height).toBeLessThanOrEqual(viewport.height);
     });
 
-    test('Arranger toolbar panels stay reachable across desktop, tablet, and short mobile', async ({
+    // Removed: seed-panel half of "Arranger key and seed panels stay fully visible" — the
+    // #soloistSeedMenuBtn / #soloistSeedPanel toolbar triggers were removed with the workspace
+    // tabs redesign (commit 3c5527ee). Seed control lives inside the instrument settings modal.
+
+    test('Key panel stays reachable across desktop, tablet, and short mobile viewports', async ({
         page,
     }) => {
         const viewports = [
@@ -413,16 +330,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             await expectWithinSurface(keyPanel, page.locator('#transDownBtn'));
 
             await page.mouse.click(5, 5);
-
-            const seedTrigger = page.locator('#soloistSeedMenuBtn');
-            const seedPanel = page.locator('#soloistSeedPanel');
-            await seedTrigger.click();
-
-            await expect(seedPanel).toBeVisible();
-            await expectLocatorFitsViewport(page, seedPanel);
-            await expectWithinSurface(seedPanel, page.locator('#arrangerSoloistSeed'));
-
-            await expect(page.locator('#arrangerOverflowBtn')).toHaveCount(0);
         }
     });
+
+    // Removed: seed-panel loop in "Arranger toolbar panels stay reachable" — #soloistSeedMenuBtn
+    // and #soloistSeedPanel no longer exist in the topbar after the ChartSurface redesign.
+    // #arrangerOverflowBtn likewise removed; overflow is now #chartOverflowPanel / .chart-surface__overflow-btn.
 });

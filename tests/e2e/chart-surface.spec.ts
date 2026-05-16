@@ -84,7 +84,7 @@ test.describe('ChartSurface @ui', () => {
             await expect(sheet).toBeVisible();
             await expect(sheet.locator('.workspace-studio-mix-row')).toHaveCount(5);
             await expect(
-                sheet.locator('.workspace-studio-mixer-button-label', { hasText: 'Mixer' }),
+                sheet.locator('.workspace-studio-mixer-accordion-trigger', { hasText: 'Mixer' }),
             ).toBeVisible();
 
             // Closes via the sheet's close button

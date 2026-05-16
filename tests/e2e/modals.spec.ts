@@ -4,35 +4,39 @@ import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
-async function openLibraryFromArranger(page: Page): Promise<void> {
-    const libraryButton = page.locator('#arrangerLibraryInlineBtn');
-    if (await libraryButton.isVisible()) {
-        await libraryButton.click();
+async function openEditorFromSurface(page: Page): Promise<void> {
+    // On desktop the Edit button is in the topbar; on mobile it lives inside the overflow panel.
+    const topbarEdit = page.locator('.chart-surface__topbar').getByRole('button', { name: 'Edit' });
+    if (await topbarEdit.isVisible()) {
+        await topbarEdit.click();
         return;
     }
-
-    throw new Error('Expected the arranger library button to be visible');
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.locator('#chartOverflowPanel').getByRole('button', { name: 'Edit' }).click();
 }
 
-async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
-    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
-    await modal.getByRole('button', { name: presetName, exact: true }).click();
-}
-
-async function openEditorFromArranger(page: Page): Promise<void> {
-    const editButton = page.locator('#editArrangementBtn');
-    if (await editButton.isVisible()) {
-        await editButton.click();
+async function openLibrary(page: Page): Promise<void> {
+    // On desktop the Library button is in the topbar; on mobile it lives inside the overflow panel.
+    const topbarLibrary = page
+        .locator('.chart-surface__topbar')
+        .getByRole('button', { name: 'Library' });
+    if (await topbarLibrary.isVisible()) {
+        await topbarLibrary.click();
         return;
     }
-
-    throw new Error('Expected the arranger edit button to be visible');
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.locator('#chartOverflowPanel').getByRole('button', { name: 'Library' }).click();
 }
 
 async function openEditorFromLibraryPreset(page: Page): Promise<Locator> {
-    await openLibraryFromArranger(page);
-    await choosePresetFromLibrary(page, 'All The Things You Are');
-    await openEditorFromArranger(page);
+    // Load preset via Library modal
+    await openLibrary(page);
+    const libraryModal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    await expect(libraryModal).toBeVisible();
+    await libraryModal.getByRole('button', { name: 'All The Things You Are', exact: true }).click();
+
+    // Open editor (topbar button on desktop, overflow on mobile)
+    await openEditorFromSurface(page);
     await page.waitForSelector('#editorOverlay', { state: 'visible' });
     return page.locator('#editorOverlay .settings-content');
 }
@@ -77,8 +81,8 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.click('#arrangerActionTrigger');
         const toolsMenu = page.locator('#arrangerActionMenu');
         await expect(toolsMenu).toBeVisible();
-        await expect(toolsMenu).toContainText('Import Tab');
-        await expect(toolsMenu).toContainText('Analyze');
+        await expect(toolsMenu).toContainText('Inspiration Hub');
+        await expect(toolsMenu).toContainText('Clear All');
         await page.locator('.menu-click-away').dispatchEvent('click');
 
         const viewport = page.viewportSize();
@@ -145,8 +149,8 @@ test.describe('Modals Responsiveness @ui', () => {
     });
 
     test('Share & Export Modal - Content and Consolidation', async ({ page }) => {
-        // Open share modal from the dashboard
-        await page.locator('#shareHubBtn').click();
+        // Open share modal via the Share button in the topbar
+        await page.locator('.chart-surface__share-btn').click();
 
         await page.waitForSelector('#shareOverlay', { state: 'visible' });
         const shareModal = page.locator('#shareOverlay .modal-content');
@@ -154,25 +158,22 @@ test.describe('Modals Responsiveness @ui', () => {
 
         // Verify consolidated content
         await expect(shareModal).toContainText('Share & Export');
-        await expect(shareModal).toContainText('Configure Content');
-        await expect(shareModal).toContainText('Select Destination');
+        await expect(shareModal).toContainText('1. Configure Content');
+        await expect(shareModal).toContainText('2. Select Destination');
 
         // Close modal
-        await page.click('#shareOverlay .close-btn');
+        await page.click('#closeShareBtn');
         await page.waitForSelector('#shareOverlay', { state: 'hidden' });
     });
 
     test('Inspiration Hub Modal - Layout and Actions', async ({ page }) => {
-        // Open editor first
-        await openEditorFromArranger(page);
-        await page.waitForSelector('#editorOverlay', { state: 'visible' });
+        // Open the Inspiration Hub via the overflow panel → Generate Song
+        await page.getByRole('button', { name: 'More options' }).click();
+        await page
+            .locator('#chartOverflowPanel')
+            .getByRole('button', { name: 'Generate Song' })
+            .click();
 
-        // Open randomize menu
-        await page.click('#arrangerActionTrigger');
-        await page.click('#inspirationHubBtn');
-
-        // Editor should close and generator should open
-        await page.waitForSelector('#editorOverlay', { state: 'hidden' });
         await page.waitForSelector('#generateSongOverlay', { state: 'visible' });
 
         const generatorModal = page.locator('#generateSongOverlay .settings-content');
@@ -182,7 +183,7 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(generatorModal).toContainText('Inspiration Hub');
 
         // Switch to Randomize tab to see these settings
-        await page.click('button:has-text("Randomize")');
+        await page.getByRole('button', { name: /Randomize/ }).click();
         await expect(generatorModal).toContainText('Root Key');
         await expect(generatorModal).toContainText('Key Quality');
         await expect(generatorModal).toContainText('Structure');

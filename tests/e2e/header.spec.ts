@@ -3,65 +3,33 @@ import pkg from '@playwright/test';
 
 const { expect, test } = pkg;
 
-test.describe('Header Visual Integrity', () => {
+// Removed: `Mobile Header - Title and Settings Icon @mobile`
+// The <header><h1> tagline markup was eliminated by the UI redesign (commit 3c5527ee).
+// Transport/play-button layout is no longer a header concern; mobile topbar
+// functionality is covered by chart-surface.spec.ts.
+
+test.describe('Desktop Header - Layout @desktop', () => {
     test.beforeEach(async ({ page }) => {
-        // Navigate to the app before each test
         await page.goto('/');
-        // Wait for the app to be fully hydrated
         await page.waitForSelector('html[data-hydrated="true"]', {
             state: 'attached',
             timeout: 15000,
         });
+        await page.setViewportSize({ width: 1366, height: 900 });
     });
 
-    test('Mobile Header - Title and Settings Icon @mobile', async ({ page }) => {
-        // This test specifically targets the mobile viewport defined in config
-        const header = page.locator('header');
+    test('topbar is visible and contains key controls @desktop', async ({ page }) => {
+        const topbar = page.locator('.chart-surface__topbar');
+        await expect(topbar).toBeVisible();
 
-        // 1. Verify title text is visible
-        const title = header.locator('h1');
-        await expect(title).toBeVisible();
-        await expect(title).toHaveText('Ensemble');
+        // Play / transport control
+        await expect(page.locator('#playBtn')).toBeVisible();
 
-        const playBtn = page.locator('#playBtn');
-        const playBtnText = page.locator('#playBtnText');
-
-        await expect(playBtn).toBeVisible();
-        const startBox = await playBtn.boundingBox();
-        if (!startBox) {
-            throw new Error('Expected play button to have a bounding box before playback starts');
-        }
-        await playBtn.click();
-        await expect(playBtnText).toHaveText(/STOP \(\d:\d{2}\)/);
-
-        const [titleBox, playBtnBox] = await Promise.all([
-            title.boundingBox(),
-            playBtn.boundingBox(),
-        ]);
-        if (!titleBox || !playBtnBox) {
-            throw new Error('Expected mobile header controls to be measurable');
-        }
-        expect(playBtnBox.width).toBeCloseTo(startBox.width, 1);
-        expect(playBtnBox.height).toBeCloseTo(startBox.height, 1);
-        expect(titleBox.x + titleBox.width).toBeLessThan(playBtnBox.x);
-
-        // 2. Verify Settings button is visible
-        const settingsBtn = page.locator('#settingsBtn');
-        await expect(settingsBtn).toBeVisible();
-    });
-
-    test('Desktop Header - Layout @desktop', async ({ page }) => {
-        // This test targets desktop viewports
-        const header = page.locator('header');
-
-        await expect(header).toBeVisible();
-
-        // Ensure title is present
-        const title = header.locator('h1');
-        await expect(title).toContainText('Ensemble');
-
-        // Ensure Play button is visible in header area
-        const playBtn = page.locator('#playBtn');
-        await expect(playBtn).toBeVisible();
+        // Action buttons present in the topbar
+        await expect(topbar.getByRole('button', { name: 'Library' })).toBeVisible();
+        await expect(topbar.getByRole('button', { name: 'Edit' })).toBeVisible();
+        await expect(topbar.locator('.chart-surface__share-btn')).toBeVisible();
+        await expect(topbar.locator('.chart-surface__viz-btn')).toBeVisible();
+        await expect(topbar.locator('.chart-surface__overflow-btn')).toBeVisible();
     });
 });

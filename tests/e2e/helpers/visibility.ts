@@ -51,29 +51,6 @@ export async function expectLocatorFitsViewport(
         .toBe(true);
 }
 
-export async function expectSurfaceFitsViewport(page: Page, surface: Locator): Promise<void> {
-    await expectLocatorFitsViewport(
-        page,
-        surface,
-        surface.locator('.workspace-studio-surface-body'),
-    );
-}
-
-export async function expectNoHorizontalOverflow(locator: Locator): Promise<void> {
-    const overflowMetrics = await locator.evaluate((el) => ({
-        clientWidth: el.clientWidth,
-        scrollWidth: el.scrollWidth,
-    }));
-
-    expect(overflowMetrics.scrollWidth).toBeLessThanOrEqual(overflowMetrics.clientWidth + 1);
-}
-
-export async function expectNoVerticalOverflow(locator: Locator, tolerance = 24): Promise<void> {
-    await expect
-        .poll(async () => locator.evaluate((el) => el.scrollHeight - el.clientHeight))
-        .toBeLessThanOrEqual(tolerance);
-}
-
 export async function expectOwnsInteriorProbe(locator: Locator): Promise<void> {
     const ownsInteriorProbe = await locator.evaluate((el) => {
         const rect = el.getBoundingClientRect();
@@ -84,28 +61,4 @@ export async function expectOwnsInteriorProbe(locator: Locator): Promise<void> {
     });
 
     expect(ownsInteriorProbe).toBe(true);
-}
-
-export async function expectScrollsToRevealTarget(
-    page: Page,
-    scrollContainer: Locator,
-    target: Locator,
-): Promise<void> {
-    void page;
-    const metrics = await scrollContainer.evaluate((el) => ({
-        scrollHeight: el.scrollHeight,
-        clientHeight: el.clientHeight,
-        scrollTop: el.scrollTop,
-    }));
-
-    if (metrics.scrollHeight <= metrics.clientHeight + 24) {
-        await expect(target).toBeVisible();
-        return;
-    }
-
-    await target.scrollIntoViewIfNeeded();
-    await expect(target).toBeVisible();
-    await expect
-        .poll(async () => scrollContainer.evaluate((el) => el.scrollTop))
-        .toBeGreaterThan(0);
 }
