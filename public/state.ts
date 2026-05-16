@@ -86,19 +86,25 @@ export function getSyncState() {
             volume: bass.volume,
         },
         soloist: {
-            // Wire format remains flat — worker keeps its own flat mirror.
+            // Wire shape mirrors the local SoloistState layout (config flat at
+            // top; engine-runtime fields under `session` / `audio`) so the
+            // worker can apply it with `recursiveSafeSync` directly.
             style: soloist.style,
             octave: soloist.octave,
             enabled: soloist.enabled,
-            lastFreq: soloist.audio.lastFreq,
             volume: soloist.volume,
             mode: soloist.mode,
-            sessionSteps: soloist.session.sessionSteps,
             seed: soloist.seed,
-            sessionSeed: soloist.session.seed,
             phrasingIntensity: soloist.phrasingIntensity,
             tradeMode: soloist.tradeMode,
             hookRetentionProb: soloist.hookRetentionProb,
+            session: {
+                sessionSteps: soloist.session.sessionSteps,
+                seed: soloist.session.seed,
+            },
+            audio: {
+                lastFreq: soloist.audio.lastFreq,
+            },
         },
         harmony: {
             style: harmony.style,

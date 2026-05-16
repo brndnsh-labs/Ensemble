@@ -117,7 +117,6 @@ describe('Soloist Phrasing Analysis', () => {
             pitchHistory: [],
             deviceBuffer: [],
             motifBuffer: [],
-            motifCache: [],
             sessionSteps: 64, // Bypass warmup
             phraseContext: {
                 role: 'call',

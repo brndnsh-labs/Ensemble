@@ -75,7 +75,6 @@ export function resetSoloistState(state: EnsembleState): void {
     memory.recentNotes = [];
     memory.hookBuffer = [];
     memory.sharedHookBuffer = [];
-    memory.lickDictionary = [];
     memory.sectionRecall = {};
     memory.sectionRecallLoop = null;
     memory.formArcRecall = {};

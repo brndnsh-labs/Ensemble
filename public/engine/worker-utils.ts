@@ -13,25 +13,23 @@ export interface ChordAtStep {
  * GENERATIVE STATE PROTECTION
  * These keys are managed locally by the worker's generative engines.
  * Overwriting them from the main thread during sync causes glitches, silence,
- * and resets in the middle of phrases.
+ * and resets in the middle of phrases. Keys are scoped per-level — when
+ * `recursiveSafeSync` descends into a nested object, it looks up the
+ * protected list under `${moduleName}.${key}` (e.g. `soloist.session.phrasing`).
  */
 export const WORKER_MANAGED_KEYS: Record<string, string[]> = {
-    soloist: [
+    'soloist.session.phrasing': [
+        'state',
         'isResting',
+        'transitionState',
         'restSteps',
         'activeSteps',
         'busySteps',
-        'lastFreq',
-        'lastMidiPlayed',
-        'lastRenderedFreq',
-        'embellishmentBuffer',
-        'deviceBuffer',
-        'sharedHookBuffer',
-        'lastAttackStep',
-        'sessionSteps',
         'isWaitingForEntry',
         'isYielding',
+        'lastAttackStep',
     ],
+    'soloist.audio': ['lastMidiPlayed', 'lastRenderedFreq', 'embellishmentBuffer', 'deviceBuffer'],
     bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
     harmony: ['motifBuffer', 'lastMidis'],
     groove: ['fillSteps', 'fillActive', 'fillStartStep', 'fillLength', 'pendingCrash', 'snareMask'],

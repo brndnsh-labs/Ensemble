@@ -154,17 +154,15 @@ describe('KeySignatureControls Component', () => {
             keySelect.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        // Use vi.waitFor to wait for the dynamic import and subsequent state change
         await vi.waitFor(
             () => {
-                expect(mockArranger.key).toBe('G');
+                expect(mockDispatch).toHaveBeenCalledWith('SET_KEY', 'G');
             },
             { timeout: 1000, interval: 5 },
         );
 
         expect(validateAndAnalyze).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
-        expect(mockDispatch).toHaveBeenCalledWith('KEY_CHANGE');
     });
 
     it('handles time signature change without lastDrumPreset', async () => {
@@ -179,19 +177,17 @@ describe('KeySignatureControls Component', () => {
             timeSigSelect.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
-        // Use vi.waitFor to wait for the dynamic import and subsequent state change
         await vi.waitFor(
             () => {
-                expect(mockArranger.timeSignature).toBe('3/4');
+                expect(mockDispatch).toHaveBeenCalledWith('SET_TIME_SIGNATURE', '3/4');
             },
             { timeout: 1000, interval: 5 },
         );
 
-        expect(mockArranger.grouping).toBeNull();
+        expect(mockDispatch).toHaveBeenCalledWith('SET_GROUPING', null);
         expect(loadDrumPreset).not.toHaveBeenCalled();
         expect(validateAndAnalyze).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
-        expect(mockDispatch).toHaveBeenCalledWith('TIME_SIG_CHANGE');
     });
 
     it('handles time signature change with lastDrumPreset', async () => {
@@ -221,7 +217,7 @@ describe('KeySignatureControls Component', () => {
             { timeout: 1000, interval: 5 },
         );
 
-        expect(mockDispatch).toHaveBeenCalledWith('TIME_SIG_CHANGE');
+        expect(mockDispatch).toHaveBeenCalledWith('SET_TIME_SIGNATURE', '3/4');
     });
 
     it('renders grouping toggle for 5/4 and allows cycling options', async () => {
@@ -254,7 +250,7 @@ describe('KeySignatureControls Component', () => {
             () => {
                 // 5/4 options are [[3, 2], [2, 3]]
                 // It should advance from [3, 2] to [2, 3]
-                expect(mockArranger.grouping).toEqual([2, 3]);
+                expect(mockDispatch).toHaveBeenCalledWith('SET_GROUPING', [2, 3]);
             },
             { timeout: 1000, interval: 5 },
         );
@@ -262,7 +258,6 @@ describe('KeySignatureControls Component', () => {
         expect(flushBuffers).toHaveBeenCalled();
         expect(syncWorker).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
-        expect(mockDispatch).toHaveBeenCalledWith('GROUPING_CHANGE');
     });
 
     it('does nothing when toggling grouping on unsupported time signature', async () => {
@@ -285,7 +280,7 @@ describe('KeySignatureControls Component', () => {
                 groupingLabel.dispatchEvent(new Event('click', { bubbles: true }));
                 await new Promise((resolve) => setTimeout(resolve, 0));
             });
-            expect(mockDispatch).not.toHaveBeenCalledWith('GROUPING_CHANGE');
+            expect(mockDispatch).not.toHaveBeenCalledWith('SET_GROUPING', expect.anything());
         }
     });
 

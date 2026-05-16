@@ -72,9 +72,7 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
             recentNotes: [],
             hookBuffer: [],
             sharedHookBuffer: [],
-            motifCache: null,
             rhythmicMotif: [],
-            lickDictionary: [],
             sectionRecall: {},
             sectionRecallLoop: null,
             formArcRecall: {},
@@ -172,14 +170,8 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         sharedHookBuffer: (v) => {
             session.memory.sharedHookBuffer = v as any;
         },
-        motifCache: (v) => {
-            session.memory.motifCache = v;
-        },
         rhythmicMotif: (v) => {
             session.memory.rhythmicMotif = v as any;
-        },
-        lickDictionary: (v) => {
-            session.memory.lickDictionary = v as any;
         },
         sectionRecall: (v) => {
             session.memory.sectionRecall = v as any;

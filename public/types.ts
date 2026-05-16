@@ -592,17 +592,8 @@ export interface SoloistMemory {
     readonly hookBuffer: SoloistHook[];
     /** Hooks shared from other instruments (e.g. Ska-Punk harmonies echoing the soloist). */
     readonly sharedHookBuffer: SoloistHook[];
-    /** Cached motif data. Initialized to null; not yet repopulated by the active pipeline. */
-    // TODO(soloist-session): once the motif-cache pipeline is reintroduced, type as MotifEntry | null.
-    readonly motifCache: unknown;
     /** Current rhythmic motif (subset of the active rhythm plan retained across phrases). */
     readonly rhythmicMotif: RhythmNode[];
-    /**
-     * Dictionary of loaded licks. Producer not currently wired in this codebase
-     * — left permissive until the lick library lands.
-     */
-    // TODO(soloist-session): type as SoloistLick[] when the lick pipeline lands.
-    readonly lickDictionary: unknown[];
     /** Per-loop section signatures keyed by section label. */
     readonly sectionRecall: Record<string, SectionRecallEntry>;
     /** Loop number currently represented in sectionRecall. */
@@ -1104,8 +1095,8 @@ export type ActionPayloadUpdateHB = Partial<HarmonyState>;
  *   `restSteps`, `activeSteps`, `busySteps`, `isWaitingForEntry`, `isYielding`,
  *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
  *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
- *   `hookBuffer`, `sharedHookBuffer`, `motifCache`, `rhythmicMotif`,
- *   `lickDictionary`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
+ *   `hookBuffer`, `sharedHookBuffer`, `rhythmicMotif`,
+ *   `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
  *   `rhythmPlan`, `rhythmicEntropy`, `deviceBuffer`, `embellishmentBuffer`,
  *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
  *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
@@ -1154,9 +1145,7 @@ export type ActionPayloadUpdateSB = Partial<{
     recentNotes: RecentSoloistNote[];
     hookBuffer: SoloistHook[];
     sharedHookBuffer: SoloistHook[];
-    motifCache: unknown;
     rhythmicMotif: RhythmNode[];
-    lickDictionary: unknown[];
     sectionRecall: Record<string, SectionRecallEntry>;
     sectionRecallLoop: number | null;
     formArcRecall: Record<string, FormArcEntry>;
@@ -1217,6 +1206,7 @@ export interface ActionPayloadMap {
     UPDATE_SECTION: Section;
     SET_KEY: string;
     SET_TIME_SIGNATURE: string;
+    SET_GROUPING: number[] | null;
     SET_IS_MINOR: boolean;
     LOAD_TEMPLATE: ActionPayloadLoadTemplate;
     SET_METRONOME: boolean;
@@ -1233,9 +1223,6 @@ export interface ActionPayloadMap {
     HYDRATE?: undefined;
     TOAST_EXPIRED?: undefined;
     FLASH_EXPIRED?: undefined;
-    KEY_CHANGE?: undefined;
-    TIME_SIG_CHANGE?: undefined;
-    GROUPING_CHANGE?: undefined;
     REL_KEY_TOGGLE?: undefined;
     TRANSPOSE?: undefined;
     VIS_RESET?: undefined;
@@ -1301,6 +1288,7 @@ export const ACTIONS = {
     UPDATE_SECTION: 'UPDATE_SECTION',
     SET_KEY: 'SET_KEY',
     SET_TIME_SIGNATURE: 'SET_TIME_SIGNATURE',
+    SET_GROUPING: 'SET_GROUPING',
     SET_IS_MINOR: 'SET_IS_MINOR',
     LOAD_TEMPLATE: 'LOAD_TEMPLATE',
     SET_METRONOME: 'SET_METRONOME',
@@ -1321,9 +1309,6 @@ export const ACTIONS = {
     HYDRATE: 'HYDRATE',
     TOAST_EXPIRED: 'TOAST_EXPIRED',
     FLASH_EXPIRED: 'FLASH_EXPIRED',
-    KEY_CHANGE: 'KEY_CHANGE',
-    TIME_SIG_CHANGE: 'TIME_SIG_CHANGE',
-    GROUPING_CHANGE: 'GROUPING_CHANGE',
     REL_KEY_TOGGLE: 'REL_KEY_TOGGLE',
     TRANSPOSE: 'TRANSPOSE',
     VIS_RESET: 'VIS_RESET',

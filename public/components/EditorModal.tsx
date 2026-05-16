@@ -1,10 +1,4 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { dispatch, getState } from '../state.js';
-import { useEnsembleState } from '../ui-bridge.js';
-import { Arranger } from './Arranger.jsx';
-
-const { arranger } = getState();
-
 import {
     addSection,
     clearChordPresetHighlight,
@@ -13,9 +7,11 @@ import {
     saveProgression,
 } from '../arranger-controller.js';
 import { pushHistory, undo } from '../history.js';
-import type { Mutable } from '../types.js';
+import { arranger, dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
+import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols, generateId } from '../utils.js';
+import { Arranger } from './Arranger.jsx';
 
 export function EditorModal() {
     const { isOpen, currentKey, sectionCount, linkedCount, sectionKeyCount } = useEnsembleState(
@@ -107,9 +103,7 @@ export function EditorModal() {
         setShowConfirmClear(false);
         setIsMenuOpen(false);
         pushHistory();
-        (arranger as Mutable<typeof arranger>).sections = [
-            { id: generateId(), label: 'Intro', value: '' },
-        ]; // @direct-mutation
+        dispatch(ACTIONS.SET_SECTIONS, [{ id: generateId(), label: 'Intro', value: '' }]);
         clearChordPresetHighlight();
         refreshArrangerUI();
     };

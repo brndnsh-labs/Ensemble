@@ -3,7 +3,6 @@ import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { arranger } from '../state.js';
-import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
@@ -38,10 +37,9 @@ function getRelativeKeyActionLabel(isMinor: boolean) {
 }
 
 function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[]) => void) {
-    (arranger as Mutable<typeof arranger>).key = newKey; // @direct-mutation
+    dispatch(ACTIONS.SET_KEY, newKey);
     validateAndAnalyze();
     saveCurrentState();
-    dispatch(ACTIONS.KEY_CHANGE);
 }
 
 function updateTimeSignature(
@@ -49,14 +47,13 @@ function updateTimeSignature(
     lastDrumPreset: string | null,
     dispatch: (action: any, ...args: any[]) => void,
 ) {
-    (arranger as Mutable<typeof arranger>).timeSignature = timeSignature; // @direct-mutation
-    (arranger as Mutable<typeof arranger>).grouping = null; // @direct-mutation
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, timeSignature);
+    dispatch(ACTIONS.SET_GROUPING, null);
     if (lastDrumPreset) {
         loadDrumPreset(lastDrumPreset);
     }
     validateAndAnalyze();
     saveCurrentState();
-    dispatch(ACTIONS.TIME_SIG_CHANGE);
 }
 
 function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
@@ -69,11 +66,10 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
     const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
     const nextIndex = (currentIndex + 1) % options.length;
 
-    (arranger as Mutable<typeof arranger>).grouping = options[nextIndex]; // @direct-mutation
+    dispatch(ACTIONS.SET_GROUPING, options[nextIndex]);
     flushBuffers();
     syncWorker();
     saveCurrentState();
-    dispatch(ACTIONS.GROUPING_CHANGE);
 }
 
 export function TimeSignatureControl() {

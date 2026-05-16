@@ -57,6 +57,9 @@ export function arrangerReducer(action: Action): boolean {
         case ACTIONS.SET_TIME_SIGNATURE:
             a.timeSignature = action.payload;
             return true;
+        case ACTIONS.SET_GROUPING:
+            a.grouping = action.payload;
+            return true;
         case ACTIONS.SET_KEY:
             a.key = action.payload;
             return true;

@@ -1,23 +1,201 @@
 // @ts-nocheck
-// TODO: All tests in this file were removed in the StudioWorkspace → InstrumentRail migration
-// (commit 3c5527ee removed StudioWorkspace entirely).
-//
-// The surface under test no longer exists. The replacement architecture is:
-//   - Desktop: `.instrument-rail` (--vertical or --horizontal) is always visible.
-//     Per-instrument settings open via the ⚙ aria-label="<Instrument> settings" button on each
-//     mix row, rendering a `.workspace-studio-surface--settings.is-open` popover anchored to the
-//     row. The mixer is now a `.workspace-studio-mixer-accordion` inside the same rail.
-//   - Mobile: `.mobile-action-bar__btn` with text "Mix" opens `.mobile-mix-sheet` (a
-//     StudioSurface portal). Inside it, `InstrumentRail` renders 5 `.workspace-studio-mix-row`
-//     rows. Per-instrument settings open from those rows too.
-//
-// Coverage to rebuild (separate design task):
-//   1. Desktop — mixer accordion opens and all 5 instrument strips (vol/reverb sliders) visible
-//      and within viewport.
-//   2. Desktop — Drum settings popover (swing, swing-base, creativity) visible and within bounds.
-//   3. Desktop — Chords settings popover (density select) visible and within bounds.
-//   4. Desktop — Harmony settings popover (complexity slider) visible and within bounds.
-//   5. Desktop — Soloist settings popover (preset, phrasing, trading controls) visible/scrollable.
-//   6. Mobile — Mix sheet opens 5 rows; instrument settings popovers accessible from within.
-//   7. Mobile — Mixer accordion within mix sheet scrolls to reveal all sliders on short viewport.
-//   8. iPhone — Mix sheet and soloist settings use full-height insets; controls reachable.
+import type { Page } from '@playwright/test';
+import pkg from '@playwright/test';
+
+const { expect, test } = pkg;
+
+const ACCENT_BY_LABEL: Record<string, string> = {
+    Drums: 'groove',
+    Bass: 'bass',
+    Chords: 'chords',
+    Harmony: 'harmony',
+    Soloist: 'soloist',
+};
+
+// IDs in the DOM (set by InstrumentSettings#getModuleName) — note that `groove`
+// renders as `drum`, `chords` as `chord`, and `harmony` stays `harmony`.
+const SLIDER_PREFIX: Record<string, string> = {
+    Drums: 'drum',
+    Bass: 'bass',
+    Chords: 'chord',
+    Harmony: 'harmony',
+    Soloist: 'soloist',
+};
+
+function settingsSurfaceFor(page: Page, label: string) {
+    const accent = ACCENT_BY_LABEL[label];
+    return page.locator(
+        `.workspace-studio-surface--settings.workspace-studio-surface--${accent}.is-open`,
+    );
+}
+
+async function openInstrumentSettings(page: Page, label: string) {
+    await page
+        .getByRole('button', { name: `${label} settings` })
+        .first()
+        .click();
+    const surface = settingsSurfaceFor(page, label);
+    await expect(surface).toBeVisible();
+    return surface;
+}
+
+async function openMobileMixSheet(page: Page) {
+    await page.locator('.mobile-action-bar__btn', { hasText: 'Mix' }).click();
+    await expect(page.locator('.mobile-mix-sheet')).toBeVisible();
+}
+
+async function expectWithinViewport(page: Page, locator) {
+    const viewport = page.viewportSize();
+    const box = await locator.boundingBox();
+    expect(viewport).not.toBeNull();
+    expect(box).not.toBeNull();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+}
+
+test.describe('Instrument settings — desktop @ui', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto('/');
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
+    });
+
+    test('mixer accordion exposes all 5 instrument strips', async ({ page }) => {
+        const trigger = page.locator('.workspace-studio-mixer-accordion-trigger');
+        await expect(trigger).toBeVisible();
+        await trigger.click();
+
+        const body = page.locator('.workspace-studio-mixer-accordion-body');
+        await expect(body).toBeVisible();
+        const strips = body.locator('.workspace-studio-mixer-strip');
+        await expect(strips).toHaveCount(5);
+
+        for (const label of Object.keys(SLIDER_PREFIX)) {
+            const prefix = SLIDER_PREFIX[label];
+            const volume = page.locator(`#${prefix}Volume`);
+            const reverb = page.locator(`#${prefix}Reverb`);
+            await volume.scrollIntoViewIfNeeded();
+            await expect(volume).toBeVisible();
+            await reverb.scrollIntoViewIfNeeded();
+            await expect(reverb).toBeVisible();
+        }
+    });
+
+    test('Drum settings popover exposes swing, swing-base, and creativity', async ({ page }) => {
+        const surface = await openInstrumentSettings(page, 'Drums');
+
+        await expect(surface.locator('#swingSlider')).toBeVisible();
+        await expect(surface.locator('#swingBaseSelect')).toBeVisible();
+        // Toggle hides the native checkbox; verify via accessibility role.
+        await expect(surface.getByRole('switch', { name: 'Creativity' })).toBeAttached();
+
+        await expectWithinViewport(page, surface);
+    });
+
+    test('Chords settings popover exposes density select', async ({ page }) => {
+        const surface = await openInstrumentSettings(page, 'Chords');
+        await expect(surface.locator('#densitySelect')).toBeVisible();
+        await expectWithinViewport(page, surface);
+    });
+
+    test('Harmony settings popover exposes complexity slider', async ({ page }) => {
+        const surface = await openInstrumentSettings(page, 'Harmony');
+        await expect(surface.locator('#harmonyComplexity')).toBeVisible();
+        await expectWithinViewport(page, surface);
+    });
+
+    test('Soloist settings popover exposes preset, complexity, and trading controls', async ({
+        page,
+    }) => {
+        const surface = await openInstrumentSettings(page, 'Soloist');
+
+        await expect(surface.locator('#soloistComplexity')).toBeVisible();
+        await expect(surface.locator('#soloistPresetSelect')).toBeVisible();
+        const soloistCard = surface.locator('.workspace-studio-surface-card--soloist');
+        await expect(soloistCard).toBeVisible();
+        await expect(soloistCard.getByText('Trading')).toBeVisible();
+        await expect(soloistCard.locator('#arrangerSoloistSeed')).toBeVisible();
+
+        // Body container should be the scroll area when content exceeds height.
+        const body = surface.locator('.workspace-studio-surface-body');
+        const fits = await body.evaluate(
+            (el) => el.scrollHeight >= el.clientHeight && el.clientHeight > 0,
+        );
+        expect(fits).toBe(true);
+    });
+});
+
+test.describe('Instrument settings — mobile @mobile', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/');
+        await page.waitForSelector('html[data-hydrated="true"]', {
+            state: 'attached',
+            timeout: 15000,
+        });
+    });
+
+    test('mix sheet opens with 5 rows and instrument settings reachable from a row', async ({
+        page,
+    }) => {
+        await openMobileMixSheet(page);
+
+        const sheet = page.locator('.mobile-mix-sheet');
+        await expect(sheet.locator('.workspace-studio-mix-row')).toHaveCount(5);
+
+        await sheet.getByRole('button', { name: 'Chords settings' }).click();
+        const settings = settingsSurfaceFor(page, 'Chords');
+        await expect(settings).toBeVisible();
+        await expect(settings.locator('#densitySelect')).toBeVisible();
+    });
+
+    test('mixer accordion inside mix sheet scrolls to reveal every slider', async ({ page }) => {
+        await openMobileMixSheet(page);
+
+        const sheet = page.locator('.mobile-mix-sheet');
+        const trigger = sheet.locator('.workspace-studio-mixer-accordion-trigger');
+        await trigger.click();
+
+        const body = sheet.locator('.workspace-studio-mixer-accordion-body');
+        await expect(body).toBeVisible();
+
+        // Bottom slider reachable via scroll.
+        const lastReverb = page.locator('#soloistReverb');
+        await lastReverb.scrollIntoViewIfNeeded();
+        await expect(lastReverb).toBeVisible();
+
+        // Top slider still reachable after scrolling back.
+        const firstVolume = page.locator('#drumVolume');
+        await firstVolume.scrollIntoViewIfNeeded();
+        await expect(firstVolume).toBeVisible();
+    });
+
+    test('soloist settings inside mix sheet remain reachable on narrow viewport', async ({
+        page,
+    }) => {
+        await openMobileMixSheet(page);
+
+        const sheet = page.locator('.mobile-mix-sheet');
+        await sheet.getByRole('button', { name: 'Soloist settings' }).click();
+
+        const surface = settingsSurfaceFor(page, 'Soloist');
+        await expect(surface).toBeVisible();
+
+        const viewport = page.viewportSize();
+        const box = await surface.boundingBox();
+        expect(box).not.toBeNull();
+        // Full-bleed sheet on mobile: spans most of the height, fully within width.
+        expect(box.height).toBeGreaterThan(viewport.height * 0.6);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+
+        // Seed control sits at the bottom of the surface; must be reachable via scroll.
+        const seed = surface.locator('#arrangerSoloistSeed');
+        await seed.scrollIntoViewIfNeeded();
+        await expect(seed).toBeVisible();
+    });
+});

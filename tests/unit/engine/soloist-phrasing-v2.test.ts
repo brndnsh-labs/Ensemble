@@ -49,7 +49,6 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
             lastAttackStep: -100,
             deviceBuffer: [],
             motifBuffer: [],
-            motifCache: [],
             notesInPhrase: 0,
             notesThisMeasure: 0,
             sessionSteps: 100,
