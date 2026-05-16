@@ -4,6 +4,8 @@ Observations gathered during the TypeScript migration (May 2026). Not emergencie
 
 Items are listed in **suggested execution order**. Earlier items unblock or simplify later ones. Each entry ends with a recommended model/subagent strategy.
 
+**As of May 16 2026 all ten main items are ✅ DONE.** A future session resuming this doc should start at the [**Remaining work**](#remaining-work) section at the bottom — it consolidates every open sub-piece scattered through the body, grouped by readiness.
+
 ## How to use this doc
 
 The Phase 8 TS migration validated a strong working pattern: **Opus plans and reviews, Sonnet subagents execute mechanical work in parallel, the main thread handles validation and shared-file updates.** Most items below benefit from the same split.
@@ -129,6 +131,50 @@ Results: zero `INEFFECTIVE_DYNAMIC_IMPORT` warnings on `vite build` (was 3); dep
 
 ---
 
-## Notes
+## Remaining work
 
-None of these are emergencies. The codebase has strong test coverage, real critique tests for musicality, clean state architecture, an intentional worker split, and now a completed TS migration. The biggest single-investment payback is #2 (Chord type) — it ripples out across every engine and pays back across every downstream module.
+All ten main items shipped. Below is every open sub-piece that surfaced during execution, gathered here so a future session doesn't have to mine the bodies above. None are emergencies — order them however you like.
+
+### Ready to execute now
+
+Each item has known scope, identified files, and a clear approach. Pick up any in any order.
+
+**1. Soloist worker-side state mirror restructure** *(from #4 deferred)*
+- *Where:* `public/logic-worker.ts` — find `syncSoloistFromWire()`.
+- *What:* The main-thread `SoloistState` was restructured into `{ flat config, session, audio }` in commit `43a1fe12`, but the worker's local soloist mirror stayed flat behind a translator. Mirror the same shape inside the worker so the translator can be deleted.
+- *Scope:* ~200 lines, contained to `logic-worker.ts` plus any worker-internal helpers that read soloist fields directly. Wire format stays the same (`getSyncState()` already emits flat).
+- *Approach:* One focused Opus session, or a single Sonnet sweep briefed with the commit pattern from `43a1fe12`. Reference `tests/utils/mock-soloist.ts` for the flat→nested route table — the worker translator can be deleted once the worker reads nested directly.
+- *Verification:* `npm run typecheck`, `npx vitest run tests/unit/engine/worker-sync tests/unit/engine/worker-client`, full `npm test`.
+
+**2. UI direct-writes to arranger → dispatch via reducer** *(from #7.1)*
+- *Where:* `public/components/KeySignatureControls.tsx`, `public/components/EditorModal.tsx`. ~5 call sites total (grep `@direct-mutation` in those files).
+- *What:* Each site writes to `arranger.*` directly then dispatches a notification action (`KEY_CHANGE`, `TIME_SIG_CHANGE`). Move the state write into `arrangerReducer` so the dispatch is the source of truth.
+- *Scope:* Tiny. Inline as part of the next task that touches that flow rather than its own session.
+- *Approach:* Direct, no subagent needed.
+- *Verification:* `npm test`, plus manual smoke that key/time-sig changes still propagate to the chart.
+
+**3. Playwright instrument-settings spec replacements** *(from #3 still-open)*
+- *Where:* `tests/e2e/instrument-settings.spec.ts` — there's a documented TODO block describing what each replacement should cover.
+- *What:* 8 replacement Playwright tests targeting the new `InstrumentRail` + `mobile-mix-sheet` architecture. The original suite was scrapped when `StudioWorkspace` was eliminated; the file currently has zero active tests.
+- *Scope:* Medium — likely a focused day. Each test is independent.
+- *Approach:* Reference the May 2026 e2e restoration commit `b7aa300c` for the new idiom (`.chart-surface__topbar` selectors, `getByRole('button')`, overflow-panel flows for mobile). Sonnet subagents can each own one test; main thread handles setup harness.
+- *Verification:* `npx playwright test tests/e2e/instrument-settings.spec.ts` across all three projects (Desktop Chrome, Mobile Chrome, Mobile Safari).
+
+### Speculative future
+
+These have no current need; pick them up only if their trigger condition materializes.
+
+**4. Per-slice discriminated `Action` exhaustiveness** *(from #6.1)*
+- *What:* Split the flat `Action` union into per-slice unions (`PlaybackAction`, `BassAction`, etc.) with a centralized slice-ownership map. Each reducer would then be forced to handle every action it owns.
+- *Scope:* Strictly bigger than #6 delivered. Requires a non-broadcast dispatch shape.
+- *Trigger:* Ship only if missing-case bugs start surfacing — current behavior is fine.
+
+**5. `motifCache` / `lickDictionary` producer pipelines** *(from #4 deferred)*
+- *Where:* `public/types.ts:596,604` — both are `unknown` / `unknown[]` with `TODO(soloist-session)` markers.
+- *What:* Both fields exist on `SoloistMemory` but neither has a producer wired in this codebase. Either type concretely (`MotifEntry | null` and `SoloistLick[]`) and wire the producers, or delete the fields outright.
+- *Trigger:* A feature that needs either field. Until then, the placeholders are honest documentation.
+
+**6. `ActionPayloadUpdateSB` derived from `SOLOIST_FIELD_ROUTES`** *(from #4 deferred)*
+- *Where:* `public/types.ts:1117` (type) + `public/state/instruments.ts:230` (route table).
+- *What:* Currently hand-enumerated in both places. Deriving would cut the duplication risk but lose per-field value typing (the route table maps to functions; the type carries value shape).
+- *Trigger:* Re-evaluate if the route table grows substantially or a new field gets added to one but not the other and isn't caught in review.
