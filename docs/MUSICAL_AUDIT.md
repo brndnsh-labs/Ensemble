@@ -6,10 +6,10 @@ Started: 2026-05-16. Archive when the "Open findings" and "Queued" sections are 
 
 ## Status (2026-05-16)
 
-- **Shipped:** 19 prior fixes + drummer-sweep session (11 critique files) + bass-sweep session (9 critique files: funk, rock, country, acoustic, blues-bassist, bossa, disco, metal, reggae) — +37 new assertions added, +18 multi-intensity scaling tests added across the two sweeps, 10 latent smells closed.
-- **Queued:** empty
-- **Open (engine-side):** 2 newly surfaced — see below (`checkBassActiveStyle` missing `'dub'` branch; country bass lacks quarter-note Root-Fifth alternation).
-- **Future passes:** placeholder-threshold sweep, velocity-as-gain naming, re-enable types in `tests/standards/`. Harness-silencing audit completed (see below) — zero active findings. Next-session pickup: harmony + coordination cross-instrument sweep; latin/minimal/shred bass critique creation.
+- **Shipped:** 19 prior fixes + drummer-sweep session (11 critique files) + bass-sweep session (9 critique files: funk, rock, country, acoustic, blues-bassist, bossa, disco, metal, reggae) — +37 new assertions added, +18 multi-intensity scaling tests added across the two sweeps, 10 latent smells closed. Coordination-contract audit pass surfaced 2 new engine bugs + 6 queued pickups (see below).
+- **Queued:** 6 coordination-contract pickups — see "Queued" section below.
+- **Open (engine-side):** 4 — `checkBassActiveStyle` missing `'dub'` branch; country bass lacks quarter-note Root-Fifth alternation; **NEW**: bass-engine unconditional kick-lock across all styles; **NEW**: harmony returns silent on tension chord + any soloist flag (should collapse to guide-tone pair).
+- **Future passes:** placeholder-threshold sweep, velocity-as-gain naming, re-enable types in `tests/standards/`. Harness-silencing audit completed (see below) — zero active findings. Next-session pickup: execute Queued pickups below; latin/minimal/shred bass critique creation.
 
 ## Methodology
 
@@ -24,6 +24,32 @@ Two additional smells discovered during the May 2026 audit pass:
 > (e) **Harness silences engine path** — the test passes an incomplete `stepInfo` object (e.g. just `{ isBeatStart: ... }`) when the engine checks other properties (`isBackbeat`, `isOffbeat`, `isMeasureStart`, `isPulseStart`). The engine's relevant lane never fires, so the test measures only the fallback lane while looking healthy. Fix: build stepInfo via `getStepInfo` from `public/utils.ts`, or construct an object containing every property the engine reads. Subtle and high-impact — already caught in `reggae-piano-critique` and `funk-drummer-critique`.
 
 The audit looks for any of these five smells per test file, then verifies the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
+
+## Queued
+
+Surfaced by the 2026-05-16 coordination-contract audit pass (first review run by the new `music-theory-reviewer` agent against `public/engine/coordination-engine.ts` and `tests/standards/ensemble-coordination.test.ts`). Engine bugs in this list also appear in "Open findings" below; pickups here describe the test/spec work needed to land each fix and prevent regression.
+
+### Contract test rewrite (priority — current test provides false confidence)
+
+The contract test file `tests/standards/ensemble-coordination.test.ts` is largely non-contractual: it contains an object-literal tautology (smell **a**) at lines 22–33, a bass-range test claiming 28–51 when the contract says 23–57 (smell **c**/**d**) at lines 37–64, and an `expect(true).toBe(true)` no-op at lines 143–165. The file named after the contract is currently the *least* trustworthy file in `tests/standards/`. Before any new coordination tests are added, this file should be rewritten to actually exercise `createCoordinationContext` → `updateCoordinationContext` across the soloist → bass → chords producer order documented in `tick-logic.ts:241–362`, and to assert that downstream consumers see the published fields in time.
+
+### Pickups (ranked)
+
+1. **Bass kick-lock should be style-gated.** `bass-engine.ts:40` returns `true` unconditionally when `coordination?.kickHit` is set, regardless of style. The comment labels this "Rhythmic Yielding" but the implementation locks bass to every kick — wrong for jazz walking, reggae one-drop, country two-step, shuffle blues. Test setup: run `isBassActive` with `style: 'jazz' | 'dub' | 'walking'` and `kickHit: true` on steps where the style would not fire on its own. Claim: bass independence per style — funk/rock/disco lock to kick; jazz/reggae/country phrase against it.
+
+2. **Tension-chord silence should collapse to guide tones.** `harmonies.ts:786` returns `[]` when `isTensionChord && (accompanimentHit || soloistActive || soloistBusy)`. The OR is aggressive — `soloistActive` alone fires it, which is virtually always true mid-solo. On an altered V7 going to I, that's the exact moment a comper plays the guide-tone shell hardest. Going silent leaves a hole the listener hears as a dropout. Test setup: altered V7 (e.g. G7#9) with `soloistActive: true`, jazz feel. Claim: harmony collapses to guide tones (3rd + b7), not silence, on tension chords under any soloist activity.
+
+3. **`accompanimentMidis` and `avgChordMidi` are dead contract.** Written every chord turn at `coordination-engine.ts:90–92`; grepping `public/` finds zero consumers. The natural use cases — soloist avoiding chord-voice unison, harmony fitting between chord voices — are exactly the "proactive generator awareness" the contract header advertises. Decide: either wire into `soloist-pitch-engine.ts` pitch selection (avoid chord-voice unison) or delete the writes. Currently paying compute for a feature it doesn't ship.
+
+4. **`bassMidi`-driven voicing floor is untested.** `accompaniment.ts:1172–1188, 1566, 1690–1693, 1743` rejects chord voices ≤ `bassMidi + 12` — the classic chord-stack-above-bass reservation. No test verifies it. Test setup: generate accompaniment with `coordination.bassMidi = 40` (E2) vs. `bassMidi = 0` (no bass). Claim: when bass plays MIDI 40, no chord voice lands within an octave above it; when no bass, chord can sit lower.
+
+5. **`soloistPhraseEnd` antiphonal response is untested.** `harmonies.ts:263` triggers a response burst when the soloist hits a phrase boundary. No critique test exercises it. Test setup: harmony engine across a phrase boundary with `soloistPhraseEnd: true, soloistActive: false` vs. `false, false`. Claim: harmony produces an audible call-and-response gesture in the gap after a soloist phrase, not at random.
+
+6. **Soloist register slot — "priority 60–90" is aspirational, not enforced.** `coordination-engine.ts:126–129` only clamps when `midi < 52`; there is no ceiling. CLAUDE.md § Coordination & Register Slotting claims "Soloist: priority 60–90 (only clamp when a note would fall below MIDI 52)" — which is technically consistent (priority ≠ clamp), but no test verifies the soloist actually *prefers* 60–90 vs. living above 90. Either tighten the claim ("soloist floors at 52, no ceiling") or add a test that the soloist's pitch distribution centers in the priority window.
+
+### Programmer's-math gates worth documenting (not blocking)
+
+`harmonies.ts:361, 364`; `accompaniment.ts:1385, 1405` use round-number yield probabilities (0.3, 0.4, 0.6) with no WHY comments. Not bugs per se, but they fail the documented-musical-intent rule in CLAUDE.md § Musical Intent. Pass when next touching these files: add `// why:` comments or replace with style-table values.
 
 ## Patterns proven
 
@@ -105,6 +131,10 @@ Two engine-side gaps surfaced by the bass-sweep session (2026-05-16). Both are r
 1. **Country bass is half-note Two-Step only; missing quarter-note Root-Fifth alternation** (`public/engine/bass-styles.ts:116`, `:248`). `checkBassActiveStyle` for `'country'` returns `step % (stepsPerBeat * 2) === 0`, so only beats 1 and 3 (musical) fire. The pitch logic in `getBassNoteStyle` has a dead `isFifthBeat = intBeat === 1 || intBeat === 3` branch that never executes. Iconic country bass alternates Root (1) – Fifth-below (2) – Root (3) – Fifth-below (4) on quarter notes. Either add a higher-intensity quarter-note pattern (most authentic) or document the Two-Step lock and add a separate `'country-walking'` style for the Root-Fifth case.
 
 2. **`checkBassActiveStyle` has no `'dub'` branch** (`public/engine/bass-styles.ts:5-158`). `isBassActive('dub', ...)` falls through to `return false`. In production, reggae bass fires only via the `coordination.kickHit` lock at `bass-engine.ts:40` — set by `tick-logic.ts:230` after the drummer's kick is computed. This is fragile: any callsite that doesn't propagate coordination silences reggae bass entirely. Add an explicit dub branch (e.g. fires on riddim positions for the current intensity band) so the engine works without coordination plumbing, and keep the kick-lock as an additional trigger.
+
+3. **Bass kick-lock is unconditional across all styles** (`public/engine/bass-engine.ts:40`). `isBassActive` short-circuits to `return true` whenever `coordination?.kickHit` is set, regardless of style. The comment calls this "Rhythmic Yielding," but the result is that the bassist behaves like a hi-hat with pitches — wrong for jazz walking (independent quarters), reggae one-drop (skips beat 1 where the kick sits), country two-step (Root–Root half-notes, not kick-driven), shuffle blues (boogie pattern, not kick-driven). Real ensembles have the bassist phrasing *against* the drummer in most genres, not locked to every kick. Style-gate the kick-lock: funk / rock / metal / disco lock; jazz / reggae / country / blues use independent activation. See queued pickup #1.
+
+4. **Harmony returns silent on tension chord + any soloist flag** (`public/engine/harmonies.ts:783-789`). The current code returns `[]` (no notes) when `isTensionChord && (accompanimentHit || soloistActive || soloistBusy)`. The OR makes the gate trigger virtually any time the soloist is playing a note. On an altered V7 → I, that's the exact moment a real comper plays the guide-tone shell (3rd + b7) hardest. Going silent leaves an audible hole the listener hears as a dropout, not as ensemble restraint. Fix: collapse to `[3, b7]` (guide-tone pair) instead of `return []`. See queued pickup #2.
 
 Two **latent patterns** worth knowing about (no current test failures, but tomorrow's audit must account for them):
 
