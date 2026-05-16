@@ -7,6 +7,10 @@ export default defineConfig({
         globals: true,
         environment: 'node',
         pool: 'threads',
+        // Default 5s; raised to 30s so slow integration tests (notably soloist
+        // hook/triplet/motivic-response specs) don't trip the 15s coverage-mode
+        // limit when v8 instrumentation roughly quadruples runtime.
+        testTimeout: 30000,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

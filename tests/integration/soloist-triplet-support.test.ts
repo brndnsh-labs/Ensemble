@@ -36,7 +36,7 @@ describe('Soloist Triplet Support', () => {
         expect(jazz.aggregate.anchorExactRate).toBeGreaterThanOrEqual(0.95);
         expect(blues.aggregate.anchorExactRate).toBeGreaterThanOrEqual(0.75);
         expect(blues.aggregate.tripletAttackShare).toBeGreaterThan(0.03);
-    }, 15_000);
+    }, 30_000);
 
     it('keeps fixed-seed triplet cadences audible on the head audit seed', () => {
         const arrangement = buildHookAuditArrangement('4/4');

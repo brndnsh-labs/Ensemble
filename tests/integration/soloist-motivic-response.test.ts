@@ -92,7 +92,7 @@ describe('Soloist Motivic Response', () => {
             bossa.aggregate.loop1RhythmReuseShare + 0.2,
         );
         expect(bossa.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.04);
-    }, 25_000);
+    }, 45_000);
 
     it('keeps the audit head seed anchored and triplet-aware on later loops', () => {
         const arrangement = buildHookAuditArrangement('4/4');
@@ -115,5 +115,5 @@ describe('Soloist Motivic Response', () => {
         expect(rock?.loop1AnchorExactRate).toBeGreaterThanOrEqual(0.95);
         expect(rock?.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.5);
         expect(rock?.laterLoopTripletCarryShare).toBe(0);
-    }, 15_000);
+    }, 30_000);
 });

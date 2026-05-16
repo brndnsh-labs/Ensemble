@@ -65,7 +65,7 @@ Replaced the bash + esbuild + sed pipeline with `vite.config.ts`. `npm run dev` 
 
 One quirk worth noting: a small inline `copyStaticAssets` plugin in `vite.config.ts` copies `manifest.json`, `icon-*.png`, `icon.svg`, and `MANUAL.md` to `dist/` verbatim, then rewrites the hashed manifest/icon hrefs Vite emits in `index.html` back to the unhashed paths. This is needed because the PWA manifest references icons by their bare filenames; if Vite hashed them, the lookups would 404.
 
-**Open follow-up:** the entry filename is now `index.<rev>.js` (Vite uses the HTML basename) instead of `main.<rev>.js`. Cosmetic only — nothing in the repo relies on the old name, but any external monitoring that watches for `main-*.js` URLs in logs would need updating.
+**Cosmetic follow-up resolved:** entry filename is `index.<rev>.js` (Vite uses the HTML basename) instead of legacy `main.<rev>.js`. Verified by grep — no code, scripts, configs, or docs in the repo reference the old name. Any external monitoring that watches log streams for `main-*.js` URLs would still need updating, but that's outside the repo's purview.
 
 ---
 
@@ -99,7 +99,9 @@ A few reducers needed minimal `as any` casts where the new strict payload types 
 
 ## 9. Coverage scope sanity-check ✅ DONE (May 2026)
 
-`vitest.config.ts` now has `coverage.include: ['public/**/*.{ts,tsx}']` (TS-only glob) with appropriate excludes for `components/**`, `data/**`, `sw.ts`, `main.ts`, `ui-root.tsx`, `App.tsx`. The original `.js`-only glob that produced empty reports is gone. **Open follow-up if curious:** run `npx vitest run --coverage` and inspect the HTML report to confirm the chosen excludes still match intent — but no known issue.
+`vitest.config.ts` now has `coverage.include: ['public/**/*.{ts,tsx}']` (TS-only glob) with appropriate excludes for `components/**`, `data/**`, `sw.ts`, `main.ts`, `ui-root.tsx`, `App.tsx`. The original `.js`-only glob that produced empty reports is gone.
+
+**Follow-up resolved:** running `npx vitest run --coverage` initially failed because v8 instrumentation roughly quadruples runtime and two slow integration specs (`soloist-triplet-support`, `soloist-motivic-response`) had hard 15s/25s per-test timeouts. Bumped those to 30s/45s respectively and added a project-wide `testTimeout: 30000` in `vitest.config.ts` so future slow specs don't trip the default 5s limit. The HTML report at `coverage/index.html` now generates cleanly. Final numbers: 88.64% statements, 89.76% functions, 81.63% branches.
 
 ---
 
