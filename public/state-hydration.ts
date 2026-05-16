@@ -11,6 +11,7 @@ import { saveCurrentState } from './persistence.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
 
 import { dispatch, getState, storage } from './state.js';
+import type { Mutable } from './types.js';
 import { ACTIONS } from './types.js';
 import {
     decompressSections,
@@ -158,7 +159,8 @@ export function hydrateState(): void {
             stopAtEnd: false,
         });
 
-        vizState.enabled = savedState.vizEnabled !== undefined ? savedState.vizEnabled : false; // @direct-mutation
+        (vizState as Mutable<typeof vizState>).enabled =
+            savedState.vizEnabled !== undefined ? savedState.vizEnabled : false; // @direct-mutation
 
         if (savedState.chords) {
             Object.assign(chords, {
@@ -313,7 +315,7 @@ export function loadFromUrl(): void {
 
     const sParam = params.get('s');
     if (sParam) {
-        arranger.sections = decompressSections(sParam);
+        (arranger as Mutable<typeof arranger>).sections = decompressSections(sParam); // @direct-mutation
         hasParams = true;
     } else {
         const progParam = params.get('prog');
@@ -323,7 +325,9 @@ export function loadFromUrl(): void {
                 prog = prog.substring(0, 1000);
             }
             prog = stripDangerousChars(prog);
-            arranger.sections = [{ id: generateId(), label: 'Main', value: prog }];
+            (arranger as Mutable<typeof arranger>).sections = [
+                { id: generateId(), label: 'Main', value: prog },
+            ]; // @direct-mutation
             hasParams = true;
         }
     }
@@ -336,14 +340,14 @@ export function loadFromUrl(): void {
     if (keyParam) {
         const rawKey = normalizeKey(keyParam);
         if (KEY_ORDER.includes(rawKey)) {
-            arranger.key = rawKey;
+            (arranger as Mutable<typeof arranger>).key = rawKey; // @direct-mutation
         }
     }
 
     const tsParam = params.get('ts');
     if (tsParam) {
         if ((TIME_SIGNATURES as any)[tsParam]) {
-            arranger.timeSignature = tsParam;
+            (arranger as Mutable<typeof arranger>).timeSignature = tsParam; // @direct-mutation
         }
     }
 
@@ -365,8 +369,8 @@ export function loadFromUrl(): void {
     const genreParam = params.get('genre');
     if (genreParam) {
         if (GENRE_NAMES.includes(genreParam)) {
-            groove.lastSmartGenre = genreParam; // @direct-mutation
-            groove.genreFeel = genreParam; // @direct-mutation
+            (groove as Mutable<typeof groove>).lastSmartGenre = genreParam; // @direct-mutation
+            (groove as Mutable<typeof groove>).genreFeel = genreParam; // @direct-mutation
         }
     }
 
@@ -389,7 +393,7 @@ export function loadFromUrl(): void {
     const notationParam = params.get('notation');
     if (notationParam) {
         if (['roman', 'name', 'nns'].includes(notationParam)) {
-            arranger.notation = notationParam;
+            (arranger as Mutable<typeof arranger>).notation = notationParam; // @direct-mutation
         }
     }
 

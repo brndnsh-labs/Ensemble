@@ -1,4 +1,4 @@
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
@@ -91,7 +91,7 @@ export function playSoloNote(
 
     // Retrieve last frequency for portamento
     const prevFreq = soloist.lastRenderedFreq || freq;
-    soloist.lastRenderedFreq = freq; // @direct-mutation
+    (soloist as Mutable<typeof soloist>).lastRenderedFreq = freq; // @direct-mutation
 
     switch (preset) {
         case 'neo':
@@ -198,7 +198,7 @@ export function playSoloNote(
             break;
     }
 
-    soloist.activeVoices.push(voiceObj); // @direct-mutation
+    (soloist as Mutable<typeof soloist>).activeVoices.push(voiceObj); // @direct-mutation
 }
 
 /**
@@ -206,7 +206,7 @@ export function playSoloNote(
  */
 function manageVoices(playTime: number, soloist: SoloistState): void {
     if (!soloist.activeVoices) {
-        soloist.activeVoices = []; // @direct-mutation
+        (soloist as Mutable<typeof soloist>).activeVoices = []; // @direct-mutation
     }
 
     // Clean up finished voices (in-place mutation to satisfy state checks)

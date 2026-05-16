@@ -1,4 +1,4 @@
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { createSimplePanner, playPercussiveStrike, rampGain } from './synth-utils.js';
 
@@ -62,7 +62,7 @@ export function updateSustain(
         return;
     }
     const scheduleTime = time !== null ? time : playback.audio.currentTime;
-    playback.sustainActive = active; // @direct-mutation
+    (playback as Mutable<typeof playback>).sustainActive = active; // @direct-mutation
 
     if (!active && playback.heldNotes) {
         playback.heldNotes.forEach((note: any) => {
@@ -83,7 +83,7 @@ export function killAllPianoNotes(state: EnsembleState): void {
         });
         playback.heldNotes.clear();
     }
-    playback.sustainActive = false; // @direct-mutation
+    (playback as Mutable<typeof playback>).sustainActive = false; // @direct-mutation
 }
 
 interface PlayNoteOptions {
@@ -116,7 +116,7 @@ export function playNote(
     const finalVol = vol * polyphonyComp;
 
     if (!playback.heldNotes) {
-        playback.heldNotes = new Set(); // @direct-mutation
+        (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
     }
 
     try {

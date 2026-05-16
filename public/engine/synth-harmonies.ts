@@ -1,4 +1,4 @@
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
@@ -58,7 +58,7 @@ export function playHarmonyNote(
     let retriggerProfile: ReturnType<typeof getHarmonyRetriggerProfile> | null = null;
 
     if (!harmony.activeVoices) {
-        harmony.activeVoices = []; // @direct-mutation
+        (harmony as Mutable<typeof harmony>).activeVoices = []; // @direct-mutation
     }
 
     for (let i = harmony.activeVoices.length - 1; i >= 0; i--) {

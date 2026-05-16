@@ -1,5 +1,6 @@
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
+import type { Mutable } from './types.js';
 import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { syncWorker } from './worker-client.js';
@@ -34,12 +35,13 @@ export function setBpm(
         const ratio = currentBpm / newBpm;
         const noteTimeRemaining = playback.nextNoteTime - now;
         if (noteTimeRemaining > 0) {
-            playback.nextNoteTime = now + noteTimeRemaining * ratio; // @direct-mutation
+            (playback as Mutable<typeof playback>).nextNoteTime = now + noteTimeRemaining * ratio; // @direct-mutation
         }
 
         const unswungNextNoteTimeRemaining = playback.unswungNextNoteTime - now;
         if (unswungNextNoteTimeRemaining > 0) {
-            playback.unswungNextNoteTime = now + unswungNextNoteTimeRemaining * ratio; // @direct-mutation
+            (playback as Mutable<typeof playback>).unswungNextNoteTime =
+                now + unswungNextNoteTimeRemaining * ratio; // @direct-mutation
         }
     }
 

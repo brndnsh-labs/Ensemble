@@ -8,7 +8,7 @@ if (args.length === 0) {
 const files = args.flatMap((arg) => (arg.includes('*') ? globSync(arg) : [arg]));
 
 const mutationRegex =
-    /(playback|chords|bass|soloist|harmony|groove|midi|vizState)(\.[a-zA-Z0-9_]+)+ = /;
+    /(playback|chords|bass|soloist|harmony|groove|midi|vizState|arranger|conductor)(\.[a-zA-Z0-9_]+)+ = /;
 
 let hasError = false;
 

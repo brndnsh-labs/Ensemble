@@ -1,5 +1,5 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, GlobalContext } from '../types.js';
+import type { Action, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export type { GlobalContext };
@@ -89,37 +89,38 @@ export const playback = deepSignal<GlobalContext>({
 });
 
 export function playbackReducer(action: Action): boolean {
+    const p = playback as Mutable<typeof playback>;
     switch (action.type) {
         case ACTIONS.RESET_STATE:
-            playback.bpm = 100;
-            playback.theme = 'auto';
-            playback.bandIntensity = 0.35;
-            playback.complexity = 0.3;
-            playback.autoIntensity = true;
-            playback.metronome = false;
-            playback.countIn = true;
-            playback.visualFlash = false;
-            playback.haptic = false;
-            playback.sessionTimer = 5;
-            playback.applyPresetSettings = false;
-            playback.conductorVelocity = 1.0;
-            playback.updateAvailable = false;
+            p.bpm = 100;
+            p.theme = 'auto';
+            p.bandIntensity = 0.35;
+            p.complexity = 0.3;
+            p.autoIntensity = true;
+            p.metronome = false;
+            p.countIn = true;
+            p.visualFlash = false;
+            p.haptic = false;
+            p.sessionTimer = 5;
+            p.applyPresetSettings = false;
+            p.conductorVelocity = 1.0;
+            p.updateAvailable = false;
             return true;
         case ACTIONS.SET_UPDATE_AVAILABLE:
-            playback.updateAvailable = !!action.payload;
+            p.updateAvailable = !!action.payload;
             return true;
         case ACTIONS.TOGGLE_PLAY:
-            playback.isPlaying = !playback.isPlaying;
-            if (playback.isPlaying) {
-                playback.sessionStartTime = performance.now();
-                playback.currentLoopCount = 0;
+            p.isPlaying = !p.isPlaying;
+            if (p.isPlaying) {
+                p.sessionStartTime = performance.now();
+                p.currentLoopCount = 0;
             }
-            if (playback.autoIntensity) {
-                playback.bandIntensity = 0.35;
+            if (p.autoIntensity) {
+                p.bandIntensity = 0.35;
             }
             return true;
         case ACTIONS.SET_BPM:
-            playback.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
+            p.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
             return true;
         case ACTIONS.SET_MODAL_OPEN:
             if (Object.hasOwn(playback.modals, action.payload.modal)) {
@@ -134,50 +135,50 @@ export function playbackReducer(action: Action): boolean {
             }
             break;
         case ACTIONS.SET_BAND_INTENSITY:
-            playback.bandIntensity = Math.max(0, Math.min(1, action.payload));
+            p.bandIntensity = Math.max(0, Math.min(1, action.payload));
             return true;
         case ACTIONS.SET_COMPLEXITY:
-            playback.complexity = Math.max(0, Math.min(1, action.payload));
+            p.complexity = Math.max(0, Math.min(1, action.payload));
             return true;
         case ACTIONS.SET_AUTO_INTENSITY:
-            playback.autoIntensity = !!action.payload;
+            p.autoIntensity = !!action.payload;
             return true;
         case ACTIONS.SET_METRONOME:
-            playback.metronome = action.payload;
+            p.metronome = action.payload;
             return true;
         case ACTIONS.SET_PRESET_SETTINGS_MODE:
-            playback.applyPresetSettings = action.payload;
+            p.applyPresetSettings = action.payload;
             return true;
         case ACTIONS.SET_SONG_MODE:
-            playback.songMode = !!action.payload;
+            p.songMode = !!action.payload;
             return true;
         case ACTIONS.SET_SESSION_TIMER:
-            playback.sessionTimer = action.payload;
+            p.sessionTimer = action.payload;
             return true;
         case ACTIONS.SET_STOP_AT_END:
-            playback.stopAtEnd = action.payload;
+            p.stopAtEnd = action.payload;
             return true;
         case ACTIONS.SET_ENDING_PENDING:
-            playback.isEndingPending = action.payload;
+            p.isEndingPending = action.payload;
             return true;
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
-            if (playback.scheduleAheadTime < 0.4) {
-                playback.scheduleAheadTime = playback.scheduleAheadTime * 2.0;
+            if (p.scheduleAheadTime < 0.4) {
+                p.scheduleAheadTime = p.scheduleAheadTime * 2.0;
                 console.warn(
-                    `[Performance] Emergency Lookahead Triggered: ${playback.scheduleAheadTime}s`,
+                    `[Performance] Emergency Lookahead Triggered: ${p.scheduleAheadTime}s`,
                 );
                 setTimeout(() => {
-                    playback.scheduleAheadTime = 0.2;
+                    p.scheduleAheadTime = 0.2;
                     console.log('[Performance] Lookahead reset to normal.');
                 }, 10000);
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (action.payload.velocity) {
-                playback.conductorVelocity = action.payload.velocity;
+                p.conductorVelocity = action.payload.velocity;
             }
             if (action.payload.lyricalBias !== undefined) {
-                playback.lyricalBias = action.payload.lyricalBias;
+                p.lyricalBias = action.payload.lyricalBias;
             }
             if (action.payload.intent) {
                 if (action.payload.intent.syncopation !== undefined) {
@@ -195,22 +196,24 @@ export function playbackReducer(action: Action): boolean {
             }
             break;
         case ACTIONS.SHOW_TOAST: {
-            const p = action.payload;
+            const toast = action.payload;
             const id =
-                (typeof p === 'object' ? p.id : undefined) ||
+                (typeof toast === 'object' ? toast.id : undefined) ||
                 Math.random().toString(36).substr(2, 9);
-            const message = String((typeof p === 'object' ? p.message : undefined) || p);
-            playback.toasts = [...playback.toasts, { id, message }];
+            const message = String(
+                (typeof toast === 'object' ? toast.message : undefined) || toast,
+            );
+            p.toasts = [...p.toasts, { id, message }];
             return true;
         }
         case 'TOAST_EXPIRED':
-            playback.toasts = playback.toasts.filter((t: any) => t.id !== action.payload);
+            p.toasts = p.toasts.filter((t: any) => t.id !== action.payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
-            playback.flashIntensity = action.payload || 0.25;
+            p.flashIntensity = action.payload || 0.25;
             return true;
         case 'FLASH_EXPIRED':
-            playback.flashIntensity = 0;
+            p.flashIntensity = 0;
             return true;
     }
     return false;

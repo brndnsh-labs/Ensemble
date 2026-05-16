@@ -83,13 +83,22 @@ A few reducers needed minimal `as any` casts where the new strict payload types 
 
 ---
 
-## 7. `@direct-mutation` tightening
+## 7. `@direct-mutation` tightening ✅ DONE (May 2026)
 
-**Why seventh:** Low-stakes hardening. The current discipline is documented via comments; this enforces it at the type level.
+Closed in two commits.
 
-25+ direct mutations in `scheduler-core` alone. The "all writes go through dispatch" rule has a big asterisk, and `check-mutations.js` now only scans `components/*.tsx` after the TS migration. Two ways forward: lean in (mark state slices `readonly` except where `@direct-mutation` annotates, enforced via `tsc`), or refactor the hottest paths to a typed mutation API.
+**Phase 1** (commit `c0854a52`) expanded the textual `check-mutations` script: glob now covers `public/**/*.{ts,tsx}` instead of only `components/*.tsx`, and the regex catches one level of nested writes (`slice.x.y =`). The script also accepts annotations on the line above the assignment (formatter-friendly). 11 newly-surfaced sites were annotated (Web Audio param writes in engine init, `playback.intent.*` in accompaniment, `soloist.phraseContext.skeleton`). Engine-code mutation discipline is now CI-enforced, not convention-only.
 
-**Approach:** Opus picks the strategy — readonly types is the smaller, safer diff. Sonnet applies the chosen approach across state slices and engine files in parallel.
+**Phase 2** marked the top-level fields of all 10 state-slice interfaces (`GlobalContext`, `GrooveState`, `ChordState`, `BassState`, `SoloistState`, `HarmonyState`, `MidiState`, `VisualizerState`, `ConductorState`, `ArrangerState`) as `readonly` and added a `Mutable<T>` helper in `types.ts`. Reducers use a function-top alias (`const p = playback as Mutable<typeof playback>;`) for static writes; `@direct-mutation` / `@worker-mutation` sites in engine code use inline casts (`(slice as Mutable<typeof slice>).field = value`). Nested types (`PlaybackIntent`, `ModalsState`, `PocketState`, `SoloistPhraseContext`) were left mutable — nested writes work without casts and are still gated by the textual check.
+
+Surprises surfaced and resolved during reconciliation:
+
+- The pre-existing `check-mutations` regex was missing `arranger` and `conductor` slices entirely. 12 previously-invisible direct writes (5 in `state-hydration.ts`, 4 in `KeySignatureControls.tsx`, 1 each in `history.ts`, `chords-engine.ts`, `EditorModal.tsx`) were annotated `@direct-mutation` + cast. The regex was extended to include both slices.
+- The cast pattern defeats tsc's narrowing — `(playback as Mutable<typeof playback>).masterGain = x` no longer narrows `playback.masterGain` from `GainNode | null` to `GainNode` on subsequent lines. Resolved in `engine.ts` by hoisting newly-created audio nodes to local variables (`const masterGain = playback.audio.createGain(); (playback as Mutable<typeof playback>).masterGain = masterGain; masterGain.gain.setValueAtTime(...);`).
+
+Pattern validated by the Phase 8 TS migration held up well: Opus designed the cast template + proved it end-to-end on the smallest slice (`VisualizerState`), then 5 parallel Sonnet subagents (A=types.ts, B/C=reducers, D/E=engine files) executed mechanical casts. A second cleanup round (F/G/H) caught files missed by the initial survey (`soloist.ts` alone needed 93 casts; `midi-worker-logic.ts`, `tick-logic.ts`, `bass-engine.ts`, `harmonies.ts`, `instrument-controller.ts` all needed mop-up).
+
+**Open follow-up (#7.1, low priority):** UI components in `KeySignatureControls.tsx` and `EditorModal.tsx` write to `arranger.*` directly then dispatch a notification action (`KEY_CHANGE`, `TIME_SIG_CHANGE`). These are now annotated `@direct-mutation` to preserve current behavior, but the cleaner architecture is to extend `arrangerReducer` so the state write happens inside the dispatch. ~5 call sites; small surgery; defer until the next time something in that flow needs work.
 
 ---
 

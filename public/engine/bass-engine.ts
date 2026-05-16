@@ -1,4 +1,4 @@
-import type { Chord, EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -21,9 +21,9 @@ import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
  */
 export function resetBassState(state: EnsembleState): void {
     const { bass } = state;
-    bass.busySteps = 0; // @worker-mutation
-    bass.lastFreq = null; // @worker-mutation
-    bass.lastMidiPlayed = null; // @worker-mutation
+    (bass as Mutable<typeof bass>).busySteps = 0; // @worker-mutation
+    (bass as Mutable<typeof bass>).lastFreq = null; // @worker-mutation
+    (bass as Mutable<typeof bass>).lastMidiPlayed = null; // @worker-mutation
 }
 
 export function isBassActive(

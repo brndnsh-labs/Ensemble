@@ -6,7 +6,7 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
-import type { Chord, ChordNamePart, FormattedChordNames } from '../types.js';
+import type { Chord, ChordNamePart, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { getBassSpaceFloor } from './voicing-policy.js';
@@ -913,7 +913,7 @@ export function validateProgression(
         }
     });
 
-    arranger.progression = allChords;
+    (arranger as Mutable<typeof arranger>).progression = allChords; // @direct-mutation
     Object.assign(arranger, { progression: allChords });
     updateProgressionCache(state);
     if (dispatch) {

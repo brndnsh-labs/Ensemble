@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { SoloistState } from '../state/instruments.js';
-import type { Chord, EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import {
     INFLUENCE_POOLS,
@@ -29,26 +29,26 @@ const MOTIVIC_RESPONSE_STYLES = new Set([
  */
 export function resetSoloistState(state: EnsembleState): void {
     const { soloist } = state;
-    soloist.isResting = true; // @worker-mutation
-    soloist.phrasingState = 'rest'; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).isResting = true; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phrasingState = 'rest'; // @worker-mutation
     (soloist as any).transitionState = null; // @worker-mutation
-    soloist.rhythmicMotif = []; // @worker-mutation
-    soloist.busySteps = 0; // @worker-mutation
-    soloist.activeSteps = 0; // @worker-mutation
-    soloist.restSteps = 0; // @worker-mutation
-    soloist.sessionSteps = 0; // @worker-mutation
-    soloist.deviceBuffer = []; // @worker-mutation
-    soloist.hookBuffer = []; // @worker-mutation
-    soloist.sharedHookBuffer = []; // @worker-mutation
-    soloist.lickDictionary = []; // @worker-mutation
-    soloist.recentNotes = []; // @worker-mutation
-    soloist.phraseStartStep = null; // @worker-mutation
-    soloist.phraseLoopCount = null; // @worker-mutation
-    soloist.phraseSectionLabel = null; // @worker-mutation
-    soloist.phraseSectionOccurrence = 0; // @worker-mutation
-    soloist.sectionRecall = {}; // @worker-mutation
-    soloist.sectionRecallLoop = null; // @worker-mutation
-    soloist.formArcRecall = {}; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).rhythmicMotif = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).busySteps = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).activeSteps = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).restSteps = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).sessionSteps = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).deviceBuffer = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).hookBuffer = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).sharedHookBuffer = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).lickDictionary = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).recentNotes = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseStartStep = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseLoopCount = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionLabel = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionOccurrence = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).sectionRecall = {}; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).sectionRecallLoop = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).formArcRecall = {}; // @worker-mutation
     if (soloist.phraseContext) {
         soloist.phraseContext.role = 'call'; // @worker-mutation
         soloist.phraseContext.skeleton = []; // @worker-mutation
@@ -121,14 +121,14 @@ function ensureSectionRecallLoop(soloist: SoloistState, loopCount: number): void
         typeof soloist.sectionRecall !== 'object' ||
         Array.isArray(soloist.sectionRecall)
     ) {
-        soloist.sectionRecall = {}; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).sectionRecall = {}; // @worker-mutation
     }
     if (
         !Number.isFinite(soloist.sectionRecallLoop as number) ||
         soloist.sectionRecallLoop !== loopCount
     ) {
-        soloist.sectionRecall = {}; // @worker-mutation
-        soloist.sectionRecallLoop = loopCount; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).sectionRecall = {}; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).sectionRecallLoop = loopCount; // @worker-mutation
     }
 }
 
@@ -138,7 +138,7 @@ function ensureFormArcRecall(soloist: SoloistState): void {
         typeof soloist.formArcRecall !== 'object' ||
         Array.isArray(soloist.formArcRecall)
     ) {
-        soloist.formArcRecall = {}; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).formArcRecall = {}; // @worker-mutation
     }
 }
 
@@ -435,11 +435,11 @@ function commitTrackedPhraseSignature(soloist: SoloistState, loopCount: number):
     }
     storeSectionRecallSignature(soloist, sourceLoop, signature);
     storeFormArcRecallSignature(soloist, sourceLoop, signature);
-    soloist.recentNotes = []; // @worker-mutation
-    soloist.phraseStartStep = null; // @worker-mutation
-    soloist.phraseLoopCount = null; // @worker-mutation
-    soloist.phraseSectionLabel = null; // @worker-mutation
-    soloist.phraseSectionOccurrence = 0; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).recentNotes = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseStartStep = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseLoopCount = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionLabel = null; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionOccurrence = 0; // @worker-mutation
 }
 
 function trackPhraseNote(
@@ -462,15 +462,18 @@ function trackPhraseNote(
     }
 
     if (!Array.isArray(soloist.recentNotes)) {
-        soloist.recentNotes = []; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).recentNotes = []; // @worker-mutation
     }
     if (!Number.isFinite(soloist.phraseStartStep) || soloist.phraseStartStep === null) {
-        soloist.phraseStartStep = step; // @worker-mutation
-        soloist.phraseLoopCount = loopCount; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).phraseStartStep = step; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).phraseLoopCount = loopCount; // @worker-mutation
     }
     if (sourceNode.sectionLabel && !soloist.phraseSectionLabel) {
-        soloist.phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
-        soloist.phraseSectionOccurrence = Math.max(1, sourceNode.sectionOccurrence || 1); // @worker-mutation
+        (soloist as Mutable<typeof soloist>).phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).phraseSectionOccurrence = Math.max(
+            1,
+            sourceNode.sectionOccurrence || 1,
+        ); // @worker-mutation
     }
 
     const lastTracked = soloist.recentNotes[soloist.recentNotes.length - 1] || null;
@@ -479,11 +482,14 @@ function trackPhraseNote(
         const phraseSpan = step - (soloist.phraseStartStep ?? step);
         if (gap >= stepsPerBeat || phraseSpan >= stepsPerMeasure * 2) {
             commitTrackedPhraseSignature(soloist, loopCount);
-            soloist.phraseStartStep = step; // @worker-mutation
-            soloist.phraseLoopCount = loopCount; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).phraseStartStep = step; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).phraseLoopCount = loopCount; // @worker-mutation
             if (sourceNode.sectionLabel) {
-                soloist.phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
-                soloist.phraseSectionOccurrence = Math.max(1, sourceNode.sectionOccurrence || 1); // @worker-mutation
+                (soloist as Mutable<typeof soloist>).phraseSectionLabel = sourceNode.sectionLabel; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).phraseSectionOccurrence = Math.max(
+                    1,
+                    sourceNode.sectionOccurrence || 1,
+                ); // @worker-mutation
             }
         }
     }
@@ -658,11 +664,11 @@ function preparePhraseResponseContext(
 
     soloist.phraseContext.responseSignature = responseSignature; // @worker-mutation
     soloist.phraseContext.responseSource = responseSignature ? responseSource : 'free'; // @worker-mutation
-    soloist.recentNotes = []; // @worker-mutation
-    soloist.phraseStartStep = step; // @worker-mutation
-    soloist.phraseLoopCount = loopCount; // @worker-mutation
-    soloist.phraseSectionLabel = sectionContext.label; // @worker-mutation
-    soloist.phraseSectionOccurrence = sectionContext.occurrence; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).recentNotes = []; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseStartStep = step; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseLoopCount = loopCount; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionLabel = sectionContext.label; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).phraseSectionOccurrence = sectionContext.occurrence; // @worker-mutation
 }
 
 /**
@@ -799,7 +805,7 @@ export function getSoloistNote(
     const isDownbeat = stepInfo ? stepInfo.isMeasureStart : measureStep === 0;
     const isBackbeat = stepInfo ? stepInfo.isBackbeat : false;
 
-    soloist.sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
+    (soloist as Mutable<typeof soloist>).sessionSteps = (soloist.sessionSteps || 0) + 1; // @worker-mutation
 
     const finalizeNote = (res: any): any => {
         if (!res) {
@@ -811,7 +817,7 @@ export function getSoloistNote(
         // Coordination: Mark as busy if playing short durations or dense phrases
         primary.isBusy = (soloist.busySteps || 0) > 0 || (primary.durationSteps || 1) < 1.0;
 
-        soloist.lastMidiPlayed = primary.midi; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).lastMidiPlayed = primary.midi; // @worker-mutation
 
         let timingOffset = calculateTimingOffset(
             'soloist',
@@ -846,7 +852,7 @@ export function getSoloistNote(
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
 
         if (!primary.isDoubleStop) {
-            soloist.lastFreq = getFrequency(primary.midi); // @worker-mutation
+            (soloist as Mutable<typeof soloist>).lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
         applyBluesBends(primary, activeStyle, currentChord);
@@ -857,19 +863,19 @@ export function getSoloistNote(
     if (soloist.embellishmentBuffer && soloist.embellishmentBuffer.length > 0) {
         const embNote = soloist.embellishmentBuffer.shift();
         const primaryNote = Array.isArray(embNote) ? embNote[0] : embNote;
-        soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
         logDebug(`Playing embellishment note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(embNote);
     }
     if (soloist.deviceBuffer && soloist.deviceBuffer.length > 0) {
         const devNote = soloist.deviceBuffer.shift();
         const primaryNote = Array.isArray(devNote) ? devNote[0] : devNote;
-        soloist.busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).busySteps = (primaryNote.durationSteps || 1) - 1; // @worker-mutation
         logDebug(`Playing device note, busySteps remaining: ${soloist.busySteps}`);
         return finalizeNote(devNote);
     }
     if ((soloist.busySteps || 0) > 0) {
-        soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
         logDebug(
             `Silenced because busy holding previous note. busySteps remaining: ${soloist.busySteps}`,
         );
@@ -879,7 +885,7 @@ export function getSoloistNote(
     // --- Natural Exit Logic ---
     if (soloist.isYielding && (soloist.isResting || soloist.phrasingState === 'rest')) {
         if (soloist.tradeMode === 'manual' && soloist.enabled) {
-            soloist.isYielding = false; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).isYielding = false; // @worker-mutation
         } else {
             return null;
         }
@@ -890,8 +896,8 @@ export function getSoloistNote(
         // While playing the head/themed improv, the soloist is technically actively phrasing,
         // so we must force isResting = false to prevent the global orchestrator from giving
         // the solo away to comping instruments due to assumed inactivity.
-        soloist.isResting = false; // @worker-mutation
-        soloist.phrasingState = 'active'; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).isResting = false; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).phrasingState = 'active'; // @worker-mutation
         const sessionSeed = headSessionSeed;
         let shouldFallThrough = false;
 
@@ -985,7 +991,10 @@ export function getSoloistNote(
                     shouldCapBusyToSpacing && Number.isFinite(nextSeedInfo.gap)
                         ? Math.max(0, nextSeedInfo.gap - 1)
                         : durationBusySteps;
-                soloist.busySteps = Math.min(durationBusySteps, spacingBusySteps); // @worker-mutation
+                (soloist as Mutable<typeof soloist>).busySteps = Math.min(
+                    durationBusySteps,
+                    spacingBusySteps,
+                ); // @worker-mutation
 
                 logDebug(
                     `[Head/Themed Performance] Playing seeded note: MIDI ${headNote.midi}. (Prob: ${survivalProb.toFixed(2)}, isAnchor: ${headNote.isAnchor})`,
@@ -1031,7 +1040,7 @@ export function getSoloistNote(
                     sectionOccurrence: sectionContext.occurrence,
                 };
 
-                soloist.lastAttackStep = step; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).lastAttackStep = step; // @worker-mutation
 
                 const result = selectPitchAndDevices(
                     state,
@@ -1075,7 +1084,7 @@ export function getSoloistNote(
             }
         }
         if ((soloist.busySteps || 0) > 0) {
-            soloist.busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).busySteps = (soloist.busySteps || 0) - 1; // @worker-mutation
             return null;
         }
 
@@ -1124,8 +1133,8 @@ export function getSoloistNote(
                 const gapFillSteps = isFirstRestatementLoop
                     ? Math.max(2, Math.floor(stepsPerBeat / 2), Math.floor(minGap / 3))
                     : Math.floor(minGap / 2);
-                soloist.activeSteps = gapFillSteps; // @worker-mutation
-                soloist.isResting = false; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).activeSteps = gapFillSteps; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).isResting = false; // @worker-mutation
                 logDebug(
                     `[Gap-Fill] Found gap of ${minGap} steps. Waking generative engine for ${soloist.activeSteps} steps.`,
                 );
@@ -1161,7 +1170,7 @@ export function getSoloistNote(
 
         // PRE-HEAT: Force a lead-in transition at the start of the song to ensure count-in pick-ups
         if (step < 0 && effectiveIntensity > 0.3) {
-            soloist.transitionState = 'lead_in'; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).transitionState = 'lead_in'; // @worker-mutation
             logDebug(`Forcing START-OF-SONG lead-in`);
         }
     }
@@ -1171,7 +1180,7 @@ export function getSoloistNote(
         // PRE-HEAT: If we are at the start of the song, preserve the forced lead_in
         const isStartOfSong = step < 0 && step === -stepsPerMeasure;
         if (!isStartOfSong || soloist.transitionState === null) {
-            soloist.transitionState =
+            (soloist as Mutable<typeof soloist>).transitionState =
                 Math.random() < 0.6 - effectiveIntensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
             logDebug(`Selected transition state: ${soloist.transitionState}`);
         }
@@ -1179,19 +1188,24 @@ export function getSoloistNote(
         // Mutate rhythmic entropy at section boundaries based on intensity
         // This locks the variation for the next section, preserving micro-level predictability
         const shiftScale = 0.2 + effectiveIntensity * 0.4; // Max 0.6 shift at high intensity
-        soloist.rhythmicEntropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).rhythmicEntropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
     } else if (!isFinalMeasure && stepInForm !== coordination.sectionStart) {
-        soloist.transitionState = null; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).transitionState = null; // @worker-mutation
     }
 
     // --- 2. Simplified Phrasing State Machine ---
     if (soloist.isResting === undefined) {
-        soloist.isResting = soloist.phrasingState === 'rest' || soloist.phrasingState === undefined; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).isResting =
+            soloist.phrasingState === 'rest' || soloist.phrasingState === undefined; // @worker-mutation
         if (soloist.restSteps === undefined) {
-            soloist.restSteps = soloist.isResting ? stepsPerMeasure : 0; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).restSteps = soloist.isResting
+                ? stepsPerMeasure
+                : 0; // @worker-mutation
         }
         if (soloist.activeSteps === undefined) {
-            soloist.activeSteps = soloist.isResting ? 0 : stepsPerMeasure * 2; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).activeSteps = soloist.isResting
+                ? 0
+                : stepsPerMeasure * 2; // @worker-mutation
         }
     }
 
@@ -1199,21 +1213,21 @@ export function getSoloistNote(
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
         const restBeatStart = tsConfig.beats >= 4 ? 2 : 1;
         if (beatInMeasure >= restBeatStart) {
-            soloist.isResting = true; // @worker-mutation
-            soloist.phrasingState = 'rest'; // @worker-mutation
-            soloist.restSteps = remainingSteps; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).isResting = true; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).phrasingState = 'rest'; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).restSteps = remainingSteps; // @worker-mutation
         }
     }
 
     if (soloist.isResting) {
-        soloist.restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).restSteps = (soloist.restSteps || 0) - 1; // @worker-mutation
 
         // --- Proactive Lead-in Wake-up ---
         if ((soloist.transitionState || null) === 'lead_in') {
             const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
             // If we are in the last beat of the measure, force wake up to play pick-ups
             if (beatInMeasure === tsConfig.beats - 1) {
-                soloist.restSteps = 0; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).restSteps = 0; // @worker-mutation
                 logDebug(`Forced proactive wake-up for lead-in pickups (last beat of measure).`);
             }
         }
@@ -1235,9 +1249,9 @@ export function getSoloistNote(
                     coordination.bypassRhythm ||
                     (soloist.restSteps || 0) < -stepsPerMeasure)
             ) {
-                soloist.isResting = false; // @worker-mutation
-                soloist.phrasingState = 'active'; // @worker-mutation
-                soloist.phraseCount = (soloist.phraseCount || 0) + 1; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).isResting = false; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).phrasingState = 'active'; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).phraseCount = (soloist.phraseCount || 0) + 1; // @worker-mutation
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
                 let _nextActiveSteps = Math.floor(
@@ -1248,7 +1262,8 @@ export function getSoloistNote(
                     _nextActiveSteps = soloist.sessionSeed.loopLengthSteps;
                 }
 
-                soloist.activeSteps = _nextActiveSteps; /* @worker-mutation */
+                (soloist as Mutable<typeof soloist>).activeSteps =
+                    _nextActiveSteps; /* @worker-mutation */
                 logDebug(
                     `Waking up for ~${soloist.activeSteps} steps${isStrictHeadPlayback ? ' (Head Mode)' : ''}. Generating new rhythm plan.`,
                 );
@@ -1278,7 +1293,7 @@ export function getSoloistNote(
                     soloist,
                     stepInfo,
                 );
-                soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).rhythmPlan = nextRhythmPlan; // @worker-mutation
 
                 logDebug(`Generated rhythm plan of length: ${soloist.rhythmPlan.length}`);
 
@@ -1296,7 +1311,7 @@ export function getSoloistNote(
             return null;
         }
     } else {
-        soloist.activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).activeSteps = (soloist.activeSteps || 0) - 1; // @worker-mutation
 
         const isStrongResolution =
             measureStep === stepsPerMeasure - 1 || (isBackbeat && effectiveIntensity > 0.5);
@@ -1307,8 +1322,8 @@ export function getSoloistNote(
             !coordination.bypassRhythm &&
             !isStrictHeadPlayback
         ) {
-            soloist.isResting = true; // @worker-mutation
-            soloist.phrasingState = 'rest'; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).isResting = true; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).phrasingState = 'rest'; // @worker-mutation
             if (coordination) {
                 coordination.soloistPhraseEnd = true;
             }
@@ -1318,7 +1333,7 @@ export function getSoloistNote(
             const nextRestSteps = Math.floor(
                 stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
             );
-            soloist.restSteps = nextRestSteps; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).restSteps = nextRestSteps; // @worker-mutation
 
             const minimumRestSteps =
                 activeStyle === 'bird'
@@ -1329,14 +1344,14 @@ export function getSoloistNote(
                         ? 3
                         : 4;
             if (soloist.restSteps < minimumRestSteps) {
-                soloist.restSteps = minimumRestSteps; // @worker-mutation
+                (soloist as Mutable<typeof soloist>).restSteps = minimumRestSteps; // @worker-mutation
             }
             logDebug(
                 `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)})`,
             );
             // Clear rhythm plan just in case
             commitTrackedPhraseSignature(soloist, loopCount);
-            soloist.rhythmPlan = []; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).rhythmPlan = []; // @worker-mutation
             return null;
         }
     }
@@ -1378,12 +1393,12 @@ export function getSoloistNote(
                 soloist,
                 stepInfo,
             );
-            soloist.rhythmPlan = nextRhythmPlan; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).rhythmPlan = nextRhythmPlan; // @worker-mutation
             if (soloist.activeSteps === undefined || soloist.activeSteps <= 0) {
-                soloist.activeSteps = planSteps; /* @worker-mutation */
+                (soloist as Mutable<typeof soloist>).activeSteps = planSteps; /* @worker-mutation */
             }
         } else {
-            soloist.rhythmPlan = []; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).rhythmPlan = []; // @worker-mutation
         }
     }
 
@@ -1394,7 +1409,7 @@ export function getSoloistNote(
         if (soloist.rhythmPlan.length > 0 && step >= soloist.rhythmPlan[0].stepTarget) {
             const rhythmNode = soloist.rhythmPlan.shift(); // @worker-mutation
 
-            soloist.lastAttackStep = step; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).lastAttackStep = step; // @worker-mutation
 
             const result = selectPitchAndDevices(
                 state,

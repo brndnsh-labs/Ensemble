@@ -3,6 +3,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { arranger } from '../state.js';
+import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
@@ -37,7 +38,7 @@ function getRelativeKeyActionLabel(isMinor: boolean) {
 }
 
 function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[]) => void) {
-    arranger.key = newKey;
+    (arranger as Mutable<typeof arranger>).key = newKey; // @direct-mutation
     validateAndAnalyze();
     saveCurrentState();
     dispatch(ACTIONS.KEY_CHANGE);
@@ -48,8 +49,8 @@ function updateTimeSignature(
     lastDrumPreset: string | null,
     dispatch: (action: any, ...args: any[]) => void,
 ) {
-    arranger.timeSignature = timeSignature;
-    arranger.grouping = null;
+    (arranger as Mutable<typeof arranger>).timeSignature = timeSignature; // @direct-mutation
+    (arranger as Mutable<typeof arranger>).grouping = null; // @direct-mutation
     if (lastDrumPreset) {
         loadDrumPreset(lastDrumPreset);
     }
@@ -68,7 +69,7 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
     const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
     const nextIndex = (currentIndex + 1) % options.length;
 
-    arranger.grouping = options[nextIndex];
+    (arranger as Mutable<typeof arranger>).grouping = options[nextIndex]; // @direct-mutation
     flushBuffers();
     syncWorker();
     saveCurrentState();

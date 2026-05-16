@@ -1,5 +1,5 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, ConductorState } from '../types.js';
+import type { Action, ConductorState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export type { ConductorState };
@@ -13,29 +13,30 @@ export const conductor = deepSignal<ConductorState>({
 });
 
 export function conductorReducer(action: Action): boolean {
+    const c = conductor as Mutable<typeof conductor>;
     switch (action.type) {
         case ACTIONS.UPDATE_CONDUCTOR_STATE:
             if (action.payload.targetIntensity !== undefined) {
-                conductor.targetIntensity = action.payload.targetIntensity;
+                c.targetIntensity = action.payload.targetIntensity;
             }
             if (action.payload.stepSize !== undefined) {
-                conductor.stepSize = action.payload.stepSize;
+                c.stepSize = action.payload.stepSize;
             }
             if (action.payload.form !== undefined) {
-                conductor.form = action.payload.form;
+                c.form = action.payload.form;
             }
             if (action.payload.loopCount !== undefined) {
-                conductor.loopCount = action.payload.loopCount;
+                c.loopCount = action.payload.loopCount;
             }
             if (action.payload.formIteration !== undefined) {
-                conductor.formIteration = action.payload.formIteration;
+                c.formIteration = action.payload.formIteration;
             }
             return true;
         case ACTIONS.RESET_STATE:
-            conductor.targetIntensity = 0.35;
-            conductor.stepSize = 0.0005;
-            conductor.loopCount = 0;
-            conductor.formIteration = 0;
+            c.targetIntensity = 0.35;
+            c.stepSize = 0.0005;
+            c.loopCount = 0;
+            c.formIteration = 0;
             return true;
     }
     return false;

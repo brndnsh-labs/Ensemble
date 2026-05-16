@@ -116,52 +116,52 @@ export interface Section {
 
 export interface ArrangerState {
     /** List of song sections. */
-    sections: Section[];
+    readonly sections: Section[];
     /** Flattened list of parsed chord objects. */
-    progression: Chord[];
+    readonly progression: Chord[];
     /** The global musical key (e.g., "C", "F#"). */
-    key: string;
+    readonly key: string;
     /** The global time signature (e.g., "4/4", "3/4"). */
-    timeSignature: string;
+    readonly timeSignature: string;
     /** Whether the key is minor. */
-    isMinor: boolean;
+    readonly isMinor: boolean;
     /** Notation style ('roman', 'nns', 'name'). */
-    notation: string;
+    readonly notation: string;
     /** Whether the current progression is valid. */
-    valid: boolean;
+    readonly valid: boolean;
     /** Total number of 16th note steps in the song. */
-    totalSteps: number;
+    readonly totalSteps: number;
     /** Map of steps to chord objects. */
-    stepMap: Array<{ start: number; end: number; chord: Chord }>;
+    readonly stepMap: Array<{ start: number; end: number; chord: Chord }>;
     /** Map of measures to time signatures. */
-    measureMap: Array<{ start: number; end: number; ts: string }>;
+    readonly measureMap: Array<{ start: number; end: number; ts: string }>;
     /** Map of sections to step ranges. */
-    sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
+    readonly sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
     /** Undo history stack (JSON strings). */
-    history: string[];
+    readonly history: string[];
     /** ID of the last edited section. */
-    lastInteractedSectionId: string;
+    readonly lastInteractedSectionId: string;
     /** Name of the last loaded chord preset. */
-    lastChordPreset: string;
+    readonly lastChordPreset: string;
     /** ID of a section that was programmatically mutated. */
-    mutatedSectionId: string | null;
+    readonly mutatedSectionId: string | null;
     /** Whether the arrangement has been manually modified. */
-    isDirty: boolean;
+    readonly isDirty: boolean;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
-    grouping: number[] | null;
+    readonly grouping: number[] | null;
 }
 
 export interface ConductorState {
     /** Target intensity level for auto-intensity drift. */
-    targetIntensity: number;
+    readonly targetIntensity: number;
     /** Internal step size for auto-intensity. */
-    stepSize: number;
+    readonly stepSize: number;
     /** Structural analysis of the song arrangement. */
-    form: object | null;
+    readonly form: object | null;
     /** Number of times the current section has looped. */
-    loopCount: number;
+    readonly loopCount: number;
     /** Number of times the entire song has looped. */
-    formIteration: number;
+    readonly formIteration: number;
 }
 
 export interface Instrument {
@@ -190,125 +190,125 @@ export interface PocketState {
 
 export interface GrooveState {
     /** Whether the drum engine is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** List of drum instruments. */
-    instruments: Instrument[];
+    readonly instruments: Instrument[];
     /** Volume level. */
-    volume: number;
+    readonly volume: number;
     /** Reverb level. */
-    reverb: number;
+    readonly reverb: number;
     /** Number of measures in the loop (1-8). */
-    measures: number;
+    readonly measures: number;
     /** Currently visible measure for editing. */
-    currentMeasure: number;
+    readonly currentMeasure: number;
     /** Whether to scroll grid during playback. */
-    followPlayback: boolean;
+    readonly followPlayback: boolean;
     /** Humanization percentage (0-100). */
-    humanize: number;
+    readonly humanize: number;
     /** Swing percentage (0-100). */
-    swing: number;
+    readonly swing: number;
     /** Swing subdivision ('8th' or '16th'). */
-    swingSub: string;
+    readonly swingSub: string;
     /** Name of the last loaded drum preset. */
-    lastDrumPreset: string;
+    readonly lastDrumPreset: string;
     /** Thematic seed for deterministic generation. */
-    seed: string;
+    readonly seed: string;
     /** Cache for decoded drum samples. */
-    audioBuffers: any;
+    readonly audioBuffers: any;
     /** Active genre for procedural nuances ('Rock', 'Jazz', 'Funk'). */
-    genreFeel: string;
+    readonly genreFeel: string;
     /** Whether a drum fill is currently being played. */
-    fillActive: boolean;
+    readonly fillActive: boolean;
     /** Transient storage for the generated fill pattern. */
-    fillSteps: object;
+    readonly fillSteps: object;
     /** Last gain node for the hi-hat. */
-    lastHatGain: GainNode | null;
+    readonly lastHatGain: GainNode | null;
     /** Last gain node for the ride cymbal. */
-    lastRideGain: GainNode | null;
+    readonly lastRideGain: GainNode | null;
     /** Last gain node for the crash cymbal. */
-    lastCrashGain: GainNode | null;
+    readonly lastCrashGain: GainNode | null;
     /** Step index where the current fill began. */
-    fillStartStep: number;
+    readonly fillStartStep: number;
     /** Length of the current fill in steps. */
-    fillLength: number;
+    readonly fillLength: number;
     /** 16-bit mask of the current snare pattern. */
-    snareMask: number;
+    readonly snareMask: number;
     /** Whether a crash cymbal is queued for the next downbeat. */
-    pendingCrash: boolean;
+    readonly pendingCrash: boolean;
     /** Whether generative fills/variations are enabled. */
-    creativity: boolean;
+    readonly creativity: boolean;
     /** Random seeds for each song section. */
-    sectionSeedMap: object;
+    readonly sectionSeedMap: object;
     /** Unified rhythmic pocket configuration. */
-    pocket: PocketState;
+    readonly pocket: PocketState;
     /** Last selected smart genre. */
-    lastSmartGenre: string;
+    readonly lastSmartGenre: string;
     /** Genre queued for the next measure. */
-    pendingGenreFeel: { genreName?: string; feel?: string } | null;
+    readonly pendingGenreFeel: { genreName?: string; feel?: string } | null;
     /** Beats until genre switch. */
-    genreSwitchCountdown: number | null;
+    readonly genreSwitchCountdown: number | null;
     /** Pre-calculated section orchestration map. */
-    orchestrationMap: any[] | null;
+    readonly orchestrationMap: any[] | null;
     /** Pre-calculated song-wide fill map. */
-    fillMap: Record<number, any> | null;
+    readonly fillMap: Record<number, any> | null;
     /** Pre-calculated soloist accent catching map. */
-    accentMap: Record<number, any> | null;
+    readonly accentMap: Record<number, any> | null;
     /** Absolute playback step when the current seed maps were generated. */
-    seedTimelineStartStep: number;
+    readonly seedTimelineStartStep: number;
     /** Pre-calculated pattern variations for the current preset. */
-    variations: any[] | null;
+    readonly variations: any[] | null;
     /** Map of scheduled drum events. */
-    buffer: Map<number, any>;
+    readonly buffer: Map<number, any>;
 }
 
 export interface ChordState {
     /** Whether the accompanist is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** The comping style ('smart', 'pad', etc). */
-    style: string;
+    readonly style: string;
     /** Output gain multiplier. */
-    volume: number;
+    readonly volume: number;
     /** Reverb send amount. */
-    reverb: number;
+    readonly reverb: number;
     /** Base MIDI octave for voicing. */
-    octave: number;
+    readonly octave: number;
     /** Voicing density ('thin', 'standard', 'rich'). */
-    density: string;
+    readonly density: string;
     /** Index of the currently playing chord (UI). */
-    lastActiveChordIndex: number | null;
+    readonly lastActiveChordIndex: number | null;
     /** Index of the last scheduled chord (Internal). */
-    scheduledChordIndex: number | null;
+    readonly scheduledChordIndex: number | null;
     /** Scheduled notes buffer. */
-    buffer: Map<number, any>;
+    readonly buffer: Map<number, any>;
     /** 16-bit mask of the current comping pattern. */
-    rhythmicMask: number;
+    readonly rhythmicMask: number;
     /** Optional instrument name. */
-    instrument?: string;
+    readonly instrument?: string;
 }
 
 export interface BassState {
     /** Whether the bass engine is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** Volume level. */
-    volume: number;
+    readonly volume: number;
     /** Reverb level. */
-    reverb: number;
+    readonly reverb: number;
     /** Frequency of the last played note. */
-    lastFreq: number | null;
+    readonly lastFreq: number | null;
     /** Frequency of the note currently ringing. */
-    lastPlayedFreq: number | null;
+    readonly lastPlayedFreq: number | null;
     /** Map of scheduled notes from the worker. */
-    buffer: Map<number, any>;
+    readonly buffer: Map<number, any>;
     /** Base MIDI octave. */
-    octave: number;
+    readonly octave: number;
     /** Playing style ID (e.g., 'walking', 'funk'). */
-    style: string;
+    readonly style: string;
     /** Counter for "busy" playing periods. */
-    busySteps: number;
+    readonly busySteps: number;
     /** Last MIDI note value played. */
-    lastMidiPlayed: number | null;
+    readonly lastMidiPlayed: number | null;
     /** Last gain node for dynamic continuity. */
-    lastBassGain: GainNode | null;
+    readonly lastBassGain: GainNode | null;
 }
 
 export interface SoloistSessionSeed {
@@ -331,146 +331,146 @@ export interface SoloistPhraseContext {
 
 export interface SoloistState {
     /** Whether the soloist is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** Mix volume (0.0 - 1.0). */
-    volume: number;
+    readonly volume: number;
     /** Reverb level. */
-    reverb: number;
+    readonly reverb: number;
     /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
-    preset: string;
+    readonly preset: string;
     /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
-    mode: string;
+    readonly mode: string;
     /** Thematic seed for deterministic generation. */
-    seed: string;
+    readonly seed: string;
     /** Slider for how dynamic/articulated the phrasing is. */
-    phrasingIntensity: number;
+    readonly phrasingIntensity: number;
     /** Probability of retaining a hook motif. */
-    hookRetentionProb: number;
+    readonly hookRetentionProb: number;
     /** Seed melody for the current session. */
-    sessionSeed: SoloistSessionSeed | null;
+    readonly sessionSeed: SoloistSessionSeed | null;
     /** Planned rhythmic phrase. */
-    rhythmPlan: any[];
+    readonly rhythmPlan: any[];
     /** Buffer for melodic embellishments. */
-    deviceBuffer: any[];
+    readonly deviceBuffer: any[];
     /** Buffer for melodic embellishments. */
-    embellishmentBuffer: any[];
+    readonly embellishmentBuffer: any[];
     /** Short term hook memory. */
-    hookBuffer: any[];
+    readonly hookBuffer: any[];
     /** Hooks shared from other instruments. */
-    sharedHookBuffer: any[];
+    readonly sharedHookBuffer: any[];
     /** Total steps played in current session. */
-    sessionSteps: number;
+    readonly sessionSteps: number;
     /** Mode for trading fours ('manual', 'auto'). */
-    tradeMode: string;
+    readonly tradeMode: string;
     /** Whether waiting to start a phrase. */
-    isWaitingForEntry: boolean;
+    readonly isWaitingForEntry: boolean;
     /** Whether yielding space to other instruments. */
-    isYielding: boolean;
+    readonly isYielding: boolean;
     /** Whether tracking motifs is enabled. */
-    motifTracking: boolean;
+    readonly motifTracking: boolean;
     /** Total phrases played. */
-    phraseCount: number;
+    readonly phraseCount: number;
     /** Number of notes played in the current phrase. */
-    notesInPhrase: number;
+    readonly notesInPhrase: number;
     /** Entropy level of the current rhythm. */
-    rhythmicEntropy: number;
+    readonly rhythmicEntropy: number;
     /** Last frequency played. */
-    lastFreq: number | null;
+    readonly lastFreq: number | null;
     /** Last frequency sent to visualizer. */
-    lastPlayedFreq: number | null;
+    readonly lastPlayedFreq: number | null;
     /** Last frequency sent to visualizer. */
-    lastRenderedFreq: number | null;
+    readonly lastRenderedFreq: number | null;
     /** Current melodic tension level. */
-    tension: number;
+    readonly tension: number;
     /** Steps the soloist has been active. */
-    activeSteps: number;
+    readonly activeSteps: number;
     /** Steps the soloist has been resting. */
-    restSteps: number;
+    readonly restSteps: number;
     /** Whether currently resting. */
-    isResting: boolean;
+    readonly isResting: boolean;
     /** Steps matching current melodic trend. */
-    contourSteps: number;
+    readonly contourSteps: number;
     /** Current contour direction ('Up', 'Down', 'Static'). */
-    melodicTrend: string;
+    readonly melodicTrend: string;
     /** Melodic direction multiplier. */
-    direction: number;
+    readonly direction: number;
     /** Local complexity level. */
-    complexity: number;
+    readonly complexity: number;
     /** Step of the last note attack. */
-    lastAttackStep: number;
+    readonly lastAttackStep: number;
     /** Current state in the phrasing lifecycle. */
-    phrasingState: string;
+    readonly phrasingState: string;
     /** Cached motif data. */
-    motifCache: any;
+    readonly motifCache: any;
     /** Current rhythmic motif. */
-    rhythmicMotif: any[];
+    readonly rhythmicMotif: any[];
     /** Dictionary of loaded licks. */
-    lickDictionary: any[];
+    readonly lickDictionary: any[];
     /** Recently played notes. */
-    recentNotes: any[];
+    readonly recentNotes: any[];
     /** Step when the current phrase started. */
-    phraseStartStep: number | null;
+    readonly phraseStartStep: number | null;
     /** Loop index captured for the active phrase. */
-    phraseLoopCount: number | null;
+    readonly phraseLoopCount: number | null;
     /** Section label captured for the active phrase. */
-    phraseSectionLabel: string | null;
+    readonly phraseSectionLabel: string | null;
     /** Section occurrence captured for the active phrase. */
-    phraseSectionOccurrence: number;
+    readonly phraseSectionOccurrence: number;
     /** Per-loop section signatures keyed by section label. */
-    sectionRecall: Record<string, any>;
+    readonly sectionRecall: Record<string, any>;
     /** Loop number currently represented in sectionRecall. */
-    sectionRecallLoop: number | null;
+    readonly sectionRecallLoop: number | null;
     /** Cross-loop section signatures keyed by section label. */
-    formArcRecall: Record<string, any>;
+    readonly formArcRecall: Record<string, any>;
     /** Context data for the current phrase. */
-    phraseContext: SoloistPhraseContext;
+    readonly phraseContext: SoloistPhraseContext;
     /** Probability of playing double stops. */
-    doubleStopProb: number;
+    readonly doubleStopProb: number;
     /** Active polyphonic voices. */
-    activeVoices: any[];
+    readonly activeVoices: any[];
     /** Last MIDI note value played. */
-    lastMidiPlayed: number | null;
+    readonly lastMidiPlayed: number | null;
     /** Optional playing style. */
-    style?: string;
+    readonly style?: string;
     /** Map of scheduled notes from the worker. */
-    buffer: Map<number, any>;
+    readonly buffer: Map<number, any>;
     /** Base MIDI octave. */
-    octave: number;
+    readonly octave: number;
     /** Last note end time. */
-    lastNoteEnd: number;
+    readonly lastNoteEnd: number;
     /** Optional busy steps counter. */
-    busySteps: number;
+    readonly busySteps: number;
     /** Phrasing transition state. */
-    transitionState: string | null;
+    readonly transitionState: string | null;
     /** Last active smart style. */
-    lastSmartStyle: string;
+    readonly lastSmartStyle: string;
 }
 
 export interface HarmonyState {
     /** Whether the harmony engine is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** Volume level. */
-    volume: number;
+    readonly volume: number;
     /** Reverb level. */
-    reverb: number;
+    readonly reverb: number;
     /** Map of scheduled notes from the worker. */
-    buffer: Map<number, any>;
+    readonly buffer: Map<number, any>;
     /** Base MIDI octave. */
-    octave: number;
+    readonly octave: number;
     /** Playing style ID (e.g., 'horns', 'strings'). */
-    style: string;
+    readonly style: string;
     /** Local complexity override (0.0 - 1.0). */
-    complexity: number;
+    readonly complexity: number;
     /** Short-term memory for current section hooks. */
-    motifBuffer: any[];
+    readonly motifBuffer: any[];
     /** 16-bit mask of the current rhythmic motif (16th notes). */
-    rhythmicMask: number;
+    readonly rhythmicMask: number;
     /** Array of recently played MIDI notes. */
-    lastMidis: number[];
+    readonly lastMidis: number[];
     /** Currently playing polyphonic voices. */
-    activeVoices: any[];
+    readonly activeVoices: any[];
     /** Current micro-timing offset. */
-    pocketOffset: number;
+    readonly pocketOffset: number;
 }
 
 export interface MidiOutput {
@@ -480,186 +480,197 @@ export interface MidiOutput {
 
 export interface MidiState {
     /** Whether Web MIDI output is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
     /** List of available MIDI output ports. */
-    outputs: MidiOutput[];
+    readonly outputs: MidiOutput[];
     /** The ID of the currently selected MIDI output. */
-    selectedOutputId: string | null;
+    readonly selectedOutputId: string | null;
     /** MIDI channel for Chords (1-16). */
-    chordsChannel: number;
+    readonly chordsChannel: number;
     /** MIDI channel for Bass (1-16). */
-    bassChannel: number;
+    readonly bassChannel: number;
     /** MIDI channel for Soloist (1-16). */
-    soloistChannel: number;
+    readonly soloistChannel: number;
     /** MIDI channel for Harmonies (1-16). */
-    harmonyChannel: number;
+    readonly harmonyChannel: number;
     /** MIDI channel for Drums (1-16). */
-    drumsChannel: number;
+    readonly drumsChannel: number;
     /** Global MIDI latency offset in ms. */
-    latency: number;
+    readonly latency: number;
     /** Whether to mute internal audio when MIDI is active. */
-    muteLocal: boolean;
+    readonly muteLocal: boolean;
     /** Octave offset for chords. */
-    chordsOctave: number;
+    readonly chordsOctave: number;
     /** Octave offset for bass. */
-    bassOctave: number;
+    readonly bassOctave: number;
     /** Octave offset for soloist. */
-    soloistOctave: number;
+    readonly soloistOctave: number;
     /** Octave offset for harmonies. */
-    harmonyOctave: number;
+    readonly harmonyOctave: number;
     /** Octave offset for drums. */
-    drumsOctave: number;
+    readonly drumsOctave: number;
     /** Velocity scaling factor. */
-    velocitySensitivity: number;
+    readonly velocitySensitivity: number;
 }
 
 export interface GlobalContext {
     /** The Web Audio API context. */
-    audio: AudioContext | null;
+    readonly audio: AudioContext | null;
     /** The master volume gain node. */
-    masterGain: GainNode | null;
+    readonly masterGain: GainNode | null;
     /** The master soft-clipper/saturator. */
-    saturator: WaveShaperNode | null;
+    readonly saturator: WaveShaperNode | null;
     /** The master safety limiter. */
-    masterLimiter: DynamicsCompressorNode | null;
+    readonly masterLimiter: DynamicsCompressorNode | null;
     /** The global reverb node. */
-    reverbNode: ConvolverNode | null;
+    readonly reverbNode: ConvolverNode | null;
     /** HPF for reverb cleaning. */
-    reverbPreFilter: BiquadFilterNode | null;
+    readonly reverbPreFilter: BiquadFilterNode | null;
     /** The gain node for chords. */
-    chordsGain: GainNode | null;
+    readonly chordsGain: GainNode | null;
     /** Reverb send for chords. */
-    chordsReverb: GainNode | null;
+    readonly chordsReverb: GainNode | null;
     /** EQ for chords (HP/Notch). */
-    chordsEQ: BiquadFilterNode | null;
+    readonly chordsEQ: BiquadFilterNode | null;
     /** Stereo panner for chords. */
-    chordsPanner: StereoPannerNode | null;
+    readonly chordsPanner: StereoPannerNode | null;
     /** The gain node for drums. */
-    drumsGain: GainNode | null;
+    readonly drumsGain: GainNode | null;
     /** HP/air EQ for drums bus. */
-    drumsEQ: BiquadFilterNode | null;
+    readonly drumsEQ: BiquadFilterNode | null;
     /** Reverb send for drums. */
-    drumsReverb: GainNode | null;
+    readonly drumsReverb: GainNode | null;
     /** The gain node for bass. */
-    bassGain: GainNode | null;
+    readonly bassGain: GainNode | null;
     /** Reverb send for bass. */
-    bassReverb: GainNode | null;
+    readonly bassReverb: GainNode | null;
     /** Sidechain ducking gain node for bass. */
-    bassSidechain: GainNode | null;
+    readonly bassSidechain: GainNode | null;
     /** EQ for bass (HPF/Notch). */
-    bassEQ: BiquadFilterNode | null;
+    readonly bassEQ: BiquadFilterNode | null;
     /** The gain node for soloist. */
-    soloistGain: GainNode | null;
+    readonly soloistGain: GainNode | null;
     /** Reverb send for soloist. */
-    soloistReverb: GainNode | null;
+    readonly soloistReverb: GainNode | null;
     /** EQ for soloist (LPF/Shelf). */
-    soloistEQ: BiquadFilterNode | null;
+    readonly soloistEQ: BiquadFilterNode | null;
     /** The gain node for harmonies. */
-    harmoniesGain: GainNode | null;
+    readonly harmoniesGain: GainNode | null;
     /** Reverb send for harmonies. */
-    harmoniesReverb: GainNode | null;
+    readonly harmoniesReverb: GainNode | null;
     /** EQ for harmonies (HPF). */
-    harmoniesEQ: BiquadFilterNode | null;
+    readonly harmoniesEQ: BiquadFilterNode | null;
     /** Stereo panner for harmonies. */
-    harmoniesPanner: StereoPannerNode | null;
+    readonly harmoniesPanner: StereoPannerNode | null;
     /** Whether the sequencer is currently playing. */
-    isPlaying: boolean;
+    readonly isPlaying: boolean;
     /** Beats per minute (40-240). */
-    bpm: number;
+    readonly bpm: number;
     /** The scheduler time for the next note (swung). */
-    nextNoteTime: number;
+    readonly nextNoteTime: number;
     /** The scheduler time for the next note (straight/quantized). */
-    unswungNextNoteTime: number;
+    readonly unswungNextNoteTime: number;
     /** Lookahead time for scheduling (in seconds). */
-    scheduleAheadTime: number;
+    readonly scheduleAheadTime: number;
     /** The global step counter. */
-    step: number;
+    readonly step: number;
     /** Queue of normalized visual events waiting to be rendered. */
-    drawQueue: any[];
+    readonly drawQueue: any[];
     /** Whether the metronome count-in is active. */
-    isCountingIn: boolean;
+    readonly isCountingIn: boolean;
     /** Current beat of the count-in (0-3). */
-    countInBeat: number;
+    readonly countInBeat: number;
     /** Whether the visualizer loop is active. */
-    isDrawing: boolean;
+    readonly isDrawing: boolean;
     /** The current UI theme ('auto', 'light', 'dark'). */
-    theme: string;
+    readonly theme: string;
     /** The screen wake lock object. */
-    wakeLock: WakeLockSentinel | null;
+    readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */
-    bandIntensity: number;
+    readonly bandIntensity: number;
     /** Global complexity level (0.0 - 1.0). */
-    complexity: number;
+    readonly complexity: number;
     /** Whether the intensity automatically drifts over time. */
-    autoIntensity: boolean;
+    readonly autoIntensity: boolean;
     /** Whether muted instruments strictly reserve their sonic space. */
-    practiceMode: boolean;
+    readonly practiceMode: boolean;
     /** Whether the metronome is active. */
-    metronome: boolean;
+    readonly metronome: boolean;
     /** Whether to apply BPM/Style from presets. */
-    applyPresetSettings: boolean;
+    readonly applyPresetSettings: boolean;
     /** Whether the global sustain pedal is "pressed". */
-    sustainActive: boolean;
+    readonly sustainActive: boolean;
     /** Whether "Song Mode" (intelligent evolution and endings) is active. */
-    songMode: boolean;
+    readonly songMode: boolean;
     /** Session timer in minutes (0 = infinite). */
-    sessionTimer: number;
+    readonly sessionTimer: number;
     /** Whether debug logging for the soloist is active. */
-    debugSoloist: boolean;
+    readonly debugSoloist: boolean;
     /** The performance.now() timestamp when playback started. */
-    sessionStartTime: number;
+    readonly sessionStartTime: number;
     /** Whether to stop at the end of the current progression/loop. */
-    stopAtEnd: boolean;
+    readonly stopAtEnd: boolean;
     /** Whether the resolution sequence is about to trigger. */
-    isEndingPending: boolean;
+    readonly isEndingPending: boolean;
     /** Current rhythmic intent (syncopation, anticipation, etc). */
-    intent: PlaybackIntent;
+    readonly intent: PlaybackIntent;
     /** Cache of currently animating drum UI elements. */
-    lastActiveDrumElements: HTMLElement[] | null;
+    readonly lastActiveDrumElements: HTMLElement[] | null;
     /** Currently sustaining piano notes. */
-    heldNotes: Set<any>;
+    readonly heldNotes: Set<any>;
     /** The last step index processed by the UI loop. */
-    lastPlayingStep: number;
+    readonly lastPlayingStep: number;
     /** Whether to log messages from the audio worker. */
-    workerLogging: boolean;
+    readonly workerLogging: boolean;
     /** ID of the timeout for audio context suspension. */
-    suspendTimeout: number | null | any;
+    readonly suspendTimeout: number | null | any;
     /** The current musical key being tracked by playback. */
-    currentKey: string | null;
+    readonly currentKey: string | null;
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
-    conductorVelocity: number;
+    readonly conductorVelocity: number;
     /** Bias towards lyrical phrasing in soloist (0.0-1.0). */
-    lyricalBias: number;
+    readonly lyricalBias: number;
     /** Master output volume. */
-    masterVolume: number;
+    readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
-    countIn: boolean;
+    readonly countIn: boolean;
     /** Whether visual flashing is enabled. */
-    visualFlash: boolean;
+    readonly visualFlash: boolean;
     /** Whether haptic feedback is enabled. */
-    haptic: boolean;
+    readonly haptic: boolean;
     /** List of active toast notifications. */
-    toasts: Array<{ id: string; message: string }>;
+    readonly toasts: Array<{ id: string; message: string }>;
     /** Current intensity of the screen flash effect. */
-    flashIntensity: number;
+    readonly flashIntensity: number;
     /** Whether a PWA update is pending. */
-    updateAvailable: boolean;
+    readonly updateAvailable: boolean;
     /** Whether the resolution ending sequence has been triggered. */
-    resolutionTriggered: boolean;
+    readonly resolutionTriggered: boolean;
     /** Whether the scheduler is currently active. */
-    isScheduling: boolean;
+    readonly isScheduling: boolean;
     /** Visibility state for various UI modals. */
-    modals: ModalsState;
+    readonly modals: ModalsState;
     /** Number of loops before stopping (0 = infinite). */
-    loopLimit: number;
+    readonly loopLimit: number;
     /** Current loop iteration counter. */
-    currentLoopCount: number;
+    readonly currentLoopCount: number;
 }
 
 export interface VisualizerState {
     /** Whether the advanced visualizer is active. */
-    enabled: boolean;
+    readonly enabled: boolean;
 }
+
+/**
+ * Strips `readonly` from every field of T. Use sparingly at write sites:
+ *
+ * - Reducers: alias once at function top — `const v = vizState as Mutable<typeof vizState>;`
+ * - @direct-mutation engine sites: inline — `(vizState as Mutable<typeof vizState>).enabled = true;`
+ *
+ * Dynamic-key writes (`slice[key] = value`) inside reducers may still use
+ * `(slice as any)[key]` — those are unchecked by intent.
+ */
+export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 export interface EnsembleState {
     arranger: ArrangerState;

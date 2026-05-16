@@ -1,7 +1,7 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import type { GlobalContext } from '../state/playback.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -61,13 +61,13 @@ export function initAudio(
         }
 
         if (providedAudioContext) {
-            playback.audio = providedAudioContext; // @direct-mutation
+            (playback as Mutable<typeof playback>).audio = providedAudioContext; // @direct-mutation
         } else {
             const AudioContextClass =
                 window.AudioContext ||
                 (window as unknown as { webkitAudioContext: typeof AudioContext })
                     .webkitAudioContext;
-            playback.audio = new AudioContextClass(); // @direct-mutation
+            (playback as Mutable<typeof playback>).audio = new AudioContextClass(); // @direct-mutation
         }
 
         if (playback.audio && !usingOfflineContext) {
@@ -82,10 +82,11 @@ export function initAudio(
         }
 
         if (playback.audio) {
-            playback.masterGain = playback.audio.createGain(); // @direct-mutation
+            const masterGain = playback.audio.createGain();
+            (playback as Mutable<typeof playback>).masterGain = masterGain; // @direct-mutation
             const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
-            playback.masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
-            playback.masterGain.gain.exponentialRampToValueAtTime(
+            masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
+            masterGain.gain.exponentialRampToValueAtTime(
                 initMasterVol,
                 playback.audio.currentTime + 0.04,
             );
@@ -100,7 +101,7 @@ export function initAudio(
                 await killAllNotes(state);
                 if (pbState.audio) {
                     pbState.audio.close().then(() => {
-                        pbState.audio = null; // @worker-mutation
+                        (pbState as Mutable<GlobalContext>).audio = null; // @worker-mutation
                         initAudio(state);
                         restoreGains(state);
                         if (pbState.masterGain) {
@@ -113,16 +114,18 @@ export function initAudio(
         }
 
         if (playback.audio) {
-            playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
-            playback.saturator.curve = createSoftClipCurve(); // @direct-mutation
-            playback.saturator.oversample = '4x'; // @direct-mutation
+            const saturator = playback.audio.createWaveShaper();
+            (playback as Mutable<typeof playback>).saturator = saturator; // @direct-mutation
+            saturator.curve = createSoftClipCurve(); // @direct-mutation
+            saturator.oversample = '4x'; // @direct-mutation
 
-            playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
-            playback.masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
-            playback.masterLimiter.knee.setValueAtTime(3, playback.audio.currentTime);
-            playback.masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
-            playback.masterLimiter.attack.setValueAtTime(0.001, playback.audio.currentTime);
-            playback.masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
+            const masterLimiter = playback.audio.createDynamicsCompressor();
+            (playback as Mutable<typeof playback>).masterLimiter = masterLimiter; // @direct-mutation
+            masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
+            masterLimiter.knee.setValueAtTime(3, playback.audio.currentTime);
+            masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
+            masterLimiter.attack.setValueAtTime(0.001, playback.audio.currentTime);
+            masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
         }
 
         if (
@@ -137,9 +140,10 @@ export function initAudio(
         }
 
         if (playback.audio && playback.masterGain) {
-            playback.reverbNode = playback.audio.createConvolver(); // @direct-mutation
-            playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0); // @direct-mutation
-            playback.reverbNode.connect(playback.masterGain);
+            const reverbNode = playback.audio.createConvolver();
+            (playback as Mutable<typeof playback>).reverbNode = reverbNode; // @direct-mutation
+            reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0); // @direct-mutation
+            reverbNode.connect(playback.masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---
             const reverbHPF = playback.audio.createBiquadFilter();
@@ -151,8 +155,8 @@ export function initAudio(
             reverbLPF.frequency.setValueAtTime(6000, playback.audio.currentTime);
 
             reverbHPF.connect(reverbLPF);
-            reverbLPF.connect(playback.reverbNode);
-            playback.reverbPreFilter = reverbHPF; // @direct-mutation
+            reverbLPF.connect(reverbNode);
+            (playback as Mutable<typeof playback>).reverbPreFilter = reverbHPF; // @direct-mutation
         }
 
         const modules = [
@@ -206,8 +210,8 @@ export function initAudio(
                 notch.connect(panner);
                 panner.connect(playback.masterGain);
 
-                playback.chordsEQ = busEQ; // @direct-mutation
-                playback.chordsPanner = panner; // @direct-mutation
+                (playback as Mutable<typeof playback>).chordsEQ = busEQ; // @direct-mutation
+                (playback as Mutable<typeof playback>).chordsPanner = panner; // @direct-mutation
             } else if (m.name === 'bass') {
                 const sidechain = playback.audio.createGain();
                 sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
@@ -236,8 +240,8 @@ export function initAudio(
                 scoop.connect(definition);
                 definition.connect(playback.masterGain);
 
-                playback.bassSidechain = sidechain; // @direct-mutation
-                playback.bassEQ = busEQ; // @direct-mutation
+                (playback as Mutable<typeof playback>).bassSidechain = sidechain; // @direct-mutation
+                (playback as Mutable<typeof playback>).bassEQ = busEQ; // @direct-mutation
             } else if (m.name === 'soloist') {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
@@ -249,7 +253,7 @@ export function initAudio(
                 busEQ.connect(presence);
                 presence.connect(playback.masterGain);
 
-                playback.soloistEQ = busEQ; // @direct-mutation
+                (playback as Mutable<typeof playback>).soloistEQ = busEQ; // @direct-mutation
             } else if (m.name === 'harmonies') {
                 const warmth = playback.audio.createBiquadFilter();
                 warmth.type = 'peaking';
@@ -263,8 +267,8 @@ export function initAudio(
                 busEQ.connect(warmth);
                 warmth.connect(panner);
                 panner.connect(playback.masterGain);
-                playback.harmoniesEQ = busEQ; // @direct-mutation
-                playback.harmoniesPanner = panner; // @direct-mutation
+                (playback as Mutable<typeof playback>).harmoniesEQ = busEQ; // @direct-mutation
+                (playback as Mutable<typeof playback>).harmoniesPanner = panner; // @direct-mutation
             } else if (m.name === 'drums') {
                 const drumsHP = playback.audio.createBiquadFilter();
                 drumsHP.type = 'highpass';
@@ -279,7 +283,7 @@ export function initAudio(
                 gainNode.connect(drumsHP);
                 drumsHP.connect(drumsAir);
                 drumsAir.connect(playback.masterGain);
-                playback.drumsEQ = drumsHP; // @direct-mutation
+                (playback as Mutable<typeof playback>).drumsEQ = drumsHP; // @direct-mutation
             }
 
             (playback as unknown as Record<string, GainNode>)[`${m.name}Gain`] = gainNode;

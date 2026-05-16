@@ -13,6 +13,7 @@ import {
     saveProgression,
 } from '../arranger-controller.js';
 import { pushHistory, undo } from '../history.js';
+import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { formatUnicodeSymbols, generateId } from '../utils.js';
 
@@ -106,7 +107,9 @@ export function EditorModal() {
         setShowConfirmClear(false);
         setIsMenuOpen(false);
         pushHistory();
-        arranger.sections = [{ id: generateId(), label: 'Intro', value: '' }];
+        (arranger as Mutable<typeof arranger>).sections = [
+            { id: generateId(), label: 'Intro', value: '' },
+        ]; // @direct-mutation
         clearChordPresetHighlight();
         refreshArrangerUI();
     };

@@ -1,5 +1,12 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, GlobalContext, GrooveState, Instrument, PocketState } from '../types.js';
+import type {
+    Action,
+    GlobalContext,
+    GrooveState,
+    Instrument,
+    Mutable,
+    PocketState,
+} from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export type { GrooveState, Instrument, PocketState };
@@ -63,6 +70,7 @@ export const groove = deepSignal<GrooveState>({
 });
 
 export function grooveReducer(action: Action, playback: GlobalContext): boolean {
+    const g = groove as Mutable<typeof groove>;
     switch (action.type) {
         case ACTIONS.UPDATE_GB:
             for (const key in action.payload) {
@@ -82,22 +90,22 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             }
             break;
         case ACTIONS.RESET_STATE:
-            groove.enabled = true;
-            groove.volume = 1.0;
-            groove.reverb = 0.2;
-            groove.swing = 0;
-            groove.swingSub = '8th';
-            groove.genreFeel = 'Rock';
-            groove.lastSmartGenre = 'Rock';
-            groove.measures = 1;
-            groove.currentMeasure = 0;
-            groove.orchestrationMap = null;
-            groove.fillMap = null;
-            groove.accentMap = null;
-            groove.seedTimelineStartStep = 0;
-            groove.lastHatGain = null;
-            groove.lastRideGain = null;
-            groove.lastCrashGain = null;
+            g.enabled = true;
+            g.volume = 1.0;
+            g.reverb = 0.2;
+            g.swing = 0;
+            g.swingSub = '8th';
+            g.genreFeel = 'Rock';
+            g.lastSmartGenre = 'Rock';
+            g.measures = 1;
+            g.currentMeasure = 0;
+            g.orchestrationMap = null;
+            g.fillMap = null;
+            g.accentMap = null;
+            g.seedTimelineStartStep = 0;
+            g.lastHatGain = null;
+            g.lastRideGain = null;
+            g.lastCrashGain = null;
 
             groove.pocket.globalDrive = 0;
             groove.pocket.tightness = 0.5;
@@ -111,16 +119,16 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             });
             return true;
         case ACTIONS.SET_ACTIVE_MEASURE:
-            groove.currentMeasure = parseInt(String(action.payload), 10);
+            g.currentMeasure = parseInt(String(action.payload), 10);
             return true;
         case ACTIONS.SET_SWING:
-            groove.swing = action.payload;
+            g.swing = action.payload;
             return true;
         case ACTIONS.SET_SWING_SUB:
-            groove.swingSub = action.payload;
+            g.swingSub = action.payload;
             return true;
         case ACTIONS.SET_HUMANIZE:
-            groove.humanize = action.payload;
+            g.humanize = action.payload;
             return true;
         case ACTIONS.SET_VOLUME:
             if (
@@ -128,7 +136,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 action.payload.module === 'drum' ||
                 action.payload.module === 'drums'
             ) {
-                groove.volume = action.payload.value;
+                g.volume = action.payload.value;
                 return true;
             }
             return false;
@@ -138,51 +146,51 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 action.payload.module === 'drum' ||
                 action.payload.module === 'drums'
             ) {
-                groove.reverb = action.payload.value;
+                g.reverb = action.payload.value;
                 return true;
             }
             return false;
         case ACTIONS.SET_GROOVE_SEED:
             if (!groove.sectionSeedMap) {
-                groove.sectionSeedMap = {};
+                g.sectionSeedMap = {};
             }
             (groove.sectionSeedMap as any)[action.payload.sectionId] = action.payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== action.payload) {
-                groove.genreSwitchCountdown = action.payload;
+                g.genreSwitchCountdown = action.payload;
                 return true;
             }
             return false;
         case ACTIONS.SET_GENRE_FEEL:
             if (playback.isPlaying) {
-                groove.pendingGenreFeel = action.payload;
-                groove.lastSmartGenre = action.payload.genreName || groove.lastSmartGenre;
+                g.pendingGenreFeel = action.payload;
+                g.lastSmartGenre = action.payload.genreName || groove.lastSmartGenre;
             } else {
-                groove.genreFeel = action.payload.feel ?? groove.genreFeel;
-                groove.pendingGenreFeel = null;
-                groove.lastSmartGenre = action.payload.genreName || groove.lastSmartGenre;
+                g.genreFeel = action.payload.feel ?? groove.genreFeel;
+                g.pendingGenreFeel = null;
+                g.lastSmartGenre = action.payload.genreName || groove.lastSmartGenre;
                 // DeepSignal handles nested reactivity, but we still map to ensure fresh references
                 // for any legacy components that might rely on shallow comparison.
-                groove.instruments = groove.instruments.map((inst) => ({
+                g.instruments = groove.instruments.map((inst) => ({
                     ...inst,
                     steps: [...inst.steps],
                 }));
 
                 if (action.payload.swing !== undefined) {
-                    groove.swing = action.payload.swing;
+                    g.swing = action.payload.swing;
                 }
                 if (action.payload.sub !== undefined) {
-                    groove.swingSub = action.payload.sub;
+                    g.swingSub = action.payload.sub;
                 }
             }
             return true;
         case ACTIONS.TRIGGER_FILL:
-            groove.fillSteps = action.payload.steps;
-            groove.fillActive = true;
-            groove.fillStartStep = action.payload.startStep;
-            groove.fillLength = action.payload.length;
-            groove.pendingCrash = !!action.payload.crash;
+            g.fillSteps = action.payload.steps;
+            g.fillActive = true;
+            g.fillStartStep = action.payload.startStep;
+            g.fillLength = action.payload.length;
+            g.pendingCrash = !!action.payload.crash;
             return true;
     }
     return false;

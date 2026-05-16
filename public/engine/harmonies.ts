@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { Chord, EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { getBestInversion } from './chords-engine.js';
 import {
@@ -83,7 +83,7 @@ export function clearHarmonyMemory(state: EnsembleState | null): void {
     }
     const { harmony } = state;
     motifCache.clear();
-    harmony.lastMidis = []; // @worker-mutation
+    (harmony as Mutable<typeof harmony>).lastMidis = []; // @worker-mutation
     lastPlayedStep = -1;
 }
 
@@ -604,7 +604,7 @@ function finalizeHarmonyNotes(
         finalMidisForMemory.push(midi);
     }
 
-    harmony.lastMidis = finalMidisForMemory; // @worker-mutation
+    (harmony as Mutable<typeof harmony>).lastMidis = finalMidisForMemory; // @worker-mutation
     lastPlayedStep = step; // @worker-mutation
     return notes;
 }
@@ -754,7 +754,7 @@ export function getHarmonyNotes(
 
     const motif = motifCache.get(sectionKey)!;
     if (harmony.rhythmicMask !== motif.rhythmicMask) {
-        harmony.rhythmicMask = motif.rhythmicMask; // @worker-mutation
+        (harmony as Mutable<typeof harmony>).rhythmicMask = motif.rhythmicMask; // @worker-mutation
     }
 
     const context: HarmonyContext = {

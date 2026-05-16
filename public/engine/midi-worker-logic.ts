@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm } from '../form-analysis.js';
-import type { EnsembleState, StepInfo } from '../types.js';
+import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, getStepInfo } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState } from './accompaniment.js';
@@ -198,18 +198,18 @@ export class ExportProcessor {
             currentLoopCount: playback.currentLoopCount,
         };
 
-        chords.enabled = true; // @worker-mutation
-        bass.enabled = true; // @worker-mutation
-        soloist.enabled = true; // @worker-mutation
-        harmony.enabled = true; // @worker-mutation
-        groove.enabled = true; // @worker-mutation
-        playback.currentLoopCount = 0; // @worker-mutation
+        (chords as Mutable<typeof chords>).enabled = true; // @worker-mutation
+        (bass as Mutable<typeof bass>).enabled = true; // @worker-mutation
+        (soloist as Mutable<typeof soloist>).enabled = true; // @worker-mutation
+        (harmony as Mutable<typeof harmony>).enabled = true; // @worker-mutation
+        (groove as Mutable<typeof groove>).enabled = true; // @worker-mutation
+        (playback as Mutable<typeof playback>).currentLoopCount = 0; // @worker-mutation
 
         resetSoloistState(this.state);
         resetBassState(this.state);
-        harmony.lastMidis = []; // @worker-mutation
-        groove.fillActive = false; // @worker-mutation
-        groove.pendingCrash = false; // @worker-mutation
+        (harmony as Mutable<typeof harmony>).lastMidis = []; // @worker-mutation
+        (groove as Mutable<typeof groove>).fillActive = false; // @worker-mutation
+        (groove as Mutable<typeof groove>).pendingCrash = false; // @worker-mutation
 
         compingState.lockedUntil = 0; // @worker-mutation
         compingState.lastChordIndex = -1; // @worker-mutation
@@ -529,8 +529,8 @@ export class ExportProcessor {
             if (groove.fillActive) {
                 const fillStep = globalStep - groove.fillStartStep;
                 if (fillStep === groove.fillLength) {
-                    groove.fillActive = false; // @worker-mutation
-                    groove.pendingCrash = false; // @worker-mutation
+                    (groove as Mutable<typeof groove>).fillActive = false; // @worker-mutation
+                    (groove as Mutable<typeof groove>).pendingCrash = false; // @worker-mutation
                 }
             }
 
@@ -808,15 +808,16 @@ export class ExportProcessor {
     cleanup(): void {
         const { chords, bass, soloist, harmony, groove, playback } = this.state;
         if (this.prevStates) {
-            chords.enabled = this.prevStates.chords; // @worker-mutation
-            bass.enabled = this.prevStates.bass; // @worker-mutation
-            soloist.enabled = this.prevStates.soloist; // @worker-mutation
-            harmony.enabled = this.prevStates.harmony; // @worker-mutation
-            groove.enabled = this.prevStates.groove; // @worker-mutation
-            playback.bandIntensity = this.prevStates.intensity; // @worker-mutation
-            soloist.mode = this.prevStates.mode; // @worker-mutation
-            soloist.sessionSteps = this.prevStates.sessionSteps; // @worker-mutation
-            playback.currentLoopCount = this.prevStates.currentLoopCount; // @worker-mutation
+            (chords as Mutable<typeof chords>).enabled = this.prevStates.chords; // @worker-mutation
+            (bass as Mutable<typeof bass>).enabled = this.prevStates.bass; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).enabled = this.prevStates.soloist; // @worker-mutation
+            (harmony as Mutable<typeof harmony>).enabled = this.prevStates.harmony; // @worker-mutation
+            (groove as Mutable<typeof groove>).enabled = this.prevStates.groove; // @worker-mutation
+            (playback as Mutable<typeof playback>).bandIntensity = this.prevStates.intensity; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).mode = this.prevStates.mode; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).sessionSteps = this.prevStates.sessionSteps; // @worker-mutation
+            (playback as Mutable<typeof playback>).currentLoopCount =
+                this.prevStates.currentLoopCount; // @worker-mutation
         }
 
         _isExporting = false;

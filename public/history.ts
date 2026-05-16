@@ -1,4 +1,5 @@
 import { getState } from './state.js';
+import type { Mutable } from './types.js';
 import { showToast } from './ui.js';
 
 export function pushHistory(): void {
@@ -21,7 +22,7 @@ export function undo(refreshArrangerUI?: () => void): void {
     try {
         const parsed = JSON.parse(last);
         if (Array.isArray(parsed)) {
-            arranger.sections = parsed;
+            (arranger as Mutable<typeof arranger>).sections = parsed; // @direct-mutation
         } else {
             console.warn('[History] Undo failed: Snapshot is not an array');
             return;

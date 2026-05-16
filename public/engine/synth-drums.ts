@@ -1,5 +1,5 @@
 import type { GrooveState } from '../state/groove.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import {
     createSimplePanner,
@@ -589,15 +589,15 @@ export function killDrumNote(state: EnsembleState): void {
     }
     if (groove.lastHatGain) {
         rampGain(groove.lastHatGain.gain, 0, playback.audio.currentTime, 0.005);
-        groove.lastHatGain = null; // @direct-mutation
+        (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
     }
     if (groove.lastRideGain) {
         rampGain(groove.lastRideGain.gain, 0, playback.audio.currentTime, 0.05);
-        groove.lastRideGain = null; // @direct-mutation
+        (groove as Mutable<typeof groove>).lastRideGain = null; // @direct-mutation
     }
     if (groove.lastCrashGain) {
         rampGain(groove.lastCrashGain.gain, 0, playback.audio.currentTime, 0.12);
-        groove.lastCrashGain = null; // @direct-mutation
+        (groove as Mutable<typeof groove>).lastCrashGain = null; // @direct-mutation
     }
 }
 
@@ -884,9 +884,9 @@ export function playDrumSound(
         );
 
         if (isRide) {
-            groove.lastRideGain = gain; // @direct-mutation
+            (groove as Mutable<typeof groove>).lastRideGain = gain; // @direct-mutation
         } else {
-            groove.lastHatGain = gain; // @direct-mutation
+            (groove as Mutable<typeof groove>).lastHatGain = gain; // @direct-mutation
         }
 
         source.connect(bpFilter);
@@ -927,10 +927,10 @@ export function playDrumSound(
         source.onended = () => {
             if (isRide) {
                 if (groove.lastRideGain === gain) {
-                    groove.lastRideGain = null; // @direct-mutation
+                    (groove as Mutable<typeof groove>).lastRideGain = null; // @direct-mutation
                 }
             } else if (groove.lastHatGain === gain) {
-                groove.lastHatGain = null; // @direct-mutation
+                (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };
@@ -948,11 +948,11 @@ export function playDrumSound(
 
         if (groove.lastHatGain) {
             rampGain(groove.lastHatGain.gain, 0, playTime, 0.04);
-            groove.lastHatGain = null; // @direct-mutation
+            (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
         }
         if (groove.lastRideGain) {
             rampGain(groove.lastRideGain.gain, 0, playTime, 0.12);
-            groove.lastRideGain = null; // @direct-mutation
+            (groove as Mutable<typeof groove>).lastRideGain = null; // @direct-mutation
         }
         if (groove.lastCrashGain) {
             rampGain(groove.lastCrashGain.gain, 0, playTime, 0.18);
@@ -981,7 +981,7 @@ export function playDrumSound(
         // before the long tail takes over. tc 0.06 keeps the transient crisp.
         gain.gain.setTargetAtTime(vol * 0.42, playTime + 0.015, 0.06);
         gain.gain.setTargetAtTime(0, playTime + voiceConfig.decayDelay, voiceConfig.decayTime);
-        groove.lastCrashGain = gain; // @direct-mutation
+        (groove as Mutable<typeof groove>).lastCrashGain = gain; // @direct-mutation
 
         source.connect(bpFilter);
         bpFilter.connect(hpFilter);
@@ -993,7 +993,7 @@ export function playDrumSound(
 
         source.onended = () => {
             if (groove.lastCrashGain === gain) {
-                groove.lastCrashGain = null; // @direct-mutation
+                (groove as Mutable<typeof groove>).lastCrashGain = null; // @direct-mutation
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };

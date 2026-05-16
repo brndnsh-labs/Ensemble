@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -102,19 +102,19 @@ export function togglePlay(
 
     if (isStopping) {
         if (!fromDispatch) {
-            playback.isPlaying = false; // @direct-mutation
+            (playback as Mutable<typeof playback>).isPlaying = false; // @direct-mutation
         }
         if (playback.autoIntensity && dispatch) {
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
         stopWorker();
         stopPlatformAudioAndWakeLock();
-        playback.drawQueue = []; // @direct-mutation
-        playback.lastActiveDrumElements = null; // @direct-mutation
-        chords.lastActiveChordIndex = null; // @direct-mutation
-        chords.scheduledChordIndex = null; // @direct-mutation
-        playback.resolutionTriggered = false; // @direct-mutation
-        playback.isScheduling = false; // @direct-mutation
+        (playback as Mutable<typeof playback>).drawQueue = []; // @direct-mutation
+        (playback as Mutable<typeof playback>).lastActiveDrumElements = null; // @direct-mutation
+        (chords as Mutable<typeof chords>).lastActiveChordIndex = null; // @direct-mutation
+        (chords as Mutable<typeof chords>).scheduledChordIndex = null; // @direct-mutation
+        (playback as Mutable<typeof playback>).resolutionTriggered = false; // @direct-mutation
+        (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
         if (dispatch) {
             dispatch(ACTIONS.SET_ENDING_PENDING, false);
             dispatch(ACTIONS.SET_STOP_AT_END, false);
@@ -130,11 +130,16 @@ export function togglePlay(
             if (playback.suspendTimeout) {
                 clearTimeout(playback.suspendTimeout);
             }
-            playback.suspendTimeout /* @direct-mutation */ = setTimeout(() => {
-                if (!playback.isPlaying && playback.audio && playback.audio.state === 'running') {
-                    playback.audio.suspend();
-                }
-            }, 3000) as any;
+            (playback as Mutable<typeof playback>).suspendTimeout /* @direct-mutation */ =
+                setTimeout(() => {
+                    if (
+                        !playback.isPlaying &&
+                        playback.audio &&
+                        playback.audio.state === 'running'
+                    ) {
+                        playback.audio.suspend();
+                    }
+                }, 3000) as any;
         }
     } else {
         if (playback.suspendTimeout) {
@@ -147,19 +152,19 @@ export function togglePlay(
         }
 
         if (!fromDispatch) {
-            playback.isPlaying = true; // @direct-mutation
-            playback.sessionStartTime = performance.now(); // @direct-mutation
+            (playback as Mutable<typeof playback>).isPlaying = true; // @direct-mutation
+            (playback as Mutable<typeof playback>).sessionStartTime = performance.now(); // @direct-mutation
         }
 
         if (playback.autoIntensity && dispatch) {
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
 
-        playback.step = 0; // @direct-mutation
-        playback.resolutionTriggered = false; // @direct-mutation
-        playback.isScheduling = false; // @direct-mutation
-        chords.scheduledChordIndex = 0; // @direct-mutation
-        chords.lastActiveChordIndex = null; // @direct-mutation
+        (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
+        (playback as Mutable<typeof playback>).resolutionTriggered = false; // @direct-mutation
+        (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
+        (chords as Mutable<typeof chords>).scheduledChordIndex = 0; // @direct-mutation
+        (chords as Mutable<typeof chords>).lastActiveChordIndex = null; // @direct-mutation
         if (dispatch) {
             dispatch(ACTIONS.RESET_SESSION); // Reset warm-up counters
             dispatch(ACTIONS.SET_ENDING_PENDING, false);
@@ -170,10 +175,10 @@ export function togglePlay(
         startPlatformAudioAndWakeLock();
         restoreGains(state);
         const startTime = (playback.audio?.currentTime || 0) + 0.1;
-        playback.nextNoteTime = startTime; // @direct-mutation
-        playback.unswungNextNoteTime = startTime; // @direct-mutation
-        playback.isCountingIn = playback.countIn; // @direct-mutation
-        playback.countInBeat = 0; // @direct-mutation
+        (playback as Mutable<typeof playback>).nextNoteTime = startTime; // @direct-mutation
+        (playback as Mutable<typeof playback>).unswungNextNoteTime = startTime; // @direct-mutation
+        (playback as Mutable<typeof playback>).isCountingIn = playback.countIn; // @direct-mutation
+        (playback as Mutable<typeof playback>).countInBeat = 0; // @direct-mutation
 
         // Initial MIDI cleanup
         startMidiTransport(state, startTime);
@@ -272,7 +277,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
     if (playback.isScheduling || !playback.isPlaying) {
         return;
     }
-    playback.isScheduling = true; // @direct-mutation
+    (playback as Mutable<typeof playback>).isScheduling = true; // @direct-mutation
 
     try {
         requestBuffer(playback.step);
@@ -311,7 +316,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 // --- Resolution Trigger Logic ---
                 // If ending is pending or stopAtEnd is active, check for appropriate boundary (Next Chorus)
                 if (playback.step > 0 && playback.step % arranger.totalSteps === 0) {
-                    playback.currentLoopCount++;
+                    (playback as Mutable<typeof playback>).currentLoopCount++; // @direct-mutation
 
                     // --- Loop Limit Check ---
                     if (playback.songMode && playback.loopLimit > 0 && !playback.isEndingPending) {
@@ -326,8 +331,8 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                         playback.resolutionTriggered
                     ) {
                         if (!playback.resolutionTriggered) {
-                            playback.resolutionTriggered = true; // @direct-mutation
-                            playback.stopAtEnd = false; // @direct-mutation
+                            (playback as Mutable<typeof playback>).resolutionTriggered = true; // @direct-mutation
+                            (playback as Mutable<typeof playback>).stopAtEnd = false; // @direct-mutation
                             triggerResolution(state, playback.nextNoteTime, dispatch);
                         }
                         return; // Stop scheduling
@@ -343,7 +348,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
             }
         }
     } finally {
-        playback.isScheduling = false; // @direct-mutation
+        (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
     }
 }
 
@@ -354,24 +359,24 @@ function applyPendingGenre(state: EnsembleState): void {
         return;
     }
 
-    groove.genreFeel = payload.feel; // @direct-mutation
+    (groove as Mutable<typeof groove>).genreFeel = payload.feel; // @direct-mutation
     if (payload.swing !== undefined) {
-        groove.swing = payload.swing; // @direct-mutation
+        (groove as Mutable<typeof groove>).swing = payload.swing; // @direct-mutation
     }
     if (payload.sub !== undefined) {
-        groove.swingSub = payload.sub; // @direct-mutation
+        (groove as Mutable<typeof groove>).swingSub = payload.sub; // @direct-mutation
     }
     if (payload.genreName) {
-        groove.lastSmartGenre = payload.genreName; // @direct-mutation
+        (groove as Mutable<typeof groove>).lastSmartGenre = payload.genreName; // @direct-mutation
     }
 
     if (payload.drum) {
         loadDrumPreset(payload.drum);
     }
 
-    groove.pendingGenreFeel = null; // @direct-mutation
+    (groove as Mutable<typeof groove>).pendingGenreFeel = null; // @direct-mutation
 
-    playback.nextNoteTime = playback.unswungNextNoteTime; // @direct-mutation
+    (playback as Mutable<typeof playback>).nextNoteTime = playback.unswungNextNoteTime; // @direct-mutation
 
     syncAndFlushWorker(state, playback.step);
     triggerFlash(0.15);
@@ -381,14 +386,14 @@ function advanceCountIn(state: EnsembleState): void {
     const { playback, arranger } = state;
     const effectiveBpm = playback.bpm;
     const beatDuration = 60.0 / effectiveBpm;
-    playback.nextNoteTime += beatDuration;
-    playback.unswungNextNoteTime += beatDuration;
-    playback.countInBeat++;
+    (playback as Mutable<typeof playback>).nextNoteTime += beatDuration; // @direct-mutation
+    (playback as Mutable<typeof playback>).unswungNextNoteTime += beatDuration; // @direct-mutation
+    (playback as Mutable<typeof playback>).countInBeat++; // @direct-mutation
     const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     if (playback.countInBeat >= ts.beats) {
-        playback.isCountingIn = false; // @direct-mutation
-        playback.step = 0; // @direct-mutation
+        (playback as Mutable<typeof playback>).isCountingIn = false; // @direct-mutation
+        (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
     }
 }
 
@@ -513,9 +518,9 @@ function advanceGlobalStep(state: EnsembleState): void {
 
     const duration = calculateStepDuration(playback.step, effectiveBpm, ts, groove);
 
-    playback.nextNoteTime += duration;
-    playback.unswungNextNoteTime += sixteenth;
-    playback.step++; // @direct-mutation
+    (playback as Mutable<typeof playback>).nextNoteTime += duration; // @direct-mutation
+    (playback as Mutable<typeof playback>).unswungNextNoteTime += sixteenth; // @direct-mutation
+    (playback as Mutable<typeof playback>).step++; // @direct-mutation
 }
 
 /**
@@ -539,7 +544,7 @@ function getChordAtStep(state: EnsembleState, step: number): ChordAtStep | null 
     const { arranger, chords } = state;
     const cursor = { index: chords.scheduledChordIndex || 0, sectionIndex: 0 };
     const result = _getChordAtStep(step, arranger, cursor);
-    chords.scheduledChordIndex = cursor.index; // @direct-mutation — always persist, including loop-back resets
+    (chords as Mutable<typeof chords>).scheduledChordIndex = cursor.index; // @direct-mutation — always persist, including loop-back resets
     return result;
 }
 
@@ -592,10 +597,10 @@ function scheduleDrums(
                     value: false,
                 });
             } else {
-                groove.fillActive = false; // @direct-mutation
+                (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
             }
             if (groove.pendingCrash) {
-                groove.pendingCrash = false; // @direct-mutation
+                (groove as Mutable<typeof groove>).pendingCrash = false; // @direct-mutation
             }
         }
 
@@ -681,7 +686,7 @@ function scheduleBass(
                 const { freq, durationSteps, velocity, timingOffset, muted } = noteEntry;
                 const { chord } = chordData as any;
                 const adjustedTime = time + (timingOffset || 0);
-                bass.lastPlayedFreq = freq; // @direct-mutation
+                (bass as Mutable<typeof bass>).lastPlayedFreq = freq; // @direct-mutation
                 const midiNum = getMidi(freq || 0) || 0;
                 const { name, octave } = midiToNote(midiNum);
                 const spb = 60.0 / playback.bpm;
@@ -760,7 +765,7 @@ function scheduleSoloist(
                 const offsetS = timingOffset || 0;
 
                 if (!noteEntry.isDoubleStop) {
-                    soloist.lastPlayedFreq = freq; // @direct-mutation
+                    (soloist as Mutable<typeof soloist>).lastPlayedFreq = freq; // @direct-mutation
                 }
 
                 const midiNum = noteEntry.midi || getMidi(freq || 0) || 0;
@@ -814,7 +819,7 @@ function scheduleSoloist(
                         noteType,
                     });
                 }
-                soloist.lastNoteEnd = finalTime + duration; // @direct-mutation
+                (soloist as Mutable<typeof soloist>).lastNoteEnd = finalTime + duration; // @direct-mutation
             }
         });
     }
@@ -835,7 +840,7 @@ export function scheduleChordVisuals(
         }
 
         if (chords.lastActiveChordIndex !== chordData.chordIndex) {
-            chords.lastActiveChordIndex = chordData.chordIndex; // @direct-mutation
+            (chords as Mutable<typeof chords>).lastActiveChordIndex = chordData.chordIndex; // @direct-mutation
         }
 
         // Only queue canvas events when the Visuals workspace is active.
@@ -1053,7 +1058,7 @@ export function scheduleGlobalEvent(
             }
         }
         if (groove.snareMask !== snareMask) {
-            groove.snareMask = snareMask; // @direct-mutation
+            (groove as Mutable<typeof groove>).snareMask = snareMask; // @direct-mutation
             // Immediate sync to worker so harmony module can "hear" the new drum pattern
             syncWorker(ACTIONS.SET_PARAM, {
                 module: 'groove',
@@ -1148,7 +1153,7 @@ export function scheduleGlobalEvent(
     const chordData = getChordAtStep(state, step);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
-            playback.currentKey = chordData.chord.key as any; // @direct-mutation
+            (playback as Mutable<typeof playback>).currentKey = chordData.chord.key as any; // @direct-mutation
             window.dispatchEvent(
                 new CustomEvent('key-change', { detail: { key: playback.currentKey } }),
             );
@@ -1253,7 +1258,7 @@ function syncAndFlushWorker(
     if (dispatch) {
         dispatch(ACTIONS.SET_PARAM, { module: 'groove', param: 'fillActive', value: false });
     } else {
-        groove.fillActive = false; // @direct-mutation
+        (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
     }
 
     killAllNotes(state);

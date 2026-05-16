@@ -5,6 +5,7 @@ import type {
     BassState,
     ChordState,
     HarmonyState,
+    Mutable,
     SoloistPhraseContext,
     SoloistSessionSeed,
     SoloistState,
@@ -160,6 +161,10 @@ const instrumentStateMap: Record<string, any> = {
 };
 
 export function instrumentReducer(action: Action): boolean {
+    const c = chords as Mutable<typeof chords>;
+    const b = bass as Mutable<typeof bass>;
+    const s = soloist as Mutable<typeof soloist>;
+    const h = harmony as Mutable<typeof harmony>;
     switch (action.type) {
         case ACTIONS.SET_PARAM: {
             const modKey =
@@ -173,71 +178,71 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_MODAL_OPEN:
             return false;
         case ACTIONS.RESET_STATE:
-            chords.enabled = true;
-            chords.volume = 1.0;
-            chords.reverb = INSTRUMENT_REVERB_DEFAULTS.chords;
-            chords.instrument = 'Clean';
-            chords.octave = 65;
-            chords.density = 'standard';
+            c.enabled = true;
+            c.volume = 1.0;
+            c.reverb = INSTRUMENT_REVERB_DEFAULTS.chords;
+            c.instrument = 'Clean';
+            c.octave = 65;
+            c.density = 'standard';
 
-            bass.enabled = true;
-            bass.volume = 1.0;
-            bass.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
-            bass.octave = 38;
-            bass.style = 'smart';
+            b.enabled = true;
+            b.volume = 1.0;
+            b.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
+            b.octave = 38;
+            b.style = 'smart';
 
-            soloist.enabled = false;
-            soloist.preset = 'trumpet';
-            soloist.volume = 1.0;
-            soloist.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
-            soloist.octave = 72;
-            soloist.style = 'smart';
-            soloist.mode = 'monophonic';
-            soloist.complexity = 0.5;
-            soloist.tradeMode = 'manual';
-            soloist.isWaitingForEntry = false;
-            soloist.isYielding = false;
-            soloist.motifTracking = false;
-            soloist.seed = '';
-            soloist.sessionSeed = null;
-            soloist.phrasingIntensity = 0.5;
-            soloist.busySteps = 0;
-            soloist.sessionSteps = 0;
-            soloist.phraseCount = 0;
-            soloist.isResting = true;
-            soloist.restSteps = 0;
-            soloist.activeSteps = 0;
-            soloist.rhythmicEntropy = 0;
-            soloist.rhythmPlan = [];
-            soloist.deviceBuffer = [];
-            soloist.embellishmentBuffer = [];
-            soloist.hookBuffer = [];
-            soloist.sharedHookBuffer = [];
-            soloist.recentNotes = [];
-            soloist.phraseStartStep = null;
-            soloist.phraseLoopCount = null;
-            soloist.phraseSectionLabel = null;
-            soloist.phraseSectionOccurrence = 0;
-            soloist.sectionRecall = {};
-            soloist.sectionRecallLoop = null;
-            soloist.formArcRecall = {};
-            soloist.phraseContext.role = 'call';
-            soloist.phraseContext.skeleton = [];
-            soloist.phraseContext.lastInterval = null;
-            soloist.phraseContext.profile = 'srv';
-            soloist.phraseContext.signature = null;
-            soloist.phraseContext.responseSignature = null;
-            soloist.phraseContext.responseMode = 'free';
-            soloist.phraseContext.responseSource = 'free';
-            soloist.phraseContext.sectionLabel = null;
-            soloist.phraseContext.sectionOccurrence = 0;
+            s.enabled = false;
+            s.preset = 'trumpet';
+            s.volume = 1.0;
+            s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
+            s.octave = 72;
+            s.style = 'smart';
+            s.mode = 'monophonic';
+            s.complexity = 0.5;
+            s.tradeMode = 'manual';
+            s.isWaitingForEntry = false;
+            s.isYielding = false;
+            s.motifTracking = false;
+            s.seed = '';
+            s.sessionSeed = null;
+            s.phrasingIntensity = 0.5;
+            s.busySteps = 0;
+            s.sessionSteps = 0;
+            s.phraseCount = 0;
+            s.isResting = true;
+            s.restSteps = 0;
+            s.activeSteps = 0;
+            s.rhythmicEntropy = 0;
+            s.rhythmPlan = [];
+            s.deviceBuffer = [];
+            s.embellishmentBuffer = [];
+            s.hookBuffer = [];
+            s.sharedHookBuffer = [];
+            s.recentNotes = [];
+            s.phraseStartStep = null;
+            s.phraseLoopCount = null;
+            s.phraseSectionLabel = null;
+            s.phraseSectionOccurrence = 0;
+            s.sectionRecall = {};
+            s.sectionRecallLoop = null;
+            s.formArcRecall = {};
+            s.phraseContext.role = 'call';
+            s.phraseContext.skeleton = [];
+            s.phraseContext.lastInterval = null;
+            s.phraseContext.profile = 'srv';
+            s.phraseContext.signature = null;
+            s.phraseContext.responseSignature = null;
+            s.phraseContext.responseMode = 'free';
+            s.phraseContext.responseSource = 'free';
+            s.phraseContext.sectionLabel = null;
+            s.phraseContext.sectionOccurrence = 0;
 
-            harmony.enabled = false;
-            harmony.volume = 1.0;
-            harmony.reverb = INSTRUMENT_REVERB_DEFAULTS.harmony;
-            harmony.octave = 60;
-            harmony.style = 'smart';
-            harmony.complexity = 0.5;
+            h.enabled = false;
+            h.volume = 1.0;
+            h.reverb = INSTRUMENT_REVERB_DEFAULTS.harmony;
+            h.octave = 60;
+            h.style = 'smart';
+            h.complexity = 0.5;
             return true;
         case ACTIONS.SET_STYLE:
             if (instrumentStateMap[action.payload.module]) {
@@ -245,7 +250,7 @@ export function instrumentReducer(action: Action): boolean {
             }
             return true;
         case ACTIONS.SET_DENSITY:
-            chords.density = action.payload;
+            c.density = action.payload;
             return true;
         case ACTIONS.SET_VOLUME:
             if (instrumentStateMap[action.payload.module]) {
@@ -258,37 +263,37 @@ export function instrumentReducer(action: Action): boolean {
             }
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
-            soloist.mode = resolveSoloistMode(action.payload);
+            s.mode = resolveSoloistMode(action.payload);
             return true;
         case ACTIONS.SET_SOLOIST_SEED:
-            soloist.seed = action.payload;
+            s.seed = action.payload;
             return true;
         case ACTIONS.SET_SOLOIST_PRESET:
-            soloist.preset = action.payload;
+            s.preset = action.payload;
             return true;
         case ACTIONS.RESET_SESSION:
-            soloist.sessionSteps = 0;
+            s.sessionSteps = 0;
             return true;
         case ACTIONS.SET_GENRE_FEEL:
             if (action.payload.chord) {
-                chords.style = action.payload.chord;
+                c.style = action.payload.chord;
             }
             if (action.payload.bass) {
-                bass.style = action.payload.bass;
+                b.style = action.payload.bass;
             }
             if (action.payload.soloist) {
-                soloist.style = action.payload.soloist;
+                s.style = action.payload.soloist;
             }
             if (action.payload.harmony) {
-                harmony.style = action.payload.harmony;
+                h.style = action.payload.harmony;
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (action.payload.density) {
-                chords.density = action.payload.density;
+                c.density = action.payload.density;
             }
             if (action.payload.hookProb) {
-                soloist.hookRetentionProb = action.payload.hookProb;
+                s.hookRetentionProb = action.payload.hookProb;
             }
             return true;
         case ACTIONS.UPDATE_HB:

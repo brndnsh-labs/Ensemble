@@ -1,4 +1,4 @@
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { playPercussiveStrike, rampGain, updateDensityDucking } from './synth-utils.js';
 
@@ -9,7 +9,7 @@ export function killBassNote(state: EnsembleState): void {
     }
     if (bass.lastBassGain) {
         rampGain(bass.lastBassGain.gain, 0, playback.audio.currentTime, 0.005);
-        bass.lastBassGain = null; // @direct-mutation
+        (bass as Mutable<typeof bass>).lastBassGain = null; // @direct-mutation
     }
 }
 
@@ -156,7 +156,7 @@ export function playBassNote(
         if (bass.lastBassGain && bass.lastBassGain !== mainGain) {
             rampGain(bass.lastBassGain.gain, 0, startTime, 0.005);
         }
-        bass.lastBassGain = mainGain; // @direct-mutation
+        (bass as Mutable<typeof bass>).lastBassGain = mainGain; // @direct-mutation
 
         oscSine.start(startTime);
         oscTri.start(startTime);

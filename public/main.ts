@@ -11,6 +11,7 @@ import { initPWA } from './pwa.js';
 import { getState, subscribe } from './state.js';
 import { handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
+import type { Mutable } from './types.js';
 import { mountComponents } from './ui-root.jsx';
 import { initWorker, syncWorker } from './worker-client.js';
 
@@ -153,14 +154,14 @@ function init() {
         return;
     }
     const wasSustainActive = playback.sustainActive;
-    playback.sustainActive = false; // @direct-mutation
+    (playback as Mutable<typeof playback>).sustainActive = false; // @direct-mutation
     const now = playback.audio?.currentTime || 0;
     if (playback.audio) {
         chord.freqs.forEach((f: number) =>
             playNote(getState(), f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
         );
     }
-    playback.sustainActive = wasSustainActive; // @direct-mutation
+    (playback as Mutable<typeof playback>).sustainActive = wasSustainActive; // @direct-mutation
     const cards = document.querySelectorAll('.chord-card');
     if (cards[index]) {
         cards[index].classList.add('active');

@@ -1,5 +1,5 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, ArrangerState, Section } from '../types.js';
+import type { Action, ArrangerState, Mutable, Section } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export type { ArrangerState, Section };
@@ -25,6 +25,7 @@ export const arranger = deepSignal<ArrangerState>({
 });
 
 export function arrangerReducer(action: Action): boolean {
+    const a = arranger as Mutable<typeof arranger>;
     switch (action.type) {
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'arranger') {
@@ -33,7 +34,7 @@ export function arrangerReducer(action: Action): boolean {
             }
             break;
         case ACTIONS.RESET_STATE:
-            arranger.sections = [
+            a.sections = [
                 {
                     id: 's1',
                     label: 'Intro',
@@ -42,32 +43,32 @@ export function arrangerReducer(action: Action): boolean {
                     repeat: 1,
                 },
             ];
-            arranger.key = 'C';
-            arranger.timeSignature = '4/4';
-            arranger.notation = 'roman';
-            arranger.isMinor = false;
-            arranger.isDirty = false;
-            arranger.history = [];
-            arranger.grouping = null;
+            a.key = 'C';
+            a.timeSignature = '4/4';
+            a.notation = 'roman';
+            a.isMinor = false;
+            a.isDirty = false;
+            a.history = [];
+            a.grouping = null;
             return true;
         case ACTIONS.SET_NOTATION:
-            arranger.notation = action.payload;
+            a.notation = action.payload;
             return true;
         case ACTIONS.SET_TIME_SIGNATURE:
-            arranger.timeSignature = action.payload;
+            a.timeSignature = action.payload;
             return true;
         case ACTIONS.SET_KEY:
-            arranger.key = action.payload;
+            a.key = action.payload;
             return true;
         case ACTIONS.LOAD_TEMPLATE:
-            arranger.sections = action.payload.sections;
+            a.sections = action.payload.sections;
             if (action.payload.isMinor !== undefined) {
-                arranger.isMinor = action.payload.isMinor;
+                a.isMinor = action.payload.isMinor;
             }
-            arranger.isDirty = true;
+            a.isDirty = true;
             return true;
         case ACTIONS.SET_ARRANGEMENT:
-            arranger.sections = action.payload;
+            a.sections = action.payload;
             return true;
     }
     return false;

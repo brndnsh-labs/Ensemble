@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import {
     binarySearchMap,
     getFrequency,
@@ -278,7 +278,7 @@ export function generateNotesForStep(
                             res.freq = getFrequency(res.midi);
                         }
                         if (!res.isDoubleStop) {
-                            soloist.lastFreq = res.freq; // @worker-mutation
+                            (soloist as Mutable<typeof soloist>).lastFreq = res.freq; // @worker-mutation
                         }
                         notesToMain.push({ ...res, step, module: 'soloist' });
                     }
@@ -325,7 +325,7 @@ export function generateNotesForStep(
                     if (!bassResult.freq) {
                         bassResult.freq = getFrequency(bassResult.midi);
                     }
-                    bass.lastFreq = bassResult.freq; // @worker-mutation
+                    (bass as Mutable<typeof bass>).lastFreq = bassResult.freq; // @worker-mutation
                     notesToMain.push({ ...bassResult, step, module: 'bass' });
                     updateCoordinationContext(coordination, 'bass', bassResult);
                 }
@@ -417,7 +417,7 @@ export function applyWorkerTransition(
     if (modStep === 0 && step > 0) {
         conductorState.loopCount++;
         conductorState.formIteration++;
-        playback.currentLoopCount = conductorState.loopCount; // @worker-mutation
+        (playback as Mutable<typeof playback>).currentLoopCount = conductorState.loopCount; // @worker-mutation
     }
 
     const entry = binarySearchMap(arranger.stepMap || [], modStep);
@@ -428,11 +428,11 @@ export function applyWorkerTransition(
     // --- Phase 2: Thematic Fill Memory ---
     if (timelineStep >= 0 && groove.fillMap?.[timelineStep]) {
         const fillData = groove.fillMap[timelineStep];
-        groove.fillSteps = fillData.steps; // @worker-mutation
-        groove.fillActive = true; // @worker-mutation
-        groove.fillStartStep = step; // @worker-mutation
-        groove.fillLength = fillData.length; // @worker-mutation
-        groove.pendingCrash = fillData.crash; // @worker-mutation
+        (groove as Mutable<typeof groove>).fillSteps = fillData.steps; // @worker-mutation
+        (groove as Mutable<typeof groove>).fillActive = true; // @worker-mutation
+        (groove as Mutable<typeof groove>).fillStartStep = step; // @worker-mutation
+        (groove as Mutable<typeof groove>).fillLength = fillData.length; // @worker-mutation
+        (groove as Mutable<typeof groove>).pendingCrash = fillData.crash; // @worker-mutation
     }
 
     // --- Auto Intensity Simulation for Offline Export ---
@@ -504,7 +504,7 @@ export function applyWorkerTransition(
         if (entry && entry.end > entry.start) {
             const stepSize = (targetEnergy - playback.bandIntensity) / (entry.end - entry.start);
             const newIntensity = Math.max(0.1, Math.min(1.0, playback.bandIntensity + stepSize));
-            playback.bandIntensity = newIntensity; // @worker-mutation
+            (playback as Mutable<typeof playback>).bandIntensity = newIntensity; // @worker-mutation
         }
     } else if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
         const grandCycle = conductorState.formIteration % 8;
@@ -516,19 +516,23 @@ export function applyWorkerTransition(
         } else {
             target = 0.4;
         }
-        playback.bandIntensity = playback.bandIntensity + (target - playback.bandIntensity) * 0.5; // @worker-mutation
+        (playback as Mutable<typeof playback>).bandIntensity =
+            playback.bandIntensity + (target - playback.bandIntensity) * 0.5; // @worker-mutation
     }
 
-    harmony.complexity = Math.max(0, (playback.bandIntensity - 0.2) * 1.25); // @worker-mutation
+    (harmony as Mutable<typeof harmony>).complexity = Math.max(
+        0,
+        (playback.bandIntensity - 0.2) * 1.25,
+    ); // @worker-mutation
 
     // Handle offline export specific end-of-loop build up
     if (conductorState.loopMode !== undefined && conductorState.totalLoops !== undefined) {
         const isLastLoop = conductorState.loopCount >= conductorState.totalLoops - 1;
         if (isLastLoop && conductorState.totalLoops > 1) {
-            harmony.complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
+            (harmony as Mutable<typeof harmony>).complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
         }
     } else if (playback.songMode && playback.isEndingPending) {
         // Live Mode Ending Anticipation
-        harmony.complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
+        (harmony as Mutable<typeof harmony>).complexity = Math.max(harmony.complexity, 0.85); // @worker-mutation
     }
 }

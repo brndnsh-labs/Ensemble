@@ -13,6 +13,7 @@ import {
 } from './engine/engine.js';
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState, getSyncState, stateMap } from './state.js';
+import type { Mutable } from './types.js';
 import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { flushWorker, syncWorker } from './worker-client.js';
@@ -128,7 +129,7 @@ function flushBuffer(type: string): void {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
         if (bass.lastPlayedFreq !== null) {
-            bass.lastFreq = bass.lastPlayedFreq; // @worker-mutation
+            (bass as Mutable<typeof bass>).lastFreq = bass.lastPlayedFreq; // @worker-mutation
         }
         bass.buffer.clear();
         killBassNote(stateMap);
@@ -136,7 +137,7 @@ function flushBuffer(type: string): void {
     }
     if (type === 'soloist' || type === 'all') {
         if (soloist.lastPlayedFreq !== null) {
-            soloist.lastFreq = soloist.lastPlayedFreq; // @worker-mutation
+            (soloist as Mutable<typeof soloist>).lastFreq = soloist.lastPlayedFreq; // @worker-mutation
         }
         soloist.buffer.clear();
         killSoloistNote(stateMap);

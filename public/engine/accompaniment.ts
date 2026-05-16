@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { Chord, EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import {
     getBassSpaceFloor,
@@ -840,7 +840,7 @@ function updateRhythmicIntent(
             mask |= 1 << i;
         }
     }
-    chords.rhythmicMask = mask; // @worker-mutation
+    (chords as Mutable<typeof chords>).rhythmicMask = mask; // @worker-mutation
 
     playback.intent.anticipation = intensity * 0.2; // @worker-mutation
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
