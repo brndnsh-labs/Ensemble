@@ -120,7 +120,7 @@ class AudioHealthMonitor {
         if (playback.masterGain) {
             try {
                 playback.masterGain.disconnect();
-                playback.masterGain.gain.value = 0;
+                playback.masterGain.gain.value = 0; // @direct-mutation
             } catch {
                 /* ignore */
             }

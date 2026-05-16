@@ -842,17 +842,17 @@ function updateRhythmicIntent(
     }
     chords.rhythmicMask = mask; // @worker-mutation
 
-    playback.intent.anticipation = intensity * 0.2;
+    playback.intent.anticipation = intensity * 0.2; // @worker-mutation
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
         playback.intent.anticipation += 0.15;
     }
 
-    playback.intent.syncopation = complexity * 0.4;
+    playback.intent.syncopation = complexity * 0.4; // @worker-mutation
     if (genre === 'Funk') {
         playback.intent.syncopation += 0.2;
     }
 
-    playback.intent.layBack = intensity < 0.4 ? 0.02 : 0;
+    playback.intent.layBack = intensity < 0.4 ? 0.02 : 0; // @worker-mutation
     if (genre === 'Neo-Soul') {
         playback.intent.layBack += 0.05; // More lag for Dilla feel
     }

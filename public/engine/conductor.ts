@@ -148,11 +148,11 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
             playback.chordsPanner.pan.setTargetAtTime(-0.2, time, ramp);
         }
         if (playback.bassEQ) {
-            playback.bassEQ.type = 'highpass';
+            playback.bassEQ.type = 'highpass'; // @direct-mutation
             playback.bassEQ.frequency.setTargetAtTime(40, time, ramp);
         }
         if (playback.soloistEQ) {
-            playback.soloistEQ.type = 'highshelf';
+            playback.soloistEQ.type = 'highshelf'; // @direct-mutation
             playback.soloistEQ.frequency.setTargetAtTime(8000, time, ramp);
             playback.soloistEQ.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
         }

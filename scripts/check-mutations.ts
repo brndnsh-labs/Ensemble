@@ -1,12 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 
-const files = process.argv.slice(2);
-if (files.length === 0) {
+const args = process.argv.slice(2);
+if (args.length === 0) {
     process.exit(0);
 }
 
+const files = args.flatMap((arg) => (arg.includes('*') ? globSync(arg) : [arg]));
+
 const mutationRegex =
-    /(playback|chords|bass|soloist|harmony|groove|midi|vizState)\.[a-zA-Z0-9]+ = /;
+    /(playback|chords|bass|soloist|harmony|groove|midi|vizState)(\.[a-zA-Z0-9_]+)+ = /;
 
 let hasError = false;
 
@@ -20,15 +22,21 @@ for (const file of files) {
         const lines = content.split('\n');
 
         lines.forEach((line, index) => {
-            if (
-                mutationRegex.test(line) &&
-                !line.includes('@direct-mutation') &&
-                !line.includes('@worker-mutation')
-            ) {
-                console.error(`Mutation violation in ${file}:${index + 1}`);
-                console.error(`  > ${line.trim()}`);
-                hasError = true;
+            if (!mutationRegex.test(line)) {
+                return;
             }
+            const prev = lines[index - 1] ?? '';
+            const isAnnotated =
+                line.includes('@direct-mutation') ||
+                line.includes('@worker-mutation') ||
+                prev.includes('@direct-mutation') ||
+                prev.includes('@worker-mutation');
+            if (isAnnotated) {
+                return;
+            }
+            console.error(`Mutation violation in ${file}:${index + 1}`);
+            console.error(`  > ${line.trim()}`);
+            hasError = true;
         });
     } catch (err) {
         console.error(`Error reading ${file}: ${(err as Error).message}`);

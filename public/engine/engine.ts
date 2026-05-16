@@ -71,6 +71,7 @@ export function initAudio(
         }
 
         if (playback.audio && !usingOfflineContext) {
+            // @direct-mutation
             playback.audio.onstatechange = () => {
                 if (playback.audio && playback.audio.state === 'suspended' && playback.isPlaying) {
                     playback.audio
@@ -113,8 +114,8 @@ export function initAudio(
 
         if (playback.audio) {
             playback.saturator = playback.audio.createWaveShaper(); // @direct-mutation
-            playback.saturator.curve = createSoftClipCurve();
-            playback.saturator.oversample = '4x';
+            playback.saturator.curve = createSoftClipCurve(); // @direct-mutation
+            playback.saturator.oversample = '4x'; // @direct-mutation
 
             playback.masterLimiter = playback.audio.createDynamicsCompressor(); // @direct-mutation
             playback.masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
@@ -137,7 +138,7 @@ export function initAudio(
 
         if (playback.audio && playback.masterGain) {
             playback.reverbNode = playback.audio.createConvolver(); // @direct-mutation
-            playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
+            playback.reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0); // @direct-mutation
             playback.reverbNode.connect(playback.masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---

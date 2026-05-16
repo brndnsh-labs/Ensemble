@@ -14,7 +14,7 @@
         "jscpd": "jscpd public",
         "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json",
         "typecheck:tests": "tsc -p tsconfig.tests.json",
-        "check-mutations": "node scripts/check-mutations.ts public/components/*.tsx",
+        "check-mutations": "node scripts/check-mutations.ts \"public/**/*.{ts,tsx}\"",
         "test": "npm run check-mutations && npm run lint && npm run lint:docs && npx vitest run --reporter=dot --silent=true",
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",
         "test:e2e": "npm run build:quiet && npx playwright test",

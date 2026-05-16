@@ -1285,9 +1285,10 @@ export function getSoloistNote(
                 // Capture skeleton for future responses
                 if (nextRhythmPlan.length > 0) {
                     // Skeleton is relative steps from phrase start
+                    // @worker-mutation
                     soloist.phraseContext.skeleton = nextRhythmPlan.map(
                         (n: any) => n.stepTarget - step,
-                    ); // @worker-mutation
+                    );
                 }
             }
         }
