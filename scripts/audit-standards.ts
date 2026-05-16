@@ -1,3 +1,4 @@
+// @ts-nocheck
 // cspell:ignore iidim
 
 import { TIME_SIGNATURES } from '../public/config.js';

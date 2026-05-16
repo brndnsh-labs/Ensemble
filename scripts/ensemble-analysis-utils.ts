@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
 import { DRUM_PRESETS } from '../public/data/drum-presets.js';
 import { SMART_GENRES } from '../public/data/smart-genres.js';

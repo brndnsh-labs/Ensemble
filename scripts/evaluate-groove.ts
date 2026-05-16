@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
 import { generateDrumFills, generateDrumOrchestration } from '../public/engine/drum-seeder.js';
 import { applyGrooveOverrides, getDrumMotif } from '../public/engine/groove-engine.js';

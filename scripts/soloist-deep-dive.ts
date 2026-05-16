@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Soloist deep-dive script.
  * Defaults to focus-first output; add --full for the raw event log.

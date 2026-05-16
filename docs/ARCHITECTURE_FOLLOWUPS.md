@@ -39,13 +39,11 @@ Across `chords-engine`, `accompaniment`, `bass-engine`, `harmonies`, `soloist`, 
 
 ---
 
-## 3. Tests → TypeScript
+## 3. Tests → TypeScript ✅ DONE (May 2026)
 
-**Why third (or run in background):** Independent of every other item, so it can run in parallel with other work. It also validates that the production types are actually usable from outside — the only real way to find out.
+Completed in two phases. Phase A (commit `299f7a4d`) converted ~220 unit/integration/standards/ui test files. Phase B (May 15 2026) finished the remaining `tests/bench/` (Vitest benchmarks), `tests/e2e/` (Playwright specs), `scripts/` (Node CLI tools), and root configs (`vitest.config.ts`, `vitest.bench.config.ts`, `playwright.config.ts`). The repo is now zero-`.js` outside the single `.dependency-cruiser.cjs` config. Pattern validated: parallel Sonnet subagents grouped by directory, `@ts-nocheck` liberally applied to mock-heavy files, main thread reconciles configs.
 
-All 234 test files are `.test.js`. Now that production source is fully TS, converting tests would catch type drift in test fixtures and shared utilities, and stress-test whether production types are convenient to consume.
-
-**Approach:** Pure parallel Sonnet, exactly like Phase 8 component/engine batches. Fan out 4–6 subagents per batch of ~30–50 files. Group by directory: `tests/unit/`, `tests/integration/`, `tests/standards/`, `tests/ui/`, `tests/scripts/`. Leave the bench tests in `tests/bench/` and Playwright specs in `tests/e2e/` for last — they have different conventions. Main thread updates `package.json` (`check-mutations` arg, lint-staged patterns) at the end.
+**Pre-existing breakage surfaced (not caused by Phase B, not fixed):** `npm run drums:report`, `ensemble:report`, `mix:report`, and `audit-standards` all error with `ERR_MODULE_NOT_FOUND` because they use `.js` import specifiers pointing into `public/`, where every file is now `.ts`. Node ESM doesn't apply `moduleResolution: "Bundler"`'s `.js`→`.ts` rewriting; these scripts have been broken since the original `public/` TS migration. Fix options: (a) add a Node TS loader (`tsx`) to the package.json invocations, (b) rewrite the import specifiers in the affected scripts to `.ts`, or (c) port these analyses into Vitest where the resolver already handles it. The underlying logic has good unit-test coverage in `tests/scripts/` so this is purely about the CLI entrypoints.
 
 ---
 

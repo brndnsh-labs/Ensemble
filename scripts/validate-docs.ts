@@ -1,3 +1,4 @@
+// @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -55,6 +56,7 @@ const VALID_BARE_LINKS = new Set([
     'package.json',
     'package-lock.json',
     'playwright.config.js',
+    'playwright.config.ts',
 ]);
 
 const VALID_LINK_PREFIXES = [
@@ -158,7 +160,7 @@ function resolveDocLink(rawPath) {
 
 function validatePlaywrightProjectDocs() {
     let hasError = false;
-    const projects = extractPlaywrightProjects(readText('playwright.config.js'));
+    const projects = extractPlaywrightProjects(readText('playwright.config.ts'));
 
     for (const docPath of PLAYWRIGHT_DOCS) {
         const content = readText(docPath);

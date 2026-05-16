@@ -44,11 +44,11 @@ Targeted tests:
 ```bash
 npm test -- visualizer                              # Vitest filename/name filter
 npm test -- standards/                              # critique-only Vitest files
-npx vitest run tests/standards/funk-bass-critique.test.js
-npx vitest run tests/unit/engine/worker-client.test.js -t "specific test name"
+npx vitest run tests/standards/funk-bass-critique.test.ts
+npx vitest run tests/unit/engine/worker-client.test.ts -t "specific test name"
 
-npx playwright test tests/e2e/workspace-surfaces.spec.js
-npx playwright test tests/e2e/arranger-mobile.spec.js --project="Mobile Chrome"
+npx playwright test tests/e2e/chart-surface.spec.ts
+npx playwright test tests/e2e/arranger-mobile.spec.ts --project="Mobile Chrome"
 npx playwright test -g "@ipad" --project="Mobile Safari"
 npx playwright test -g "@mobile"
 ```
@@ -137,7 +137,7 @@ All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.js
 
 ### Critique tests (`tests/standards/`)
 
-The **Definition of Done** for musicality. When you modify a musical engine (bass, drums, soloist, etc.), you **must** run the corresponding critique test (e.g. `npx vitest run tests/standards/funk-bass-critique.test.js`). They use statistical ranges — never replace with rigid binary snapshots. Check the "Critique Report" output for balance.
+The **Definition of Done** for musicality. When you modify a musical engine (bass, drums, soloist, etc.), you **must** run the corresponding critique test (e.g. `npx vitest run tests/standards/funk-bass-critique.test.ts`). They use statistical ranges — never replace with rigid binary snapshots. Check the "Critique Report" output for balance.
 
 ### Vitest (logic / unit / integration)
 

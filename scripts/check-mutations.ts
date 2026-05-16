@@ -31,7 +31,7 @@ for (const file of files) {
             }
         });
     } catch (err) {
-        console.error(`Error reading ${file}: ${err.message}`);
+        console.error(`Error reading ${file}: ${(err as Error).message}`);
     }
 }
 

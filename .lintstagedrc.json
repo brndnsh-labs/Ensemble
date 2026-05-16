@@ -3,5 +3,5 @@
         "biome check --write --no-errors-on-unmatched",
         "cspell --no-must-find-files"
     ],
-    "public/**/*.{ts,tsx}": ["node scripts/check-mutations.js", "npm run depcheck"]
+    "public/**/*.{ts,tsx}": ["node scripts/check-mutations.ts", "npm run depcheck"]
 }

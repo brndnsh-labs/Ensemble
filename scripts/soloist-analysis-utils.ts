@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getSoloistNote } from '../public/engine/soloist.js';
 import { resolveSoloistStyle } from '../public/engine/soloist-config.js';

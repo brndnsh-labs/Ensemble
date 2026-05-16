@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * 6/8 soloist audit for All Blues-style material.
  * Compact by default; add --drill-down or --full for more detail.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { spawn } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Chord accompaniment audit.
  * Default output is compact and measure-focused; add --drill-down or --full for more detail.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
 import { compingState, getAccompanimentNotes } from '../public/engine/accompaniment.js';
 import { validateProgression } from '../public/engine/chords-engine.js';

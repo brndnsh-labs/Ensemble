@@ -7,10 +7,10 @@
         "public/ui-types.ts",
         "public/ui-root.tsx",
         "public/visualizer-worker.ts",
-        "scripts/*.js",
-        "tests/scripts/*.js"
+        "scripts/*.ts",
+        "tests/scripts/*.ts"
     ],
-    "project": ["public/**/*.{ts,tsx}", "scripts/*.js", "tests/**/*.js"],
+    "project": ["public/**/*.{ts,tsx}", "scripts/*.ts", "tests/**/*.{ts,tsx}"],
     "ignoreDependencies": ["esbuild"],
     "ignoreExportsUsedInFile": true,
     "ignore": ["public/engine/grooves/*.ts"]
