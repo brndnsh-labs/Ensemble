@@ -198,7 +198,11 @@
         "detuning",
         "detuned",
         "Leslies",
-        "interp"
+        "interp",
+        "stdev",
+        "flatlines",
+        "beatstarts",
+        "Questlove"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

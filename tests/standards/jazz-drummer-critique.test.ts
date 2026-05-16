@@ -121,7 +121,9 @@ describe('Jazz Drummer Critique', () => {
                 }
 
                 // --- CRITIQUE: Snare Comping ---
-                if (stepData.instruments.Snare) {
+                // Engine routes snare → Sidestick at intensity < 0.4 (jazz.ts:222),
+                // so count both as snare-voice comping events.
+                if (stepData.instruments.Snare || stepData.instruments.Sidestick) {
                     snareCompingHits++;
                     if (s === 14) {
                         snareAnchorHits++;
@@ -144,11 +146,11 @@ describe('Jazz Drummer Critique', () => {
             `[Foot Chick Solidity]      ${(footChickSolidity * 100).toFixed(1)}% (Target: 100%)`,
         );
         console.log(
-            `[Kick Feathering Consistency] ${(kickFeatheringScore * 100).toFixed(1)}% (Target: >90%)`,
+            `[Kick Feathering Consistency] ${(kickFeatheringScore * 100).toFixed(1)}% (Target: >95%)`,
         );
         console.log(`[Comping Density]          ${compingDensity.toFixed(2)} hits/bar`);
         console.log(
-            `[Snare Anchor (And of 4)]  ${((snareAnchorHits / totalBars) * 100).toFixed(1)}% occurrence`,
+            `[Snare Anchor (And of 4)]  ${((snareAnchorHits / totalBars) * 100).toFixed(1)}% occurrence (Target: >95%)`,
         );
         console.log('------------------------------------\n');
 
@@ -159,11 +161,17 @@ describe('Jazz Drummer Critique', () => {
         expect(footChickSolidity).toBe(1.0);
 
         // MUSICAL: Kick feathering should be the default quarter note behavior
-        expect(kickFeatheringScore).toBeGreaterThan(0.85);
+        // Engine plays quiet kick on every beat-start (jazz.ts:123-128); delivers 100%.
+        expect(kickFeatheringScore).toBeGreaterThan(0.95);
 
         // MUSICAL: Comping should be active but conversational
         expect(compingDensity).toBeGreaterThan(0.8); // Increased from 0.5
         expect(compingDensity).toBeLessThan(5.5); // Increased from 4.5
+
+        // MUSICAL: "And of 4" is the canonical jazz snare anchor.
+        // Motif 3 plays it deterministically; other motifs hit it with prob ~0.95
+        // (compProb 0.45 + 0.5 base). Engine delivers ~100%.
+        expect(snareAnchorHits / totalBars).toBeGreaterThan(0.95);
     });
 
     it('should increase comping density with intensity', () => {
@@ -174,7 +182,10 @@ describe('Jazz Drummer Critique', () => {
             let hits = 0;
             perf.forEach((bar) =>
                 bar.forEach((step) => {
-                    if (step.instruments.Snare) {
+                    // Count both Snare and Sidestick — engine routes to Sidestick
+                    // at intensity < 0.4 (jazz.ts:222). Counting only Snare would
+                    // measure the routing threshold, not the comping density claim.
+                    if (step.instruments.Snare || step.instruments.Sidestick) {
                         hits++;
                     }
                     if (step.instruments.Kick && step.loopStep % 4 !== 0) {
@@ -187,10 +198,16 @@ describe('Jazz Drummer Critique', () => {
 
         const lowComping = getCompingHits(lowIntensityPerf);
         const highComping = getCompingHits(highIntensityPerf);
+        const ratio = lowComping > 0 ? highComping / lowComping : Infinity;
 
         console.log(
-            `[Jazz Intensity] Low (0.2) Comping: ${lowComping}, High (0.9) Comping: ${highComping}`,
+            `[Jazz Intensity] Low (0.2) Comping: ${lowComping}, High (0.9) Comping: ${highComping}, Ratio: ${ratio.toFixed(2)}x`,
         );
-        expect(highComping).toBeGreaterThan(lowComping);
+        // Engine drives comping density mostly via intensity-scaled kick bombs
+        // (bombProb = intensity * 0.12, jazz.ts:146). Snare/Sidestick comping density
+        // is rhythm-driven (drumComplexity, soloistBusy) so it does not scale steeply
+        // with intensity — at high intensity the snare comping gets LOUDER (Snare
+        // instead of Sidestick) more than it gets DENSER. Engine delivers ~1.7x ratio.
+        expect(highComping).toBeGreaterThan(lowComping * 1.4);
     });
 });

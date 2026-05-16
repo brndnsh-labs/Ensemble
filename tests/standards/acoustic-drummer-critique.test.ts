@@ -160,9 +160,76 @@ describe('Acoustic Drummer Critique', () => {
         );
 
         console.log(
-            `[Acoustic Dynamics] Low Intensity: ${sidestickHits} Sidesticks, ${snareHits} Snares`,
+            `[Acoustic Dynamics] Low Intensity: ${sidestickHits} Sidesticks, ${snareHits} Snares (Target: Sidesticks >25, Snares 0)`,
         );
-        expect(sidestickHits).toBeGreaterThan(0);
+        // Engine routes snare → Sidestick when intensity < 0.75 (acoustic.ts:50).
+        // Motif distribution at intensity 0.3 averages ~1.4 snare events/bar.
+        // Over 32 bars expect ~40 Sidesticks; threshold 25 keeps statistical headroom.
+        expect(sidestickHits).toBeGreaterThan(25);
         expect(snareHits).toBe(0);
+    });
+
+    it('should lock backbeat snare at intensity 0.75 with motif >= 1', () => {
+        // At intensity 0.75 the binaryTier still applies (intensity < 0.65 is false →
+        // second tier picks dominate). Motif 1+ fires snare on beats 2 and 4. Run
+        // enough bars to wash out motif-0 seed-paths and measure backbeat coverage
+        // across all motifs.
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.75 },
+        });
+        let backbeatHits = 0;
+        let motif0Bars = 0;
+        performance.forEach((bar) => {
+            let hadBackbeat = false;
+            bar.forEach((stepData) => {
+                const s = stepData.loopStep;
+                if ((s === 4 || s === 12) && stepData.instruments.Snare) {
+                    backbeatHits++;
+                    hadBackbeat = true;
+                }
+            });
+            if (!hadBackbeat) {
+                motif0Bars++;
+            }
+        });
+        const backbeatScore = backbeatHits / (numBars * 2);
+        console.log(
+            `[Acoustic Backbeat] ${(backbeatScore * 100).toFixed(1)}% (motif-0 'half-time' bars: ${motif0Bars})`,
+        );
+        // Motif 0 (Minimal) fires snare on beat 3 only; motif 1+ fires on backbeats.
+        // Engine picks motif 0 when seed < 0.2 → ~20% of bars. Floor at 75% catches
+        // the lane firing while still allowing the half-time motif to exist.
+        expect(backbeatScore).toBeGreaterThan(0.7);
+    });
+
+    it('should add kick syncopation above intensity 0.5', () => {
+        // Engine: kick syncopation gate at `intensity > 0.5 && isOffbeat && beatIndex
+        // === 1 || 3` with roll(0.4, intensity). Below 0.5 no syncopated kicks.
+        const lowPerf = simulatePerformance(64, { playback: { bandIntensity: 0.4 } });
+        const highPerf = simulatePerformance(64, { playback: { bandIntensity: 0.95 } });
+
+        const syncopatedKicks = (perf) => {
+            let h = 0;
+            perf.forEach((b) =>
+                b.forEach((stepData) => {
+                    if (
+                        stepData.instruments.Kick &&
+                        (stepData.loopStep === 6 || stepData.loopStep === 14)
+                    ) {
+                        h++;
+                    }
+                }),
+            );
+            return h;
+        };
+        const lowSync = syncopatedKicks(lowPerf);
+        const highSync = syncopatedKicks(highPerf);
+        console.log(`[Acoustic Kick Syncopation] 0.4=${lowSync} → 0.95=${highSync}`);
+        // Low gate (0.4) is below the 0.5 threshold so engine fires 0 syncopated
+        // kicks. High intensity expects ~40-50% of the 128 possible offbeat positions
+        // (roll(0.4, 0.95) ≈ 0.38 prob). Threshold > 30 catches the lane firing.
+        expect(lowSync).toBe(0);
+        expect(highSync).toBeGreaterThan(30);
     });
 });

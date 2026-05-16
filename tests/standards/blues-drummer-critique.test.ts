@@ -233,14 +233,20 @@ describe('Blues Drummer Critique', () => {
         // CRITICAL: Kick should always ground the 1 and 3 in standard Blues.
         expect(kickScore).toBe(1.0);
 
-        // MUSICAL: HiHat/Ride should be mostly on the shuffle grid.
-        expect(shuffleScore).toBeGreaterThan(0.8);
+        // MUSICAL: HiHat/Ride should be almost entirely on the shuffle grid.
+        // Engine delivers 100% — every hat hit lands on [0,4,8,12] or [2,6,10,14].
+        expect(shuffleScore).toBeGreaterThan(0.95);
 
         // MUSICAL: Circular dynamics - backbeat-a should be slightly softer than downbeat-a
         expect(avgHatBackbeatA).toBeLessThan(avgHatDownbeatA * 0.98);
 
-        // MUSICAL: Snare participation in the shuffle at high intensity
-        expect(snareGhostHits / totalBars).toBeGreaterThan(0.1);
+        // MUSICAL: Snare participation in the shuffle at high intensity.
+        // Engine delivers ~1.35 ghost hits/bar via Texas-shuffle motif (blues.ts).
+        expect(snareGhostHits / totalBars).toBeGreaterThan(0.8);
+
+        // MUSICAL: Ghost notes should be present but stay subordinate to the backbeat.
+        // Engine delivers ~24% — well under the 30% authenticity ceiling.
+        expect(ghostToBackbeatRatio).toBeLessThan(0.3);
 
         // NEW: Velocity Tiering Assertions
         expect(avgHatBeat).toBeGreaterThan(avgHatA); // Loping feel
@@ -285,43 +291,72 @@ describe('Blues Drummer Critique', () => {
             `[Drive Critique] Feathered Velocity: ${avgBackbeatKick.toFixed(2)} vs Primary: ${avgPrimaryKick.toFixed(2)}`,
         );
 
-        // Assert that at high intensity, we get kicks on the backbeats (Four-on-the-floor)
-        expect(backbeatKickHits).toBeGreaterThan(15);
-        // Assert they are "feathered" (significantly quieter than primary hits)
-        expect(avgBackbeatKick).toBeLessThan(avgPrimaryKick * 0.8);
-        // Assert we still get consistent pushes into the downbeat
-        expect(pushKickHits).toBeGreaterThan(16);
+        // Assert that at high intensity, we get kicks on the backbeats (Four-on-the-floor).
+        // Engine delivers ~38/64 (~60%) at intensity 0.9.
+        expect(backbeatKickHits).toBeGreaterThan(30);
+        // Assert they are "feathered" (significantly quieter than primary hits).
+        // Engine delivers ~0.64 vs ~1.22 (~52% of primary).
+        expect(avgBackbeatKick).toBeLessThan(avgPrimaryKick * 0.65);
+        // Assert we still get consistent pushes into the downbeat.
+        // Engine plays the 'a' of 4 on every bar at intensity 0.9 (32/32).
+        expect(pushKickHits).toBeGreaterThan(28);
     });
 
-    it('should occasionally signal structural transitions with a crash', () => {
-        // We simulate a 4-bar section, so bar 3 is a turnaround, and bar 4 is a new section start
-        const performance = simulatePerformance(32, {
-            // Run more bars to catch the probabilistic crash
+    it('should occasionally fire crash cymbals on bar downbeats at high intensity', () => {
+        // Engine logic (blues.ts:59): isDownbeat && intensity > 0.75 && roll(0.25).
+        // The crash fires on ANY bar downbeat, not specifically at section boundaries —
+        // the prior test name ("structural transitions") implied a section-aware crash
+        // that the engine does not actually have. (Engine improvement queued.) For now
+        // verify the gate the engine DOES have: 25% per downbeat at high intensity.
+        const numBars = 64;
+        const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.9 },
             groove: { creativity: true, genreFeel: 'Blues' },
-            arranger: {
-                timeSignature: '4/4',
-                sectionMap: [
-                    { start: 0, end: 64 },
-                    { start: 64, end: 128 },
-                    { start: 128, end: 192 },
-                    { start: 192, end: 256 },
-                ],
-            },
         });
 
         let crashCount = 0;
-        [4, 8, 12].forEach((barIdx) => {
+        let crashVelocityFloor = Infinity;
+        for (let barIdx = 0; barIdx < numBars; barIdx++) {
             const downbeat = performance[barIdx][0];
             if (downbeat.instruments.Open && downbeat.instruments.Open.sound === 'Crash') {
                 crashCount++;
-                expect(downbeat.instruments.Open.velocity).toBeGreaterThan(1.1);
+                crashVelocityFloor = Math.min(
+                    crashVelocityFloor,
+                    downbeat.instruments.Open.velocity,
+                );
             }
-        });
+        }
 
-        console.log(`[Section Start] Crashes observed at section boundaries: ${crashCount}/3`);
-        // We expect at least one crash over a few section boundaries due to roll(0.3)
-        expect(crashCount).toBeGreaterThanOrEqual(0); // Softened constraint since it's highly probabilistic
+        const crashRate = crashCount / numBars;
+        console.log(
+            `[Crash Rate] ${crashCount}/${numBars} bars (${(crashRate * 100).toFixed(1)}%, Target: ~25%)`,
+        );
+        console.log(`[Crash Velocity Floor] ${crashVelocityFloor.toFixed(2)} (Target: >1.1)`);
+
+        // Engine fires crash at 25% per downbeat at intensity > 0.75. Over 64 bars
+        // expected mean is 16 with stdev ~3.5. Bounds catch statistical flake while
+        // still failing if the gate were silently broken (0) or hyperactive (>30).
+        expect(crashCount).toBeGreaterThan(7);
+        expect(crashCount).toBeLessThan(30);
+        // All crashes are stamped at velocity 1.25 (blues.ts:61).
+        expect(crashVelocityFloor).toBeGreaterThan(1.1);
+    });
+
+    it('should suppress crashes at low intensity', () => {
+        // Crash gate requires intensity > 0.75 — low intensity should produce zero.
+        const numBars = 32;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.5 },
+        });
+        let crashCount = 0;
+        for (let barIdx = 0; barIdx < numBars; barIdx++) {
+            const dn = performance[barIdx][0];
+            if (dn.instruments.Open && dn.instruments.Open.sound === 'Crash') {
+                crashCount++;
+            }
+        }
+        console.log(`[Low-Intensity Crashes] ${crashCount}/${numBars} (Target: 0)`);
+        expect(crashCount).toBe(0);
     });
 
     it('should increase rhythmic complexity appropriately with high intensity', () => {
@@ -338,8 +373,15 @@ describe('Blues Drummer Critique', () => {
 
         const lowHits = countTotalHits(lowIntensityPerf);
         const highHits = countTotalHits(highIntensityPerf);
+        const ratio = lowHits > 0 ? highHits / lowHits : Infinity;
 
-        console.log(`[Intensity Scan] Low: ${lowHits} total hits, High: ${highHits} total hits`);
-        expect(highHits).toBeGreaterThanOrEqual(lowHits * 0.95);
+        console.log(
+            `[Intensity Scan] Low: ${lowHits} total hits, High: ${highHits} total hits, Ratio: ${ratio.toFixed(2)}x`,
+        );
+        // Prior assertion (highHits >= lowHits * 0.95) was inverted — it passed when
+        // high DROPPED below low by up to 5%, so the named "should increase" claim was
+        // not actually enforced. Engine delivers ~1.23x (e.g. 1280 → 1575) from kick
+        // shuffle pushes, crash adds, and higher kick activity at high intensity.
+        expect(highHits).toBeGreaterThan(lowHits * 1.15);
     });
 });

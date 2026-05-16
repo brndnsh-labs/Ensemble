@@ -68,8 +68,16 @@ describe('Snare Creativity Integrity', () => {
         }
 
         const averageExtraHits = totalExtraSnareHits / numBars;
-        // Increased from 1.5 to 2.0 to allow for authentic Texas Shuffle snare participation
+        console.log(
+            `[Snare Creativity] Blues extra snare hits/bar (excluding backbeats): ${averageExtraHits.toFixed(2)} (Target: <2.0)`,
+        );
+        // Texas-shuffle ghosts at intensity 0.8 fire on isOffbeat positions. Engine
+        // delivers ~1.3-1.5/bar including the entropy phase.
         expect(averageExtraHits).toBeLessThan(2.0);
+        // Also assert a positive floor — a Blues engine that emits ZERO ghost snares
+        // at intensity 0.8 has lost its Texas shuffle character. Catches regression
+        // in the snare lane gating.
+        expect(averageExtraHits).toBeGreaterThan(0.5);
     });
 
     it('should avoid snare hits immediately after the backbeat (steps 5 and 13) in Blues', () => {

@@ -75,39 +75,78 @@ describe('Shred Drummer Critique', () => {
     };
 
     it('should pass an authenticity critique for a 128-bar Shred performance', () => {
+        // Shred delegates to the Metal engine (shred.ts:6-13). Verify the aliased
+        // engine still delivers metal-quality density and backbeat at intensity 0.95.
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.95 },
             groove: { creativity: true, genreFeel: 'Shred' },
         });
 
-        let _backbeatHits = 0;
         let kickHits = 0;
+        let backbeatHits = 0;
+        let blastBars = 0;
 
         performance.forEach((bar) => {
+            let snareKickLocks = 0;
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
-
-                if (s === 4 || s === 12) {
-                    if (stepData.instruments.Snare) {
-                        _backbeatHits++;
-                    }
+                if ((s === 4 || s === 12) && stepData.instruments.Snare) {
+                    backbeatHits++;
                 }
-
                 if (stepData.instruments.Kick) {
                     kickHits++;
+                    if (stepData.instruments.Snare) {
+                        snareKickLocks++;
+                    }
                 }
             });
+            if (snareKickLocks >= 4) {
+                blastBars++;
+            }
         });
 
         const totalBars = performance.length;
         const kickDensity = kickHits / totalBars;
 
         console.log('\n--- SHRED DRUMMER CRITIQUE REPORT ---');
-        console.log(`[Kick Density (Double Bass)] ${kickDensity.toFixed(2)} kicks/bar`);
+        console.log(
+            `[Kick Density (Double Bass)] ${kickDensity.toFixed(2)} kicks/bar (Target: >12)`,
+        );
+        console.log(`[Backbeat (non-blast bars)]  ${backbeatHits} hits over ${totalBars} bars`);
+        console.log(`[Blast Bars]                 ${blastBars}/${totalBars} (Target: >30)`);
         console.log('-------------------------------------\n');
 
-        // Intense double bass, equivalent to metal
-        expect(kickDensity).toBeGreaterThan(6);
+        // Metal motifs 3-4 fire continuous 16th kicks at intensity 0.95 → ~14-15/bar.
+        // Prior threshold > 6 left 8pt of unused headroom.
+        expect(kickDensity).toBeGreaterThan(12);
+        // Blast Beat motif (4) overrides backbeat with eighth-note snare. Across
+        // 128 bars expect ~50 blast bars and ~78 non-blast bars. Backbeat lane fires
+        // on every non-blast bar's steps 4 and 12 → ~156 hits. Floor accounts for
+        // motif distribution variance.
+        expect(backbeatHits).toBeGreaterThan(120);
+        // Blast beat threshold same as metal — engine should select motif 4 at high
+        // intensity often enough to register.
+        expect(blastBars).toBeGreaterThan(30);
+    });
+
+    it('should increase kick density monotonically with intensity (Metal alias)', () => {
+        const lowPerf = simulatePerformance(64, { playback: { bandIntensity: 0.3 } });
+        const highPerf = simulatePerformance(64, { playback: { bandIntensity: 0.95 } });
+
+        const kickCount = (perf) => {
+            let h = 0;
+            perf.forEach((b) => b.forEach((s) => s.instruments.Kick && h++));
+            return h;
+        };
+
+        const lowK = kickCount(lowPerf);
+        const highK = kickCount(highPerf);
+        console.log(
+            `[Shred Intensity] Kicks 0.3=${lowK} → 0.95=${highK}, ratio: ${(highK / (lowK || 1)).toFixed(2)}x`,
+        );
+        // Metal motif 0 fires kick on every beat + & of 3 (5/16). Motif 3/4 fire on
+        // every 16th. Expected ratio ~3.2x. Conservative threshold 2x.
+        expect(highK).toBeGreaterThan(lowK * 2);
     });
 });
