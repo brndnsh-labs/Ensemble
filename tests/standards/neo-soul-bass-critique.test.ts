@@ -92,13 +92,51 @@ describe('Neo-Soul Bassist Critique', () => {
     });
 
     it('should implement syncopated "hammer-ons" at high complexity', () => {
-        const performance = simulatePerformance(16, {
+        // The neo-soul bass engine (bass-engine.ts:399-431) fires anchors on the
+        // downbeat and beat 3, then on the 8th-note "& of each beat" picks
+        // probabilistically between root, 5th, and a "hammer-on" interval — a
+        // half or whole step above the root with shortened duration (0.2). That
+        // is the genre-defining ornament the test name claims to enforce.
+        //
+        // The previous metric just counted `p.info.mStep % 4 !== 0` and asserted
+        // `> 5` over 16 bars (0.3 syncopated notes per bar). That captures "any
+        // note not on a beat start," not "syncopated hammer-ons" — a root on
+        // step 6 and a hammer-on on step 6 both incremented the same counter.
+        //
+        // We now check both halves of the claim: (a) the note lands on a
+        // syncopated 8th-note offbeat (steps 2, 6, 10, 14), and (b) the pitch
+        // is a half or whole step above the chord root (the hammer-on interval).
+        const numBars = 64; // longer simulation for stable rates
+        const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.9, complexity: 0.9 },
         });
 
-        const syncopatedHits = performance.filter((p) => p.info.mStep % 4 !== 0);
-        console.log(`[Neo-Soul Critique] Syncopated Hits: ${syncopatedHits.length}`);
+        const SYNCOPATED_POSITIONS = new Set([2, 6, 10, 14]); // 8th-note "&" of each beat
+        const chordRoot = 36;
 
-        expect(syncopatedHits.length).toBeGreaterThan(5);
+        const syncopatedHits = performance.filter((p) => SYNCOPATED_POSITIONS.has(p.loopStep));
+        const hammerOnHits = syncopatedHits.filter((p) => {
+            const interval = (((p.note.midi - chordRoot) % 12) + 12) % 12;
+            return interval === 1 || interval === 2;
+        });
+
+        const hammerOnRate = hammerOnHits.length / (syncopatedHits.length || 1);
+        const hammerOnsPerBar = hammerOnHits.length / numBars;
+
+        console.log(
+            `[Neo-Soul Critique] Syncopated 8th-note hits: ${syncopatedHits.length}, ` +
+                `of which hammer-ons (root ± half/whole step): ${hammerOnHits.length} ` +
+                `(${(hammerOnRate * 100).toFixed(1)}%), ${hammerOnsPerBar.toFixed(2)} per bar`,
+        );
+
+        // Engine expectation at intensity 0.9 / complexity 0.9: upbeat hitProb
+        // ≈ 0.83; of those hits, the hammer-on branch fires ~30% (rand 0.4-0.7).
+        // 4 upbeats/bar × 0.83 × 0.3 ≈ 1 hammer-on/bar. A floor of 0.5/bar gives
+        // headroom while still requiring the genre ornament to be audible.
+        expect(hammerOnsPerBar).toBeGreaterThan(0.5);
+        // And at least some meaningful share of the syncopated hits should be
+        // the hammer-on interval — otherwise the engine is producing syncopation
+        // without the genre's signature ornament.
+        expect(hammerOnRate).toBeGreaterThan(0.15);
     });
 });

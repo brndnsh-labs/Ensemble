@@ -170,22 +170,38 @@ describe('Soloist Blues Critique', () => {
         const notesPerBar = notes.length / numBars;
 
         console.log('\n--- BLUES SOLOIST CRITIQUE REPORT ---');
-        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <6.0)`);
-        console.log(`[Chord Tone Ratio]      ${(chordToneRatio * 100).toFixed(1)}% (Target: >40%)`);
-        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >1.5%)`);
+        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <5.0)`);
+        console.log(`[Chord Tone Ratio]      ${(chordToneRatio * 100).toFixed(1)}% (Target: >45%)`);
+        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >15%)`);
         console.log(
-            `[Blue Note Inflection]  ${(blueNoteBendRatio * 100).toFixed(1)}% bends (Target: >30%)`,
+            `[Blue Note Inflection]  ${(blueNoteBendRatio * 100).toFixed(1)}% bends (Target: >50%)`,
         );
         console.log(
             `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 2.0-6.0)`,
         );
         console.log('------------------------------------\n');
 
-        expect(avgInterval).toBeLessThan(9.0);
-        expect(chordToneRatio).toBeGreaterThan(0.25);
-        expect(blueNoteRatio).toBeGreaterThan(0.015);
-        expect(blueNoteBendRatio).toBeGreaterThan(0.15);
-        expect(notesPerBar).toBeGreaterThan(1.5);
-        expect(notesPerBar).toBeLessThan(14.0); // Loosened the strict limit, but ensuring it is somewhat reasonable
+        // Honest thresholds: reflect what the engine actually delivers (logged targets above)
+        // with a real headroom argument, not placeholders below the random baseline.
+        //
+        // Melodic Smoothness: engine ~3.4 semitones; report says <6 (singable blues phrasing).
+        // Anything > 5 starts to read as angular rather than vocal-like.
+        expect(avgInterval).toBeLessThan(5.0);
+        // Chord Tones: engine ~55%. Random pitch over blues scale (7 notes, 3 are chord tones)
+        // gives ~43% baseline. >45% guards "engine has chord-tone bias on top of scale shape."
+        expect(chordToneRatio).toBeGreaterThan(0.45);
+        // Blue Notes (b3 + b5): engine ~27%. Uniform-random over 12 chromatic semitones gives
+        // 2/12 ≈ 17%. >15% certifies the engine still picks blues-scale tones (not a flat-7
+        // jazz line) without being so tight it flakes on RNG runs.
+        expect(blueNoteRatio).toBeGreaterThan(0.15);
+        // Bend coverage: engine ~100% bends on blue notes (`applyBluesBends` in utils.ts).
+        // The report claim ">30%" was already implied by the engine design. >50% leaves
+        // headroom but guards a real regression if the bend path stops firing.
+        expect(blueNoteBendRatio).toBeGreaterThan(0.5);
+        // Note Density: engine ~3.5/bar; report claims 2.0-6.0 as the singable range.
+        // Anything below 2 is sparse to the point of "comping more than soloing"; above 6
+        // crosses into bebop territory, not blues.
+        expect(notesPerBar).toBeGreaterThan(2.0);
+        expect(notesPerBar).toBeLessThan(6.0);
     });
 });
