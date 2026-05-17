@@ -665,7 +665,7 @@ export function selectPitchAndDevices(
                     weight *= 4.0;
                 }
                 if (interval === 4 || interval === 3) {
-                    weight *= 2.5;
+                    weight *= 3;
                 }
                 if (isChordTone) {
                     weight *= 1.4;
@@ -685,7 +685,7 @@ export function selectPitchAndDevices(
                     weight *= 0.6;
                 }
                 if (interval === 2 || interval === 5 || interval === 9) {
-                    weight *= 2.5; // 2 / 4 / 6: suspended, "to be continued"
+                    weight *= 3; // 2 / 4 / 6: suspended, "to be continued"
                 }
             }
         }
@@ -884,6 +884,28 @@ export function selectPitchAndDevices(
                     weight += seedBoost;
                 }
             }
+        }
+
+        // --- Tension-Chord Alteration Bias (final-stage multiplier) ---
+        // why: leaning on b9/#9/#11/b13 over V7alt/V7b9/V7#9/etc. is the single most
+        // idiomatic move in jazz soloing. Reading `coordination.stepCoordination.{isTensionChord,
+        // altPitchClasses}` published by the chord-preamble in tick-logic.ts (see
+        // coordination-engine.ts getAltPitchClasses). Applied as a **final-stage** multiplier
+        // (not an additive bonus) per CLAUDE.md "final-stage multipliers win" — the chord-tone
+        // bonus, SRDC mult, scale-tone boost, profile bonus, and seed boost all push toward
+        // diatonic/chord-tone pitches; an additive bias on altered tones gets washed out.
+        // Multiplier value 2.0: an earlier 3.0 stacked with Departure's existing scale-tone
+        // ×2 multiplier (line ~756) to push altered-PC selection over 60% — "plays mostly
+        // alterations" rather than "leans on alterations." 2.0 produces a healthy ≥15pt shift
+        // (measured ~25-30pt) while letting chord-tone resolution still dominate strong beats.
+        // Gate on `isTensionChord` so plain V7 / maj7 / m7 are unaffected.
+        const stepCoordTension = coordination.stepCoordination;
+        if (
+            stepCoordTension?.isTensionChord &&
+            stepCoordTension.altPitchClasses?.length > 0 &&
+            stepCoordTension.altPitchClasses.includes(pc)
+        ) {
+            weight *= 2.0;
         }
 
         CANDIDATE_WEIGHTS[m] = weight;

@@ -28,6 +28,7 @@ Coordination publishes `isTensionChord: boolean` and `altPitchClasses: number[]`
 
 **Acceptance:** soloist pitch distribution over an altered V7 shifts measurably toward b9/#9/b13 pitch classes (gap >15pt vs plain V7). Critique test in `tests/standards/soloist-tension-awareness.test.ts`. Wire-up only — bebop chromatic *neighbors* are epic 4, S1.
 **Effort:** ~4h. **Model:** opus (multiplier value + "what counts as tension"). **Reviewer:** state-discipline-reviewer + music-theory-reviewer. **Source:** `harmony-coordination.md` P0 #8.
+**Status:** Shipped 2026-05-16 — `ALT_EXTENSIONS_BY_QUALITY` map + `getAltPitchClasses()` + `isTensionChordForSoloist()` in `coordination-engine.ts`; published by chord-data preamble in `tick-logic.ts` (before producers run, so soloist-runs-first ordering sees fresh values); soloist consumer in `soloist-pitch-engine.ts` final-stage `weight *= 2.0` (reduced from sketched 3.0 after music-theory review — 3.0 stacked with Departure's scale-tone ×2 to push altered-PC selection >60%). Map content: dominants get full altered set, m7b5 gets [b9, natural-9], dim gets [natural-9] (W-H diminished), aug gets [#11] (whole-tone). Critique test `soloist-tension-awareness.test.ts` 2 sub-tests / 30 trials, ≥15pt gap on altered V7 vs plain V7.
 
 ### S3. Wire `upcomingSectionFirstChord` into bass + chord engines
 Bass: at step `sectionEnd - stepsPerBeat/2`, allow a chromatic approach to the upcoming root. Chords: on the last beat of a section, voice the upcoming chord as an anticipation. The field is already published; consumers are missing.

@@ -13,6 +13,8 @@ import {
     type CoordinationCarryover,
     createCoordinationContext,
     enforceRegisterSlotting,
+    getAltPitchClasses,
+    isTensionChordForSoloist,
     updateCoordinationContext,
 } from './coordination-engine.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
@@ -108,6 +110,21 @@ export function generateNotesForStep(
         const sectionSteps = sectionEnd - sectionStart;
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
         (coordination as any).isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
+
+        // --- Tension-chord publication (writer: chord-preamble; readable-after: any producer) ---
+        // why: must be published BEFORE the soloist producer runs (line ~254) so the
+        // pitch picker's final-stage `weight *= 3` multiplier on altered pitch classes
+        // (soloist-pitch-engine.ts) actually sees the signal. The soloist always runs
+        // ahead of the chords producer, so writing this in `updateCoordinationContext('chords')`
+        // would be one tick too late. Both fields are pure functions of the current chord.
+        const currentChord = chordData.chord;
+        if (currentChord) {
+            (coordination as any).isTensionChord = isTensionChordForSoloist(currentChord.quality);
+            (coordination as any).altPitchClasses = getAltPitchClasses(
+                currentChord.quality,
+                currentChord.rootMidi,
+            );
+        }
 
         if (remainingSteps <= stepsPerMeasure) {
             const nextSectionChordData = getChordAtStep(
