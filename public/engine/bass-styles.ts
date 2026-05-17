@@ -986,7 +986,11 @@ export function getBassNoteStyle(
                     break;
                 }
             }
-            approach = clampAndNormalize(withOctaveJump(approach));
+            // why: approach notes must sit within ±5 semitones of their target;
+            // withOctaveJump would add ±12, turning a smooth half-step approach into
+            // a dissonant octave leap — contradicts voice-leading intent (bass.md P0 #2).
+            // Octave displacement is reserved for downbeat root statements only.
+            approach = clampAndNormalize(approach);
             const bend =
                 Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0;
             return result(getFrequency(approach), 1, velocity, 0, bend);
@@ -997,7 +1001,10 @@ export function getBassNoteStyle(
             );
             const approach =
                 valid.length > 0 ? valid[Math.floor(Math.random() * valid.length)] : targetRoot - 5;
-            return result(getFrequency(withOctaveJump(approach)), null, velocity);
+            // why: candidates already filtered to absMin–absMax (bass register 23–57);
+            // withOctaveJump would displace the perfect-fourth approach (−5) by ±12,
+            // producing a leap instead of a smooth landing. Reserve for downbeat roots.
+            return result(getFrequency(approach), null, velocity);
         }
     }
 

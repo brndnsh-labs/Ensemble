@@ -719,7 +719,11 @@ export function getBassNote(
                     break;
                 }
             }
-            approach = clampAndNormalizeMidi(withOctaveJump(approach), prevMidi);
+            // why: approach notes must sit within ±5 semitones of their target;
+            // withOctaveJump would add ±12, contradicting the chromatic leading-tone
+            // intent (F#2→G2 becomes F#3→G2 — a dissonant leap, not a half-step).
+            // Reserve octave displacement for downbeat root statements only (bass.md P0 #2).
+            approach = clampAndNormalizeMidi(approach, prevMidi);
             return result(
                 getFrequency(approach),
                 1,
@@ -731,13 +735,15 @@ export function getBassNote(
             const valid = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7].filter(
                 (n) => n >= absMin && n <= absMax && !isSameAsPrev(n) && n % 12 !== baseRoot % 12,
             );
+            // why: candidates are already filtered to absMin–absMax (bass register 23–57),
+            // so they're in range. withOctaveJump would add ±12 and turn the intended
+            // perfect-fourth below (−5) into an octave-displaced leap. Approach notes
+            // must stay close to their target — reserve octave jumps for downbeat roots.
             return result(
                 getFrequency(
-                    withOctaveJump(
-                        valid.length > 0
-                            ? valid[Math.floor(Math.random() * valid.length)]
-                            : targetRoot - 5,
-                    ),
+                    valid.length > 0
+                        ? valid[Math.floor(Math.random() * valid.length)]
+                        : targetRoot - 5,
                 ),
                 null,
                 velocity,
