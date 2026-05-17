@@ -259,8 +259,15 @@ describe('Conductor Logic', () => {
             expect(playback.bandIntensity).toBeGreaterThan(0.35);
         });
 
-        it('should use asymmetric ramping (faster drops)', () => {
+        it('should use asymmetric ramping (faster builds, S8 inversion)', () => {
             vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            // why: S8 inverted the prior 2.5×-down / 1.0×-up asymmetry to
+            // 0.5×-down / 1.5×-up. Real bands lean into rises and ease out of
+            // drops ("settle in and build"), not the other way around. The
+            // prior asymmetry, combined with the random jitter at line 445/457,
+            // created a structural pull toward floor that parked funk/neo-soul
+            // backbeats below the Snare-vs-Sidestick gate. See
+            // `docs/audit/epic-form-arrangement.md` S8.
             // Test Build
             playback.bandIntensity = 0.35;
             conductor.targetIntensity = 0.7;
@@ -274,8 +281,9 @@ describe('Conductor Logic', () => {
             updateAutoConductor(getState(), dispatch);
             const dropDiff = 0.35 - playback.bandIntensity;
 
-            // Drop should be faster (multiplier 2.5 in code when intensity > target)
-            expect(dropDiff).toBeGreaterThan(buildDiff);
+            // Build should now be faster (multiplier 1.5 when target > intensity,
+            // multiplier 0.5 when target < intensity).
+            expect(buildDiff).toBeGreaterThan(dropDiff);
         });
     });
 

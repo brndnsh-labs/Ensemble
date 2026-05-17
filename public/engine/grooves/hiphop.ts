@@ -88,7 +88,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     // --- 2. SNARE / CLAP ---
     else if (context.inst.name === 'Snare') {
         shouldPlay = false;
-        soundName = intensity < 0.4 ? 'Sidestick' : 'Snare';
+        // why: gate lowered from 0.4 → 0.3 (S8 sweep). Boom-bap snare at
+        // default intensity should crack — the 808-snap aesthetic is sidestick
+        // only at very low energy (lo-fi/chill). Matches funk/country sweep.
+        // Lo-fi/chill protection comes from the macro-arc (`conductor.ts`) dragging
+        // intensity below 0.3 for low-energy sections — there's no hip-hop entry in
+        // `GENRE_INTENSITY_FLOORS`, so the macro-arc is free to take it down to 0.1.
+        // The per-tick gate is the wrong place to express the lo-fi/chill carve-out;
+        // if a future per-motif branch wants explicit Sidestick at moderate
+        // intensity, add an `activeMotif === <chill>` gate above this line. (S8 2026-05-17)
+        soundName = intensity < 0.3 ? 'Sidestick' : 'Snare';
 
         if (isBackbeat) {
             shouldPlay = true;

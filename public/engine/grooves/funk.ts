@@ -192,7 +192,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             } else if (orchestration?.snareVoice === 'None') {
                 shouldPlay = false;
             } else {
-                soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+                // why: gate lowered from 0.4 → 0.3 (S8). Prior 0.4 was a
+                // conductor-calibration choice — at default bandIntensity (0.35)
+                // the funk backbeat read as Sidestick where a real funk drummer
+                // plays full Snare. Companion fixes: ramp inversion + Funk genre
+                // floor 0.45 in `conductor.ts`. Bossa/jazz/acoustic gates stay
+                // higher because Sidestick is genre-correct at low energy there.
+                soundName = intensity > 0.3 ? 'Snare' : 'Sidestick';
                 velocity = scaleVelocity(1.2, intensity, 0.1);
             }
         }

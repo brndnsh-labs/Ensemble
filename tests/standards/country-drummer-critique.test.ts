@@ -203,8 +203,9 @@ describe('Country Drummer Critique', () => {
         // roll), while motif 1 (Light Train) fires only E-of-beat 16ths.
         // At intensity 0.5 motif 0/1 dominate (backbeat + light train).
         // At intensity 0.95 motif 2 dominates with continuous 16th train.
-        // Both endpoints sit above the intensity 0.4 sidestick boundary so the harness
-        // filter (soundName === instName) records both runs consistently.
+        // Both endpoints sit above every per-motif sidestick boundary (motif 0 = 0.4,
+        // motif > 0 = 0.3 post-S8) so the harness filter (soundName === instName)
+        // records both runs consistently.
         const lowPerf = simulatePerformance(64, { playback: { bandIntensity: 0.5 } });
         const highPerf = simulatePerformance(64, { playback: { bandIntensity: 0.95 } });
 

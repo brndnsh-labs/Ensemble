@@ -61,7 +61,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             const jitter = (Math.random() - 0.5) * 0.08;
 
             if (isBackbeat) {
-                soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+                // why: gate lowered from 0.4 → 0.3 (S8 sweep). Same conductor-
+                // calibration story as `funk.ts:195`: at default bandIntensity
+                // the train-beat backbeat read as rim, not the country snare crack.
+                soundName = intensity > 0.3 ? 'Snare' : 'Sidestick';
                 velocity = scaleVelocity(0.95, intensity, 0.1) + jitter;
             } else if (isBeatStart) {
                 soundName = 'Snare';
@@ -86,6 +89,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // Motif 0: Standard Two-Step
             if (isBackbeat) {
                 shouldPlay = true;
+                // why: gate kept at 0.4 (NOT swept with the train-beat sibling above).
+                // The slow honky-tonk ballad two-step (motif 0) has a strong rim-click
+                // tradition at moderate intensity — the Snare crack is reserved for
+                // higher-energy train beats (motifs 1-2). Lowering this gate would
+                // homogenize the ballad-vs-train dynamic distinction. (S8 review 2026-05-17)
                 soundName = intensity < 0.4 ? 'Sidestick' : 'Snare';
                 velocity = scaleVelocity(0.9, intensity, 0.1);
             }

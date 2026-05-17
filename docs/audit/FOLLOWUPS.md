@@ -59,6 +59,8 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 - **HiHat suppression on final bar reads abrupt in 8th-note-hat genres.** Epic 2 S4. Per-genre gate. ~1h. *Source: Epic 2 S4 review.*
 - **Imperfect Symmetry intensity 0.4 floor.** Epic 2 S2 gates the gesture at `intensity ≥ 0.4`, suppressing it during quiet ballad-style Verse 2 — exactly where subtle variation is most musical. Consider 0.25 or gentler upward bias at low intensity. ~1h. *Source: Epic 2 S2 review.*
 - **Per-genre intro/outro mute tuning.** Epic 2 S5 currently genre-flat (`INTRO_MUTES = { bass: 2, chords: 3, harmony: 4 }`). ~3h. *Source: Epic 2 S5 Deferred.*
+- **S8 ramp-inversion aggressiveness.** `conductor.ts:229` ships `0.5 down / 1.5 up`; with `stepSize = (target - current)/16` the up-ramp can leap +0.25 in a single measure (verified in S8 trace: `0.50 → 0.75`). Effectively trades the pre-S8 floor-bias for a ceiling-bias. Listen-test alternative: `0.75 / 1.25` (gentler) or `1.0 / 1.0` (neutral baseline). Audit doc S8 explicitly said "Pick after a listen-test of both directions"; the shipped value is plausible but unverified by listening. ~1h. *Source: form-arrangement/S8 review (2026-05-17).*
+- **S8 Ska-Punk genre floor.** S8 lowered the Ska-Punk backbeat Snare gate to 0.3 but did NOT add a `GENRE_INTENSITY_FLOORS` entry. Ska-Punk is high-energy by genre identity (the comment in `ska-punk.ts:155` says so); should get a floor around 0.4 analogous to Disco 0.45 to keep the upbeat-crack consistent. Inconsistent calibration story with Funk (which got gate + floor). ~30min. *Source: form-arrangement/S8 review (2026-05-17).*
 - **Disco intensity-axis miscategorization.** `drums.md` P2 #18. The 4-motif system is mostly load-bearing for `synth-drums` velocity scaling; touch when Disco gets another audit pass. *Source: Epic 7 Deferred.*
 - **Bossa/samba label split.** `bass.md` P2 #16. Currently conflates two distinct feels. ~2h. *Source: Epic 5 Notes.*
 - **Walking-ska M6 over minor chords.** `bass.md` P1 #9. Small follow-on. ~1h. *Source: Epic 5 Notes.*
@@ -76,6 +78,7 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 - **Engine-wide determinism test waits on S4+S5.** Epic 3 S3 determinism test stubs `Math.random` to isolate S3's contribution alone; engine-wide test was gated on `withOctaveJump` (S4 shipped) and harmony coin flips (S5 shipped) — now unblocked. ~2h to write. *Source: Epic 3 S3 Status.*
 - **Conductor cool-down jitter headroom is thin.** Epic 2 S7 `tests/standards/conductor-arc-critique.test.ts:393-427` asserts `targetIntensity < 0.6` against worst-case `0.5 + 0.075 jitter = 0.575` — only 0.025 cushion. Safe today (`Math.random()` is strictly `< 1`) but will silently start clipping if jitter envelope widens. Consider asserting `< 0.625` with a pinned-to-jitter-constant comment, or `≤ 0.575 + ε` so regressions on the jitter constant surface as deliberate test failures. ~30min. *Source: Epic 2 S7 review.*
 - **Conductor critique only exercises ceiling-clamped section.** Epic 2 S7 fixture uses Chorus (energy 0.9) so the macro clamp resolves to ceiling and assertions probe the ladder directly. Companion test should transition into a low-energy section (e.g. Verse, energy 0.5) and verify `targetEnergy` lands at the `getSectionEnergy()` value (not the ceiling) and stays inside the macro window. ~1h. *Source: Epic 2 S7 review.*
+- **S8 funk-backbeat-presence integration coverage.** PART 1 of `tests/standards/funk-backbeat-presence.test.ts` fixes `bandIntensity=0.35` directly and exercises only the gate; PART 2 measures the ramp without measuring backbeat routing during it. Add a PART 3 that runs `runConductorArc` for 32 bars AND collects backbeats from `applyGrooveOverrides` using the conductor-driven per-tick `bandIntensity`, asserting ≥80% Snare on the integrated trace. Closes the listener-experience gap that sub-mechanism tests miss. ~1h. *Source: form-arrangement/S8 review (2026-05-17).*
 
 ## G. Schema cleanup & stale carriers
 
@@ -105,4 +108,4 @@ Pointers in case someone greps from a finding:
 
 ---
 
-**Last reviewed:** 2026-05-17 (initial extraction from epic Status blocks + Deferred sections after Epic 2 S6 shipped).
+**Last reviewed:** 2026-05-17 (S8 review additions: ramp-inversion aggressiveness §E, Ska-Punk genre floor §E, funk-backbeat-presence integration coverage §F).

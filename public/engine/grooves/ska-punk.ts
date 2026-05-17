@@ -150,7 +150,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         if (shouldPlay) {
             velocity = scaleVelocity(1.2, intensity, 0.1);
-            soundName = intensity > 0.4 ? 'Snare' : 'Sidestick';
+            // why: gate lowered from 0.4 → 0.3 (S8 sweep). Ska-punk is a
+            // high-energy genre by definition — sidestick at moderate intensity
+            // misreads as a polka, not a punk backbeat. No genre floor in the
+            // map yet for ska-punk so the per-tick gate carries the load.
+            soundName = intensity > 0.3 ? 'Snare' : 'Sidestick';
         }
 
         // Turnaround Fill

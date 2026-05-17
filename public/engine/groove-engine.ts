@@ -302,6 +302,12 @@ export function applyGrooveOverrides(
         if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
             currentState.shouldPlay = true;
             currentState.velocity = 0.1 + Math.random() * 0.15;
+            // why: gate kept at 0.4 (NOT swept with the per-genre S8 backbeat gates).
+            // This fires entropy-phase syncopation hits across ALL genres including ones
+            // whose per-genre Snare gates were deliberately preserved (Jazz brushwork,
+            // Bossa clave, Acoustic ballad). Blanket-lowering to 0.3 would crack ghost
+            // hits where the genre identity is rim. Ghost-fill velocity (0.1-0.25) is
+            // quieter than backbeat (~1.2 scaled) — rim is the musical default. (S8 2026-05-17)
             currentState.soundName = playback.bandIntensity < 0.4 ? 'Sidestick' : 'Snare';
         } else if (
             (inst.name === 'HiHat' || inst.name === 'Open') &&
@@ -395,6 +401,8 @@ export function applyGrooveOverrides(
                     // band used elsewhere in this engine (entropy ghost = 0.1+rand*0.15,
                     // entropy hat = 0.2+rand*0.2). For Snare, route to Sidestick at low
                     // intensity to match the entropy-phase convention at line 304.
+                    // S8 2026-05-17: this gate stays at 0.4 by design (see line 304 rationale);
+                    // per-genre gates were swept to 0.3, ghost-fills across all genres stay rim.
                     currentState.shouldPlay = true;
                     currentState.velocity = 0.18;
                     if (inst.name === 'Snare') {

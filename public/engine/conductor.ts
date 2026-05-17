@@ -8,6 +8,46 @@ import { generateProceduralFill } from './fills.js';
 
 type Dispatch = (action: any, payload?: any) => void;
 
+/**
+ * Per-genre `targetEnergy` floors for the auto-intensity macro-arc.
+ *
+ * why: the macro-arc ladder and `getSectionEnergy` both produce values that
+ * cluster around 0.4–0.5 for low-energy windows, which sits BELOW the
+ * Snare-vs-Sidestick gates in several genres (`grooves/funk.ts:195` at 0.3
+ * post-S8, neo-soul's INTENSITY_BANDS.LOW=0.35, disco's 0.35) and makes the
+ * groove read as "polite rim-shot" where a real player would crack the snare.
+ *
+ * Genres listed here have a real natural floor — funk's pocket NEVER drops
+ * below "engaged"; bossa/jazz legitimately go quieter. Genres NOT in the map
+ * preserve the prior no-floor behavior so the macro-arc can still take them
+ * down to 0.1 for ambient/lyrical passages.
+ *
+ * Values are starting points (audit doc 2026-05-17 listening test); expect
+ * ±0.05 tuning once we measure realized bandIntensity in critique tests.
+ */
+const GENRE_INTENSITY_FLOORS: Record<string, number> = {
+    // why: funk pocket needs to crack — Snare gate at 0.3, floor at 0.45 keeps
+    // backbeat well above with headroom for verse breakdowns.
+    Funk: 0.45,
+    // why: neo-soul snare gate is INTENSITY_BANDS.LOW=0.35; 0.40 keeps the
+    // dilla-pocket snare just above the rim-shot threshold.
+    'Neo-Soul': 0.4,
+    // why: disco is a high-energy genre by definition — four-on-the-floor
+    // needs presence; 0.45 keeps the kick punching.
+    Disco: 0.45,
+    // why: existing Rock/Metal floor preserved (was hard-coded at
+    // `conductor.ts:448-450` pre-S8).
+    Rock: 0.35,
+    Metal: 0.35,
+    // why: jazz and bossa legitimately operate quietly — sidestick comping
+    // and brush ride ARE the genre identity at low intensity. Floor still
+    // present so we don't bottom out at 0.1 (dead-air) on a moody chart.
+    Jazz: 0.3,
+    // why: canonical `groove.genreFeel` is 'Bossa Nova' (see groove-engine.ts:34,
+    // drum-presets.ts:830) — 'Bossa' key alone would never match in production.
+    'Bossa Nova': 0.3,
+};
+
 export function analyzeFormUI(arranger: EnsembleState['arranger'], dispatch?: Dispatch) {
     const form = analyzeForm(arranger);
     if (form && dispatch) {
@@ -181,8 +221,14 @@ export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
     }
 
     if (Math.abs(playback.bandIntensity - conductor.targetIntensity) > 0.001) {
-        // Asymmetric ramping: humans tend to build energy gradually but can stop/drop quickly
-        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 2.5 : 1.0;
+        // why: invert the prior 2.5×-down / 1.0×-up asymmetry to 0.5×-down / 1.5×-up.
+        // Real bands "settle in and build" — they lean into rises and ease out of drops,
+        // not the other way around. Combined with the random jitter at line 445/457 the
+        // old asymmetric down-ramp created a structural pull toward floor that parked
+        // funk/neo-soul/disco backbeats below the 0.4 Snare-vs-Sidestick gate
+        // (`grooves/funk.ts:195`). Inversion + per-genre floors below + drum-gate sweep
+        // are S8's three stacking fixes.
+        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 0.5 : 1.5;
         let newIntensity =
             playback.bandIntensity +
             (playback.bandIntensity < conductor.targetIntensity
@@ -444,9 +490,15 @@ export function checkSectionTransition(
                     targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
                     targetEnergy += Math.random() * 0.15 - 0.075;
 
-                    // Genre-specific floors for auto-intensity
-                    if (groove.genreFeel === 'Rock' || groove.genreFeel === 'Metal') {
-                        targetEnergy = Math.max(0.35, targetEnergy);
+                    // why: genre-specific floors keep the auto-intensity above each
+                    // genre's Snare-vs-Sidestick gate. Applied AFTER the random jitter
+                    // (so a low jitter draw can't undo the floor) and BEFORE the global
+                    // [0.1, 1.0] clamp. Centralized in `GENRE_INTENSITY_FLOORS` at
+                    // module scope rather than scattered across groove configs so the
+                    // blast radius stays inside conductor.ts. See S8 (epic-form-arrangement).
+                    const genreFloor = GENRE_INTENSITY_FLOORS[groove.genreFeel];
+                    if (genreFloor !== undefined) {
+                        targetEnergy = Math.max(genreFloor, targetEnergy);
                     }
 
                     targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
