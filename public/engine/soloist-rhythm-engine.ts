@@ -174,6 +174,18 @@ export function generateRhythmPlan(
     sessionSteps: number,
     soloistState: SoloistState,
     _stepInfo: StepInfo | null = null,
+    // why: epic-form-arrangement S6 — Chorus Evolution rhythm-side.
+    // The pitch engine already reads `playback.currentLoopCount` per-tick
+    // (soloist-pitch-engine.ts:235, 861-877) to escalate device frequency
+    // and SRDC phasing per loop. The rhythm engine had zero loop awareness:
+    // every chorus emitted the same attack-grid, so the "Loop 0 Head / Loop
+    // 1 Themed Improv / Loop 2+ Exploratory" arc in CLAUDE.md was only
+    // pitch-deep. This parameter closes the rhythm-side: density grows
+    // (+15%/loop) and an attack-jitter (±5%/loop) breaks the metronomic
+    // grid so successive choruses *feel* different, not just sound different.
+    // Defaults to 0 so existing call sites (unit tests, isolated engines)
+    // see "Loop 0 Head" behavior — i.e. no loop bias — until they opt in.
+    loopCount: number = 0,
 ): any[] {
     const plan: any[] = [];
     const _config = (STYLE_CONFIG as any)[style] || STYLE_CONFIG.scalar;
@@ -313,7 +325,16 @@ export function generateRhythmPlan(
             // Use the config's rhythmicDensity as the 'medium' point (0.5 intensity).
             // Scale between 50% and 150% of the baseline density based on intensity.
             const rhythmicDensity = _config.rhythmicDensity || 0.5;
-            const densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
+            let densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
+            // why: epic-form-arrangement S6 — +15% density per loop. Pitch engine
+            // already escalates devices +20%/loop (soloist-pitch-engine.ts:1004);
+            // rhythm side now mirrors. Loop 0 unchanged; Loop 2 → density ×1.30;
+            // Loop 3 → ×1.45. Capped at loopCount=4 (×1.60) so unbounded loop
+            // counts don't drive attackProb into permanent saturation — the
+            // pitch engine clamps device boost at loopCount=3 in liveLoopLift
+            // (soloist-pitch-engine.ts:395); we follow the same ceiling spirit.
+            const loopForRhythm = Math.min(4, Math.max(0, loopCount));
+            densityScale *= 1 + loopForRhythm * 0.15;
             const intensityScale = rhythmicDensity * densityScale * 2.0; // Normalized to ~1.0 at medium
 
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
@@ -449,6 +470,23 @@ export function generateRhythmPlan(
             }
             if (isSectionDownbeat) {
                 attackProb = 1.0;
+            }
+
+            // why: epic-form-arrangement S6 — attack-jitter grows +5%/loop.
+            // Final-stage multiplier (after bypassRhythm/isSectionDownbeat
+            // overrides so cadence/downbeat anchors stay at 1.0; the jitter
+            // can only nudge those *down* below 1.0, never produce a missed
+            // forced attack). Hash-based sign so the jitter is deterministic
+            // per step — same step across two runs gets the same sign; the
+            // PRNG choice is `Math.random()` rather than a seeded helper so
+            // tests can stub Math.random and isolate loop-count effects from
+            // attack-jitter noise (see project memory:
+            // feedback_determinism_test_pattern). Skipped at loopCount=0
+            // so Loop 0 (The Head) stays exactly as before — strict head
+            // adherence per CLAUDE.md § Dynamic Head / Chorus Evolution.
+            if (loopForRhythm > 0 && attackProb < 1.0) {
+                const attackJitter = loopForRhythm * 0.05;
+                attackProb *= 1 + (Math.random() - 0.5) * 2 * attackJitter;
             }
 
             if (Math.random() <= attackProb) {

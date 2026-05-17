@@ -1389,6 +1389,9 @@ export function getSoloistNote(
                 );
 
                 // GENERATE RHYTHM PLAN FOR THE PHRASE
+                // why: pass loopCount so the rhythm engine's S6 density+jitter
+                // escalation fires; Math.max(0, ...) clamps the no-playback
+                // sentinel (-1) to "Loop 0 Head" semantics.
                 const nextRhythmPlan = generateRhythmPlan(
                     step,
                     soloist.session.phrasing.activeSteps || 0,
@@ -1400,6 +1403,7 @@ export function getSoloistNote(
                     soloist.session.sessionSteps || 0,
                     soloist,
                     stepInfo,
+                    Math.max(0, loopCount),
                 );
                 rhy.plan = nextRhythmPlan; // @worker-mutation
 
@@ -1489,6 +1493,8 @@ export function getSoloistNote(
                 stepsPerBeat,
                 arranger,
             );
+            // why: pass loopCount so the rhythm engine's S6 density+jitter
+            // escalation fires; same clamp as the primary call site above.
             const nextRhythmPlan = generateRhythmPlan(
                 step,
                 planSteps,
@@ -1500,6 +1506,7 @@ export function getSoloistNote(
                 soloist.session.sessionSteps,
                 soloist,
                 stepInfo,
+                Math.max(0, loopCount),
             );
             rhy.plan = nextRhythmPlan; // @worker-mutation
             if (
