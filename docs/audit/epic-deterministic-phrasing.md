@@ -29,6 +29,7 @@ Almost every story here is small (under half a day) but compounding: each one sh
 
 **Acceptance:** 4-bar phrase stability test. STICKY_GENRES list updated to include Jazz/Blues/Bossa (which the current implementation excludes).
 **Effort:** ~3h. **Model:** opus (Phase 1 — picks the phrase-stability hash; subsequent rhythm-pattern stories replicate). **Reviewer:** music-theory-reviewer. **Source:** `chords.md` P0 #2.
+**Status:** Shipped 2026-05-17. Bossa currently reuses the Jazz bank (port-for-fidelity); follow-up needed to design a partido-alto-specific bank. Sparse-vibe cell collapse + active-vibe ornament collision flagged by reviewer as pre-existing issues; deferred. Bank is a faithful port of the prior 5 random branches, not a curated final set — anticipation-of-1 idiom missing.
 
 ### S3. Bass generic walking fallback: target-aware + seeded
 `bass-engine.ts:638-668` picks one of top-2 scale tones via `Math.random()`. Replace with a target-distance score (weight candidates by descending distance to `nextChord.rootMidi`) and seed the final pick with `(barIndex * 7 + intBeat * 11) % 3`.

@@ -18,7 +18,7 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 | :- | :- | :-: | :-: | :-: | :- |
 | 1 | [Coordination Contract](epic-coordination-contract.md) | yes | 6 | 6 | Highest-leverage. Unlocks epics 4, 6, 8. **Complete — Phase 1 Epic-1 done.** |
 | 2 | [Form & Arrangement Awareness](epic-form-arrangement.md) | yes | 7 | 0 | Imperfect Symmetry for non-soloists; intro/outro layering; final-bar cascade. |
-| 3 | [Deterministic Phrasing Sweep](epic-deterministic-phrasing.md) | yes | 5 | 1 | Replace bare `Math.random()` with `barIndex`-seeded variation. |
+| 3 | [Deterministic Phrasing Sweep](epic-deterministic-phrasing.md) | yes | 5 | 2 | Replace bare `Math.random()` with `barIndex`-seeded variation. |
 | 4 | [Soloist Idiom & Bebop Vocabulary](epic-soloist-idiom.md) | no | 6 | 0 | Bebop chromatic unlock; profile multiplier placement; head-bypass jitter. |
 | 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 0 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. |
 | 6 | [Chord Voicing & Comping Cells](epic-chords-voicing.md) | no | 6 | 0 | Voice leading 2nd pass; sticky comping cells; altered-dominant breadth. |

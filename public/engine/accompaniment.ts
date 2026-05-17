@@ -52,7 +52,24 @@ export const compingState: CompingState = {
     funkRotationIndex: 0,
 };
 
-const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
+// why: STICKY genres retain the comping cell across multiple bars instead of
+//      re-rolling every bar in `updateRhythmicIntent`. Funk was the original
+//      sticky case (S1: deterministic cell bank). S2 (epic-deterministic-
+//      phrasing) extends sticky behavior to Jazz/Bossa/Blues so the phrase-
+//      stable Charleston-family picker isn't bypassed by the non-sticky
+//      `grooveRetentionCount = 0` branch — without STICKY membership the
+//      picker re-runs every bar and the (sectionId, barIndex>>2) hash never
+//      gets to hold a cell across the 4-bar phrase.
+const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa', 'Blues'];
+
+// why: epic-deterministic-phrasing S2 — picker genres whose 6th-param
+//      `phraseIndex` argument is the load-bearing hash input (Funk uses
+//      funkRotationIndex; Jazz/Bossa/Blues use barIndex). For these genres
+//      the no-repeat retry in `updateRhythmicIntent` MUST NOT fire: a "same
+//      cell as last bar" result is the desired locked-cell / phrase-stable
+//      behavior, not stochastic collision to be re-rolled. Stochastic genres
+//      (Rock, Country, Pop default) still benefit from the retry.
+const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa', 'Blues']);
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
@@ -112,6 +129,100 @@ const FUNK_COMPING_CELLS: readonly (readonly number[])[] = [
 //        cell 2 [0,7,11,14]  -> ornament 13 (e-of-4)
 //        cell 3 [2,6,10,15]  -> ornament 11 (a-of-3)
 const FUNK_COMPING_ORNAMENTS: readonly number[] = [9, 5, 13, 11];
+
+/**
+ * Jazz Charleston-family comping cell bank.
+ *
+ * Source: chords.md P0 #2 / epic-deterministic-phrasing S2. Real Jazz comping holds a
+ * Charleston-family rhythmic figure for a 4-bar phrase, then refreshes — it does NOT
+ * re-roll every bar (which is what the previous `Math.random()` picker did, and which
+ * made comping read as amnesiac across the phrase). The bank below is the direct
+ * translation of the five previously-stochastic branches (`Math.random()` thresholds
+ * 0.6/0.4/0.25/0.1 over Charleston, Reverse Charleston, Syncopated Ands, Red Garland
+ * Lite, and Sparse Anticipation) into named, stable cells. Cell choice is keyed by
+ * `(sectionId, barIndex >> 2)` so all 4 bars of one phrase share the same cell; vibe
+ * (sparse/active) modulates the cell on top of the pick rather than changing which
+ * cell wins.
+ *
+ * NB on Bossa reuse: the picker currently routes both `Jazz` and `Bossa` through
+ * this bank. That is a port-for-fidelity choice — the previous `Math.random()` picker
+ * also shared one branch set across both genres. Bossa nova partido-alto comping is
+ * actually a 16th-note, clave-derived 2-bar cell (closer to `[0,3,6,10]` answered by
+ * `[2,6,10,14]`), NOT American swing Charleston. A follow-up story should split this
+ * into a dedicated `BOSSA_COMPING_CELLS` bank with a `barIndex >> 1` (2-bar) hash.
+ * Do NOT propagate the "one bank for Jazz+Bossa" pattern to other deterministic-
+ * phrasing stories — track the bossa-bank gap in epic-deterministic-phrasing.
+ *
+ * NB on the phrase-shift convention: `>> 2` is a hardcoded 4-bar shift, NOT the
+ * STICKY-aware `funkRotationIndex` mechanism Funk uses. This is fine today because
+ * Jazz/Bossa/Blues retain for exactly 4 bars under the current `maxGrooveLength`
+ * default. If `maxGrooveLength` ever varies by genre (slower comping, larger forms),
+ * this picker must switch to a rotation counter like Funk — otherwise the picker
+ * will flip the cell mid-retain and produce exactly the "comper forgot what they
+ * played" symptom S2 was meant to fix. S3+ implementers copying this pattern: use a
+ * rotation counter if your genre's retain length is variable.
+ *
+ * 16th-grid nomenclature (beat-N at step 4*(N-1); e=+1; &=+2; a=+3):
+ *   Steps:  0  1  2  3   4  5  6  7   8  9 10 11  12 13 14 15
+ *   Names:  1  e  &  a   2  e  &  a   3  e  &  a   4  e  &  a
+ *
+ * Indices reflect 4/4 with stepsPerBeat=4 (the dominant Jazz/Bossa time signature).
+ * Computed once at module load using `spb=4` and `syncRatio=0.5`; the picker no
+ * longer recomputes per-bar `getBeatStep()` offsets for these cells. Other time
+ * signatures fall back to the residual Rock/Pop branch.
+ */
+const JAZZ_COMPING_CELLS: readonly (readonly number[])[] = [
+    // why: Charleston — One + &-of-2. The archetypal stride/swing comping figure;
+    //      the listener locks onto the One-and-then-push-into-3 lift. Threshold
+    //      0.6 in the old picker (the most-common branch), preserved as cell 0.
+    [0, 6],
+    // why: Reverse Charleston — &-of-1 + beat-3. Anticipates beat 1 from the prior
+    //      bar's "and" and lands flat on the downbeat of 3; gives the line a
+    //      different shape from Charleston without abandoning the half-note pulse.
+    [2, 8],
+    // why: Syncopated Ands — &-of-2 + &-of-4. Pure offbeat comping; reads as
+    //      Bill Evans/Bossa-style "pushing" the front of every other half-bar.
+    [6, 14],
+    // why: Red Garland Lite — One + &-of-2 + &-of-3 (three hits). Comment in the
+    //      old picker described "1, &2, &3" but the third hit was active-only;
+    //      promoting it to the canonical cell makes Red Garland distinct from
+    //      Charleston (otherwise both balanced-vibe cells were [0,6]).
+    [0, 6, 10],
+    // why: Sparse Anticipation — &-of-4 alone. Maximum breathing room; one
+    //      anticipation note before the next bar. Threshold 0.0–0.1 in the old
+    //      picker (rarest), preserved as the most spacious bank entry.
+    [14],
+] as const;
+
+/**
+ * Blues comping cell bank.
+ *
+ * Source: chords.md P0 #2 / epic-deterministic-phrasing S2. The previously-stochastic
+ * Blues block (`type > 0.72 / 0.45 / 0.2 / else`) is lifted into named cells with
+ * the same `(sectionId, barIndex >> 2)` phrase-stability hash as Jazz/Bossa. Every
+ * cell starts on the One (Blues comping is built off the downbeat); variation is in
+ * how the bar is answered.
+ *
+ * 16th indices computed against 4/4 with stepsPerBeat=4 (firstBackbeat=1,
+ * secondBackbeat=3, middleBeat=2; latePushStep=floor(4*0.75)=3).
+ */
+const BLUES_COMPING_CELLS: readonly (readonly number[])[] = [
+    // why: Backbeat-lean — One + beats 2 and 4. Locks tight with the drummer's
+    //      backbeat; classic shuffle-blues block-chord answer. Old picker
+    //      threshold > 0.72 (the dominant branch), preserved as cell 0.
+    [0, 4, 12],
+    // why: Shuffle anticipation — One + late-&-of-2 (step 7) + beat-4.
+    //      Pushes into 3 from a swung "and" of 2; reads as a Texas-shuffle lift.
+    [0, 7, 12],
+    // why: Beat-3 answer — One + beat-3 + late-&-of-4 (step 15). Strong middle
+    //      pivot, then a turnaround push back into the next One; canonical
+    //      I-IV-V "and the band joins in on 3" gesture.
+    [0, 8, 15],
+    // why: Juke-joint pocket — One + beat-2 + late-&-of-3 (step 11). Denser,
+    //      forward-leaning; the late-&-of-3 is the hook that distinguishes
+    //      this from the backbeat-lean cell.
+    [0, 4, 11],
+] as const;
 
 /**
  * Deterministic int hash for cell-bank picking. Folds a small string id (typically
@@ -631,96 +742,116 @@ export function generateCompingPattern(
     }
 
     if (genre === 'Blues') {
-        const type = Math.random();
-        const firstBackbeat = backbeat[0] ?? Math.min(1, finalBeat);
-        const secondBackbeat = backbeat[1] ?? finalBeat;
+        // why: chords.md P0 #2 / epic-deterministic-phrasing S2 — Blues comping
+        //      is phrase-stable, not stochastic per-bar. Pick a cell from the
+        //      bank keyed by `(sectionId, barIndex >> 2)` so all 4 bars of one
+        //      phrase share the same rhythmic shape. `phraseIndex` here is the
+        //      caller's bar index (see `updateRhythmicIntent` line ~975) — we
+        //      right-shift to convert bar → 4-bar phrase index. Hash multipliers
+        //      `17` and `31` mirror the S1 Funk picker for cross-genre consistency.
+        const phraseHash = phraseIndex >> 2;
+        const sectionHash = hashSectionId(sectionId);
+        const cellIndex =
+            (((sectionHash * 17 + phraseHash * 31) % BLUES_COMPING_CELLS.length) +
+                BLUES_COMPING_CELLS.length) %
+            BLUES_COMPING_CELLS.length;
+        const cell = BLUES_COMPING_CELLS[cellIndex];
 
-        hit(0);
-
+        // why: `sparse` vibe drops the latest (highest-step) hit, mirroring the
+        //      S1 Funk sparse rule. Preserves cell identity while opening room
+        //      for the soloist; identity remains tied to the bank pick, not to
+        //      vibe (S2 hard rule: vibe modulates the cell, doesn't change which
+        //      cell is picked). The minimum-One safety net guarantees the bar
+        //      has a downbeat even if the cell were ever empty.
         if (vibe === 'sparse') {
-            if (type > 0.5) {
-                hit(getBeatStep(secondBackbeat));
-            } else {
-                hit(getBeatStep(firstBackbeat, latePushStep));
+            if (cell.length <= 1) {
+                hit(cell[0] ?? 0);
+                return pattern;
+            }
+            for (let i = 0; i < cell.length - 1; i++) {
+                hit(cell[i]);
             }
             return pattern;
         }
 
-        if (type > 0.72) {
-            // Lean on the drummer's backbeat, then answer late in the bar.
-            addBeatHits([firstBackbeat, secondBackbeat]);
-            if (intensity > 0.45) {
-                hit(getBeatStep(secondBackbeat, latePushStep));
-            }
-        } else if (type > 0.45) {
-            // Shuffle-style anticipation: 1, late-&2, 4.
-            hit(getBeatStep(firstBackbeat, latePushStep));
-            hit(getBeatStep(secondBackbeat));
-        } else if (type > 0.2) {
-            // Strong beat-3 answer with a turnaround lift.
-            hit(getBeatStep(middleBeat));
-            hit(getBeatStep(secondBackbeat, latePushStep));
-        } else {
-            // Denser juke-joint pocket: 1, 2, late-&3.
-            hit(getBeatStep(firstBackbeat));
-            hit(getBeatStep(middleBeat, latePushStep));
+        for (let i = 0; i < cell.length; i++) {
+            hit(cell[i]);
         }
 
-        if (vibe === 'active' || intensity > 0.58 || playback.complexity > 0.5) {
-            if (Math.random() < 0.5) {
-                hit(getBeatStep(middleBeat, latePushStep));
-            }
-            if (Math.random() < 0.35) {
-                hit(getBeatStep(secondBackbeat, offbeatStep));
+        // why: `active` vibe (or high intensity/complexity) adds late-&-of-3 as a
+        //      single ornament — preserves Blues forward-pull without bloating
+        //      the cell. The previous stochastic 35/50% offbeat additions used
+        //      `Math.random()`; replaced with a deterministic gate keyed off
+        //      `(sectionHash, phraseHash)` so the ornament locks to the phrase.
+        //      Only fires when the parent cell doesn't already cover that step
+        //      to avoid double-strike.
+        const wantOrnament = vibe === 'active' || intensity > 0.58 || playback.complexity > 0.5;
+        if (wantOrnament) {
+            const ornamentStep = getBeatStep(middleBeat, latePushStep); // late-&-of-3 = step 11
+            if (pattern[ornamentStep] !== 1) {
+                // why: gate every other phrase (sectionHash + phraseHash) % 2 so the
+                //      ornament doesn't fire on every active bar — keeps "active"
+                //      from collapsing the bank's distinct cells onto identical
+                //      ornament-augmented shapes.
+                if ((sectionHash + phraseHash) % 2 === 0) {
+                    hit(ornamentStep);
+                }
             }
         }
         return pattern;
     }
 
     if (genre === 'Jazz' || genre === 'Bossa') {
-        const type = Math.random();
-        // 8th-note swing and Bossa use the 'and' (0.5 ratio) for syncopation
-        const syncRatio = 0.5;
+        // why: chords.md P0 #2 / epic-deterministic-phrasing S2 — Jazz/Bossa
+        //      Charleston-family comping is phrase-stable. Pick one cell from
+        //      the bank, keyed by `(sectionId, barIndex >> 2)`, and hold it for
+        //      the full 4-bar phrase. `phraseIndex` here is the caller's bar
+        //      index (see `updateRhythmicIntent`); we right-shift to convert
+        //      bar → 4-bar phrase index. Hash multipliers `17` and `31` mirror
+        //      the S1 Funk picker for cross-genre consistency.
+        const phraseHash = phraseIndex >> 2;
+        const sectionHash = hashSectionId(sectionId);
+        const cellIndex =
+            (((sectionHash * 17 + phraseHash * 31) % JAZZ_COMPING_CELLS.length) +
+                JAZZ_COMPING_CELLS.length) %
+            JAZZ_COMPING_CELLS.length;
+        const cell = JAZZ_COMPING_CELLS[cellIndex];
 
-        if (type > 0.6) {
-            // Charleston: 1 and &2
-            hit(0);
-            if (vibe !== 'sparse') {
-                hit(getBeatStep(1, Math.floor(spb / 2)));
+        // why: `sparse` vibe drops the latest (highest-step) hit, matching the
+        //      original picker's "if (vibe !== 'sparse') hit(secondNote)" pattern
+        //      and the S1 Funk sparse rule. Identity remains tied to the cell
+        //      pick, not to vibe (S2 hard rule: vibe modulates the cell, doesn't
+        //      change which cell is picked). Single-hit cells (e.g. Sparse
+        //      Anticipation `[14]`) keep their lone hit so the bar isn't empty.
+        if (vibe === 'sparse') {
+            if (cell.length <= 1) {
+                hit(cell[0]);
+                return pattern;
             }
-        } else if (type > 0.4) {
-            // Reverse Charleston: &1 and 3
-            hit(getBeatStep(0, Math.floor(spb * syncRatio)));
-            if (vibe !== 'sparse') {
-                hit(getBeatStep(2));
+            for (let i = 0; i < cell.length - 1; i++) {
+                hit(cell[i]);
             }
-        } else if (type > 0.25) {
-            // Syncopated "Ands": &2 and &4
-            hit(getBeatStep(1, Math.floor(spb * syncRatio)));
-            if (vibe !== 'sparse') {
-                const last = ts.beats - 1;
-                hit(getBeatStep(last, Math.floor(spb * syncRatio)));
-            }
-        } else if (type > 0.1) {
-            // Red Garland Lite: 1, &2, &3
-            hit(0);
-            hit(getBeatStep(1, Math.floor(spb * syncRatio)));
-            if (vibe === 'active') {
-                hit(getBeatStep(2, Math.floor(spb * syncRatio)));
-            }
-        } else {
-            // Sparse Anticipation: &4
-            const last = ts.beats - 1;
-            hit(getBeatStep(last, Math.floor(spb * syncRatio)));
+            return pattern;
         }
 
-        if (vibe === 'active') {
-            // Add comping chatter
-            if (ts.beats >= 4 && Math.random() > 0.5) {
-                hit(getBeatStep(1));
-            }
-            if (ts.beats >= 3 && Math.random() > 0.5) {
-                hit(getBeatStep(2, Math.floor(spb / 2)));
+        for (let i = 0; i < cell.length; i++) {
+            hit(cell[i]);
+        }
+
+        // why: `active` vibe adds one piece of "comping chatter" deterministically.
+        //      The previous picker used two `Math.random() > 0.5` gates to drop
+        //      hits on beat-2 and &-of-3; replaced with a single phrase-keyed
+        //      ornament (alternates beat-2 and &-of-3 across phrases) so the
+        //      chatter locks to the phrase identity instead of jittering each bar.
+        //      Only fires when the step isn't already part of the parent cell to
+        //      avoid double-strike.
+        if (vibe === 'active' && ts.beats >= 4) {
+            const ornamentStep =
+                (sectionHash + phraseHash) % 2 === 0
+                    ? getBeatStep(1) // beat-2
+                    : getBeatStep(2, Math.floor(spb / 2)); // &-of-3
+            if (pattern[ornamentStep] !== 1) {
+                hit(ornamentStep);
             }
         }
         return pattern;
@@ -987,10 +1118,17 @@ function updateRhythmicIntent(
         // reference point for the continuity cache instead of starting empty.
         newCell[0] = 1;
     }
-    // why: the no-repeat retry below is for stochastic genres (Jazz/Rock/Blues). Funk
-    //      is intentionally deterministic per the S1 bank, so a "same as last bar"
-    //      result is the desired locked-cell behavior, not something to re-roll.
-    if (genre !== 'Funk' && JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
+    // why: the no-repeat retry below is for stochastic genres (Rock, Country,
+    //      Pop default). Deterministic-picker genres (Funk S1; Jazz/Bossa/Blues
+    //      S2) intentionally hold a cell for multiple bars — a "same as last
+    //      bar" result is the desired locked-cell / phrase-stable behavior, not
+    //      a stochastic collision to re-roll. Without this guard, a phrase-2
+    //      Jazz cell that equals phrase-1's cell would get re-picked out of the
+    //      deterministic hash and break the (sectionId, barIndex>>2) invariant.
+    if (
+        !DETERMINISTIC_PICKER_GENRES.has(genre) &&
+        JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)
+    ) {
         newCell = generateCompingPattern(
             state,
             genre,
