@@ -182,8 +182,8 @@ export function checkBassActiveStyle(
     }
     if (style === 'dub') {
         // why: dub fires at riddim positions selected by intensity. Same band thresholds
-        // as getBassNoteStyle:710 — keep both sites in sync. The one-drop silencer in
-        // getBassNoteStyle:696 thins beat 1 at low intensity AFTER the active-lane fires.
+        // as getBassNoteStyle — keep both sites in sync. Beat-1 presence is controlled
+        // entirely by the riddim tables (One Drop has no step-0 entry; others do).
         const intensity = playback.bandIntensity;
         let selectedRiddim: keyof typeof REGGAE_RIDDIMS = 'One Drop';
         if (intensity > 0.85) {
@@ -740,14 +740,12 @@ export function getBassNoteStyle(
 
     // --- DUB STYLE (Reggae) ---
     if (style === 'dub') {
-        const isOne = stepInChord === 0 || isDownbeat;
-
-        // 1. One Drop Logic: Highly probabilistic silence on Beat 1
-        // Traditional One Drop leaves the 1 completely empty for the guitar/drums.
-        if (isOne && intensity < 0.7 && Math.random() < 0.8) {
-            return null;
-        }
-
+        // why: the old "One Drop silencer" block was removed here. It mislabeled the
+        // affected riddims — at intensity 0.45-0.7 the active riddim is 54-46 or Stalag
+        // (both have a step-0 entry), yet the silencer was randomly suppressing beat 1
+        // 80% of the time on those riddims. One Drop itself (intensity < 0.45) has no
+        // step-0 entry, so the silencer was a no-op there anyway. Beat-1 presence is
+        // now fully controlled by the riddim tables below. (bass.md P0 #3)
         const deepRoot = clampAndNormalize(baseRoot - 12);
         // Force deep register for Dub (Stay within safe sub-bass range)
         let finalDeepRoot = deepRoot;

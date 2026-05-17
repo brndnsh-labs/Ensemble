@@ -68,36 +68,59 @@ describe('Reggae Bassist Critique', () => {
         return performance;
     };
 
-    it('should skip Beat 1 frequently at medium intensity (One-Drop bias)', () => {
-        // bass-styles.ts:696 gates beat 1 with `intensity < 0.7 && random < 0.8`, so
-        // medium intensity should produce ~80% silence on bar downbeats.
+    it('should fire beat 1 reliably at intensity 0.5 (54-46 riddim has step-0 entry)', () => {
+        // bass.md P0 #3: the old silencer was randomly dropping beat 1 80% of the time
+        // on the 54-46 and Stalag riddims (intensity 0.45-0.7), which DO have step-0
+        // entries. After deletion, the riddim table alone governs beat-1 presence.
+        // 54-46 fires at intensity > 0.45: step-0 entry [0, 0, 1.1, 2] present.
         const performance = simulatePerformance(128, {
             playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 90 },
         });
 
         let beatOneHits = 0;
         const totalBars = 128;
-
         performance.forEach((p) => {
             if (p.loopStep === 0) {
                 beatOneHits++;
             }
         });
 
-        const oneSilenceRatio = 1 - beatOneHits / totalBars;
-        console.log(
-            `[Reggae Critique] Beat 1 Silence Ratio: ${(oneSilenceRatio * 100).toFixed(1)}%`,
-        );
+        const beatOneRate = beatOneHits / totalBars;
+        console.log(`[Reggae Critique] 54-46 beat-1 hit rate: ${(beatOneRate * 100).toFixed(1)}%`);
 
-        // 80% engine gate; observed across runs should hover near 80% with stdev ~3.5%.
-        expect(oneSilenceRatio).toBeGreaterThan(0.7);
-        expect(oneSilenceRatio).toBeLessThan(0.9);
+        // 54-46 has a step-0 entry. Path is deterministic after silencer removal
+        // (isBassActive → riddim.find → emit, no gating RNG). Require exact match
+        // so a future ~5% beat-1 regression cannot slip through a loose band.
+        expect(beatOneHits).toBe(totalBars);
+    });
+
+    it('should fire beat 1 reliably at intensity 0.7 (Stalag riddim has step-0 entry)', () => {
+        // bass.md P0 #3: Stalag fires at intensity > 0.65. Its step-0 entry [0, 0, 1.1, 2]
+        // means beat 1 should hit every bar. The old silencer wrongly suppressed it.
+        const performance = simulatePerformance(128, {
+            playback: { bandIntensity: 0.7, complexity: 0.5, bpm: 90 },
+        });
+
+        let beatOneHits = 0;
+        const totalBars = 128;
+        performance.forEach((p) => {
+            if (p.loopStep === 0) {
+                beatOneHits++;
+            }
+        });
+
+        const beatOneRate = beatOneHits / totalBars;
+        console.log(`[Reggae Critique] Stalag beat-1 hit rate: ${(beatOneRate * 100).toFixed(1)}%`);
+
+        // Stalag has a step-0 entry; same deterministic path as 54-46. Tighten to
+        // exact match (sibling Steppers test on line 127 uses the same pattern).
+        expect(beatOneHits).toBe(totalBars);
     });
 
     it('should leave Beat 1 fully open at high intensity (Steppers riddim)', () => {
         // intensity > 0.85 selects 'Steppers' which DOES have a step-0 entry.
-        // The 80% silencer at line 696 only fires when intensity < 0.7, so at 0.95
-        // every bar's beat 1 should fire.
+        // The old silencer is gone; at 0.95 the riddim table alone governs beat 1,
+        // so every bar's beat 1 should fire deterministically.
         const performance = simulatePerformance(64, {
             playback: { bandIntensity: 0.95, complexity: 0.5, bpm: 90 },
         });
@@ -144,10 +167,8 @@ describe('Reggae Bassist Critique', () => {
             `[Reggae Critique] Riddim positions — OneDrop: [${[...oneDropPositions].sort((a, b) => a - b).join(',')}] Steppers: [${[...steppersPositions].sort((a, b) => a - b).join(',')}]`,
         );
 
-        // One Drop has the 80% silencer on beat 1 too (line 696 fires on isOne, not just
-        // isDownbeat — and isDownbeat includes the One-Drop pos 8 hit). So position 8
-        // also gets silenced sometimes. The riddim still constrains *which* positions
-        // could ever fire.
+        // One Drop has no step-0 entry — position 8 is its only hit.
+        // The riddim table alone constrains which positions fire.
         for (const pos of oneDropPositions) {
             expect(pos).toBe(8);
         }
