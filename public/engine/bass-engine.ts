@@ -90,6 +90,20 @@ export function isBassActive(
     ) {
         return true;
     }
+
+    // why: epic-form-arrangement S4 — force-activate on the downbeat of the
+    // form's final measure so getBassNote's `isFinalMeasureBass` short-circuit
+    // can fire its sustained-tonic gesture. Without this, styles whose normal
+    // gate would skip the downbeat (e.g. an offbeat-only funk pattern) would
+    // silently miss the resolution cadence.
+    const isFinalMeasureCoord = coordination?.isFinalMeasure === true;
+    const isMeasureStart = stepInfo
+        ? stepInfo.isMeasureStart
+        : step % (ts.beats * ts.stepsPerBeat) === 0;
+    if (isFinalMeasureCoord && isMeasureStart) {
+        return true;
+    }
+
     const intBeat = stepInfo
         ? stepInfo.beatIndex
         : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
@@ -599,6 +613,66 @@ export function getBassNote(
         }
         return note;
     };
+
+    // --- Final-Bar Resolution Cascade (epic-form-arrangement S4) ---
+    // why: form-arranger.md P1 #6 — when song-mode playback is ending, the band
+    // should land together on the form's final downbeat. Today only the soloist
+    // senses the form's end (`soloist.ts` SRDC `conclusion` phase); the bass hits
+    // the loop boundary cold. On the final bar, play the tonic on beat 1 with
+    // sustained duration (held through the bar) and emit nothing on subsequent
+    // sub-beats — the "and we're done" gesture.
+    //
+    // Implementation:
+    //   - Downbeat of final bar (isDownbeat && isFinalMeasure): emit a sustained
+    //     root note (tonic of the current chord, normalized to bass range) with
+    //     `durationSteps = stepsPerMeasure` so it rings through the bar.
+    //   - Any subsequent step in the final bar: return null. Silence on those
+    //     sub-beats lets the sustained tonic ring (and avoids the rock/funk
+    //     8th-note pattern continuing to fire underneath the held note).
+    //
+    // Precedence: this short-circuit runs BEFORE the per-genre lanes and
+    // bypasses result() entirely — we construct the note dict directly so
+    // none of result()'s scaffolding interferes: no Imperfect-Symmetry wrap
+    // (a 2nd+ occurrence outro must NOT see its tonic displaced ±12 by S2's
+    // IS gesture — reviewer P1-1), no per-style duration clamp (the cadence
+    // requests the full measure, intentionally exceeding short-style's
+    // maxSafeDuration), no withOctaveJump.
+    //
+    // Musical intent: "land hard on the tonic, no variation theatre on the
+    // way out." Velocity 1.1 — clear accent above the default 1.0 — signals
+    // arrival without overshooting the 1.25 cap. Muted=0 (open) so the note
+    // sustains cleanly.
+    //
+    // Source: docs/audit/form-arranger.md P1 #6;
+    //         docs/audit/epic-form-arrangement.md S4.
+    const isFinalMeasureBass = context?.stepCoordination?.isFinalMeasure === true;
+    if (isFinalMeasureBass) {
+        if (isDownbeat) {
+            const intensityFactor = 0.6 + intensity * 0.7;
+            const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
+            let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
+            if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
+                timingOffset += 0.01 + intensity * 0.015;
+            }
+            return {
+                freq: getFrequency(baseRoot),
+                midi: baseRoot,
+                velocity: finalVel,
+                // why: hold for the full measure — "the bassist landed and
+                // let it ring." Bypassing result()'s maxSafeDuration clamp
+                // is intentional; the cadence is a one-shot sustain, not the
+                // per-style picking duration that clamp was designed for.
+                durationSteps: stepsPerMeasure,
+                timingOffset,
+                muted: 0,
+                bendStartInterval: 0,
+            };
+        }
+        // why: subsequent steps in the final bar emit nothing. This is the
+        // "ring out" half of the gesture — the tonic from beat 1 sustains; the
+        // rock/funk 8th-note pattern doesn't undercut it with offbeat root hits.
+        return null;
+    }
 
     // --- Section-Transition Chromatic Anticipation ---
     // why: "The transition feels like the drummer is leading a band that didn't get

@@ -1346,6 +1346,13 @@ interface AccompanimentCoordination {
     // no-sectionMap fallback so engines can safely gate on `> 1` without an
     // undefined check.
     sectionOccurrence?: number;
+    // why: epic-form-arrangement S4 — published by tick-logic chord-preamble
+    // (see tick-logic.ts:200). When true, the accompaniment plays a single
+    // root-position cadence voicing on beat 1 of the final bar and yields
+    // silence on subsequent sub-beats so the chord rings out. Overrides
+    // Imperfect Symmetry (the resolution gesture is more important than a
+    // repeat-pass inversion rotation).
+    isFinalMeasure?: boolean;
 }
 
 /**
@@ -1469,6 +1476,95 @@ export function getAccompanimentNotes(
         }
         return rotated.map((m) => getFrequency(m));
     };
+
+    // --- Final-Bar Cadence Voicing (epic-form-arrangement S4) ---
+    // why: form-arranger.md P1 #6 — when song-mode playback is ending, the band
+    // should resolve together on the form's final downbeat. The comper plays a
+    // single cadence voicing — root position, minimal extension (root + 3rd +
+    // 5th, optionally + 7th for jazz-family genres) — on beat 1 of the final
+    // bar, then yields silence so the chord rings out. The "resolved feel" is
+    // exactly the absence of extensions/syncopation on the way out.
+    //
+    // Precedence: this overrides Imperfect Symmetry on the final bar. The
+    // `shouldRotateVoicing` flag was computed above based on sectionOccurrence;
+    // we deliberately ignore it here — the resolution gesture is more important
+    // than a repeat-pass inversion rotation.
+    //
+    // Voicing recipe:
+    //   - Pull `chord.intervals` to extract the 3rd (interval 3 or 4) and 5th
+    //     (interval 7) — these define the chord's quality without color tones.
+    //   - For jazz/blues/neo-soul: also include the 7th (interval 10 or 11) so
+    //     a "resolved" maj7 / m7 still sounds like that family of music, not a
+    //     bare triad. A bare triad on a jazz outro would feel like the engine
+    //     gave up.
+    //   - Stack root + 3rd + 5th (+ optional 7th) above the chord root, then
+    //     transpose into the chord register slot (52-84) via the standard
+    //     register-slot clamp downstream. No inversions, no extensions.
+    //
+    // Strike pattern: single hit on measureStep 0 with `durationSteps = spm`
+    // so the voicing rings through the bar. Subsequent steps of the final
+    // measure return [] (no notes) so the cadence sustains uncluttered.
+    //
+    // Source: docs/audit/form-arranger.md P1 #6;
+    //         docs/audit/epic-form-arrangement.md S4.
+    const isFinalMeasureComp = coordination?.isFinalMeasure === true;
+    if (isFinalMeasureComp) {
+        if (!stepInfo.isMeasureStart) {
+            // why: silence on sub-beats lets the downbeat voicing ring out.
+            return [];
+        }
+        // why: chart-driven cadence voicing. Pull only first-octave intervals
+        // (≤ 11) from chord.intervals so we faithfully voice whatever quality
+        // the chart specifies — power chord [0,7] stays [0,7], dim [0,3,6]
+        // keeps its b5, aug keeps its #5, sus keeps the suspension, maj7
+        // keeps the 7th. Stripping intervals > 11 drops 9/11/13 extensions for
+        // the "resolved feel" of a minimal voicing. No invented intervals via
+        // `??` fallbacks — that silently rewrites chord quality on the most
+        // important bar of the song (see music-theory review P0-1/P0-2/P0-3).
+        const rawIntervals: number[] = chord.intervals ?? [0, 4, 7];
+        let cadenceIntervals: number[] = Array.from(
+            new Set(rawIntervals.filter((iv) => iv >= 0 && iv <= 11)),
+        ).sort((a, b) => a - b);
+        if (!cadenceIntervals.includes(0)) {
+            cadenceIntervals = [0, ...cadenceIntervals];
+        }
+        // Defensive fallback: if the chart somehow produced a single-pitch
+        // voicing after filtering (unusual), pad with a triad so the cadence
+        // still rings as a chord.
+        if (cadenceIntervals.length < 2) {
+            cadenceIntervals = [0, 4, 7];
+        }
+        // Root-position MIDI voicing anchored at chord.rootMidi; clamp into the
+        // chord/harmony register slot ceiling (84) by transposing octaves down
+        // if needed before the engine's downstream enforceRegisterSlotting
+        // would clamp the spread.
+        const rootMidi = chord.rootMidi;
+        let cadenceMidis = cadenceIntervals.map((iv) => rootMidi + iv);
+        // why: target the lower half of the chord slot (52-68) — a final cadence
+        // is grounded, not airy. If the rootMidi is below 52, shift up; if above
+        // 68, shift the whole voicing down an octave.
+        while (cadenceMidis[0] < 52) {
+            cadenceMidis = cadenceMidis.map((m) => m + 12);
+        }
+        while (cadenceMidis[0] > 68) {
+            cadenceMidis = cadenceMidis.map((m) => m - 12);
+        }
+        // why: accent the cadence ABOVE ordinary comp downbeats (~0.71 at
+        // intensity 0.55). 0.95 * velocityFactor lands at ~0.94 mid-intensity,
+        // ~1.04 high-intensity — the "land together" gesture wants the chords
+        // at least as prominent as drums/bass.
+        const velocityFactor = 0.5 + intensity * 0.9;
+        const cadenceVelocity = 0.95 * velocityFactor;
+        const cadenceDuration = Math.max(1, spm);
+        return cadenceMidis.map((midi) => ({
+            freq: getFrequency(midi),
+            midi,
+            velocity: cadenceVelocity,
+            durationSteps: cadenceDuration,
+            timingOffset: 0,
+            instrument: 'Piano',
+        }));
+    }
 
     // --- Sustain / CC Handling ---
     const chordIndex = arranger.progression ? arranger.progression.indexOf(chord) : -1;

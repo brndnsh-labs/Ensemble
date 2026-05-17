@@ -107,6 +107,7 @@ export function applyGrooveOverrides(
         groupIndex,
         sectionId: sectionIdFromTick,
         sectionOccurrence,
+        isFinalMeasure,
     }: any,
 ) {
     const { soloist, arranger } = state;
@@ -343,7 +344,17 @@ export function applyGrooveOverrides(
     const sectionOccurrenceSafe: number = sectionOccurrence ?? 1;
     const isRepeatPassDrums = sectionOccurrenceSafe >= 2;
     const isGhostLane = inst.name === 'Snare' || inst.name === 'HiHat' || inst.name === 'Open';
-    if (isRepeatPassDrums && isGhostLane && arrangerState.timeSignature === '4/4') {
+    // why: epic-form-arrangement S4 precedence — on the form's final bar, the
+    // resolution gesture (Crash + sustained cymbal) overrides Imperfect Symmetry.
+    // Gating the ghost-permutation block prevents a "skipped ghost" from landing
+    // on the same bar as the cadence crash, which would muddy the resolution.
+    const isFinalMeasureDrums = isFinalMeasure === true;
+    if (
+        !isFinalMeasureDrums &&
+        isRepeatPassDrums &&
+        isGhostLane &&
+        arrangerState.timeSignature === '4/4'
+    ) {
         // why: skip foundational positions — downbeat (step 0) and backbeats
         // (steps 4, 12 in 4/4) define the genre's groove skeleton; permuting
         // them would read as a glitch, not as expressive variation. Allowed
@@ -394,6 +405,79 @@ export function applyGrooveOverrides(
                     }
                 }
             }
+        }
+    }
+
+    // --- Final-Bar Resolution Cymbal (epic-form-arrangement S4) ---
+    // why: form-arranger.md P1 #6 — when song-mode playback is ending, the band
+    // should signal the ending across all instruments. Today the drum engine
+    // only signals via the section-boundary Crash (line ~221) — which fires on
+    // every section turnaround, not on the song's last bar. Add an explicit
+    // final-bar gesture: Crash + sustained Open cymbal on beat 1, plus a
+    // reinforced Kick. The "final cymbal swell" of the audit doc.
+    //
+    // Lane assignments mirror the section-boundary Crash routing (line ~221)
+    // and `crash-routing-critique.test.ts`: route the crash on the Open lane to
+    // avoid the double-Crash audio artifact (synth-drums.ts:949-955's
+    // lastCrashGain ramp-down would otherwise choke the second voice's tail).
+    // Kick gets a reinforced thump for arrival weight. The HiHat lane is left
+    // alone — its closed-hat ticking on the final bar would clutter the swell.
+    // Snare gets a final accent on the downbeat (a "punctuation snare hit") if
+    // present.
+    //
+    // Suppressing other voices on the final bar: we ALSO drop HiHat hits past
+    // beat 1, so the Open/Crash swell rings out cleanly. Snare backbeats are
+    // left alone (a real drummer keeps the backbeat through the final bar's
+    // hit; only the cymbal stops ticking).
+    //
+    // Precedence: this block runs AFTER imperfect-symmetry (which itself is
+    // gated off above on the final bar), AFTER section-boundary crash routing,
+    // and BEFORE velocity humanization — so the seed-jitter still applies for
+    // a natural feel even on the cadence hit.
+    //
+    // Source: docs/audit/form-arranger.md P1 #6;
+    //         docs/audit/epic-form-arrangement.md S4.
+    if (isFinalMeasureDrums) {
+        if (isDownbeat) {
+            // Beat 1 of the final bar: fire the resolution gesture per-lane.
+            if (inst.name === 'Open') {
+                // why: Open lane carries the Crash for the final-bar swell —
+                // same routing convention as the section-boundary crash above
+                // (line ~225). Velocity 1.25 — strong arrival, kept below the
+                // synth ceiling 1.4 so it doesn't clip.
+                currentState.shouldPlay = true;
+                currentState.soundName = 'Crash';
+                currentState.velocity = 1.25;
+            } else if (inst.name === 'Kick') {
+                // why: reinforced kick on the final downbeat — the bass and
+                // chord cadence both anchor on beat 1; the kick anchors the
+                // drums alongside them.
+                currentState.shouldPlay = true;
+                currentState.velocity = 1.3;
+            } else if (inst.name === 'Snare') {
+                // why: a punctuation snare on the final downbeat (a real
+                // drummer would not skip the backbeat-arrival accent). 1.15 —
+                // strong but below the kick/crash so the swell remains the
+                // dominant gesture.
+                currentState.shouldPlay = true;
+                currentState.velocity = 1.15;
+            } else if (inst.name === 'HiHat') {
+                // why: suppress the closed-hat on beat 1 — the Open Crash is
+                // what we want ringing through the bar. Closed hat overlay
+                // would clutter the swell.
+                currentState.shouldPlay = false;
+            }
+        } else {
+            // After beat 1: silence the cymbal lanes so the swell rings out.
+            // why: HiHat ticking past beat 1 would chop the Crash's tail.
+            // Open keeps the Crash routing if it was set above, but we don't
+            // re-trigger it — only the beat-1 fire is allowed.
+            if (inst.name === 'HiHat' || inst.name === 'Open') {
+                currentState.shouldPlay = false;
+            }
+            // Snare/Kick: let the strategy/entropy decide as usual — a real
+            // drummer might add a backbeat or a kick echo on beat 3 of the
+            // final bar. We don't actively suppress those.
         }
     }
 

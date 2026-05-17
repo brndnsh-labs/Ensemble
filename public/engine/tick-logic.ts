@@ -160,6 +160,46 @@ export function generateNotesForStep(
         // writer: chord-data preamble (this line); readable-after: any producer
         const sectionCtx = getSectionContext(arranger, step);
         (coordination as any).sectionOccurrence = sectionCtx.occurrence;
+
+        // --- Final-measure publication (epic-form-arrangement S4) ---
+        // why: form-arranger.md P1 #6 — only the soloist senses the form's end
+        // today (`soloist.ts:1257` derives a per-section `isFinalMeasure`). Bass,
+        // chords, harmony, and drums hit the loop boundary cold. Publish a clear
+        // band-wide "this is the final bar of a song-mode playback that is
+        // ending" signal so:
+        //   - drums fire a Crash + sustained cymbal on beat 1 (final cymbal swell)
+        //   - bass holds tonic on the downbeat (no walking, no octave plays)
+        //   - chords/accompaniment play a cadence voicing (root position,
+        //     minimal extension) — the resolved feel
+        //
+        // Condition exactly mirrors the story sketch:
+        //   playback.songMode && playback.isEndingPending
+        //     && step-within-form + stepsPerMeasure >= arranger.totalSteps
+        //
+        // We use `stepInForm` (the absolute step modulo total form length) so
+        // looped song-mode playback gates on the same bar number every iteration
+        // until `isEndingPending` is set by the scheduler at end-button / session-
+        // timer expiration. Both conditions must hold — otherwise normal looping
+        // would fire the cadence on the form's last bar every loop, which is
+        // wrong (only the FINAL pass ends).
+        //
+        // Precedence: when true, downstream engines OVERRIDE Imperfect Symmetry
+        // on the final bar — the resolution gesture is more important than a
+        // repeat-pass octave/voicing/ghost shift. See coordination-engine.ts
+        // `isFinalMeasure` doc comment for the musical reasoning.
+        //
+        // writer: chord-data preamble (this block); readable-after: any producer
+        const totalFormSteps = Number.isFinite(arranger?.totalSteps) ? arranger.totalSteps : 0;
+        if (playback.songMode && playback.isEndingPending && totalFormSteps > 0) {
+            const stepInForm = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
+            // why: `stepInForm + stepsPerMeasure >= total` is true for every step
+            // in the last bar of the form. Using `>=` matches the audit-doc
+            // sketch and handles the boundary case where stepInForm is exactly
+            // (total - stepsPerMeasure) — the very first step of the final bar.
+            if (stepInForm + stepsPerMeasure >= totalFormSteps) {
+                (coordination as any).isFinalMeasure = true;
+            }
+        }
     }
 
     // Pre-calculate Drum Hits for Coordination
@@ -269,6 +309,13 @@ export function generateNotesForStep(
                 // context's createCoordinationContext default, so engines can safely
                 // gate on `occurrence > 1` without an undefined check.
                 sectionOccurrence: coordination.sectionOccurrence ?? 1,
+                // why: epic-form-arrangement S4 — final-bar resolution cascade.
+                // Published per-tick on the coordination context by the chord-data
+                // preamble (see line ~199); pass it down so applyGrooveOverrides can
+                // fire a Crash + sustained cymbal on the final bar of a song-mode
+                // playback that is ending. Default `false` mirrors the coordination
+                // context default; engines safely gate without an undefined check.
+                isFinalMeasure: (coordination as any).isFinalMeasure === true,
             });
 
             if (!evaluateOnly && result.shouldPlay) {

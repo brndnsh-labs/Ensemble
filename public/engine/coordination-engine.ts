@@ -191,6 +191,29 @@ export function createCoordinationContext(
         // writer: tick-logic.ts (chord-data preamble, before producers run)
         // readable-after: chord-data preamble (any producer)
         sectionOccurrence: 1,
+        // why: epic-form-arrangement S4 — final-bar resolution cascade. True ONLY
+        // when song-mode playback is ending AND the current tick is inside the
+        // final measure of the form (`playback.isEndingPending && modStep +
+        // stepsPerMeasure >= arranger.totalSteps`). Bass holds tonic, chords play
+        // a root-position cadence voicing, drums fire a Crash + sustained cymbal.
+        // Currently only the soloist senses the form's end (`soloist.ts:1257`'s
+        // per-section `isFinalMeasure`); this flag lets the rest of the band end
+        // together.
+        //
+        // Precedence: when true, this OVERRIDES Imperfect Symmetry on the final
+        // bar — bass/chords/drums each early-out to the resolution gesture rather
+        // than apply a repeat-pass octave/voicing/ghost shift on top. The musical
+        // intent is "land hard on the tonic, no variation theatre on the way out."
+        //
+        // Default of `false` matches non-ending playback and the no-arranger
+        // fallback so engines can safely gate on truthy without an undefined
+        // check.
+        //
+        // Source: docs/audit/form-arranger.md P1 #6;
+        //         docs/audit/epic-form-arrangement.md S4.
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        isFinalMeasure: false,
         // why: published per-tick from the current chord (writer: tick-logic chord-preamble
         // at lines ~102-122; readable-after: chord-preamble — i.e. by EVERY producer
         // including the soloist which runs first). Lets the soloist bias toward
