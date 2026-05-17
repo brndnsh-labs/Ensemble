@@ -53,7 +53,22 @@ export function fillBuffers(
                 includeHarmony: harmony.enabled && step >= workerContext.hbBufferHead,
                 includeDrums: false, // Drums are handled by synth-drums in live engine
             },
+            // Thread sticky soloist position across ticks so harmony can read it on
+            // stab steps where the soloist itself is resting. Paired with step so
+            // consumers can age-cap stale values.
+            {
+                lastActiveSoloistMidi: workerContext.lastActiveSoloistMidi,
+                lastActiveSoloistStep: workerContext.lastActiveSoloistStep,
+            },
         );
+
+        // Persist sticky carryover for the next tick (only when the soloist
+        // actually ran on this tick — otherwise the context's value is the
+        // seeded carryover, identity-preserving).
+        if (tickResult.coordination?.lastActiveSoloistMidi) {
+            workerContext.lastActiveSoloistMidi = tickResult.coordination.lastActiveSoloistMidi;
+            workerContext.lastActiveSoloistStep = tickResult.coordination.lastActiveSoloistStep;
+        }
 
         for (let i = 0; i < tickResult.notes.length; i++) {
             notesToMain.push(tickResult.notes[i]);

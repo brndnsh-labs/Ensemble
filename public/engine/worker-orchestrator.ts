@@ -23,6 +23,13 @@ export interface WorkerContext {
     LOOKAHEAD: number;
     messageQueue: WorkerMessageQueueItem[];
     state: EnsembleState | null;
+    // why: sticky cross-tick coordination state (soloist's most recent non-rest MIDI
+    // + the absolute step at which it was written). Lives here because the per-tick
+    // coordination context is recreated each call to generateNotesForStep — without
+    // this carryover the harmony spectral-gap branch (harmonies.ts:535-540) would
+    // essentially never fire. The step is paired so consumers can age-cap the value.
+    lastActiveSoloistMidi: number;
+    lastActiveSoloistStep: number;
 }
 
 export const workerContext: WorkerContext = {
@@ -37,6 +44,8 @@ export const workerContext: WorkerContext = {
     LOOKAHEAD: 64,
     messageQueue: [],
     state: null,
+    lastActiveSoloistMidi: 0,
+    lastActiveSoloistStep: 0,
 };
 
 export function getWorkerState(): EnsembleState | null {
@@ -52,4 +61,7 @@ export function resetWorkerContext(step: number): void {
     workerContext.mainCursor.sectionIndex = 0;
     workerContext.lookaheadCursor.index = 0;
     workerContext.lookaheadCursor.sectionIndex = 0;
+    // Clear sticky coordination — a fresh playback should not remember the prior session.
+    workerContext.lastActiveSoloistMidi = 0;
+    workerContext.lastActiveSoloistStep = 0;
 }

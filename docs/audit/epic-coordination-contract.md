@@ -21,6 +21,7 @@ Pick up the most-recent non-rest soloist MIDI and persist it as `lastActiveSoloi
 
 **Acceptance:** new critique test that simulates soloist activity + harmony stab on different steps; the harmony's octave-shift branch is exercised. 30-run reliability.
 **Effort:** ~2h. **Model:** opus (shape decision: pure stickiness vs new field). **Reviewer:** state-discipline-reviewer + music-theory-reviewer. **Source:** `harmony-coordination.md` P0 #2.
+**Status:** Shipped 2026-05-16 — added `lastActiveSoloistMidi` + `lastActiveSoloistStep` to `CoordinationCarryover`, threaded through `workerContext` (live) and `ExportProcessor` (export), consumer in `harmonies.ts` age-caps at 32 steps. Critique test `soloist-harmony-spectral-gap.test.ts` 4 sub-tests / 29+/30 reliability.
 
 ### S2. Add `isTensionChord` + alteration pitch-classes to the context
 Coordination publishes `isTensionChord: boolean` and `altPitchClasses: number[]` written by the chords producer. Soloist consumes both as a final-stage `weight *= 3` multiplier on altered pitches over V7alt/V7b9/V7#9 etc.

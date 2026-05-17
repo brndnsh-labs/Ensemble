@@ -5,7 +5,30 @@ import type { StepInfo } from '../types.js';
  * This module ensures the "Musical Coordination Contract" is satisfied.
  */
 
-export function createCoordinationContext(step: number, stepInfo: StepInfo | null = null) {
+/**
+ * Carryover values that survive across ticks. Producers of the per-tick context
+ * (currently only `tick-logic.ts → generateNotesForStep`) thread this in via the
+ * caller (`worker-buffer-manager`, `midi-worker-logic`) so consumers that need
+ * "what did the soloist do recently?" can read a sticky value instead of the
+ * current-tick-only `soloistMidi` (which is ~0 on most harmony stab steps
+ * because harmony explicitly yields away from soloist-active steps).
+ *
+ * writer: tick-logic.ts (copies out after each generated step)
+ * readable-after: any consumer in any module
+ */
+export interface CoordinationCarryover {
+    lastActiveSoloistMidi: number;
+    // Absolute step at which lastActiveSoloistMidi was last written. Lets consumers
+    // age-cap the sticky so a soloist who played one note then went silent doesn't
+    // steer harmony's register for the entire remaining session.
+    lastActiveSoloistStep: number;
+}
+
+export function createCoordinationContext(
+    step: number,
+    stepInfo: StepInfo | null = null,
+    carryover: CoordinationCarryover | null = null,
+) {
     // Initial context derived from the "anchor" (Groove)
     const ts = (stepInfo as any)?.tsConfig || { beats: 4, stepsPerBeat: 4 };
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
@@ -20,8 +43,17 @@ export function createCoordinationContext(step: number, stepInfo: StepInfo | nul
         snareHit: false, // Set during pre-calculation
         pocketOffset: 0, // To be set from groove-engine
         soloistBusy: false, // Set by soloist turn
-        soloistMidi: 0, // Set by soloist turn
+        soloistMidi: 0, // Set by soloist turn (current tick only)
         avgSoloistMidi: 0,
+        // why: harmony's spectral-gap branch (harmonies.ts:535-540) needs a non-zero
+        // soloist position on harmony-stab steps, but the soloist usually rests on those
+        // steps. lastActiveSoloistMidi survives across ticks so the branch actually fires.
+        // Seeded from caller carryover; updated in updateCoordinationContext('soloist').
+        lastActiveSoloistMidi: carryover?.lastActiveSoloistMidi || 0,
+        // Step at which lastActiveSoloistMidi was last written. Consumers compare against
+        // `step` to age-cap stale values (see harmonies.ts spectral-gap branch). 0 means
+        // "never set" (sentinel — equivalent to no sticky).
+        lastActiveSoloistStep: carryover?.lastActiveSoloistStep || 0,
         bassHit: false, // Set by bass turn
         bassMidi: 0, // Set by bass turn
         accompanimentHit: false,
@@ -58,6 +90,12 @@ export function updateCoordinationContext(context: any, module: string, result: 
             if (mainResult) {
                 context.soloistActive = true;
                 context.soloistMidi = mainResult.midi;
+                // why: sticky companion to soloistMidi — overwritten on every non-rest
+                // soloist note. Paired with lastActiveSoloistStep so consumers can
+                // age-cap a stale value (soloist who played one note then went silent
+                // shouldn't steer harmony for the rest of the session).
+                context.lastActiveSoloistMidi = mainResult.midi;
+                context.lastActiveSoloistStep = context.step;
                 if (mainResult.isBusy) {
                     context.soloistBusy = true;
                 }

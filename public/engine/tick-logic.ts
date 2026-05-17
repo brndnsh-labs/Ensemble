@@ -10,6 +10,7 @@ import {
 import { getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
+    type CoordinationCarryover,
     createCoordinationContext,
     enforceRegisterSlotting,
     updateCoordinationContext,
@@ -64,12 +65,18 @@ export interface GenerateNotesResult {
 
 /**
  * Generates notes and drum hits for a single musical step.
+ *
+ * `carryover` carries sticky cross-tick coordination state (e.g.
+ * lastActiveSoloistMidi) — callers should store the post-tick value from
+ * `result.coordination` and feed it back in on the next tick. Stateless
+ * callers (drum-only paths, isolated tests) can omit it.
  */
 export function generateNotesForStep(
     state: EnsembleState,
     step: number,
     cursors: TickCursors,
     options: GenerateNotesOptions = {},
+    carryover: CoordinationCarryover | null = null,
 ): GenerateNotesResult {
     const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
 
@@ -89,7 +96,7 @@ export function generateNotesForStep(
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
     // 1. Context Assembly (Anchor: Groove)
-    const coordination = createCoordinationContext(step, stepInfo as any);
+    const coordination = createCoordinationContext(step, stepInfo as any, carryover);
     (coordination as any).pocketOffset = calculatePocketOffset(playback, groove);
 
     if (chordData) {

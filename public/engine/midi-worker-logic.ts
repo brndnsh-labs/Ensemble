@@ -92,6 +92,11 @@ export class ExportProcessor {
     prevStates: ExportPrevStates;
     exportConductor: ExportConductor;
     globalStep: number;
+    // why: sticky cross-tick soloist position for harmony's spectral-gap branch.
+    // Independent from the live workerContext so an export run doesn't pollute (or get
+    // polluted by) playback state. Step is paired so consumers can age-cap stale values.
+    lastActiveSoloistMidi: number;
+    lastActiveSoloistStep: number;
 
     constructor(state: EnsembleState, options: ExportOptions) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
@@ -228,6 +233,8 @@ export class ExportProcessor {
         };
 
         this.globalStep = 0;
+        this.lastActiveSoloistMidi = 0;
+        this.lastActiveSoloistStep = 0;
     }
 
     start(): void {
@@ -436,7 +443,19 @@ export class ExportProcessor {
                 includeHarmony: this.includedTracks.includes('harmonies'),
                 includeDrums: this.includedTracks.includes('drums'),
             },
+            // Thread sticky soloist position across ticks so the exported harmony track
+            // matches live playback's spectral-gap behavior. Step paired so consumers
+            // can age-cap stale values.
+            {
+                lastActiveSoloistMidi: this.lastActiveSoloistMidi,
+                lastActiveSoloistStep: this.lastActiveSoloistStep,
+            },
         );
+
+        if (tickResult.coordination?.lastActiveSoloistMidi) {
+            this.lastActiveSoloistMidi = tickResult.coordination.lastActiveSoloistMidi;
+            this.lastActiveSoloistStep = tickResult.coordination.lastActiveSoloistStep;
+        }
 
         const stepInfo = getStepInfo(
             globalStep,

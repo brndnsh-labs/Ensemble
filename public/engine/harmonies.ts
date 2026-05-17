@@ -532,7 +532,27 @@ function finalizeHarmonyNotes(
     // Spectral Gaps: Register Awareness
     // Use a realistic base if octave is 0 (default)
     let targetOctave = (octave || chords.octave || 60) + (styleConfig.octaveOffset || 0);
-    const soloistMidi = coordination.soloistMidi || coordination.avgSoloistMidi || 0;
+    // why: harmony stabs usually fire on steps where the soloist is RESTING (harmony
+    // yields to soloist-active steps at :335/:349/:364), so current-tick soloistMidi is
+    // almost always 0 in production. Fall back to lastActiveSoloistMidi — the most
+    // recent non-rest soloist note — so the octave-shift branch actually engages.
+    //
+    // Ordering: avgSoloistMidi first because for spectral-gap reasoning we want "where
+    // is the soloist's mass right now," which is the centroid across same-tick notes
+    // (matters for double-stops); falls back to the single picked main note, then to
+    // the sticky last-active value when the soloist is resting.
+    //
+    // Age cap: the sticky is gated by lastActiveSoloistStep — values older than
+    // SOLOIST_STICKY_STALE_STEPS (~2 bars at 4/4 16th-step) are treated as 0 so a
+    // soloist who played one note and went silent doesn't steer harmony forever.
+    const SOLOIST_STICKY_STALE_STEPS = 32;
+    const lastStep = coordination.lastActiveSoloistStep || 0;
+    const stickyAge = (coordination.step || 0) - lastStep;
+    const stickyMidi =
+        lastStep > 0 && stickyAge <= SOLOIST_STICKY_STALE_STEPS
+            ? coordination.lastActiveSoloistMidi || 0
+            : 0;
+    const soloistMidi = coordination.avgSoloistMidi || coordination.soloistMidi || stickyMidi || 0;
     if (soloistMidi > 72 && targetOctave > 48) {
         targetOctave -= 12;
     } else if (soloistMidi > 0 && soloistMidi < 60 && targetOctave < 72) {
