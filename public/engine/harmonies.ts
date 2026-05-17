@@ -13,6 +13,20 @@ import { getWorkerState } from './worker-orchestrator.js';
  * HARMONIES.JS (v3 - Behavioral Strategy Architecture)
  */
 
+// mulberry32 — 32-bit scrambled hash. Replaces raw Math.random() at per-step
+// decision sites so antiphonal response, reinforcement, and timing-jitter are
+// deterministic and reproducible across loops (epic-deterministic-phrasing S5).
+// DO NOT use a simple LCG on small integer seeds; mulberry32 scrambles small
+// linear inputs into well-distributed uint32 outputs.
+// why: identical to the scrambleHash in bass-engine.ts (S4); copied as a
+// local to avoid a cross-file refactor in this story.
+const scrambleHash = (seed: number): number => {
+    let t = (seed + 0x6d2b79f5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+};
+
 interface TimeSignatureConfig {
     beats: number;
     stepsPerBeat: number;
@@ -271,7 +285,9 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     // A. Antiphony (Response)
     if (coordination.soloistPhraseEnd && !coordination.soloistActive) {
         const responseProb = 0.4 + playback.bandIntensity * 0.5;
-        if (Math.random() < responseProb) {
+        // why: tag 1 — response trigger. Seeded from motif.seed (section hash)
+        // and step so the same phrase-end position fires the same way each loop.
+        if (scrambleHash(context.motif.seed + step * 31 + 1) < responseProb) {
             return { type: 'reinforce', isResponse: true, duration: 2 };
         }
     }
@@ -300,7 +316,8 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
                 reinforceProb = (playback.bandIntensity - 0.4) * 0.8;
             }
 
-            if (Math.random() < reinforceProb) {
+            // why: tag 2 — melodic-shadowing reinforce trigger.
+            if (scrambleHash(context.motif.seed + step * 31 + 2) < reinforceProb) {
                 return {
                     type: 'reinforce',
                     isLatched: true,
@@ -320,7 +337,8 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
             // A strong downbeat or half-bar downbeat
             if (nextSeedNote?.isAnchor && nextSeedNote.step % Math.floor(spm / 2) === 0) {
                 const pushProb = loopCount === 0 ? 0.8 : 0.3;
-                if (Math.random() < pushProb) {
+                // why: tag 3 — hype-man push trigger.
+                if (scrambleHash(context.motif.seed + step * 31 + 3) < pushProb) {
                     return { type: 'reinforce', isLatched: true, isBloom: true, duration: 1 };
                 }
             }
@@ -360,8 +378,9 @@ function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
 
         if (isSoloistBusy || coordination.accompanimentHit) {
             needed += 0.25;
-            // Higher penalty for medium/light hits when busy
-            if (val > 1 && Math.random() > 0.4) {
+            // Higher penalty for medium/light hits when busy.
+            // why: tag 4 — busy-suppression gate. Preserves original 0.4 floor.
+            if (val > 1 && scrambleHash(motif.seed + step * 31 + 4) > 0.4) {
                 needed = 2.0;
             }
         }
@@ -370,10 +389,15 @@ function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
             // Yielding: Protect downbeats in comping-heavy genres
             const isDownbeatHit = val === 1 && measureStep % ts.stepsPerBeat === 0;
             if (!isDownbeatHit) {
-                if (coordination.accompanimentHit && Math.random() < 0.6) {
+                // why: tag 5 — accompaniment-collision yield.
+                if (
+                    coordination.accompanimentHit &&
+                    scrambleHash(motif.seed + step * 31 + 5) < 0.6
+                ) {
                     return null;
                 }
-                if (coordination.bassHit && Math.random() < 0.3) {
+                // why: tag 6 — bass-collision yield.
+                if (coordination.bassHit && scrambleHash(motif.seed + step * 31 + 6) < 0.3) {
                     return null;
                 }
             }
@@ -490,7 +514,15 @@ function finalizeHarmonyNotes(
     }
 
     // --- REINFORCEMENT: Tutti/Shadow logic ---
-    if (isLatched && anchorMidi && playback.bandIntensity > 0.8 && Math.random() < 0.5) {
+    // why: tag 7 — anchor-tutti latch coin. Seeded from (chord.rootMidi, step) since
+    // finalizeHarmonyNotes doesn't carry a motif handle — chord+step is the next-best
+    // stable key for "same beat in the same chart fires the same way each loop."
+    if (
+        isLatched &&
+        anchorMidi &&
+        playback.bandIntensity > 0.8 &&
+        scrambleHash(chord.rootMidi * 100 + step * 31 + 7) < 0.5
+    ) {
         const relativeSeedInterval = (anchorMidi - chord.rootMidi + 120) % 12;
         if (!intervals.includes(relativeSeedInterval)) {
             intervals = [...intervals, relativeSeedInterval];
@@ -672,10 +704,15 @@ function finalizeHarmonyNotes(
         }
 
         const stagger = (i - (currentMidis.length - 1) / 2) * 0.005;
+        // why: tag 8 — per-voice timing jitter. Seeded by (chord.rootMidi, step,
+        // voice index i) so each voice gets a distinct but reproducible offset.
+        // Original Math.random() * jitter produced [0, jitter] (asymmetric, always
+        // pushes notes late); preserved literally for behavioral parity.
         let offset =
             (coordination.pocketOffset || 0) +
             stagger +
-            Math.random() * (styleConfig.timingJitter || 0.008);
+            scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
+                (styleConfig.timingJitter || 0.008);
         if (feel === 'Neo-Soul') {
             offset += 0.02; // Dilla lag
         }
