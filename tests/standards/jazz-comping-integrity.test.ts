@@ -171,6 +171,106 @@ describe('Jazz Comping Integrity', () => {
         expect(midis).toContain(7); // G (7 % 12)
     });
 
+    it('S4: altered-dominant gate covers 7b9 (parity at high intensity → shell)', () => {
+        // chords.md P1 #7 / epic-chords-voicing S4:
+        // G7b9 → Cm is more common in Real Book than G7alt → Cm, yet the original gate
+        // was chord.quality === '7alt' only. After S4 the gate covers all five altered
+        // qualities. At high intensity the shell-reduction path reads chord.intervals
+        // directly, so this test verifies the GATE fires (chord enters the altered
+        // branch and gets reduced to 3+b7), not the voicing function's per-quality logic.
+        // Alteration-preservation inside buildResolvingAlteredVoicing is covered below.
+        const g7b9 = {
+            rootMidi: 55, // G3
+            quality: '7b9',
+            intervals: [4, 10, 13], // 3 (B=4), b7 (F=10), b9 (Ab=13)
+            freqs: [246.94, 311.13, 349.23, 415.3].map((f) => f),
+            is7th: true,
+            beats: 4,
+        };
+
+        compingState.currentCell[0] = 1;
+        compingState.lockedUntil = 100;
+        playback.bandIntensity = 0.7;
+
+        const notes = getAccompanimentNotes(getState(), g7b9, 0, 0, 0, {
+            isBeatStart: true,
+            isGroupStart: true,
+        });
+
+        expect(notes.length).toBe(2);
+        const pcs = notes.map((n) => n.midi % 12);
+        expect(pcs).toContain(11); // B — major 3rd
+        expect(pcs).toContain(5); // F — b7
+    });
+
+    it('S4: buildResolvingAlteredVoicing preserves charted alteration per quality', () => {
+        // chords.md P1 #7 / epic-chords-voicing S4 (review P0):
+        // At intensity 0.4 the shell-reduction path does NOT fire — the output of
+        // buildResolvingAlteredVoicing is the dominant voicing. Each altered quality
+        // must produce the alteration the chart actually wrote: 7b9 → b9,
+        // 7#9 → #9, 7#11 → #11. A G7#11 must not be silently re-voiced as G7b9
+        // or G7b13 (which collapses the charted Lydian-dominant color into the
+        // generic altered sound).
+        //
+        // G root (pc 7): b9 = pc 8 (Ab), #9 = pc 10 (Bb), #11 = pc 1 (C#),
+        //                b13 = pc 3 (Eb), 3 = pc 11 (B), b7 = pc 5 (F).
+
+        const baseChord = {
+            rootMidi: 55, // G3
+            freqs: [196.0, 246.94, 293.66, 349.23], // G-B-D-F (placeholder)
+            is7th: true,
+            beats: 4,
+        };
+
+        compingState.currentCell[0] = 1;
+        compingState.lockedUntil = 100;
+        playback.bandIntensity = 0.4;
+        playback.complexity = 0.4;
+
+        // Next chord: Cm (resolution target) — helps voice-leading score pick a voicing
+        // close to the next chord's register without forcing any specific alteration.
+        const nextCm = {
+            rootMidi: 60,
+            quality: 'm7',
+            intervals: [3, 7, 10],
+            freqs: [261.63, 311.13, 392.0, 466.16],
+            is7th: true,
+            beats: 4,
+        };
+
+        const cases: Array<[string, number[], number, number[]]> = [
+            // [quality, intervals, requiredPc, forbiddenPcs]
+            ['7b9', [4, 10, 13], 8, []], // b9 (Ab) required
+            ['7#9', [4, 10, 15], 10, []], // #9 (Bb) required
+            ['7#11', [4, 10, 18], 1, [3]], // #11 (C#) required; b13 (Eb) forbidden
+            ['7b13', [4, 10, 20], 3, []], // b13 (Eb) required
+        ];
+
+        for (const [quality, intervals, requiredPc, forbiddenPcs] of cases) {
+            const chord = { ...baseChord, quality, intervals };
+            const notes = getAccompanimentNotes(getState(), chord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+                nextChord: nextCm,
+            });
+
+            expect(notes.length, `${quality} produced an empty voicing`).toBeGreaterThan(0);
+            const pcs = notes.map((n) => n.midi % 12);
+
+            expect(
+                pcs.includes(requiredPc),
+                `${quality} missing required alteration pc=${requiredPc}; got pcs=${pcs.join(',')}`,
+            ).toBe(true);
+
+            for (const forbiddenPc of forbiddenPcs) {
+                expect(
+                    pcs.includes(forbiddenPc),
+                    `${quality} contains forbidden pc=${forbiddenPc}; got pcs=${pcs.join(',')}`,
+                ).toBe(false);
+            }
+        }
+    });
+
     it('should implement Call & Response by suppressing hits when soloist is busy', () => {
         const chord = {
             rootMidi: 60,

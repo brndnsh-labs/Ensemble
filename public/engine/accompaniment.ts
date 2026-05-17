@@ -80,6 +80,14 @@ const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa', 'Blues']);
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa']);
 
+// why: all altered-dominant qualities share one comping idiom — guide tones (3, b7)
+// plus 1–2 altered colors. The resolving-voicing path (buildResolvingAlteredVoicing)
+// and the high-intensity shell-reduction path both apply equally to 7alt, 7b9, 7#9,
+// 7b13, and 7#11. Gating on '7alt' alone (the original code) left charts that spell
+// G7b9 or G7#9 falling through to the generic inversion path with no awareness of
+// their resolution-critical altered tones. Source: chords.md P1 #7.
+const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11']);
+
 /**
  * Funk comping cell bank.
  *
@@ -483,6 +491,74 @@ function countSharedPitchClasses(
  * Favor guide tones plus one or two strong colors, and avoid exposing the 3rd/#9 semitone clash
  * unless the intensity/complexity is high enough to justify that heat.
  */
+// why: per-quality candidate sets for buildResolvingAlteredVoicing. Each chart
+// symbol names a specific alteration; the candidate set must honor it so a
+// G7#11 doesn't come out sounding like G7b9. Interval keys: 4=3, 10=b7, 13=b9,
+// 15=#9, 18=#11, 20=b13. Sources: chords.md P1 #7, S4 review P0.
+// - '7alt': full altered license. Keeps the legacy candidate set (b9/b13 mix)
+//   that prior tests certified; #11 deliberately omitted from the default set
+//   to avoid a silent behavior shift on plain '7alt' chords.
+// - '7b9' / '7b13': the charted alteration is mandatory; the other b-tone is
+//   an optional color (musically compatible).
+// - '7#9': #9 mandatory. The Hendrix-style 3+#9 semitone clash is the sound
+//   here, not an accident — that's handled by a penalty bypass below.
+// - '7#11': #11 mandatory. b13 deliberately forbidden — they share the same
+//   step (b5/#11 vs b13) and stack into a muddy whole-tone cluster that is not
+//   idiomatic Lydian-dominant. b9 stays allowed as an ambiguous color.
+function getAlteredVoicingCandidates(
+    quality: string | undefined,
+    intensity: number,
+    complexity: number,
+): number[][] {
+    const heat = intensity > 0.72 || complexity > 0.7;
+    switch (quality) {
+        case '7b9':
+            return heat
+                ? [
+                      [4, 10, 13],
+                      [4, 10, 13, 20],
+                      [4, 10, 13, 15, 20],
+                  ]
+                : [
+                      [4, 10, 13],
+                      [4, 10, 13, 20],
+                  ];
+        case '7#9':
+            return [
+                [4, 10, 15],
+                [4, 10, 15, 20],
+            ];
+        case '7b13':
+            return heat
+                ? [
+                      [4, 10, 20],
+                      [4, 10, 13, 20],
+                      [4, 10, 13, 15, 20],
+                  ]
+                : [
+                      [4, 10, 20],
+                      [4, 10, 13, 20],
+                  ];
+        case '7#11':
+            return [
+                [4, 10, 18],
+                [4, 10, 13, 18],
+            ];
+        default: {
+            // '7alt' and any fallback path. Preserve legacy candidate set.
+            const base = [
+                [4, 10, 20],
+                [4, 10, 13],
+                [4, 10, 13, 20],
+            ];
+            if (heat) {
+                base.push([4, 10, 13, 15, 20]);
+            }
+            return base;
+        }
+    }
+}
+
 function buildResolvingAlteredVoicing(
     chord: { rootMidi?: number; freqs?: number[]; quality?: string } | null,
     previousMidis: number[] = [],
@@ -506,14 +582,7 @@ function buildResolvingAlteredVoicing(
               ? averageMidi(nextMidis)
               : resolvedRootMidi + 14;
 
-    const candidateIntervals = [
-        [4, 10, 20],
-        [4, 10, 13],
-        [4, 10, 13, 20],
-    ];
-    if (intensity > 0.72 || complexity > 0.7) {
-        candidateIntervals.push([4, 10, 13, 15, 20]);
-    }
+    const candidateIntervals = getAlteredVoicingCandidates(chord?.quality, intensity, complexity);
 
     let bestMidis = placeIntervalsNearTarget(
         resolvedRootMidi,
@@ -542,7 +611,9 @@ function buildResolvingAlteredVoicing(
             getNearestVoiceLeadingCost(candidateMidis, nextMidis) * 0.6 +
             (candidateMidis[candidateMidis.length - 1] - candidateMidis[0]) * 0.12;
 
-        if (complexity < 0.68 && intensity < 0.78) {
+        // why: skip the 3+b3 clash penalty for 7#9 — the Hendrix-style 3+#9
+        // semitone collision IS the charted sound, not an accident to avoid.
+        if (complexity < 0.68 && intensity < 0.78 && chord?.quality !== '7#9') {
             const intervalClasses = candidateMidis
                 .map((midi) => getChordIntervalClass(midi, chord))
                 .filter((intervalClass) => intervalClass !== null);
@@ -1923,7 +1994,9 @@ export function getAccompanimentNotes(
         let voicing = [...chord.freqs];
         const complexity = playback.complexity;
         const shouldUseResolvingAlteredVoicing =
-            genre === 'Jazz' && chord.quality === '7alt' && chords.style !== 'pad';
+            genre === 'Jazz' &&
+            ALTERED_DOMINANT_QUALITIES.has(chord.quality) &&
+            chords.style !== 'pad';
 
         // --- NEW: Harmonic Tension Scaling ---
         // At high complexity, favor 9ths, 11ths, and 13ths (extensions)
@@ -1986,8 +2059,13 @@ export function getAccompanimentNotes(
         const useClarity = (soloistMidi || 0) > 72;
         if (chords.style === 'smart') {
             // Jazz Shell Lesson: If things are hot and harmony is complex, stick to shells (3 & 7)
+            // why: all altered-dominant qualities (7alt, 7b9, 7#9, 7b13, 7#11) plus halfdim/dim
+            // are equally tense — they all want guide-tone-only shells at high intensity to avoid
+            // muddying the altered colors. Sourced from ALTERED_DOMINANT_QUALITIES set.
             const isComplex =
-                chord.quality === '7alt' || chord.quality === 'halfdim' || chord.quality === 'dim';
+                ALTERED_DOMINANT_QUALITIES.has(chord.quality) ||
+                chord.quality === 'halfdim' ||
+                chord.quality === 'dim';
 
             // LOW INTENSITY: Gentle Shells (2 notes)
             if (groundingRequired && voicing.length > 4) {
