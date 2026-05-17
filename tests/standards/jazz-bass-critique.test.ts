@@ -155,4 +155,83 @@ describe('Jazz Bass Critique', () => {
         // headroom for the engine's diatonic-fifth alternative without being a placeholder.
         expect(chromaticApproachRate).toBeGreaterThan(0.5);
     });
+
+    // why: epic-bass-voice-leading S1. Walking-bass approach notes should fire
+    // only ahead of REAL chord changes (next bar differs from current). Previously
+    // the engine gated on `nextChord && ...`, which fires on every bar boundary
+    // including held-chord boundaries — sounds like a stumble. After the
+    // isChordChangeApproach helper, a 16-bar held Cmaj7 should produce zero
+    // chromatic neighbor-of-root notes on the "& of 4" (step 14).
+    it('does not fire chromatic approaches inside a held chord', () => {
+        const heldChord = {
+            rootMidi: 48,
+            quality: 'maj7',
+            beats: 4,
+            intervals: [0, 4, 7, 11],
+            sectionId: 'A',
+        };
+        const totalMeasures = 16;
+        const totalSteps = totalMeasures * 16;
+        const tsConfig = TIME_SIGNATURES['4/4'];
+
+        // Reset the shared stepMap so this test is independent of the prior test.
+        mockState.arranger.stepMap = [];
+        for (let m = 0; m < totalMeasures; m++) {
+            mockState.arranger.stepMap.push({
+                start: m * 16,
+                end: (m + 1) * 16,
+                chord: heldChord,
+            });
+        }
+
+        let lastMidi = null;
+        let chromaticNeighborHitsOnHeldBars = 0;
+        let approachWindowsSampled = 0;
+        const rootPc = heldChord.rootMidi % 12;
+
+        for (let i = 0; i < totalSteps; i++) {
+            const stepInMeasure = i % 16;
+            const measure = Math.floor(i / 16);
+            // nextChord is also the held chord — that is the whole point of the test.
+            const nextChord = measure < totalMeasures - 1 ? heldChord : null;
+            const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
+            if (!isBassActive(getState(), 'quarter', i, stepInMeasure, info)) {
+                continue;
+            }
+            const note = getBassNote(
+                getState(),
+                heldChord,
+                nextChord,
+                Math.floor(stepInMeasure / 4),
+                lastMidi ? getFrequency(lastMidi) : 0,
+                48,
+                'quarter',
+                0,
+                i,
+                stepInMeasure,
+                {},
+                info,
+            );
+            if (note && !note.muted) {
+                if (stepInMeasure === 14) {
+                    approachWindowsSampled++;
+                    const diff = Math.abs((note.midi % 12) - rootPc);
+                    if (diff === 1 || diff === 11) {
+                        chromaticNeighborHitsOnHeldBars++;
+                    }
+                }
+                lastMidi = note.midi;
+            }
+        }
+
+        console.log(
+            '\n--- HELD-CHORD APPROACH CRITIQUE ---\n' +
+                `[Approach windows]      ${approachWindowsSampled}\n` +
+                `[Chromatic-neighbor leans on held bars] ${chromaticNeighborHitsOnHeldBars} (target: 0)\n` +
+                '-------------------------------------\n',
+        );
+
+        expect(approachWindowsSampled).toBeGreaterThan(0);
+        expect(chromaticNeighborHitsOnHeldBars).toBe(0);
+    });
 });

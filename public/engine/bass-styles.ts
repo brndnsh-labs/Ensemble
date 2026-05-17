@@ -2,6 +2,34 @@ import { REGGAE_RIDDIMS } from '../config.js';
 import type { EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 
+type ChordChangeShape = {
+    rootMidi: number;
+    bassMidi?: number | null;
+};
+
+/**
+ * Type-guard returning true only when nextChord represents an actual chord
+ * change vs the current chord — i.e. the bass target on the next bar is
+ * different from now.
+ *
+ * why: every "approach note" callsite previously gated on `nextChord && ...`,
+ * which fires inside held chords too — producing stumbling chromatic leans on
+ * non-change bars. The audit (bass.md P1 #5, P2 #13) named this as the
+ * highest-leverage architectural fix in the bass engine. Type-predicate form
+ * lets call sites use `nextChord.rootMidi` directly after the guard.
+ */
+export function isChordChangeApproach<T extends ChordChangeShape>(
+    nextChord: T | null | undefined,
+    chord: ChordChangeShape,
+): nextChord is T {
+    if (!nextChord) {
+        return false;
+    }
+    const nextTarget = nextChord.bassMidi ?? nextChord.rootMidi;
+    const currentTarget = chord.bassMidi ?? chord.rootMidi;
+    return nextTarget !== currentTarget;
+}
+
 export function checkBassActiveStyle(
     style: string,
     step: number,
@@ -581,9 +609,14 @@ export function getBassNoteStyle(
             }
         }
 
-        // 4. Harmonic Approaches
-        if (intensity > 0.75 && stepInBeat === ts.stepsPerBeat - 1 && Math.random() < 0.6) {
-            const target = nextChord ? normalizeToRange(nextChord.rootMidi) : baseRoot;
+        // 4. Harmonic Approaches — only on real chord changes (audit: bass.md P2 #13)
+        if (
+            intensity > 0.75 &&
+            stepInBeat === ts.stepsPerBeat - 1 &&
+            isChordChangeApproach(nextChord, chord) &&
+            Math.random() < 0.6
+        ) {
+            const target = normalizeToRange(nextChord.rootMidi);
             const approach = Math.random() < 0.5 ? target - 1 : target + 1;
             return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.1);
         }
@@ -911,7 +944,7 @@ export function getBassNoteStyle(
         (isBeatStart && (isLastBeatOfMeasure || isEndOfChord)) || isEighthSkip || isLastEighth;
 
     // Use a slightly more aggressive chromatic probability for the critique to ensure it triggers
-    if (isApproachPoint && nextChord) {
+    if (isApproachPoint && isChordChangeApproach(nextChord, chord)) {
         const nextTarget =
             nextChord.bassMidi !== null && nextChord.bassMidi !== undefined
                 ? nextChord.bassMidi

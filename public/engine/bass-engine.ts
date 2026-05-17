@@ -14,7 +14,7 @@ import { getScaleForChord } from './theory-scales.js';
 
 // (Old getScaleForBass removed, using imported version)
 import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
-import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
+import { checkBassActiveStyle, getBassNoteStyle, isChordChangeApproach } from './bass-styles.js';
 
 // why: Genres where bass-doubles-kick is the musical intent. Other styles
 // (jazz/dub/country/blues/bossa/acoustic/neo/walking-ska/hiphop/whole/half/arp)
@@ -680,7 +680,7 @@ export function getBassNote(
         isEighthSkip ||
         step % 16 === 14;
 
-    if (isApproachPoint && nextChord) {
+    if (isApproachPoint && isChordChangeApproach(nextChord, chord)) {
         const nextTarget = nextChord.bassMidi ?? nextChord.rootMidi;
         const targetRoot = normalizeToRange(nextTarget);
         let chromaticProb =

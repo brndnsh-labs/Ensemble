@@ -20,6 +20,7 @@ Add `isChordChangeApproach(stepInfo, nextChord, chord, ts)` in `bass-engine.ts` 
 
 **Acceptance:** approach notes fire only on real chord changes. Critique test: across a chart with mostly held chords, approach-note counts on non-change beats === 0.
 **Effort:** ~4h. **Model:** sonnet (mechanical helper extraction + callsite audit). **Reviewer:** music-theory-reviewer. **Source:** `bass.md` P1 #5, P2 #13.
+**Status:** Shipped 2026-05-17. Helper placed in `bass-styles.ts` (not new `bass-utils.ts`) as a type-predicate; three call sites migrated (`bass-engine.ts:683`, `bass-styles.ts:585`, `bass-styles.ts:914`). Helper uses `bassMidi ?? rootMidi` so it also catches slash-chord changes that the inline predicate at sites 313/463/812 misses — those three sites left alone per scope.
 
 ### S2. Chromatic approach to next chord works in all genres
 After S1, remove the `['Jazz', 'Blues']` genre gate at `bass-engine.ts:589-593` and `bass-styles.ts:929-932`. Keep probability lower for non-jazz/blues (`chromaticProb *= 0.5`). Voice leading vocabulary now available across rock/funk/pop/country/soul/gospel.
