@@ -144,6 +144,15 @@ function selectGroundedIntervals(intervals: number[], targetCount = 4): number[]
         others.push(interval);
     });
 
+    // why: order is [roots, guides, colors, fifths, others] — NOT R-3-5-7.
+    // This function is reached only when `shouldPreferGroundedPracticeVoicing`
+    // gates the call (see voicing-policy.ts `PRACTICE_GROUNDING_QUALITIES`:
+    // halfdim, dim, 7b5, aug, augmaj7, 7alt, 7#9, 7b9). Plain 7/maj7/m7 never
+    // reach here. For tension/altered qualities the characteristic alteration
+    // (e.g. b9 in 7b9 = interval 13, color-class) IS the chord identity — a
+    // 4-note slice that drops the alteration in favor of a fifth would emit a
+    // plain dominant 7. Colors before fifths is therefore correct. See
+    // harmony-coordination.md P2 #14 + epic-harmony-polish.md S3 review.
     return [...roots, ...guides, ...colors, ...fifths, ...others].slice(0, targetCount);
 }
 

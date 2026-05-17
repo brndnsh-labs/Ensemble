@@ -450,6 +450,36 @@ describe('Harmony Engine Logic', () => {
             expect(requested).toContain(10);
         });
 
+        // why: epic-harmony-polish S3 (review P0). selectGroundedIntervals fires
+        // here (Jazz + practiceMode + tension quality satisfies
+        // shouldPreferGroundedPracticeVoicing). For 7b9 the characteristic
+        // alteration (b9 = interval 13) IS the chord identity; if a reorder
+        // ever evicted it in favor of the perfect 5th, the chord would emit a
+        // plain dominant 7 instead. This test guards bucket-order regressions.
+        it('should preserve the b9 in 7b9 voicings in Jazz practice mode', () => {
+            _playback.practiceMode = true;
+            _bass.enabled = false;
+            _groove.genreFeel = 'Jazz';
+
+            const chord = {
+                rootMidi: 60,
+                intervals: [0, 4, 7, 10, 13],
+                quality: '7b9',
+                sectionId: 'p2b9',
+                beats: 4,
+            };
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+
+            const requested = getLastRequestedIntervals();
+            // The characteristic b9 must survive the grounded-voicing slice.
+            // interval-class 1 (= pc(b9 above root) = 13 % 12 = 1)
+            const hasB9 = requested.some((i: number) => ((i % 12) + 12) % 12 === 1);
+            expect(hasB9).toBe(true);
+            // Guide tones still present
+            expect(requested).toContain(4);
+            expect(requested).toContain(10);
+        });
+
         it('should ALWAYS reserve bass register (stay above 52) given new safety rules', () => {
             _playback.practiceMode = false;
             _bass.enabled = false;

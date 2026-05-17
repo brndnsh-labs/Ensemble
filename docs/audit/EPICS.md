@@ -23,7 +23,7 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 | 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 3 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. S1+S2+S3 shipped 2026-05-17. |
 | 6 | [Chord Voicing & Comping Cells](epic-chords-voicing.md) | no | 6 | 3 | Voice leading 2nd pass; sticky comping cells; altered-dominant breadth. S2+S3+S4 shipped 2026-05-17. |
 | 7 | [Drum Sound Design & Genre Idiom](epic-drums-idiom.md) | no | 7 | 2 | Crash/Cowbell/Brush wiring; tom vocabulary; entropy floor per genre. S1+S7 shipped 2026-05-17. |
-| 8 | [Harmony Layer Polish](epic-harmony-polish.md) | no | 5 | 1 | Pad sustain/legato; antiphonal anchor; grounded-intervals fifth ordering. S2 shipped 2026-05-17. |
+| 8 | [Harmony Layer Polish](epic-harmony-polish.md) | no | 5 | 2 | Pad sustain/legato; antiphonal anchor; grounded-intervals fifth ordering. S2+S3 shipped 2026-05-17 (S3 revised after review: kept original order, added guard test). |
 
 **Total: 50 stories.** Most are independent; pick what's interesting.
 
