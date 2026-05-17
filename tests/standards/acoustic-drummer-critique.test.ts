@@ -203,6 +203,47 @@ describe('Acoustic Drummer Critique', () => {
         expect(backbeatScore).toBeGreaterThan(0.7);
     });
 
+    it('should fire snare on beat 3 only for half-time motif 0', () => {
+        // Motif 0 is the half-time pattern: snare on beat 3 (step 8) only, NOT on
+        // beats 2 (step 4) and 4 (step 12). At intensity 0.5, binaryTier(0.65, 0.6)
+        // returns the first tier (intensity < 0.65), and the first tier's breakpoint
+        // is 0.6 — so motif 0 fires when sectionSeed < 0.6, roughly 60% of bars.
+        // Audit finding: drums.md P1 #12 (acoustic motif 0 renamed to "Half-time").
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.5 },
+        });
+
+        let halfTimeBars = 0;
+        performance.forEach((bar) => {
+            let hasBeat3 = false;
+            let hasBackbeat = false;
+            bar.forEach((stepData) => {
+                if (!stepData.instruments.Snare) {
+                    return;
+                }
+                if (stepData.loopStep === 8) {
+                    hasBeat3 = true;
+                }
+                if (stepData.loopStep === 4 || stepData.loopStep === 12) {
+                    hasBackbeat = true;
+                }
+            });
+            if (hasBeat3 && !hasBackbeat) {
+                halfTimeBars++;
+            }
+        });
+
+        console.log(
+            `[Acoustic Half-time Motif 0] half-time bars (beat-3 hit, no backbeat): ${halfTimeBars}/${numBars}`,
+        );
+        // Motif 0 selected when sectionSeed < 0.6 at intensity 0.5 → ~60% of bars.
+        // Each motif-0 bar emits exactly one half-time pattern (beat 3 snare, no
+        // backbeat snare). Expected ~76 half-time bars over 128. Floor at 8 keeps
+        // generous statistical headroom while still proving the pattern fires.
+        expect(halfTimeBars).toBeGreaterThan(8);
+    });
+
     it('should add kick syncopation above intensity 0.5', () => {
         // Engine: kick syncopation gate at `intensity > 0.5 && isOffbeat && beatIndex
         // === 1 || 3` with roll(0.4, intensity). Below 0.5 no syncopated kicks.

@@ -22,7 +22,7 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 | 4 | [Soloist Idiom & Bebop Vocabulary](epic-soloist-idiom.md) | no | 6 | 0 | Bebop chromatic unlock; profile multiplier placement; head-bypass jitter. |
 | 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 0 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. |
 | 6 | [Chord Voicing & Comping Cells](epic-chords-voicing.md) | no | 6 | 0 | Voice leading 2nd pass; sticky comping cells; altered-dominant breadth. |
-| 7 | [Drum Sound Design & Genre Idiom](epic-drums-idiom.md) | no | 7 | 0 | Crash/Cowbell/Brush wiring; tom vocabulary; entropy floor per genre. |
+| 7 | [Drum Sound Design & Genre Idiom](epic-drums-idiom.md) | no | 7 | 2 | Crash/Cowbell/Brush wiring; tom vocabulary; entropy floor per genre. S1+S7 shipped 2026-05-17. |
 | 8 | [Harmony Layer Polish](epic-harmony-polish.md) | no | 5 | 0 | Pad sustain/legato; antiphonal anchor; grounded-intervals fifth ordering. |
 
 **Total: 49 stories.** Most are independent; pick what's interesting.

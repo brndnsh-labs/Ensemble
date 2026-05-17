@@ -140,4 +140,55 @@ describe('Latin Drummer Critique', () => {
         expect(kickScore).toBe(1.0);
         expect(shakerScore).toBe(1.0);
     });
+
+    it('should emit full Snare (not Sidestick) on backbeats at high intensity in Samba and Partido Alto', () => {
+        // Samba (activeMotif 2) and Partido Alto (activeMotif 3) should route the
+        // on-beat-2/4 (isBackbeat) hit to 'Snare' when intensity > 0.8, matching the
+        // caixa/snare crack of a real samba batería at full energy.
+        // Clave positions (non-backbeat steps) remain on Sidestick.
+        // Audit finding: drums.md P0 #4.
+        // We use genreFeel 'Bossa Nova' with intensity 0.9 — at this level the motif
+        // selector (binaryTier 0.6/0.7) pushes to activeMotif 2 or 3.
+
+        const performance = simulatePerformance(64, {
+            playback: { bandIntensity: 0.9 },
+            groove: { creativity: true, genreFeel: 'Bossa Nova' },
+        });
+
+        let snareOnBackbeat = 0;
+        let sidestickOnBackbeat = 0;
+
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                // Backbeat positions: step 4 (beat 2) and step 12 (beat 4)
+                if (stepData.loopStep === 4 || stepData.loopStep === 12) {
+                    if (stepData.instruments.Snare) {
+                        const sound = stepData.instruments.Snare.sound;
+                        if (sound === 'Snare') {
+                            snareOnBackbeat++;
+                        } else if (sound === 'Sidestick') {
+                            sidestickOnBackbeat++;
+                        }
+                    }
+                }
+            });
+        });
+
+        const totalBackbeatEvents = snareOnBackbeat + sidestickOnBackbeat;
+        const snareRate = snareOnBackbeat / (totalBackbeatEvents || 1);
+
+        console.log(
+            `[Latin Snare Body] Backbeat events at intensity 0.9: ${snareOnBackbeat} Snare, ${sidestickOnBackbeat} Sidestick (Snare rate: ${(snareRate * 100).toFixed(1)}%)`,
+        );
+
+        // why: at intensity 0.9 the motif selector spreads across motifs 0–3 (clave
+        // motifs 0/1 keep Sidestick; Samba=2 and Partido Alto=3 upgrade backbeat to
+        // Snare under the new `intensity > 0.8` gate). Asserting `snareRate === 1.0`
+        // would require *every* bar to land in motif 2/3, which the selector does
+        // not guarantee at any single intensity. The meaningful claim is that the
+        // new high-energy path fires — a non-trivial Snare share on backbeat events
+        // proves Samba/Partido Alto are reachable and route correctly.
+        expect(snareOnBackbeat).toBeGreaterThan(0);
+        expect(snareRate).toBeGreaterThan(0.3);
+    });
 });

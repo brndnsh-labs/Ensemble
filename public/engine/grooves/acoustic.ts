@@ -17,7 +17,9 @@ export const config = {
 
 /**
  * Maps intensity to motif complexity for Acoustic.
- * 0: Minimal Folk/Cajon, 1: Driving Folk, 2: Soft Rock/Shaker-driven, 3: Dynamic Build
+ * 0: Half-time (kick on 1, snare on 3), 1: Driving Folk, 2: Soft Rock/Shaker-driven, 3: Dynamic Build
+ * why: motif 0 produces kick-1 / snare-3 — the Americana half-time backbeat, not "Minimal Folk/Cajon".
+ * Renamed to "Half-time" to match the actual output (audit finding drums.md P1 #12).
  */
 export const getMotif = makeMotifSelector([
     binaryTier(0.65, 0.6),
@@ -50,7 +52,9 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         soundName = intensity >= 0.75 ? 'Snare' : 'Sidestick';
 
         if (activeMotif === 0) {
-            // Minimal: Beat 3 only (Half-time pulse)
+            // Half-time: Snare on beat 3 only (beatIndex 2).
+            // why: kick-1 + snare-3 is the textbook Americana half-time pattern; keeping snare
+            // off beats 2 and 4 maintains the "space" that defines the half-time groove feel.
             if (isBeatStart && beatIndex === 2) {
                 shouldPlay = true;
             }

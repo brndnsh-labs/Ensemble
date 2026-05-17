@@ -79,10 +79,22 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = scaleVelocity(0.8, intensity, 0.1);
         }
 
-        // Crash on the One for section energy
-        if (isOpenLane && isDownbeat && intensity > 0.8 && roll(0.4)) {
+        // D-beat open hat on "and of 4": the breath accent that completes the gallop phrase.
+        // why: real D-beat (Discharge / crust-punk) consistently accents the "&4" position
+        // with an open hat — it functions as a phrase exhale matching the doubled kick on
+        // beats 1+&1 and 3+&3.
+        if (isOpenLane && activeMotif === 3 && isOffbeat && beatIndex === 3) {
             shouldPlay = true;
             soundName = 'Open';
+            velocity = scaleVelocity(1.0, intensity, 0.1);
+        }
+
+        // Crash on the One for section energy
+        // why: route to the real Crash voice (not Open) — matches the S1 fix in groove-engine.ts
+        // that points section-marker hits at the actual crash branch in synth-drums.ts.
+        if (isOpenLane && isDownbeat && intensity > 0.8 && roll(0.4)) {
+            shouldPlay = true;
+            soundName = 'Crash';
             velocity = 1.4;
         }
     }
@@ -101,12 +113,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 shouldPlay = true;
             }
         } else if (activeMotif === 3) {
-            // D-Beat / Syncopated
+            // D-Beat (Discharge / crust-punk): kick on 1, "and of 1", 3, "and of 3".
+            // why: the defining D-beat gallop is the doubled offbeat kick (beat 1 + &1,
+            // beat 3 + &3), not a syncopated pattern. This creates the driving, urgent
+            // crust-punk feel. Snare locks to 2 and 4 (standard backbeat, handled in the
+            // Snare section). Open hat lands on "and of 4" for a breath accent.
             if (
-                isDownbeat ||
-                (isAOfBeat && beatIndex === 0) ||
-                (isBeatStart && beatIndex === 2) ||
-                (isOffbeat && beatIndex === 3)
+                isDownbeat || // beat 1
+                (isOffbeat && beatIndex === 0) || // "and of 1"
+                (isBeatStart && beatIndex === 2) || // beat 3
+                (isOffbeat && beatIndex === 2) // "and of 3"
             ) {
                 shouldPlay = true;
             }

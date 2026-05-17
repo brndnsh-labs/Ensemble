@@ -214,4 +214,62 @@ describe('Ska-Punk Drummer Critique', () => {
         // High intensity averages ~2.5-3/bar across motif 0-3.
         expect(highD).toBeGreaterThan(lowD * 1.15);
     });
+
+    it('should play D-beat kick pattern (1, &1, 3, &3) and open hat on &4 in motif 3', () => {
+        // Motif 3 (D-Beat / Discharge-style crust-punk) defines a gallop feel with kick
+        // doubled on beats 1+&1 and 3+&3, snare on 2+4, open hat breath on &4.
+        // In 16-step 4/4 grid:
+        //   step 0  = beat 1  (kick)       step 2  = &1 (kick)
+        //   step 4  = beat 2  (snare)      step 8  = beat 3 (kick)
+        //   step 10 = &3      (kick)       step 12 = beat 4 (snare)
+        //   step 14 = &4      (open hat breath)
+        // Audit finding: drums.md P1 #13.
+        // To isolate motif 3 we seed bars consistently using intensity 0.99, which
+        // pushes the motif selector's second tier to pick=3 (seed > 0.8 → picks 3).
+
+        // Run enough bars for the motif-3 section to appear
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.99 },
+        });
+
+        // For bars that look like the gallop pattern (kick on step 0 AND step 2 AND
+        // step 8 AND step 10) count how often the pattern is complete.
+        // This distinguishes the D-beat gallop from plain four-on-the-floor.
+        let gallopBars = 0;
+        let gallopBarsWithOpenHat = 0;
+
+        performance.forEach((bar) => {
+            const kickSteps = new Set(bar.filter((s) => s.instruments.Kick).map((s) => s.loopStep));
+            const isGallop =
+                kickSteps.has(0) &&
+                kickSteps.has(2) &&
+                kickSteps.has(8) &&
+                kickSteps.has(10) &&
+                !kickSteps.has(4) && // gallop does NOT kick on beat 2
+                !kickSteps.has(12); // gallop does NOT kick on beat 4
+
+            if (isGallop) {
+                gallopBars++;
+                const hasOpenAt14 = bar.some(
+                    (s) => s.loopStep === 14 && (s.instruments.Open || s.instruments.HiHat),
+                );
+                if (hasOpenAt14) {
+                    gallopBarsWithOpenHat++;
+                }
+            }
+        });
+
+        const gallopRate = gallopBars / numBars;
+        console.log(
+            `[Ska-Punk D-Beat] Gallop bars: ${gallopBars}/${numBars} (${(gallopRate * 100).toFixed(1)}%), open-hat on &4: ${gallopBarsWithOpenHat}`,
+        );
+
+        // At intensity 0.99 the motif selector picks motif 3 when second-tier seed > 0.8.
+        // Approximately 20% of bars should exhibit the D-beat gallop pattern.
+        // Threshold 10% gives comfortable headroom (actual observed ~18-22%).
+        expect(gallopRate).toBeGreaterThan(0.1);
+        // Gallop bars must also have the open hat breath on step 14 (&4).
+        expect(gallopBarsWithOpenHat).toBeGreaterThan(0);
+    });
 });

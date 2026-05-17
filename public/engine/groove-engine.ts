@@ -143,23 +143,6 @@ export function applyGrooveOverrides(
         sectionSeed = ((seedBarIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
     }
 
-    if (justFinishedTurnaround && isDownbeat) {
-        if (inst.name === 'Kick') {
-            currentState.shouldPlay = true;
-            currentState.velocity = 1.35;
-        } else if (inst.name === 'HiHat' || inst.name === 'Open') {
-            currentState.shouldPlay = true;
-            // Use Open hats only at higher intensities for the section-start crash
-            if (playback.bandIntensity > 0.45) {
-                currentState.soundName = 'Open';
-                currentState.velocity = 1.2;
-            } else {
-                currentState.soundName = 'HiHat';
-                currentState.velocity = 1.1;
-            }
-        }
-    }
-
     const context = {
         step,
         inst,
@@ -196,6 +179,29 @@ export function applyGrooveOverrides(
         currentState = strategy.applyOverrides(context, currentState);
     }
 
+    // --- Phase 2b: Section-boundary Crash (applied post-strategy so genre overrides don't clobber it) ---
+    // why: the turnaround block previously ran BEFORE strategy.applyOverrides, which unconditionally
+    // resets the hat lane (e.g. funk.ts:64 sets shouldPlay=false and rebuilds from scratch), so the
+    // Crash routing was always wiped. Moving it here — parallel with the crash-catch accent below —
+    // guarantees the Crash fires on the final, post-strategy state.
+    if (justFinishedTurnaround && isDownbeat) {
+        if (inst.name === 'Kick') {
+            currentState.shouldPlay = true;
+            currentState.velocity = 1.35;
+        } else if (inst.name === 'Open' && playback.bandIntensity > 0.45) {
+            // why: route the section-start crash splash on the Open lane only — `blues.ts:59`
+            // is the reference pattern. Firing on both HiHat and Open lanes (the previous
+            // implementation) produces two stacked Crash drumHits per boundary, and the
+            // second voice's `lastCrashGain` ramp-down in synth-drums.ts:949-955 actively
+            // chokes the first voice's tail (audible "flam" + gain stutter). The HiHat lane
+            // keeps whatever the genre strategy decided. At intensity < 0.45 we leave the
+            // Open lane to its strategy default — no crash on a quiet intro return.
+            currentState.shouldPlay = true;
+            currentState.soundName = 'Crash';
+            currentState.velocity = 1.2;
+        }
+    }
+
     // --- Phase 3: Soloist Accent Catching ---
     const accent = timelineStep >= 0 ? groove.accentMap?.[timelineStep] : null;
     if (accent) {
@@ -203,9 +209,14 @@ export function applyGrooveOverrides(
             if (inst.name === 'Kick') {
                 currentState.shouldPlay = true;
                 currentState.velocity = 1.3;
-            } else if (inst.name === 'HiHat' || inst.name === 'Open') {
+            } else if (inst.name === 'Open') {
+                // why: route crash-catch accents on the Open lane only — same double-fire
+                // reasoning as the section-boundary block above. A crash-catch fires every
+                // time the soloist hits a peak (velocity > 0.85 or syncopation > 0.75), so
+                // the duplicate-Crash artifact cumulatively dominated a song with an active
+                // soloist. The HiHat lane stays on whatever the strategy chose.
                 currentState.shouldPlay = true;
-                currentState.soundName = 'Open';
+                currentState.soundName = 'Crash';
                 currentState.velocity = 1.25;
             }
         } else if (accent.type === 'snare-stab') {

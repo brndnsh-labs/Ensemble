@@ -113,6 +113,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     shouldPlay = true;
                 }
             }
+            // why: at full-crack samba intensity the on-beat-2/4 pulse gets a full Snare body
+            // (caixa/snare with crisp top), matching what a real samba batería does at high
+            // energy.  Clave slots (non-backbeat positions) stay on Sidestick.
+            if (isBackbeat && intensity > 0.8) {
+                shouldPlay = true;
+                soundName = 'Snare';
+            }
         } else {
             // Partido Alto
             if (isBar1) {
@@ -123,6 +130,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 if ((isPulseStart && !isBackbeat) || (isOffbeat && isBackbeat)) {
                     shouldPlay = true;
                 }
+            }
+            // why: Partido Alto at full intensity also deserves a Snare crack on the backbeat
+            // so the groove reads as a high-energy Afro-Brazilian idiom, not a gentle bossa rim.
+            if (isBackbeat && intensity > 0.8) {
+                shouldPlay = true;
+                soundName = 'Snare';
             }
         }
 

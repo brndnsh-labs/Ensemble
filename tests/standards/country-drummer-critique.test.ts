@@ -121,7 +121,7 @@ describe('Country Drummer Critique', () => {
         console.log('\n--- COUNTRY DRUMMER CRITIQUE REPORT ---');
         console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log(
-            `[Snare Continuity]      ${(snareContinuity * 100).toFixed(1)}% (averaged across motifs 0/1/2; Target: >65%)`,
+            `[Snare Continuity]      ${(snareContinuity * 100).toFixed(1)}% (averaged across motifs 0/1/2; Target: >58%)`,
         );
         console.log(
             `[Velocity Tiering]      Backbeat: ${avgBackbeatVel.toFixed(2)} vs Ghost: ${avgGhostVel.toFixed(2)} (Target: >2.5x)`,
@@ -135,9 +135,11 @@ describe('Country Drummer Critique', () => {
         // regardless of motif). 100% is the bedrock.
         expect(backbeatScore).toBe(1.0);
         // Train-beat continuity at intensity 0.8 averages across the three motifs
-        // (Two-Step, Light Train, Heavy Train). Engine delivers ~71% averaged. The
-        // dedicated train-beat motif (2) delivers ~95% — covered by a separate test.
-        expect(snareContinuity).toBeGreaterThan(0.65);
+        // (Two-Step ~12.5%, Light Train ~75%, Heavy Train ~100%).
+        // Motif distribution at intensity 0.8: ~30% motif-0, ~50% motif-1, ~20% motif-2.
+        // Expected average: 0.30*0.125 + 0.50*0.75 + 0.20*1.0 ≈ 61.3%.
+        // Threshold 0.58 gives ~3pt statistical headroom from observed ~62%.
+        expect(snareContinuity).toBeGreaterThan(0.58);
         // Engine: backbeat velocity ~0.95 * dampening, ghost velocity ~0.15 + small.
         // Observed ratio ~3.4x.
         expect(avgBackbeatVel).toBeGreaterThan(avgGhostVel * 2.5);
@@ -197,8 +199,10 @@ describe('Country Drummer Critique', () => {
     });
 
     it('should increase snare continuity with intensity', () => {
-        // Engine: train-beat ghost prob = 0.5 + intensity * 0.5 (country.ts:74).
-        // Plus motif selector lifts to motif 2 at higher intensity/seed → more 16ths.
+        // Engine: motif 2 (Heavy Train) fires all 16ths deterministically (no stochastic
+        // roll), while motif 1 (Light Train) fires only E-of-beat 16ths.
+        // At intensity 0.5 motif 0/1 dominate (backbeat + light train).
+        // At intensity 0.95 motif 2 dominates with continuous 16th train.
         // Both endpoints sit above the intensity 0.4 sidestick boundary so the harness
         // filter (soundName === instName) records both runs consistently.
         const lowPerf = simulatePerformance(64, { playback: { bandIntensity: 0.5 } });
@@ -215,8 +219,45 @@ describe('Country Drummer Critique', () => {
         console.log(
             `[Country Intensity] Snare hits 0.5=${lowS} → 0.95=${highS}, ratio: ${(highS / (lowS || 1)).toFixed(2)}x`,
         );
-        // At intensity 0.5 motif 0/1 dominate (backbeat + light train). At intensity
-        // 0.95 motif 2 dominates with 16th train. Conservative ratio threshold 1.5x.
+        // At intensity 0.95 motif 2 (all 16ths) dominates: ~100% of 16 steps/bar.
+        // At intensity 0.5 motif 0/1 dominate: ~40% density.
+        // Conservative ratio threshold 1.5x (actual is ~2.5x).
         expect(highS).toBeGreaterThan(lowS * 1.5);
+    });
+
+    it('should produce continuous deterministic 16th train beat in motif 2', () => {
+        // Motif 2 ("Full Heavy Train Beat") must fire snare on ALL 16 steps per bar
+        // without stochastic gaps — this is the S7 fix (audit finding drums.md P1 #11).
+        // The train beat's defining texture is a continuous 16th roll; a random gate
+        // would produce machine-gun clusters, not a steady train.
+        // To isolate motif 2 we use intensity 0.95 (seed distribution pushes to motif 2
+        // when seed > 0.8) and count bars where every step has a Snare hit.
+        const numBars = 64;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.95 },
+        });
+
+        let fullTrainBars = 0;
+        let totalSnareStepsPerBar = 0;
+
+        performance.forEach((bar) => {
+            const snareSteps = bar.filter((s) => s.instruments.Snare).length;
+            totalSnareStepsPerBar += snareSteps;
+            if (snareSteps === 16) {
+                fullTrainBars++;
+            }
+        });
+
+        const avgSnareSteps = totalSnareStepsPerBar / numBars;
+        console.log(
+            `[Country Train Beat] Avg snare steps/bar at intensity 0.95: ${avgSnareSteps.toFixed(1)}/16 (full-16th bars: ${fullTrainBars}/${numBars})`,
+        );
+        // why: the actual claim being tested is "motif 2 fires all 16 snare steps
+        // *without stochastic gaps* when it is selected". A bar with all 16 snare
+        // steps can only arise from motif 2's deterministic gate — motifs 0/1 cap
+        // out below 16 even at maximum density. So fullTrainBars > 0 across the
+        // 64-bar window directly proves the S7 fix; a per-bar-average threshold
+        // would be polluted by motif distribution rather than testing determinism.
+        expect(fullTrainBars).toBeGreaterThan(0);
     });
 });

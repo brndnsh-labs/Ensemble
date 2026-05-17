@@ -71,14 +71,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 velocity = scaleVelocity(0.3, intensity, 0.1) + jitter;
             } else if (isEOfBeat || isAOfBeat) {
                 // The "chicka" ghosts (16ths)
-                const ghostProb = 0.5 + intensity * 0.5;
-                if (roll(ghostProb)) {
-                    shouldPlay = true;
-                    soundName = 'Snare';
-                    velocity = scaleVelocity(0.15, intensity, 0.08) + jitter;
-                } else {
-                    shouldPlay = false;
-                }
+                // why: a real train beat — light OR heavy — plays the full 16th lattice
+                // (every "e" AND "a"). The difference between Light Train (motif 1) and
+                // Heavy Train (motif 2) is velocity dynamic, not rhythmic spacing. Replaces
+                // the prior `roll(0.5 + intensity * 0.5)` (rhythmic gaps → machine-gun
+                // stutter) AND the brief E-only motif-1 thinning (which lost the "a" hits
+                // that define the train pocket). Motif 1 = 60% of motif 2's ghost velocity.
+                shouldPlay = true;
+                soundName = 'Snare';
+                const ghostScale = activeMotif >= 2 ? 0.15 : 0.09;
+                velocity = scaleVelocity(ghostScale, intensity, 0.08) + jitter;
             }
         } else {
             // Motif 0: Standard Two-Step
