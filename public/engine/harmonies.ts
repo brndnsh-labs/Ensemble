@@ -501,8 +501,12 @@ function finalizeHarmonyNotes(
         }
     }
 
-    // Safety Floor: Always stay above 52 (E3) to reserve space for the bass.
-    const safetyFloor = 52;
+    // Safety Floor: maintain >= P5 gap above bass to avoid muddy low-register clusters.
+    // why: harmony slot starts at 52 (E3); when bass walks high (e.g. MIDI 55 = G3),
+    // sitting harmony at 52 creates an E3-G3 minor-third mud cluster. Lifting the floor
+    // to bassMidi + 7 reserves a perfect fifth of separation. Fallback to 52 when
+    // bassMidi is 0/undefined (bass not running or producer order has not yet fired).
+    const safetyFloor = Math.max(52, (coordination.bassMidi || 0) + 7);
 
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
