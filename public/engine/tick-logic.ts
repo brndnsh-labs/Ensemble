@@ -99,6 +99,7 @@ export function generateNotesForStep(
 
     // 1. Context Assembly (Anchor: Groove)
     const coordination = createCoordinationContext(step, stepInfo as any, carryover);
+    // writer: groove preamble (this line); readable-after: any producer
     (coordination as any).pocketOffset = calculatePocketOffset(playback, groove);
 
     if (chordData) {
@@ -109,10 +110,12 @@ export function generateNotesForStep(
         // why: section boundaries on the coordination context directly so consumers
         // that receive bare coordination (e.g. isBassActive) can read sectionEnd
         // without depending on the wrapper-context shape passed to getBassNote.
+        // writer: chord-data preamble (these lines); readable-after: any producer
         (coordination as any).sectionStart = sectionStart;
         (coordination as any).sectionEnd = sectionEnd;
 
         // --- Structural Awareness: Turnaround Detection ---
+        // writer: chord-data preamble (this line); readable-after: any producer
         const sectionSteps = sectionEnd - sectionStart;
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
         (coordination as any).isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
@@ -132,6 +135,7 @@ export function generateNotesForStep(
             );
         }
 
+        // writer: chord-data preamble (this block); readable-after: any producer
         if (remainingSteps <= stepsPerMeasure) {
             const nextSectionChordData = getChordAtStep(
                 sectionEnd,
@@ -257,7 +261,9 @@ export function generateNotesForStep(
             return result.shouldPlay;
         };
 
+        // writer: drum preamble; readable-after: any producer (bass locks to kick using this)
         coordination.kickHit = checkHit('Kick', true);
+        // writer: drum preamble; readable-after: any producer
         coordination.snareHit = checkHit('Snare', true);
 
         // If including drums, process all instruments for actual playback
@@ -324,6 +330,7 @@ export function generateNotesForStep(
             // mocked tests and production code both exercise the same harmony branches.
             // Written here (after getSoloistNote) so session state reflects this tick's
             // final phrasing decisions before harmony runs.
+            // writer: soloist producer (these lines); readable-after: soloist producer (bass, chords, harmony)
             coordination.soloistResting = Boolean(soloist.session.phrasing.isResting);
             coordination.soloistNotesInPhrase = soloist.session.currentPhrase.notesInPhrase ?? 0;
         }
