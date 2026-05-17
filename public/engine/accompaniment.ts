@@ -24,6 +24,12 @@ interface CompingState {
     maxGrooveLength: number;
     lastSectionId: string | null;
     lastVoicingMidis: number[];
+    // why: epic-deterministic-phrasing S1 — counter incremented every time the
+    //      STICKY (Funk) cell-bank picker fires (initial pick + each rotation).
+    //      Used as the phrase-index input to the cell-bank hash so cell choice
+    //      is tied to rotation events, not to bar arithmetic that collides with
+    //      the rotation-length snap interval. Reset on section change.
+    funkRotationIndex: number;
 }
 
 /**
@@ -43,6 +49,7 @@ export const compingState: CompingState = {
     maxGrooveLength: 4,
     lastSectionId: null,
     lastVoicingMidis: [],
+    funkRotationIndex: 0,
 };
 
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
@@ -55,6 +62,72 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 // vocabulary (`Neo-Soul` is); kept for forward compatibility omitted here.
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa']);
+
+/**
+ * Funk comping cell bank.
+ *
+ * Source: chords.md P0 #1 / epic-deterministic-phrasing S1. Real funk comping is built
+ * on a 1–2-bar 16th-note groove cell that *loops* — the listener locks onto the cell as
+ * the groove's signature. Replacing per-step `Math.random()` placement with a small
+ * bank gives that signature feel and makes loops reproducible across critique runs.
+ *
+ * Each entry lists the 16th-step indices (0–15) where the chord stab lands. Cell choice
+ * is keyed by `(sectionId, funkRotationIndex)` where `funkRotationIndex` increments at
+ * every STICKY rotation event in {@link updateRhythmicIntent} — so each rotation draws
+ * a fresh cell rather than coupling to bar arithmetic that aliases with the rotation
+ * length. `sparse` vibe drops the last hit; `active` vibe adds one ornament from a
+ * parallel ornament bank.
+ *
+ * 16th-grid nomenclature (beat-N at step 4*(N-1); e=+1; &=+2; a=+3):
+ *   Steps:  0  1  2  3   4  5  6  7   8  9 10 11  12 13 14 15
+ *   Names:  1  e  &  a   2  e  &  a   3  e  &  a   4  e  &  a
+ *
+ * Cell shape was chosen as the Phase-1 reference for Epic 3 — later seeded-bank stories
+ * (S2 jazz/bossa Charleston picker, S3 walking-bass fallback) replicate this hash and
+ * structure.
+ */
+const FUNK_COMPING_CELLS: readonly (readonly number[])[] = [
+    // why: One + a-of-1 + &-of-2 + a-of-3 — chicken-scratch anchor: the One lands,
+    //      then the a-of-1 / &-of-2 pair answers it as a tight 16th-note chatter and
+    //      a-of-3 pushes back toward the next half-bar. James-Brown / Stubblefield feel.
+    [0, 3, 6, 11],
+    // why: All-16th scratch with no downbeat (a-of-1, &-of-2, &-of-3, &-of-4) —
+    //      clavinet "drop the One" feel; the omission of beat 1 is the hook.
+    [3, 6, 10, 14],
+    // why: Bootsy "On the One" + a-of-2 + a-of-3 + &-of-4 — anchored stab plus
+    //      forward-leaning offbeats that keep the listener pulling toward beat 1.
+    [0, 7, 11, 14],
+    // why: Pure off-the-beat chatter (&-of-1, &-of-2, &-of-3, a-of-4) — lives
+    //      entirely in 16th syncopation against a steady bass; the closing a-of-4
+    //      pushes hard into the next One, which is what makes the cell breathe.
+    [2, 6, 10, 15],
+] as const;
+
+// why: optional ornament hits per cell, applied only on `active` vibe — gives one
+//      extra 16th of motion without breaking the cell's identity. Each index is
+//      verified not to collide with its parent cell's hits AND to land on a 16th
+//      syncopation (e/&/a), never on a downbeat:
+//        cell 0 [0,3,6,11]   -> ornament 9  (e-of-3)
+//        cell 1 [3,6,10,14]  -> ornament 5  (e-of-2)   (was 4 = beat-2 downbeat; fixed)
+//        cell 2 [0,7,11,14]  -> ornament 13 (e-of-4)
+//        cell 3 [2,6,10,15]  -> ornament 11 (a-of-3)
+const FUNK_COMPING_ORNAMENTS: readonly number[] = [9, 5, 13, 11];
+
+/**
+ * Deterministic int hash for cell-bank picking. Folds a small string id (typically
+ * `chord.sectionId`) into an int so `(sectionId, phraseIndex)` keys produce stable
+ * picks across loops while still varying across sections.
+ */
+function hashSectionId(sectionId: string | null | undefined): number {
+    if (!sectionId) {
+        return 0;
+    }
+    let h = 0;
+    for (let i = 0; i < sectionId.length; i++) {
+        h = (h * 31 + sectionId.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h);
+}
 
 function averageMidi(midis: number[]): number {
     return midis.length === 0 ? 0 : midis.reduce((sum, midi) => sum + midi, 0) / midis.length;
@@ -385,6 +458,8 @@ function buildResolvingAlteredVoicing(
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param vibe - 'sparse' | 'balanced' | 'active'
  * @param length - Pattern length in steps (default 16).
+ * @param barIndex - Absolute bar index. Used by deterministic cell pickers (Funk).
+ * @param sectionId - Current arranger section id; folded into deterministic-cell hashes.
  * @returns Binary array (0 | 1) of length `length`, where 1 marks a rhythmic hit.
  */
 export function generateCompingPattern(
@@ -393,6 +468,8 @@ export function generateCompingPattern(
     vibe: string,
     tsConfig: any,
     length = 16,
+    barIndex = 0,
+    sectionId: string | null = null,
 ): number[] {
     const { playback } = state;
     const pattern = new Array(length).fill(0);
@@ -494,24 +571,60 @@ export function generateCompingPattern(
     }
 
     if (genre === 'Funk') {
-        // Focus on "e" and "a" (16th subdivisions)
-        if (Math.random() > 0.75) {
-            hit(0); // Very optional 1
+        // why: chords.md P0 #1 / epic-deterministic-phrasing S1 — funk comping is
+        //      cell-based, not stochastic per-step. Pick a cell from the bank keyed
+        //      by `(sectionId, barIndex)` so the same chord on the same bar of a
+        //      loop produces the same rhythmic shape. Caller may pass the engine's
+        //      `funkRotationIndex` AS `barIndex` to lock cell choice to STICKY
+        //      rotation events instead of to absolute bar count (see
+        //      `updateRhythmicIntent`).
+        //
+        //      NB: do NOT right-shift `barIndex` here. The earlier `>> 1` aliased
+        //      with the 4-bar / 8-bar STICKY rotation snap so the picker collapsed
+        //      to one or two cells after a few bars (reviewer P0-1, 2026-05-17).
+        const sectionHash = hashSectionId(sectionId);
+        const phraseIndex = barIndex;
+        const cellIndex =
+            (((sectionHash * 17 + phraseIndex * 31) % FUNK_COMPING_CELLS.length) +
+                FUNK_COMPING_CELLS.length) %
+            FUNK_COMPING_CELLS.length;
+        const cell = FUNK_COMPING_CELLS[cellIndex];
+
+        // why: `sparse` vibe drops the last (latest-in-bar) hit so the cell still
+        //      reads as itself but with one less syncopation — preserves identity
+        //      across vibe changes. The minimal-One branch (12.5% of sparse phrases,
+        //      keyed on `% 8`) was previously a total-silence branch (25%, `% 4`) —
+        //      reviewer P1-7: full-bar silence reads as a dropout, not as sparse
+        //      comping. Hitting just the One preserves the groove's pulse while
+        //      giving the section maximum breathing room.
+        if (vibe === 'sparse') {
+            const minimalGate = (sectionHash + phraseIndex) % 8 === 0;
+            if (minimalGate) {
+                hit(0);
+                return pattern;
+            }
+            for (let i = 0; i < cell.length - 1; i++) {
+                hit(cell[i]);
+            }
+            return pattern;
         }
 
-        let density = 1;
+        for (let i = 0; i < cell.length; i++) {
+            hit(cell[i]);
+        }
+
+        // why: `active` vibe adds one ornament 16th from a parallel bank — same hash
+        //      space so the ornament locks to the cell instead of jittering each bar.
+        //      Ornaments are verified above to land on syncopations and never collide
+        //      with the parent cell's hits.
         if (vibe === 'active') {
-            density = Math.max(2, Math.floor(ts.beats * 0.75));
-        }
-        if (vibe === 'sparse' && Math.random() < 0.5) {
-            return pattern; // Allow total silence
+            const ornamentIdx =
+                (((sectionHash * 19 + phraseIndex * 11) % FUNK_COMPING_ORNAMENTS.length) +
+                    FUNK_COMPING_ORNAMENTS.length) %
+                FUNK_COMPING_ORNAMENTS.length;
+            hit(FUNK_COMPING_ORNAMENTS[ornamentIdx]);
         }
 
-        for (let i = 0; i < density; i++) {
-            const b = Math.floor(Math.random() * ts.beats);
-            const sub = Math.random() < 0.5 ? 1 : spb - 1; // "e" or "a"
-            hit(getBeatStep(b, sub));
-        }
         return pattern;
     }
 
@@ -749,6 +862,10 @@ function updateRhythmicIntent(
         compingState.grooveRetentionCount = 0;
         compingState.lastSectionId = sectionId as any;
         compingState.lockedUntil = 0; // Force update
+        // why: each section gets its own rotation sequence so the cell-bank picker
+        //      restarts at index 0 on every section change — same arranger position
+        //      across loops produces the same cell.
+        compingState.funkRotationIndex = 0;
     }
 
     if (step < compingState.lockedUntil) {
@@ -806,7 +923,19 @@ function updateRhythmicIntent(
         // If we exceeded max length, reset and fall through to pick new cell
         if (compingState.grooveRetentionCount > compingState.maxGrooveLength) {
             compingState.grooveRetentionCount = 1; // Start new groove now
-            compingState.maxGrooveLength = 4 + Math.floor(Math.random() * 4); // 4-8 bars
+            // why: epic-deterministic-phrasing S1 — STICKY rotation length used to
+            //      be uniform-random 4–8 bars (`4 + Math.floor(Math.random() * 4)`),
+            //      which broke loop-equality on Funk comping. Snap to musical phrase
+            //      lengths {4, 8} keyed off `funkRotationIndex` rather than off
+            //      `barIndex >> 2`. Reviewer P1-6: bar-index hashing has hysteresis
+            //      (once max snaps to 8, the next rotation is bar+8, preserving the
+            //      mod-2 parity and tending to stick at 8 forever). The rotation
+            //      counter is a fresh draw each time, breaking the hysteresis.
+            //      Partial fix for chords.md P2 #13 — full arranger-aware snap is
+            //      tracked separately. Weighting `{4: 0.5, 8: 0.5}` (mod 2); the
+            //      optional 16-bar bucket from chords.md is deferred.
+            const rotateHash = hashSectionId(sectionId) + compingState.funkRotationIndex + 1;
+            compingState.maxGrooveLength = rotateHash % 2 === 0 ? 4 : 8;
         }
     } else {
         // Non-sticky genres (Jazz, Rock, etc.) always refresh or have standard logic
@@ -828,16 +957,57 @@ function updateRhythmicIntent(
 
     // Replace static lookup with procedural generation
     // IMPLEMENT NO-REPEAT RULE: Keep trying until we get a different pattern (up to 3 times)
-    let newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
+    // why: for Funk we feed the rotation counter (not the bar index) as the picker's
+    //      `barIndex` arg — cell choice should advance once per STICKY rotation event,
+    //      not once per absolute bar (which is meaningless inside a 4–8 bar retain).
+    //      For non-Funk genres `barIndex` is unused; we still pass the real bar number
+    //      for future deterministic pickers to key off. Reviewer P0-1, 2026-05-17.
+    const barIndex = Math.floor(step / spm);
+    const funkPickIndex = compingState.funkRotationIndex;
+    if (genre === 'Funk') {
+        // Advance the counter so the next rotation draws a fresh cell. We snapshot
+        // the pre-increment value above so the current pick uses the index that was
+        // valid for *this* rotation event (initial pick = 0, then 1, 2, ...).
+        compingState.funkRotationIndex = funkPickIndex + 1;
+    }
+    const pickerBarIndex = genre === 'Funk' ? funkPickIndex : barIndex;
+    let newCell = generateCompingPattern(
+        state,
+        genre,
+        compingState.currentVibe,
+        ts,
+        spm,
+        pickerBarIndex,
+        sectionId,
+    );
     if (genre === 'Jazz' && compingState.lastVoicingMidis.length === 0 && step % spm === 0) {
         // Give the first jazz bar a voiced downbeat so the harmony has a real
         // reference point for the continuity cache instead of starting empty.
         newCell[0] = 1;
     }
-    if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-        newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
+    // why: the no-repeat retry below is for stochastic genres (Jazz/Rock/Blues). Funk
+    //      is intentionally deterministic per the S1 bank, so a "same as last bar"
+    //      result is the desired locked-cell behavior, not something to re-roll.
+    if (genre !== 'Funk' && JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
+        newCell = generateCompingPattern(
+            state,
+            genre,
+            compingState.currentVibe,
+            ts,
+            spm,
+            pickerBarIndex,
+            sectionId,
+        );
         if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-            newCell = generateCompingPattern(state, genre, compingState.currentVibe, ts, spm);
+            newCell = generateCompingPattern(
+                state,
+                genre,
+                compingState.currentVibe,
+                ts,
+                spm,
+                pickerBarIndex,
+                sectionId,
+            );
         }
     }
     compingState.currentCell = newCell;

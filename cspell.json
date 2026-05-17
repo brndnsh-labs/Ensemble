@@ -236,7 +236,9 @@
         "Tresillo",
         "tumbao",
         "unbuilt",
-        "unranked"
+        "unranked",
+        "Bootsy",
+        "clavinet"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

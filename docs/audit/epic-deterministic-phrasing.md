@@ -22,6 +22,7 @@ Almost every story here is small (under half a day) but compounding: each one sh
 
 **Acceptance:** funk comping on the same chord across two loops produces the same rhythmic shape. New critique test in `funk-piano-critique.test.ts` asserts ≥3 distinct cells across 8 bars but cell at `barIndex % bankSize` is stable.
 **Effort:** ~3h. **Model:** opus (Phase 1 — picks the cell-bank shape that ~7 later stories reuse). **Reviewer:** music-theory-reviewer. **Source:** `chords.md` P0 #1.
+**Status:** Shipped 2026-05-17
 
 ### S2. Jazz/Bossa/Blues Charleston-family pattern picker per phrase
 `accompaniment.ts:556-602` re-rolls the comping rhythm every bar. Replace with `(sectionId, barIndex >> 2)` hash → choose one Charleston-family pattern for a 4-bar phrase. In-phrase variation comes from intensity/soloistBusy.
