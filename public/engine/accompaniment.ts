@@ -1482,9 +1482,21 @@ export function getAccompanimentNotes(
         const isEighth = step % (ts.stepsPerBeat / 2) === 0;
 
         if (isEighth) {
-            // Power Chord Voicing: Root, 5th, Octave
+            // Power Chord Voicing: quality-aware interval above root + octave double.
+            // why: a plain P5 power chord over dim/halfdim/7b5 contradicts the b5 of
+            // the chord and effectively re-voices the harmony as a major-implying
+            // power chord — the chart says one thing, the comper plays another.
+            // Metal idiom: tritone power chord (b5) for diminished/half-diminished,
+            // augmented power chord (#5) for aug/augmaj7, plain P5 for everything else.
             const root = chord.rootMidi;
-            const voicing = [root, root + 7, root + 12];
+            const q = chord.quality;
+            const powerInterval =
+                q === 'dim' || q === 'halfdim' || q === '7b5'
+                    ? 6
+                    : q === 'aug' || q === 'augmaj7'
+                      ? 8
+                      : 7;
+            const voicing = [root, root + powerInterval, root + 12];
 
             const isBackbeat = stepInfo ? stepInfo.isBackbeat : intBeat % 2 !== 0;
 
