@@ -8,9 +8,10 @@ This is the epic where the "the band sounds like a machine on repeat passes" rep
 
 ## Source findings
 
-- `form-arranger.md` P0 #1, #3; P1 #4, #5, #6, #7, #8; P2 #14
+- `form-arranger.md` P0 #1, #3; P1 #4, #5, #6, #7, #8; P2 #11, #14, #15
 - `soloist.md` P1 #6 (rhythm engine has zero loop awareness)
 - `chords.md` P1 #5 (per-chord-retrigger extension randomization, related to repeat differentiation)
+- Listening-test observation 2026-05-17: auto-intensity parks below typical operating range for most genres, producing Sidestick-dominant backbeats where full Snare is idiomatic (see S8)
 
 ## Stories
 
@@ -55,6 +56,26 @@ No tests guard the conductor's session-timer arc, role-based energy, fill trigge
 
 **Acceptance:** baseline coverage for everything in `conductor.ts` that the conductor audit lists as untested.
 **Effort:** ~4h. **Model:** sonnet (tests against documented behavior; thresholds need 30-run reliability loop). **Reviewer:** none (tests are the deliverable). **Source:** `form-arranger.md` P2 #14.
+
+### S8. Energy arc calibration: ramp symmetry, per-genre floors, drum-gate alignment
+Listening test (2026-05-17) reveals auto-intensity parks below the typical operating range for most genres. Funk in particular spends most of its time at `bandIntensity` ≈ 0.35–0.5, which sits below the `intensity > 0.4` Snare-vs-Sidestick gate at `grooves/funk.ts:195` — so the backbeat reads as Sidestick where a real funk drummer would play full Snare. Three stacking root causes:
+
+1. **Asymmetric downward ramp** (`conductor.ts:183-191`): `multiplier = bandIntensity > targetIntensity ? 2.5 : 1.0` — ramps DOWN 2.5× faster than UP. Excursions above target snap back fast; excursions below linger. The comment says "humans build gradually, drop quickly," but combined with the random jitter at `:445` and `:457` the system has a structural pull toward floor.
+2. **Genre floors only exist for Rock/Metal** (`conductor.ts:448-450`). Funk, Neo-Soul, Jazz, Disco, Bossa all lack a floor and spend significant time at section-default energies (0.4-0.5) that are below their natural operating range.
+3. **Drum-engine Snare gates were calibrated for a higher baseline than the conductor delivers.** `funk.ts:195` (`intensity > 0.4` for backbeat Snare), `funk.ts:227` (motif-3 needs `> 0.8`), and similar gates across other genres assume a band that lives at 0.5–0.7. The conductor parks at 0.35–0.5.
+
+**Sketch:**
+- **Ramp symmetry**: drop the asymmetric multiplier, or invert it (slow descents, fast ascents — "drummers settle in and build"). Pick after a listen-test of both directions.
+- **Per-genre floors**: extend the `conductor.ts:448` branch into a small map (suggested starting values for the listen-test: Funk 0.45, Neo-Soul 0.40, Disco 0.45, Jazz 0.30, Bossa 0.30, alongside existing Rock/Metal 0.35). Either add a `floorIntensity` field to each genre's groove config, or centralize in a `genre-energy-floors.ts` map.
+- **Drum-gate sweep**: audit all `intensity > 0.4` Snare-vs-Sidestick gates across `grooves/*.ts`; lower to ~0.30–0.35 where the existing 0.4 was a conductor-calibration choice rather than a musical one. Distinguish "Sidestick is genre-correct at low energy" (Bossa, Acoustic ballad) from "Sidestick is a fallback because the conductor under-delivers" (Funk verse).
+
+**Acceptance:**
+- At default state (no session timer, no chord chart loaded, default `bandIntensity`), a 32-bar Funk playback emits ≥80% of backbeats on `Snare` rather than `Sidestick`. New `tests/standards/funk-backbeat-presence.test.ts`.
+- Conductor-arc test (pair this with S7): default playback reaches `bandIntensity` ≥ 0.5 within the first 16 bars (vs. current ~0.35 baseline).
+- 30-run reliability ≥27/30 on each new test.
+- Cross-genre regression: Funk, Neo-Soul, Disco, Jazz drummer-critique tests should still pass with updated thresholds; if any tests assumed the prior Sidestick-dominant behavior, update them.
+
+**Effort:** ~6h. **Model:** opus (per-genre floor values + ramp-symmetry direction need musical judgment and a listening check; touches both conductor and drum engines so blast radius is wider than a typical Phase 2 story). **Reviewer:** music-theory-reviewer + state-discipline-reviewer (changes to default `playback.bandIntensity` if pursued cross the state slice). **Source:** Listening-test observation 2026-05-17; adjacent to `form-arranger.md` P1 #4 (section-aware orchestration half-implemented), P2 #15 (conductor "functional but thin").
 
 ## Deferred (need a product call)
 
