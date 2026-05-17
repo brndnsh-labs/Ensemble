@@ -458,7 +458,10 @@ function buildResolvingAlteredVoicing(
  * Replaces static PIANO_CELLS table to save space and increase variety.
  * @param vibe - 'sparse' | 'balanced' | 'active'
  * @param length - Pattern length in steps (default 16).
- * @param barIndex - Absolute bar index. Used by deterministic cell pickers (Funk).
+ * @param phraseIndex - Index into the genre's phrase/cell bank. For most genres this
+ *   is the absolute bar index; STICKY-deterministic genres (Funk) pass a per-rotation
+ *   counter (`compingState.funkRotationIndex`) so cell choice advances on rotation
+ *   events rather than absolute bars (which would collide with the {4,8}-bar snap).
  * @param sectionId - Current arranger section id; folded into deterministic-cell hashes.
  * @returns Binary array (0 | 1) of length `length`, where 1 marks a rhythmic hit.
  */
@@ -468,7 +471,7 @@ export function generateCompingPattern(
     vibe: string,
     tsConfig: any,
     length = 16,
-    barIndex = 0,
+    phraseIndex = 0,
     sectionId: string | null = null,
 ): number[] {
     const { playback } = state;
@@ -573,17 +576,16 @@ export function generateCompingPattern(
     if (genre === 'Funk') {
         // why: chords.md P0 #1 / epic-deterministic-phrasing S1 — funk comping is
         //      cell-based, not stochastic per-step. Pick a cell from the bank keyed
-        //      by `(sectionId, barIndex)` so the same chord on the same bar of a
-        //      loop produces the same rhythmic shape. Caller may pass the engine's
-        //      `funkRotationIndex` AS `barIndex` to lock cell choice to STICKY
-        //      rotation events instead of to absolute bar count (see
+        //      by `(sectionId, phraseIndex)` so the same chord on the same phrase of
+        //      a loop produces the same rhythmic shape. For Funk, the caller passes
+        //      `compingState.funkRotationIndex` as `phraseIndex` so cell choice
+        //      locks to STICKY rotation events instead of absolute bar count (see
         //      `updateRhythmicIntent`).
         //
-        //      NB: do NOT right-shift `barIndex` here. The earlier `>> 1` aliased
+        //      NB: do NOT right-shift `phraseIndex` here. The earlier `>> 1` aliased
         //      with the 4-bar / 8-bar STICKY rotation snap so the picker collapsed
         //      to one or two cells after a few bars (reviewer P0-1, 2026-05-17).
         const sectionHash = hashSectionId(sectionId);
-        const phraseIndex = barIndex;
         const cellIndex =
             (((sectionHash * 17 + phraseIndex * 31) % FUNK_COMPING_CELLS.length) +
                 FUNK_COMPING_CELLS.length) %

@@ -62,7 +62,11 @@ describe('Funk Piano Critique', () => {
 
             if (notes.length > 0 && notes[0].midi > 0) {
                 totalStabs++;
-                if (stepInMeasure % 2 !== 0) {
+                // why: a 16th syncopation is anything that doesn't land on a quarter-
+                //      note pulse (steps 0, 4, 8, 12). The earlier `% 2` metric
+                //      counted `&` positions (steps 2, 6, 10, 14) as on-beat, which
+                //      undercounted real syncopation by ~50% across the bank.
+                if (stepInMeasure % 4 !== 0) {
                     syncopatedHits++;
                 }
                 if (notes.length <= 3) {
@@ -82,7 +86,7 @@ describe('Funk Piano Critique', () => {
                 '------------------------------------\n',
         );
 
-        expect(syncopationRatio).toBeGreaterThan(0.4);
+        expect(syncopationRatio).toBeGreaterThan(0.7);
         expect(leanRatio).toBeGreaterThan(0.9);
     });
 
