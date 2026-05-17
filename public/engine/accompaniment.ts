@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import {
     getBassSpaceFloor,
     shouldPreferGroundedPracticeVoicing,
@@ -1353,6 +1354,16 @@ interface AccompanimentCoordination {
     // Imperfect Symmetry (the resolution gesture is more important than a
     // repeat-pass inversion rotation).
     isFinalMeasure?: boolean;
+    // why: epic-form-arrangement S5 — Intro/Outro instrument layering. Number
+    // of bars elapsed since the start of the current Intro section, or `-1`
+    // if not in an Intro. The comper rests when `< INTRO_MUTES.chords` so
+    // the drum-and-bass duo establishes before the harmonic layer enters.
+    introBarsElapsed?: number;
+    // why: epic-form-arrangement S5. Bars REMAINING in the current Outro
+    // section (including the current bar), or `-1` if not in an Outro. The
+    // comper rests when `<= OUTRO_MUTES.chords` so the outro fades out before
+    // the final cadence.
+    outroBarsRemaining?: number;
 }
 
 /**
@@ -1564,6 +1575,28 @@ export function getAccompanimentNotes(
             timingOffset: 0,
             instrument: 'Piano',
         }));
+    }
+
+    // --- Intro/Outro layering mute (epic-form-arrangement S5) ---
+    // why: form-arranger.md P1 #4 — the comper enters at bar `INTRO_MUTES.chords`
+    // of an Intro section (default 4, so chords join with the verse downbeat on
+    // a typical 4-bar intro) and drops out `OUTRO_MUTES.chords` bars before an
+    // Outro ends (default 3, so chords pull out one bar after harmony does).
+    //
+    // Precedence: the isFinalMeasure branch above already returned the cadence
+    // voicing for the form's final downbeat, so this mute cannot suppress S4's
+    // resolution. Below `isFinalMeasureComp`'s block, ABOVE everything else.
+    //
+    // Return `[]` rather than a CC-only sentinel: the intro/outro mute is a
+    // hard rest (no chord voicings, no sustain pedal release events). A
+    // sustain-pedal event in an "empty" bar would betray the silence.
+    const compIntroElapsed = coordination?.introBarsElapsed ?? -1;
+    if (compIntroElapsed >= 0 && compIntroElapsed < INTRO_MUTES.chords) {
+        return [];
+    }
+    const compOutroRemaining = coordination?.outroBarsRemaining ?? -1;
+    if (compOutroRemaining >= 0 && compOutroRemaining <= OUTRO_MUTES.chords) {
+        return [];
     }
 
     // --- Sustain / CC Handling ---

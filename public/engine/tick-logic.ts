@@ -8,6 +8,7 @@ import {
     isSectionTurnaround,
 } from '../utils.js';
 import { getAccompanimentNotes } from './accompaniment.js';
+import { isIntroSectionLabel, isOutroSectionLabel } from './arrangement-layering.js';
 import { getSectionContext } from './arranger-utils.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
@@ -199,6 +200,58 @@ export function generateNotesForStep(
             if (stepInForm + stepsPerMeasure >= totalFormSteps) {
                 (coordination as any).isFinalMeasure = true;
             }
+        }
+
+        // --- Intro/Outro layering publication (epic-form-arrangement S5) ---
+        // why: form-arranger.md P1 #4 — the arranger has Intro/Outro labels
+        // (unrollArrangement at arranger-utils.ts:131-133; form-analysis.ts:
+        // 99-104) but no engine reads them. Publish two bar-counter fields so
+        // bass/chords/harmony can stay silent for the first N bars of an
+        // intro (drums-only opening that LAYERS in) and the last N bars of
+        // an outro (band thins out before the final cadence).
+        //
+        // Source labels live on `chord.sectionLabel` (unroller sets this at
+        // arranger-utils.ts:161). Substring match — same vocabulary the
+        // soloist already uses at `soloist.ts:102` for `isOutro`.
+        //
+        // Both fields default to -1 (sentinel "not in intro/outro section"),
+        // so engines can gate cleanly:
+        //   if (introBarsElapsed >= 0 && introBarsElapsed < INTRO_MUTES[me]) return null;
+        //   if (outroBarsRemaining >= 0 && outroBarsRemaining <= OUTRO_MUTES[me]) return null;
+        //
+        // Bar accounting: `bars-elapsed = floor((step - sectionStart) / spm)`
+        // is the number of COMPLETE bars before the current step (bar 0 is
+        // the first bar of the section). `bars-remaining = ceil((sectionEnd
+        // - step) / spm)` is the number of bars left including the current
+        // one (so the LAST bar of a section reports `1`, not `0`).
+        //
+        // Precedence: `isFinalMeasure` (S4) OVERRIDES outro mute on the
+        // form's final bar — the resolution cadence must fire even if bass
+        // would otherwise be muted by `outroBarsRemaining <= OUTRO_MUTES.bass`.
+        // Engine gates check `isFinalMeasure` first; this preamble does not
+        // need to clear the outro counter (a clear would prevent engines that
+        // don't consume `isFinalMeasure` from honoring the outro mute on the
+        // sub-beats of the final bar — symmetry with S4's own sub-beat
+        // silence is cleaner).
+        const currentLabel = (currentChord as any)?.sectionLabel;
+        if (isIntroSectionLabel(currentLabel)) {
+            // why: `step >= sectionStart` is guaranteed by `getChordAtStep`'s
+            // lookup contract, but floor() handles the boundary cleanly.
+            // Bar 0 spans `sectionStart .. sectionStart + spm - 1`; bar 1
+            // spans `sectionStart + spm .. + 2spm - 1`; etc.
+            (coordination as any).introBarsElapsed = Math.floor(
+                (step - sectionStart) / stepsPerMeasure,
+            );
+        } else if (isOutroSectionLabel(currentLabel)) {
+            // why: `Math.ceil` ensures the LAST step of the last bar still
+            // reports `1` (not `0`) — so engines whose mute is `OUTRO_MUTES
+            // <= 1` correctly silence on the entire final bar of the outro.
+            // E.g. sectionEnd=64, step=63, spm=16 → ceil((64-63)/16)=1.
+            // E.g. sectionEnd=64, step=48, spm=16 → ceil((64-48)/16)=1
+            //   (the LAST bar). step=47 → ceil(17/16)=2 (the second-to-last).
+            const remaining = sectionEnd - step;
+            (coordination as any).outroBarsRemaining =
+                remaining > 0 ? Math.ceil(remaining / stepsPerMeasure) : 0;
         }
     }
 

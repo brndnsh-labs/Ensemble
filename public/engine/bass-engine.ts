@@ -14,6 +14,7 @@ import { getScaleForChord } from './theory-scales.js';
 
 // (Old getScaleForBass removed, using imported version)
 import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
+import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { checkBassActiveStyle, getBassNoteStyle, isChordChangeApproach } from './bass-styles.js';
 
 // why: Genres where bass-doubles-kick is the musical intent. Other styles
@@ -102,6 +103,27 @@ export function isBassActive(
         : step % (ts.beats * ts.stepsPerBeat) === 0;
     if (isFinalMeasureCoord && isMeasureStart) {
         return true;
+    }
+
+    // why: epic-form-arrangement S5 — Intro/Outro instrument layering. The
+    // bass enters at bar `INTRO_MUTES.bass` of an Intro section and drops out
+    // `OUTRO_MUTES.bass` bars before an Outro section ends. Gate `isBassActive`
+    // here so the kick-lock and section-anticipation early-activations above
+    // can't smuggle a note past the layering gate. (`getBassNote` defends in
+    // depth at its top so any direct-call test or future caller also honors
+    // the mute.)
+    //
+    // Precedence: the final-bar return above already fired for `isFinalMeasure`
+    // — so the bass's S4 cadence still lands even when `outroBarsRemaining`
+    // would otherwise mute the bar. Order matters; do not move this block
+    // above the isFinalMeasure check.
+    const introElapsed = coordination?.introBarsElapsed ?? -1;
+    if (introElapsed >= 0 && introElapsed < INTRO_MUTES.bass) {
+        return false;
+    }
+    const outroRemaining = coordination?.outroBarsRemaining ?? -1;
+    if (outroRemaining >= 0 && outroRemaining <= OUTRO_MUTES.bass) {
+        return false;
     }
 
     const intBeat = stepInfo
@@ -671,6 +693,26 @@ export function getBassNote(
         // why: subsequent steps in the final bar emit nothing. This is the
         // "ring out" half of the gesture — the tonic from beat 1 sustains; the
         // rock/funk 8th-note pattern doesn't undercut it with offbeat root hits.
+        return null;
+    }
+
+    // --- Intro/Outro layering mute (epic-form-arrangement S5) ---
+    // why: form-arranger.md P1 #4 — during the first `INTRO_MUTES.bass` bars of
+    // an Intro section, AND during the last `OUTRO_MUTES.bass` bars of an Outro
+    // section, the bass should be silent. The drums establish the groove first
+    // (intro) and ring out the last bar (outro). `isBassActive` already mirrors
+    // this gate; defense-in-depth here protects direct-call tests and any
+    // future caller that bypasses `isBassActive`.
+    //
+    // Precedence: the isFinalMeasure short-circuit ABOVE already fired the S4
+    // cadence on the form's final bar, so this mute cannot suppress the
+    // resolution. Verified by reading: S4 returns BEFORE this block.
+    const bassIntroElapsed = context?.stepCoordination?.introBarsElapsed ?? -1;
+    if (bassIntroElapsed >= 0 && bassIntroElapsed < INTRO_MUTES.bass) {
+        return null;
+    }
+    const bassOutroRemaining = context?.stepCoordination?.outroBarsRemaining ?? -1;
+    if (bassOutroRemaining >= 0 && bassOutroRemaining <= OUTRO_MUTES.bass) {
         return null;
     }
 

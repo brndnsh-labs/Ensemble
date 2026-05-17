@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
+import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
 import {
     isTensionChordQuality,
@@ -762,6 +763,28 @@ export function getHarmonyNotes(
 
     const { playback, groove, harmony, soloist, arranger } = activeState;
     if (playback.bandIntensity < 0.22) {
+        return [];
+    }
+
+    // --- Intro/Outro layering mute (epic-form-arrangement S5) ---
+    // why: form-arranger.md P1 #4 — harmony enters LAST on the intro (after
+    // drums, bass, and chord comp have established) and drops out FIRST on
+    // the outro (so the harmonic-color layer thins the texture before the
+    // chord foundation does). With `INTRO_MUTES.harmony = 4` and
+    // `OUTRO_MUTES.harmony = 4`, a typical 8-bar outro hears harmony silent
+    // for the back half — a clear arc.
+    //
+    // No precedence concern with S4 final-bar: harmony has no final-bar
+    // cadence gesture (intentional — drums + bass + chords carry the
+    // resolution). If outroBarsRemaining is 1 (the final bar), harmony was
+    // already muted starting 4 bars earlier; the cadence the listener hears
+    // is the bass+chords+drums trio, which matches the audit-doc framing.
+    const harmIntroElapsed = coordination?.introBarsElapsed ?? -1;
+    if (harmIntroElapsed >= 0 && harmIntroElapsed < INTRO_MUTES.harmony) {
+        return [];
+    }
+    const harmOutroRemaining = coordination?.outroBarsRemaining ?? -1;
+    if (harmOutroRemaining >= 0 && harmOutroRemaining <= OUTRO_MUTES.harmony) {
         return [];
     }
 

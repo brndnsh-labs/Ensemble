@@ -214,6 +214,39 @@ export function createCoordinationContext(
         // writer: tick-logic.ts (chord-data preamble, before producers run)
         // readable-after: chord-data preamble (any producer)
         isFinalMeasure: false,
+        // why: epic-form-arrangement S5 — Intro/Outro instrument layering.
+        // A produced track opens drums-only for 2-4 bars, then layers in bass,
+        // then chords, then harmony — and inverts the order on the outro.
+        // Today all six engines emit from beat 1; the "Intro" is just "the
+        // same band, quieter" (form-arranger.md P1 #4).
+        //
+        // Semantics:
+        //   - `introBarsElapsed`: number of COMPLETE bars elapsed since the
+        //     start of the current section, when the section's label matches
+        //     `isIntroSectionLabel`. Bar 0 = first bar (first downbeat through
+        //     end-of-bar). Engines compare against `INTRO_MUTES[engine]` from
+        //     `arrangement-layering.ts` — `introBarsElapsed < muteBars`
+        //     means "I should rest this tick."
+        //   - `outroBarsRemaining`: number of bars REMAINING in the current
+        //     section (including the current bar), when the section's label
+        //     matches `isOutroSectionLabel`. Engines compare against
+        //     `OUTRO_MUTES[engine]` — `outroBarsRemaining <= muteBars`
+        //     means "I should rest this tick" (outro fade-out).
+        //   - `-1` is the sentinel for "not in an intro/outro section." A
+        //     sentinel rather than `undefined` so producers can read the field
+        //     once and gate cleanly: `if (introBarsElapsed >= 0 && ...)`.
+        //
+        // Precedence: `isFinalMeasure` (S4) OVERRIDES the outro mute on the
+        // final bar of the form — the resolution cadence MUST fire even if
+        // the bass would otherwise be muted by `outroBarsRemaining <= 1`.
+        // Engines that consume both flags MUST check `isFinalMeasure` first.
+        //
+        // Source: docs/audit/form-arranger.md P1 #4;
+        //         docs/audit/epic-form-arrangement.md S5.
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        introBarsElapsed: -1,
+        outroBarsRemaining: -1,
         // why: published per-tick from the current chord (writer: tick-logic chord-preamble
         // at lines ~102-122; readable-after: chord-preamble — i.e. by EVERY producer
         // including the soloist which runs first). Lets the soloist bias toward
