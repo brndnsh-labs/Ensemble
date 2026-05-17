@@ -317,6 +317,15 @@ export function generateNotesForStep(
                 }
                 updateCoordinationContext(coordination, 'soloist', soloResult);
             }
+
+            // why: harmonies.ts previously reached into soloist.session.* directly for
+            // isResting and notesInPhrase (harmony-coordination.md P0 #5). Publishing
+            // these through the coordination context keeps the contract surface honest:
+            // mocked tests and production code both exercise the same harmony branches.
+            // Written here (after getSoloistNote) so session state reflects this tick's
+            // final phrasing decisions before harmony runs.
+            coordination.soloistResting = Boolean(soloist.session.phrasing.isResting);
+            coordination.soloistNotesInPhrase = soloist.session.currentPhrase.notesInPhrase ?? 0;
         }
     }
 

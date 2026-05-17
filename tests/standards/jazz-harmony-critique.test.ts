@@ -58,7 +58,9 @@ describe('Jazz Harmony Critique', () => {
                 'smart',
                 stepInMeasure,
                 null,
-                {},
+                // soloistResting/soloistNotesInPhrase now read from coordination
+                // context (S4); set to match the mock's isResting:true, notesInPhrase:0.
+                { soloistResting: true, soloistNotesInPhrase: 0 },
             );
 
             if (notes.length > 0) {
@@ -120,12 +122,13 @@ describe('Jazz Harmony Critique', () => {
         };
 
         // Scenario 1: Soloist resting — default jazz comp shell.
-        mockState.soloist.session.phrasing.isResting = true;
-        const notesQuiet = getHarmonyNotes(getState(), chord, null, 0, 64, 'smart', 0, null, {});
+        // soloistResting/soloistNotesInPhrase are now coordination context fields (S4).
+        const notesQuiet = getHarmonyNotes(getState(), chord, null, 0, 64, 'smart', 0, null, {
+            soloistResting: true,
+            soloistNotesInPhrase: 0,
+        });
 
         // Scenario 2: Soloist busy, no crowding — should not exceed quiet, and should drop tensions.
-        mockState.soloist.session.phrasing.isResting = false;
-        mockState.soloist.session.currentPhrase.notesInPhrase = 5;
         const notesBusy = getHarmonyNotes(
             getState(),
             chord,
@@ -135,7 +138,12 @@ describe('Jazz Harmony Critique', () => {
             'smart',
             0,
             { midi: 72 },
-            { soloistActive: true, soloistBusy: true },
+            {
+                soloistActive: true,
+                soloistBusy: true,
+                soloistResting: false,
+                soloistNotesInPhrase: 5,
+            },
         );
 
         // Scenario 3: Crowded — soloist busy AND another accompaniment voice is hitting.
@@ -149,7 +157,13 @@ describe('Jazz Harmony Critique', () => {
             'smart',
             0,
             { midi: 72 },
-            { soloistActive: true, soloistBusy: true, accompanimentHit: true },
+            {
+                soloistActive: true,
+                soloistBusy: true,
+                soloistResting: false,
+                soloistNotesInPhrase: 5,
+                accompanimentHit: true,
+            },
         );
 
         console.log(

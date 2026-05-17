@@ -149,6 +149,18 @@ export function createCoordinationContext(
         // readable-after: chord-data preamble (any producer)
         isTensionChord: false,
         altPitchClasses: [] as number[],
+        // why: harmony's comper and finalizer modes read these to decide voicing density
+        // and guide-tone reduction when the soloist is active. Publishing them through the
+        // coordination context rather than letting harmonies.ts reach into soloist.session.*
+        // directly keeps the contract surface honest and ensures mocked tests exercise the
+        // same code paths as production. (Source: harmony-coordination.md P0 #5, S4.)
+        // writer: tick-logic.ts (soloist producer block, after getSoloistNote)
+        // readable-after: soloist producer (any consumer that runs after soloist)
+        // Default `true` matches state.soloist.session.phrasing.isResting's boot value
+        // in public/state/instruments.ts, so harmony doesn't see a false "busy" signal
+        // on the first tick before the soloist producer has written.
+        soloistResting: true,
+        soloistNotesInPhrase: 0,
     };
 }
 

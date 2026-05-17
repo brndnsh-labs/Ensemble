@@ -55,7 +55,8 @@ describe('Bossa Nova Harmony Critique', () => {
                 'smart',
                 stepInMeasure,
                 null,
-                {},
+                // soloistResting/soloistNotesInPhrase now read from coordination (S4).
+                { soloistResting: true, soloistNotesInPhrase: 0 },
             );
 
             if (notes.length > 0) {

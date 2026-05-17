@@ -135,7 +135,13 @@ describe('Harmony Engine Logic', () => {
             _groove.genreFeel = 'Pop'; // Ensure activeStyle resolves to 'strings' for min polyphony 2
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 10, 14], sectionId: 's1', beats: 4 };
 
-            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+            // soloistResting/soloistNotesInPhrase are now read from the coordination context (S4).
+            // Soloist is enabled but resting — supply soloistResting:true so the engine takes
+            // the `else if` / guide-tone path rather than the busy-soloist voicing-reduction path.
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, {
+                soloistResting: true,
+                soloistNotesInPhrase: 0,
+            });
 
             const requested = getLastRequestedIntervals();
             // Should prefer 4 and 10
@@ -148,14 +154,17 @@ describe('Harmony Engine Logic', () => {
         it('should restrict to safe voicings when soloist is active', () => {
             _playback.bandIntensity = 0.8;
             _soloist.enabled = true;
-            _soloist.isResting = false;
-            _soloist.notesInPhrase = 5; // Busy
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
             const chord = { rootMidi: 60, intervals: [0, 4, 7, 14, 18], sectionId: 's1', beats: 4 }; // 9, #11
 
-            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0);
+            // Soloist-busy signal arrives via the coordination contract (S4) — drive it
+            // explicitly rather than relying on engine-internal session state.
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, {
+                soloistResting: false,
+                soloistNotesInPhrase: 5,
+            });
 
             const requested = getLastRequestedIntervals();
             expect(requested).not.toContain(14); // 9th
@@ -297,11 +306,22 @@ describe('Harmony Engine Logic', () => {
 
     describe('Soloist Awareness (Integration)', () => {
         it('should play stabs when soloist is resting', () => {
-            _soloist.isResting = true;
             _groove.genreFeel = 'Funk';
             let stabFound = false;
+            // Soloist-rest signal arrives via the coordination contract (S4).
+            const coord = { soloistResting: true, soloistNotesInPhrase: 0 };
             for (let s = 1; s < 16; s++) {
-                const res = getHarmonyNotes(getState(), chordC, null, s, 60, 'smart', s);
+                const res = getHarmonyNotes(
+                    getState(),
+                    chordC,
+                    null,
+                    s,
+                    60,
+                    'smart',
+                    s,
+                    null,
+                    coord,
+                );
                 if (res.length > 0 && res[0].durationSteps < 4) {
                     stabFound = true;
                     break;
@@ -311,20 +331,30 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should use sparse comping when soloist is busy', () => {
-            _soloist.isResting = false;
-            _soloist.notesInPhrase = 10;
             _playback.bandIntensity = 0.5; // Moderate intensity
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
 
-            const res = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
+            // Soloist-busy signal arrives via the coordination contract (S4).
+            const coord = { soloistResting: false, soloistNotesInPhrase: 10 };
+            const res = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0, null, coord);
             expect(res.length).toBeGreaterThan(0);
             // In new logic, downbeat duration is 3 (less than 4-step pad)
             expect(res[0].durationSteps).toBeLessThan(4);
 
             // At 0.5 intensity, it should skip some non-essential hits when soloist is busy
             // (needed = 0.4 + 0.2 = 0.6 for medium hits, 0.5 < 0.6)
-            const offbeatRes = getHarmonyNotes(getState(), chordC, null, 3, 60, 'smart', 3);
+            const offbeatRes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                3,
+                60,
+                'smart',
+                3,
+                null,
+                coord,
+            );
             if (offbeatRes.length > 0) {
                 // If it does play, it should be very short
                 expect(offbeatRes[0].durationSteps).toBeLessThan(2);

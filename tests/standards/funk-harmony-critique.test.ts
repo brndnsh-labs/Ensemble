@@ -60,7 +60,9 @@ describe('Funk Harmony Critique', () => {
                 'smart',
                 stepInMeasure,
                 null,
-                {},
+                // soloistResting/soloistNotesInPhrase are now read from coordination
+                // context (S4); set to match the mock's isResting:true, notesInPhrase:0.
+                { soloistResting: true, soloistNotesInPhrase: 0 },
             );
 
             if (notes.length > 0) {

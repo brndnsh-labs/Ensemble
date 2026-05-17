@@ -329,7 +329,10 @@ function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
     const { step, motif, playback, coordination, ts, measureStep, soloist } = context;
 
     const isSoloistBusy =
-        coordination.soloistBusy || (soloist.enabled && !soloist.session.phrasing.isResting);
+        // why: soloistResting is published to the coordination context by tick-logic.ts
+        // soloist producer block (S4); reading from the contract surface rather than
+        // private session state directly ensures mocked tests exercise this branch.
+        coordination.soloistBusy || (soloist.enabled && !coordination.soloistResting);
 
     // Coordination: Yield to soloist if not reinforcing
     if (lastPlayedStep !== -1 && step === lastPlayedStep + 1 && coordination.soloistActive) {
@@ -420,10 +423,12 @@ function finalizeHarmonyNotes(
     const feel = groove.genreFeel;
 
     const isSoloistBusy =
+        // why: soloistResting and soloistNotesInPhrase are published via coordination
+        // context by the tick-logic soloist producer block (S4); reading from the
+        // contract surface rather than private session state keeps the contract honest.
         coordination.soloistBusy ||
         (soloist.enabled &&
-            (!soloist.session.phrasing.isResting ||
-                soloist.session.currentPhrase.notesInPhrase > 3));
+            (!coordination.soloistResting || coordination.soloistNotesInPhrase > 3));
     const accompanimentCrowding = coordination.accompanimentHit && !isLatched && !isBloom;
 
     // --- VOICING REFINEMENT (Musical Taste) ---
@@ -443,7 +448,8 @@ function finalizeHarmonyNotes(
     if (!groundingRequired && (isSoloistBusy || coordination.accompanimentHit)) {
         intervals = getSafeVoicings(intervals, rootlessComping);
         if (
-            soloist.session.currentPhrase.notesInPhrase > 3 ||
+            // why: soloistNotesInPhrase published via coordination context (S4).
+            coordination.soloistNotesInPhrase > 3 ||
             coordination.accompanimentHit ||
             harmony.complexity < 0.4
         ) {
