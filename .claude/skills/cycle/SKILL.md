@@ -75,7 +75,7 @@ Goal: collapse the routine `/implement → /review → /patch → /done` rhythm 
    - What surprised us? Anything to add to `MEMORY.md` (feedback / project / reference memories)?
    - Did any audit-doc premises break? Update `docs/audit/<area>.md` if so.
    - Should `docs/MUSICAL_AUDIT.md` "Shipped" history record anything noteworthy?
-   - Any follow-ups deferred during the epic worth surfacing as new stories?
+   - Scan `docs/audit/FOLLOWUPS.md` for items in this epic's area — anything ready to promote to a story, fix inline next pass, or delete because the surrounding code shifted?
 
    Resume with `/cycle next --until-blocked` when ready, or run `/pmlite` to step back.
    ```

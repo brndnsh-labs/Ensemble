@@ -17,16 +17,18 @@ Goal: persist story completion in the audit tree, update EPICS.md tally, and com
 
 4. **If a whole epic is now done** (Done == Stories), update its row's `Notes` column to `✅ Shipped <date>` and consider whether to move its summary to `docs/MUSICAL_AUDIT.md` Shipped table as a follow-up. Surface this as a suggestion to the user — don't auto-archive.
 
-5. **Survey the diff.**
+5. **Capture new follow-ups.** If `/review` surfaced P2 deferrals that aren't already covered by an existing story, append them to the relevant section of [`docs/audit/FOLLOWUPS.md`](../../docs/audit/FOLLOWUPS.md) in the same pass. Format: `**Location:** what · why deferred · ~size · *Source: <story-id> review*`. Don't bury them in the Status block alone — that hides the work from anyone scanning at the doc level.
+
+6. **Survey the diff.**
    - `git status` — confirm only expected files changed.
    - `git diff --stat` — confirm scope is consistent with the stories.
 
-6. **Draft a Conventional-Commit message.**
+7. **Draft a Conventional-Commit message.**
    - Single story: scoped to the engine area (e.g., `fix(bass): chromatic approach gated to chord changes only`).
    - Multi-story batch: pick a higher-level scope (e.g., `refactor(coordination): wire upcomingSectionFirstChord into bass and chords`). Body lists each story.
    - End with the standard `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` line.
 
-7. **Present the plan.** Format:
+8. **Present the plan.** Format:
 
    ```
    ## Plan: commit <N> shipped stories
@@ -53,7 +55,7 @@ Goal: persist story completion in the audit tree, update EPICS.md tally, and com
    Commit now? Or adjust the message?
    ```
 
-8. **On confirmation:**
+9. **On confirmation:**
    - Edit the epic file(s) to add Status: Shipped lines.
    - Edit `docs/audit/EPICS.md` to update tally.
    - Stage relevant files: the implementation diff PLUS the audit-tree updates.
@@ -61,7 +63,7 @@ Goal: persist story completion in the audit tree, update EPICS.md tally, and com
    - Commit using a HEREDOC for proper formatting.
    - Run `git status` after to verify.
 
-9. **Suggest next step.**
+10. **Suggest next step.**
 
    ```
    ## Done. Next:

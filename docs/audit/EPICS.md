@@ -9,6 +9,7 @@ Each epic is session-pickup-ready: titled, motivated, broken into session-sized 
 - **EPICS.md (this file)** = the tracker. One line per epic with status; never grows past ~80 lines.
 - **`docs/audit/epic-<slug>.md`** = stories for that epic. Pick up one, ship it, mark it done in the epic file, update the count here.
 - **`docs/audit/<area>.md`** = the underlying findings, untouched. New findings during work go back into the area file, *not* into the epic file.
+- **[`docs/audit/FOLLOWUPS.md`](FOLLOWUPS.md)** = shippable-but-flagged items surfaced during `/review`. Append here when a P2 deferral doesn't justify a fresh story but shouldn't be lost. Promote to a story (move to an epic file) when it grows or accumulates urgency.
 
 Story sizing: each story is a single focused session (2–6 hours) — one engine touch + critique test + reliability loop. Pattern proven by the May 2026 sweeps (see `docs/MUSICAL_AUDIT.md` § "Shipped").
 

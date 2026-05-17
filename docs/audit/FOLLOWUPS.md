@@ -1,0 +1,105 @@
+# Follow-ups & Deferred Work
+
+Companion to [`EPICS.md`](EPICS.md). Captures every "shippable but flagged" item that surfaced during audit work — items that don't justify a fresh story yet but shouldn't be lost to grep.
+
+Each entry: **location** · what it is · why it's deferred · size estimate · provenance (which story or review surfaced it).
+
+## How this doc gets used
+
+- **When `/review` surfaces a P2 deferral** that isn't already covered by an existing story, append it to the relevant section here in the same pass as the Status block update. Don't bury it in the Status block alone — that hides the work from anyone scanning at the doc level.
+- **When promoting a follow-up to a real story**, copy the entry into the appropriate epic file as a new S<N>, then delete the follow-up entry (or replace it with a single-line `→ Epic <N>/S<N>` pointer).
+- **When fixing a follow-up inline** (e.g. while in adjacent code), delete the entry in the same commit that ships the fix.
+- **When in doubt about "is this a follow-up or a story?"**: if it's <2h mechanical work in a file someone's already touching, follow-up. If it needs musical taste, design, or its own critique test, it's a story — promote it to the relevant epic.
+
+A follow-up that's been sitting here for >2 months without being touched is signal: either promote it to a story (it's load-bearing) or delete it (we've decided we don't care). Don't let this file become a graveyard.
+
+---
+
+## A. Product calls needed (decide before any coding)
+
+- **`breakdown` / `drop` semantics** — `form-arranger.md` P1 #5. Genre-dependent. Either implement as a structural mute+slam bar, or delete from the energy map. Discuss before picking up. *Source: Epic 2 Deferred.*
+- **Macro-arc grand cycle** — `form-arranger.md` P1 #5 + P2 #10/#11. `formIteration % 8` placeholder; replacing it is a product conversation, not engine work. *Source: Epic 2 Deferred.*
+- **SRDC Restatement multiplier** — `soloist.md` P1 #5. Currently ×1.15 sits inside the noise floor. Bump to ×1.3, OR refold Restatement into contour/repetition logic. Open question whether Restatement should feel pitch-wise ("I meant that") or motivic-recall rhythm-wise. *Source: Epic 4 Deferred.*
+- **Rock harmonic-anticipation push tuning** — `bass.md` P1 #8. Needs a "Stones-y vs classic 70s" feel call. *Source: Epic 5 Notes.*
+
+## B. Multiplier placement & architecture trade-offs
+
+Items where the shipped fix is "consistent with adjacent code" rather than "strictly final-stage." Realized effects are within audit-doc tolerance but the canonical fix is documented for future hardening.
+
+- **Epic 2 S6 — densityScale placement.** `soloist-rhythm-engine.ts:337` puts the `1 + loopCount * 0.15` multiplier on `densityScale` before four downstream additive boosts (`+= 0.4` seed, `+= 0.2` × downbeat/kick/snare). Realized delta is +25% vs audit-doc target +30%; canonical fix would be a post-multiplier on `attackProb` right before the jitter. Mirrors pitch engine for symmetry. ~1h. *Source: form-arrangement/S6 review (2026-05-17).*
+- **Epic 1 S5 — soloist-devices unison floor.** `soloist-devices.ts` enclosure/run/approach picker (~lines 314-340) doesn't consult `coordination.stepCoordination.accompanimentMidis`. Puts a ~10pp absolute floor on unison-rate drop — why acceptance was reframed from "≥30pp absolute" to "≥30% relative." Closing this would push absolute drop above 30pp. ~3h. *Source: Epic 1 S5 Status block.*
+- **Epic 3 S2 — Bossa Charleston bank is a Jazz port.** Bossa currently reuses the Jazz cell bank as a port-for-fidelity. Anticipation-of-1 idiom missing; partido-alto-specific bank needed. ~3h. *Source: Epic 3 S2 Status block.*
+
+## C. Cross-engine consistency (same fix-shape repeated elsewhere)
+
+- **Hash-helper consolidation across 3 engines.** `bass-engine.ts` + `groove-engine.ts` use djb2-33-from-5381; `accompaniment.ts` uses djb2-31-from-0. Independent per-engine target distributions are currently a happy hash accident — formalize with deliberate per-engine domain salts when the helper centralizes. Tracked alongside the Epic 3 S5 TODO. ~2h. *Source: Epic 2 S3 review.*
+- **Native-style chromatic leading tones.** Epic 5 S2's gate removal only benefits the generic walking-bass / `quarter` fallback. Native handlers in `bass-styles.ts` for `rock` (~445-489), `pop`, `country`, `soul`, `gospel` return non-`undefined` from `getBassNoteStyle` on every 8th and bypass the gated branch. Adding a ~5-10% chromatic-leading-tone sub-branch inside each native style on `intBeat === ts.beats - 1` chord-change boundaries (gated by `isChordChangeApproach`) delivers the audit-doc claim S2 partially landed. ~2h per style (~10h total). *Source: Epic 5 S2 review.*
+- **Altered-dominant narrow consumers.** Epic 6 S4 broadened `ALTERED_DOMINANT_QUALITIES` but two consumers are still narrow: `soloist-pitch-engine.ts:418` only checks `7alt`/`7#9`; `accompaniment.ts:1228` `wasTense` sustain-pedal list only covers `7alt`/`dim`/`halfdim`/`7b9`/`7#9`. Should consume the broader set. ~2h. *Source: Epic 6 S4 Status block.*
+- **Three slash-chord-blind predicate sites in bass.** Epic 5 S1 helper uses `bassMidi ?? rootMidi` so it catches slash-chord changes that three inline predicate sites miss — `bass-engine.ts:313/463/812`. Left alone per S1 scope; should be migrated for consistency. ~1h. *Source: Epic 5 S1 Status block.*
+- **Three remaining `soloist.session.*` reads in `harmonies.ts`.** `session.memory.sharedHookBuffer` at lines 271-272 (Ska-Punk only) + `session.seed` at line 279 (melodic shadowing). Different field shapes than S4's boolean/scalar surface — would need a buffer-object + RNG-seed context-fields design. Worth its own story under Epic 1 if/when "grep returns zero" becomes a hard rule. ~3h. *Source: Epic 1 S4 follow-up scope.*
+- **Three remaining `Math.random()` in `groove-engine.ts`.** Lines 259/281/293 (drum-strategy probability/velocity randomness). Out of scope for Epic 3 S5 per story brief. Promote if drum tests start flaking. ~1h. *Source: Epic 3 S5 Status block.*
+
+## D. Coordination consumption gaps
+
+Fields published on `coordination` where only some consumers exist.
+
+- **Reggae bass coordination consumption (S6 second half).** `bass-engine.ts:42-54` currently reads only `kickHit`. On `coordination.soloistPhraseEnd`, permit an optional half-bar fill; on tension-chord, allow scalar approach to upcoming root. Explicitly Deferred to Phase 3 (opus). ~2h. *Source: Epic 5 S6 Status block.*
+- **Comper reacting to soloist phrase-end.** `chords.md` P2 #16. Depends on Epic 1's soloist-phrase-end coordination field (now exists). ~2h. *Source: Epic 6 Deferred.*
+- **`bassMidi` floor consolidation across 4 lanes.** `chords.md` P2 #15. Bundle with whichever Epic 6 story touches the relevant lane. ~2h. *Source: Epic 6 Deferred.*
+- **Funk 3-note Clav.** `chords.md` P2 #17. Small standalone or bundle with Epic 6 S5. ~1h. *Source: Epic 6 Deferred.*
+- **Color tones at moderate intensity.** `chords.md` P1 #11. Small change; bundle with Epic 6 S6 or stand alone. ~1h. *Source: Epic 6 Deferred.*
+- **Soloist device-selection uniform-random over ranked list.** `soloist.md` P2 #14. Single ~2h story. P2 nice-to-have. *Source: Epic 4 Deferred.*
+
+## E. Per-genre tuning & sound design
+
+Taste-driven gestures or per-genre values still flat. Each one is a future-story candidate, not a follow-up to anything in particular.
+
+- **Per-genre final-bar drum gestures.** Epic 2 S4 uses a universal snare-stinger; jazz/bossa might prefer ride-bell + comping. *Source: Epic 2 S4 review.*
+- **Final-bar voice-leading discards `previousVoicingMidis`.** Epic 2 S4 cadence voicing is chart-driven but drops voice-leading into the resolution. ~2h. *Source: Epic 2 S4 review.*
+- **HiHat suppression on final bar reads abrupt in 8th-note-hat genres.** Epic 2 S4. Per-genre gate. ~1h. *Source: Epic 2 S4 review.*
+- **Imperfect Symmetry intensity 0.4 floor.** Epic 2 S2 gates the gesture at `intensity ≥ 0.4`, suppressing it during quiet ballad-style Verse 2 — exactly where subtle variation is most musical. Consider 0.25 or gentler upward bias at low intensity. ~1h. *Source: Epic 2 S2 review.*
+- **Per-genre intro/outro mute tuning.** Epic 2 S5 currently genre-flat (`INTRO_MUTES = { bass: 2, chords: 3, harmony: 4 }`). ~3h. *Source: Epic 2 S5 Deferred.*
+- **Disco intensity-axis miscategorization.** `drums.md` P2 #18. The 4-motif system is mostly load-bearing for `synth-drums` velocity scaling; touch when Disco gets another audit pass. *Source: Epic 7 Deferred.*
+- **Bossa/samba label split.** `bass.md` P2 #16. Currently conflates two distinct feels. ~2h. *Source: Epic 5 Notes.*
+- **Walking-ska M6 over minor chords.** `bass.md` P1 #9. Small follow-on. ~1h. *Source: Epic 5 Notes.*
+- **Generic walking target-awareness.** `bass.md` P1 #10. ~2h. *Source: Epic 5 Notes.*
+- **Funk pop/chuck/hammer probability documentation.** `bass.md` P2 #17. Doc/comment pass. ~1h. *Source: Epic 5 Notes.*
+
+## F. Test rigor & determinism
+
+- **`instHash` for drum lanes uses bare polynomial hash.** Epic 2 S3, `groove-engine.ts`. No canonical `scrambleHash` pre-scrambling. Empirically fine, future cleanup. ~30min. *Source: Epic 2 S3 review.*
+- **Accompaniment S3 test fixture primary seed lands target=0.** The cascade-from-`bar > target` path is not directly observed in the primary fixture (compensated by 8-sectionId aggregate in the parity-collapse test). Worth adding a fixture with `target > 0`. ~1h. *Source: Epic 2 S3 review.*
+- **Drums-not-muted regression test asserts Kick only.** Epic 2 S5. Extending to Snare/HiHat for symmetry is a nit. ~30min. *Source: Epic 2 S5 review.*
+- **`withOctaveJump` PC-fold metric can't detect regressions on `clampAndNormalize`-wrapped chromatic paths.** Epic 5 S3. The +12 gets re-folded away by PC-fold. Live audible behavior concentrated in unwrapped fallback (which IS guarded). Tightening to engine-computed `targetRoot` is future regression-hardening. ~2h. *Source: Epic 5 S3 review.*
+- **Deterministic-seeding of head-bypass jitter PRNG.** Epic 4 S4. Jitter is scale-clamped but not yet seeded. ~1h. *Source: Epic 4 S4 Status.*
+- **Sparse-vibe cell collapse + active-vibe ornament collision.** Epic 3 S2. Pre-existing reviewer-flagged issues; deferred. ~2h. *Source: Epic 3 S2 Status.*
+- **Engine-wide determinism test waits on S4+S5.** Epic 3 S3 determinism test stubs `Math.random` to isolate S3's contribution alone; engine-wide test was gated on `withOctaveJump` (S4 shipped) and harmony coin flips (S5 shipped) — now unblocked. ~2h to write. *Source: Epic 3 S3 Status.*
+
+## G. Schema cleanup & stale carriers
+
+- **Naming collision: `soloist.ts:1257 isFinalMeasure` (per-section) vs `coordination.isFinalMeasure` (per-song).** Epic 2 S4. Different semantics, same name. Rename the local. ~30min. *Source: Epic 2 S4 review.*
+- **Three state-discipline NITs at Epic 2 S4.** Untyped `: any` parameter bag in cadence helper; redundant `as any` cast; defensive `arranger?.` where arranger is guaranteed. ~30min. *Source: Epic 2 S4 review.*
+
+## H. Cross-references (already routed to a story — no work tracked here)
+
+Pointers in case someone greps from a finding:
+
+- `chords.md` P0 #1 funk groove-cell determinism → Epic 3 S1 ✅
+- `chords.md` P0 #2 Jazz/Bossa/Blues Charleston picker → Epic 3 S2 ✅
+- `chords.md` P1 #5 per-chord-retrigger extension randomization → folds into Epic 6 S1 (open)
+- `chords.md` P2 #14 `accompanimentMidis` consumption → Epic 1 S5 ✅
+- `drums.md` P2 #15 `humanizeVelocity` seeded → Epic 3 S5 ✅
+- `drums.md` P2 #17 motif rotation fictional → Epic 2 S1 ✅ partial; binaryTier widening still open
+- `harmony-coordination.md` P0 #2/#3/#4/#5 → Epic 1 ✅
+- `harmony-coordination.md` P1 #8 → Epic 1 S2 ✅
+- `harmony-coordination.md` P1 #9 → Epic 5 S6 (partial: delete only ✅; consumption still open in §D)
+- `harmony-coordination.md` P1 #10 → Epic 1 S6 ✅
+- `harmony-coordination.md` P2 #13 → Epic 3 S5 ✅
+- `soloist.md` P1 #6 → Epic 2 S6 ✅
+- `soloist.md` P1 #8 → Epic 1 S5 ✅
+- `form-arranger.md` P0 #2 (`upcomingSectionFirstChord`) → Epic 1 S3 ✅
+- `form-arranger.md` P2 #11 (conductor `Math.random`) → tracked in Epic 3 area
+
+---
+
+**Last reviewed:** 2026-05-17 (initial extraction from epic Status blocks + Deferred sections after Epic 2 S6 shipped).
