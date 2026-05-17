@@ -105,6 +105,8 @@ export function applyGrooveOverrides(
         isCompound,
         stepInGroup,
         groupIndex,
+        sectionId: sectionIdFromTick,
+        sectionOccurrence,
     }: any,
 ) {
     const { soloist, arranger } = state;
@@ -312,6 +314,86 @@ export function applyGrooveOverrides(
             currentState.shouldPlay = true;
             currentState.velocity = 0.2 + Math.random() * 0.2;
             currentState.soundName = 'HiHat';
+        }
+    }
+
+    // --- Imperfect Symmetry: per-bar ghost-note permutation on repeat passes ---
+    // why: epic-form-arrangement S3 — when a section repeats (Verse 2 vs Verse 1),
+    // the drums otherwise produce an identical 16-step pattern, making the band
+    // sound mechanical on repeated form. On the restatement we permute ONE ghost
+    // note per 16-step bar (per Snare/HiHat lane) by toggling its play state at
+    // a seeded, non-foundational step. Mirrors the bass S2 pattern; same seed
+    // recipe `(sectionIdHash, occurrence, barIndex, instName)`.
+    //
+    // Musical intent: "this drummer pushed the ghost one 16th later on Verse 2."
+    // The skeleton (Kick on 1, Snare backbeat) is preserved — we only touch
+    // non-foundational subdivisions where a real drummer would naturally vary
+    // the embellishment between passes. Kick lane is exempt entirely so the
+    // pocket's bottom never moves.
+    //
+    // Toggle semantics (musically symmetric — picks the seeded step regardless
+    // of whether it's currently a hit, then flips it):
+    //   - currently playing → drop to silent (the drummer "skipped" that ghost)
+    //   - currently silent  → add a ghost hit at low velocity (the drummer
+    //     "added" a ghost where none existed on the Statement pass)
+    // Either way the bar's hit distribution changes by exactly one event.
+    //
+    // Source: docs/audit/form-arranger.md P1 #7;
+    //         docs/audit/epic-form-arrangement.md S3.
+    const sectionOccurrenceSafe: number = sectionOccurrence ?? 1;
+    const isRepeatPassDrums = sectionOccurrenceSafe >= 2;
+    const isGhostLane = inst.name === 'Snare' || inst.name === 'HiHat' || inst.name === 'Open';
+    if (isRepeatPassDrums && isGhostLane && arrangerState.timeSignature === '4/4') {
+        // why: skip foundational positions — downbeat (step 0) and backbeats
+        // (steps 4, 12 in 4/4) define the genre's groove skeleton; permuting
+        // them would read as a glitch, not as expressive variation. Allowed
+        // candidates are the 13 remaining 16th positions per bar.
+        const FOUNDATIONAL_STEPS_4_4 = new Set([0, 4, 12]);
+        if (!FOUNDATIONAL_STEPS_4_4.has(loopStep)) {
+            // Hash sectionId string (djb2) for stable per-section variation.
+            const sectionIdStr: string = sectionIdFromTick || sectionId || '';
+            let sectionIdHash = 5381 | 0;
+            for (let i = 0; i < sectionIdStr.length; i++) {
+                sectionIdHash = (Math.imul(sectionIdHash, 33) + sectionIdStr.charCodeAt(i)) | 0;
+            }
+            // why: also fold the instrument name so Snare and HiHat each get
+            // their own target step within the bar — otherwise both lanes
+            // would permute on the same 16th, doubling the gesture.
+            let instHash = 0;
+            const instName: string = inst.name ?? '';
+            for (let c = 0; c < instName.length; c++) {
+                instHash = (instHash * 31 + instName.charCodeAt(c)) | 0;
+            }
+            const targetSeed = scrambleHash(
+                (sectionIdHash ^
+                    (sectionOccurrenceSafe * 0x9e3779b1) ^
+                    (barIndex * 0x85ebca77) ^
+                    (instHash * 0x27d4eb2f)) |
+                    0,
+            );
+            // 13 non-foundational candidate steps: [1,2,3,5,6,7,8,9,10,11,13,14,15]
+            const candidateSteps = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15];
+            const targetStep = candidateSteps[Math.floor(targetSeed * candidateSteps.length)];
+            if (loopStep === targetStep && !inst.muted) {
+                if (currentState.shouldPlay) {
+                    // why: drop this ghost — the drummer skipped it on the repeat.
+                    // Preserve soundName so logging stays informative.
+                    currentState.shouldPlay = false;
+                } else {
+                    // why: add a ghost at low velocity. 0.18 sits in the ghost-velocity
+                    // band used elsewhere in this engine (entropy ghost = 0.1+rand*0.15,
+                    // entropy hat = 0.2+rand*0.2). For Snare, route to Sidestick at low
+                    // intensity to match the entropy-phase convention at line 304.
+                    currentState.shouldPlay = true;
+                    currentState.velocity = 0.18;
+                    if (inst.name === 'Snare') {
+                        currentState.soundName =
+                            playback.bandIntensity < 0.4 ? 'Sidestick' : 'Snare';
+                    } else {
+                        currentState.soundName = 'HiHat';
+                    }
+                }
+            }
         }
     }
 

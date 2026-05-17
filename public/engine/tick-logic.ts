@@ -261,6 +261,14 @@ export function generateNotesForStep(
                 isTurnaround,
                 stepsPerBar,
                 loopStep: drumStep,
+                // why: epic-form-arrangement S3 — Imperfect Symmetry for drums on
+                // repeat passes. Published per-tick on the coordination context by
+                // the chord-data preamble (see line ~162); pass it down so
+                // applyGrooveOverrides can permute one ghost note per 16-step bar
+                // when sectionOccurrence ≥ 2. Default 1 mirrors the coordination
+                // context's createCoordinationContext default, so engines can safely
+                // gate on `occurrence > 1` without an undefined check.
+                sectionOccurrence: coordination.sectionOccurrence ?? 1,
             });
 
             if (!evaluateOnly && result.shouldPlay) {

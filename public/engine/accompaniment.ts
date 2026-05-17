@@ -1338,6 +1338,14 @@ interface AccompanimentCoordination {
     upcomingSectionFirstChord?: any;
     // why: needed to compute the anticipation step offset from the section boundary.
     sectionEnd?: number;
+    // why: epic-form-arrangement S3 — published by tick-logic chord-preamble
+    // (see tick-logic.ts:162). When ≥ 2, the accompaniment rotates one voicing
+    // inversion per phrase, seeded by (sectionId, occurrence, barIndex), so
+    // Verse 2 sounds audibly different from Verse 1 without changing the chord
+    // function. Default 1 matches createCoordinationContext / getSectionContext
+    // no-sectionMap fallback so engines can safely gate on `> 1` without an
+    // undefined check.
+    sectionOccurrence?: number;
 }
 
 /**
@@ -1377,6 +1385,90 @@ export function getAccompanimentNotes(
     const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
+
+    // --- Imperfect Symmetry: per-phrase voicing inversion on repeat passes ---
+    // why: epic-form-arrangement S3 — when a section repeats (Verse 2 vs Verse 1),
+    // the comper otherwise produces identical voicings, making the band sound
+    // mechanical on repeated form. On the restatement we rotate the voicing by
+    // ONE inversion (lowest note up an octave) on the seeded TARGET BAR per
+    // 4-bar phrase, seeded by `(sectionId, occurrence, phraseIndex)` like bass
+    // S2. The rotation then cascades through `recenterVoicing` /
+    // `selectCompactCluster` (both use `compingState.lastVoicingMidis`), so the
+    // pianist "commits to" the new register for the rest of the phrase — same
+    // musical framing as bass S2.
+    //
+    // Source: docs/audit/form-arranger.md P1 #7;
+    //         docs/audit/epic-form-arrangement.md S3.
+    const compSectionOccurrence: number = coordination?.sectionOccurrence ?? 1;
+    const isRepeatPassComp = compSectionOccurrence >= 2;
+    const compBarIndex = Math.floor(step / spm);
+    const COMP_PHRASE_BARS = 4; // why: standard 4-bar phrase, matches bass S2.
+    const compPhraseIndex = Math.floor(compBarIndex / COMP_PHRASE_BARS);
+    const compBarInPhrase = compBarIndex % COMP_PHRASE_BARS;
+    const compSectionIdHash = hashSectionId(chord.sectionId || '');
+    // mulberry32 — 32-bit scrambled hash. Inlined here (rather than imported)
+    // to mirror the local-copy convention bass-engine.ts and groove-engine.ts
+    // already use (`scrambleHash`); a cross-file refactor of the helper is
+    // tracked separately in the deterministic-phrasing epic.
+    const compScrambleHash = (seed: number): number => {
+        let t = (seed + 0x6d2b79f5) | 0;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+    };
+    const compTargetSeed = compScrambleHash(
+        (compSectionIdHash ^
+            (compSectionOccurrence * 0x9e3779b1) ^
+            (compPhraseIndex * 0x85ebca77)) |
+            0,
+    );
+    // One target bar per 4-bar phrase. From the target bar onwards (within the
+    // phrase), every voicing gets rotated — this implements the "commit to the
+    // new register for the rest of the phrase" musical gesture (cascades
+    // naturally via recenterVoicing's previousVoicingMidis bias).
+    const compTargetBarInPhrase = Math.floor(compTargetSeed * COMP_PHRASE_BARS);
+    const shouldRotateVoicing = isRepeatPassComp && compBarInPhrase >= compTargetBarInPhrase;
+    /**
+     * Rotate a midi voicing by one inversion: move the lowest note up an octave.
+     * No-op if voicing has fewer than 2 notes (rotation is meaningless on a
+     * unison/empty voicing) or if the rotated note would exceed the 84 ceiling
+     * (chords/harmony register-slot upper bound — going past would defeat the
+     * register-slotting contract and let the post-engine clamp distort the
+     * intended inversion).
+     */
+    const rotateVoicingMidi = (midis: number[]): number[] => {
+        if (!shouldRotateVoicing || midis.length < 2) {
+            return midis;
+        }
+        const sorted = [...midis].sort((a, b) => a - b);
+        const newLow = sorted[0] + 12;
+        // why: chords/harmony register slot is 52-84 (CLAUDE.md). If rotating
+        // the lowest up an octave would push it above the register slot
+        // ceiling, skip the rotation rather than letting enforceRegisterSlotting
+        // octave-clamp it back down (which would undo the gesture).
+        if (newLow > 84) {
+            return midis;
+        }
+        return [...sorted.slice(1), newLow].sort((a, b) => a - b);
+    };
+    /**
+     * Freq-array variant: convert to midi, rotate, convert back. Used by genre
+     * lanes that operate on freqs (country, reggae, jazz/standard).
+     */
+    const rotateVoicingFreqs = (freqs: number[]): number[] => {
+        if (!shouldRotateVoicing || freqs.length < 2) {
+            return freqs;
+        }
+        const midis = freqs.map((f) => getMidi(f)).filter((m): m is number => Number.isFinite(m));
+        if (midis.length < 2) {
+            return freqs;
+        }
+        const rotated = rotateVoicingMidi(midis);
+        if (rotated === midis) {
+            return freqs;
+        }
+        return rotated.map((m) => getFrequency(m));
+    };
 
     // --- Sustain / CC Handling ---
     const chordIndex = arranger.progression ? arranger.progression.indexOf(chord) : -1;
@@ -1519,6 +1611,7 @@ export function getAccompanimentNotes(
             if (voicing.length > 3) {
                 voicing = voicing.slice(0, 3); // Simple triads
             }
+            voicing = rotateVoicingFreqs(voicing);
 
             voicing.forEach((f, i) => {
                 notes.push({
@@ -1647,6 +1740,12 @@ export function getAccompanimentNotes(
                     voicing = voicing.map((midi: number) => midi + 12);
                 }
             }
+            // why: apply Imperfect-Symmetry rotation BEFORE caching to
+            // `compingState.lastVoicingMidis`, so the next bar's
+            // selectCompactCluster cascade carries the new register forward
+            // (the "pianist commits to the inversion for the rest of the
+            // phrase" gesture — matches bass S2's prevMidi-bias cascade).
+            voicing = rotateVoicingMidi(voicing);
             compingState.lastVoicingMidis = [...voicing];
 
             // Neo-Soul "Drunken" Timing (Randomized displacement) - TIGHTENED
@@ -1694,6 +1793,7 @@ export function getAccompanimentNotes(
             if (voicing.length > 3) {
                 voicing = voicing.slice(0, 3); // Tight skanks
             }
+            voicing = rotateVoicingFreqs(voicing);
 
             voicing.forEach((f, i) => {
                 notes.push({
@@ -1800,6 +1900,9 @@ export function getAccompanimentNotes(
                 reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
                 84,
             );
+            // why: Imperfect-Symmetry rotation before caching — same reasoning
+            // as the Neo-Soul lane, lets the cascade carry forward.
+            voicing = rotateVoicingMidi(voicing);
             compingState.lastVoicingMidis = [...voicing];
 
             voicing.forEach((m: any, i: number) => {
@@ -2216,6 +2319,13 @@ export function getAccompanimentNotes(
                 voicing = alignedMidis.map((midi) => getFrequency(midi));
             }
         }
+
+        // why: Imperfect-Symmetry rotation BEFORE caching to
+        // compingState.lastVoicingMidis, so the recenterVoicing cascade picks
+        // up the rotated voicing on subsequent bars (the "pianist commits to
+        // the inversion for the rest of the phrase" gesture). See bass S2's
+        // prevMidi-bias cascade for the same musical framing.
+        voicing = rotateVoicingFreqs(voicing);
 
         const finalVoicingMidis = getMidiVoicing(voicing);
         if (finalVoicingMidis.length > 0) {
