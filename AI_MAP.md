@@ -57,6 +57,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/theory-scales.ts` | Scale degrees and mode definitions. | `getScaleForChord` |
 | `public/engine/resolution.ts` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
 | `public/engine/arranger-utils.ts` | Arrangement unrolling and form utilities. | `unrollArrangement` |
+| `public/engine/arrangement-layering.ts` | Per-engine intro/outro mute schedule (S5). | `INTRO_MUTES`, `OUTRO_MUTES`, `isIntroSectionLabel` |
 
 ## Engine Styles (Genre Logic)
 
