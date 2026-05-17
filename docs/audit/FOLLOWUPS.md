@@ -74,11 +74,14 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 - **Deterministic-seeding of head-bypass jitter PRNG.** Epic 4 S4. Jitter is scale-clamped but not yet seeded. ~1h. *Source: Epic 4 S4 Status.*
 - **Sparse-vibe cell collapse + active-vibe ornament collision.** Epic 3 S2. Pre-existing reviewer-flagged issues; deferred. ~2h. *Source: Epic 3 S2 Status.*
 - **Engine-wide determinism test waits on S4+S5.** Epic 3 S3 determinism test stubs `Math.random` to isolate S3's contribution alone; engine-wide test was gated on `withOctaveJump` (S4 shipped) and harmony coin flips (S5 shipped) — now unblocked. ~2h to write. *Source: Epic 3 S3 Status.*
+- **Conductor cool-down jitter headroom is thin.** Epic 2 S7 `tests/standards/conductor-arc-critique.test.ts:393-427` asserts `targetIntensity < 0.6` against worst-case `0.5 + 0.075 jitter = 0.575` — only 0.025 cushion. Safe today (`Math.random()` is strictly `< 1`) but will silently start clipping if jitter envelope widens. Consider asserting `< 0.625` with a pinned-to-jitter-constant comment, or `≤ 0.575 + ε` so regressions on the jitter constant surface as deliberate test failures. ~30min. *Source: Epic 2 S7 review.*
+- **Conductor critique only exercises ceiling-clamped section.** Epic 2 S7 fixture uses Chorus (energy 0.9) so the macro clamp resolves to ceiling and assertions probe the ladder directly. Companion test should transition into a low-energy section (e.g. Verse, energy 0.5) and verify `targetEnergy` lands at the `getSectionEnergy()` value (not the ceiling) and stays inside the macro window. ~1h. *Source: Epic 2 S7 review.*
 
 ## G. Schema cleanup & stale carriers
 
 - **Naming collision: `soloist.ts:1257 isFinalMeasure` (per-section) vs `coordination.isFinalMeasure` (per-song).** Epic 2 S4. Different semantics, same name. Rename the local. ~30min. *Source: Epic 2 S4 review.*
 - **Three state-discipline NITs at Epic 2 S4.** Untyped `: any` parameter bag in cadence helper; redundant `as any` cast; defensive `arranger?.` where arranger is guaranteed. ~30min. *Source: Epic 2 S4 review.*
+- **Dead role-switch arms in `conductor.ts:401-428`.** Switch handles `Exposition / Development / Contrast / Build / Climax / Recapitulation / Resolution`, but `form-analysis.ts:analyzeForm` (lines 93-140) only emits `Intro / Outro / Peak / Main Theme / Theme B / Bridge / Variation / Refrain / Build`. Only `Build` intersects — six of seven case arms are unreachable from in-engine analyzer output. Fix direction: either rename the switch arms to the `analyzeForm` vocabulary, or have `analyzeForm` emit the formal-music vocabulary (the latter is musically richer — real sonata-form terminology — but a wider rework). ~2h for the rename fix; ~4h for the analyzer enrichment. *Source: Epic 2 S7 review (2026-05-17).*
 
 ## H. Cross-references (already routed to a story — no work tracked here)
 

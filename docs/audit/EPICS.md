@@ -18,7 +18,7 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 | # | Epic | Cross-cutting? | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :-: | :- |
 | 1 | [Coordination Contract](epic-coordination-contract.md) | yes | 6 | 6 | Highest-leverage. Unlocks epics 4, 6, 8. **Complete — Phase 1 Epic-1 done.** |
-| 2 | [Form & Arrangement Awareness](epic-form-arrangement.md) | yes | 8 | 6 | Imperfect Symmetry for non-soloists; intro/outro layering; final-bar cascade; energy-arc calibration. S1+S2+S3+S4+S5+S6 shipped 2026-05-17. |
+| 2 | [Form & Arrangement Awareness](epic-form-arrangement.md) | yes | 8 | 7 | Imperfect Symmetry for non-soloists; intro/outro layering; final-bar cascade; energy-arc calibration. S1+S2+S3+S4+S5+S6+S7 shipped 2026-05-17. |
 | 3 | [Deterministic Phrasing Sweep](epic-deterministic-phrasing.md) | yes | 5 | 5 | Replace bare `Math.random()` with `barIndex`-seeded variation. S3+S4+S5 shipped 2026-05-17. **Complete.** |
 | 4 | [Soloist Idiom & Bebop Vocabulary](epic-soloist-idiom.md) | no | 6 | 1 | Bebop chromatic unlock; profile multiplier placement; head-bypass jitter. S4 shipped 2026-05-17. |
 | 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 4 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. S1+S2+S3 shipped 2026-05-17; S6 (delete-only half) shipped 2026-05-17. |
