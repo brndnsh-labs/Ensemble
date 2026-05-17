@@ -67,6 +67,22 @@ When a consumer engine needs state owned by another engine, the proven recipe is
 
 3. **Annotate producer order in code.** Every field on the coordination context gets a `// writer: <producer-name>` and `// readable-after: <producer-name>` comment in `createCoordinationContext()`. Guard with `tests/unit/engine/producer-order.test.ts` — mock the producer's output to a sentinel value (e.g. MIDI 72) and spy on a later consumer to assert it sees that value. If anyone reorders the producers, the positive test fails.
 
+### Loop-awareness via per-tick `playback.currentLoopCount`
+
+When you want an engine to vary its behavior across loop passes ("Chorus Evolution"), the proven recipe is:
+
+1. **Read `playback.currentLoopCount` at per-tick time**, not at seed time. The slot lives in `playback` state (`types.ts:162`), maintained by the conductor at iteration boundaries (`conductor.ts:319-322`), and flowed into every per-tick engine via the `playback` arg. No new context field or state slice is needed — the data plumbing is universal.
+
+2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`arranger-utils.ts:81-92`). The seeder's `index` maxes out at ~5 regardless of loop count.
+
+3. **Reference consumers:** `soloist-pitch-engine.ts:235, 861-877, 999-1056` (~20 reads — Head/paraphrase/development branching, device-frequency scaling, fatigue decay); `groove-engine.ts:143-155` (motif complexity cap, via the exported `motifCapForLoop()` helper).
+
+4. **Helper-extract the cap/scale formula** so the boundary table is unit-testable separately from the engine integration. Pattern: `export function motifCapForLoop(loopCount)` + a 6-line boundary-table test + one integration smoke that confirms the helper is wired into `applyGrooveOverrides`. Avoids the brittle "direction-of-divergence" assertion problem when PRNG state interacts with the cap.
+
+5. **Test framing:** drive the engine with two `playback` objects (`currentLoopCount: 0` vs `2`) against the same fixture, and assert direction-agnostic divergence (`diffSteps.length >= threshold`). Don't assert "Loop 2 produces *more* X than Loop 0" — depending on PRNG state inside the engine, tier-boundary cases can flip the direction even when the cap is correctly wired.
+
+Confirmed in Epic 2 / S1 (commit c334e7f9, 2026-05-17, drums motif cap). Template for Epic 2 / S6 (soloist rhythm density) and any future engine wanting loop-awareness.
+
 ### Dual-gate activation pattern (for bass-style behaviors firing on off-style steps)
 
 When adding a new bass behavior that fires on a step the active style doesn't normally play (e.g. a chromatic anticipation note on the half-beat in a quarter-note country style), gate the behavior in BOTH `isBassActive` (force-activate the step) AND `getBassNote` (override the pitch). Single-gate version is dead code — `getBassNote` is never called on a step the style skipped, so a pitch-only gate fires zero times.
@@ -120,6 +136,7 @@ Confirmed in Epic 1 / S3 (commit b461637c, `upcomingSectionFirstChord` chromatic
 | 2026-05-16 | `reggae-bass-critique.test.ts` smells (c) + (e) — test measured an empty performance | `checkBassActiveStyle` had no `'dub'` branch, so `isBassActive('dub', ...)` returned false universally. | Restructured harness to force activation via `{ kickHit: true }` coordination. New assertions: One-Drop bias, Steppers full beat-1 fire, riddim-position switching, register clamp. 30/30 reliability passed. |
 | 2026-05-16 | Bass kick-lock was unconditional across all styles | `bass-engine.ts:40` returned `true` whenever `coordination?.kickHit` was set, regardless of style. Wrong for jazz walking, reggae one-drop, country two-step, shuffle blues, hip-hop/trap. | Added `KICK_LOCK_STYLES` set `{rock, funk, rocco, metal, disco}`. Music-theory review pass caught hip-hop mis-categorization. Reviewer also requested positive-firing test for dub's independent active-lane. |
 | 2026-05-16 | `checkBassActiveStyle` had no `'dub'` branch | `isBassActive('dub', ...)` returned false universally; production reggae bass fired only via the kick-lock. Removing kick-lock for style-gating would have silenced reggae outright. | Added `'dub'` branch that mirrors `getBassNoteStyle:710-719`'s intensity-banded riddim selection. 30/30 reliability passed. |
+| 2026-05-17 | Drum-seeder loop-awareness was structurally broken (`drum-seeder.ts:157-159`) | Block tried to fake loop-awareness from seed-time `index < arranger.sectionMap.length`. `unrollArrangement` merges consecutive same-label iterations (`arranger-utils.ts:81-92`), so the unrolled-map index maxes out at ~5 regardless of loop count — the check was always true, capping every section on every loop pass. Acceptance criterion "Loop 0 vs Loop 2 differ on the same chart" was structurally unachievable at the seeder layer. | Moved cap to `applyGrooveOverrides` in `groove-engine.ts:143-155` where the per-tick `playback.currentLoopCount` is real. Exported `motifCapForLoop()` helper for testability. Mirrors soloist's per-tick consumption (`soloist-pitch-engine.ts:235, 861-877`); establishes the per-tick loop-awareness template (see Patterns proven). Loop 0,1 → Standard (1); Loop 2+ → Active (2); Busy (3) permanently dropped to Active. |
 
 ## Related
 
