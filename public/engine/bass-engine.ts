@@ -690,14 +690,17 @@ export function getBassNote(
                 (playback.complexity || 0.5) * 0.2) *
                 0.3;
         if (intensity > 0.75 && ['Jazz', 'Blues'].includes(groove.genreFeel)) {
+            // why: jazz/blues idiomatic — chromatic leading tones are the primary
+            // approach vocabulary at high intensity; raise to near-certain.
             chromaticProb = 0.95;
+        } else if (!['Jazz', 'Blues'].includes(groove.genreFeel)) {
+            // why: rock/funk/pop/country/soul/gospel all use chromatic approaches but
+            // less frequently than jazz/blues — half the base probability preserves the
+            // idiom without over-jazzing non-jazz genres (bass.md P1 #4).
+            chromaticProb *= 0.5;
         }
 
-        if (
-            Math.random() < chromaticProb &&
-            (['Jazz', 'Blues'].includes(groove.genreFeel) ||
-                (soloist.session.tension || 0) + intensity * 0.3 > 0.7)
-        ) {
+        if (Math.random() < chromaticProb) {
             const choices = [
                 { midi: targetRoot - 5, weight: 0.5 },
                 { midi: targetRoot - 1, weight: 1.0 },

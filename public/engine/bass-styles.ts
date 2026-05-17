@@ -936,7 +936,7 @@ export function getBassNoteStyle(
         return undefined;
     }
 
-    // Walking Bass Approach Logic (Jazz/Blues)
+    // Chromatic Approach Logic — universal across genres; Jazz/Blues retain higher probability
     const isLastBeatOfMeasure = intBeat === ts.beats - 1;
     const isEndOfChord = intBeat === beatsInChord - 1;
     const isLastEighth = _stepInfo?.mStep === ts.beats * ts.stepsPerBeat - 2;
@@ -956,13 +956,17 @@ export function getBassNoteStyle(
 
         // Force very high probability for Jazz/Blues at high levels
         if (intensity > 0.75 && (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues')) {
+            // why: jazz/blues idiomatic — chromatic leading tones are the primary
+            // approach vocabulary at high intensity; raise to near-certain.
             chromaticProb = 0.95;
+        } else if (groove.genreFeel !== 'Jazz' && groove.genreFeel !== 'Blues') {
+            // why: rock/funk/pop/country/soul/gospel all use chromatic approaches but
+            // less frequently than jazz/blues — half the base probability preserves the
+            // idiom without over-jazzing non-jazz genres (bass.md P1 #4).
+            chromaticProb *= 0.5;
         }
 
-        if (
-            Math.random() < chromaticProb &&
-            (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues' || pullTension > 0.7)
-        ) {
+        if (Math.random() < chromaticProb) {
             const choices = [
                 { midi: targetRoot - 5, weight: 0.5 },
                 { midi: targetRoot - 1, weight: 1.0 },

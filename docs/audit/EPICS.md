@@ -20,7 +20,7 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 | 2 | [Form & Arrangement Awareness](epic-form-arrangement.md) | yes | 8 | 0 | Imperfect Symmetry for non-soloists; intro/outro layering; final-bar cascade; energy-arc calibration. |
 | 3 | [Deterministic Phrasing Sweep](epic-deterministic-phrasing.md) | yes | 5 | 3 | Replace bare `Math.random()` with `barIndex`-seeded variation. S3 shipped 2026-05-17. |
 | 4 | [Soloist Idiom & Bebop Vocabulary](epic-soloist-idiom.md) | no | 6 | 1 | Bebop chromatic unlock; profile multiplier placement; head-bypass jitter. S4 shipped 2026-05-17. |
-| 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 1 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. S1 shipped 2026-05-17. |
+| 5 | [Bass Routing & Voice Leading](epic-bass-voice-leading.md) | no | 7 | 2 | Chord-change-approach helper; Latin/Minimal/Shred routing; country quarter-note R-5. S1+S2 shipped 2026-05-17. |
 | 6 | [Chord Voicing & Comping Cells](epic-chords-voicing.md) | no | 6 | 2 | Voice leading 2nd pass; sticky comping cells; altered-dominant breadth. S2+S3 shipped 2026-05-17. |
 | 7 | [Drum Sound Design & Genre Idiom](epic-drums-idiom.md) | no | 7 | 2 | Crash/Cowbell/Brush wiring; tom vocabulary; entropy floor per genre. S1+S7 shipped 2026-05-17. |
 | 8 | [Harmony Layer Polish](epic-harmony-polish.md) | no | 5 | 1 | Pad sustain/legato; antiphonal anchor; grounded-intervals fifth ordering. S2 shipped 2026-05-17. |
