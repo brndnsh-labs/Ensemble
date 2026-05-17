@@ -47,6 +47,15 @@ export const compingState: CompingState = {
 
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska'];
 
+// why: comping styles that idiomatically land on offbeats — these are the genres
+// where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
+// rather than as a premature downbeat. Block-chord styles (Reggae skank,
+// country boom-chick, power-metal) play only on downbeats so an anticipated
+// stab would feel out of place. Note: `'Soul'` is not in the live `genreFeel`
+// vocabulary (`Neo-Soul` is); kept for forward compatibility omitted here.
+// Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
+const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa']);
+
 function averageMidi(midis: number[]): number {
     return midis.length === 0 ? 0 : midis.reduce((sum, midi) => sum + midi, 0) / midis.length;
 }
@@ -942,6 +951,12 @@ interface AccompanimentCoordination {
     bassMidi?: number;
     kickHit?: boolean;
     snareHit?: boolean;
+    // writer: tick-logic chord-preamble (readable by any producer)
+    // why: chord anticipation gate reads the upcoming section root so the comper
+    // can pre-voice the new chord on the "and-of-4" of the last measure.
+    upcomingSectionFirstChord?: any;
+    // why: needed to compute the anticipation step offset from the section boundary.
+    sectionEnd?: number;
 }
 
 /**
@@ -1027,6 +1042,56 @@ export function getAccompanimentNotes(
         stepInfo && stepInfo.beatIndex !== undefined
             ? stepInfo.beatIndex
             : Math.floor(measureStep / (ts.stepsPerBeat || 4));
+
+    // --- Section-Transition Chord Anticipation ---
+    // why: form-arranger.md P0 #2 — the comper pre-voices the upcoming section's
+    // first chord on the "and-of-4" of the last measure so the transition feels led
+    // rather than cold. Classic jazz "anticipated chord" technique. See
+    // CHORD_ANTICIPATION_GENRES at module top for the genre allowlist.
+    //
+    // Gate conditions (all must hold):
+    //   1. upcomingSectionFirstChord is set (tick-logic publishes during the last
+    //      stepsPerMeasure of a section, so this naturally fires in the last measure).
+    //   2. measureStep === spm - stepsPerBeat/2 (the "and-of-4"; same step the bass
+    //      anticipation lands on — bass + chord arrive together).
+    //   3. Genre is in the offbeat-comping set.
+    //   4. Soloist is not busy — anticipated stab shouldn't clutter a solo peak.
+    //   5. Upcoming chord has a pre-computed `freqs` voicing. If `freqs` is empty
+    //      we SKIP the anticipation rather than synthesizing one — silence is
+    //      better than a guessed voicing that would be wrong for the actual chord
+    //      quality (e.g. a dom7 shell on a maj7 misleads where the form is heading).
+    //
+    // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
+    const upcomingSectionChord = (coordination as any).upcomingSectionFirstChord;
+    const sectionBoundaryMeasureStep = spm - Math.floor(ts.stepsPerBeat / 2);
+    const upcomingHasFreqs = (upcomingSectionChord?.freqs?.length || 0) > 0;
+
+    if (
+        upcomingSectionChord &&
+        upcomingHasFreqs &&
+        measureStep === sectionBoundaryMeasureStep &&
+        CHORD_ANTICIPATION_GENRES.has(genre) &&
+        !isSoloistBusy
+    ) {
+        // Trim to 3 voices max — anticipated stab is lighter than the downbeat.
+        const fullVoicing: number[] = [...upcomingSectionChord.freqs];
+        const sectionChordVoicing = fullVoicing.length > 3 ? fullVoicing.slice(0, 3) : fullVoicing;
+
+        // why: anticipation velocity is softer than a normal hit so it "leads"
+        // rather than sounding like a premature downbeat. Staccato duration (1 step)
+        // ensures it doesn't blur into the section boundary.
+        const sectionTransitionNotes = sectionChordVoicing.map((f: number, i: number) => ({
+            midi: getMidi(f),
+            velocity: (0.35 + intensity * 0.3) * (0.9 + i * 0.05),
+            durationSteps: 1,
+            ccEvents: i === 0 ? ccEvents : [],
+            timingOffset: i * 0.006 - 0.01, // slight push (anticipation feel)
+            instrument: 'Piano',
+            muted: false,
+        }));
+
+        return sectionTransitionNotes.filter((n: any) => n.midi > 0);
+    }
 
     // --- GENRE LANES ---
 

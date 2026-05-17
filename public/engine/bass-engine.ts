@@ -23,6 +23,23 @@ import { checkBassActiveStyle, getBassNoteStyle } from './bass-styles.js';
 // every hi-hat-locked kick burst.
 const KICK_LOCK_STYLES = new Set(['rock', 'funk', 'rocco', 'metal', 'disco']);
 
+// why: section-transition anticipation gate. The chromatic-approach branch inside
+// getBassNote (~line 407) fires at step `sectionEnd - stepsPerBeat/2`, but tick-logic
+// only calls getBassNote when isBassActive returns true. For styles like jazz/walking
+// that play on quarter notes, the half-beat anticipation step is otherwise inactive —
+// so isBassActive must also recognize the gate, otherwise the anticipation note is
+// dead code in production (and the critique test sees a 50%+ failure rate).
+//
+// Set membership: limited to genres that idiomatically use chromatic-approach
+// 16th-note passing tones into chord changes. Rock and disco are intentionally
+// EXCLUDED — rock typically locks-to-kick on a riff (real rock transition lives
+// in the drum fill, not a bass passing tone), disco rides a signature octave-pump
+// pattern that a chromatic walk-in would disrupt. Country is excluded for now
+// pending a `country-walking` style key (boom-chick country shouldn't anticipate;
+// bluegrass walking should).
+// Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
+const ANTICIPATION_STYLES = new Set(['jazz', 'walking', 'funk', 'blues', 'bossa', 'rocco', 'neo']);
+
 /**
  * Resets the internal generative state of the bass.
  */
@@ -55,6 +72,24 @@ export function isBassActive(
 
     const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+
+    // Section-transition anticipation: force-activate on the half-beat before a
+    // section boundary so getBassNote's chromatic-approach gate (~line 407) can
+    // fire. Without this, isBassActive's per-style gate (e.g. jazz plays on
+    // quarter notes only) would skip the call entirely and the anticipation
+    // would be dead code. See ANTICIPATION_STYLES at module top.
+    // Reads `coordination.{upcomingSectionFirstChord,sectionEnd}` written by the
+    // chord-data preamble in tick-logic.ts.
+    const upcomingForActivation = coordination?.upcomingSectionFirstChord;
+    const coordSectionEnd = coordination?.sectionEnd ?? null;
+    if (
+        upcomingForActivation &&
+        coordSectionEnd !== null &&
+        step === coordSectionEnd - Math.floor(ts.stepsPerBeat / 2) &&
+        ANTICIPATION_STYLES.has(style)
+    ) {
+        return true;
+    }
     const intBeat = stepInfo
         ? stepInfo.beatIndex
         : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
@@ -403,6 +438,78 @@ export function getBassNote(
         }
         return note;
     };
+
+    // --- Section-Transition Chromatic Anticipation ---
+    // why: "The transition feels like the drummer is leading a band that didn't get
+    // the chart" (form-arranger.md P0 #2). When the upcoming section's first chord
+    // is known, land a chromatic approach note (±1 semitone) exactly at the half-beat
+    // before the section downbeat so the bass walks into the new tonic.
+    //
+    // Gate conditions (all must hold):
+    //   1. coordination.upcomingSectionFirstChord is published (last measure of section).
+    //   2. We're at exactly sectionEnd - stepsPerBeat/2 (the "and-of-4" of the last beat).
+    //   3. Style is in the melodic-walk set (jazz/walking/funk/rock/blues/bossa/rocco/neo/disco).
+    //      Dub, minimal, whole, half, and country are excluded: these styles favor
+    //      root-hold or sparse patterns where a chromatic tail would feel forced.
+    //
+    // This is a direct pitch override (gate), not a weight multiplier — the
+    // anticipation must fire deterministically at the correct step so the listener
+    // hears it every time. One step per section boundary, nothing more.
+    //
+    // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
+    // (ANTICIPATION_STYLES is module-level so isBassActive sees the same gate.)
+    const upcomingSectionChord = context?.stepCoordination?.upcomingSectionFirstChord;
+    const bassAnticipationSectionEnd = context?.sectionEnd ?? null;
+    const anticipationStep =
+        bassAnticipationSectionEnd !== null
+            ? bassAnticipationSectionEnd - Math.floor(ts.stepsPerBeat / 2)
+            : -1;
+
+    if (
+        upcomingSectionChord &&
+        bassAnticipationSectionEnd !== null &&
+        step === anticipationStep &&
+        ANTICIPATION_STYLES.has(style)
+    ) {
+        // Normalize the upcoming root into bass register using the same register
+        // logic as the current chord.
+        const nextRoot = upcomingSectionChord.bassMidi ?? upcomingSectionChord.rootMidi;
+        const targetRoot = normalizeToRange(nextRoot);
+
+        // Pick ±1 approach direction: prefer the smaller motion from the current
+        // position. If no prevMidi, approach from below (half-step below is the
+        // canonical "leading tone" walk-in).
+        const fromBelow = targetRoot - 1;
+        const fromAbove = targetRoot + 1;
+        let approachMidi: number;
+        if (prevMidi !== null) {
+            const distBelow = Math.abs(fromBelow - prevMidi);
+            const distAbove = Math.abs(fromAbove - prevMidi);
+            // why: prefer smaller interval for smooth voice-leading; tie-break to below
+            approachMidi = distBelow <= distAbove ? fromBelow : fromAbove;
+        } else {
+            // why: half-step below is the most idiomatic chromatic walk-in
+            approachMidi = fromBelow;
+        }
+
+        // Clamp into bass register (23-57).
+        while (approachMidi < absMin) {
+            approachMidi += 12;
+        }
+        while (approachMidi > absMax) {
+            approachMidi -= 12;
+        }
+
+        return result(
+            getFrequency(approachMidi),
+            // why: duration=1 (one sub-beat step) — short, punchy approach note that
+            // doesn't blur into the new downbeat.
+            1,
+            // why: slight accent (×1.05) so the anticipation "pops" audibly before
+            // the new section lands; subtler than a downbeat accent (×1.15).
+            velocity * 1.05,
+        );
+    }
 
     if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
         const isUpbeat = step % ts.stepsPerBeat !== 0;

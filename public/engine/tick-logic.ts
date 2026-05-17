@@ -106,6 +106,12 @@ export function generateNotesForStep(
         const remainingSteps = sectionEnd - step;
         const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
 
+        // why: section boundaries on the coordination context directly so consumers
+        // that receive bare coordination (e.g. isBassActive) can read sectionEnd
+        // without depending on the wrapper-context shape passed to getBassNote.
+        (coordination as any).sectionStart = sectionStart;
+        (coordination as any).sectionEnd = sectionEnd;
+
         // --- Structural Awareness: Turnaround Detection ---
         const sectionSteps = sectionEnd - sectionStart;
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
