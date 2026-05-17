@@ -151,13 +151,6 @@ export function generateDrumOrchestration(
             motifComplexity = 3; // Busy
         }
 
-        // --- POCKET DISCIPLINE (Metronome First) ---
-        // For the first iteration (The Head), cap complexity at 'Standard' (1)
-        // to ensure a rock-solid foundation for the user.
-        if (index < (arranger.sectionMap?.length || 1)) {
-            motifComplexity = Math.min(motifComplexity, 1);
-        }
-
         orchestrationMap.push({
             start: sectionRange.start,
             end: sectionRange.end,

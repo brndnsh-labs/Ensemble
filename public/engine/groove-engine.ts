@@ -68,6 +68,20 @@ function humanizeVelocity(vel: number, seed: number, amount = 0.05): number {
     return vel * (1.0 + (scrambleHash(seed) - 0.5) * amount);
 }
 
+/**
+ * Per-loop motif complexity cap for Chorus Evolution pocket discipline.
+ * Loop 0,1 → Standard (1): metronomic foundation on The Head.
+ * Loop 2+  → Active   (2): groove opens up on repeat passes.
+ * Cap never exceeds 2 so the engine doesn't jump straight to Busy (3).
+ * why: form-arranger.md P0 #3 — drums must prove Chorus Evolution contract
+ * before fanning out to other engines; groove-engine.ts applies this at
+ * per-tick time so the same OrchestrationMap entry renders differently
+ * across loop passes without re-seeding the whole arrangement.
+ */
+export function motifCapForLoop(loopCount: number): number {
+    return Math.min(2, 1 + Math.floor(loopCount / 2));
+}
+
 export function applyGrooveOverrides(
     state: any,
     {
@@ -129,10 +143,16 @@ export function applyGrooveOverrides(
     const orchestration: any = groove.orchestrationMap
         ? binarySearchMap(groove.orchestrationMap, timelineStep)
         : null;
-    const effectiveComplexity =
+    // Pocket discipline by loop: Loop 0,1 → Standard (1); Loop 2+ → Active (2).
+    // Read playback.currentLoopCount at per-tick time so the same orchestration
+    // entry renders differently across repeat passes (Chorus Evolution).
+    const loopCount = playback?.currentLoopCount ?? 0;
+    const motifCap = motifCapForLoop(loopCount);
+    const cappedMotif =
         orchestration?.motifComplexity !== undefined
-            ? orchestration.motifComplexity / 3
-            : drumComplexity;
+            ? Math.min(orchestration.motifComplexity, motifCap)
+            : undefined;
+    const effectiveComplexity = cappedMotif !== undefined ? cappedMotif / 3 : drumComplexity;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
     const isTurnaround =

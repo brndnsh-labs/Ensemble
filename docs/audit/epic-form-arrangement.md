@@ -16,10 +16,11 @@ This is the epic where the "the band sounds like a machine on repeat passes" rep
 ## Stories
 
 ### S1. Drums: motif complexity cap relaxes per loop
-`drum-seeder.ts:157-159` caps `motifComplexity` to 1 ("Standard") for "The Head" and never relaxes. Raise the cap to `Math.min(2, 1 + Math.floor(loopCount / 2))`. Proves the Chorus Evolution contract on one engine before fanning out.
+`groove-engine.ts:129-135` consumed `orchestration.motifComplexity` at per-tick time but did not vary the cap with loop count. A misplaced static block in `drum-seeder.ts:154-159` had tried to fake this from seed-time `index` comparisons, but the seeder runs once and has no access to `playback.currentLoopCount`, so the cap was permanent for all loops. The fix: delete the seeder block and apply `Math.min(2, 1 + Math.floor(loopCount / 2))` inside `applyGrooveOverrides` where `playback.currentLoopCount` is real — the same pattern the soloist already uses. Cap exported as `motifCapForLoop()` for testability. Loop 0,1 → Standard (1); Loop 2+ → Active (2); never Busy (3+).
 
-**Acceptance:** Loop 0 and Loop 2 produce measurably different motif distributions on the same chart. Critique test in `tests/standards/drummer-chorus-evolution.test.ts`.
+**Acceptance:** Loop 0 and Loop 2 produce measurably different motif distributions on the same chart (19/64 steps diverge in Funk with a Busy orchestration entry). Critique test in `tests/standards/drummer-chorus-evolution.test.ts`.
 **Effort:** ~3h. **Model:** sonnet (small change, clear test). **Reviewer:** music-theory-reviewer. **Source:** `form-arranger.md` P0 #3, `drums.md` P2 #17.
+**Status:** Shipped 2026-05-17. Cap moved from broken seed-time `index` check in `drum-seeder.ts:154-159` (the seeder has no access to `playback.currentLoopCount`; `unrollArrangement` merges same-label iterations so the check was structurally broken — capped every section on every pass) to `applyGrooveOverrides` in `groove-engine.ts` where the per-tick `playback.currentLoopCount` is real. Exported `motifCapForLoop()` for testability. Busy(3) now permanently clipped to Active(2) — intentional per "never Busy (3+)" clause. Mirrors soloist's per-tick `playback.currentLoopCount` pattern (`soloist-pitch-engine.ts:235, 861-877`); establishes template for S6.
 
 ### S2. Imperfect Symmetry for bass on repeated sections
 Add `sectionOccurrence` to coordination context (already computed in `soloist.ts:128-138`). When `occurrence > 1`, bass adds a deterministic octave displacement on one beat per phrase, seeded by `(sectionId, occurrence, barIndex)`. Same pattern proven on bossa-bass (May 2026 shipped).
