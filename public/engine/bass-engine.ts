@@ -762,15 +762,54 @@ export function getBassNote(
             // Priority 1: Hand position (Weight already includes stepwise bonus)
             // Priority 2: Proximity to Center
             candidates.sort((a, b) => b.weight - a.weight);
-            return result(
-                getFrequency(
-                    withOctaveJump(
-                        candidates[Math.floor(Math.random() * Math.min(2, candidates.length))].midi,
-                    ),
-                ),
-                null,
-                velocity,
-            );
+
+            // Target-aware bias (beats 2-3-4): walking lines should lean toward the
+            // next chord's root so the line has directional momentum. A real walking
+            // bassist's pull toward the target is beat-asymmetric — beat 4 is the
+            // approach (strongest pull), beat 3 a directional pass (moderate), beat 2
+            // is mostly about leaving the root (weakest). Scaling by (intBeat / 3) on
+            // the proximity term encodes that pedagogy: beat 2 gets ~1/3 the lift,
+            // beat 3 ~2/3, beat 4 full. (In practice beat 4 is usually intercepted by
+            // the chromatic-approach branch above, but on held chords where that
+            // branch doesn't fire this preserves the right shape.)
+            // Final-stage weight *= multiplier (not additive) so it dominates over the
+            // hand-position / center-proximity ranking already embedded in each weight.
+            // why: bass.md P2 #15 / epic-deterministic-phrasing S3 — generic fallback
+            //   had no target awareness; uniform bias was also musically wrong shape.
+            const barIndex = Math.floor(step / stepsPerMeasure);
+            if (nextChord && nextChord.rootMidi !== chord.rootMidi) {
+                const nextTarget = normalizeToRange(nextChord.rootMidi);
+                // why: 7-semitone (perfect-fifth) approach window. A candidate within
+                //   a fifth of the target gets meaningful lift; beyond a fifth, the
+                //   note is too distant to feel like an approach and the lift falls
+                //   off to zero. /12 was too gentle — a fifth-away candidate kept
+                //   ~0.42 proximity, washing out the bias against hand-position score.
+                const APPROACH_WINDOW = 7;
+                const beatScale = intBeat / 3;
+                for (const c of candidates) {
+                    const dist = Math.abs(c.midi - nextTarget);
+                    const proximity = Math.max(0, 1 - dist / APPROACH_WINDOW);
+                    c.weight *= 1 + proximity * beatScale;
+                }
+                // Re-sort after target-distance bias applied.
+                candidates.sort((a, b) => b.weight - a.weight);
+            }
+
+            // Deterministic parity pick between the top two candidates. Replaces the
+            // old `Math.random() * 2` (same "vary between the two best" intent) with
+            // a seeded boolean so the same bar produces the same note across loops,
+            // per CLAUDE.md § Deterministic phrasing.
+            // Why parity over modulo-3-of-sorted-list: after target-distance re-sort,
+            // candidates[0] is always closest to the target. A `% 3` cycle would walk
+            // closest→2nd→3rd in monotonic order every chord-change bar, producing a
+            // robotic phrase and frequently landing the next root *on* the passing
+            // beat (killing its character). Binary parity preserves the original
+            // top-2 variety without imposing a fixed sequence.
+            // why: bass.md P2 #15 — raw Math.random() makes loops diverge; reviewer
+            //   flagged %3 as monotone-robotic; parity restores idiomatic phrasing.
+            const seedBit = (barIndex * 7 + intBeat * 11) & 1;
+            const pickIndex = candidates.length > 1 ? seedBit : 0;
+            return result(getFrequency(withOctaveJump(candidates[pickIndex].midi)), null, velocity);
         }
     }
     return result(getFrequency(withOctaveJump(baseRoot)), null, velocity);

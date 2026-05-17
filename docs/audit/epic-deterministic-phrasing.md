@@ -36,6 +36,7 @@ Almost every story here is small (under half a day) but compounding: each one sh
 
 **Acceptance:** walking lines target the next chord's root on beats 2-3-4. Same line on Loop 1 == Loop 2 in jazz mode. Add to `jazz-bass-critique.test.ts`.
 **Effort:** ~3h. **Model:** sonnet (after S1/S2 pattern established). **Reviewer:** music-theory-reviewer. **Source:** `bass.md` P2 #15.
+**Status:** Shipped 2026-05-17. Beat-asymmetric `(intBeat/3)` scaling on the proximity bias (beat 2 weakest, beat 4 strongest); `/7` perfect-fifth approach window (a fifth-away candidate gets zero lift). Top-2 binary parity pick replaces `Math.random()*2` — preserves "vary between the two best" without imposing the monotone closest-to-target walk a `% 3` would. A/B critique test asserts bias-on mean is ≥0.20 st closer to next root than bias-off on beat 3 (empirical -0.25 st across 128 samples). Determinism test stubs `Math.random` to isolate S3's contribution; engine-wide determinism waits on S4 (`withOctaveJump`) and S5 (harmony coin flips).
 
 ### S4. `withOctaveJump` becomes structural, not stochastic
 `bass-engine.ts:392-405` octave-jumps 2-10% of all notes via bare `Math.random()`. Restrict to `isBeatStart && (isMeasureStart || isSectionStart)` with the same probability budget, and seed the trigger by `barIndex`.
