@@ -908,6 +908,65 @@ export function selectPitchAndDevices(
             weight *= 2.0;
         }
 
+        // --- Accompaniment Unison Avoidance (final-stage multiplier) ---
+        // why: soloist + chord voice landing on the same pitch-class is a registration
+        // smear that muddies jazz comping ("playing the chord with the chord"). The
+        // `accompanimentMidis` array is published by the chords producer in
+        // coordination-engine.ts updateCoordinationContext('chords') and holds the
+        // active chord voicing's MIDIs. Producer order is Soloist → Bass → Chords, so
+        // here we see the PREVIOUS tick's voicing — but jazz/funk chord stabs sustain
+        // across ticks and a re-comp typically picks adjacent voicings, so it remains
+        // a reasonable proxy for "what's currently ringing."
+        //
+        // Final-stage multiplier per CLAUDE.md "final-stage multipliers win" — applied
+        // AFTER chord-tone bonus, SRDC mult, scale-tone boost, profile bonus, and
+        // alteration mult. Many competing factors push toward chord-tone PCs; an
+        // additive penalty on unison PCs gets washed out (see
+        // feedback_weight_tuning_multiplier_placement).
+        //
+        // Multiplier value 0.05: empirically tuned. The story sketch (0.5) is far too
+        // gentle — chord-tone bonus (+150), strong-beat chord-tone boost (+300), and
+        // SRDC Conclusion ×1.5 multiplier produce a weight stack typically 5-20× larger
+        // on chord-tone PCs than on scale-only PCs, so a 0.5× shave barely moves the
+        // realized distribution (measured ~4pt drop). At 0.05× the picker's chord-tone
+        // unison rate drops from ~35-40% (Conclusion phase) down to ~10-12% — a strong
+        // ~60-70% RELATIVE drop. (The residual is mostly device-system fallthrough:
+        // enclosures, runs, and approach notes can land on chord tones AFTER the
+        // picker has been biased away; out of scope for this story.)
+        //
+        // Why not lower (0.01, 0.001)? Below 0.05 the gap is bounded by the device
+        // floor (~10pt), so further suppression doesn't help and risks breaking
+        // chord-tone landings on strong beats (the +300 strong-beat chord-tone bonus
+        // should still produce a chord-tone landing on ~beat 1 sustains; cutting too
+        // far below 0.05 would let scale-only PCs dominate even strong beats, which
+        // sounds rootless and unsettled).
+        //
+        // EXEMPTION — phrase-end response resolution: when the rhythm engine flags
+        // this as `isPhraseEnd` on a `response` phrase, the soloist is rhetorically
+        // ANSWERING the call and the listener expects landing at home (root/5th).
+        // The response phrase block above (lines ~660-672) applies `weight *= 4.0`
+        // on root/5th and `*= 1.4` on chord tones — but those multipliers execute
+        // BEFORE this one in candidate-loop order. So without an exemption, a root
+        // landing in the chord's voicing gets `4.0 × 1.4 × 0.05 = 0.28` net while a
+        // maj7 (PC 11) outside the voicing gets `1.4 × 1.0 = 1.4` net, inverting
+        // the resolution. Skip the penalty on phrase-end response so the answer
+        // can come home even when the chord is sustaining a tonic voicing — the
+        // unison happens for one tick (the landing), which is the moment cohesion
+        // is wanted, not the moment to push away from. Reviewer-flagged P0 in
+        // initial S5 patch.
+        const accompMidis = stepCoordTension?.accompanimentMidis;
+        const isPhraseEndResponse =
+            rhythmNode?.isPhraseEnd === true &&
+            soloistState.session.currentPhrase.context?.role === 'response';
+        if (accompMidis && accompMidis.length > 0 && !isPhraseEndResponse) {
+            for (let i = 0; i < accompMidis.length; i++) {
+                if (((accompMidis[i] % 12) + 12) % 12 === pc) {
+                    weight *= 0.05;
+                    break;
+                }
+            }
+        }
+
         CANDIDATE_WEIGHTS[m] = weight;
         totalWeight += weight;
     }

@@ -525,6 +525,55 @@ function finalizeHarmonyNotes(
     const densityCap = [maxDensity, tensionDensityCap, accompanimentDensityCap]
         .filter((cap): cap is number => Number.isFinite(cap as number))
         .reduce((minCap, cap) => Math.min(minCap, cap), maxDensity);
+
+    // --- Accompaniment PC-Overlap Avoidance ---
+    // why: when a separate chord stab is hitting on the same tick
+    // (accompanimentCrowding), stacking the same pitch-class in the harmony voicing
+    // creates a muddy unison rather than a complementary color. Reorder
+    // `targetIntervals` (still equal to `intervals` — the slice below hasn't run yet)
+    // so intervals whose resulting PC is NOT in `accompanimentMidis` come first; the
+    // density cap then preferentially keeps the non-overlapping voices.
+    //
+    // Stable partition (not a sort) — preserves the existing interval ordering within
+    // each bucket so guide-tone selection, rootless reduction, and tension support all
+    // remain authoritative for "which voices matter"; this pass only adjusts the
+    // priority WITHIN the already-curated set when the chord stab is competing.
+    //
+    // Producer order: harmony runs after chords this tick (tick-logic.ts), so
+    // `accompanimentMidis` is fresh — reflecting the voicing the chord engine just
+    // emitted, exactly what we want to avoid stacking against. Story
+    // coordination-contract/S5.
+    const accompMidisHarmony = coordination.accompanimentMidis;
+    if (
+        accompanimentCrowding &&
+        accompMidisHarmony &&
+        accompMidisHarmony.length > 0 &&
+        targetIntervals.length > densityCap
+    ) {
+        const accompPCs = new Set<number>();
+        for (let i = 0; i < accompMidisHarmony.length; i++) {
+            accompPCs.add(((accompMidisHarmony[i] % 12) + 12) % 12);
+        }
+        const rootPc = ((chord.rootMidi % 12) + 12) % 12;
+        const nonOverlap: number[] = [];
+        const overlap: number[] = [];
+        for (let i = 0; i < targetIntervals.length; i++) {
+            const iv = targetIntervals[i];
+            const ivPc = ((((rootPc + iv) % 12) + 12) % 12) as number;
+            if (accompPCs.has(ivPc)) {
+                overlap.push(iv);
+            } else {
+                nonOverlap.push(iv);
+            }
+        }
+        // Only reorder if there's something to push down — otherwise leave the
+        // existing ordering untouched so other priorities (guide tones, tension
+        // support) remain visible at the top.
+        if (nonOverlap.length > 0 && overlap.length > 0) {
+            targetIntervals = nonOverlap.concat(overlap);
+        }
+    }
+
     if (targetIntervals.length > densityCap) {
         targetIntervals = targetIntervals.slice(0, densityCap);
     }
