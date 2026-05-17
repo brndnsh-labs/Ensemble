@@ -160,8 +160,12 @@ describe('Jazz Bass Critique', () => {
     // Math.random() with a seeded index keyed on barIndex + intBeat. Two identical
     // runs over the same progression must produce bit-identical bass note sequences
     // *from the S3 fallback path*. We stub Math.random() to a fixed value so any
-    // remaining stochastic paths in the bass engine (octave jumps — S4; humanization)
-    // resolve identically across runs, isolating S3's determinism claim.
+    // remaining stochastic paths in the bass engine (humanization etc.) resolve
+    // identically across runs, isolating S3's determinism claim.
+    // Note: withOctaveJump (S4) no longer uses Math.random() — its trigger and
+    // direction are both LCG-seeded from barIndex+sectionSeedInt, so this stub is
+    // no longer needed for octave-jump isolation, but is retained to guard against
+    // any future Math.random() reintroduction in other engine paths.
     it('produces identical walking lines on repeated loops (determinism check)', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const chordC = { rootMidi: 48, quality: 'maj7', beats: 4, intervals: [0, 4, 7, 11] };
@@ -431,5 +435,122 @@ describe('Jazz Bass Critique', () => {
 
         expect(approachWindowsSampled).toBeGreaterThan(0);
         expect(chromaticNeighborHitsOnHeldBars).toBe(0);
+    });
+
+    // why: epic-deterministic-phrasing S4. withOctaveJump is now (1) gated to
+    // isBeatStart && (isMeasureStart || isSectionStart) and (2) seeded by a
+    // scrambled hash of (barIndex, sectionSeedInt). Three narrow assertions:
+    //
+    //   1. DENSITY: across a 256-bar held chord at intensity 0.9, the count of
+    //      displaced downbeats (midi 36, the jumped-down target when baseRoot
+    //      48 + 12 = 60 exceeds the 55 ceiling) sits in [10, 50]. The trigger
+    //      probability is 0.02 + 0.9×0.08 = 0.092, so expected ≈24 fires with
+    //      mulberry32 scrambling; the range absorbs PRNG tweaks but fails hard
+    //      if the seed produces a sawtooth pattern the way the original LCG
+    //      did (review P0: 0 successful jumps over 256 bars).
+    //
+    //   2. STRUCTURAL GATE: the gate's blocking of non-downbeat jumps rests on
+    //      code inspection of `if (!isStructuralJumpPoint) return note;`. We
+    //      cannot directly observe "did withOctaveJump fire on a passing note"
+    //      from output midis because voice leading propagates downbeat
+    //      displacements forward; this test does not attempt that proof.
+    //
+    //   3. DETERMINISM: identical runs are bit-identical. This proves the
+    //      trigger and direction decisions are now seeded (not stochastic),
+    //      NOT that the gate works — Math.random() is stubbed to 0.5 to fix
+    //      the other engine-wide RNG paths so we can isolate withOctaveJump's
+    //      determinism alone.
+    it('withOctaveJump fires on structural downbeats at audible density (S4)', () => {
+        // Stub other Math.random() calls so all other engine randomness is
+        // fixed — isolates the withOctaveJump contribution and lets two runs
+        // be bit-identical.
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        // Single chord held for 256 bars — ensures every downbeat step routes
+        // through `stepInChord === 0 → withOctaveJump(baseRoot)` so the trigger
+        // fires only at the LCG-determined bars.
+        const heldC = { rootMidi: 48, quality: 'maj7', beats: 4, intervals: [0, 4, 7, 11] };
+
+        const totalMeasures = 256;
+        const totalSteps = totalMeasures * 16;
+        const tsConfig = TIME_SIGNATURES['4/4'];
+
+        const buildStepMap = () => {
+            mockState.arranger.stepMap = [];
+            for (let m = 0; m < totalMeasures; m++) {
+                mockState.arranger.stepMap.push({
+                    start: m * 16,
+                    end: (m + 1) * 16,
+                    chord: { ...heldC, sectionId: '1' },
+                });
+            }
+        };
+
+        // Collect all emitted notes with their step and isMeasureStart flag.
+        const collectNotes = () => {
+            buildStepMap();
+            const notes: { step: number; midi: number; isMeasureStart: boolean }[] = [];
+            let lastMidi: number | null = null;
+            for (let i = 0; i < totalSteps; i++) {
+                const stepInMeasure = i % 16;
+                const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
+                if (!isBassActive(getState(), 'quarter', i, stepInMeasure, info)) {
+                    continue;
+                }
+                const note = getBassNote(
+                    getState(),
+                    heldC,
+                    heldC,
+                    Math.floor(stepInMeasure / 4),
+                    lastMidi ? getFrequency(lastMidi) : 0,
+                    48,
+                    'quarter',
+                    0,
+                    i,
+                    stepInMeasure,
+                    {},
+                    info,
+                );
+                if (note && !note.muted) {
+                    notes.push({ step: i, midi: note.midi, isMeasureStart: info.isMeasureStart });
+                    lastMidi = note.midi;
+                }
+            }
+            return notes;
+        };
+
+        const run1 = collectNotes();
+        const run2 = collectNotes();
+
+        // --- Determinism: both runs must be bit-identical ---
+        // Proves the trigger and direction decisions are seeded (not
+        // stochastic). Does NOT prove the gate works — see test comment above.
+        expect(run1.length).toBeGreaterThan(0);
+        expect(run1.map((n) => n.midi)).toEqual(run2.map((n) => n.midi));
+
+        // --- Density: octave jumps fire at audible density ---
+        // baseRoot 48 + 12 = 60 exceeds the non-Neo ceiling 55, so all
+        // successful jumps go DOWN to midi 36. Trigger probability at
+        // intensity 0.9 is 0.02 + 0.9×0.08 = 0.092; with mulberry32 hashing
+        // across 256 downbeat samples, expect ~24 fires. Range [10, 50]
+        // tolerates PRNG-choice tweaks but flags a regression to the
+        // sawtooth-LCG behavior where 0 jumps succeeded over 256 bars (S4
+        // review P0).
+        const downbeatsAt36 = run1.filter((n) => n.isMeasureStart && n.midi === 36);
+        const downbeatTotal = run1.filter((n) => n.isMeasureStart).length;
+
+        console.log(
+            '\n--- OCTAVE JUMP STRUCTURAL GATE (S4) ---\n' +
+                `[Total notes]                  ${run1.length}\n` +
+                `[Downbeat notes]               ${downbeatTotal}\n` +
+                `[Downbeats at midi 36 (jumped-down)] ${downbeatsAt36.length} (target: 10-50)\n` +
+                `[Run 1 == Run 2]               ${run1.map((n) => n.midi).join(',') === run2.map((n) => n.midi).join(',')}\n` +
+                '-----------------------------------------\n',
+        );
+
+        expect(downbeatsAt36.length).toBeGreaterThanOrEqual(10);
+        expect(downbeatsAt36.length).toBeLessThanOrEqual(50);
+
+        randomSpy.mockRestore();
     });
 });

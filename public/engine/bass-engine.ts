@@ -424,17 +424,68 @@ export function getBassNote(
 
     const isSoloistBusy = (soloist.session.phrasing.busySteps || 0) > 0;
 
+    // --- Structural gate + seeded RNG for withOctaveJump ---
+    // why: bass.md P2 #12 / epic-deterministic-phrasing S4 — replace bare
+    //   Math.random() in withOctaveJump with a (barIndex, sectionStart)-seeded
+    //   hash and restrict firing to structural downbeats (bar 1 of a section
+    //   or section start), per CLAUDE.md § Deterministic phrasing.
+    const barIndex = Math.floor(step / stepsPerMeasure);
+    const sectionSeedInt =
+        typeof context?.sectionStart === 'number' ? Math.abs(context.sectionStart) | 0 : 0;
+    const isBeatStartLocal = stepInfo?.isBeatStart ?? step % ts.stepsPerBeat === 0;
+    const isStructuralJumpPoint = isBeatStartLocal && (isDownbeat || isSectionStart);
+
+    // mulberry32 — 32-bit scrambled hash. Replaces the linear LCG that was
+    // producing a sawtooth pattern on small (barIndex * 13) inputs — review
+    // found a contiguous 18-bar trigger block all biased UP (P0). Mulberry32
+    // scrambles small linear inputs into well-distributed uint32 outputs.
+    const scrambleHash = (seed: number): number => {
+        let t = (seed + 0x6d2b79f5) | 0;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+    };
+
     const withOctaveJump = (note: number): number => {
         if (isSoloistBusy || intensity < 0.4) {
             return note;
         }
-        if (Math.random() < 0.02 + intensity * 0.08) {
-            const direction = note > 48 ? -1 : Math.random() < 0.5 ? 1 : -1;
-            const shifted = note + 12 * direction;
+        // why: bass.md P2 #12 — bare RNG fires on 2-10% of ALL notes regardless
+        //   of position, producing mid-line jolts in walking lines. Restricting
+        //   to structural points makes octave displacement feel like an
+        //   intentional "dig-in" at a section arrival or phrase downbeat.
+        if (!isStructuralJumpPoint) {
+            return note;
+        }
+        // Trigger and direction decisions are seeded from independently
+        // scrambled hashes of (barIndex, sectionSeedInt). The probability
+        // budget (2-10%) is preserved from the original; structural rarity
+        // reduces effective all-note density to ~0.1-0.6%.
+        const triggerHash = scrambleHash(barIndex * 0x9e3779b1 + sectionSeedInt * 0x85ebca77);
+        if (triggerHash < 0.02 + intensity * 0.08) {
             const ceiling = style === 'neo' || groove.genreFeel === 'Neo-Soul' ? 42 : 55;
-            if (shifted >= 36 && shifted <= ceiling) {
-                return shifted;
+            // Force direction from available headroom: if a +12 jump would clear
+            // the ceiling, must descend; if a -12 jump would underflow 36, must
+            // ascend. Without this, an asymmetric clamp pre-S4 was silently
+            // wiping ~50% of would-be jumps (review P0).
+            // why: review found that at baseRoot 48, +12 = 60 > 55 ceiling and
+            //   every UP fire was clamped to no-op. Decide direction by where
+            //   the room is, then use the seed only for the symmetric case.
+            const canGoUp = note + 12 <= ceiling;
+            const canGoDown = note - 12 >= 36;
+            let direction: number;
+            if (canGoUp && !canGoDown) {
+                direction = 1;
+            } else if (canGoDown && !canGoUp) {
+                direction = -1;
+            } else if (canGoUp && canGoDown) {
+                // Both fit — use a second scrambled hash to pick.
+                const dirHash = scrambleHash(triggerHash * 0xffffffff + 0x27d4eb2d);
+                direction = dirHash < 0.5 ? -1 : 1;
+            } else {
+                return note; // No headroom either direction.
             }
+            return note + 12 * direction;
         }
         return note;
     };
@@ -785,7 +836,7 @@ export function getBassNote(
             // hand-position / center-proximity ranking already embedded in each weight.
             // why: bass.md P2 #15 / epic-deterministic-phrasing S3 — generic fallback
             //   had no target awareness; uniform bias was also musically wrong shape.
-            const barIndex = Math.floor(step / stepsPerMeasure);
+            // Uses the outer `barIndex` declared near withOctaveJump (S4); same value.
             if (nextChord && nextChord.rootMidi !== chord.rootMidi) {
                 const nextTarget = normalizeToRange(nextChord.rootMidi);
                 // why: 7-semitone (perfect-fifth) approach window. A candidate within
