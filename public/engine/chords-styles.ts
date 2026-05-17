@@ -58,10 +58,14 @@ export function getRootlessVoicing(
     if (isMinor) {
         // Neo-Soul Quartal / Clusters
         if (genre === 'Neo-Soul' && quality === 'minor' && is7th) {
-            // Modern quartal stacks: 4, b7, b3, 5, (9)
-            // Added Clusters: 2nd + b3rd (2, 3) for that "crunch"
+            // why: D'Angelo quartal m11 voicing — b3, 4, b7, 9 (pcs 3, 5, 10, 14).
+            // Prior [2, 3, 5, 10, 15, 19] stacked pc 2 (9) and 3 (b3) as adjacent
+            // semitones in the SAME octave — a half-step cluster that reads as a
+            // mistake, not the canonical "neo-soul crunch." The replacement keeps
+            // the b3 (which is what makes the chord sound minor) and lifts the 9
+            // up a whole step from the b3, so no in-octave half-step neighbors.
             if (isRich || intensity > 0.6) {
-                return [2, 3, 5, 10, 15, 19];
+                return [3, 5, 10, 14];
             }
             return [5, 10, 15, 19];
         }

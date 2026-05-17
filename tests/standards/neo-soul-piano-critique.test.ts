@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { getRootlessVoicing } from '../../public/engine/chords-styles.js';
 import { getState } from '../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -80,5 +81,38 @@ describe('Neo-Soul Piano Critique', () => {
 
         expect(lagRatio).toBeGreaterThan(0.9);
         expect(richRatio).toBeGreaterThan(0.8);
+    });
+
+    // why: epic-chords-voicing S2. The Neo-Soul rich m7 voicing used to return
+    // [2, 3, 5, 10, 15, 19], stacking pc 2 and pc 3 as adjacent semitones in the
+    // same octave — an unintentional half-step cluster. Canonical D'Angelo
+    // quartal m11 keeps the b3 (so the chord sounds MINOR) but spaces it from
+    // the 9 by a whole step. This test asserts both: zero in-octave half-step
+    // adjacencies AND b3 (pc 3) present somewhere in the stack.
+    it('rich Neo-Soul m7 voicing has no half-step adjacencies and retains the b3', () => {
+        mockState.playback.bandIntensity = 0.7; // > 0.6 to hit the rich branch
+        const intervals = getRootlessVoicing(getState(), 'minor', true, true);
+        expect(intervals).not.toBeNull();
+        const sorted = [...(intervals as number[])].sort((a, b) => a - b);
+        const adjacencies: Array<[number, number]> = [];
+        for (let i = 0; i < sorted.length - 1; i++) {
+            if (sorted[i + 1] - sorted[i] === 1) {
+                adjacencies.push([sorted[i], sorted[i + 1]]);
+            }
+        }
+        const pcs = new Set(sorted.map((n) => ((n % 12) + 12) % 12));
+        console.log(
+            '\n--- NEO-SOUL RICH VOICING ADJACENCY ---\n' +
+                `[Intervals]             [${sorted.join(', ')}]\n` +
+                `[Pitch classes]         [${[...pcs].sort((a, b) => a - b).join(', ')}]\n` +
+                `[Half-step adjacencies] ${adjacencies.length} (target: 0)\n` +
+                `[Contains b3 (pc 3)]    ${pcs.has(3)} (target: true)\n` +
+                '----------------------------------------\n',
+        );
+        expect(adjacencies).toEqual([]);
+        // why: a Neo-Soul m7 voicing without the b3 sounds sus, not minor.
+        // The b3 is the defining minor pitch class — its loss is a regression
+        // the prior version of this test missed.
+        expect(pcs.has(3)).toBe(true);
     });
 });

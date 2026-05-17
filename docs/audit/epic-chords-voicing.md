@@ -27,12 +27,14 @@ Two stories here unlock listening tests: sticky comping cells (S1) and voice-lea
 
 **Acceptance:** Cm7 Neo-Soul rich voicing no longer has adjacent half-steps in the same octave. `neo-soul-piano-critique.test.ts` extended with adjacency check.
 **Effort:** ~2h. **Model:** sonnet (one-line voicing change + adjacency test). **Reviewer:** music-theory-reviewer. **Source:** `chords.md` P0 #3.
+**Status:** Shipped 2026-05-17. Replacement is `[3, 5, 10, 14]` (b3, 4, b7, 9 — D'Angelo quartal m11), not the initial `[5, 10, 14, 17]` proposal which dropped the b3 and would have sounded sus instead of minor. Test extended to assert b3 (pc 3) presence as well as adjacency.
 
 ### S3. Power-metal voicing respects chord quality
 `accompaniment.ts:1105-1142` slams `[root, root+7, root+12]` over every chord including dim/halfdim/aug/7alt. Read `chord.quality`: dim/halfdim/7b5 → `[root, root+6, root+12]` (tritone power chord); aug/7#5 → `[root, root+8, root+12]`; else keep P5.
 
 **Acceptance:** metal turnaround over m7b5 → V7alt → im no longer plays P5 voicings on m7b5. New `metal-piano-critique.test.ts` (none exists).
 **Effort:** ~3h. **Model:** sonnet (per-quality voicing table + first metal-piano critique test). **Reviewer:** music-theory-reviewer. **Source:** `chords.md` P0 #4.
+**Status:** Shipped 2026-05-17. Per-quality inline dispatch: `dim`/`halfdim`/`7b5` → tritone power chord; `aug`/`augmaj7` → augmented power chord; default P5. Verified against `chords-engine.ts` parser output: `m7b5`/`dim7`/`ø` inputs all normalize to `halfdim`/`dim` — covered.
 
 ### S4. Altered-dominant voicing covers all altered qualities
 `accompaniment.ts:1538-1539` gates `shouldUseResolvingAlteredVoicing` on `chord.quality === '7alt'` only. Extend to `{'7alt', '7b9', '7#9', '7b13', '7#11'}`. All share the same comping idiom (guide tones + 1-2 altered colors).
