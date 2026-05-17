@@ -8,6 +8,7 @@ import {
     isSectionTurnaround,
 } from '../utils.js';
 import { getAccompanimentNotes } from './accompaniment.js';
+import { getSectionContext } from './arranger-utils.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
     type CoordinationCarryover,
@@ -146,6 +147,19 @@ export function generateNotesForStep(
                 (coordination as any).upcomingSectionFirstChord = nextSectionChordData.chord;
             }
         }
+
+        // --- Section-occurrence publication (epic-form-arrangement S2) ---
+        // why: Imperfect Symmetry for repeat passes. The soloist already derives this
+        // value via `getSectionContext` from its SRDC path (soloist.ts); we publish
+        // the same lookup onto the coordination context here so bass/drums/accomp
+        // producers can diverge Verse 2 from Verse 1 without re-walking sectionMap.
+        // Default 1 was already written by createCoordinationContext — we overwrite
+        // only when arranger.sectionMap is populated. Must happen BEFORE any producer
+        // runs, because the bass producer (which is the consumer in this story) is
+        // invoked further down at line ~340.
+        // writer: chord-data preamble (this line); readable-after: any producer
+        const sectionCtx = getSectionContext(arranger, step);
+        (coordination as any).sectionOccurrence = sectionCtx.occurrence;
     }
 
     // Pre-calculate Drum Hits for Coordination

@@ -175,6 +175,22 @@ export function createCoordinationContext(
         // writer: tick-logic.ts chord-data preamble at line ~142 (before producers run)
         // readable-after: chord-data preamble (any producer including soloist)
         upcomingSectionFirstChord: null as any,
+        // why: epic-form-arrangement S2 (Imperfect Symmetry). Same value the soloist
+        // derives from `getSectionContext(arranger, step)` (soloist.ts). Published
+        // through the coordination context so bass/drums/accompaniment producers can
+        // diverge their repeat passes (Verse 1 vs Verse 2 vs Verse 3) without each
+        // engine re-deriving the same lookup against `arranger.sectionMap`.
+        //
+        // Semantics:
+        //   1 = first occurrence ("Statement" — no Imperfect-Symmetry bias)
+        //   2 = second occurrence ("Restatement" — engines may apply seeded variation)
+        //   3+ = further repeats (engines may amplify variation per occurrence)
+        //
+        // Default of 1 matches `getSectionContext`'s no-sectionMap fallback so engines
+        // can safely test `occurrence > 1` without guarding against `undefined`.
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        sectionOccurrence: 1,
         // why: published per-tick from the current chord (writer: tick-logic chord-preamble
         // at lines ~102-122; readable-after: chord-preamble — i.e. by EVERY producer
         // including the soloist which runs first). Lets the soloist bias toward

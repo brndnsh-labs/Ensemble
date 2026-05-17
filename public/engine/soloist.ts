@@ -10,6 +10,7 @@ import type {
     StepInfo,
 } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
+import { getSectionContext, normalizeLoopStep } from './arranger-utils.js';
 import {
     INFLUENCE_POOLS,
     resolveSoloistStyle,
@@ -83,72 +84,9 @@ export function resetSoloistState(state: EnsembleState): void {
     rhythm.deviceBuffer = [];
 }
 
-function normalizeLoopStep(step: number, loopLength: number): number {
-    if (!Number.isFinite(loopLength) || loopLength <= 0) {
-        return step;
-    }
-    return ((step % loopLength) + loopLength) % loopLength;
-}
-
-function getSectionContext(
-    arranger: any,
-    step: number,
-): {
-    label: string;
-    occurrence: number;
-    totalOccurrences: number;
-    isRestatement: boolean;
-    isLastSection: boolean;
-    sectionStart: number;
-    sectionEnd: number;
-} {
-    const sectionMap = arranger?.sectionMap;
-    if (!Array.isArray(sectionMap) || sectionMap.length === 0) {
-        return {
-            label: 'Main',
-            occurrence: 1,
-            totalOccurrences: 1,
-            isRestatement: false,
-            isLastSection: true,
-            sectionStart: 0,
-            sectionEnd: 0,
-        };
-    }
-
-    const totalFormSteps =
-        Number.isFinite(arranger?.totalSteps) && arranger.totalSteps > 0
-            ? arranger.totalSteps
-            : sectionMap[sectionMap.length - 1]?.end || 1;
-    const stepInForm = normalizeLoopStep(step, totalFormSteps);
-    const currentSection =
-        sectionMap.find(
-            (section: { start?: number; end?: number }) =>
-                stepInForm >= (section.start || 0) && stepInForm < (section.end || 0),
-        ) || sectionMap[0];
-    const label = currentSection?.label || 'Main';
-    let occurrence = 0;
-    let totalOccurrences = 0;
-
-    for (const section of sectionMap) {
-        if ((section?.label || 'Main') !== label) {
-            continue;
-        }
-        totalOccurrences++;
-        if (section === currentSection) {
-            occurrence = totalOccurrences;
-        }
-    }
-
-    return {
-        label,
-        occurrence: occurrence || 1,
-        totalOccurrences: totalOccurrences || 1,
-        isRestatement: (occurrence || 1) > 1,
-        isLastSection: currentSection === sectionMap[sectionMap.length - 1],
-        sectionStart: currentSection?.start ?? 0,
-        sectionEnd: currentSection?.end ?? 0,
-    };
-}
+// getSectionContext + normalizeLoopStep moved to ./arranger-utils.ts (S2,
+// Imperfect Symmetry — single source of truth for both soloist's SRDC and
+// the coordination-context preamble that publishes sectionOccurrence).
 
 // SRDC phase derivation (Statement / Restatement / Departure / Conclusion).
 // Mirrors the seeder's logic at soloist-seeder.ts:1602-1603 so live phrase

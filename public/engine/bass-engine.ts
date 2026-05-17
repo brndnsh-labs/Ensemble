@@ -340,6 +340,109 @@ export function getBassNote(
     const beatsInChord = Math.round(chord.beats);
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
 
+    // --- Shared seeded RNG (used by both Imperfect Symmetry and withOctaveJump) ---
+    // mulberry32 — 32-bit scrambled hash. Hoisted up here so the result() wrapper
+    // (defined just below) can apply Imperfect-Symmetry post-processing without
+    // duplicating the hash function.
+    const scrambleHash = (seed: number): number => {
+        let t = (seed + 0x6d2b79f5) | 0;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+    };
+
+    // --- Imperfect Symmetry: per-phrase octave displacement on repeat passes ---
+    // why: epic-form-arrangement S2 — when a section repeats (Verse 2 vs Verse 1),
+    // the bass would otherwise produce an identical line, making the band sound
+    // mechanical on repeated form. On the restatement we shift the note at ONE
+    // seeded beat per 4-bar phrase by ±12 semitones (pitch class preserved).
+    //
+    // Audible effect — read before tuning: although only ONE step is directly
+    // shifted, the shift cascades through `prevMidi`'s Hand-Position (×1.5 within
+    // ±5 semitones) and Stepwise (×2.0 within ±2) bonuses in `clampAndNormalize`,
+    // so the rest of the phrase migrates into the new register. Measured ~44%
+    // step-level divergence between Verse 1 and Verse 2. This is the intended
+    // gesture, not a leak: a real bassist who jumps an octave at beat 3 typically
+    // commits — they don't snap back to the old register on beat 4. Treat this
+    // helper as "seed a register migration for the remainder of the phrase," not
+    // "displace a single note." Capping the cascade would un-musical-ify it.
+    //
+    // Seeded by `(sectionId-hash, occurrence, phraseIndex)`. Direction is also
+    // hash-seeded (NOT parity) so Verse 2, 3, 4 each pick independently — V4 ≠ V2.
+    // The headroom-forced branch (28-51 comfort range, 23-57 absolute clamp)
+    // overrides the hash only when one direction is out of range.
+    //
+    // Source: docs/audit/form-arranger.md P1 #7; docs/audit/epic-form-arrangement.md S2.
+    const barIndexEarly = Math.floor(step / stepsPerMeasure);
+    const isBeatStartEarly = stepInfo?.isBeatStart ?? step % ts.stepsPerBeat === 0;
+    const isSoloistBusyEarly = (soloist.session.phrasing.busySteps || 0) > 0;
+    const sectionOccurrence: number = context?.stepCoordination?.sectionOccurrence ?? 1;
+    const isRepeatPass = sectionOccurrence >= 2;
+    // Hash the sectionId (string) into a 32-bit int so different sections of the
+    // same occurrence-index get different phrase-target patterns. Cheap djb2.
+    const sectionIdStr: string = (chord as any)?.sectionId || '';
+    let sectionIdHash = 5381 | 0;
+    for (let i = 0; i < sectionIdStr.length; i++) {
+        sectionIdHash = (Math.imul(sectionIdHash, 33) + sectionIdStr.charCodeAt(i)) | 0;
+    }
+    const PHRASE_BARS = 4; // why: standard 4-bar phrase in pop/rock/jazz.
+    const phraseIndex = Math.floor(barIndexEarly / PHRASE_BARS);
+    const barInPhrase = barIndexEarly % PHRASE_BARS;
+
+    const withImperfectSymmetry = (note: number): number => {
+        // Gate conditions:
+        //   - sectionOccurrence ≥ 2 (occurrence=1 is the "Statement", left untouched)
+        //   - musical guards: not during soloist busy, intensity ≥ 0.4 so quiet
+        //     ballad passages aren't disrupted by an unexpected octave jolt
+        //   - current step is at a beat-start (sub-beat 16ths/8ths stay in-register;
+        //     a mid-beat octave jump would sound like a glitch, not phrasing)
+        //   - exactly one target beat per 4-bar phrase, seeded so Verse 2 ≠ Verse 1
+        if (!isRepeatPass || isSoloistBusyEarly || intensity < 0.4) {
+            return note;
+        }
+        if (!isBeatStartEarly) {
+            return note;
+        }
+        // why: 16 candidate beats per 4-bar phrase (4 beats × 4 bars in 4/4). Pick
+        // exactly one. Seeded by (sectionIdHash, occurrence, phraseIndex) so:
+        //   - same section + same occurrence + same phrase → same target beat (deterministic)
+        //   - occurrence 2 vs occurrence 3 → different target beats (variation per repeat)
+        //   - different sectionIds at same occurrence → different patterns (Verse-2 ≠ Chorus-2)
+        const BEATS_PER_PHRASE = PHRASE_BARS * ts.beats;
+        const targetSeed = scrambleHash(
+            (sectionIdHash ^ (sectionOccurrence * 0x9e3779b1) ^ (phraseIndex * 0x85ebca77)) | 0,
+        );
+        const targetBeatInPhrase = Math.floor(targetSeed * BEATS_PER_PHRASE);
+        const currentBeatInPhrase = barInPhrase * ts.beats + intBeat;
+        if (currentBeatInPhrase !== targetBeatInPhrase) {
+            return note;
+        }
+        // why: force direction from headroom (canonical rule from
+        // feedback_seeded_prng_mulberry32). Comfort range (28-51) rather than absolute
+        // (23-57) keeps the displacement in the bass's idiomatic neck range — the
+        // extreme attic / sub-basement would sound out-of-character even when in-range.
+        const canGoUp = note + 12 <= 51;
+        const canGoDown = note - 12 >= 28;
+        if (canGoUp && canGoDown) {
+            // why: both directions fit — hash-seeded choice so V2 / V3 / V4 / V5
+            // each pick independently. Earlier draft used `occurrence % 2` parity,
+            // but that collapses to two values (V4 ≡ V2 in direction); reviewer
+            // P1-3. Reuse a derived hash of the same seed components but XOR'd
+            // with a third constant so we don't correlate with `targetSeed`.
+            const dirSeed = scrambleHash(
+                (sectionIdHash ^ (sectionOccurrence * 0xc2b2ae35) ^ (phraseIndex * 0x27d4eb2f)) | 0,
+            );
+            return note + (dirSeed < 0.5 ? -12 : 12);
+        }
+        if (canGoUp) {
+            return note + 12;
+        }
+        if (canGoDown) {
+            return note - 12;
+        }
+        return note; // No headroom either direction.
+    };
+
     /**
      * @param muted - Palm-mute amount: 0 (open) to 1 (fully muted).
      */
@@ -411,9 +514,24 @@ export function getBassNote(
                   : ts.stepsPerBeat * 0.95;
         const safeDuration = Math.min(durationSteps, maxSafeDuration);
 
+        // why: Imperfect Symmetry (S2) — applied here so EVERY return path through
+        // the bass engine inherits the repeat-pass octave displacement on its target
+        // beat. The wrap is a no-op (returns the original note) when sectionOccurrence
+        // is 1 or when the gate conditions don't match. Pitch class is preserved.
+        const baseMidi = getMidi(freq);
+        let outFreq = freq;
+        let outMidi = baseMidi;
+        if (baseMidi !== null) {
+            const shiftedMidi = withImperfectSymmetry(baseMidi);
+            if (shiftedMidi !== baseMidi) {
+                outMidi = shiftedMidi;
+                outFreq = getFrequency(shiftedMidi);
+            }
+        }
+
         return {
-            freq,
-            midi: getMidi(freq),
+            freq: outFreq,
+            midi: outMidi,
             velocity: finalVel,
             durationSteps: safeDuration,
             timingOffset,
@@ -424,27 +542,19 @@ export function getBassNote(
 
     const isSoloistBusy = (soloist.session.phrasing.busySteps || 0) > 0;
 
-    // --- Structural gate + seeded RNG for withOctaveJump ---
+    // --- Structural gate for withOctaveJump ---
     // why: bass.md P2 #12 / epic-deterministic-phrasing S4 — replace bare
     //   Math.random() in withOctaveJump with a (barIndex, sectionStart)-seeded
     //   hash and restrict firing to structural downbeats (bar 1 of a section
     //   or section start), per CLAUDE.md § Deterministic phrasing.
-    const barIndex = Math.floor(step / stepsPerMeasure);
+    // `barIndex` and `isBeatStartLocal` reuse the values computed earlier
+    // (barIndexEarly, isBeatStartEarly) for Imperfect Symmetry. `scrambleHash`
+    // is the shared mulberry32 declared above the result() wrapper.
+    const barIndex = barIndexEarly;
     const sectionSeedInt =
         typeof context?.sectionStart === 'number' ? Math.abs(context.sectionStart) | 0 : 0;
-    const isBeatStartLocal = stepInfo?.isBeatStart ?? step % ts.stepsPerBeat === 0;
+    const isBeatStartLocal = isBeatStartEarly;
     const isStructuralJumpPoint = isBeatStartLocal && (isDownbeat || isSectionStart);
-
-    // mulberry32 — 32-bit scrambled hash. Replaces the linear LCG that was
-    // producing a sawtooth pattern on small (barIndex * 13) inputs — review
-    // found a contiguous 18-bar trigger block all biased UP (P0). Mulberry32
-    // scrambles small linear inputs into well-distributed uint32 outputs.
-    const scrambleHash = (seed: number): number => {
-        let t = (seed + 0x6d2b79f5) | 0;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-    };
 
     const withOctaveJump = (note: number): number => {
         if (isSoloistBusy || intensity < 0.4) {
