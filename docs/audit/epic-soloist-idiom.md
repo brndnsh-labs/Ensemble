@@ -35,6 +35,7 @@ The architectural fix — apply profile-boost as a final-stage `weight *= mult` 
 
 **Acceptance:** themed-improv passes never produce out-of-key notes from jitter. Existing themed-improv critique tests pass.
 **Effort:** ~3h. **Model:** sonnet (scale-clamp is mechanical; existing tests guard musicality). **Reviewer:** music-theory-reviewer. **Source:** `soloist.md` P1 #7.
+**Status:** Shipped 2026-05-17. Approach A (scale-tone walking): jitter collects every scale-tone MIDI in a ±2-octave window via `getScaleForChord` and picks an N-step neighbor. New seed-step out-of-key rate assertion in `soloist-jazz-critique.test.ts` (threshold 0.15; residual is from non-jitter selectPitchAndDevices path producing intentional chromatic notes). Deterministic-seeding of the jitter PRNG is a follow-up.
 
 ### S5. Role-skeleton response preserves duration shape
 `soloist-rhythm-engine.ts:213-245` returns a `durationSteps: 1` 16th for every attack on a "response" skeleton path. Preserve source `durationSteps` from the call (or fall through to the main attack-prob path with a contour overlay). Also tag mid-phrase phrase-end markers inside this branch — currently they're monophonic-only.

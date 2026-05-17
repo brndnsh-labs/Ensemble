@@ -18,6 +18,7 @@ import {
 } from './soloist-config.js';
 import { selectPitchAndDevices } from './soloist-pitch-engine.js';
 import { generateRhythmPlan } from './soloist-rhythm-engine.js';
+import { getScaleForChord } from './theory-scales.js';
 
 type PhraseResponseSource = 'free' | 'form' | 'seed' | 'section' | 'recent';
 
@@ -1138,8 +1139,44 @@ export function getSoloistNote(
                             : 1;
                     const jitterProb = isFirstRestatementLoop ? 0.16 : 0.32;
                     if (Math.random() < jitterProb) {
-                        targetMidi +=
-                            Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
+                        // why: chromatic ±N jitter can turn a 5th into a b5 or a 3 into a b3,
+                        // producing out-of-key pitches that sound like mistakes. Walk by
+                        // scale-degree steps instead — collect every scale-tone MIDI in a
+                        // ±2-octave window around the seed and pick an N-step neighbor.
+                        const scaleIntervals = getScaleForChord(
+                            state,
+                            currentChord,
+                            nextChord,
+                            activeStyle,
+                        );
+                        const rootPc = ((currentChord.rootMidi % 12) + 12) % 12;
+                        const scalePcSet = new Set<number>(
+                            scaleIntervals.map((i: number) => (((rootPc + i) % 12) + 12) % 12),
+                        );
+                        const scaleNeighbors: number[] = [];
+                        for (let m = headNote.midi - 24; m <= headNote.midi + 24; m++) {
+                            if (scalePcSet.has(((m % 12) + 12) % 12)) {
+                                scaleNeighbors.push(m);
+                            }
+                        }
+                        if (scaleNeighbors.length > 0) {
+                            let seedIdx = 0;
+                            let minDist = Number.POSITIVE_INFINITY;
+                            for (let i = 0; i < scaleNeighbors.length; i++) {
+                                const d = Math.abs(scaleNeighbors[i] - headNote.midi);
+                                if (d < minDist) {
+                                    minDist = d;
+                                    seedIdx = i;
+                                }
+                            }
+                            const stepOffset =
+                                Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
+                            const targetIdx = Math.max(
+                                0,
+                                Math.min(scaleNeighbors.length - 1, seedIdx + stepOffset),
+                            );
+                            targetMidi = scaleNeighbors[targetIdx];
+                        }
                     }
                 }
 
