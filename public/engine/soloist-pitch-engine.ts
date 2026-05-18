@@ -680,16 +680,54 @@ export function selectPitchAndDevices(
                         weight *= 1.5;
                     }
                     break;
-                case 'evans':
+                case 'evans': {
                     // Bill Evans: Upper Extensions (9, 11, #11, 13)
-                    if (evansIntervals.has(interval)) {
-                        weight += 500; // Final boost to reliably exceed 40% target
-                        weight *= 10.0;
+                    // why: hybrid additive-floor + final-stage multiplier. The
+                    // previous `weight += 500` additive floor (pre-S2) drowned
+                    // every other bias and produced ~80% extension caricature.
+                    // A pure ×N final-stage multiplier (S2 first pass) needed
+                    // ×80 to survive stacked chord-tone biases and over-tuned
+                    // past Evans's transcribed signature into stacked-fourths
+                    // late-modal caricature (~55% extension blanket).
+                    //
+                    // Evans's actual playing per transcription evidence sits at
+                    // ~25-35% extension landings, with chord-tones (especially
+                    // 3rd/7th guide tones) carrying the line. Tuned via 20-run
+                    // reliability loop with stabilized fixture (per-iteration
+                    // profile pin + 800-step loop + 512-step section). The
+                    // engine has two regimes:
+                    //   - +60/×3.5 → stable ~25-30% (extensions win weak beats,
+                    //     chord-tones win strong beats — matches transcription)
+                    //   - +100/×4 → stable ~50-55% (extensions also win strong
+                    //     beats → caricature)
+                    // No smooth landing in 30-40% band; the regimes are bimodal
+                    // because of how chord-tone stacked additives (+150 chord,
+                    // +300 strong-beat) interact with the picker. Selected
+                    // +60/×3.5 to stay in the musically defensible band.
+                    //
+                    // At phrase-end with role === 'response', skip the extension
+                    // boost entirely so the V→I cadence (handled by the
+                    // phrase-end ×4.0 root/5th pull below) can actually land
+                    // home — audit P1 #4's original ask. Without this, the
+                    // extension boost on the 9 swamps the cadence pull and
+                    // Evans response phrases never resolve home.
+                    const phraseRole = soloistState.session.currentPhrase.context?.role;
+                    const isEvansCadence =
+                        rhythmNode?.isPhraseEnd === true && phraseRole === 'response';
+                    if (evansIntervals.has(interval) && !isEvansCadence) {
+                        weight += 60;
+                        weight *= 3.5;
                     }
-                    if (interval === 0) {
-                        weight *= 0.01; // Avoid roots almost entirely
+                    if (interval === 0 && rhythmNode?.isPhraseEnd !== true) {
+                        // why: Evans avoids the root mid-phrase to keep upper-structure
+                        // color front and center, but at phrase ends the 'response'
+                        // cadence should be allowed to resolve home (V→I beat-1).
+                        // Discouraged-not-forbidden: chord-tone resolution still wins
+                        // on strong beats / sustains without freezing root out.
+                        weight *= 0.1;
                     }
                     break;
+                }
                 case 'coltrane': {
                     // Coltrane: Wide intervals, intense
                     const coltraneDist = Math.abs(m - lastMidi);
@@ -873,7 +911,22 @@ export function selectPitchAndDevices(
             }
         }
 
-        if (dist > 7) {
+        // why: wide-interval profiles (Coltrane "sheets of sound", EVH tapping
+        // leaps) explicitly boost specific leap ranges in the profile switch
+        // above. The universal large-leap penalties (×0.4 floor, then ×0.1
+        // non-octave) stack multiplicatively and reduce the boost (e.g.
+        // Coltrane ×1.5) to ×0.06 net — washing the idiom out entirely. Skip
+        // the universal penalties only when the active profile's OWN boost
+        // condition matches this leap: Coltrane endorses dist > 7, EVH endorses
+        // dist > 5. Don't bypass for Coltrane on 6/7-semitone leaps — those
+        // aren't part of his transcribed signature and should still be
+        // penalized like normal soloist output. Audit P2 #15.
+        const activeProfile = hasGreatsProfile
+            ? soloistState.session.currentPhrase.context.profile
+            : null;
+        const skipLargeLeapPenalty =
+            (activeProfile === 'coltrane' && dist > 7) || (activeProfile === 'evh' && dist > 5);
+        if (dist > 7 && !skipLargeLeapPenalty) {
             weight *= 0.4;
         }
         // Gently encourage stepwise motion and penalize large leaps
@@ -881,9 +934,9 @@ export function selectPitchAndDevices(
             weight *= 1.5;
         } else if (dist <= 4) {
             weight *= 1.2;
-        } else if (dist > 7 && dist !== 12) {
+        } else if (dist > 7 && dist !== 12 && !skipLargeLeapPenalty) {
             weight *= 0.1; // Moderate penalty for large leaps (not octaves)
-        } else if (dist > 5 && dist !== 12) {
+        } else if (dist > 5 && dist !== 12 && !skipLargeLeapPenalty) {
             weight *= 0.5; // Slight penalty for medium leaps
         }
 
