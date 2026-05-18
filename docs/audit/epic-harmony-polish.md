@@ -24,6 +24,7 @@ Replace the hard `safetyFloor = 52` at `harmonies.ts:499` with `safetyFloor = Ma
 
 **Acceptance:** muddy E3-A3 clusters disappear when bass is at the top of its range. Critique test asserts harmony lowest-note minus bass note >= 7 semitones on simultaneous events.
 **Effort:** ~2h. **Model:** sonnet (one-line floor change + new critique test). **Reviewer:** music-theory-reviewer. **Source:** `harmony-coordination.md` P1 #7.
+**Status:** Shipped 2026-05-17 (commit `0523e1eb`). Hard `safetyFloor = 52` in `harmonies.ts` replaced with `Math.max(52, (coordination.bassMidi || 0) + 7)`, reserving a perfect fifth above whatever the bass is currently playing. Eliminates muddy E3-G3 clusters when the bass walks high. New `tests/standards/harmony-bass-seam.test.ts` sweeps bass MIDI 50-57 and verifies the legacy 52 floor still holds when `bassMidi` is absent. Per-story Status marker added retroactively 2026-05-18 — a past `/done` step had skipped this bookkeeping; EPICS.md tally was already correct.
 
 ### S3. `selectGroundedIntervals` puts fifths before colors
 `harmonies.ts:147` returns `[...roots, ...guides, ...colors, ...fifths, ...others]`. Reorder to `[roots, guides, fifths, colors, others]` so a 4-note grounded voicing of a 7-chord is R-3-5-7, not R-3-7-color.
