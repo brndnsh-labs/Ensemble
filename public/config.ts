@@ -127,6 +127,21 @@ export const SMART_BASS_STYLE_MAP = {
     Metal: 'metal',
     'Ska-Punk': 'walking-ska',
     Ska: 'walking-ska',
+    // why: bass.md P0 #1 — these three canonical genre keys (matching
+    // groove-engine.ts strategies map) previously fell through to fallback
+    // 'rock' and played rock bass under all of them. Routes pick idiomatic
+    // floors:
+    //   Shred ≈ Metal (CLAUDE.md alias family).
+    //   Minimal = 'whole' (drone-floor): one sustained root per chord. This is
+    //     the La Monte Young end of minimalism; Reich/Glass/Riley
+    //     broken-chord pattern minimalism is deferred to a future story.
+    //   Latin = 'walking-ska' (ship-now floor): bouncy 8ths, closer than rock
+    //     but NOT idiomatic Latin — tumbao (anticipated 2&, R-5 lower-neighbor
+    //     against clave) is the canonical Latin bass idiom and is deferred to a
+    //     future story per S4 partial-ship note.
+    Latin: 'walking-ska',
+    Minimal: 'whole',
+    Shred: 'metal',
 };
 
 export const SMART_SCALE_STYLE_MAP = {
