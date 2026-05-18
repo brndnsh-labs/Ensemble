@@ -75,6 +75,20 @@ const milesIntervals = new Set([2, 5, 9]);
 const evansIntervals = new Set([2, 5, 6, 9]);
 const alteredHookIntervals = new Set([1, 3, 6, 8]);
 
+// Base rarity penalty for chromatic neighbors of chord tones. Scaled by
+// per-style config.chromaticism so high-chromaticism profiles (bird 0.9,
+// coltrane 0.7, jazz 0.5, bossa 0.5, neo 0.6) admit neighbors freely while
+// the admission path is gated off entirely below 0.3 (see
+// chromaticNeighborsActive). Final tuning lives downstream — this is the
+// per-attack base penalty before the resolution kicker fires; the kicker
+// (`weight *= 12.0` when last attack was a chromatic neighbor) is what
+// produces the bebop "approach → chord-tone landing" pair shape. Test
+// ratchet for the bias delta lives in soloist-jazz-critique.test.ts ("Bird
+// produces more chromatic-neighbor attacks than a low-chromaticism baseline"
+// and the post-neighbor resolution-uplift assertion). See Epic 4 / S1 in
+// docs/audit/epic-soloist-idiom.md.
+const CHROMATIC_NEIGHBOR_BASE_PENALTY = 0.5;
+
 function pushUniqueDevice(devices: string[], device: string | null | undefined): void {
     if (device && !devices.includes(device)) {
         devices.push(device);
@@ -491,6 +505,51 @@ export function selectPitchAndDevices(
         chordMask |= 1 << intv;
     }
 
+    // Chromatic neighbors of chord tones (interval = chord-tone ±1, but not itself a
+    // chord tone). Built once per call. Unlocks bebop approach-note vocabulary that
+    // was previously blocked by the `!isScaleTone && !isBlueNote` continue — Bird's
+    // chromaticism: 0.9 config knob was dead because chromatic neighbors couldn't
+    // enter the candidate pool at all (Epic 4 / S1). The intervals selected here
+    // include true chromatic approach tones (e.g. b3-to-3 or b5-to-5 on a maj7)
+    // that aren't already scale tones.
+    let chromaticNeighborMask = 0;
+    for (let i = 0; i < 12; i++) {
+        if ((chordMask >> i) & 1) {
+            chromaticNeighborMask |= 1 << ((i + 1) % 12);
+            chromaticNeighborMask |= 1 << ((i + 11) % 12);
+        }
+    }
+    chromaticNeighborMask &= ~chordMask;
+
+    const styleChromaticism: number = config.chromaticism ?? 0;
+    // Gate the chromatic-neighbor admission path at a meaningful chromaticism
+    // floor. Below 0.3 (country 0.2, default scalar 0.1) chromatic approach is
+    // not part of the style idiom and the picker should stay diatonic. Jazz
+    // (0.5), bird (0.9), coltrane (0.7), neo (0.6), and bossa (0.5) clear the
+    // floor cleanly. Without this threshold every style trickles chromatic
+    // approach tones at a low rate (0.1 × 0.5 base penalty = 0.05 weight), which
+    // is a country soloist playing Db on a C chord — a vocabulary mistake.
+    const chromaticNeighborsActive = styleChromaticism >= 0.3;
+
+    // Detect a "bebop resolution" condition: the previous attack landed on a
+    // chromatic neighbor of the current chord's chord-tone PCs (and wasn't a
+    // scale tone or blue note). When true we push the current attack hard
+    // toward a chord tone — that's the canonical Charlie Parker "approach
+    // tone → chord tone on next attack" gesture. Without this, raising the
+    // base chromatic-neighbor admission rate just increases neighbor density
+    // without lifting the *pair-rate* metric the critique tracks (more
+    // approach notes that don't actually approach anything).
+    const lastPC = ((lastMidi % 12) + 12) % 12;
+    const lastInterval = (lastPC - (rootMidi % 12) + 12) % 12;
+    const lastWasScaleTone = ((scaleMask >> lastInterval) & 1) === 1;
+    const lastWasBlueNote =
+        isBluesOrJazz && (lastInterval === 3 || lastInterval === 6 || lastInterval === 10);
+    const lastWasChromaticNeighbor =
+        chromaticNeighborsActive &&
+        !lastWasScaleTone &&
+        !lastWasBlueNote &&
+        ((chromaticNeighborMask >> lastInterval) & 1) === 1;
+
     for (let m = searchMin; m <= searchMax; m++) {
         const pc = ((m % 12) + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
@@ -502,7 +561,15 @@ export function selectPitchAndDevices(
         if (isBluesOrJazz && (interval === 3 || interval === 6 || interval === 10)) {
             isBlueNote = true;
         }
-        if (!isScaleTone && !isBlueNote) {
+        // Chromatic neighbor: ±1 semitone from a chord-tone PC, not already a
+        // scale tone or blue note. Gated by config.chromaticism so only styles
+        // that opt into chromatic vocabulary (bebop, jazz, fusion) admit them.
+        const isChromaticNeighbor =
+            !isScaleTone &&
+            !isBlueNote &&
+            chromaticNeighborsActive &&
+            ((chromaticNeighborMask >> interval) & 1) === 1;
+        if (!isScaleTone && !isBlueNote && !isChromaticNeighbor) {
             continue;
         }
 
@@ -906,6 +973,38 @@ export function selectPitchAndDevices(
             stepCoordTension.altPitchClasses.includes(pc)
         ) {
             weight *= 2.0;
+        }
+
+        // --- Bebop Resolution Bias (final-stage multiplier) ---
+        // why: when the previous attack landed on a chromatic neighbor of the
+        // current chord's chord-tone PCs, push HARD toward a chord-tone landing
+        // on THIS attack. That's the canonical bebop "approach tone → chord
+        // tone" gesture (Parker, Coltrane sheets of sound). Without it, raising
+        // the chromatic-neighbor admission rate floods the engine with approach
+        // notes that don't actually approach anything. Applied as a final-stage
+        // multiplier per CLAUDE.md "final-stage multipliers win" — chord-tone
+        // bonuses already accumulate +150 to +450 additive weight, but a 3× on
+        // top is what lifts the *pair-rate* metric the critique enforces.
+        if (lastWasChromaticNeighbor && isChordTone) {
+            weight *= 12.0;
+        }
+
+        // --- Chromatic Neighbor Rarity Penalty (final-stage multiplier) ---
+        // why: chromatic neighbors are now ADMITTED into the candidate pool (Epic 4
+        // / S1) so Bird's `chromaticism: 0.9` and Coltrane's `: 0.7` can actually
+        // surface bebop approach-note vocabulary. But chord tones and scale tones
+        // still need to dominate — chromatic approach is a SEASONING, not a base
+        // diet. Applied as a final-stage multiplier per CLAUDE.md "final-stage
+        // multipliers win": the +100 weak-beat-passing-tone bonus at line ~742
+        // doesn't check isScaleTone, so without this dampener chromatic neighbors
+        // would inherit that boost and rate way above the intended 8% acceptance
+        // band. Scaling by styleChromaticism means Bird (0.9) lets neighbors
+        // through 18× more freely than a low-chromaticism style (0.05). The
+        // multiplier value is tuned against the 30-run loop on
+        // soloist-jazz-critique.test.ts targeting ≥8% neighbor→chord-tone
+        // resolution on Bird.
+        if (isChromaticNeighbor) {
+            weight *= CHROMATIC_NEIGHBOR_BASE_PENALTY * styleChromaticism;
         }
 
         // --- Accompaniment Unison Avoidance (final-stage multiplier) ---
