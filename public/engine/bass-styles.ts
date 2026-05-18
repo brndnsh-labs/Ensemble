@@ -141,7 +141,36 @@ export function checkBassActiveStyle(
         return false;
     }
     if (style === 'country') {
-        return step % (ts.stepsPerBeat * 2) === 0; // Alternating beats (1 and 3 in 4/4)
+        // why: Two-Step floor (intensity <= 0.6) — classic honky-tonk half-note Roots
+        // on beats 1 and 3 (matches the kick on a Two-Step drum pattern). At
+        // intensity > 0.6 we promote to the quarter-note Root-Fifth tier (R-5-R-5),
+        // the bread-and-butter country walking-bass shape. The earlier engine
+        // returned `step % 8 === 0` unconditionally, leaving the `isFifthBeat`
+        // branch in getBassNoteStyle dead code (audit: MUSICAL_AUDIT.md Open #1,
+        // bass.md P1 #6). Threshold of 0.6 exactly: at-or-below stays Two-Step,
+        // strictly-above promotes to quarter-note tier.
+        const isQuarterTier = playback.bandIntensity > 0.6;
+        if (isQuarterTier && isQuarter) {
+            return true;
+        }
+        // why: walk-up — the last beat & last "&" before a chord change need to fire
+        // so getBassNoteStyle can build a 2-note stepwise walk to the next root.
+        // checkBassActiveStyle has no chord context, so we conservatively allow the
+        // last-beat slots whenever intensity could justify a walk-up (>0.5) and let
+        // the note-picker return null when there's no chord change. This keeps the
+        // Two-Step floor (beats 1+3 root) intact while opening the door for the
+        // walk-up shape on chord-boundary bars.
+        const stepsPerBeat = ts.stepsPerBeat;
+        const allowWalkUp = playback.bandIntensity > 0.5;
+        if (allowWalkUp) {
+            const lastBeatStart = stepsPerBeat * (ts.beats - 1); // step 12 in 4/4
+            const lastBeatAnd = lastBeatStart + Math.floor(stepsPerBeat / 2); // step 14 in 4/4
+            const mStepLocal = stepInfo ? stepInfo.mStep : step % (ts.beats * stepsPerBeat);
+            if (mStepLocal === lastBeatStart || mStepLocal === lastBeatAnd) {
+                return true;
+            }
+        }
+        return step % (stepsPerBeat * 2) === 0; // Two-Step half-notes on beats 1 and 3
     }
     if (style === 'metal') {
         if (is8th) {
@@ -290,24 +319,131 @@ export function getBassNoteStyle(
         return result(getFrequency(clampAndNormalize(withOctaveJump(baseRoot + targetInterval))));
     }
 
-    // --- COUNTRY STYLE (Root-Five) ---
+    // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
     if (style === 'country') {
-        // Strictly Root on 1 & 3, Fifth on 2 & 4 (in 4/4)
-        if (!isBeatStart) {
-            return null;
-        }
+        // Two intensity tiers (matched in checkBassActiveStyle so the active gate
+        // and the note picker agree):
+        //   • intensity <= 0.6  → Two-Step half-notes (Roots on beats 1, 3).
+        //   • intensity >  0.6  → Quarter-note R-5-R-5 honky-tonk walking bass.
+        // Plus a 2-note stepwise walk-up on the last beat + "&" before any chord
+        // change at intensity > 0.5 (independent of Two-Step vs quarter tier).
+        // Audit source: MUSICAL_AUDIT.md Open #1, bass.md P1 #6.
+        const isQuarterTier = intensity > 0.6;
 
-        // Simplify to just Root on 1 at very low intensity
+        // Very low intensity: just the downbeat root.
         if (intensity < 0.2 && !isDownbeat) {
             return null;
         }
 
-        const _isRootBeat = intBeat === 0 || intBeat === 2;
-        const isFifthBeat = intBeat === 1 || intBeat === 3;
+        const stepsPerBeat = ts.stepsPerBeat;
+        const lastBeatStart = stepsPerBeat * (ts.beats - 1); // step 12 in 4/4
+        const lastBeatAnd = lastBeatStart + Math.floor(stepsPerBeat / 2); // step 14 in 4/4
+        const mStep = _stepInfo ? _stepInfo.mStep : step % (ts.beats * stepsPerBeat);
+        const isLastBeatOfBar = mStep === lastBeatStart;
+        const isLastBeatAndOfBar = mStep === lastBeatAnd;
+
+        // ===== WALK-UP =====
+        // why: real country walk-ups are 2-to-4 stepwise notes leading into the next
+        // root — not a single chromatic neighbor. Build a 2-note walk: a step-tone
+        // approach on beat 4, and a chromatic neighbor on the "&" of 4, landing on
+        // the next root downbeat. The country scale is pentatonic, so the diatonic
+        // path produces the 6th or 9th of the current chord when those are 2
+        // semitones from the target; the 4th and 7th fall through to the
+        // pentatonic-fallback (nearest scale tone within ±2..4 of target), which
+        // keeps the walk inside the major-pent vocabulary instead of inventing a
+        // 4th/7th that isn't in country's scale.
+        if (
+            isChordChangeApproach(nextChord, chord) &&
+            intensity > 0.5 &&
+            (isLastBeatOfBar || isLastBeatAndOfBar)
+        ) {
+            const nextTarget = normalizeToRange(nextChord.rootMidi);
+            // why: walk-ups punch slightly hotter than Two-Step roots
+            // (0.95 + intensity*0.3) to articulate the line as a pickup gesture.
+            // Slope is shallower (0.2 vs 0.3) so they don't overpower the downbeat.
+            const walkVel = 1.0 + intensity * 0.2;
+
+            if (isLastBeatAndOfBar) {
+                // Step "&" of 4 — chromatic neighbor a half-step from target.
+                // why: half-step approach is the universal "pulling into the root"
+                // gesture; direction is whichever sits within the bass register and
+                // sounds like a lead-in (below for ascending lines, above for
+                // descending). We pick by which is closer to prevMidi (smooth voice
+                // leading from the beat-4 walk note above).
+                const below = normalizeToRange(nextTarget - 1);
+                const above = normalizeToRange(nextTarget + 1);
+                const ref = prevMidi ?? baseRoot;
+                const approach = Math.abs(below - ref) <= Math.abs(above - ref) ? below : above;
+                // why: "&" is a soft pickup, not the accent — beat 4 is the
+                // accented walk tone, downbeat target is loudest. Country phrasing
+                // wants strong-soft-LANDING, not soft-strong-LANDING.
+                return result(getFrequency(approach), 1, walkVel * 0.85);
+            }
+
+            // Beat 4 — first walk note: a step two semitones away from the target
+            // on the approach side. why: country walks lean on whole-step motion
+            // setting up the chromatic half-step on the "&" → root downbeat (T-2,
+            // T-1, T as a three-note pull-in). Direction is computed from raw
+            // rootMidi delta (ascending V→I = walk down into target, descending
+            // I→V = walk up into target) so the walk follows harmonic contour
+            // rather than register-normalized contour — normalizeToRange will
+            // clamp the walk note into register afterward.
+            const rawDelta = nextChord.rootMidi - chord.rootMidi;
+            const direction = rawDelta >= 0 ? -1 : 1; // approach side
+            const wholeStep = normalizeToRange(nextTarget + direction * 2);
+            const wholeStepPC = (((wholeStep - chord.rootMidi) % 12) + 12) % 12;
+            // why: if T-2 (or T+2) is a diatonic scale tone of the current chord,
+            // prefer it — that's the canonical "5-6-7-1" shape. Otherwise use a
+            // chromatic neighbor two steps away regardless (still a valid walk note;
+            // the half-step on the "&" carries the line into the new chord).
+            const isDiatonic = scale.includes(wholeStepPC);
+            let walkNote = wholeStep;
+            if (!isDiatonic) {
+                // Pick the nearest scale tone within ±3 semitones of the target.
+                const scaleCandidates = scale
+                    .map((ivl) => normalizeToRange(chord.rootMidi + ivl))
+                    .filter(
+                        (m) =>
+                            m >= absMin &&
+                            m <= absMax &&
+                            m !== nextTarget &&
+                            Math.abs(m - nextTarget) >= 2 &&
+                            Math.abs(m - nextTarget) <= 4,
+                    )
+                    .sort((a, b) => Math.abs(a - nextTarget) - Math.abs(b - nextTarget));
+                if (scaleCandidates.length > 0) {
+                    walkNote = scaleCandidates[0];
+                }
+            }
+            // why: beat 4 is the accented walk tone (full walkVel); the "&"
+            // pickup above is reduced to 0.85. See velocity-shape note above.
+            return result(getFrequency(walkNote), 1, walkVel);
+        }
+
+        // ===== NON-WALK-UP STEPS =====
+        if (!isBeatStart) {
+            // Last-beat-and-of-bar without chord change → silent.
+            return null;
+        }
+
+        // Beat-4 in Two-Step (not chord change, not quarter-tier) → silent.
+        // The activator may have allowed step 12 for walk-up eligibility, but with
+        // no chord change and no quarter-tier, this slot doesn't fire.
+        if (isLastBeatOfBar && !isQuarterTier) {
+            return null;
+        }
+
+        // R-5-R-5 in quarter-tier; R-R half-notes in Two-Step.
+        // why: in Two-Step we only reach this code on beats 1 and 3 (the activator
+        // gates `step % 8 === 0`), both of which are roots — keeping the honky-tonk
+        // half-note Root pattern intact. In quarter-tier we additionally reach
+        // beats 2 and 4 (the activator allows isQuarter), which become the fifth.
+        const isFifthBeat = isQuarterTier && (intBeat === 1 || intBeat === 3);
 
         let note = baseRoot;
         if (isFifthBeat) {
-            // Authentic Country: Prefer the fifth BELOW the root if possible
+            // Authentic Country: Prefer the fifth BELOW the root if possible (the
+            // canonical "boom-chick" alternation lives in the deep register).
             note = normalizeToRange(baseRoot - 5); // Perfect 4th down = Perfect 5th interval
             if (note > baseRoot) {
                 note -= 12; // Force below
@@ -315,16 +451,6 @@ export function getBassNoteStyle(
             // Dynamic floor check
             if (note < absMin) {
                 note += 12;
-            }
-        }
-
-        // Occasional walk-up on the last beat of a section
-        const isLastBeat = intBeat === ts.beats - 1;
-        if (isLastBeat && intensity > 0.5 && nextChord && nextChord.rootMidi !== chord.rootMidi) {
-            if (Math.random() < 0.4) {
-                const nextTarget = normalizeToRange(nextChord.rootMidi);
-                const approach = normalizeToRange(nextTarget - 1);
-                return result(getFrequency(approach), 1, 1.1);
             }
         }
 
