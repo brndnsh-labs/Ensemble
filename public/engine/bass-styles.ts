@@ -471,19 +471,89 @@ export function getBassNoteStyle(
 
         let note = finalDeepRoot;
         let dur = ts.stepsPerBeat * 0.9; // Warm, long sustain
+        let bendStartInterval = 0;
 
         if (intensity < 0.4) {
             dur = ts.stepsPerBeat * 1.95; // Extreme sustain for sub-chugs
         } else {
-            // High complexity: Probabilistic 808-style melodic glides
-            if (playback.complexity > 0.7 && !isBeatStart && Math.random() < 0.5) {
-                const glideNote = Math.random() < 0.6 ? finalDeepRoot + 12 : finalDeepRoot + 7;
+            // why: 808 slide gesture, gated to chord-change boundaries only
+            // (bass.md P1 #7). The previous within-chord +12/+7 leap on
+            // `complexity > 0.7` sounded like a synth lead jumping mid-chord, not
+            // an 808 slide — it has been deleted in favor of a true between-chord
+            // bend that targets the upcoming root.
+            //
+            // The slide fires on the LAST ACTIVE STEP before the new chord. The
+            // hip-hop activator (`isBassActive`) permits step % ts.stepsPerBeat
+            // === Math.floor(ts.stepsPerBeat/2) — the "and" of each beat — so we
+            // key off the "and" of beat 4. The audit recipe named
+            // `stepInBeat === ts.stepsPerBeat - 1` but that step is gated OFF
+            // by the activator; using the last active eighth keeps the gesture
+            // inside the genre's groove without widening the activator.
+            //
+            // Direction follows raw rootMidi delta — V→I (descending root) =
+            // slide *up* from -2 into the new root; I→V (ascending root) =
+            // slide *down* from +2 into the new root. ±2 (whole-step) is the
+            // canonical 808 slide interval; smaller (±1) reads as a passing
+            // chromatic, larger (±3) reads as a melodic walk-up.
+            const stepInBeat = step % ts.stepsPerBeat;
+            const isLastActiveStepBeforeChange =
+                stepInBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === ts.beats - 1;
+            if (
+                isLastActiveStepBeforeChange &&
+                isChordChangeApproach(nextChord, chord) &&
+                intensity > 0.5 &&
+                Math.random() < 0.55
+            ) {
+                // why: intensity > 0.5 gate keeps the slide a high-energy
+                // gesture (quiet hip-hop at intensity 0.4-0.5 stays grounded);
+                // 0.55 stochastic gate makes the slide a frequent-but-not-every
+                // boundary event, leaving room for plain root statements on the
+                // "and" before chord changes too.
+                // why: target the actual bass voice — slash chords (e.g.
+                // C/E → F) walk the bass into the next BASS note, not the
+                // chord root. Falls back to rootMidi when no slash.
+                const nextBassTarget = nextChord.bassMidi ?? nextChord.rootMidi;
+                const currentBassTarget = chord.bassMidi ?? chord.rootMidi;
+                let slideTarget = clampAndNormalize(nextBassTarget - 12);
+                while (slideTarget > 36) {
+                    slideTarget -= 12;
+                }
+                const rawDelta = nextBassTarget - currentBassTarget;
+                // why: 808 slide geometry — the slide ORIGINATES at/near the
+                // previous root and glides INTO the target. So for an
+                // ascending root motion (I→V, rawDelta > 0), the note begins
+                // BELOW the target (bendStartInterval < 0) and bends up; for
+                // a descending root motion (V→I, rawDelta < 0), the note
+                // begins ABOVE (bendStartInterval > 0) and bends down. This
+                // matches the canonical FL Studio "slide note" idiom that
+                // defines the trap/drill 808 bassline (bass.md P1 #7 review).
+                // ±2 (whole-step) is conservative; once the synth layer wires
+                // bendStartInterval through playBassNote (currently silently
+                // dropped — separate follow-up), tune up to ±5 by ear.
+                // Slash-chord (rawDelta === 0 PC-equal but bassMidi differs)
+                // falls into rawDelta < 0 branch arbitrarily; the audible
+                // distance is small enough that direction matters little.
+                const direction = rawDelta > 0 ? -1 : 1;
+                bendStartInterval = direction * 2;
+                note = slideTarget;
+                // why: shorten the slide note so it reads as a pickup gesture
+                // into the new chord's downbeat, not a sustained root.
+                dur = ts.stepsPerBeat * 0.5;
+            } else if (playback.complexity > 0.85 && !isBeatStart && Math.random() < 0.15) {
+                // why: retain a very low-rate octave grace note for high-
+                // complexity high-energy moments (e.g. a triplet 808 fill),
+                // but at MUCH lower probability than before (was 0.5, now 0.15)
+                // and gated stricter (was complexity > 0.7, now > 0.85). Drops
+                // the "synth lead" complaint while preserving an 808's classic
+                // melodic ornament. Fifth removed (was +7) — fifths above the
+                // root in deep sub register sound like a key-change error.
+                const glideNote = finalDeepRoot + 12;
                 note = clampAndNormalize(glideNote);
                 dur = 0.5;
             }
         }
 
-        const res = result(getFrequency(note), dur, 1.0 + intensity * 0.2);
+        const res = result(getFrequency(note), dur, 1.0 + intensity * 0.2, 0, bendStartInterval);
         res.timingOffset += lag;
         return res;
     }
