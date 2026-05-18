@@ -1,5 +1,5 @@
 import type { SoloistState } from '../state/instruments.js';
-import type { StepInfo } from '../types.js';
+import type { SkeletonNode, StepInfo } from '../types.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 
@@ -225,35 +225,114 @@ export function generateRhythmPlan(
     } else if (
         ['blues', 'jazz', 'rock', 'scalar'].includes(style) &&
         soloistState.session.currentPhrase.context?.role === 'response' &&
-        soloistState.session.currentPhrase.context?.skeleton?.length > 0 &&
-        Math.random() < 0.8 // 80% chance to follow skeleton for response
+        (soloistState.session.currentPhrase.context?.skeleton?.length ?? 0) > 0 &&
+        // why: 80% follow-through is a high-level "answer-mirrors-call" gate. The
+        // remaining 20% falls through to the main attack-prob path so the response
+        // sometimes breathes its own rhythm — a soloist who replies *identically*
+        // every call gets robotic. Threshold is intentionally `Math.random()` and
+        // not deterministic-seeded: this is a gate on whether the entire branch
+        // runs, so a stub or hash here would either lock the test into one path
+        // or never exercise the other (see audit P2 #11 for future tuning hooks).
+        Math.random() < 0.8
     ) {
-        for (const relStep of soloistState.session.currentPhrase.context.skeleton) {
+        const skeleton = soloistState.session.currentPhrase.context.skeleton as Array<
+            number | SkeletonNode
+        >;
+        // why: epic-soloist-idiom S5 — paraphrase = mirror shape AND mark breaths.
+        // (1) Preserve source durationSteps so the call's long-long-short-short
+        //     contour survives. Pre-fix every entry hardcoded `durationSteps: 1`,
+        //     so a sustained-then-comping call always came back as a flat sixteenth
+        //     string — see `soloist.md` P0 #3 ("the answer comes back as a uniform
+        //     string of 16th-note staccato attacks at the call's positions").
+        // (2) Tag mid-phrase phrase-end markers when a sustained attack lands on a
+        //     strong beat after some lead-in notes. Previously the response-skeleton
+        //     branch only got `isPhraseEnd: true` on its final node (via the trailing
+        //     plan[last].isPhraseEnd block below). For longer responses (16+ steps,
+        //     6+ attacks), the role-aware landing bias in soloist-pitch-engine.ts
+        //     (rhythmNode?.isPhraseEnd === true branch) was only exercised once at
+        //     the very end — `soloist.md` P1 #9 calls this out for the monophonic
+        //     case; here we close the gap on the skeleton-mirror path too.
+        let respNotesInPhrase = 0;
+        for (let i = 0; i < skeleton.length; i++) {
+            const entry = skeleton[i];
+            const rawOffset = typeof entry === 'number' ? entry : entry.stepOffset;
+            const relStep = Math.max(0, Math.round(rawOffset || 0));
+            // why: legacy entries (or any persisted state pre-S5) might lack
+            // duration/velocity. Default `durationSteps: 1` matches the old
+            // behavior so back-compat is exact for those entries; velocity
+            // defaults to `0.72` matching the response-signature-builder's
+            // default (line 138 above) so the two paraphrase paths agree.
+            const srcDurationSteps =
+                typeof entry === 'number' ? 1 : Math.max(1, Math.round(entry.durationSteps || 1));
+            const srcVelocity = typeof entry === 'number' ? 0.72 : entry.velocity || 0.72;
+
             const stepTarget = startStep + relStep;
             if (stepTarget >= startStep + activeSteps) {
                 continue;
             }
+            // Clamp duration so a long sustain at the tail doesn't overrun
+            // the active phrase (the picker would crop later anyway, but
+            // keeping the plan in-bounds avoids confusing downstream consumers).
+            const maxDuration = Math.max(1, startStep + activeSteps - stepTarget);
+            const durationSteps = Math.min(srcDurationSteps, maxDuration);
+            const isSustained = durationSteps > 1;
 
-            const measureStep = stepTarget % stepsPerMeasure;
-            const stepInBeat = measureStep % stepsPerBeat;
+            const measureStep =
+                ((stepTarget % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+            const stepInBeat = ((measureStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
             const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
             const isBeatStart = stepInBeat === 0;
             const isDownbeat = measureStep === 0;
             const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+            // why: derive strong-beat from the response's own meter position only.
+            // Inheriting the call's `srcIsStrongBeat` would leak meter context onto
+            // response steps that land in positionally weak slots (e.g. a syncopated
+            // off-beat skeleton offset), inflating their duration via the line-style
+            // strong-beat duration rule at line ~774 below. The pitch picker also
+            // reads this flag for landing bias; mixing two meanings into one signal
+            // (positional strong vs sourced strong) bleeds across consumers.
+            const isStrongBeat = isBeatStart || isDownbeat || isBackbeat;
 
-            let stepVelocity = 0.6 + intensity * 0.4;
+            // why: response velocity = call velocity rebalanced for the response
+            // accent grid. The call's contour (loud-soft-loud-soft) is preserved
+            // multiplicatively, but a downbeat in the response still pulls up
+            // and an offbeat still pulls down — a paraphrase, not a verbatim copy.
+            // Accents kept modest (1.10 / 1.05) so a loud call note mirrored onto
+            // a response downbeat doesn't saturate the 1.25 clamp — at 1.20/1.10
+            // a `srcVelocity` near the call ceiling would peg every time, flattening
+            // exactly the contour peaks the paraphrase is meant to preserve.
+            let stepVelocity = srcVelocity * (0.85 + intensity * 0.3);
             if (isDownbeat) {
-                stepVelocity *= 1.2;
-            } else if (isBackbeat) {
                 stepVelocity *= 1.1;
+            } else if (isBackbeat) {
+                stepVelocity *= 1.05;
             }
+
+            const remainingSteps = (coordination.sectionEnd || 0) - stepTarget;
+            const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
+            const isLastInSkeleton = i === skeleton.length - 1;
+            // Mid-phrase phrase-end: a sustained landing on a strong beat after
+            // ≥4 attacks — the same shape the monophonic main-path uses for its
+            // breath-mark, minus the breath-rest (responses don't take breaths
+            // inside the skeleton; they paraphrase end-to-end). The pitch picker
+            // reads `isPhraseEnd` to bias Response landings toward root/3rd/5th
+            // (see soloist-pitch-engine.ts:716 and :1110).
+            const isMidPhraseEnd =
+                !isLastInSkeleton &&
+                isSustained &&
+                respNotesInPhrase >= 4 &&
+                (isDownbeat || isBeatStart || isFinalMeasure);
 
             plan.push({
                 stepTarget,
                 velocity: Math.min(1.25, stepVelocity),
-                isStrongBeat: isBeatStart || isDownbeat || isBackbeat,
-                durationSteps: 1,
+                isStrongBeat,
+                durationSteps,
+                isSustained,
+                vibrato: isSustained,
+                isPhraseEnd: isMidPhraseEnd || undefined,
             });
+            respNotesInPhrase++;
         }
     } else {
         let sustainStepsRemaining = 0;

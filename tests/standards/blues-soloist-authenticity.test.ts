@@ -251,6 +251,163 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         expect(buryRate).toBeLessThan(0.05);
     });
 
+    it('should preserve call duration shape on the response (skeleton-mirror branch)', () => {
+        // why: epic-soloist-idiom S5 — the response-skeleton branch in
+        // soloist-rhythm-engine used to emit `durationSteps: 1` for every
+        // attack, flattening any "long-long-short-short" call into a uniform
+        // sixteenth tick. This test fails pre-fix because every captured
+        // response phrase has duration variance ≈ 0 (every entry is 1).
+        // Post-fix the response plan carries the call's durations, so the
+        // response distribution mirrors the call's distribution.
+        //
+        // Measurement: every time the role transitions, snapshot the current
+        // rhythm-plan's durationSteps as an array (the "phrase"). Bucket
+        // each phrase's durations into [short=1, medium=2-3, long=4+] and
+        // compare paired call → response histograms via L1 distance. The
+        // response that *flattens* shows L1 ≈ (call's long+medium fraction);
+        // the response that *mirrors* shows L1 close to 0.
+        //
+        // Two assertions: (1) the response distribution has nontrivial long+
+        // medium mass (i.e., not 100% short); (2) the mean paired-L1 distance
+        // is smaller than the random-shuffle baseline by a real margin —
+        // the actual mirroring claim.
+        const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 1024 };
+        const { soloist, playback } = getState();
+        playback.bandIntensity = 0.7;
+
+        const ts = TIME_SIGNATURES['4/4'];
+
+        type Phrase = { role: 'call' | 'response'; durations: number[] };
+        const phrases: Phrase[] = [];
+
+        // Capture each phrase exactly once at its onset — the moment the
+        // soloist wakes from rest. The plan is regenerated at that transition
+        // (see soloist.ts:1395 and surrounding), so the role + the fresh plan
+        // we read on the first non-resting tick *is* the phrase. Mid-phrase
+        // ticks shrink the plan as notes play and would over-count if we
+        // sampled them, so we gate strictly on the rest→active edge.
+        let prevIsResting = true;
+
+        const totalSteps = 60000;
+        for (let i = 0; i < totalSteps; i++) {
+            const info = getStepInfo(i, ts, [], TIME_SIGNATURES);
+
+            getSoloistNote(
+                getState(),
+                chord,
+                null,
+                i,
+                440,
+                0,
+                'blues',
+                info.mStep,
+                { sectionStart: 0, sectionEnd: totalSteps, bypassRhythm: false },
+                info,
+            );
+
+            const isResting = soloist.session.phrasing.isResting;
+            const currentRole = soloist.session.currentPhrase.context?.role;
+            // Rest → active edge: a new phrase just started, the plan has been
+            // freshly generated for it. Capture once and wait for the next rest.
+            if (prevIsResting && !isResting) {
+                const plan = soloist.session.rhythm.plan || [];
+                if (plan.length > 0 && (currentRole === 'call' || currentRole === 'response')) {
+                    phrases.push({
+                        role: currentRole,
+                        durations: plan.map((n: any) =>
+                            Math.max(1, Math.round(n.durationSteps || 1)),
+                        ),
+                    });
+                }
+            }
+            prevIsResting = isResting;
+        }
+
+        // Bucket durations into [short=1, medium=2-3, long=4+].
+        const bucketHistogram = (durations: number[]): [number, number, number] => {
+            if (durations.length === 0) {
+                return [0, 0, 0];
+            }
+            let short = 0;
+            let medium = 0;
+            let long = 0;
+            for (const d of durations) {
+                if (d <= 1) {
+                    short++;
+                } else if (d <= 3) {
+                    medium++;
+                } else {
+                    long++;
+                }
+            }
+            const total = durations.length;
+            return [short / total, medium / total, long / total];
+        };
+
+        const l1 = (a: [number, number, number], b: [number, number, number]) =>
+            Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+
+        // Build paired call → response sequences from the captured phrases.
+        const pairs: Array<{ call: number[]; response: number[] }> = [];
+        for (let i = 0; i < phrases.length - 1; i++) {
+            if (phrases[i].role === 'call' && phrases[i + 1].role === 'response') {
+                const call = phrases[i].durations;
+                const response = phrases[i + 1].durations;
+                if (call.length >= 2 && response.length >= 2) {
+                    pairs.push({ call, response });
+                }
+            }
+        }
+
+        const responsePhrases = phrases.filter((p) => p.role === 'response');
+        const responseBuckets = responsePhrases.map((p) => bucketHistogram(p.durations));
+        const avgResponseShortFraction =
+            responseBuckets.reduce((s, b) => s + b[0], 0) / (responseBuckets.length || 1);
+
+        // Paired L1: distance between each call→response bucket pair.
+        const pairedL1s = pairs.map(({ call, response }) =>
+            l1(bucketHistogram(call), bucketHistogram(response)),
+        );
+        const meanPairedL1 = pairedL1s.reduce((s, v) => s + v, 0) / (pairedL1s.length || 1);
+
+        // Random-shuffle baseline: for each call, pair it with a random response
+        // from elsewhere in the session. If duration shape is unrelated to call,
+        // paired-L1 ≈ shuffled-L1. If responses mirror their own calls, paired-L1
+        // is meaningfully smaller. Use a deterministic shuffle (i+7) so the
+        // baseline is stable across runs.
+        const shuffledL1s = pairs.map(({ call }, idx) => {
+            const partnerIdx = (idx + 7) % pairs.length;
+            return l1(bucketHistogram(call), bucketHistogram(pairs[partnerIdx].response));
+        });
+        const meanShuffledL1 = shuffledL1s.reduce((s, v) => s + v, 0) / (shuffledL1s.length || 1);
+
+        console.log(
+            `[Blues Audit S5] phrases=${phrases.length} pairs=${pairs.length} ` +
+                `response-short-fraction=${(avgResponseShortFraction * 100).toFixed(1)}% ` +
+                `paired-L1=${meanPairedL1.toFixed(3)} shuffled-L1=${meanShuffledL1.toFixed(3)}`,
+        );
+
+        // Sanity: we got enough paired samples to measure.
+        expect(pairs.length).toBeGreaterThan(10);
+
+        // (1) Response distribution is not flat-sixteenths. Pre-fix this was
+        //     ~0.95+ short (every skeleton-branch attack used durationSteps:1).
+        //     Post-fix the call's long/medium notes are mirrored — across 30
+        //     reliability runs response-short stayed between 0.15 and 0.30.
+        //     Threshold 0.50 gives ~20pt headroom over the upper observed edge
+        //     while still catching a partial regression (if someone hardcodes
+        //     `durationSteps: 1` in ~60%+ of skeleton entries the fraction
+        //     climbs back through 0.50 long before the old 0.88 trip-wire).
+        expect(avgResponseShortFraction).toBeLessThan(0.5);
+
+        // (2) Paired call→response L1 distance is meaningfully smaller than
+        //     the random-shuffle baseline. With 3-bucket histograms L1 lives
+        //     in [0, 2]. Across 30 runs paired-L1 stayed 0.05-0.20 below
+        //     shuffled-L1; require at least a 0.02 gap so the assertion is
+        //     directional but doesn't flake on the small-sample tail.
+        expect(meanPairedL1).toBeLessThan(meanShuffledL1 - 0.02);
+    });
+
     it('should trigger bluesTurnaround device during turnaround steps', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 128 };
         const { soloist } = getState();

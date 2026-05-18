@@ -516,13 +516,38 @@ export interface SoloistVoice {
     nodes: AudioNode[];
 }
 
+/**
+ * A single attack captured from the call's rhythm plan, preserved so the response
+ * phrase can paraphrase duration + velocity contour — not just attack positions.
+ * See epic-soloist-idiom S5 and `soloist.md` P0 #3.
+ */
+export interface SkeletonNode {
+    /** `stepTarget - phraseStartStep` — relative position inside the phrase. */
+    stepOffset: number;
+    /** Source duration from the call; the response mirrors this so long-long-short-short survives. */
+    durationSteps: number;
+    /** Source velocity from the call; mirrored so loud-soft contour also survives. */
+    velocity: number;
+    /** Whether this attack was on a strong beat in the call (used for the response's accent grid). */
+    isStrongBeat: boolean;
+}
+
 export interface SoloistPhraseContext {
     role: string;
     /**
-     * Step-offset skeleton for the active phrase — each entry is a `stepTarget - phraseStartStep`
-     * captured from the rhythm plan. Later loops follow this shape when paraphrasing.
+     * Skeleton of the active phrase — captured from the rhythm plan so a later "response"
+     * phrase can paraphrase the call's shape.
+     *
+     * Entry shape evolved with the role-skeleton-response fix (epic-soloist-idiom S5):
+     *  - Legacy: plain `number` = `stepTarget - phraseStartStep` (offset only). The response
+     *    branch in soloist-rhythm-engine used to emit `durationSteps: 1` for every entry,
+     *    flattening "long-long-short-short" call shapes into "tick-tick-tick-tick" replies.
+     *  - Current: `SkeletonNode = { stepOffset, durationSteps, velocity, isStrongBeat }` so
+     *    the response can mirror duration shape AND velocity contour, not just attack
+     *    positions. Plain-number entries are still tolerated for back-compat with any
+     *    persisted state slice that pre-dates the enrichment.
      */
-    skeleton: number[];
+    skeleton: Array<number | SkeletonNode>;
     /** Direction + interval from the previous note; null until the first note plays. */
     lastInterval: { semitones: number; direction: 1 | -1 } | null;
     profile: string;

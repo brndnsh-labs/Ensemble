@@ -1409,12 +1409,27 @@ export function getSoloistNote(
 
                 logDebug(`Generated rhythm plan of length: ${soloist.session.rhythm.plan.length}`);
 
-                // Capture skeleton for future responses
+                // Capture skeleton for future responses.
+                // why: epic-soloist-idiom S5 — the response branch in
+                // soloist-rhythm-engine used to read the skeleton as bare step
+                // offsets and emit `durationSteps: 1` per attack, flattening
+                // every "long-long-short-short" call into "tick-tick-tick-tick".
+                // We now preserve the call's per-attack durationSteps, velocity,
+                // and isStrongBeat so the response can paraphrase the call's
+                // *rhythmic shape*, not just its grid positions. The skeleton
+                // is intentionally a coarse copy (no triplet placement, no
+                // pitch class) — pitch + ornament decisions still get re-rolled
+                // in the response phrase; only the duration/velocity contour
+                // is mirrored. (Richer copies live on `responseSignature`.)
                 if (nextRhythmPlan.length > 0) {
-                    // Skeleton is relative steps from phrase start
                     // @worker-mutation
                     soloist.session.currentPhrase.context.skeleton = nextRhythmPlan.map(
-                        (n: any) => n.stepTarget - step,
+                        (n: any) => ({
+                            stepOffset: n.stepTarget - step,
+                            durationSteps: Math.max(1, n.durationSteps || 1),
+                            velocity: n.velocity || 0.72,
+                            isStrongBeat: Boolean(n.isStrongBeat),
+                        }),
                     );
                 }
             }
