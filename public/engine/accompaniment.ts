@@ -4,6 +4,7 @@ import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import {
     getBassSpaceFloor,
+    getNearestVoiceLeadingCost,
     shouldPreferGroundedPracticeVoicing,
     shouldReserveBassSpace,
 } from './voicing-policy.js';
@@ -458,20 +459,6 @@ function placeIntervalsNearTarget(
     });
 
     return [...new Set(placed)].sort((a, b) => a - b);
-}
-
-function getNearestVoiceLeadingCost(fromMidis: number[], toMidis: number[]): number {
-    if (fromMidis.length === 0 || toMidis.length === 0) {
-        return 0;
-    }
-
-    return fromMidis.reduce((sum, midi) => {
-        const nearest = toMidis.reduce(
-            (best, targetMidi) => Math.min(best, Math.abs(targetMidi - midi)),
-            Number.POSITIVE_INFINITY,
-        );
-        return sum + nearest;
-    }, 0);
 }
 
 function countSharedPitchClasses(

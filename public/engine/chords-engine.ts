@@ -9,7 +9,7 @@ import {
 import type { Chord, ChordNamePart, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
-import { getBassSpaceFloor } from './voicing-policy.js';
+import { getBassSpaceFloor, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
 export type { Chord, ChordNamePart, FormattedChordNames };
 
@@ -209,6 +209,7 @@ export function getBestInversion(
     min: number = 52,
     max: number = 84,
     style: string = 'stabs',
+    enableVoiceLeading: boolean = false,
 ): number[] {
     const { chords } = state;
     const homeAnchor = anchor || chords.octave || 60;
@@ -236,6 +237,7 @@ export function getBestInversion(
     // shift the entire block as a unit to preserve the harmonic structure.
     const isSpread = Math.max(...intervals) > 12;
 
+    let result: number[];
     if (isSpread) {
         let bestShift = 0;
         let minDistance = Infinity;
@@ -252,27 +254,109 @@ export function getBestInversion(
                 bestShift = shift;
             }
         }
-        return intervals.map((i: any) => rootMidi + i + bestShift).sort((a, b) => a - b);
+        result = intervals.map((i: any) => rootMidi + i + bestShift).sort((a, b) => a - b);
+    } else {
+        result = [];
+        intervals.forEach((inter, i) => {
+            const note = rootMidi + inter;
+            const pc = note % 12;
+            const octaves = [-24, -12, 0, 12, 24];
+            const candidates = octaves.map((o) => Math.floor(targetCenter / 12) * 12 + o + pc);
+            candidates.sort((a, b) => Math.abs(a - targetCenter) - Math.abs(b - targetCenter));
+
+            let best = candidates[0];
+            if (i > 0 && best < RANGE_MIN) {
+                while (best - result[i - 1] < 7) {
+                    best += 12;
+                }
+            }
+            result.push(best);
+        });
     }
 
-    const result: number[] = [];
-    intervals.forEach((inter, i) => {
-        const note = rootMidi + inter;
-        const pc = note % 12;
-        const octaves = [-24, -12, 0, 12, 24];
-        const candidates = octaves.map((o) => Math.floor(targetCenter / 12) * 12 + o + pc);
-        candidates.sort((a, b) => Math.abs(a - targetCenter) - Math.abs(b - targetCenter));
+    // Voice-leading second pass: refine the per-interval register-centroid baseline
+    // by snapping each new voice toward its nearest pitch-class neighbor in
+    // `previousMidis`. why: chords.md P1 #6 — the first pass places each interval
+    // at "nearest octave to targetCenter" independently, so common tones and
+    // guide-tone partners (b7→3, 3→7) don't carry across chord changes. This pass
+    // snaps each voice to the octave of its nearest-PC prev voice; common tones
+    // (PC dist 0) collapse to the prior MIDI exactly, half-step resolutions fall
+    // out naturally. Cost-gated against the baseline so we only commit when total
+    // voice-leading motion strictly decreases.
+    //
+    // Opt-in via `enableVoiceLeading`: this is jazz-style voice leading and is
+    // appropriate for chord comping over functional progressions (ii–V–I). Pocket
+    // genres (Neo-Soul, Funk, Reggae) and harmony-line callers that own their own
+    // register intent (harmonies.ts spectral-gap branch) want stability, not
+    // common-tone octave snaps, so the pass stays off by default. Production
+    // callers can opt in per-genre in a follow-up; the test fixture exercises the
+    // behavior directly.
+    let voiceLedResult = result;
+    if (enableVoiceLeading && previousMidis && previousMidis.length > 0) {
+        const refined = result.map((current) => {
+            const pc = ((current % 12) + 12) % 12;
 
-        let best = candidates[0];
-        if (i > 0 && best < RANGE_MIN) {
-            while (best - result[i - 1] < 7) {
-                best += 12;
+            // Find the previous midi nearest in pitch-class space. Pitch-class
+            // distance (mod 12, folded to [0,6]) means common tones get distance 0,
+            // 7→3 and 3→7 get distance 1, etc. — natural priority order.
+            let bestPrev = previousMidis[0];
+            let bestPcDist = Number.POSITIVE_INFINITY;
+            for (let p = 0; p < previousMidis.length; p++) {
+                const prevPc = ((previousMidis[p] % 12) + 12) % 12;
+                const raw = Math.abs(pc - prevPc);
+                const pcDist = Math.min(raw, 12 - raw);
+                if (pcDist < bestPcDist) {
+                    bestPcDist = pcDist;
+                    bestPrev = previousMidis[p];
+                }
             }
-        }
-        result.push(best);
-    });
 
-    let finalResult = result;
+            // Snap `current` to whichever octave of its pitch class sits closest to
+            // bestPrev. For common tones this collapses to bestPrev itself; for
+            // step-wise neighbors it picks the same octave as the prior partner.
+            // Try candidates in distance order so that if the closest octave
+            // falls outside the register slot we fall back to the next-closest.
+            const prevOctaveBase = Math.floor(bestPrev / 12) * 12;
+            const candidates = [
+                prevOctaveBase - 12 + pc,
+                prevOctaveBase + pc,
+                prevOctaveBase + 12 + pc,
+            ];
+            candidates.sort((a, b) => Math.abs(a - bestPrev) - Math.abs(b - bestPrev));
+
+            for (let c = 0; c < candidates.length; c++) {
+                if (candidates[c] >= RANGE_MIN && candidates[c] <= RANGE_MAX) {
+                    return candidates[c];
+                }
+            }
+            return current;
+        });
+
+        const baselineCost = getNearestVoiceLeadingCost(result, previousMidis);
+        const refinedCost = getNearestVoiceLeadingCost(refined, previousMidis);
+        // Pocket-preservation gate: getNearestVoiceLeadingCost doesn't enforce a
+        // one-to-one match between new and prev voices, so it can reward "all new
+        // voices crowd around a single prev voice" — which
+        // is how a greedy nearest-PC snap can ratchet a comping pattern down
+        // toward the bass floor across a long progression. Require the refined
+        // centroid to stay within a perfect fourth (5 semitones) of homeAnchor
+        // so common-tone holds and step-wise resolutions can still commit but
+        // a register slide can't. ANCHOR-relative (not baseline-relative) because
+        // the goal is to keep voicings IN the comping pocket the caller asked for,
+        // not just close to whatever the first pass happened to produce.
+        const MAX_REFINED_CENTROID_DRIFT = 5;
+        let refinedSum = 0;
+        for (let i = 0; i < refined.length; i++) {
+            refinedSum += refined[i];
+        }
+        const refinedCentroid = refinedSum / refined.length;
+        const refinedAnchorDrift = Math.abs(refinedCentroid - homeAnchor);
+        if (refinedCost < baselineCost && refinedAnchorDrift <= MAX_REFINED_CENTROID_DRIFT) {
+            voiceLedResult = refined;
+        }
+    }
+
+    let finalResult = voiceLedResult;
     const minNote = Math.min(...finalResult);
     if (minNote < RANGE_MIN) {
         finalResult = finalResult.map((n) => n + 12);

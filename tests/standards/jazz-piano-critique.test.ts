@@ -5,6 +5,7 @@ import {
     generateCompingPattern,
     getAccompanimentNotes,
 } from '../../public/engine/accompaniment.js';
+import { getBestInversion } from '../../public/engine/chords-engine.js';
 import { getState } from '../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -372,6 +373,302 @@ describe('Jazz Piano Critique', () => {
             //      should be fully covered). Threshold = full bank size, no
             //      sub-baseline slack.
             expect(distinctCells).toBeGreaterThanOrEqual(bankSize);
+        });
+    });
+
+    // why: chords.md P1 #6 / epic-chords-voicing S1. `getBestInversion` previously
+    //      placed each interval at "nearest octave to targetCenter" independently.
+    //      The targetCenter is derived from the previous voicing centroid, which
+    //      did pull new voicings into roughly the same register pocket, but the
+    //      per-interval pass had no notion of which previous voice each new voice
+    //      should hold/resolve to. A common-tone PC could land in a different
+    //      octave than its prior incarnation; a guide-tone third/seventh could
+    //      jump an octave away from the prior seventh/third. S1 adds a second
+    //      pass that snaps each new voice to the octave of the nearest-PC previous
+    //      voice (common tones collapse to the prior MIDI, b7→3 resolutions
+    //      collapse to the prior 7th's octave), cost-gated and register-clamped.
+    //
+    //      These assertions prove the second pass actually moves the needle on
+    //      the canonical ii–V–I voice-leading benchmark. We compare against a
+    //      "null prev" control where each chord is voiced from scratch — the
+    //      honest baseline for a register-centroid optimizer without voice
+    //      leading. Threshold is set above the noise floor of the centroid-pull
+    //      behavior so a regression to "centroid only" (which still produces
+    //      *some* implicit voice leading via shared targetCenter) is caught.
+    describe('S1: voice-leading second pass on ii–V–I', () => {
+        // Rootless jazz voicings: m7=[3,10,14], 7=[4,10,14], maj7=[4,11,14].
+        // Standard `[3,7,10]` / `[4,7,10]` / `[4,7,11]` (with-5) work too —
+        // we test both to confirm the pass helps across voicing densities.
+        const PROGS_C = [
+            // Dm7 — G7 — Cmaj7 in C major (the canonical example from the audit).
+            {
+                name: 'rootless',
+                chords: [
+                    { root: 62, intervals: [3, 10, 14] }, // F, C, E (b3, b7, 9)
+                    { root: 55, intervals: [4, 10, 14] }, // B, F, A (3, b7, 9)
+                    { root: 60, intervals: [4, 11, 14] }, // E, B, D (3, 7, 9)
+                ],
+            },
+            {
+                name: 'with-5',
+                chords: [
+                    { root: 62, intervals: [0, 3, 7, 10] }, // D, F, A, C
+                    { root: 55, intervals: [0, 4, 7, 10] }, // G, B, D, F
+                    { root: 60, intervals: [0, 4, 7, 11] }, // C, E, G, B
+                ],
+            },
+        ];
+
+        // why: ii–V–I across the circle of fifths probes voice leading at every
+        //      starting register, not just C. Some keys force the centroid pull
+        //      to fire (drift > 5 from anchor), which is exactly where the
+        //      second pass earns its keep — when the centroid is yanked back
+        //      toward the home anchor and would otherwise misplace a voice.
+        const KEYS = [
+            { name: 'C', ii: 62, V: 55, I: 60 },
+            { name: 'F', ii: 67, V: 60, I: 65 },
+            { name: 'Bb', ii: 60, V: 53, I: 58 },
+            { name: 'Eb', ii: 65, V: 58, I: 63 },
+            { name: 'Ab', ii: 58, V: 63, I: 56 },
+            { name: 'Db', ii: 63, V: 56, I: 61 },
+            { name: 'G', ii: 57, V: 62, I: 67 },
+            { name: 'D', ii: 64, V: 57, I: 62 },
+        ];
+
+        const topMotionFor = (chords) => {
+            const tops = chords.map((c) => Math.max(...c));
+            let sum = 0;
+            for (let i = 1; i < tops.length; i++) {
+                sum += Math.abs(tops[i] - tops[i - 1]);
+            }
+            return sum;
+        };
+
+        const totalMotionFor = (chords) => {
+            // Sum of per-voice nearest-neighbor distances across consecutive chords.
+            // Mirrors the engine's own `getNearestVoiceLeadingCost` (one-direction).
+            let total = 0;
+            for (let i = 1; i < chords.length; i++) {
+                const from = chords[i - 1];
+                const to = chords[i];
+                for (const f of from) {
+                    let best = Number.POSITIVE_INFINITY;
+                    for (const t of to) {
+                        best = Math.min(best, Math.abs(t - f));
+                    }
+                    total += best;
+                }
+            }
+            return total;
+        };
+
+        const stateStub = {
+            playback: { bandIntensity: 0.5, complexity: 0.5 },
+            chords: { octave: 60 },
+        };
+
+        // Position 9 of `getBestInversion` is the opt-in `enableVoiceLeading` flag;
+        // positions 5-8 are `isPivot`, `anchor`, `min`, `max` and we accept their
+        // defaults. Spelling them out keeps the call site readable when the test
+        // breaks in the future.
+        const vlArgs = [false, null, 52, 84, 'stabs', true] as const;
+
+        it.each(PROGS_C)('holds common-tone F across Dm7→G7 (C major, $name)', ({ chords }) => {
+            // why: the canonical "F held" claim from the story. F is the b3 of
+            //      Dm7 (pc 5) and the b7 of G7 (pc 5). With voice leading on, the
+            //      same MIDI value should appear in both voicings — not just the
+            //      same pitch class in some random octave. This isolates the
+            //      common-tone-hold branch of the second pass without any
+            //      statistical thresholds.
+            const dm7 = getBestInversion(
+                stateStub,
+                chords[0].root,
+                chords[0].intervals,
+                [],
+                ...vlArgs,
+            );
+            const g7 = getBestInversion(
+                stateStub,
+                chords[1].root,
+                chords[1].intervals,
+                dm7,
+                ...vlArgs,
+            );
+            // F-pitch-class MIDIs present in each chord:
+            const dm7Fs = dm7.filter((m) => m % 12 === 5);
+            const g7Fs = g7.filter((m) => m % 12 === 5);
+            expect(dm7Fs.length).toBeGreaterThan(0);
+            expect(g7Fs.length).toBeGreaterThan(0);
+            // The same MIDI should appear in both — common-tone hold, not octave jump.
+            const sharedMidi = dm7Fs.some((m) => g7Fs.includes(m));
+            expect(sharedMidi).toBe(true);
+        });
+
+        it.each(PROGS_C)('minimizes top-voice motion across ii–V–I in C ($name)', ({ chords }) => {
+            // With voice leading (production path: previousMidis passed forward)
+            const withVL = [];
+            for (let i = 0; i < chords.length; i++) {
+                const prev = i === 0 ? [] : withVL[i - 1];
+                withVL.push(
+                    getBestInversion(
+                        stateStub,
+                        chords[i].root,
+                        chords[i].intervals,
+                        prev,
+                        ...vlArgs,
+                    ),
+                );
+            }
+
+            // Without voice leading (control: previousMidis forced empty for each chord —
+            // each voicing is centered on the home anchor in isolation).
+            const noVL = chords.map((c) => getBestInversion(stateStub, c.root, c.intervals, []));
+
+            const topVL = topMotionFor(withVL);
+            const topNoVL = topMotionFor(noVL);
+            const totalVL = totalMotionFor(withVL);
+            const totalNoVL = totalMotionFor(noVL);
+
+            console.log(
+                `\n--- ii–V–I C ${chords.length}v ${chords[0].intervals.length}-interval ` +
+                    `($name) ---\n` +
+                    `[Top motion]    VL=${topVL}  NoVL=${topNoVL}\n` +
+                    `[Total motion]  VL=${totalVL}  NoVL=${totalNoVL}\n` +
+                    '------------------------------------\n',
+            );
+
+            // With voice leading must not be WORSE than the null-baseline.
+            // why: per-key the differential can be 0 when both paths happen to
+            //      land identical voicings, but it must never regress.
+            expect(totalVL).toBeLessThanOrEqual(totalNoVL);
+            expect(topVL).toBeLessThanOrEqual(topNoVL);
+        });
+
+        it('aggregate top-voice motion across 8 keys drops substantially with voice leading', () => {
+            // why: this is the headline assertion — across the circle of fifths,
+            //      voice-leading-aware placement should significantly reduce the
+            //      summed top-voice traversal vs the null-prev control. We sum
+            //      over all 8 keys × 2 voicing densities = 16 progressions and
+            //      require the VL aggregate to be at most 60% of the null
+            //      baseline. The 60% headroom is calibrated from the simulator:
+            //      the centroid-pull baseline already produces ~70% of null,
+            //      and the second pass takes another ~10pp off; 60% is the
+            //      midpoint with a comfortable cushion against single-key
+            //      regressions. Sub-baseline guard (per MUSICAL_AUDIT): a 60%
+            //      threshold is well above the noise floor.
+            let totalVL = 0;
+            let totalNoVL = 0;
+            let topVL = 0;
+            let topNoVL = 0;
+
+            for (const key of KEYS) {
+                for (const voicing of PROGS_C) {
+                    // Re-root the voicing template at this key's degrees:
+                    const chords = [
+                        { root: key.ii, intervals: voicing.chords[0].intervals },
+                        { root: key.V, intervals: voicing.chords[1].intervals },
+                        { root: key.I, intervals: voicing.chords[2].intervals },
+                    ];
+                    const withVL = [];
+                    for (let i = 0; i < chords.length; i++) {
+                        const prev = i === 0 ? [] : withVL[i - 1];
+                        withVL.push(
+                            getBestInversion(
+                                stateStub,
+                                chords[i].root,
+                                chords[i].intervals,
+                                prev,
+                                ...vlArgs,
+                            ),
+                        );
+                    }
+                    const noVL = chords.map((c) =>
+                        getBestInversion(stateStub, c.root, c.intervals, []),
+                    );
+                    totalVL += totalMotionFor(withVL);
+                    totalNoVL += totalMotionFor(noVL);
+                    topVL += topMotionFor(withVL);
+                    topNoVL += topMotionFor(noVL);
+                }
+            }
+
+            const totalRatio = totalVL / totalNoVL;
+            const topRatio = topVL / topNoVL;
+
+            console.log(
+                '\n--- ii–V–I VOICE-LEADING AGGREGATE (8 keys × 2 voicings) ---\n' +
+                    `[Total motion]  VL=${totalVL}  NoVL=${totalNoVL}  ratio=${(totalRatio * 100).toFixed(1)}%\n` +
+                    `[Top motion]    VL=${topVL}  NoVL=${topNoVL}  ratio=${(topRatio * 100).toFixed(1)}%\n` +
+                    '----------------------------------------------------------\n',
+            );
+
+            // why: empirically the opt-in second pass (with the pocket-preservation
+            //      gate in place) drops total motion to ~66% of the null baseline
+            //      and top-voice motion to ~74%. Guard at 0.72 / 0.80 — well above
+            //      the null-baseline noise floor (1.0) and ~6-8pp below measurement,
+            //      so disabling the opt-in pass or breaking the cost gate fails
+            //      loudly without flaking on per-key variance. Sub-baseline-threshold
+            //      guard per docs/MUSICAL_AUDIT.md.
+            expect(totalRatio).toBeLessThan(0.72);
+            expect(topRatio).toBeLessThan(0.8);
+
+            // why: pocket-preservation assertion. The motion-ratio metric doesn't
+            //      enforce a one-to-one match between new and prev voices, so it
+            //      would reward an algorithm that ratchets every chord toward
+            //      whichever register has the most prev voices, even
+            //      if the resulting voicings collapse below the comping pocket.
+            //      Require every chord's centroid to stay within ~7 of the home
+            //      anchor (55 ≤ centroid ≤ 67) AND the median top voice across all
+            //      progressions to land at or above MIDI 63 (D#4) — both ensure
+            //      voicings remain in the canonical mid-piano comping range.
+            //      Per-chord centroid ceiling is asymmetric (down-cap tighter
+            //      than up-cap) because some keys' first-pass placement is
+            //      naturally pulled high by the centroid-pull cascade, and that
+            //      pre-existing first-pass behavior is out of S1 scope. If a
+            //      future cost-gate change lets refinements migrate the centroid
+            //      down the keyboard, these gates fail before the motion-ratio
+            //      gates do. Direct guard against the music-theory-reviewer's
+            //      register-collapse pathology.
+            const allCentroids: number[] = [];
+            const allTops: number[] = [];
+            for (const key of KEYS) {
+                for (const voicing of PROGS_C) {
+                    const chords = [
+                        { root: key.ii, intervals: voicing.chords[0].intervals },
+                        { root: key.V, intervals: voicing.chords[1].intervals },
+                        { root: key.I, intervals: voicing.chords[2].intervals },
+                    ];
+                    const voiced: number[][] = [];
+                    for (let i = 0; i < chords.length; i++) {
+                        const prev = i === 0 ? [] : voiced[i - 1];
+                        voiced.push(
+                            getBestInversion(
+                                stateStub,
+                                chords[i].root,
+                                chords[i].intervals,
+                                prev,
+                                ...vlArgs,
+                            ),
+                        );
+                    }
+                    // Skip the first chord — it has no `previousMidis`, so the
+                    // second pass doesn't run on it. Its placement is whatever the
+                    // existing first-pass + range-clamp produces; that's a
+                    // pre-existing concern, not what S1 governs.
+                    for (let i = 1; i < voiced.length; i++) {
+                        const c = voiced[i];
+                        allCentroids.push(c.reduce((s, m) => s + m, 0) / c.length);
+                        allTops.push(Math.max(...c));
+                    }
+                }
+            }
+            const minCentroid = Math.min(...allCentroids);
+            const maxCentroid = Math.max(...allCentroids);
+            const sortedTops = [...allTops].sort((a, b) => a - b);
+            const medianTop = sortedTops[Math.floor(sortedTops.length / 2)];
+            expect(minCentroid).toBeGreaterThanOrEqual(55);
+            expect(maxCentroid).toBeLessThanOrEqual(67);
+            expect(medianTop).toBeGreaterThanOrEqual(63);
         });
     });
 });

@@ -91,3 +91,31 @@ export function shouldUseRootlessVoicing(
 export function getBassSpaceFloor(state: EnsembleState): number {
     return shouldReserveBassSpace(state) ? 52 : 43;
 }
+
+/**
+ * Sum of per-voice nearest-neighbor semitone distances from `fromMidis` to `toMidis`.
+ * Used as a coarse voice-leading cost so callers can prefer adjustments that reduce
+ * total motion (common-tone holds + step-wise resolutions) over the per-interval
+ * register-centroid baseline. Each `fromMidi` is matched to its nearest `toMidi`
+ * independently (no bipartite matching) — cheap, monotonic, good enough for a
+ * second-pass refinement.
+ */
+export function getNearestVoiceLeadingCost(fromMidis: number[], toMidis: number[]): number {
+    if (fromMidis.length === 0 || toMidis.length === 0) {
+        return 0;
+    }
+
+    let total = 0;
+    for (let i = 0; i < fromMidis.length; i++) {
+        const midi = fromMidis[i];
+        let best = Number.POSITIVE_INFINITY;
+        for (let j = 0; j < toMidis.length; j++) {
+            const dist = Math.abs(toMidis[j] - midi);
+            if (dist < best) {
+                best = dist;
+            }
+        }
+        total += best;
+    }
+    return total;
+}
