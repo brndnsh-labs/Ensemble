@@ -695,13 +695,16 @@ export function generateCompingPattern(
     }
 
     if (genre === 'Reggae') {
-        // Skank on backbeats
+        // NOTE: post-S5 the chord-channel reggae lane (`getAccompanimentNotes`,
+        // ~line 1899) gates only on `stepInfo.isBackbeat` and never consults
+        // `compingState.currentCell`. This pattern is not currently consumed.
+        // Kept for parity with the other genre branches in case a future bubble
+        // lane or "rockers" double-skank wants a cell to read from.
         const backbeats = ts.backbeat || [1, 3];
         backbeats.forEach((b: number) => {
             hit(getBeatStep(b));
         });
 
-        // Sometimes double skank if active
         if (vibe === 'active' || intensity > 0.7) {
             backbeats.forEach((b: number) => {
                 hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
@@ -1897,12 +1900,17 @@ export function getAccompanimentNotes(
     }
 
     if (genre === 'Reggae') {
-        // Lane A: The Skank (Staccato chords on backbeats)
+        // why: epic-chords-voicing.md S5 — the chords channel = the keyboardist,
+        // and the keyboardist in reggae plays the skank (staccato chords on
+        // beats 2 and 4). The bubble (eighth-note offbeats) is the organist's
+        // job and belongs on the harmony channel, not here. The previous code
+        // fired both lanes in parallel, which the audit identified as the
+        // union-not-choice bug. The bubble was removed entirely rather than
+        // gated on a `chords.style === 'organ'` value that doesn't exist in
+        // `CHORD_STYLES` ('organ' lives in `HARMONY_STYLES`, see
+        // `instrument-styles.ts`). Reggae-bubble-on-harmony is captured as a
+        // follow-up to live in `harmonies.ts` under `activeStyle === 'organ'`.
         const isSkank = stepInfo ? stepInfo.isBackbeat : intBeat % 2 !== 0;
-
-        // Lane B: The Bubble (Organ eighth-note patterns)
-        const isBubble = step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
-        const bubbleProb = 0.3 + intensity * 0.5;
 
         if (isSkank && isBeatStart) {
             let voicing = [...chord.freqs];
@@ -1922,35 +1930,6 @@ export function getAccompanimentNotes(
                     dry: true,
                 });
             });
-            return notes;
-        }
-
-        if (isBubble && Math.random() < bubbleProb) {
-            // Bubble uses low-register single notes or dyads
-            const bubbleMidi = getMidi(chord.freqs[0]);
-            const bubbleMidi2 = chord.freqs[1] ? getMidi(chord.freqs[1]) : null;
-
-            const v = (0.3 + intensity * 0.4) * (0.9 + Math.random() * 0.2);
-            notes.push({
-                midi: bubbleMidi,
-                velocity: v,
-                durationSteps: 0.5,
-                ccEvents: ccEvents,
-                timingOffset: 0.005,
-                instrument: 'Piano',
-                dry: true,
-            });
-            if (bubbleMidi2 && Math.random() < 0.4) {
-                notes.push({
-                    midi: bubbleMidi2,
-                    velocity: v * 0.8,
-                    durationSteps: 0.5,
-                    ccEvents: [],
-                    timingOffset: 0.01,
-                    instrument: 'Piano',
-                    dry: true,
-                });
-            }
             return notes;
         }
 
