@@ -437,16 +437,96 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             { midi: selectedMidi, durationSteps: 2, velocity: devBaseVel, style: activeStyle },
         ];
     } else if (deviceType === 'bebopScale') {
-        // Run with chromatic passing tone
-        const _scale = getScaleForChord(state, targetChord, null, activeStyle);
-        const root = targetChord.rootMidi;
-        const bebopNote = root + 11; // Major 7 passing tone for dominant
+        // why: Parker-textbook bebop line — walk into `selectedMidi` (a chord
+        // tone, gated at the picker layer in soloist-pitch-engine.ts ~1366)
+        // through bebop-scale tones with one chromatic passing tone at the
+        // canonical slot for the chord quality. Last buffer note IS
+        // `selectedMidi`; pre-notes are stepwise approaches, matching how
+        // `run` and `enclosure` resolve. The picker gate guarantees the
+        // chord-tone precondition, so the device contains no snap/repair.
+        const scale = getScaleForChord(state, targetChord, null, activeStyle);
+        const rootPc = ((targetChord.rootMidi % 12) + 12) % 12;
+        const quality = (targetChord.quality || 'major') as string;
+
+        // why: `motifApproach` indicates which side of the target the
+        // pre-notes sit on (mirrors `run`: `selectedMidi + motifApproach*k`
+        // puts them above when +1, below when -1). Walking AWAY from the
+        // target — the direction we build pre-notes in — is therefore
+        // `motifApproach`. When pre-notes sit below (motifApproach=-1),
+        // the line played forward ascends into the resolution.
+        const stepBack = motifApproach >= 0 ? 1 : -1;
+
+        // why: bebop passing-tone selection by chord quality.
+        //  - Dominant (default): major-7 between b7 and root (Parker / dominant bebop).
+        //  - Major: b6 between 5 and 6 (major bebop scale).
+        //  - Minor (m, m7, min7, m9, m11, m13, but NOT maj*): major-3 between b3 and 4 (dorian bebop).
+        // halfdim ('halfdim') doesn't start with 'm' so falls through to
+        // dominant default — musically reasonable for ø7 (locrian-bebop is
+        // a future style refinement, tracked in FOLLOWUPS.md).
+        const isMinorQuality = quality.startsWith('m') && !quality.startsWith('maj');
+        // why: include `augmaj7` (augmented-major-7) in the major family — it has a
+        // maj3 and maj7. Note: b6 PC (rootPc+8) IS the augmaj7 #5, so no chromatic
+        // passing tone is actually inserted — the walk degenerates to a clean
+        // Lydian-Augmented scalar line. Documented limitation; locrian-bebop / aug
+        // bebop variants tracked in FOLLOWUPS.md.
+        const isMajorQuality =
+            quality === 'major' || quality.startsWith('maj') || quality === 'augmaj7';
+        const passingPc = isMajorQuality
+            ? (rootPc + 8) % 12 // b6 — bridges 5 and 6 in the major bebop scale
+            : isMinorQuality
+              ? (rootPc + 4) % 12 // major 3 — bridges b3 and 4 in dorian bebop
+              : (rootPc + 11) % 12; // major 7 — bridges b7 and root in dominant bebop
+
+        // Bebop-scale PC set: chord's diatonic scale plus the chromatic passing tone.
+        const bebopPcSet = new Set<number>();
+        for (const iv of scale) {
+            bebopPcSet.add((((rootPc + iv) % 12) + 12) % 12);
+        }
+        bebopPcSet.add(passingPc);
+
+        // why: walk AWAY from `selectedMidi` in direction `stepBack` to find 3
+        // leading pitches, each one a bebop-scale step. Buffer plays in
+        // forward order, so we unshift to build
+        // [farthest, …, nearest, selectedMidi]. Max 4-semitone hop bounds
+        // the search so an exotic scale (whole-tone, diminished) doesn't
+        // run away.
+        const findNextBebopMidi = (from: number, stepDir: number): number => {
+            for (let semi = 1; semi <= 4; semi++) {
+                const candidate = from + stepDir * semi;
+                const pc = ((candidate % 12) + 12) % 12;
+                if (bebopPcSet.has(pc)) {
+                    return candidate;
+                }
+            }
+            // Fallback: full whole-tone step in stepDir. Keeps the line moving
+            // even if the scale set is degenerate.
+            return from + stepDir * 2;
+        };
+
+        const pre: any[] = [];
+        let cursor = selectedMidi;
+        for (let i = 0; i < 3; i++) {
+            cursor = findNextBebopMidi(cursor, stepBack);
+            // Velocity ramps INTO the resolution (farthest = quietest, nearest = louder).
+            // pre[0]=0.7, pre[1]=0.8, pre[2]=0.9, target=1.2 — matches run/enclosure
+            // where the resolution downbeat is the velocity peak.
+            const velMult = 0.7 + i * 0.1;
+            pre.unshift({
+                midi: cursor,
+                durationSteps: 1,
+                velocity: devBaseVel * velMult,
+                style: activeStyle,
+            });
+        }
 
         deviceBuffer = [
-            { midi: root + 12, durationSteps: 1, velocity: devBaseVel, style: activeStyle },
-            { midi: bebopNote, durationSteps: 1, velocity: devBaseVel * 0.9, style: activeStyle },
-            { midi: root + 10, durationSteps: 1, velocity: devBaseVel * 0.8, style: activeStyle },
-            { midi: root + 9, durationSteps: 1, velocity: devBaseVel * 0.7, style: activeStyle },
+            ...pre,
+            {
+                midi: selectedMidi,
+                durationSteps: 1,
+                velocity: devBaseVel * 1.2,
+                style: activeStyle,
+            },
         ];
     } else if (deviceType === 'quartalStack' && isPolyphonic) {
         // Stack of 4ths
@@ -508,7 +588,50 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         const firstNote = Array.isArray(deviceBuffer[0]) ? deviceBuffer[0][0] : deviceBuffer[0];
         const startMidi = firstNote.midi;
         const targetMidi = soloist.session.phrasing.isResting ? dynamicCenter : lastMidi;
-        const octaveShift = Math.round((targetMidi - startMidi) / 12) * 12;
+        const baseShift = Math.round((targetMidi - startMidi) / 12) * 12;
+
+        // why: scan the full buffer (including polyphonic sub-arrays) for the
+        // min/max MIDI so the chosen octave shift keeps the WHOLE buffer
+        // inside [minMidi, maxMidi]. Previously the shifter centered only
+        // `firstNote.midi` and clamped per-note on the way out — for a
+        // device like bebopScale where firstNote is the FARTHEST pre-note
+        // (~6 semitones from the resolution), the base shift could push
+        // the resolution outside the range and collapse it onto the clamp
+        // boundary, mutating its PC and breaking the contract that the
+        // last buffer note is a chord tone.
+        let bufLo = Number.POSITIVE_INFINITY;
+        let bufHi = Number.NEGATIVE_INFINITY;
+        for (const n of deviceBuffer) {
+            const notes = Array.isArray(n) ? n : [n];
+            for (const note of notes) {
+                if (note.midi < bufLo) {
+                    bufLo = note.midi;
+                }
+                if (note.midi > bufHi) {
+                    bufHi = note.midi;
+                }
+            }
+        }
+
+        // why: try the base shift first (preserves the original "center
+        // firstNote near target" intent), then ±12, then ±24. Pick the
+        // closest-to-base shift whose translated buffer fits inside the
+        // register. If none fit (range exceeds maxMidi - minMidi —
+        // genuinely degenerate), fall through to base + per-note clamp,
+        // matching the previous lossy behavior for that edge case only.
+        let octaveShift = baseShift;
+        for (const candidate of [
+            baseShift,
+            baseShift - 12,
+            baseShift + 12,
+            baseShift - 24,
+            baseShift + 24,
+        ]) {
+            if (bufLo + candidate >= minMidi && bufHi + candidate <= maxMidi) {
+                octaveShift = candidate;
+                break;
+            }
+        }
 
         return deviceBuffer.map((n: any) => {
             const notes = Array.isArray(n) ? n : [n];

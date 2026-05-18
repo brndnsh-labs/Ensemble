@@ -1359,9 +1359,19 @@ export function selectPitchAndDevices(
         // devices swallow at most one planned attack. Without this, a mid-phrase
         // bluesLick silently eats 3-4 plan attacks via the consumer's `step >
         // stepTarget` shift in soloist.ts.
-        const fittedAllowed = allowed.filter((device) =>
-            deviceFitsHere(device, soloistState, step),
-        );
+        // why: the bebopScale device is contractual — its passing tone exists
+        // to land a chord tone on the strong beat (the buffer's last note IS
+        // `selectedMidi`). When the picker chose a non-chord-tone, fall through
+        // to `run`/`enclosure` instead of compensating in the device (which
+        // would mutate `selectedMidi` by up to a tritone and break the line).
+        const selectedPcRel = (((selectedMidi - targetChord.rootMidi) % 12) + 12) % 12;
+        const selectedIsChordTone = ((chordMask >> selectedPcRel) & 1) === 1;
+        const fittedAllowed = allowed.filter((device) => {
+            if (device === 'bebopScale' && !selectedIsChordTone) {
+                return false;
+            }
+            return deviceFitsHere(device, soloistState, step);
+        });
         const deviceType =
             fittedAllowed.length > 0
                 ? fittedAllowed[Math.floor(Math.random() * fittedAllowed.length)]
