@@ -550,6 +550,19 @@ export function selectPitchAndDevices(
         !lastWasBlueNote &&
         ((chromaticNeighborMask >> lastInterval) & 1) === 1;
 
+    // S6: Pre-compute a bitmask of the style's preferred extension intervals so
+    // each candidate only needs a single O(1) bitmask test in the hot loop.
+    // why: targetExtensions lists the semitone intervals (relative to chord root)
+    // that characterize this style's harmonic color — e.g. jazz [2,6,9,11,13]:
+    // 9th (2), tritone (6), 13th (9), maj7 (11). Values > 11 are normalized via
+    // % 12 because traditional extension notation uses 9/11/13 (jazz convention)
+    // while the picker works with 0-11 intervals. Entries that normalize to the
+    // same value (e.g. 2 and 14) are deduplicated by the bitmask automatically.
+    let targetExtensionsMask = 0;
+    for (const ext of (config.targetExtensions as number[] | undefined) ?? []) {
+        targetExtensionsMask |= 1 << (((ext % 12) + 12) % 12);
+    }
+
     for (let m = searchMin; m <= searchMax; m++) {
         const pc = ((m % 12) + 12) % 12;
         const interval = (pc - (rootMidi % 12) + 12) % 12;
@@ -834,6 +847,23 @@ export function selectPitchAndDevices(
 
         if (isChordTone) {
             weight += 150;
+        }
+
+        // S6: targetExtensions nudge — additive bonus for style-characteristic
+        // color tones (e.g. jazz [2, 6, 9, 11], bird [2, 6, 9]). Convention:
+        // entries are semitone intervals 0-11; chord tones (0/4/7) and avoid
+        // notes are excluded at config-time (see soloist-config.ts comment).
+        // why additive (not final-stage *=): the goal is a small color bias
+        // that tips otherwise-equal candidates, not a dominator that overrides
+        // chord-tone or strong-beat preference. Realized lift depends on which
+        // other bonuses fired — chord-tone candidates can't overlap (those PCs
+        // are excluded from the config arrays), so +40 mostly acts on weight=1
+        // baseline candidates where it's a meaningful tip without overwhelming
+        // the chord-tone (+150) or strong-beat (+300) anchors that command on
+        // landing positions. Applied before the SRDC multiplier so Departure's
+        // chord-tone suppression doesn't also suppress extension color.
+        if ((targetExtensionsMask >> interval) & 1) {
+            weight += 40;
         }
 
         // Prioritize chord tones on strong beats or sustained notes

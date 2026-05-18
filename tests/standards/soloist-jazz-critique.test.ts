@@ -363,12 +363,18 @@ describe('Soloist Jazz Critique', () => {
             '\n--- BIRD CHROMATISM RATIO CRITIQUE ---\n' +
                 `[Total attacks]      ${notes.length}\n` +
                 `[Class buckets]      ${JSON.stringify(buckets)}\n` +
-                `[Chromatism ratio]   ${(chromatismRatio * 100).toFixed(1)}% (target ≥ 30.5%)\n` +
+                `[Chromatism ratio]   ${(chromatismRatio * 100).toFixed(1)}% (target ≥ 29%)\n` +
                 '---------------------------------------\n',
         );
 
         expect(notes.length).toBeGreaterThan(200);
-        expect(chromatismRatio).toBeGreaterThanOrEqual(0.305);
+        // S1 set floor at 30.5% over an un-patched ceiling of 30.6%.
+        // S6 stripped bird's P4 (`5`) from targetExtensions because P4 is an
+        // avoid note on most chord qualities, shifting the distribution center
+        // from ~30.8% to ~30.7% with min observed 29.7% over 20 reliability
+        // runs. Floor relaxed to 29% to absorb the new variance while still
+        // detecting the S1 chromatic-neighbor admission (un-patched < 25%).
+        expect(chromatismRatio).toBeGreaterThanOrEqual(0.29);
     });
 
     // why: Epic 4 / S3 — `bebopScale` device used to anchor at `root + 12`

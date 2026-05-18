@@ -34,12 +34,20 @@ export interface ContourSkeletonStep {
 export interface StyleConfig {
     genreGravityOffset: number;
     restBase: number;
-    tensionScale: number;
     timingJitter: number;
     maxNotesPerPhrase: number;
     minNotesPerPhrase: number;
     doubleStopProb: number;
     anticipationProb: number;
+    // S6: wired in soloist-pitch-engine selectPitchAndDevices as a +weight
+    // nudge toward style-characteristic color tones. Convention: semitone
+    // intervals 0-11 relative to the chord root. CHORD TONES (0=root, 4=maj3,
+    // 7=P5) MUST NOT appear here — they are already heavily rewarded by the
+    // chord-tone bonus (+150) and double-rewarding masks the style flavor.
+    // Avoid notes (e.g. 5=P4 over most qualities) likewise excluded. Typical
+    // values: 1 (b9), 2 (9), 6 (#11/tritone), 8 (b13), 9 (13), 10 (b7),
+    // 11 (maj7). Mask normalizes via % 12 so author shorthand is forgiving
+    // but you should write in 0-11 to stay readable.
     targetExtensions: number[];
     deviceProb: number;
     allowedDevices: string[];
@@ -50,7 +58,11 @@ export interface StyleConfig {
     stationaryProb: number;
     rhythmicDensity: number;
     syncopationLikelihood: number;
-    targetAnchoring: number;
+    // S6: wired in soloist-pitch-engine selectPitchAndDevices candidate loop
+    // as a final-stage weight *= CHROMATIC_NEIGHBOR_BASE_PENALTY * chromaticism
+    // multiplier that controls how freely chromatic approach-note neighbors
+    // of chord tones are admitted. Admission is gated off entirely below 0.3
+    // so low-chromaticism styles (country 0.2, default scalar 0.1) stay diatonic.
     chromaticism: number;
     seedTriplets: SeedTriplets;
     motivicResponse: MotivicResponse;
@@ -86,7 +98,6 @@ const DEFAULT_MOTIVIC_RESPONSE: MotivicResponse = {
 const DEFAULT_STYLE_CONFIG: StyleConfig = {
     genreGravityOffset: 0,
     restBase: 0.1,
-    tensionScale: 0.6,
     timingJitter: 8,
     maxNotesPerPhrase: 24,
     minNotesPerPhrase: 2,
@@ -102,7 +113,6 @@ const DEFAULT_STYLE_CONFIG: StyleConfig = {
     stationaryProb: 0.05,
     rhythmicDensity: 0.5,
     syncopationLikelihood: 0.2,
-    targetAnchoring: 0.8,
     chromaticism: 0.1,
     seedTriplets: DEFAULT_SEED_TRIPLETS,
     motivicResponse: DEFAULT_MOTIVIC_RESPONSE,
@@ -228,7 +238,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     shred: {
         restBase: 0.05,
-        tensionScale: 0.3,
         timingJitter: 4,
         maxNotesPerPhrase: 64,
         minNotesPerPhrase: 8,
@@ -241,7 +250,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.02,
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.4,
-        targetAnchoring: 0.4,
         chromaticism: 0.5,
         contourSkeletons: [
             [
@@ -302,13 +310,13 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     blues: {
         restBase: 0.09,
-        tensionScale: 0.8,
         timingJitter: 25,
         // Keep the blues line from sagging into too much empty space.
         minNotesPerPhrase: 4,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
-        targetExtensions: [9, 10],
+        // S6: was [9, 10]; dropped 10 (b7 already rewarded by blueNote branch).
+        targetExtensions: [9],
         deviceProb: 0.4,
         allowedDevices: ['bluesLick', 'slide', 'guitarDouble'],
         sustainProb: 0.22,
@@ -320,7 +328,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // Lift the attack rate enough to avoid sub-threshold dips, but keep the pocket open.
         rhythmicDensity: 0.82,
         syncopationLikelihood: 0.8,
-        targetAnchoring: 0.9,
         chromaticism: 0.6,
         motivicResponse: {
             enabled: true,
@@ -394,7 +401,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     neo: {
         genreGravityOffset: 0.015,
         restBase: 0.12,
-        tensionScale: 0.7,
         timingJitter: 25,
         doubleStopProb: 0.15,
         anticipationProb: 0.45,
@@ -408,7 +414,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.14,
         rhythmicDensity: 0.68,
         syncopationLikelihood: 0.9,
-        targetAnchoring: 0.6,
         chromaticism: 0.4,
         motivicResponse: {
             enabled: true,
@@ -473,20 +478,19 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     funk: {
         genreGravityOffset: -0.005,
-        tensionScale: 0.4,
         timingJitter: 5,
         maxNotesPerPhrase: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.15,
         anticipationProb: 0.2,
-        targetExtensions: [9, 13],
+        // S6: was [9, 13]; dropped 13 (normalized to 1=b9, Phrygian color rare in funk).
+        targetExtensions: [9],
         deviceProb: 0.2,
         allowedDevices: ['slide', 'run'],
         commonToneWeight: 300,
         stationaryProb: 0.1,
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.9,
-        targetAnchoring: 0.7,
         chromaticism: 0.3,
         contourSkeletons: [
             [
@@ -591,7 +595,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     minimal: {
         restBase: 0.3,
-        tensionScale: 0.95,
         timingJitter: 35,
         maxNotesPerPhrase: 8,
         minNotesPerPhrase: 1,
@@ -604,7 +607,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.4,
         rhythmicDensity: 0.3,
         syncopationLikelihood: 0.3,
-        targetAnchoring: 0.95,
         contourSkeletons: [
             [
                 {
@@ -636,13 +638,13 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     jazz: {
         restBase: 0.08,
-        tensionScale: 0.85,
         timingJitter: 15,
         maxNotesPerPhrase: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.35,
         anticipationProb: 0.6,
-        targetExtensions: [2, 6, 9, 11, 13],
+        // S6: was [2, 6, 9, 11, 13]; dropped 13 (normalized to 1=b9, incidental).
+        targetExtensions: [2, 6, 9, 11],
         deviceProb: 0.35,
         allowedDevices: [
             'enclosure',
@@ -657,7 +659,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.08,
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.85,
-        targetAnchoring: 0.5,
         chromaticism: 0.7,
         motivicResponse: {
             enabled: true,
@@ -720,13 +721,13 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     bird: {
         restBase: 0.05,
-        tensionScale: 0.9,
         timingJitter: 12,
         maxNotesPerPhrase: 48,
         minNotesPerPhrase: 4,
         doubleStopProb: 0.15,
         anticipationProb: 0.8,
-        targetExtensions: [2, 5, 6, 9],
+        // S6: was [2, 5, 6, 9]; dropped 5 (P4 avoid note on most qualities).
+        targetExtensions: [2, 6, 9],
         deviceProb: 0.4,
         allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
         commonToneWeight: 150,
@@ -737,7 +738,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         sustainProb: 0.08,
         maxSustainSteps: 6,
         syncopationLikelihood: 0.7,
-        targetAnchoring: 0.3,
         chromaticism: 0.9,
         motivicResponse: {
             enabled: true,
@@ -821,7 +821,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         ],
     },
     disco: {
-        tensionScale: 0.5,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.05,
         anticipationProb: 0.2,
@@ -878,7 +877,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     bossa: {
         restBase: 0.12,
-        tensionScale: 0.7,
         timingJitter: 15,
         doubleStopProb: 0.08,
         anticipationProb: 0.35,
@@ -889,7 +887,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.08,
         rhythmicDensity: 0.64,
         syncopationLikelihood: 0.8,
-        targetAnchoring: 0.7,
         chromaticism: 0.5,
         motivicResponse: {
             enabled: true,
@@ -954,13 +951,13 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     country: {
         restBase: 0.08,
-        tensionScale: 0.5,
         timingJitter: 4,
         maxNotesPerPhrase: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.5,
         anticipationProb: 0.2,
-        targetExtensions: [2, 4, 9],
+        // S6: was [2, 4, 9]; dropped 4 (maj3 is a chord tone, already +150).
+        targetExtensions: [2, 9],
         deviceProb: 0.45,
         allowedDevices: [
             'guitarDouble',
@@ -972,7 +969,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         ],
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.4,
-        targetAnchoring: 0.9,
         chromaticism: 0.3,
         contourSkeletons: [
             [
@@ -1020,20 +1016,19 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         ],
     },
     metal: {
-        tensionScale: 0.4,
         timingJitter: 2,
         maxNotesPerPhrase: 32,
         minNotesPerPhrase: 6,
         doubleStopProb: 0.05,
         anticipationProb: 0.05,
-        targetExtensions: [2, 7],
+        // S6: was [2, 7]; dropped 7 (P5 is a chord tone, already +150).
+        targetExtensions: [2],
         deviceProb: 0.5,
         allowedDevices: ['run'],
         commonToneWeight: 100,
         stationaryProb: 0.02,
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.3,
-        targetAnchoring: 0.5,
         chromaticism: 0.6,
         contourSkeletons: [
             [
@@ -1147,7 +1142,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     acoustic: {
         restBase: 0.15,
-        tensionScale: 0.4,
         timingJitter: 15,
         maxNotesPerPhrase: 12,
         doubleStopProb: 0.1,
@@ -1197,20 +1191,19 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     ska: {
         genreGravityOffset: -0.005,
-        tensionScale: 0.5,
         timingJitter: 5,
         maxNotesPerPhrase: 32,
         minNotesPerPhrase: 4,
         doubleStopProb: 0.2,
         anticipationProb: 0.3,
-        targetExtensions: [2, 4, 9],
+        // S6: was [2, 4, 9]; dropped 4 (maj3 is a chord tone, already +150).
+        targetExtensions: [2, 9],
         deviceProb: 0.35,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'enclosure', 'chromaticFall'],
         commonToneWeight: 250,
         stationaryProb: 0.12,
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.8,
-        targetAnchoring: 0.7,
         chromaticism: 0.4,
         contourSkeletons: [
             [
