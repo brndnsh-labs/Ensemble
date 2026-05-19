@@ -1,6 +1,7 @@
 import type { GlobalContext } from '../state/playback.js';
 import type { EnsembleState } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
+import { ALTERED_HOOK_QUALITIES } from './accompaniment.js';
 import type { SoloistIntent } from './soloist-config.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
 import { DEVICE_SPAN_STEPS, generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
@@ -429,7 +430,14 @@ export function selectPitchAndDevices(
     const stationaryScale = intent?.stationaryScale ?? 0.5;
     const prefersStationaryHook = stationaryScale > 0.7;
     const isJazzHookStyle = activeStyle === 'jazz' || activeStyle === 'bird';
-    const isAlteredHookQuality = targetChord.quality === '7alt' || targetChord.quality === '7#9';
+    // why: ALTERED_HOOK_QUALITIES = {7alt, 7b9, 7#9, 7b13} share guide-tone emphasis
+    //   plus b9/#9/b13 reward — the alt-scale tensions. 7#11 (lydian dominant) is
+    //   excluded: its scale source is root, 3, #11, 5, 6, b7, so rewarding b9/#9/b13
+    //   on 7#11 pulls the soloist to foreign tones against bright/colorful intent.
+    //   Narrowing to just 7alt/7#9 (the original code) left charts spelled G7b9 or
+    //   G7b13 falling through; broadening to 7#11 over-reaches. Source: Epic 9 S3
+    //   P1 finding (FOLLOWUPS §C).
+    const isAlteredHookQuality = ALTERED_HOOK_QUALITIES.has(targetChord.quality ?? '');
     const responseConfig = config.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
     const responseSignature = soloistState.session.currentPhrase.context?.responseSignature || null;

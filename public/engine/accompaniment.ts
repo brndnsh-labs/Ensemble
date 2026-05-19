@@ -88,7 +88,17 @@ const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 
 // 7b13, and 7#11. Gating on '7alt' alone (the original code) left charts that spell
 // G7b9 or G7#9 falling through to the generic inversion path with no awareness of
 // their resolution-critical altered tones. Source: chords.md P1 #7.
-const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11']);
+export const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11']);
+
+// why: hook/breath subset of altered dominants. Excludes 7#11 (lydian dominant) because
+// its scale source — root, 3, #11, 5, 6, b7 — does NOT contain b9, #9, or b13. Hook
+// rewards on {b9, #9, #11/b5, b13/#5} that work over 7alt/7b9/7#9/7b13 actively fight
+// 7#11's harmonic intent (#11 is bright/colorful, paired with NATURAL 9 and 13). Same
+// for the 150ms pre-cut "breath" — 7#11 is a static color chord that rings through.
+// Use ALTERED_DOMINANT_QUALITIES for structural concerns (inversion routing, shell
+// reduction); use ALTERED_HOOK_QUALITIES for soloist hook-pitch reward and comper
+// tension-resolution breath. Source: Epic 9 S3 P1 finding (music-theory review).
+export const ALTERED_HOOK_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13']);
 
 /**
  * Funk comping cell bank.
@@ -1279,9 +1289,12 @@ function handleSustainEvents(
 
     if (isNewMeasure || isNewChord) {
         // BREATH STRATEGY: If coming from a high-tension chord, cut sustain early to clear the air.
-        const wasTense = ['7alt', 'dim', 'halfdim', '7b9', '7#9'].includes(
-            compingState.lastChordQuality || '',
-        );
+        // why: ALTERED_HOOK_QUALITIES (7alt, 7b9, 7#9, 7b13) plus dim/halfdim resolve
+        //   into the next chord and benefit from a 150ms breath before resolution.
+        //   7#11 (lydian dominant) is excluded — it's a static color chord that should
+        //   ring through, not breathe. Source: Epic 9 S3 P1 finding.
+        const _q = compingState.lastChordQuality || '';
+        const wasTense = ALTERED_HOOK_QUALITIES.has(_q) || _q === 'dim' || _q === 'halfdim';
         const clearOffset = wasTense ? -0.15 : 0; // 150ms breath for tension resolution
 
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: clearOffset }); // Off
