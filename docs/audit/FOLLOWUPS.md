@@ -60,6 +60,9 @@ Four items promoted on 2026-05-19; remainder deferred.
 - **Funk 3-note Clav.** `chords.md` P2 #17. Small standalone or bundle with future Epic 6 work. ~1h. *Source: Epic 6 Deferred.*
 - **Color tones at moderate intensity.** `chords.md` P1 #11. ~1h. *Source: Epic 6 Deferred.*
 - **Soloist device-selection uniform-random over ranked list.** `soloist.md` P2 #14. ~2h. *Source: Epic 4 Deferred.*
+- **Final-bar cadence stays airy when bass is grounded high.** `accompaniment.ts:1559` `while (cadenceMidis[0] > 68 && cadenceMidis[0] - 12 >= cadenceFloor)`. When `bassMidi=62` → `cadenceFloor=69`, a cluster at `[72,76,79]` can't shift down to `[60,64,67]` (would crash bass), so it stays in soloist register — opposite of "grounded final cadence." The P5-above-bass rule is for *running* harmony, not the final-bar "we all converge" moment; cadence should be allowed to land *with* the bass at MIDI 62. Niche (bassMidi>55 on a final bar uncommon in practice) but musically wrong when it triggers. Fix shape: at the cadence site only, treat the floor permissively (allow overlap with bass for one bar). ~30min. *Source: Epic 9 S1 review (2026-05-19).*
+- **Country boom-chick bass leg coexists with band bass without safetyFloor.** `accompaniment.ts:1700-1726` boom-chick block writes notes at MIDI ≤ 55 (bass register) on the chord channel without consulting `coordination.bassMidi`. The band bassist runs alongside in 23-55; two engines can land in the same register on the same step. Country idiom traditionally has a guitarist playing a bass note + strum, but in our two-engine model this duplicates pitches. Fix shape: chord-channel bass leg yields to or pitch-merges with band bass when present. ~1h. *Source: Epic 9 S1 review (2026-05-19).*
+- **`generateCompingPattern` `motifCache` key audit.** `harmonies.ts:1002` `sectionKey = \`${chord.sectionId ?? ''}|${activeStyle}\`` now keys on `activeStyle` (Epic 9 S1.b fix) but cache will go stale on any future branch on `feel`, `bandIntensity` tier, or `complexity`. Pattern is "key on every input that branches the pattern body." ~30min. *Source: Epic 9 S1 review (2026-05-19).*
 
 ## E. Per-genre tuning & sound design
 
@@ -112,6 +115,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 **Not promoted (still deferred):**
 
 - **`instHash` for drum lanes uses bare polynomial hash.** Epic 2 S3, `groove-engine.ts`. No canonical `scrambleHash` pre-scrambling. Empirically fine, future cleanup. ~30min. *Source: Epic 2 S3 review.*
+- **`reggae-harmony-critique.test.ts` and `reggae-harmony-organ-critique.test.ts` share a near-identical 128-bar critique case.** S1.b kept both files for naming clarity (the organ-critique adds unit + non-organ regression cases the other lacks); the headline 128-bar critique is duplicated. Either fold the shared assertion into a util, or accept the duplication as cheap. ~15min. *Source: Epic 9 S1 review (2026-05-19).*
 
 ## G. Schema cleanup & stale carriers
 

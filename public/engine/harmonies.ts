@@ -225,6 +225,7 @@ export function generateCompingPattern(
     feel: string,
     seed: number,
     tsConfig?: TimeSignatureConfig,
+    activeStyle?: string,
 ): number[] {
     const ts = tsConfig || (TIME_SIGNATURES as any)['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
@@ -271,13 +272,57 @@ export function generateCompingPattern(
         pattern[getBeatStep(1, 2, 2)] = 3;
         pattern[getBeatStep(1, 3, 0)] = 2;
     } else if (feel === 'Reggae' || feel === 'Ska') {
-        pattern[getBeatStep(0, 1, 0)] = 1;
-        pattern[getBeatStep(0, 3, 0)] = 1;
-        pattern[getBeatStep(1, 1, 0)] = 1;
-        pattern[getBeatStep(1, 3, 0)] = 1;
-        if (pseudoRandom() < 0.3) {
-            pattern[getBeatStep(0, 1, 2)] = 4;
-            pattern[getBeatStep(1, 1, 2)] = 4;
+        // why: Reggae organ-bubble vs harmony-channel skank (epic-
+        // coordination-consistency S1.b). On Reggae the chord channel
+        // (accompaniment.ts) plays the keyboardist's skank on beats 2 & 4;
+        // letting the harmony channel ALSO hit beats 2 & 4 reproduces the
+        // double-stack bug that Epic 6 S5 deleted from the chord channel.
+        //
+        // When the harmony route lands on 'organ' (the smart-style default
+        // for Reggae — see getHarmonyNotes:873-874), play the **organ
+        // bubble** instead: eighth-note offbeats on chord tones (steps 2,
+        // 6, 10, 14 per bar). The bubble is the organist's idiom — it sits
+        // BETWEEN the keyboardist's skank hits, filling the offbeat grid
+        // where the skank is silent, no double-stack.
+        //
+        // Tag 1 (strong base) is the cleanest existing tag for a sustained
+        // chord-tone single voice in playComperMode (val===1 → needed=0,
+        // duration=1 at off-downbeats). An occasional tag-2 hit (medium)
+        // creates the "occasional dyad on the higher voice" texture by
+        // landing a denser voicing on a subset of offbeats.
+        //
+        // For Ska (and any non-organ Reggae user override), keep the
+        // original backbeat skank — that's the keyboardist's idiom when
+        // the harmony channel is acting as a horn-stab layer, not an
+        // organ-bubble layer.
+        if (feel === 'Reggae' && activeStyle === 'organ') {
+            // Bar 1: offbeat-eighths
+            pattern[getBeatStep(0, 0, 2)] = 1; // step 2
+            pattern[getBeatStep(0, 1, 2)] = 1; // step 6
+            pattern[getBeatStep(0, 2, 2)] = 1; // step 10
+            pattern[getBeatStep(0, 3, 2)] = 1; // step 14
+            // Bar 2: same offbeat-eighths
+            pattern[getBeatStep(1, 0, 2)] = 1; // step 18
+            pattern[getBeatStep(1, 1, 2)] = 1; // step 22
+            pattern[getBeatStep(1, 2, 2)] = 1; // step 26
+            pattern[getBeatStep(1, 3, 2)] = 1; // step 30
+            // Occasional dyad accents on a sparse subset (~30% of bars).
+            // Tag 2 → playComperMode treats as medium; finalize layer adds
+            // a higher voice. Deterministic via the same pseudoRandom seed
+            // the rest of the function uses.
+            if (pseudoRandom() < 0.3) {
+                pattern[getBeatStep(0, 2, 2)] = 2; // accent step 10
+                pattern[getBeatStep(1, 2, 2)] = 2; // accent step 26
+            }
+        } else {
+            pattern[getBeatStep(0, 1, 0)] = 1;
+            pattern[getBeatStep(0, 3, 0)] = 1;
+            pattern[getBeatStep(1, 1, 0)] = 1;
+            pattern[getBeatStep(1, 3, 0)] = 1;
+            if (pseudoRandom() < 0.3) {
+                pattern[getBeatStep(0, 1, 2)] = 4;
+                pattern[getBeatStep(1, 1, 2)] = 4;
+            }
         }
     } else if (feel === 'Neo-Soul') {
         pattern[getBeatStep(0, 0, 1)] = 1;
@@ -950,14 +995,18 @@ export function getHarmonyNotes(
     }
 
     // 2. CONTEXT OBJECT
-    const sectionKey = chord.sectionId ?? '';
+    // why: include `activeStyle` in the cache key — the Reggae organ-bubble
+    // (S1.b) branches the pattern on activeStyle, so a session that toggles
+    // style needs a fresh cell rather than serving the wrong-feel pattern
+    // from a prior cache hit.
+    const sectionKey = `${chord.sectionId ?? ''}|${activeStyle}`;
     if (!motifCache.has(sectionKey)) {
         const seed = Math.abs(
             chord.sectionId
                 ?.split('')
                 .reduce((a: number, b: string) => (a << 5) - a + b.charCodeAt(0), 0) || 0,
         );
-        const pattern = generateCompingPattern(feel, seed, ts);
+        const pattern = generateCompingPattern(feel, seed, ts, activeStyle);
 
         // Calculate a broad rhythmic mask for UI/Consistency based on "Base" hits only
         let rhythmicMask = 0;
