@@ -96,6 +96,30 @@ interface HarmonyNote {
 const motifCache = new Map<string, MotifCacheEntry>();
 let lastPlayedStep = -1;
 
+// --- Band-intensity policy for the harmony layer (epic-harmony-polish S5) ---
+// why: `playback.bandIntensity` is a 0..1 dial driving the whole band's energy.
+// Three tiers govern when and how the harmony layer is heard:
+//   < HARMONY_MUTE_FLOOR        : silence. The band is below ballad floor —
+//                                 harmony adds clutter rather than support.
+//   HARMONY_MUTE_FLOOR..HARMONY_PAD_CEILING
+//                               : default pad mode (sparse organ/string swells,
+//                                 one held tone per chord change via
+//                                 playSeaMode). Applies to ALL feels including
+//                                 Jazz — ballad-intensity Jazz wants pads, not
+//                                 comping, to match the audit-doc acceptance
+//                                 criterion in epic-harmony-polish S5.
+//                                 Soloist-driven shadow-mode (response,
+//                                 melodic latch, hype-man at harmonies.ts:997)
+//                                 preempts this default and still fires in
+//                                 this band when a live soloist is present.
+//   >= HARMONY_PAD_CEILING      : comping behavior is unlocked
+//                                 (playComperMode) for comping genres; pads
+//                                 still selected for pad-style configs.
+// Lowered from the previous undocumented 0.22 floor: 0.18-0.22 ballad
+// intensity now plays sparse swells instead of going silent.
+const HARMONY_MUTE_FLOOR = 0.15;
+const HARMONY_PAD_CEILING = 0.4;
+
 /**
  * Clears the internal motif memory.
  */
@@ -805,7 +829,12 @@ export function getHarmonyNotes(
     }
 
     const { playback, groove, harmony, soloist, arranger } = activeState;
-    if (playback.bandIntensity < 0.22) {
+    // why: below HARMONY_MUTE_FLOOR (0.15) the band is at a sub-ballad
+    // whisper — adding harmony at that level smears the chord layer rather
+    // than supporting it. Lowered from the previous undocumented 0.22 so
+    // 0.18-0.22 (ballad) intensity reaches playSeaMode below and produces
+    // sparse organ/string swells. See epic-harmony-polish S5.
+    if (playback.bandIntensity < HARMONY_MUTE_FLOOR) {
         return [];
     }
 
@@ -980,8 +1009,15 @@ export function getHarmonyNotes(
     }
 
     // Mode B: The Comper or The Sea (Standard Priority)
+    // why: below HARMONY_PAD_CEILING (0.4) the whole band is in ballad
+    // territory — every feel, including Jazz, wants sparse held swells, not
+    // comping. The previous `feel !== 'Jazz'` carve-out had Jazz comping
+    // through ballad intensities, which conflicted with the
+    // epic-harmony-polish S5 acceptance criterion ("ballad-intensity jazz
+    // plays sparse organ swells"). At >= HARMONY_PAD_CEILING the comp/sea
+    // split is driven by the configured rhythmic style.
     if (!behavior) {
-        if (config.rhythmicStyle === 'pads' || (playback.bandIntensity < 0.4 && feel !== 'Jazz')) {
+        if (config.rhythmicStyle === 'pads' || playback.bandIntensity < HARMONY_PAD_CEILING) {
             behavior = playSeaMode(context);
         } else {
             behavior = playComperMode(context);
