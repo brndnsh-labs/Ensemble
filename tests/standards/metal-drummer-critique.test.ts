@@ -35,7 +35,7 @@ describe('Metal Drummer Critique', () => {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
                 const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
-                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open', 'Crash']) {
                     const info = getStepInfo(
                         bar * 16 + step,
                         TIME_SIGNATURES['4/4'],
@@ -77,7 +77,7 @@ describe('Metal Drummer Critique', () => {
     };
 
     it('should implement high-speed Double Kick at maximum intensity', () => {
-        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.95 } });
+        const performance = simulatePerformance(64, { playback: { bandIntensity: 0.95 } });
 
         let kickHits = 0;
         performance.forEach((bar) => {
@@ -88,45 +88,119 @@ describe('Metal Drummer Critique', () => {
             });
         });
 
-        const totalSteps = 16 * 16;
+        const totalSteps = 64 * 16;
         const kickDensity = kickHits / totalSteps;
         console.log(
-            `[Metal Critique] Kick Density at Max Intensity: ${(kickDensity * 100).toFixed(1)}% (Target: >85%)`,
+            `[Metal Critique] Kick Density at Max Intensity: ${(kickDensity * 100).toFixed(1)}% (Target: >55%)`,
         );
 
-        // At intensity 0.95 the motif selector lands on motif 3 or 4 — both fire kick
-        // on every 16th (metal.ts:83-86). Engine delivers ~92%.
-        expect(kickDensity).toBeGreaterThan(0.85);
+        // At intensity 0.95 the motif selector mixes motif 2 (gallop, ~75% kick coverage),
+        // motif 3 (16ths, 100%), and motif 4 (blast — offbeat-eighths-only, 25%). Expected
+        // weighted density ≈ 0.25*0.75 + 0.35*1.0 + 0.4*0.25 ≈ 63%. Threshold > 0.55 leaves
+        // headroom across motif-4 share variance from the seeded picker over 64 bars.
+        expect(kickDensity).toBeGreaterThan(0.55);
     });
 
-    it('should pass a Blast Beat alignment check at max intensity', () => {
+    it('should ALTERNATE snare and kick on blast-beat bars (not co-articulate)', () => {
+        // why: drums.md P1 #6 — real blast beats are kick-on-offbeat-eighth + snare-on-
+        // downbeat-eighth ALTERNATION. The previous test counted bars where snare and kick
+        // shared a step (co-articulation), which codified the unison bug. The genre-defining
+        // buzz comes from alternation, so we assert disjointness on the blast-pattern bars.
         const performance = simulatePerformance(128, {
             playback: { bandIntensity: 0.95 },
             groove: { creativity: true, genreFeel: 'Metal' },
         });
 
+        const DOWNBEAT_EIGHTHS = [0, 4, 8, 12];
+        const OFFBEAT_EIGHTHS = [2, 6, 10, 14];
+
+        // A blast-pattern bar: snare lands on >=3 of the downbeat eighths AND kick lands on
+        // >=3 of the offbeat eighths. (Strict 4/4 would be ideal, but allow 1 missed slot
+        // to absorb fill-overrides from the isTurnaround branch when it ever fires.)
         let blastBars = 0;
+        let snareKickLocksOnBlast = 0; // co-articulation count on blast bars (should be ~0)
+        let snareOnOffbeatOnBlast = 0; // wrong-half snare on blast bars (should be ~0)
+        let kickOnDownbeatOnBlast = 0; // wrong-half kick on blast bars (should be ~0)
+        let blastBarUnisonStepsTotal = 0;
+
         performance.forEach((bar) => {
-            // A blast beat has snare and kick on most 16th or 8th subdivisions
-            let snareKickLocks = 0;
+            const snareOnDownEighths = DOWNBEAT_EIGHTHS.filter(
+                (s) => bar[s]?.instruments.Snare,
+            ).length;
+            const kickOnOffEighths = OFFBEAT_EIGHTHS.filter((s) => bar[s]?.instruments.Kick).length;
+            const isBlastBar = snareOnDownEighths >= 3 && kickOnOffEighths >= 3;
+            if (!isBlastBar) {
+                return;
+            }
+            blastBars++;
             bar.forEach((stepData) => {
                 if (stepData.instruments.Snare && stepData.instruments.Kick) {
-                    snareKickLocks++;
+                    snareKickLocksOnBlast++;
+                    blastBarUnisonStepsTotal++;
+                }
+                if (OFFBEAT_EIGHTHS.includes(stepData.loopStep) && stepData.instruments.Snare) {
+                    snareOnOffbeatOnBlast++;
+                }
+                if (DOWNBEAT_EIGHTHS.includes(stepData.loopStep) && stepData.instruments.Kick) {
+                    kickOnDownbeatOnBlast++;
                 }
             });
-            // We expect at least some bars to exhibit blast behavior
-            if (snareKickLocks >= 4) {
-                blastBars++;
+        });
+
+        const unisonRate = blastBars === 0 ? 0 : blastBarUnisonStepsTotal / (blastBars * 16);
+        console.log(
+            `[Metal Blast Alternation] ${blastBars}/128 bars detected as blast; unison rate ${(unisonRate * 100).toFixed(1)}% (target <5%); snare-on-offbeat ${snareOnOffbeatOnBlast} (target 0); kick-on-downbeat ${kickOnDownbeatOnBlast} (target 0)`,
+        );
+
+        // Over 128 seeded bars at intensity 0.95, motif 4 fires ~40% of the time
+        // (picks: [[0.25,2],[0.6,3], 4]) so expected blast bars ≈ 51.
+        expect(blastBars).toBeGreaterThan(30);
+        // ALTERNATION: snare and kick must NOT share steps on blast bars.
+        expect(snareKickLocksOnBlast).toBe(0);
+        // Motif-4 snare fires ONLY on isBeatStart — not on isOffbeat.
+        expect(snareOnOffbeatOnBlast).toBe(0);
+        // Motif-4 kick fires ONLY on isOffbeat — not on isBeatStart.
+        expect(kickOnDownbeatOnBlast).toBe(0);
+    });
+
+    it('should emit China at section downbeats at high intensity on Open lane only', () => {
+        // why: drums.md P1 #6 — section-accent block at metal.ts used to write
+        // soundName='Open' despite the "China/Crash" comment. After the fix it emits
+        // 'China' on downbeats at intensity > 0.8, scoped to the Open lane only
+        // (matches the post-turnaround Crash convention at groove-engine.ts:226).
+        // The HiHat and Crash lanes keep their steady-state eighth-pulse voicing on
+        // the downbeat — guards against the triple-stack regression that produced
+        // three China hits choking each other via groove.lastCrashGain.
+        const numBars = 32;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.9 },
+        });
+
+        let chinaOnOpen = 0;
+        let chinaOnHiHat = 0;
+        let chinaOnCrash = 0;
+        performance.forEach((bar) => {
+            const downbeat = bar[0];
+            if (downbeat.instruments.Open?.sound === 'China') {
+                chinaOnOpen++;
+            }
+            if (downbeat.instruments.HiHat?.sound === 'China') {
+                chinaOnHiHat++;
+            }
+            if (downbeat.instruments.Crash?.sound === 'China') {
+                chinaOnCrash++;
             }
         });
 
         console.log(
-            `[Metal Critique] Blast Beat segments observed: ${blastBars}/128 bars (Target: >30)`,
+            `[Metal China Accent] Open=${chinaOnOpen}/${numBars} (target ${numBars}); HiHat=${chinaOnHiHat} (target 0); Crash=${chinaOnCrash} (target 0)`,
         );
-        // Engine selects motif 4 (Blast Beat) at intensity > 0.85 when sectionSeed > 0.6
-        // (getMotif: picks[0.25,2],[0.6,3], 4). Over 128 random sectionSeeds expected
-        // motif-4 bars ≈ 51. Engine delivers ~53. Prior threshold >5 was a no-op.
-        expect(blastBars).toBeGreaterThan(30);
+        // Every downbeat at intensity 0.9 > 0.8 must emit China on the Open lane.
+        expect(chinaOnOpen).toBe(numBars);
+        // HiHat and Crash lanes must NOT carry China on downbeats — they keep the
+        // steady-state Ride/Open/HiHat voicing from the eighth-pulse block above.
+        expect(chinaOnHiHat).toBe(0);
+        expect(chinaOnCrash).toBe(0);
     });
 
     it('should hold the backbeat at moderate intensity (non-blast motifs)', () => {

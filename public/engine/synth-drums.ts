@@ -10,7 +10,7 @@ import {
     updateDensityDucking,
 } from './synth-utils.js';
 
-type CymbalName = 'HiHat' | 'Open' | 'Ride' | 'Crash';
+type CymbalName = 'HiHat' | 'Open' | 'Ride' | 'Crash' | 'China';
 
 interface CymbalBufferProfile {
     key: string;
@@ -150,6 +150,7 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
     'HiHat',
     'Open',
     'Crash',
+    'China',
     'Shaker',
     'Agogo',
     'Perc',
@@ -175,6 +176,7 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     'Open',
     'Ride',
     'Crash',
+    'China',
     'Clave',
     'Guiro',
     'Shaker',
@@ -303,6 +305,28 @@ const CYMBAL_BUFFER_PROFILES: Record<CymbalName, CymbalBufferProfile> = {
         saturation: 0.98,
         jitter: 0.024,
     },
+    China: {
+        // why: trashier, darker sibling to Crash (drums.md P1 #6). Higher baseFreq (1100 vs
+        // 860) gives upper-mid bite; more inharmonic partials (wider ratios than Crash,
+        // around the trash-china reference timbre). Duration 5.0s (vs Crash 9.0s) —
+        // the China "trash" lives in the attack + noise sweep, not the long metallic tail.
+        // partialDecay 1.6 (vs Crash 0.8) chokes partials twice as fast so by t≈2.5s the
+        // noiseMix dominates — that's the splash-bark character. Higher noiseMix (0.42) and
+        // transientMix (0.30) push the noise/transient layers forward vs the metal partials.
+        key: 'chinaMetal',
+        duration: 5.0,
+        baseFreq: 1100,
+        partials: [1, 1.41, 1.93, 2.51, 3.17, 3.94, 4.83],
+        metalMix: 0.32,
+        noiseMix: 0.42,
+        transientMix: 0.3,
+        partialDecay: 1.6,
+        partialSpread: 0.9,
+        noiseDecay: 1.4,
+        smooth: 0.18,
+        saturation: 1.05,
+        jitter: 0.03,
+    },
 };
 
 const CYMBAL_RUNTIME_PROFILES: Record<CymbalName, CymbalRuntimeProfile> = {
@@ -383,6 +407,32 @@ const CYMBAL_RUNTIME_PROFILES: Record<CymbalName, CymbalRuntimeProfile> = {
         decayIntensityFocus: 0.05,
         minDecay: 2.8,
         stopTime: 9.0,
+    },
+    China: {
+        // why: China filter shaping (drums.md P1 #6). bandpassBase 4200 / highpassBase 1900
+        // sit ~700 Hz above Crash — keeps the trashy upper-mid bite and removes the deep
+        // boom that Crash has. q 0.55 (vs Crash 0.45) is nasal and bright. decayBase 0.95s
+        // and stopTime 2.4s — China is a fast, bark-like accent cymbal; the "trash" is in
+        // the attack, not the sustain (matches reference trash chinas at ~2-3s ring-out).
+        // volumeScale 0.85 trims slightly under Crash (0.9) to avoid clipping
+        // when it stacks with the steady-state Open/Ride pulse on metal section downbeats.
+        volumeScale: 0.85,
+        playbackRate: 1.0,
+        playbackVariance: 0.022,
+        bandpassBase: 4200,
+        bandpassVelocity: 300,
+        bandpassCap: 5100,
+        highpassBase: 1900,
+        highpassVelocity: 120,
+        highpassCap: 2300,
+        q: 0.55,
+        attack: 0.004,
+        decayDelay: 0.08,
+        decayBase: 0.95,
+        decayVelocityFocus: 0.06,
+        decayIntensityFocus: 0.04,
+        minDecay: 0.7,
+        stopTime: 2.4,
     },
 };
 
@@ -1020,9 +1070,15 @@ export function playDrumSound(
             }
             safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
         };
-    } else if (name === 'Crash') {
+    } else if (name === 'Crash' || name === 'China') {
+        // why: China shares the Crash dispatch — same buffer-source + bandpass/highpass chain,
+        // parameterized by CymbalName. China gets its own buffer key ('chinaMetal') and its
+        // own runtime profile (filter cutoffs, decay, stop time). Both voices flow through
+        // groove.lastCrashGain so a fresh China at section accent ramps down any prior
+        // Crash/China tail — same crash-lane behavior as before, just two voices in the lane.
+        const cymbalName: CymbalName = name;
         const voiceConfig = getCymbalVoiceConfig(
-            'Crash',
+            cymbalName,
             velocity,
             (playback as any).bandIntensity || 0.5,
         );
@@ -1030,7 +1086,8 @@ export function playDrumSound(
             safeDisconnect([panner]);
             return;
         }
-        const vol = masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Crash') * rr();
+        const vol =
+            masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, cymbalName) * rr();
 
         if (groove.lastHatGain) {
             rampGain(groove.lastHatGain.gain, 0, playTime, 0.04);
@@ -1046,7 +1103,8 @@ export function playDrumSound(
 
         const source = playback.audio.createBufferSource();
         source.buffer =
-            getCymbalBuffer(groove, 'Crash') || ensureCymbalBuffer(playback.audio, groove, 'Crash');
+            getCymbalBuffer(groove, cymbalName) ||
+            ensureCymbalBuffer(playback.audio, groove, cymbalName);
         source.playbackRate.value = voiceConfig.playbackRate * rr(voiceConfig.playbackVariance);
 
         const bpFilter = playback.audio.createBiquadFilter();

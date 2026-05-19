@@ -80,9 +80,18 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isBeatStart || isOffbeat || isAOfBeat) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 3 || activeMotif === 4) {
-            // Continuous 16ths
+        } else if (activeMotif === 3) {
+            // Double Kick 16ths — continuous 16ths under the cymbal pulse.
             shouldPlay = true;
+        } else if (activeMotif === 4) {
+            // why: blast-beat ALTERNATION (drums.md P1 #6) — kick fires only on offbeat
+            // eighths (steps 2,6,10,14) so it interlocks with snare on the downbeat eighths.
+            // Real blast beats (extreme-metal kick-on-offbeat style) are kick-snare ALTERNATION
+            // at 8th-note rate, producing the genre-defining buzz; co-articulating both on
+            // every eighth collapses the rhythm into unison thuds.
+            if (isOffbeat) {
+                shouldPlay = true;
+            }
         }
 
         if (shouldPlay) {
@@ -99,8 +108,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         soundName = 'Snare';
 
         if (activeMotif === 4 && intensity > 0.85) {
-            // Blast Beat: Snare on every 8th or 16th
-            if (isEighthNote) {
+            // why: blast-beat ALTERNATION (drums.md P1 #6) — snare fires only on downbeat
+            // eighths (steps 0,4,8,12), answering the kick's offbeat-eighth alternation.
+            // Snare-on-downbeat + kick-on-offbeat at 8th-note rate is the canonical blast
+            // (extreme-metal blast style) — the alternation IS the buzz, not co-articulation.
+            if (isBeatStart) {
                 shouldPlay = true;
             }
         } else {
@@ -148,9 +160,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // Section Accents
-        if (isDownbeat && intensity > 0.8) {
+        // why: scope the China splash to the Open lane only — same pattern as the
+        // section-boundary Crash at groove-engine.ts:226 and crash-catch at :247.
+        // Firing on HiHat + Open + Crash lanes produces three stacked drumHits per
+        // downbeat that route through `groove.lastCrashGain` and choke each other
+        // (audible flam + gain stutter). HiHat and Crash lanes keep the steady-state
+        // eighth-pulse cymbal voicing on the downbeat.
+        if (isDownbeat && intensity > 0.8 && context.inst.name === 'Open') {
             shouldPlay = true;
-            soundName = 'Open'; // China/Crash
+            soundName = 'China';
             velocity = 1.4;
         }
     }

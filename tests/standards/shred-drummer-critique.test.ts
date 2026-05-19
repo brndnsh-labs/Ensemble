@@ -83,12 +83,14 @@ describe('Shred Drummer Critique', () => {
             groove: { creativity: true, genreFeel: 'Shred' },
         });
 
+        const DOWNBEAT_EIGHTHS = [0, 4, 8, 12];
+        const OFFBEAT_EIGHTHS = [2, 6, 10, 14];
+
         let kickHits = 0;
         let backbeatHits = 0;
         let blastBars = 0;
 
         performance.forEach((bar) => {
-            let snareKickLocks = 0;
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
                 if ((s === 4 || s === 12) && stepData.instruments.Snare) {
@@ -96,12 +98,18 @@ describe('Shred Drummer Critique', () => {
                 }
                 if (stepData.instruments.Kick) {
                     kickHits++;
-                    if (stepData.instruments.Snare) {
-                        snareKickLocks++;
-                    }
                 }
             });
-            if (snareKickLocks >= 4) {
+            // why: drums.md P1 #6 — blast bars now ALTERNATE (snare on downbeat eighths,
+            // kick on offbeat eighths). Detect by checking snare-on-down + kick-on-off
+            // coverage, not by co-articulation locks (which would be ~0 on alternation).
+            const snareOnDownEighths = DOWNBEAT_EIGHTHS.filter(
+                (st) => bar[st]?.instruments.Snare,
+            ).length;
+            const kickOnOffEighths = OFFBEAT_EIGHTHS.filter(
+                (st) => bar[st]?.instruments.Kick,
+            ).length;
+            if (snareOnDownEighths >= 3 && kickOnOffEighths >= 3) {
                 blastBars++;
             }
         });
@@ -111,19 +119,19 @@ describe('Shred Drummer Critique', () => {
 
         console.log('\n--- SHRED DRUMMER CRITIQUE REPORT ---');
         console.log(
-            `[Kick Density (Double Bass)] ${kickDensity.toFixed(2)} kicks/bar (Target: >12)`,
+            `[Kick Density (Double Bass)] ${kickDensity.toFixed(2)} kicks/bar (Target: >9)`,
         );
         console.log(`[Backbeat (non-blast bars)]  ${backbeatHits} hits over ${totalBars} bars`);
         console.log(`[Blast Bars]                 ${blastBars}/${totalBars} (Target: >30)`);
         console.log('-------------------------------------\n');
 
-        // Metal motifs 3-4 fire continuous 16th kicks at intensity 0.95 → ~14-15/bar.
-        // Prior threshold > 6 left 8pt of unused headroom.
-        expect(kickDensity).toBeGreaterThan(12);
-        // Blast Beat motif (4) overrides backbeat with eighth-note snare. Across
-        // 128 bars expect ~50 blast bars and ~78 non-blast bars. Backbeat lane fires
-        // on every non-blast bar's steps 4 and 12 → ~156 hits. Floor accounts for
-        // motif distribution variance.
+        // why: post-P1 #6, motif 4 (blast) now fires kick on offbeat-eighths only (4/16),
+        // not continuous 16ths. Weighted density across motif 2/3/4 mix at intensity 0.95
+        // ≈ 0.25*12 + 0.35*16 + 0.4*4 = 10.2 kicks/bar. Threshold >9 leaves seed-variance
+        // headroom (replaces the old >12 baseline that assumed unison co-articulation).
+        expect(kickDensity).toBeGreaterThan(9);
+        // Backbeat lane fires on every non-blast bar's steps 4 and 12 → ~156 hits.
+        // Floor accounts for motif distribution variance.
         expect(backbeatHits).toBeGreaterThan(120);
         // Blast beat threshold same as metal — engine should select motif 4 at high
         // intensity often enough to register.
