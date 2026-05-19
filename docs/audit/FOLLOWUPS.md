@@ -24,34 +24,42 @@ A follow-up that's been sitting here for >2 months without being touched is sign
 
 ## B. Multiplier placement & architecture trade-offs
 
-Items where the shipped fix is "consistent with adjacent code" rather than "strictly final-stage." Realized effects are within audit-doc tolerance but the canonical fix is documented for future hardening.
+All three items promoted to **Epic 9 / S5 (Multiplier placement hardening)** on 2026-05-19. Originals retained below as pointers for grep-from-finding.
 
-- **Epic 2 S6 — densityScale placement.** `soloist-rhythm-engine.ts:337` puts the `1 + loopCount * 0.15` multiplier on `densityScale` before four downstream additive boosts (`+= 0.4` seed, `+= 0.2` × downbeat/kick/snare). Realized delta is +25% vs audit-doc target +30%; canonical fix would be a post-multiplier on `attackProb` right before the jitter. Mirrors pitch engine for symmetry. ~1h. *Source: form-arrangement/S6 review (2026-05-17).*
-- **Epic 1 S5 — soloist-devices unison floor.** `soloist-devices.ts` enclosure/run/approach picker (~lines 314-340) doesn't consult `coordination.stepCoordination.accompanimentMidis`. Puts a ~10pp absolute floor on unison-rate drop — why acceptance was reframed from "≥30pp absolute" to "≥30% relative." Closing this would push absolute drop above 30pp. ~3h. *Source: Epic 1 S5 Status block.*
-- **Epic 3 S2 — Bossa Charleston bank is a Jazz port.** Bossa currently reuses the Jazz cell bank as a port-for-fidelity. Anticipation-of-1 idiom missing; partido-alto-specific bank needed. ~3h. *Source: Epic 3 S2 Status block.*
+- **Epic 2 S6 — densityScale placement** → Epic 9 / S5 (a). `soloist-rhythm-engine.ts:337` puts the `1 + loopCount * 0.15` multiplier on `densityScale` before four downstream additive boosts.
+- **Epic 1 S5 — soloist-devices unison floor** → Epic 9 / S5 (b). `soloist-devices.ts` enclosure/run/approach picker doesn't consult `accompanimentMidis`.
+- **Epic 3 S2 — Bossa Charleston bank is a Jazz port** → Epic 9 / S5 (c). Anticipation-of-1 idiom missing; partido-alto-specific bank needed.
 
 ## C. Cross-engine consistency (same fix-shape repeated elsewhere)
 
-- **Hash-helper consolidation across 3 engines.** `bass-engine.ts` + `groove-engine.ts` use djb2-33-from-5381; `accompaniment.ts` uses djb2-31-from-0. Independent per-engine target distributions are currently a happy hash accident — formalize with deliberate per-engine domain salts when the helper centralizes. Tracked alongside the Epic 3 S5 TODO. ~2h. *Source: Epic 2 S3 review.*
-- **Native-style chromatic leading tones.** Epic 5 S2's gate removal only benefits the generic walking-bass / `quarter` fallback. Native handlers in `bass-styles.ts` for `rock` (~445-489), `pop`, `country`, `soul`, `gospel` return non-`undefined` from `getBassNoteStyle` on every 8th and bypass the gated branch. Adding a ~5-10% chromatic-leading-tone sub-branch inside each native style on `intBeat === ts.beats - 1` chord-change boundaries (gated by `isChordChangeApproach`) delivers the audit-doc claim S2 partially landed. ~2h per style (~10h total). *Source: Epic 5 S2 review.*
-- **Altered-dominant narrow consumers.** Epic 6 S4 broadened `ALTERED_DOMINANT_QUALITIES` but two consumers are still narrow: `soloist-pitch-engine.ts:418` only checks `7alt`/`7#9`; `accompaniment.ts:1228` `wasTense` sustain-pedal list only covers `7alt`/`dim`/`halfdim`/`7b9`/`7#9`. Should consume the broader set. ~2h. *Source: Epic 6 S4 Status block.*
-- **Three slash-chord-blind predicate sites in bass.** Epic 5 S1 helper uses `bassMidi ?? rootMidi` so it catches slash-chord changes that three inline predicate sites miss — `bass-engine.ts:313/463/812`. Left alone per S1 scope; should be migrated for consistency. ~1h. *Source: Epic 5 S1 Status block.*
-- **`bendStartInterval` not plumbed through `playBassNote` / `scheduler-core.ts` bass buffer.** Affects both Epic 5 S3 (funk walking approach bend, `bass-styles.ts:1118-1120`) and Epic 5 S7 (hip-hop 808 slide, `bass-styles.ts:516-527`). Note carries the field; scheduler doesn't destructure it; `synth-bass.ts:26-33` has no parameter for it. Both gestures are testable at the engine layer (the bend appears on note objects) but inaudible at playback. Wiring matches `synth-soloist.ts:741-762` `applyPitchEnvelope` pattern. ~2h. *Source: Epic 5 S7 review (2026-05-18).*
-- **Three remaining `soloist.session.*` reads in `harmonies.ts`.** `session.memory.sharedHookBuffer` at lines 271-272 (Ska-Punk only) + `session.seed` at line 279 (melodic shadowing). Different field shapes than S4's boolean/scalar surface — would need a buffer-object + RNG-seed context-fields design. Worth its own story under Epic 1 if/when "grep returns zero" becomes a hard rule. ~3h. *Source: Epic 1 S4 follow-up scope.*
-- **Three remaining `Math.random()` in `groove-engine.ts`.** Lines 259/281/293 (drum-strategy probability/velocity randomness). Out of scope for Epic 3 S5 per story brief. Promote if drum tests start flaking. ~1h. *Source: Epic 3 S5 Status block.*
+Three items promoted on 2026-05-19; remainder still here as not-yet-load-bearing.
+
+- **Native-style chromatic leading tones** → **Epic 9 / S4** (fan-out, 5 styles). ~10h total.
+- **Altered-dominant narrow consumers** → **Epic 9 / S3 (a)**. Two consumers (`soloist-pitch-engine.ts:418`, `accompaniment.ts:1228` `wasTense`) still narrow.
+- **Three slash-chord-blind predicate sites in bass** → **Epic 9 / S3 (b)**. `bass-engine.ts:313/463/812` use `rootMidi`-only check; should migrate to `isChordChangeApproach` helper.
+- **`bendStartInterval` not plumbed through `playBassNote` / `scheduler-core.ts`** → **Epic 9 / S3 (c)**. Affects funk walking approach bend + hip-hop 808 slide; both gestures inaudible at playback.
+
+**Not promoted (still deferred):**
+
+- **Hash-helper consolidation across 3 engines.** `bass-engine.ts` + `groove-engine.ts` use djb2-33-from-5381; `accompaniment.ts` uses djb2-31-from-0. Independent per-engine target distributions are currently a happy hash accident. ~2h. *Source: Epic 2 S3 review.*
+- **Three remaining `soloist.session.*` reads in `harmonies.ts`.** `session.memory.sharedHookBuffer` at lines 271-272 (Ska-Punk only) + `session.seed` at line 279 (melodic shadowing). Would need a buffer-object + RNG-seed context-fields design. Worth its own story if/when "grep returns zero" becomes a hard rule. ~3h. *Source: Epic 1 S4 follow-up.*
+- **Three remaining `Math.random()` in `groove-engine.ts`.** Lines 259/281/293 (drum-strategy probability/velocity randomness). Promote if drum tests start flaking. ~1h. *Source: Epic 3 S5 Status block.*
 
 ## D. Coordination consumption gaps
 
-Fields published on `coordination` where only some consumers exist.
+Four items promoted on 2026-05-19; remainder deferred.
 
-- **Reggae bass coordination consumption (S6 second half).** `bass-engine.ts:42-54` currently reads only `kickHit`. On `coordination.soloistPhraseEnd`, permit an optional half-bar fill; on tension-chord, allow scalar approach to upcoming root. Explicitly Deferred to Phase 3 (opus). ~2h. *Source: Epic 5 S6 Status block.*
-- **Wire `enableVoiceLeading` opt-in into production jazz comping path.** Epic 6 S1 added the opt-in flag as the 10th positional arg of `getBestInversion(...)` and exercises it from `tests/standards/jazz-piano-critique.test.ts` (66% / 74% motion reduction on ii–V–I across 8 keys, with a pocket-preservation centroid cap that prevents register collapse). No production caller passes `true` yet — `chords-engine.ts:849` (main comping callsite), `harmonies.ts:663`, and `resolution.ts:136` all omit the new arg and default to `false`. Reason: common-tone octave snaps are appropriate for jazz piano but break pocket genres (Neo-Soul `analyze-chords-stats` voice-jump test) and the spectral-gap branch in harmonies which owns its own register intent. Follow-up: at `chords-engine.ts:849` pass the existing `style`/genre context and add `enableVoiceLeading` as a 10th arg gated on `style` ∈ `{jazz, bossa, blues}` (also pass the existing `style` if not already), after auditioning a few jazz progressions to confirm the production audio matches the test-fixture promise. Also: the 10-positional-arg signature should fold to an options object at the same time it gains a production caller (the test's `vlArgs` spread is the leading-indicator smell). ~3h. *Source: Epic 6 S1 Status block + 2026-05-18 music-theory-reviewer report.*
-- **Comper reacting to soloist phrase-end.** `chords.md` P2 #16. Depends on Epic 1's soloist-phrase-end coordination field (now exists). ~2h. *Source: Epic 6 Deferred.*
-- **`bassMidi` floor consolidation across 4 lanes.** `chords.md` P2 #15. Bundle with whichever Epic 6 story touches the relevant lane. ~2h. *Source: Epic 6 Deferred.*
-- **Funk 3-note Clav.** `chords.md` P2 #17. Small standalone or bundle with Epic 6 S5. ~1h. *Source: Epic 6 Deferred.*
-- **Reggae organ-bubble on the harmony channel.** Epic 6 S5 removed the bubble lane from `accompaniment.ts` (the chord channel = keyboardist, who plays the skank). The bubble (eighth-note offbeats on chord tones, `0.3 + intensity*0.5` density floor, occasional dyad on the higher voice) is the organist's idiom and belongs in `harmonies.ts` under `activeStyle === 'organ'` for `genre === 'Reggae'`. Note: `harmonies.ts:242-250` already has a Reggae/Ska comping pattern that fires on backbeats (steps 4 and 12) — this work is a **replacement** of those lines with bubble positions (steps 2, 6, 10, 14), not an addition. Otherwise enabling both channels double-stacks the skank, recreating the union bug S5 deleted. Add a `reggae-harmony-organ-critique.test.ts` (or extend the existing reggae-harmony critique) asserting bubble coverage on offbeats and silence on backbeats. ~3h. *Source: Epic 6 S5 + 2026-05-18 music-theory-reviewer P1.*
-- **Color tones at moderate intensity.** `chords.md` P1 #11. Small change; bundle with Epic 6 S6 or stand alone. ~1h. *Source: Epic 6 Deferred.*
-- **Soloist device-selection uniform-random over ranked list.** `soloist.md` P2 #14. Single ~2h story. P2 nice-to-have. *Source: Epic 4 Deferred.*
+- **Reggae bass coordination consumption** → **Epic 9 / S2 (b)**.
+- **`bassMidi` floor consolidation across 4 lanes** → **Epic 9 / S1 (a)**.
+- **Reggae organ-bubble on the harmony channel** → **Epic 9 / S1 (b)**.
+- **Comper reacting to soloist phrase-end** → **Epic 9 / S2 (a)**.
+
+**Not promoted (still deferred):**
+
+- **Wire `enableVoiceLeading` opt-in into production jazz comping path.** Epic 6 S1 added the opt-in flag; no production caller passes `true` yet. Needs gating on `style ∈ {jazz, bossa, blues}` + listen-test confirmation that production audio matches the test-fixture promise. Also: 10-positional-arg signature should fold to options object at the same time. ~3h. *Source: Epic 6 S1.*
+- **Funk 3-note Clav.** `chords.md` P2 #17. Small standalone or bundle with future Epic 6 work. ~1h. *Source: Epic 6 Deferred.*
+- **Color tones at moderate intensity.** `chords.md` P1 #11. ~1h. *Source: Epic 6 Deferred.*
+- **Soloist device-selection uniform-random over ranked list.** `soloist.md` P2 #14. ~2h. *Source: Epic 4 Deferred.*
 
 ## E. Per-genre tuning & sound design
 
@@ -85,33 +93,38 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 
 ## F. Test rigor & determinism
 
+Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / S3 (harmony/drums/conductor)**. One item still here.
+
+- **Deterministic-seeding of head-bypass jitter PRNG** → Epic 10 / S2 (a).
+- **Engine-wide determinism test** → Epic 10 / S2 (b).
+- **Picker-output-only chromatism metric for Epic 4 S1** → Epic 10 / S2 (c).
+- **Soloist test fixtures don't seed `Math.random`** → Epic 10 / S2 (d).
+- **Evans cadence test doesn't isolate phrase-end attacks** → Epic 10 / S2 (e).
+- **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a).
+- **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b).
+- **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c).
+- **Sparse-vibe cell collapse + active-vibe ornament collision** → Epic 10 / S3 (d).
+- **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e).
+- **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f).
+- **S8 funk-backbeat-presence integration coverage** → Epic 10 / S3 (h).
+- **Pad-sustain test doesn't exercise scheduler or synth legato paths** → Epic 10 / S3 (g).
+
+**Not promoted (still deferred):**
+
 - **`instHash` for drum lanes uses bare polynomial hash.** Epic 2 S3, `groove-engine.ts`. No canonical `scrambleHash` pre-scrambling. Empirically fine, future cleanup. ~30min. *Source: Epic 2 S3 review.*
-- **Accompaniment S3 test fixture primary seed lands target=0.** The cascade-from-`bar > target` path is not directly observed in the primary fixture (compensated by 8-sectionId aggregate in the parity-collapse test). Worth adding a fixture with `target > 0`. ~1h. *Source: Epic 2 S3 review.*
-- **Drums-not-muted regression test asserts Kick only.** Epic 2 S5. Extending to Snare/HiHat for symmetry is a nit. ~30min. *Source: Epic 2 S5 review.*
-- **`withOctaveJump` PC-fold metric can't detect regressions on `clampAndNormalize`-wrapped chromatic paths.** Epic 5 S3. The +12 gets re-folded away by PC-fold. Live audible behavior concentrated in unwrapped fallback (which IS guarded). Tightening to engine-computed `targetRoot` is future regression-hardening. ~2h. *Source: Epic 5 S3 review.*
-- **Deterministic-seeding of head-bypass jitter PRNG.** Epic 4 S4. Jitter is scale-clamped but not yet seeded. ~1h. *Source: Epic 4 S4 Status.*
-- **Sparse-vibe cell collapse + active-vibe ornament collision.** Epic 3 S2. Pre-existing reviewer-flagged issues; deferred. ~2h. *Source: Epic 3 S2 Status.*
-- **Engine-wide determinism test waits on S4+S5.** Epic 3 S3 determinism test stubs `Math.random` to isolate S3's contribution alone; engine-wide test was gated on `withOctaveJump` (S4 shipped) and harmony coin flips (S5 shipped) — now unblocked. ~2h to write. *Source: Epic 3 S3 Status.*
-- **Conductor cool-down jitter headroom is thin.** Epic 2 S7 `tests/standards/conductor-arc-critique.test.ts:393-427` asserts `targetIntensity < 0.6` against worst-case `0.5 + 0.075 jitter = 0.575` — only 0.025 cushion. Safe today (`Math.random()` is strictly `< 1`) but will silently start clipping if jitter envelope widens. Consider asserting `< 0.625` with a pinned-to-jitter-constant comment, or `≤ 0.575 + ε` so regressions on the jitter constant surface as deliberate test failures. ~30min. *Source: Epic 2 S7 review.*
-- **Conductor critique only exercises ceiling-clamped section.** Epic 2 S7 fixture uses Chorus (energy 0.9) so the macro clamp resolves to ceiling and assertions probe the ladder directly. Companion test should transition into a low-energy section (e.g. Verse, energy 0.5) and verify `targetEnergy` lands at the `getSectionEnergy()` value (not the ceiling) and stays inside the macro window. ~1h. *Source: Epic 2 S7 review.*
-- **S8 funk-backbeat-presence integration coverage.** PART 1 of `tests/standards/funk-backbeat-presence.test.ts` fixes `bandIntensity=0.35` directly and exercises only the gate; PART 2 measures the ramp without measuring backbeat routing during it. Add a PART 3 that runs `runConductorArc` for 32 bars AND collects backbeats from `applyGrooveOverrides` using the conductor-driven per-tick `bandIntensity`, asserting ≥80% Snare on the integrated trace. Closes the listener-experience gap that sub-mechanism tests miss. ~1h. *Source: form-arrangement/S8 review (2026-05-17).*
-- **Picker-output-only chromatism metric for Epic 4 S1.** `soloist-jazz-critique.test.ts` "Bird-profile chromatism ratio ≥ 30.5%" tests the COMBINED picker + device chromatic output because `generateMelodicDevice` and `selectPitchAndDevices` both write to the same note stream. The pre-fix engine already produced 27-31% chromatism via devices; post-fix produces 31-34%; the 0.5pt headroom over the un-patched ceiling is real but thin. A clean ratchet needs engine instrumentation that tags picker-emitted vs device-emitted attacks (e.g. a `source: 'picker' | 'device'` field on the returned note objects, surfaced only in test mode). Once that exists, the S1 test can assert picker-emitted chromatic-neighbor share directly. ~3h. *Source: soloist-idiom/S1 review (2026-05-17).*
-- **Soloist test fixtures don't seed `Math.random`.** Epic 4 S2 extension/cadence tests show wide single-run variance (15-50% extension rate, 0-50% home rate at phrase-end) despite per-iteration profile + role pinning and 800-step loops. Variance dominated by un-seeded RNG in the picker scoring, section-boundary profile re-roll, and rhythm-engine attack distribution. A `mulberry32`-seeded `Math.random` spy at test setup would collapse the distribution to a single deterministic run and let assertion bounds tighten by 3-5×. Cuts directly into the structural flakiness that forced S2's (0.15, 0.55) bounds. ~2h to write a shared test-fixture helper. *Source: soloist-idiom/S2 review (2026-05-17).*
-- **Pad-sustain test doesn't exercise scheduler or synth legato paths.** Epic 8 S1 `tests/standards/harmony-pad-sustain.test.ts` calls `getHarmonyNotes` directly and asserts only that `isLegato` is flagged at the harmony-engine layer. The scheduler-level survivor-retention branch in `scheduler-core.ts` (the `legatoMidis` partition that replaces the blanket-kill of `activeVoices`) and the synth-level voice-extension branch in `synth-harmonies.ts` (the `cancelScheduledValues` + extend-end + skip-new-oscillator path) ship with zero test coverage — roughly 110 of the ~134 changed lines. A regression that flips the scheduler condition or breaks the gain hand-off would pass this test green at 4/0. Suggested fix: add an integration-style assertion in the existing `tests/unit/engine/scheduler-core.test.ts` (or a new sibling) that drives one chord-change tick through `scheduleHarmonies` with a fake AudioContext and asserts (a) `state.harmony.activeVoices` retains the legato MIDI across the boundary, OR (b) `playHarmonyNote` returns without pushing a new voice when `isLegato=true` and a same-MIDI voice exists. ~2h. *Source: harmony-polish/S1 review (2026-05-18).*
-- **Evans cadence test doesn't isolate phrase-end attacks.** `jazz-soloist-authenticity.test.ts` "Evans response cadences should resolve home" measures root/5th rate across ALL response attacks, not phrase-end response attacks specifically. The asserted home rate (>10%) is mostly carried by the `isCallResponse` `×8.0` boost (every response attack), not by the `isEvansCadence` early-exit (phrase-end only). The test would still pass if the `isEvansCadence` guard were reverted. Suggested fix: filter the metric to phrase-end attacks only (proxy via `i % 16 === 15` or surface `isPhraseEnd` from the rhythm engine to test-mode). The optional `rootRate > 0.02` belt-and-suspenders assertion partially compensates — root-alone WAS 0% pre-fix due to `×0.01` suppression — but the cleaner test is to measure on the actual cadence subset. ~2h. *Source: soloist-idiom/S2 review (2026-05-17).*
 
 ## G. Schema cleanup & stale carriers
 
-- **Naming collision: `soloist.ts:1257 isFinalMeasure` (per-section) vs `coordination.isFinalMeasure` (per-song).** Epic 2 S4. Different semantics, same name. Rename the local. ~30min. *Source: Epic 2 S4 review.*
-- **Three state-discipline NITs at Epic 2 S4.** Untyped `: any` parameter bag in cadence helper; redundant `as any` cast; defensive `arranger?.` where arranger is guaranteed. ~30min. *Source: Epic 2 S4 review.*
-- **MIDI export silently drops `CowbellHigh`/`CowbellLow`.** `midi-worker-logic.ts:560` resolves drum hits via `DRUM_MAP[soundName]`. `DRUM_MAP` only has bare `Cowbell = 56`, with no fuzzy `name.includes('Cowbell')` branch like Agogo/Bongo have. So the disco octave-cowbell motif renders in live audio (after Epic 7 S2) but silently drops from MIDI export. Add a fuzzy fallback for the Cowbell family, plus a `'Brush'` mapping (GM doesn't have a brush note; nearest is `38 Snare` or `37 Side Stick`). ~1h. *Source: Epic 7 S2 implementer note (2026-05-18).*
-- **`KNOWN_SOUND_NAMES` substring-exemption is broader than necessary.** `synth-drums.ts:219-224` exempts `name.includes('Tom')`, `name.startsWith('Conga'/'Bongo'/'Agogo'/'Cowbell')` from the unknown-name warning. Real typos like `'AgogoMid'` or `'CowbellMid'` are exempt AND fall through the substring-matching dispatch branches that render *something* (wrong octave) rather than warn. Tighten to the exact dispatcher-recognized suffixes (`High`/`Low`/`Open`/`Mute`/`Slap` + bare root). Also: add bare `'Cowbell'` to the `KNOWN_SOUND_NAMES` set for symmetry with the listed `Tom`/`Conga`/`Bongo`/`Agogo` roots. ~30min. *Source: Epic 7 S2 review (2026-05-18).*
-- **`KNOWN_SOUND_NAMES` carries inert no-space tom variants.** `synth-drums.ts:189-191` lists `'HighTom'/'MidTom'/'LowTom'` but no emitter writes those — every fill template and groove uses the space-form (`'High Tom'/'Mid Tom'/'Low Tom'`, which is also what `state/groove.ts` and `midi-constants.ts` canonicalize). The `name.includes('Tom')` substring exemption in `maybeWarnUnknownSound` catches them anyway. Remove the four entries (`'HighTom'`, `'MidTom'`, `'LowTom'`, bare `'Tom'`) to keep the registry honest about what names actually get emitted. ~15min. *Source: drums-idiom/S4 review (2026-05-18).*
-- **Dead role-switch arms in `conductor.ts:401-428`.** Switch handles `Exposition / Development / Contrast / Build / Climax / Recapitulation / Resolution`, but `form-analysis.ts:analyzeForm` (lines 93-140) only emits `Intro / Outro / Peak / Main Theme / Theme B / Bridge / Variation / Refrain / Build`. Only `Build` intersects — six of seven case arms are unreachable from in-engine analyzer output. Fix direction: either rename the switch arms to the `analyzeForm` vocabulary, or have `analyzeForm` emit the formal-music vocabulary (the latter is musically richer — real sonata-form terminology — but a wider rework). ~2h for the rename fix; ~4h for the analyzer enrichment. *Source: Epic 2 S7 review (2026-05-17).*
+All seven items promoted on 2026-05-19. Six to **Epic 10 / S1 (schema cleanup sweep)**; the live bug to **Epic 9 / S6**.
 
-- **Legato-extension `voice.duration` grows monotonically across chains.** Epic 8 S1, `public/engine/synth-harmonies.ts:108`. Each legato extension recomputes `duration = newEnd - existing.time` from the original first-attack time, so a single voice held across N consecutive chord changes accumulates `duration ≈ N × bar_length`. The stale-voice GC at the top of `playHarmonyNote` (`voice.time + voice.duration + 1.0 <= playTime`) then keeps the voice record alive long past the audible end. Not user-visible (the `activeVoices` array is hard-capped at 3 entries via the polyphony-limit shift at line 86), but the bookkeeping is wrong. Suggested fix: track `voice.lastExtendedAt = playTime` and key the GC on that field. ~30min. *Source: harmony-polish/S1 review (2026-05-18).*
-
-- **Hype Man (Anticipation) branch never fires in either of its test fixtures.** Two tests have been red on `main` since at least the S1 (legato) commit: `tests/integration/melodic-harmony-support.test.ts:111-135` ("should play an anticipation hit before a soloist anchor") and `tests/unit/engine/harmonies-logic.test.ts > "should trigger Hype Man (Anticipation) hits before anchors"` (line ~590). Both call `getHarmonyNotes` 2 steps before a soloist anchor and assert `notes[0].isLatched === true`, but the engine returns 0 notes. The Hype Man branch is in `harmonies.ts` ~lines 340-354 (playShadowMode tag 3). Either the gate has drifted (anchorStep math, anchorMidi lookup) or one of the upstream coordination fields the test mocks doesn't satisfy the gate any more. Worth a focused 1-2h investigation: trace why `playShadowMode` returns null for the test setup at step 6 with a step-8 anchor. *Source: harmony-polish/S4 review (2026-05-18).*
+- **Naming collision: `soloist.ts:1257 isFinalMeasure` vs `coordination.isFinalMeasure`** → Epic 10 / S1 (a).
+- **Three state-discipline NITs at Epic 2 S4** → Epic 10 / S1 (b).
+- **MIDI export silently drops `CowbellHigh`/`CowbellLow`** → Epic 10 / S1 (c).
+- **`KNOWN_SOUND_NAMES` substring-exemption too broad** → Epic 10 / S1 (d).
+- **`KNOWN_SOUND_NAMES` carries inert no-space tom variants** → Epic 10 / S1 (e).
+- **Legato-extension `voice.duration` grows monotonically across chains** → Epic 10 / S1 (f).
+- **Dead role-switch arms in `conductor.ts:401-428`** → Epic 10 / S1 (also).
+- **Hype Man branch never fires in either of its test fixtures** → **Epic 9 / S6** (live bug, standalone story).
 
 ## H. Cross-references (already routed to a story — no work tracked here)
 
@@ -135,4 +148,4 @@ Pointers in case someone greps from a finding:
 
 ---
 
-**Last reviewed:** 2026-05-18 (Epic 8 / S4 review additions: Hype Man branch dead-on-main in §G alongside the S1 entries).
+**Last reviewed:** 2026-05-19 (post-audit promotion: §B, §C native chromatic + altered-dom + slash-chord + bendStartInterval, §D bassMidi floor + reggae organ + comper phrase-end + reggae bass, §F most items, §G all items moved to Epic 9 + Epic 10 sweep stories. Remaining entries in §A/§C/§D/§E/§F are not-yet-promoted — still listen-test-gated or genuinely small adjacent-work candidates).
