@@ -1542,12 +1542,21 @@ export function getAccompanimentNotes(
         const rootMidi = chord.rootMidi;
         let cadenceMidis = cadenceIntervals.map((iv) => rootMidi + iv);
         // why: target the lower half of the chord slot (52-68) — a final cadence
-        // is grounded, not airy. If the rootMidi is below 52, shift up; if above
-        // 68, shift the whole voicing down an octave.
-        while (cadenceMidis[0] < 52) {
+        // is grounded, not airy. If the rootMidi is below the bass-aware floor,
+        // shift up; if above 68, shift the whole voicing down an octave.
+        //
+        // Bass-aware floor (epic-coordination-consistency S1.a): when the band
+        // bassist is grounded high (e.g. MIDI 55 = G3) and the cadence root
+        // would sit at 52 (E3), the cluster crashes the bass register at the
+        // most important bar of the song. `max(52, bassMidi + 7)` reserves a
+        // perfect fifth of separation above the bassist (mirrors harmony main
+        // path at harmonies.ts:627); fallback to 52 when bass isn't running.
+        const cadenceBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+        const cadenceFloor = Math.max(52, cadenceBassMidi + 7);
+        while (cadenceMidis[0] < cadenceFloor) {
             cadenceMidis = cadenceMidis.map((m) => m + 12);
         }
-        while (cadenceMidis[0] > 68) {
+        while (cadenceMidis[0] > 68 && cadenceMidis[0] - 12 >= cadenceFloor) {
             cadenceMidis = cadenceMidis.map((m) => m - 12);
         }
         // why: accent the cadence ABOVE ordinary comp downbeats (~0.71 at
@@ -1745,6 +1754,16 @@ export function getAccompanimentNotes(
                 null;
             const fifthInterval = intervals.find((i) => i === 6 || i === 7 || i === 8) ?? 7;
 
+            // Bass-aware register floor (epic-coordination-consistency S1.a):
+            // mirrors harmonies.ts:627 — reserve a P5 of separation above the
+            // bassist when bass is running so the strum cluster doesn't crash
+            // the bass register when bass walks high. Country boom-chick has
+            // its own R-5 in bass register above (1700-1726), but the band
+            // bassist runs alongside; the strum is the chord half and should
+            // sit above the bassist. Fallback to 52 when bass not running.
+            const strumBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+            const strumFloor = Math.max(52, strumBassMidi + 7);
+
             // Anchor the strum cluster around middle-C (MIDI 60), then re-pick the
             // octave that minimizes centroid distance to the previous voicing.
             // Voice-leading via `compingState.lastVoicingMidis` keeps the cluster
@@ -1778,7 +1797,13 @@ export function getAccompanimentNotes(
                     const cluster = buildCluster(candidate);
                     const cMin = Math.min(...cluster);
                     const cMax = Math.max(...cluster);
-                    if (cMin < 52 || cMax > 84) {
+                    // why: bass-aware floor — reject any candidate cluster
+                    // whose lowest voice falls below `strumFloor` (P5 above
+                    // bass when bass is running, else 52). Keeps the country
+                    // strum from crashing the bass register when the band
+                    // bassist is grounded high. Mirrors the harmony-main-path
+                    // safetyFloor at harmonies.ts:627.
+                    if (cMin < strumFloor || cMax > 84) {
                         continue;
                     }
                     const centroid = cluster.reduce((a, b) => a + b, 0) / cluster.length;
@@ -1791,13 +1816,15 @@ export function getAccompanimentNotes(
                 clusterRoot = bestRoot;
             }
             const strumMidis = buildCluster(clusterRoot);
-            // Clamp into chord-register slot 52-84 (shift whole cluster by ±12
-            // if any voice escapes); preserves the interval structure.
+            // Clamp into chord-register slot (strumFloor..84) — shift whole
+            // cluster by ±12 if any voice escapes; preserves the interval
+            // structure. Floor is bass-aware (P5 above bass when running),
+            // consistent with the candidate-rejection check above.
             const minMidi = Math.min(...strumMidis);
             const maxMidi = Math.max(...strumMidis);
             let slotShift = 0;
-            if (minMidi < 52) {
-                slotShift = Math.ceil((52 - minMidi) / 12) * 12;
+            if (minMidi < strumFloor) {
+                slotShift = Math.ceil((strumFloor - minMidi) / 12) * 12;
             } else if (maxMidi > 84) {
                 slotShift = -Math.ceil((maxMidi - 84) / 12) * 12;
             }
