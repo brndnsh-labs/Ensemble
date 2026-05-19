@@ -46,6 +46,7 @@ export function playHarmonyNote(
     slideInterval = 0,
     slideDuration = 0,
     vibrato = { rate: 0, depth: 0 },
+    isLegato = false,
 ) {
     const { playback, harmony, groove } = state;
     if (!Number.isFinite(freq) || !playback.audio) {
@@ -68,8 +69,86 @@ export function playHarmonyNote(
         }
     }
 
-    // Pitch-aware Stealing
-    if (midi !== null) {
+    // Legato continuation (epic-harmony-polish S1):
+    // why: when the harmony engine flags a note as a held continuation of a
+    // voice that's already sounding at this exact MIDI (pad-mode common-tone
+    // carryover), extend the existing voice in place instead of choking + re-
+    // attacking. This is what makes "The Sea" / strings actually sustain across
+    // chord changes — without it, every common tone hears a stab-stab-stab
+    // re-articulation.
+    //
+    // Implementation:
+    //   1. Find the existing voice at the same midi.
+    //   2. Cancel its scheduled release ramp.
+    //   3. Extend its `duration` so the new fade-out happens at
+    //      playTime + duration instead of the original (earlier) end time.
+    //   4. Re-schedule the gain release using a short release tail (matches
+    //      the original setTargetAtTime release for pad-style voices).
+    //   5. Return early — do NOT spawn new oscillators. This keeps the
+    //      audio graph leak-free (no orphan nodes; the existing voice's
+    //      onended/stop chain still cleans up at the new stopTime).
+    if (isLegato && midi !== null) {
+        const existing = harmony.activeVoices.find((v: { midi: number | null }) => v.midi === midi);
+        if (existing?.gain && playback.audio) {
+            const releaseTail = style === 'stabs' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
+            try {
+                existing.gain.gain.cancelScheduledValues(playTime);
+            } catch {
+                /* some test mocks don't implement cancelScheduledValues */
+            }
+            // Restore gain to the freshly-attacked level so the survivor voice
+            // rides the new chord at full volume rather than continuing to
+            // decay from wherever the previous release ramp had reached.
+            // why: cancelScheduledValues only blocks future events — if the
+            // previous release had already started ramping toward 0, the
+            // AudioParam value is mid-decay and would otherwise continue
+            // dropping. Without this restore, a survivor voice would sit
+            // audibly behind the freshly-attacked sibling voices in the same
+            // emission; this is especially audible on short-release styles
+            // (stabs/plucks). 5 ms ramp avoids a zipper click.
+            const polyphonyDucking = harmony.activeVoices.length > 1 ? 0.85 : 1.0;
+            const restoreVol = vol * polyphonyDucking;
+            try {
+                existing.gain.gain.linearRampToValueAtTime(restoreVol, playTime + 0.005);
+            } catch {
+                existing.gain.gain.setValueAtTime?.(restoreVol, playTime);
+            }
+            // Schedule the new release window relative to the extended end time.
+            const newEnd = playTime + duration;
+            existing.gain.gain.setTargetAtTime(
+                0,
+                Math.max(playTime + 0.005, newEnd - releaseTail),
+                releaseTail,
+            );
+            // Update the voice record so subsequent legato extensions chain
+            // correctly and the stale-voice GC sees the new end time.
+            existing.duration = newEnd - existing.time;
+            // Push oscillator stop times out to the new end (best-effort —
+            // not every voice's nodes implement .stop; that's fine, the gain
+            // ramp to 0 is the audible truth and stale-voice GC will clean up).
+            const stopAt = newEnd + 0.5;
+            if (existing.nodes) {
+                for (const node of existing.nodes as Array<
+                    AudioNode & { stop?: (t: number) => void }
+                >) {
+                    try {
+                        node.stop?.(stopAt);
+                    } catch {
+                        /* ignore: node may already be stopped */
+                    }
+                }
+            }
+            return;
+        }
+        // No existing voice to extend — fall through and create one normally.
+        // This handles the edge case where the engine flagged legato but the
+        // synth had already cleaned up the voice (voice timed out, killed by
+        // an earlier non-legato chord change, etc.).
+    }
+
+    // Pitch-aware Stealing — gated on !isLegato so same-midi legato voices
+    // are NOT choked here (they're handled by the legato block above).
+    if (!isLegato && midi !== null) {
         const existing = harmony.activeVoices.find((v: { midi: number | null }) => v.midi === midi);
         if (existing) {
             retriggerProfile = getHarmonyRetriggerProfile(style);

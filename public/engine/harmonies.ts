@@ -83,6 +83,14 @@ interface HarmonyNote {
     isBloom: boolean;
     isResponse: boolean;
     isChordStart: boolean;
+    /**
+     * True when this note is a legato continuation of a voice that was already
+     * sounding at this exact MIDI on the previous harmony emission (pad mode,
+     * common-tone carryover). Synth uses this to skip the re-attack envelope
+     * and to extend the existing voice's release rather than choking + starting
+     * a new voice. See epic-harmony-polish.md S1.
+     */
+    isLegato?: boolean;
 }
 
 // Internal memory for motif consistency
@@ -680,6 +688,26 @@ function finalizeHarmonyNotes(
     const notes: HarmonyNote[] = [];
     const finalMidisForMemory: number[] = [];
 
+    // Legato continuation: in pad mode, a voice at the same MIDI as one in the
+    // previous emission is a held tone, not a re-attack. Build a quick lookup
+    // of prior MIDIs so per-voice flagging below is O(1).
+    // why: "The Sea"/strings pad currently re-attacks every chord change even
+    // when common tones carry, producing a stab-stab-stab feel instead of a
+    // sustained pad. Gated by `behavior.type === 'pad'` only — `reinforce`
+    // (Shadow) and `comp` (Comper) behaviors stay articulated. Voicing styles
+    // that route to playSeaMode at low intensity (Comper, smart) inherit
+    // legato as a side effect, which is correct: a low-intensity comp IS a
+    // held pad.
+    // Cross-midi (octave-shifted same-PC) is intentionally NOT treated as
+    // legato — the synth holds an exact MIDI voice; a different octave would
+    // require pitch-bending an existing voice, which the synth graph doesn't
+    // support. Exact-midi match is the truthful definition for sustain.
+    const priorMidiSet = new Set<number>(
+        behavior.type === 'pad' && harmony.lastMidis && harmony.lastMidis.length > 0
+            ? harmony.lastMidis
+            : [],
+    );
+
     for (let i = 0; i < currentMidis.length; i++) {
         let midi = currentMidis[i];
         if (midi < safetyFloor) {
@@ -718,6 +746,7 @@ function finalizeHarmonyNotes(
             offset += 0.02; // Dilla lag
         }
 
+        const isLegato = priorMidiSet.has(midi);
         notes.push({
             midi,
             freq: getFrequency(midi),
@@ -729,6 +758,7 @@ function finalizeHarmonyNotes(
             isBloom: !!isBloom,
             isResponse: !!isResponse,
             isChordStart: true,
+            isLegato,
         });
         finalMidisForMemory.push(midi);
     }

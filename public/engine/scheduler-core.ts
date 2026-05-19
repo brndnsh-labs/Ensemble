@@ -58,6 +58,7 @@ import {
 } from './platform-orchestrator.js';
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
+import { killActiveVoices } from './synth-utils.js';
 import { generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
@@ -959,9 +960,48 @@ function scheduleHarmonies(
 
         // If any note in this step is a chord start or movement,
         // clear previous voices once before scheduling the new ones.
+        // why: pad-mode legato (epic-harmony-polish S1) — when at least one note
+        // is a legato continuation, the blanket kill would choke voices that
+        // should be held across the chord change. Instead, kill only voices
+        // whose MIDI is NOT in the incoming legato set; voices in that set are
+        // extended in-place by playHarmonyNote. When no legato notes are present
+        // the original kill-all behavior is preserved.
         const starter = notes.find((n: any) => n.isChordStart);
         if (starter) {
-            killHarmonyNote(state, starter.killFade || 0.05);
+            const legatoMidis = new Set<number>();
+            for (let i = 0; i < notes.length; i++) {
+                if (notes[i].isLegato) {
+                    const lm = notes[i].midi ?? getMidi(notes[i].freq);
+                    if (Number.isFinite(lm)) {
+                        legatoMidis.add(lm);
+                    }
+                }
+            }
+            if (legatoMidis.size > 0 && state.harmony.activeVoices) {
+                const fade = starter.killFade || 0.05;
+                const killTime = playback.audio ? playback.audio.currentTime : 0;
+                const survivors: any[] = [];
+                const toKill: any[] = [];
+                for (const v of state.harmony.activeVoices) {
+                    if (v.midi !== null && legatoMidis.has(v.midi)) {
+                        survivors.push(v);
+                    } else {
+                        toKill.push(v);
+                    }
+                }
+                if (toKill.length > 0) {
+                    // killActiveVoices clears the array in-place; pass a local
+                    // copy so survivors are not also wiped.
+                    killActiveVoices(toKill, killTime, fade);
+                }
+                // Rebuild activeVoices in-place to retain only survivors.
+                state.harmony.activeVoices.length = 0; // @worker-mutation
+                for (const v of survivors) {
+                    state.harmony.activeVoices.push(v); // @worker-mutation
+                }
+            } else {
+                killHarmonyNote(state, starter.killFade || 0.05);
+            }
         }
 
         // Power-compensation for multiple voices: Scale volume by 1/sqrt(N)
@@ -985,6 +1025,7 @@ function scheduleHarmonies(
                 slideInterval,
                 slideDuration,
                 vibrato,
+                isLegato,
             } = n;
             const playTime = time + (timingOffset || 0);
             const m = noteMidi || getMidi(freq);
@@ -1005,6 +1046,7 @@ function scheduleHarmonies(
                     slideInterval,
                     slideDuration,
                     vibrato,
+                    !!isLegato,
                 );
                 dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration);
 
