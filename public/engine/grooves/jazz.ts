@@ -219,9 +219,26 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         }
 
+        // why: capture velocity before the Sidestick trim so the Brush branch below can
+        // restore it without depending on the exact `*0.8` factor. Prevents silent breakage
+        // if a future patch adds another velocity edit between these two branches.
+        const preTrimVelocity = velocity;
         if (shouldPlay && intensity < 0.4) {
             soundName = 'Sidestick';
             velocity *= 0.8;
+        }
+
+        // why: jazz ballad / quiet swing under intensity 0.35 and BPM < 130 should read as
+        // brushwork, not sidestick. Real brush playing has a sweep texture that sidestick
+        // (a hard wood-on-rim click) completely misses. drums.md P1 #7 fix sketch:
+        // route the snare lane through Brush when intensity < 0.35 && bpm < 130.
+        // BPM gate keeps fast bebop (>=130) on sidestick so the rhythmic placement stays crisp.
+        const bpm = context.playback.bpm;
+        if (shouldPlay && intensity < 0.35 && bpm !== undefined && bpm < 130) {
+            soundName = 'Brush';
+            // why: brush voice has its own internal velocity floor; restore the pre-trim
+            // velocity (the Sidestick branch's *0.8 doesn't apply when Brush wins).
+            velocity = preTrimVelocity;
         }
 
         // THE BIG FINISH (Ending Signaling)
@@ -235,7 +252,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     }
 
     if (shouldPlay && context.inst.name === 'Snare' && intensity < 0.35) {
-        soundName = 'Sidestick';
+        // why: preserve the Brush routing decided above — only fall back to Sidestick
+        // when Brush wasn't selected (e.g. bpm >= 130 fast ballad-but-driving case).
+        if (soundName !== 'Brush') {
+            soundName = 'Sidestick';
+        }
     }
 
     return { shouldPlay, velocity, soundName, instTimeOffset };

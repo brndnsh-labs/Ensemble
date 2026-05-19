@@ -155,7 +155,90 @@ const RIGHT_PANNED_INSTRUMENTS = new Set([
     'Perc',
     'Guiro',
     'Clave',
+    // why: cowbell typically sits to the drummer's right alongside the agogo/shaker bed;
+    // matching that placement keeps the disco "Octave Cowbells" out of the kick/snare center.
+    'CowbellHigh',
+    'CowbellLow',
 ]);
+
+/**
+ * Registry of every soundName the synth-drums dispatcher knows how to render.
+ * If a groove writes a soundName not in this set, we warn once per name per session
+ * — surfaces typos and stub voices without spamming the console or throwing.
+ * Keep this in sync with the if/else chain in `playDrumSound`.
+ */
+const KNOWN_SOUND_NAMES = new Set<string>([
+    'Kick',
+    'Snare',
+    'Sidestick',
+    'HiHat',
+    'Open',
+    'Ride',
+    'Crash',
+    'Clave',
+    'Guiro',
+    'Shaker',
+    'Perc',
+    'AgogoHigh',
+    'AgogoLow',
+    'Agogo',
+    'CowbellHigh',
+    'CowbellLow',
+    'Brush',
+    // Toms — handled by `name.includes('Tom')` branch
+    'HighTom',
+    'MidTom',
+    'LowTom',
+    'Tom',
+    // Conga / Bongo families — handled by `name.startsWith('Conga'|'Bongo')`
+    'HighConga',
+    'LowConga',
+    'OpenConga',
+    'MuteConga',
+    'SlapConga',
+    'Conga',
+    'HighBongo',
+    'LowBongo',
+    'Bongo',
+]);
+
+const warnedUnknownSounds = new Set<string>();
+
+/**
+ * Emit a single console.warn for any unknown drum soundName. Once per name
+ * per session — drummer engines should never crash playback, just degrade.
+ * Tom/Conga/Bongo names are matched by `includes/startsWith` in the dispatcher,
+ * so any name containing those tokens is implicitly known.
+ */
+function maybeWarnUnknownSound(name: string): void {
+    if (KNOWN_SOUND_NAMES.has(name)) {
+        return;
+    }
+    // why: dispatcher uses substring matching for the drum-family branches —
+    // anything containing 'Tom'/'Conga'/'Bongo'/'Agogo'/'Cowbell' will route somewhere.
+    if (
+        name.includes('Tom') ||
+        name.startsWith('Conga') ||
+        name.startsWith('Bongo') ||
+        name.startsWith('Agogo') ||
+        name.startsWith('Cowbell')
+    ) {
+        return;
+    }
+    if (warnedUnknownSounds.has(name)) {
+        return;
+    }
+    warnedUnknownSounds.add(name);
+    // eslint-disable-next-line no-console
+    console.warn(`[synth-drums] unknown soundName "${name}" — no audio voice will play.`);
+}
+
+/** Test hook: clears the "already warned" registry so each test sees fresh warnings. */
+export function _resetUnknownSoundWarnings(): void {
+    warnedUnknownSounds.clear();
+}
+
+export { KNOWN_SOUND_NAMES };
 
 const TAU = Math.PI * 2;
 
@@ -625,6 +708,9 @@ export function playDrumSound(
     if (!name || !playback.audio) {
         return;
     }
+    // why: surface engine typos / stub soundNames as a one-shot warning instead of silent
+    // audio dropouts (root cause of `drums.md` P0 #3 Cowbell going to a dead lane for months).
+    maybeWarnUnknownSound(name);
     const now = playback.audio.currentTime;
 
     // --- Density Normalization Logic ---
@@ -1159,6 +1245,109 @@ export function playDrumSound(
             decay: voiceConfig.shellDecay * rr(),
             duration: voiceConfig.shellDuration,
         });
+    } else if (name.startsWith('Cowbell')) {
+        // why: disco "Octave Cowbells" (drums.md P0 #3) need a real voice, not a fallback —
+        // the Agogo branch is too sine-sweet for the LATIN PERCUSSION 56 timbre. The canonical
+        // TR-808 cowbell is TWO oscillators sounding together at 540 Hz and 800 Hz — the
+        // 540:800 ratio (≈1.48) IS the inharmonic "clang" that makes it read as cowbell rather
+        // than tuned bell. High vs Low emphasizes one fundamental over the other, preserving
+        // the octave-ish gesture without losing the clang of both frequencies firing together.
+        const isHigh = name === 'CowbellHigh';
+        const vol = masterVol * 0.42 * rr();
+        const dominantVol = vol * 0.55;
+        const accentVol = vol * 0.32;
+
+        // 1. Lower body at 540 Hz — full volume on Low, trimmed on High.
+        playResonantTone(playback.audio, panner, playTime, {
+            type: 'triangle',
+            freqStart: 540 * rr(0.008),
+            volume: isHigh ? accentVol : dominantVol,
+            attack: 0.0008,
+            // why: shorter decay (0.04s) keeps envelope at <2% by t=0.18 — avoids the click
+            // that 0.075s decay would produce when osc.stop fires while the body is still ~9%.
+            decay: 0.04,
+            duration: 0.18,
+        });
+
+        // 2. Upper body at 800 Hz — full volume on High, trimmed on Low. Together with the
+        // 540 Hz partial these form the TR-808 dual-fundamental clang.
+        playResonantTone(playback.audio, panner, playTime, {
+            type: 'triangle',
+            freqStart: 800 * rr(0.008),
+            volume: isHigh ? dominantVol : accentVol,
+            attack: 0.001,
+            decay: 0.04,
+            duration: 0.18,
+        });
+
+        // 3. Bandpass strike click — short noise burst centered at 3.2kHz delivers the
+        // initial "tick" of the stick against the metal shell.
+        playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
+            volume: vol * 0.28,
+            filterType: 'bandpass',
+            freq: 3200,
+            Q: 2.0,
+            attack: 0.0005,
+            decay: 0.006,
+            duration: 0.04,
+        });
+    } else if (name === 'Brush') {
+        // why: jazz at intensity < 0.35 wants brushwork, not a sidestick (drums.md P1 #7).
+        // A brush sweep is essentially a long pink/whitish noise burst with a slow attack
+        // (the swish across the head) and a bandpass that sits around 1.5-2kHz to read as
+        // wire-on-coated-snare rather than full-spectrum noise (which sounds like a hi-hat).
+        const vol = masterVol * 0.55 * rr();
+
+        // 1. The "swish" — long noise sweep with slow attack (~35ms) and a bandpass that
+        // moves DOWNWARD from ~2.4kHz to ~1.4kHz over the sweep, mimicking the wire bristles
+        // dragging across the head as they decelerate.
+        const noise = playback.audio.createBufferSource();
+        noise.buffer = groove.audioBuffers.noise;
+        noise.loop = true;
+        const bp = playback.audio.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(2400, playTime);
+        bp.frequency.linearRampToValueAtTime(1400, playTime + 0.18);
+        bp.Q.value = 0.9;
+
+        const hp = playback.audio.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(450, playTime);
+
+        const gain = playback.audio.createGain();
+        gain.gain.setValueAtTime(0, playTime);
+        // why: ~35ms attack is the canonical brush sweep onset — sub-30ms reads as a hat,
+        // >60ms loses the rhythmic placement against the ride and feels late.
+        gain.gain.linearRampToValueAtTime(vol, playTime + 0.035);
+        // why: 0.18s sustain at floor then long tail — total ~0.35s gives the
+        // wire-still-in-contact-with-head decay character without smearing into the next beat
+        // at BPM<=130 (jazz ballad target).
+        gain.gain.setTargetAtTime(vol * 0.4, playTime + 0.05, 0.08);
+        gain.gain.setTargetAtTime(0, playTime + 0.2, 0.09);
+
+        noise.connect(hp);
+        hp.connect(bp);
+        bp.connect(gain);
+        gain.connect(panner);
+
+        noise.start(playTime);
+        noise.stop(playTime + 0.45);
+        noise.onended = () => safeDisconnect([noise, hp, bp, gain, panner]);
+
+        // 2. Brush "tap" body — a brief sidestick-like body so the brush has rhythmic
+        // articulation. Velocity-scaled so quiet hits stay pure-sweep texture.
+        if (velocity > 0.35) {
+            playResonantTone(playback.audio, panner, playTime, {
+                type: 'sine',
+                freqStart: 220,
+                freqEnd: 180,
+                rampDuration: 0.02,
+                volume: vol * 0.18 * velocity,
+                attack: 0.002,
+                decay: 0.035,
+                duration: 0.12,
+            });
+        }
     }
 }
 
