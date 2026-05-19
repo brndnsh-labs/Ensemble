@@ -34,12 +34,14 @@ All three items promoted to **Epic 9 / S5 (Multiplier placement hardening)** on 
 
 Three items promoted on 2026-05-19; remainder still here as not-yet-load-bearing.
 
-- **Native-style chromatic leading tones** → **Epic 9 / S4** (fan-out, 5 styles). ~10h total.
+- **Native-style chromatic leading tones** → **Epic 9 / S4** (shipped 2026-05-19, narrowed to rock-only — country was already done in Epic 5 S5; pop/soul/gospel aren't native bass styles in current codebase).
 - **Altered-dominant narrow consumers** → **Epic 9 / S3 (a)**. Two consumers (`soloist-pitch-engine.ts:418`, `accompaniment.ts:1228` `wasTense`) still narrow.
 - **Three slash-chord-blind predicate sites in bass** → **Epic 9 / S3 (b)**. `bass-engine.ts:313/463/812` use `rootMidi`-only check; should migrate to `isChordChangeApproach` helper.
 - **`bendStartInterval` not plumbed through `playBassNote` / `scheduler-core.ts`** → **Epic 9 / S3 (c)**. Affects funk walking approach bend + hip-hop 808 slide; both gestures inaudible at playback.
 
 **Not promoted (still deferred):**
+
+- **`walking-ska` style slash-chord-blind predicate.** `bass-styles.ts:1041` carries the same `nextChord.rootMidi !== chord.rootMidi` pattern that Epic 9 S3.b/S4 migrated elsewhere. Single inline site — could be folded into a future micro-sweep. Reviewer flagged during Epic 9 S4 review. ~10min. *Source: Epic 9 S4 review.*
 
 - **Hash-helper consolidation across 3 engines.** `bass-engine.ts` + `groove-engine.ts` use djb2-33-from-5381; `accompaniment.ts` uses djb2-31-from-0. Independent per-engine target distributions are currently a happy hash accident. ~2h. *Source: Epic 2 S3 review.*
 - **Three remaining `soloist.session.*` reads in `harmonies.ts`.** `session.memory.sharedHookBuffer` at lines 271-272 (Ska-Punk only) + `session.seed` at line 279 (melodic shadowing). Would need a buffer-object + RNG-seed context-fields design. Worth its own story if/when "grep returns zero" becomes a hard rule. ~3h. *Source: Epic 1 S4 follow-up.*

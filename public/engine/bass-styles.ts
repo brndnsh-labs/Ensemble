@@ -656,10 +656,41 @@ export function getBassNoteStyle(
         // 2. Fundamental Pulse: Quarter notes are solid roots
         if (isBeatStart) {
             const isPushPoint = intBeat === ts.beats - 1 && Math.random() < 0.4 + intensity * 0.3;
-            if (isPushPoint && nextChord && nextChord.rootMidi !== chord.rootMidi) {
-                // Harmonic Anticipation: Play the NEXT root early
-                const nextRoot = normalizeToRange(nextChord.rootMidi);
-                return result(getFrequency(nextRoot), 0.8, 1.2, 1);
+            if (isPushPoint && isChordChangeApproach(nextChord, chord)) {
+                // why: migrated from rootMidi-only comparison to isChordChangeApproach so
+                // slash chords (e.g. G/B → C) are detected correctly — the old predicate
+                // compared rootMidi and would miss a bass-note-only change (bass.md P1 #5,
+                // Epic 9 S3.b pattern).
+                const nextBassTarget = nextChord.bassMidi ?? nextChord.rootMidi;
+                const nextTarget = normalizeToRange(nextBassTarget);
+
+                // Chromatic leading tone sub-branch (~8-13% of push-point chord-change events).
+                // why: Stones-style root anticipation (whole-step arrival) is the rock default,
+                // but Zeppelin/Sabbath also use half-step approaches as a sub-vocabulary.
+                // Low probability preserves the genre's grounded feel; bass.md P1 #4 notes
+                // rock/funk/pop/country/soul/gospel use chromatic approaches but less
+                // frequently than jazz/blues. The native 'rock' handler always returns
+                // non-null on is8th slots, so the universal chromatic-approach branch at
+                // lines 1141-1203 never fires for rock — this sub-branch is the only path
+                // for rock to produce chromatic leading tones on beat-4 push-points.
+                if (Math.random() < 0.08 + intensity * 0.05) {
+                    const below = normalizeToRange(nextTarget - 1);
+                    const above = normalizeToRange(nextTarget + 1);
+                    // why: pick direction by proximity to prevMidi for smooth voice leading
+                    // (mirrors the country walk-up logic at bass-styles.ts:373-376).
+                    const ref = prevMidi ?? baseRoot;
+                    const approach = Math.abs(below - ref) <= Math.abs(above - ref) ? below : above;
+                    // why: chromatic and root anticipation share velocity (1.2). Both
+                    // occupy the same slot as palm-muted pickups into the downbeat — a
+                    // real bassist doesn't dynamically soften the chromatic variant; if
+                    // anything, Zeppelin/Sabbath accent the half-step pull-up. The
+                    // "sub-vocabulary" framing is encoded by probability (8-13%), not
+                    // dynamics.
+                    return result(getFrequency(approach), 0.8, 1.2, 1);
+                }
+
+                // Harmonic Anticipation: Play the NEXT root early (Stones-style default)
+                return result(getFrequency(nextTarget), 0.8, 1.2, 1);
             }
             return result(getFrequency(baseRoot), 0.8, 1.1 + intensity * 0.1);
         }
