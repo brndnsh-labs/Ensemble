@@ -1199,8 +1199,11 @@ export function getBassNote(
             // why: bass.md P2 #15 / epic-deterministic-phrasing S3 — generic fallback
             //   had no target awareness; uniform bias was also musically wrong shape.
             // Uses the outer `barIndex` declared near withOctaveJump (S4); same value.
-            if (nextChord && nextChord.rootMidi !== chord.rootMidi) {
-                const nextTarget = normalizeToRange(nextChord.rootMidi);
+            // why: isChordChangeApproach uses bassMidi ?? rootMidi, catching slash-chord
+            //   changes (e.g. C → C/E) that this inline `rootMidi !== rootMidi` check
+            //   would miss. Source: FOLLOWUPS §C — slash-chord-blind predicate migration.
+            if (nextChord && isChordChangeApproach(nextChord, chord)) {
+                const nextTarget = normalizeToRange(nextChord.bassMidi ?? nextChord.rootMidi);
                 // why: 7-semitone (perfect-fifth) approach window. A candidate within
                 //   a fifth of the target gets meaningful lift; beyond a fifth, the
                 //   note is too distant to feel like an approach and the lift falls
