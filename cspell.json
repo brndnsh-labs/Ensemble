@@ -238,7 +238,11 @@
         "unbuilt",
         "unranked",
         "Bootsy",
-        "clavinet"
+        "clavinet",
+        "Parameterised",
+        "Dmaj",
+        "Dsus",
+        "dsus"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

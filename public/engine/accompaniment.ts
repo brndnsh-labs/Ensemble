@@ -1698,19 +1698,20 @@ export function getAccompanimentNotes(
         const isGhost = measureStep % 4 !== 0 && Math.random() < intensity * 0.6;
 
         if (isBass) {
-            // Alternate Root and Fifth (if possible)
-            // measureStep 0 = Root, measureStep 8 (Beat 3) = Fifth
+            // why: strict R-5 — country boom-chick is a deterministic idiom
+            // (chords.md P1 #9); the previous 90% probabilistic gate on beat 3
+            // smeared the train-beat feel by occasionally repeating the root.
+            // measureStep 0 = root, every other strong-beat bass note = fifth.
             let note = chord.rootMidi;
-            // Simple logic: if it's the second strong beat, try fifth
-            if (measureStep > 0 && Math.random() < 0.9) {
-                note += 7; // Up a fifth (or down a fourth, logic usually wraps)
-                if (note > 60) {
-                    note -= 12; // Keep it low
-                }
-            } else {
-                // Ensure root is in bass register
+            if (measureStep === 0) {
+                // Ensure root is in bass register.
                 while (note > 55) {
                     note -= 12;
+                }
+            } else {
+                note += 7; // up a fifth from root
+                if (note > 60) {
+                    note -= 12; // keep it low (fourth below root)
                 }
             }
 
@@ -1726,15 +1727,87 @@ export function getAccompanimentNotes(
             return notes;
         } else if (isStrum || isGhost) {
             const v = isStrum ? 0.5 + intensity * 0.3 : 0.2 + intensity * 0.1;
-            let voicing = [...chord.freqs];
-            if (voicing.length > 3) {
-                voicing = voicing.slice(0, 3); // Simple triads
-            }
-            voicing = rotateVoicingFreqs(voicing);
 
-            voicing.forEach((f, i) => {
+            // why: dedicated strum voicing — canonical acoustic-guitar strum is
+            // root + 3rd + 5th + octave-doubled root (e.g. Cmaj: C3-E3-G3-C4),
+            // NOT the chord's raw `freqs.slice(0,3)` which leaks 7ths/9ths/etc.
+            // into a triadic idiom that defines the country lane.
+            // chords.md P1 #10 / epic-chords-voicing S6.
+            const rootPc = ((chord.rootMidi % 12) + 12) % 12;
+            const intervals: number[] = Array.isArray(chord.intervals) ? chord.intervals : [];
+            // Middle-voice pick: prefer the 3rd (3 or 4). For suspended chords the
+            // 3rd is deliberately absent — use the 2nd or 4th (sus2/sus4). Power
+            // chords (no 3rd, no 2/4) drop the middle voice entirely so we don't
+            // force a major 3rd onto a quality that defines itself by its absence.
+            const middleInterval =
+                intervals.find((i) => i === 3 || i === 4) ??
+                intervals.find((i) => i === 2 || i === 5) ??
+                null;
+            const fifthInterval = intervals.find((i) => i === 6 || i === 7 || i === 8) ?? 7;
+
+            // Anchor the strum cluster around middle-C (MIDI 60), then re-pick the
+            // octave that minimizes centroid distance to the previous voicing.
+            // Voice-leading via `compingState.lastVoicingMidis` keeps the cluster
+            // from leaping a 4th/5th on every chord change (the I-IV-V country
+            // loop especially). Falls back to the MIDI 60 anchor on the first
+            // chord of a section. Stays within chord-register slot 52-84.
+            const STRUM_ANCHOR = 60;
+            let clusterRoot = rootPc;
+            while (clusterRoot < STRUM_ANCHOR - 6) {
+                clusterRoot += 12;
+            }
+            while (clusterRoot > STRUM_ANCHOR + 6) {
+                clusterRoot -= 12;
+            }
+            const buildCluster = (cr: number): number[] => {
+                const cluster = [cr];
+                if (middleInterval !== null) {
+                    cluster.push(cr + middleInterval);
+                }
+                cluster.push(cr + fifthInterval);
+                cluster.push(cr + 12);
+                return cluster;
+            };
+            const prevMidis = compingState.lastVoicingMidis;
+            if (prevMidis.length > 0) {
+                const prevCentroid = prevMidis.reduce((a, b) => a + b, 0) / prevMidis.length;
+                let bestRoot = clusterRoot;
+                let bestDist = Infinity;
+                for (const shift of [-12, 0, 12]) {
+                    const candidate = clusterRoot + shift;
+                    const cluster = buildCluster(candidate);
+                    const cMin = Math.min(...cluster);
+                    const cMax = Math.max(...cluster);
+                    if (cMin < 52 || cMax > 84) {
+                        continue;
+                    }
+                    const centroid = cluster.reduce((a, b) => a + b, 0) / cluster.length;
+                    const dist = Math.abs(centroid - prevCentroid);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestRoot = candidate;
+                    }
+                }
+                clusterRoot = bestRoot;
+            }
+            const strumMidis = buildCluster(clusterRoot);
+            // Clamp into chord-register slot 52-84 (shift whole cluster by ±12
+            // if any voice escapes); preserves the interval structure.
+            const minMidi = Math.min(...strumMidis);
+            const maxMidi = Math.max(...strumMidis);
+            let slotShift = 0;
+            if (minMidi < 52) {
+                slotShift = Math.ceil((52 - minMidi) / 12) * 12;
+            } else if (maxMidi > 84) {
+                slotShift = -Math.ceil((maxMidi - 84) / 12) * 12;
+            }
+            const finalMidis = strumMidis.map((m) => m + slotShift);
+            // Persist for the next bar's voice-leading pass.
+            compingState.lastVoicingMidis = [...finalMidis];
+
+            finalMidis.forEach((m, i) => {
                 notes.push({
-                    midi: getMidi(f),
+                    midi: m,
                     velocity: v,
                     durationSteps: isGhost ? 0.5 : 2,
                     ccEvents: i === 0 ? ccEvents : [],
