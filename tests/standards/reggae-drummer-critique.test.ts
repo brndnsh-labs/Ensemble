@@ -123,6 +123,100 @@ describe('Reggae Drummer Critique', () => {
         expect(snareOnBackbeat).toBe(backbeatCount);
     });
 
+    it('should preserve One Drop beat-1 silence at intensity 0.5 (entropy floor)', () => {
+        // why: drums.md P0 #2 / epic-drums-idiom S3 — at intensity 0.5 the
+        // entropy phase used to sprinkle ~4% phantom snare hits, including on
+        // beat 1 (the One Drop "hole"). The S3 floor `suppressEntropyBelow: 0.5`
+        // in reggae.ts gates the entire entropy block off at and below 0.5,
+        // restoring the genre-defining beat-1 silence. Run 128 bars with
+        // `creativity: true` so the entropy block is engaged in principle, then
+        // assert zero non-strategy snare hits on beat 1 (loopStep 0) and on the
+        // "and of 1" (loopStep 2 — a common entropy landing site).
+        const performance = simulatePerformance(128, {
+            playback: { bandIntensity: 0.5, bpm: 90, songMode: false },
+            groove: { genreFeel: 'Reggae', creativity: true, lastDrumPreset: 'Reggae' },
+        });
+
+        // why: target the snare lane specifically — no reggae motif (One Drop /
+        // Steppers / Rockers / Dub) plays a strategy snare anywhere except the
+        // backbeat (loopStep 4, 12) and an occasional Dub Sidestick on "and-of"
+        // positions. Beat 1 (step 0) and the "and-of-1" (step 2) are positions
+        // ONLY the entropy phase would touch. With the S3 floor active, the
+        // entropy block is skipped entirely at intensity ≤ 0.5, so these
+        // positions must stay clean. Kick lane isn't measurable this way
+        // because Steppers/Rockers/Dub all play kick on beat 1 by design.
+        let snareHitsBeat1 = 0;
+        let snareHitsAndOf1 = 0;
+
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                if (stepData.loopStep === 0 && stepData.instruments.Snare) {
+                    snareHitsBeat1++;
+                }
+                if (stepData.loopStep === 2 && stepData.instruments.Snare) {
+                    snareHitsAndOf1++;
+                }
+            });
+        });
+
+        console.log(
+            `[Reggae One Drop Silence @ 0.5] Snare on beat-1: ${snareHitsBeat1}, ` +
+                `Snare on "and-of-1": ${snareHitsAndOf1}`,
+        );
+
+        // No reggae strategy plays snare on beat 1 or "and-of-1" — these
+        // positions are entropy-only landing sites. Entropy gate must zero them.
+        expect(snareHitsBeat1).toBe(0);
+        expect(snareHitsAndOf1).toBe(0);
+    });
+
+    it('should lock HiHat/Open to the grid (lay-back applies only to Kick/Snare)', () => {
+        // why: drums.md P1 #10 / epic-drums-idiom S3 — Reggae's lay-back
+        // (`instTimeOffset += 0.008 + intensity * 0.005`) used to apply to
+        // ALL lanes, dragging the hat back with the kick/snare and erasing the
+        // "drummer pushing the backbeat against a metronomic hat" tension that
+        // defines the One Drop feel. S3 scopes the offset to Kick/Snare only.
+        const performance = simulatePerformance(8, {
+            playback: { bandIntensity: 0.7, bpm: 90, songMode: false },
+        });
+
+        const offsets: Record<string, number[]> = { Kick: [], Snare: [], HiHat: [], Open: [] };
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                for (const [lane, hit] of Object.entries(stepData.instruments)) {
+                    if (offsets[lane]) {
+                        offsets[lane].push((hit as { offset: number }).offset ?? 0);
+                    }
+                }
+            });
+        });
+
+        console.log(
+            `[Reggae Lay-back Scope] Kick offsets sample: ${offsets.Kick.slice(0, 3)
+                .map((o) => o.toFixed(4))
+                .join(', ')}, ` +
+                `HiHat offsets sample: ${offsets.HiHat.slice(0, 3)
+                    .map((o) => o.toFixed(4))
+                    .join(', ')}`,
+        );
+
+        // HiHat / Open: every hit must have offset 0 (no lay-back applied).
+        for (const o of offsets.HiHat) {
+            expect(o).toBe(0);
+        }
+        for (const o of offsets.Open) {
+            expect(o).toBe(0);
+        }
+        // Kick / Snare: every hit must have a positive offset (lay-back applied).
+        // At intensity 0.7 the offset is 0.008 + 0.7*0.005 = 0.0115.
+        for (const o of offsets.Kick) {
+            expect(o).toBeGreaterThan(0);
+        }
+        for (const o of offsets.Snare) {
+            expect(o).toBeGreaterThan(0);
+        }
+    });
+
     it('should drive the kick on most pulses across high-intensity motif rotation', () => {
         // At high intensity the reggae motif selector rotates through all four
         // patterns based on per-bar sectionSeed (reggae.ts getMotif):

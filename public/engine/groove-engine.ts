@@ -273,11 +273,35 @@ export function applyGrooveOverrides(
     }
 
     // --- Entropy Phase (Random Expressivity) ---
-    // Suppress entropy during the first iteration to establish a solid 'Pocket'
-    const firstIterationSuppression = step < (arrangerState.totalSteps || 0) ? 0.3 : 1.0;
+    // why: drums.md P0 #2 — per-genre floor on entropy. Reggae One Drop holes
+    // at 0.5, Jazz ride emptiness at 0.45, Acoustic ballad at 0.5 all need
+    // entropy fully off so the silence reads as silence. `suppressEntropyBelow`
+    // defaults to 0 (legacy behavior — entropy always runs); per-genre overrides
+    // live in each grooves/*.ts config. Bossa/Latin already exempt via isLatin
+    // gating the Snare branch below; this is the broader gate that also covers
+    // the HiHat/Open branch.
+    const entropyFloor = config.suppressEntropyBelow ?? 0;
+    // why: strict `>` so the floor value itself is suppressed. The audit's
+    // canonical case (drums.md P0 #2) is "Reggae One Drop at intensity 0.5":
+    // with floor=0.5 and `>=` the entropy still fires at 0.5; `>` makes the
+    // floor inclusive of the suppressed range, matching the story's phrasing
+    // "no entropy sprinkle below the genre's floor" (≤ floor = suppressed).
+    const entropyGateActive = playback.bandIntensity > entropyFloor;
+
+    // Suppress entropy during the first iteration to establish a solid 'Pocket'.
+    // why: drums.md P0 #2 — when `arrangerState.totalSteps` is unset (early-bar
+    // bootstrap or seed paths that haven't filled the timeline length yet), the
+    // previous comparison `step < (totalSteps || 0)` collapsed to `step < 0`,
+    // which is always false → entropy fired at full strength when it should have
+    // been suppressed. Fall back to `seedTimelineStartStep + stepsPerBar`: this
+    // suppresses for the first bar after the seed timeline starts whenever the
+    // engine doesn't know the total length yet.
+    const firstIterBoundary = arrangerState.totalSteps || seedTimelineStartStep + stepsPerBar;
+    const firstIterationSuppression = step < firstIterBoundary ? 0.3 : 1.0;
 
     if (
         groove.creativity &&
+        entropyGateActive &&
         !currentState.shouldPlay &&
         Math.random() <
             playback.bandIntensity *

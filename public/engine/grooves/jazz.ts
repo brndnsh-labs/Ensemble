@@ -13,6 +13,15 @@ import {
 export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.05,
+    // why: jazz at low intensity is intentional ride emptiness — a ballad ride
+    // pattern with "space" between hits. The entropy phase's ~4% random snare
+    // sprinkle at intensity 0.3 contaminates that emptiness with phantom hits
+    // that no jazz drummer would play. 0.45 lets medium-tempo swing (strictly
+    // above 0.45) keep its conversational comping chatter, while quiet ballad
+    // sections at or below 0.45 breathe. (Worth revisiting at 0.5 if a 0.46–0.5
+    // ballad still feels too speckled — see drums.md P0 #2 follow-up.)
+    // (drums.md P0 #2)
+    suppressEntropyBelow: 0.45,
 };
 
 /**

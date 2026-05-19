@@ -174,6 +174,58 @@ describe('Jazz Drummer Critique', () => {
         expect(snareAnchorHits / totalBars).toBeGreaterThan(0.95);
     });
 
+    it('should preserve "space" at intensity 0.3 (entropy floor)', () => {
+        // why: drums.md P0 #2 / epic-drums-idiom S3 — at intensity 0.3 the
+        // entropy phase used to sprinkle ~4% random snare hits, contaminating
+        // jazz's intentional ride emptiness. S3 adds `suppressEntropyBelow: 0.45`
+        // on jazz.config, gating the entire entropy block off below 0.45. At
+        // intensity 0.3 the snare/sidestick lane should be silent OUTSIDE the
+        // motif-driven comping positions — the only snare events allowed at
+        // this intensity are the strategy's own gated comping hits.
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.3, bpm: 120, songMode: false },
+        });
+
+        // The jazz strategy fires snare on `isOffbeat` positions only (the "&"
+        // of each beat — steps 2, 6, 10, 14 in 4/4 16th-step indexing). The
+        // entropy block fires its snare sprinkle on `isSyncopated` steps —
+        // `loopStep % 2 === 1`, i.e. steps 1,3,5,7,9,11,13,15 (the "e" and "a"
+        // of each beat). Those odd-numbered positions are entropy-only landing
+        // sites for the snare lane: no jazz strategy branch ever touches them.
+        // Count snare/sidestick/brush hits there — with S3's floor active at
+        // intensity ≤ 0.45, this must be zero. Counting all three sound names
+        // captures the lane regardless of routing (intensity 0.3 + bpm 120
+        // routes snare → Brush per jazz.ts:236).
+        let oddStepCount = 0;
+        let snareOnOddSteps = 0;
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                const s = stepData.loopStep;
+                if (s % 2 === 1) {
+                    oddStepCount++;
+                    if (
+                        stepData.instruments.Snare ||
+                        stepData.instruments.Sidestick ||
+                        stepData.instruments.Brush
+                    ) {
+                        snareOnOddSteps++;
+                    }
+                }
+            });
+        });
+
+        console.log(
+            `[Jazz Space @ 0.3] Snare-lane hits on entropy-only odd steps: ` +
+                `${snareOnOddSteps}/${oddStepCount} ` +
+                `(Target: 0 — strategy plays snare only on even offbeats 2/6/10/14)`,
+        );
+
+        // Strategy snare never touches odd steps; entropy gate is off at 0.3,
+        // so the odd-step snare lane must be silent across the 128-bar window.
+        expect(snareOnOddSteps).toBe(0);
+    });
+
     it('should increase comping density with intensity', () => {
         const lowIntensityPerf = simulatePerformance(64, { playback: { bandIntensity: 0.2 } });
         const highIntensityPerf = simulatePerformance(64, { playback: { bandIntensity: 0.9 } });

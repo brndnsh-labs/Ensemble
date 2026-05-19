@@ -93,9 +93,20 @@ export function getPhraseSeed(
 
 /**
  * Default configuration for drum strategies.
+ *
+ * `suppressEntropyBelow`: when `playback.bandIntensity <= this value`, the
+ * groove engine's entropy phase (random snare/hihat sprinkle) is skipped
+ * entirely for this genre. (Strict `>` gate — the floor value itself is in
+ * the suppressed range, since the audit's canonical "broken case" sits
+ * exactly at the floor: Reggae One Drop at 0.5, Jazz ride at 0.45.) why: drums.md P0 #2 — Reggae One Drop holes at
+ * intensity 0.5 get filled by phantom snares, and Jazz at intensity 0.3
+ * gets ~4% random snare hits that contaminate intentional ride emptiness.
+ * Genres that want quiet sections to actually breathe set this per-genre.
+ * Default 0 = no suppression (legacy behavior — entropy always runs).
  */
 export const DEFAULT_CONFIG = {
     entropyMultiplier: 0.15,
+    suppressEntropyBelow: 0,
     blockAdjacentSnare: false,
     exemptFromPulseShaping: false,
     dillaFeel: false,

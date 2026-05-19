@@ -13,6 +13,13 @@ export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.06, // Tighter for acoustic precision
     blockAdjacentSnare: true,
+    // why: acoustic ballad quiet sections (intro, breakdown) should have a
+    // sparse cajon/shaker pulse without random snare/hat sprinkles. Entropy
+    // sprinkle at or below 0.5 reads as a drummer who "can't sit still" — the
+    // opposite of the genre's tasteful restraint. Strictly above 0.5 (the
+    // half-time Folk/Soft-Rock territory) entropy resumes for natural feel.
+    // (drums.md P0 #2)
+    suppressEntropyBelow: 0.5,
 };
 
 /**

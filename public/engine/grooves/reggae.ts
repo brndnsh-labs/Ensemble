@@ -11,6 +11,14 @@ import {
 
 export const config = {
     ...DEFAULT_CONFIG,
+    // why: Reggae One Drop's identity is the beat-1 silence. The entropy phase's
+    // ~4% random snare hit at intensity 0.5 lands phantom snares in exactly the
+    // hole that defines the genre. Suppress entropy at/below 0.5 so quiet/mid
+    // sections preserve the One Drop emptiness; strictly above 0.5
+    // (Steppers/Rockers/Dub territory) the entropy sprinkle is welcome as
+    // expressive chatter.
+    // (drums.md P0 #2)
+    suppressEntropyBelow: 0.5,
 };
 
 /**
@@ -49,7 +57,14 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
     // --- Lay-back: Reggae is consistently behind the beat ---
-    instTimeOffset += 0.008 + intensity * 0.005;
+    // why: scope lay-back to Kick + Snare only. The One Drop feel depends on the
+    // HiHat/Open lane staying locked to the grid while the kick/snare hit drags
+    // behind it — applying the offset to ALL lanes (the previous behavior) drags
+    // the entire kit together and erases the "drummer pushing the backbeat against
+    // a metronomic hat" tension that defines the genre. (drums.md P1 #10)
+    if (context.inst.name === 'Kick' || context.inst.name === 'Snare') {
+        instTimeOffset += 0.008 + intensity * 0.005;
+    }
 
     // --- 1. KICK & SNARE ---
     if (context.inst.name === 'Kick') {

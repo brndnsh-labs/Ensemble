@@ -244,6 +244,38 @@ describe('Acoustic Drummer Critique', () => {
         expect(halfTimeBars).toBeGreaterThan(8);
     });
 
+    it('should preserve quiet-section silence at intensity 0.4 (entropy floor)', () => {
+        // why: drums.md P0 #2 / epic-drums-idiom S3 — acoustic ballad quiet
+        // sections should breathe without random snare/hat sprinkles. S3 adds
+        // `suppressEntropyBelow: 0.5` on acoustic.config; at intensity 0.4
+        // the entropy block is fully off. The acoustic snare strategy plays
+        // only on beat-start positions (motif 0: beat 3 / step 8; other motifs:
+        // beats 2+4 / steps 4+12). Any snare hit on a non-beat-start position
+        // (i.e. loopStep % 4 !== 0) at intensity 0.4 would prove entropy is
+        // still firing. Additionally the strategy's "ghost chatter" branch
+        // gates on `intensity > 0.7`, so at 0.4 it's inactive — no strategy
+        // snare on odd/"&" positions.
+        const numBars = 64;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.4, bpm: 90, songMode: false },
+        });
+
+        let nonStrategySnareHits = 0;
+        performance.forEach((bar) => {
+            bar.forEach((stepData) => {
+                if (stepData.loopStep % 4 !== 0 && stepData.instruments.Snare) {
+                    nonStrategySnareHits++;
+                }
+            });
+        });
+
+        console.log(
+            `[Acoustic Silence @ 0.4] Snare hits on non-beat-start steps: ` +
+                `${nonStrategySnareHits} (Target: 0 — entropy gate off below 0.5)`,
+        );
+        expect(nonStrategySnareHits).toBe(0);
+    });
+
     it('should add kick syncopation above intensity 0.5', () => {
         // Engine: kick syncopation gate at `intensity > 0.5 && isOffbeat && beatIndex
         // === 1 || 3` with roll(0.4, intensity). Below 0.5 no syncopated kicks.
