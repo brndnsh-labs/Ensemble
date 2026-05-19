@@ -146,7 +146,7 @@ export function checkBassActiveStyle(
         // intensity > 0.6 we promote to the quarter-note Root-Fifth tier (R-5-R-5),
         // the bread-and-butter country walking-bass shape. The earlier engine
         // returned `step % 8 === 0` unconditionally, leaving the `isFifthBeat`
-        // branch in getBassNoteStyle dead code (audit: MUSICAL_AUDIT.md Open #1,
+        // branch in getBassNoteStyle dead code (audit: docs/archive/MUSICAL_AUDIT.md Open #1,
         // bass.md P1 #6). Threshold of 0.6 exactly: at-or-below stays Two-Step,
         // strictly-above promotes to quarter-note tier.
         const isQuarterTier = playback.bandIntensity > 0.6;
@@ -327,7 +327,7 @@ export function getBassNoteStyle(
         //   • intensity >  0.6  → Quarter-note R-5-R-5 honky-tonk walking bass.
         // Plus a 2-note stepwise walk-up on the last beat + "&" before any chord
         // change at intensity > 0.5 (independent of Two-Step vs quarter tier).
-        // Audit source: MUSICAL_AUDIT.md Open #1, bass.md P1 #6.
+        // Audit source: docs/archive/MUSICAL_AUDIT.md Open #1, bass.md P1 #6.
         const isQuarterTier = intensity > 0.6;
 
         // Very low intensity: just the downbeat root.

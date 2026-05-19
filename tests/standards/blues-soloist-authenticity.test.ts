@@ -184,7 +184,7 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         // lost their planned shape after a device appeared. We now gate device firing on
         // whether the device's span fits the plan ahead — long devices only fire when
         // they bury zero plan attacks, medium devices allow at most one. See
-        // docs/MUSICAL_AUDIT.md and soloist-pitch-engine.ts:deviceFitsHere.
+        // docs/archive/MUSICAL_AUDIT.md and soloist-pitch-engine.ts:deviceFitsHere.
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 10], sectionStart: 0, sectionEnd: 1024 };
         const { soloist, playback } = getState();
         playback.bandIntensity = 0.85; // high intensity → frequent device attempts

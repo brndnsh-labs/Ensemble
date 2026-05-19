@@ -105,7 +105,7 @@ Files audited:
   ```
 - **What a listener hears:** Restatement (×1.15) and Statement (×1.0) sit inside the noise floor of all the other simultaneous biases (chord-tone `+150`/`+300`, profile ×1.2–1.5, common-tone ×2.0). The SRDC arc is binary in practice — Conclusion or Departure.
 - **Musical claim being broken:** SRDC is a 4-phase arc; Restatement is the moment the player says "yeah, I meant it" — chord-tone pull should be measurably higher than Statement.
-- **Suggested fix sketch:** Push `restatement` to ×1.3 (and tighten Statement default), OR fold Restatement into the contour/repetition logic (rhythm reuse + same pitch contour, looser landings). The SRDC critique test (per MUSICAL_AUDIT shipped table) only measures Conclusion-vs-Departure, so this Restatement gap is currently untested.
+- **Suggested fix sketch:** Push `restatement` to ×1.3 (and tighten Statement default), OR fold Restatement into the contour/repetition logic (rhythm reuse + same pitch contour, looser landings). The SRDC critique test (per archived musical audit shipped table) only measures Conclusion-vs-Departure, so this Restatement gap is currently untested.
 
 ### 6. Loop 0/1/2 differentiation lives almost entirely in pitch — rhythm engine has zero loop awareness
 
@@ -138,7 +138,7 @@ Files audited:
 - **Where:** `soloist-pitch-engine.ts` (no references found via grep)
 - **What a listener hears:** Soloist can pick a pitch in unison with the bass's current note (smudges the bass line) or doubled with a chord voice (loses melodic identity inside the comp). One of the two specific cases the coordination contract was designed to prevent (`coordination-engine.ts:90-92` writes these fields every chord turn with zero consumers).
 - **Musical claim being broken:** `coordination-engine.ts:4`'s "Musical Coordination Contract" advertises proactive generator awareness. Real horn players hear the bass walking and step out of its way.
-- **Suggested fix sketch:** In the candidate-weight loop, when `m === coordination.bassMidi` (or `m % 12 === coordination.bassMidi % 12` and `m < lastMidi + 5`), `weight *= 0.5`. Same for `accompanimentMidis` unison check. Multiplicative and modest. Already in MUSICAL_AUDIT queued pickups; restating because soloist is the natural primary consumer.
+- **Suggested fix sketch:** In the candidate-weight loop, when `m === coordination.bassMidi` (or `m % 12 === coordination.bassMidi % 12` and `m < lastMidi + 5`), `weight *= 0.5`. Same for `accompanimentMidis` unison check. Multiplicative and modest. Already in archived musical audit queued pickups; restating because soloist is the natural primary consumer.
 
 ### 9. Phrase-end Response/Call bias is monophonic-only in practice
 
@@ -226,10 +226,10 @@ A few clusters worth treating together:
 
 - **Bebop/jazz idiom is structurally hobbled.** P0 #1 (chromatic neighbors excluded), P0 #2 (bebopScale misanchored), P1 #4 (Evans root-avoidance), and P2 #13 (dead `chromaticism` knob) all conspire to make line-style genres sound diatonic-with-color-notes rather than bebop. P0 #1 also unlocks the `chromaticism` knob — solve them together.
 
-- **"Loop differentiation" claim doesn't match the code.** P1 #6 (rhythm has no loop awareness) plus P1 #7 (head-bypass jitter is harmonically blind) mean the marquee Chorus Evolution feature is a +5% intensity bump per loop plus +20% random ornaments — not the "Statement / Themed Improv / Exploratory" arc the docs sell. Already noted as deferred in MUSICAL_AUDIT.md handoff #4; the rhythm-side gap is the bigger one.
+- **"Loop differentiation" claim doesn't match the code.** P1 #6 (rhythm has no loop awareness) plus P1 #7 (head-bypass jitter is harmonically blind) mean the marquee Chorus Evolution feature is a +5% intensity bump per loop plus +20% random ornaments — not the "Statement / Themed Improv / Exploratory" arc the docs sell. Already noted as deferred in archived musical audit.md handoff #4; the rhythm-side gap is the bigger one.
 
 - **"Profile multipliers compete with universal penalties" is a recurring engine smell.** P1 #4 (Evans) and P2 #15 (Coltrane) are both symptoms of the same architectural issue: profile boosts land in the additive phase, then universal penalties apply multiplicatively on top, washing them out. The 2026-05-16 SRDC fix correctly placed its multiplier at the final stage; the profile boosts should follow the same pattern. One architectural shift fixes multiple findings.
 
-- **Coordination consumption is half-built (P1 #8).** Coordination engine writes `bassMidi`, `accompanimentMidis`, `avgChordMidi` every chord turn; soloist reads none. Already queued in MUSICAL_AUDIT; restated here because soloist is the natural primary consumer.
+- **Coordination consumption is half-built (P1 #8).** Coordination engine writes `bassMidi`, `accompanimentMidis`, `avgChordMidi` every chord turn; soloist reads none. Already queued in archived musical audit; restated here because soloist is the natural primary consumer.
 
 - **Needs musical judgment from user:** the rhythm engine's `attackProb *= 1.0 + soloistState.session.rhythm.entropy * 0.5` (line 344) — entropy ranges `[-1, 1]` so this can multiply 0.5–1.5. Is this a documented stylistic axis or an undocumented chaos knob?

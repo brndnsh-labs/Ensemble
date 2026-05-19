@@ -94,7 +94,7 @@ describe('Soloist Musicality & Thematic Integrity', () => {
         // chord-tone weight up in Conclusion (×1.5) and down in Departure
         // (×0.7). Real soloists lean home at the end of a section and
         // explore extensions during chorus/bridge — this test pins that
-        // asymmetry. Closes Open finding #1 in docs/MUSICAL_AUDIT.md.
+        // asymmetry. Closes Open finding #1 in docs/archive/MUSICAL_AUDIT.md.
         const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
         const chordTones = [0, 4, 7, 11];
         const iterations = 800;

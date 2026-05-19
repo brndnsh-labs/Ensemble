@@ -11,7 +11,7 @@ Each epic is session-pickup-ready: titled, motivated, broken into session-sized 
 - **`docs/audit/<area>.md`** = the underlying findings, untouched. New findings during work go back into the area file, *not* into the epic file.
 - **[`docs/audit/FOLLOWUPS.md`](FOLLOWUPS.md)** = shippable-but-flagged items surfaced during `/review`. Append here when a P2 deferral doesn't justify a fresh story but shouldn't be lost. Promote to a story (move to an epic file) when it grows or accumulates urgency.
 
-Story sizing: each story is a single focused session (2–6 hours) — one engine touch + critique test + reliability loop. Pattern proven by the May 2026 sweeps (see `docs/MUSICAL_AUDIT.md` § "Shipped").
+Story sizing: each story is a single focused session (2–6 hours) — one engine touch + critique test + reliability loop. Pattern proven by the May 2026 sweeps (see `docs/archive/MUSICAL_AUDIT.md` § "Shipped").
 
 ## Status (2026-05-16)
 
@@ -79,4 +79,4 @@ Each story in the epic files is tagged inline:
 - **No P0-marked finding is gated on user judgment** — every P0 has a clear musical claim being broken and a sketched fix. Some P1s explicitly want a product call (e.g., "how busy should funk feel at intensity 0.5?"); these are noted at the story level.
 - **Two findings overlap across audits and were deduplicated**: `soloist.md P1 #8` + `harmony-coordination.md P0 #4` (both about `accompanimentMidis` consumers) live as one story in Epic 1. `bass.md P1 #11` + `harmony-coordination.md P1 #9` (both about bass coordination consumption) live as one story.
 - **Untested production behavior** (no critique test guarding a shipped claim) is flagged in the source audit files; many will get tests added as part of the stories that fix them.
-- See `docs/MUSICAL_AUDIT.md` for prior `Shipped` history and active engine-side open findings.
+- See `docs/archive/MUSICAL_AUDIT.md` for prior `Shipped` history and active engine-side open findings.

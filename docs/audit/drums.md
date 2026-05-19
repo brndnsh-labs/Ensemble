@@ -129,7 +129,7 @@ Files audited:
 - **Suggested fix sketch:** Replace with `getPhraseSeed(sectionSeed, barIndex, 1, step)` → map to a deterministic ±amount.
 
 ### 16. Entropy phase floor wrong for quiet sections
-- **Where:** `groove-engine.ts:233-272`. Documented as latent in `MUSICAL_AUDIT.md`; restating per-genre.
+- **Where:** `groove-engine.ts:233-272`. Documented as latent in `docs/archive/MUSICAL_AUDIT.md`; restating per-genre.
 - **What a drummer hears:** At intensity 0.3, `entropyMultiplier = 0.15` (default), each step has ≈4.5% chance to fire a random snare or hat hit. At intensity 0.5 it is 7.5%. Over a 32-bar verse that is 12-25 random hits — audible noise on quiet sections. Worst on Reggae (One Drop holes), Jazz (intentional ride emptiness), Acoustic (intentional sparseness).
 - **Suggested fix sketch:** Add `if (intensity < 0.4) return currentState` early in the entropy block, OR add a `config.suppressEntropyBelow: number` field with per-genre floors (Reggae 0.5, Jazz 0.45, Acoustic 0.5; Bossa already exempt via `isLatin`).
 
@@ -142,14 +142,14 @@ Files audited:
 ### 18. Disco intensity axis is loudness, but motif gating implies density
 - **Where:** `grooves/disco.ts:22-42` (`getMotif`).
 - **What a drummer hears:** Motif 3 ("Octave Cowbells") only fires at `intensity > 0.7 && seed >= 0.8` AND lives in the dead synth lane (P0 #3). Motif 2 ("Syncopated interplay") requires `intensity > 0.7`. So intensity 0-0.7 is locked to motifs 0/1.
-- **Musical claim being broken:** Per `MUSICAL_AUDIT.md` disco entry, the scaling axis is documented as "velocity/timbre not density"; the motif system gates on density anyway.
+- **Musical claim being broken:** Per `docs/archive/MUSICAL_AUDIT.md` disco entry, the scaling axis is documented as "velocity/timbre not density"; the motif system gates on density anyway.
 - **Suggested fix sketch:** Collapse the four motifs to two (foundation + busy) and move velocity-tier choices into `applyOverrides`.
 
 ## Notes for synthesis
 
 **Cluster 1 — Sound-design wiring gaps (P0).** Findings #1 (Crash never plays), #3 (Cowbell missing), partly #7 (Brush missing) share one root: groove engines write `soundName` strings with no synth handler. A `KNOWN_SOUND_NAMES` set in `synth-drums.ts` with a console warning on miss would surface future occurrences immediately.
 
-**Cluster 2 — Entropy phase is musically wrong for half the genres (P0/P1).** Findings #2 (suppression-flip), #10 (One Drop fill-in), #16 (low-intensity floor) all stem from `groove-engine.ts:233-272` running the same probability ladder regardless of musical intent. `MUSICAL_AUDIT.md` recommended tolerating it in tests; this audit recommends fixing it in engine.
+**Cluster 2 — Entropy phase is musically wrong for half the genres (P0/P1).** Findings #2 (suppression-flip), #10 (One Drop fill-in), #16 (low-intensity floor) all stem from `groove-engine.ts:233-272` running the same probability ladder regardless of musical intent. `docs/archive/MUSICAL_AUDIT.md` recommended tolerating it in tests; this audit recommends fixing it in engine.
 
 **Cluster 3 — Fill vocabulary is one-dimensional (P1).** Findings #5 (no toms in 9 genres), #6 (metal blast wrong), #9 (no trap rolls), #14 (no crash on boundary outside fills) all describe: the fill system is templates-of-snare while real drummers' fills are tom-down, crash-up, china-accent, brush-sweep. Worth one focused fill-system redesign session.
 

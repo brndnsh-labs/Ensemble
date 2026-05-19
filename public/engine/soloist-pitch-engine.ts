@@ -478,7 +478,7 @@ export function selectPitchAndDevices(
     // writes phase into phrase.context.srdcState (see deriveSrdcPhase in
     // soloist.ts); tests can also drop a top-level `srdcState` on the mock
     // soloist to drive this code path. Closes Open finding #1 in
-    // docs/MUSICAL_AUDIT.md (the pitch engine previously had no phase
+    // docs/archive/MUSICAL_AUDIT.md (the pitch engine previously had no phase
     // awareness — Conclusion and Departure got identical chord-tone pull).
     // Top-level srdcState wins over the nested phrase-context srdcState so
     // tests can drop an explicit phase on the mock soloist without the
@@ -770,7 +770,7 @@ export function selectPitchAndDevices(
         //              the root away so the listener feels the unfinished arc).
         // Without this, every note in a phrase gets the same chord-tone pull
         // and phrase endings don't actually differentiate role — the gap
-        // tracked in docs/MUSICAL_AUDIT.md "Open finding #1." Marks come from
+        // tracked in docs/archive/MUSICAL_AUDIT.md "Open finding #1." Marks come from
         // soloist-rhythm-engine.ts (isPhraseEnd on the last node of a phrase
         // chunk or pre-breath).
         if (rhythmNode?.isPhraseEnd === true) {

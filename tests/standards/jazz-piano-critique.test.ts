@@ -608,7 +608,7 @@ describe('Jazz Piano Critique', () => {
             //      the null-baseline noise floor (1.0) and ~6-8pp below measurement,
             //      so disabling the opt-in pass or breaking the cost gate fails
             //      loudly without flaking on per-key variance. Sub-baseline-threshold
-            //      guard per docs/MUSICAL_AUDIT.md.
+            //      guard per docs/archive/MUSICAL_AUDIT.md.
             expect(totalRatio).toBeLessThan(0.72);
             expect(topRatio).toBeLessThan(0.8);
 

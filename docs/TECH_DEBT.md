@@ -1,6 +1,6 @@
 # Technical Debt
 
-A running log of state-discipline, worker-contract, and architectural-hygiene findings that have been triaged but not yet fixed. Companion to `docs/MUSICAL_AUDIT.md` (which tracks musicality findings) — different failure modes, same shape of tracker.
+A running log of state-discipline, worker-contract, and architectural-hygiene findings that have been triaged but not yet fixed. Sibling tracker to `docs/audit/FOLLOWUPS.md` (musicality follow-ups) — different failure modes, same shape.
 
 Started: 2026-05-16. Each entry is sized so the next reader can decide whether to pick it up without re-deriving the audit.
 
@@ -42,7 +42,7 @@ Roughly: a multi-day refactor with non-trivial test surgery. Worth doing as its 
 
 **Severity:** `NIT` / type-safety (per `worker-contract-reviewer` taxonomy).
 
-**What:** `selectPitchAndDevices` takes `soloistState: any`. That looseness is what lets the picker read `soloistState.srdcState` (a top-level override slot used only by tests, never declared on `SoloistState` in `public/types.ts`) without a compile error. Read order is `soloistState.srdcState || soloistState.session?.currentPhrase?.context?.srdcState || 'statement'` — top-level test override wins, then production-written nested slot, then default. The pattern is documented in memory `feedback_state_mock_vs_production_override.md` and validated by `docs/MUSICAL_AUDIT.md` § Patterns Proven #5.
+**What:** `selectPitchAndDevices` takes `soloistState: any`. That looseness is what lets the picker read `soloistState.srdcState` (a top-level override slot used only by tests, never declared on `SoloistState` in `public/types.ts`) without a compile error. Read order is `soloistState.srdcState || soloistState.session?.currentPhrase?.context?.srdcState || 'statement'` — top-level test override wins, then production-written nested slot, then default. The pattern is documented in memory `feedback_state_mock_vs_production_override.md` and codified in `docs/guides/musical-engine-patterns.md` § Patterns proven (Engine-knows-where-it-is, step 5).
 
 **Why it matters:** A future maintainer tightening the picker signature to `soloistState: SoloistState` would silently break every critique test that uses the top-level override (currently `tests/standards/soloist-musicality.test.ts:109,137`, `tests/unit/engine/soloist-ceiling.test.ts:76`, `tests/unit/engine/soloist-country.test.ts:52`). The error would be a typecheck failure on the test files, not a runtime regression — caught at CI, but the failure message wouldn't obviously point at "your override slot is undeclared." Discoverability is the issue, not correctness.
 
@@ -66,6 +66,8 @@ Each entry should include: location, severity, what, why it matters, suggested f
 
 ## Related
 
-- `docs/MUSICAL_AUDIT.md` — musicality findings, same shape of tracker.
+- `docs/audit/FOLLOWUPS.md` — musicality follow-ups tracker (post-audit).
+- `docs/guides/musical-engine-patterns.md` — engine-pattern recipes referenced by some findings here.
+- `docs/archive/MUSICAL_AUDIT.md` — archived snapshot of the May 2026 musical audit.
 - `CLAUDE.md` § Mandatory Checklist and § State — the rules being enforced.
 - `.claude/agents/state-discipline-reviewer.md` — the agent that surfaces state-flow findings.

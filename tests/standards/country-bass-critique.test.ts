@@ -127,7 +127,7 @@ describe('Country Bassist Critique', () => {
         // returns `isQuarter` when intensity > 0.6, and getBassNoteStyle plays
         // R-5-R-5 (root on beats 1, 3; fifth on beats 2, 4). Previously the engine
         // returned `step % 8 === 0` unconditionally — the `isFifthBeat` branch was
-        // dead code (MUSICAL_AUDIT.md Open #1, bass.md P1 #6).
+        // dead code (docs/archive/MUSICAL_AUDIT.md Open #1, bass.md P1 #6).
         const performance = simulatePerformance(16, {
             playback: { bandIntensity: 0.85, complexity: 0.5, bpm: 115 },
         });

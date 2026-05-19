@@ -191,6 +191,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `docs/README.md` | Documentation index and repo navigation hub. |
 | `docs/VISION.md` | Product direction, open work items, and key decisions. |
 | `docs/guides/PERFORMANCE_GUIDELINES.md` | Hot-loop performance notes for audio and scheduler code. |
+| `docs/guides/musical-engine-patterns.md` | Reusable recipes for generative-engine work (5 smells, coordination, loop-awareness, final-stage multiplier discipline, seeded determinism). |
 | `public/MANUAL.md` | User-facing guide with auto-generated tables. |
 | `public/form-analysis.ts` | Song section and structure detection. |
 | `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |

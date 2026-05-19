@@ -17,7 +17,7 @@ This folder groups the living documentation for Ensemble.
 
 - [`docs/guides/`](guides/) — implementation notes and reference guides.
 - [`docs/guides/PERFORMANCE_GUIDELINES.md`](guides/PERFORMANCE_GUIDELINES.md) — hot-loop performance notes.
-- [`docs/MUSICAL_AUDIT.md`](MUSICAL_AUDIT.md) — running log of musicality findings across the critique suite and engines.
+- [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.
 - [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 
