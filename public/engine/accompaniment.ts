@@ -1354,6 +1354,13 @@ interface AccompanimentCoordination {
     // comper rests when `<= OUTRO_MUTES.chords` so the outro fades out before
     // the final cadence.
     outroBarsRemaining?: number;
+    // why: epic-coordination-consistency S2.a — phrase-end breath gate. When
+    // `soloistResting === true` and `soloistNotesInPhrase >= 3`, Jazz/Blues/Funk
+    // comping deterministically thins on non-downbeat hits so the chord channel
+    // breathes with the soloist's phrase landing. Published by tick-logic.ts
+    // (soloist producer block) — both fields are written together every tick.
+    soloistResting?: boolean;
+    soloistNotesInPhrase?: number;
 }
 
 /**
@@ -2063,8 +2070,40 @@ export function getAccompanimentNotes(
             isHit = false;
         }
 
+        // --- Phrase-End Breath (epic-coordination-consistency S2.a) ---
+        // why: chords.md P2 #16 — funk clav comping is rhythmically dense by
+        // design; when the soloist completes a phrase (≥3 notes then rest), the
+        // comper thins the 16ths so the listener hears the phrase land. This is
+        // the funk-specific arm of the same conversational gesture applied in the
+        // standard-lane block below; we duplicate here because the Funk early-
+        // return path doesn't fall through to the standard logic.
+        //
+        // Preserve `measureStep === 0` (the downbeat carries the chord change)
+        // and gate deterministically off (barIndex, intBeat) so loop comparisons
+        // and 30-seed reliability sweeps see a stable thin distribution. ~65%
+        // thin rate matches the standard-lane multiplier (see below).
+        let funkPhraseEndThinned = false;
+        if (
+            isHit &&
+            measureStep !== 0 &&
+            coordination?.soloistResting === true &&
+            (coordination?.soloistNotesInPhrase ?? 0) >= 3
+        ) {
+            const funkBarIndex = Math.floor(step / spm);
+            const funkPhraseEndHash = (funkBarIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
+            if (funkPhraseEndHash % 20 < 13) {
+                isHit = false;
+                funkPhraseEndThinned = true;
+            }
+        }
+
+        // why: ghost-note roll runs after the phrase-end gate; without this
+        // guard, ~36% of thinned slots flip back to audible muted chucks
+        // (vel ≈ 0.18) and the soloist's breath dissolves into noise floor.
+        // The gate's whole point is loop-coherent silence — gate the ghost
+        // too. (Epic 9 S2.a review P1 #1+#2.)
         const ghostProb = 0.15 + intensity * 0.35;
-        const isGhost = !isHit && Math.random() < ghostProb;
+        const isGhost = !isHit && !funkPhraseEndThinned && Math.random() < ghostProb;
 
         if (isHit || isGhost) {
             const reserveBassSpace = shouldReserveBassSpace(state);
@@ -2191,6 +2230,61 @@ export function getAccompanimentNotes(
             playback.complexity > 0.6 &&
             Math.random() < 0.3
         ) {
+            isHit = false;
+        }
+    }
+
+    // --- Phrase-End Breath (epic-coordination-consistency S2.a) ---
+    // why: chords.md P2 #16 — when the soloist completes a phrase of ≥3 notes
+    // and goes into a rest, the comper should "breathe" with the soloist (a
+    // brief half-bar silence before the next chord change). Real jazz/blues/funk
+    // compers do this without thinking — they hear the phrase land and pull back
+    // so the listener registers the resolution. Without it, the chord channel
+    // keeps chattering through the soloist's exhale and the conversation feels
+    // one-sided.
+    //
+    // Genre gate: Jazz / Blues / Funk only. These are the call-and-response
+    // idioms where a comping rest on phrase-end is canonical. Reggae just shipped
+    // an organ-bubble (S1.b) on the harmony channel that intentionally fills the
+    // offbeats; thinning the chord-channel skank would compound silence with
+    // bubble-driven activity and lose the riddim. Bossa already has its own
+    // partido-alto idiom (S5.c upcoming) — leave it for that story to design.
+    //
+    // Definition of "phrase-end": coordination.soloistResting === true AND
+    // soloistNotesInPhrase >= 3. The 3-note floor avoids treating a one-off
+    // pickup or single stab as a "phrase ending" — three is the minimum that
+    // reads as a phrase to a listener (statement + response, or short motif).
+    // We don't latch on a single tick — every tick that meets the predicate
+    // contributes to the breath, so the silence extends as long as the soloist
+    // keeps resting (the natural "exhale" duration).
+    //
+    // Final-stage multiplier (feedback_weight_tuning_multiplier_placement):
+    // applied AFTER the "Force hit on One" and "Group start" boosts above so
+    // those biases can't sneak the comp back into a phrase-end silence on a
+    // non-downbeat. We preserve `measureStep === 0` (the downbeat IS the
+    // chord-change landmark — silencing it would lose the new chord) and use
+    // a deterministic gate from (barIndex, intBeat) so loop comparisons stay
+    // coherent. ~65% thin rate on eligible non-downbeat hits is a "noticeable
+    // breath" without going completely silent.
+    const PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk']);
+    if (
+        isHit &&
+        measureStep !== 0 &&
+        PHRASE_END_THIN_GENRES.has(genre) &&
+        coordination?.soloistResting === true &&
+        (coordination?.soloistNotesInPhrase ?? 0) >= 3
+    ) {
+        // why: deterministic gate keyed off (barIndex, intBeat) so the breath
+        // is loop-coherent and critique tests measure a stable distribution
+        // rather than seed-of-the-day jitter. Threshold 0.65 (65% thin):
+        // values 0,1,2,3,4 of (h % 10) hit (50%); add 0.15 more by including
+        // h % 20 < 13 (65%). Tuned to produce a clearly audible thinning —
+        // the audit-doc sketch is "brief half-bar silence" so ~2/3 thin on
+        // each eligible step compounds into substantial silence across a
+        // multi-tick phrase-end window.
+        const barIndex = Math.floor(step / spm);
+        const phraseEndHash = (barIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
+        if (phraseEndHash % 20 < 13) {
             isHit = false;
         }
     }
