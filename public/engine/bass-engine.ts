@@ -92,6 +92,33 @@ export function isBassActive(
         return true;
     }
 
+    // why: epic-coordination-consistency S2.b — reggae bass conversational fill.
+    // Reggae bass is normally locked into the riddim tables; on a soloist
+    // phrase-end (≥3 notes then rest) we permit a single approach note at the
+    // "and-of-4" of the bar so the bass answers the soloist's exhale with a
+    // pickup into the next downbeat. Without this force-activation, dub's
+    // riddim-only gate (checkBassActiveStyle line ~212) would skip step 14 on
+    // every riddim except 54-46, and the conversational gesture would be dead
+    // code. The actual approach-note emission lives in getBassNote's reggae
+    // coordination block (just before the call to getBassNoteStyle).
+    //
+    // Gate: step is at stepsPerMeasure - 2 (step 14 in 4/4) AND coordination
+    // signals a phrase-end. Tension-chord-change approach (the second branch
+    // in the audit-doc sketch) is also gated here via upcomingSectionFirstChord
+    // when present, but bar-to-bar nextChord cases are handled inside getBassNote
+    // where the nextChord argument is in scope. ANTICIPATION_STYLES already
+    // covers section-boundary anticipation for jazz/walking/etc.; reggae gets
+    // its own narrower force-activation so non-section-boundary phrase-end
+    // fills still fire.
+    const isReggaeStyle = style === 'dub' || (groove.genreFeel || '') === 'Reggae';
+    const stepsPerBar = ts.beats * ts.stepsPerBeat;
+    const isAndOfFour = step % stepsPerBar === stepsPerBar - 2;
+    const soloistRestingForFill = coordination?.soloistResting === true;
+    const notesInPhraseForFill = coordination?.soloistNotesInPhrase ?? 0;
+    if (isReggaeStyle && isAndOfFour && soloistRestingForFill && notesInPhraseForFill >= 3) {
+        return true;
+    }
+
     // why: epic-form-arrangement S4 — force-activate on the downbeat of the
     // form's final measure so getBassNote's `isFinalMeasureBass` short-circuit
     // can fire its sustained-tonic gesture. Without this, styles whose normal
@@ -902,6 +929,115 @@ export function getBassNote(
             null,
             style === 'funk' ? 1.25 : 1.0 + intensity * 0.25,
         );
+    }
+
+    // --- Reggae Coordination Fill (epic-coordination-consistency S2.b) ---
+    // why: bass-engine.ts previously read only kickHit for reggae lock-in. On a
+    // soloist phrase-end (≥3 notes then rest) OR a real chord change at the bar
+    // boundary, the dub bassist can answer with a single approach note at the
+    // "and-of-4" of the bar — a conversational gesture during the soloist's
+    // exhale, then drop straight back into the riddim on the next downbeat. The
+    // reggae bass is locked-in by default; these are ADDITIONS on specific
+    // gated steps, not a replacement of the kick-lock pattern.
+    //
+    // Gate conditions (all must hold for the block to fire at all):
+    //   1. style === 'dub' OR genre === 'Reggae'.
+    //   2. step is at stepsPerMeasure - 2 (the "and-of-4" in 4/4 — universally
+    //      the pickup slot, and matches the existing ANTICIPATION_STYLES site
+    //      for jazz/walking so the gesture lands in the same rhythmic place).
+    //
+    // Then EITHER trigger fires the fill (ORed; we don't double-emit — one
+    // approach note per step, period):
+    //   A. Phrase-end: coordination.soloistResting === true AND
+    //      soloistNotesInPhrase >= 3. Approach the CURRENT chord's root (we're
+    //      not changing chord — the soloist breathed; we put a melodic comma
+    //      under the rest by walking back into the next bar's root downbeat
+    //      from a chromatic neighbor below).
+    //   B. Chord-change approach: isChordChangeApproach(nextChord, chord) — a
+    //      bar-to-bar root change. Walk into the upcoming root chromatically
+    //      from below or above (pick smaller motion from prevMidi).
+    //
+    // Don't double-fire: B takes precedence when both apply (a real chord
+    // change is the stronger musical signal; the phrase-end fill is a
+    // conversational gesture, the chord-change approach is functional voice-
+    // leading). Returning early bypasses the riddim table's hit at this step
+    // (only 54-46 has a step-14 entry; on other riddims the slot was silent
+    // and we're adding a new attack; on 54-46 we're replacing the lock-in
+    // riddim note with a more musical approach — same single attack, just a
+    // different pitch).
+    //
+    // Source: docs/audit/epic-coordination-consistency.md S2.b;
+    //         FOLLOWUPS §D (reggae bass).
+    const reggaeFillStyle = style === 'dub' || groove.genreFeel === 'Reggae';
+    const reggaeFillStep = stepInMeasure === stepsPerMeasure - 2;
+    if (reggaeFillStyle && reggaeFillStep) {
+        const reggaeSoloistResting = context?.stepCoordination?.soloistResting === true;
+        const reggaeNotesInPhrase = context?.stepCoordination?.soloistNotesInPhrase ?? 0;
+        const reggaePhraseEnd = reggaeSoloistResting && reggaeNotesInPhrase >= 3;
+        const reggaeChordChange = isChordChangeApproach(nextChord, chord);
+        if (reggaePhraseEnd || reggaeChordChange) {
+            // why: target the NEXT chord's root when there's a real chord change
+            // (functional voice-leading into the new tonic); fall back to the
+            // current chord's root on phrase-end-only fills (the soloist's
+            // exhale doesn't change the chord, so we walk back into our own
+            // downbeat).
+            const targetSource = reggaeChordChange
+                ? (nextChord?.bassMidi ?? nextChord?.rootMidi)
+                : (chord.bassMidi ?? chord.rootMidi);
+            const targetRoot = normalizeToRange(targetSource as number);
+
+            // why: pick ±1 semitone direction by smaller motion from prevMidi
+            // for smooth voice-leading; tie-break to BELOW (the half-step
+            // leading tone is the canonical chromatic walk-in across genres,
+            // and reggae bass favors deep grounded approaches from below into
+            // the downbeat).
+            const fromBelow = targetRoot - 1;
+            const fromAbove = targetRoot + 1;
+            let approachMidi: number;
+            if (prevMidi !== null) {
+                const distBelow = Math.abs(fromBelow - prevMidi);
+                const distAbove = Math.abs(fromAbove - prevMidi);
+                approachMidi = distBelow <= distAbove ? fromBelow : fromAbove;
+            } else {
+                approachMidi = fromBelow;
+            }
+
+            // why: keep the approach in reggae's grounded basement register
+            // — the dub branch in getBassNoteStyle forces finalDeepRoot ≤ 38;
+            // mirror that here so the fill doesn't pop above the riddim's
+            // natural register and feel like a different instrument joined.
+            while (approachMidi > 38) {
+                approachMidi -= 12;
+            }
+            while (approachMidi < absMin) {
+                approachMidi += 12;
+            }
+
+            // why: mirror dub style's velocity envelope so the fill lives in
+            // the same dynamic pocket as the riddim hits — dub at
+            // bass-styles.ts:973 scales the riddim's stored velocity by
+            // (0.8 + intensity * 0.3) and jitters by (0.95 + rand * 0.1).
+            // Without this mirror, the fill pops out as a different voice
+            // (Epic 9 S2.b review P1 #4). The ×1.05 accent on top encodes
+            // the "deliberate gesture" reading.
+            const reggaeFillVel =
+                velocity * (0.8 + intensity * 0.3) * (0.95 + Math.random() * 0.1) * 1.05;
+            const reggaeFillRes = result(
+                getFrequency(approachMidi),
+                // why: short duration (1 step) — pickup into the next downbeat,
+                // not a sustained note. Matches the section-anticipation
+                // duration at line ~810.
+                1,
+                reggaeFillVel,
+            );
+            // why: dub style adds (0.01 + intensity * 0.01) timing offset for
+            // the lazy reggae lay-back (bass-styles.ts:981). The fill is part
+            // of the same riddim conversation; without the offset it sits
+            // rhythmically ahead of the surrounding hits and reads as a
+            // different player. (Epic 9 S2.b review P1 #4.)
+            reggaeFillRes.timingOffset += 0.01 + intensity * 0.01;
+            return reggaeFillRes;
+        }
     }
 
     const styleResult = getBassNoteStyle(
