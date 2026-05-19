@@ -111,6 +111,8 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 
 - **Legato-extension `voice.duration` grows monotonically across chains.** Epic 8 S1, `public/engine/synth-harmonies.ts:108`. Each legato extension recomputes `duration = newEnd - existing.time` from the original first-attack time, so a single voice held across N consecutive chord changes accumulates `duration ≈ N × bar_length`. The stale-voice GC at the top of `playHarmonyNote` (`voice.time + voice.duration + 1.0 <= playTime`) then keeps the voice record alive long past the audible end. Not user-visible (the `activeVoices` array is hard-capped at 3 entries via the polyphony-limit shift at line 86), but the bookkeeping is wrong. Suggested fix: track `voice.lastExtendedAt = playTime` and key the GC on that field. ~30min. *Source: harmony-polish/S1 review (2026-05-18).*
 
+- **Hype Man (Anticipation) branch never fires in either of its test fixtures.** Two tests have been red on `main` since at least the S1 (legato) commit: `tests/integration/melodic-harmony-support.test.ts:111-135` ("should play an anticipation hit before a soloist anchor") and `tests/unit/engine/harmonies-logic.test.ts > "should trigger Hype Man (Anticipation) hits before anchors"` (line ~590). Both call `getHarmonyNotes` 2 steps before a soloist anchor and assert `notes[0].isLatched === true`, but the engine returns 0 notes. The Hype Man branch is in `harmonies.ts` ~lines 340-354 (playShadowMode tag 3). Either the gate has drifted (anchorStep math, anchorMidi lookup) or one of the upstream coordination fields the test mocks doesn't satisfy the gate any more. Worth a focused 1-2h investigation: trace why `playShadowMode` returns null for the test setup at step 6 with a step-8 anchor. *Source: harmony-polish/S4 review (2026-05-18).*
+
 ## H. Cross-references (already routed to a story — no work tracked here)
 
 Pointers in case someone greps from a finding:
@@ -133,4 +135,4 @@ Pointers in case someone greps from a finding:
 
 ---
 
-**Last reviewed:** 2026-05-18 (Epic 8 / S1 review additions: pad-sustain scheduler+synth test coverage gap in §F; legato-extension `voice.duration` monotonic growth in §G).
+**Last reviewed:** 2026-05-18 (Epic 8 / S4 review additions: Hype Man branch dead-on-main in §G alongside the S1 entries).

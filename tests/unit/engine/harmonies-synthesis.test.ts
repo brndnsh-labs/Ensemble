@@ -295,4 +295,221 @@ describe('Harmony Synthesis', () => {
             expect(safeDisconnect).toHaveBeenCalled();
         });
     });
+
+    // epic-harmony-polish S4 — gesture flags must produce a timbrally distinct
+    // shape from a plain stab. These tests prove the synth side actually
+    // consumes isBloom / isLatched. The third gesture (isResponse) is fully
+    // engine-side now — it bumps `timingOffset` by +5 ms and ships nothing
+    // extra on the note schema; its test lives in
+    // tests/integration/melodic-harmony-support.test.ts.
+    describe('Gesture flags (S4)', () => {
+        const ATTACK_TARGET_TIME = 'linearRampToValueAtTime';
+
+        const getAttackTime = (gainGain: any, startTime: number): number => {
+            // gain ramp call: linearRampToValueAtTime(finalVol, playTime + attack)
+            const call = gainGain[ATTACK_TARGET_TIME].mock.calls.find(
+                (c: any[]) => c[1] > startTime,
+            );
+            return call ? call[1] - startTime : 0;
+        };
+
+        const getReleaseTau = (gainGain: any): number => {
+            // setTargetAtTime(0, startTime, releaseTau) — releaseTau is third arg
+            const call = gainGain.setTargetAtTime.mock.calls[0];
+            return call ? call[2] : 0;
+        };
+
+        it('bloom note has a longer attack than a plain stab', () => {
+            // Plain stab
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs');
+            const plainGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const plainAttack = getAttackTime(plainGain, 10);
+
+            vi.clearAllMocks();
+            harmony.activeVoices = [];
+
+            // Bloom
+            playHarmonyNote(
+                getState(),
+                440,
+                10,
+                1.0,
+                0.4,
+                'stabs',
+                null,
+                0,
+                0,
+                { rate: 0, depth: 0 },
+                false, // isLegato
+                true, // isBloom
+                false, // isLatched
+            );
+            const bloomGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const bloomAttack = getAttackTime(bloomGain, 10);
+
+            // Bloom should be ~20% longer attack
+            expect(bloomAttack).toBeGreaterThan(plainAttack);
+        });
+
+        it('bloom note widens oscillator detune vs a plain stab', () => {
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs');
+            const plainOsc1 = playback.audio.createOscillator.mock.results[0].value;
+            const plainDetune = plainOsc1.detune.setValueAtTime.mock.calls[0][0];
+
+            vi.clearAllMocks();
+            harmony.activeVoices = [];
+
+            playHarmonyNote(
+                getState(),
+                440,
+                10,
+                1.0,
+                0.4,
+                'stabs',
+                null,
+                0,
+                0,
+                { rate: 0, depth: 0 },
+                false,
+                true, // isBloom
+                false,
+            );
+            const bloomOsc1 = playback.audio.createOscillator.mock.results[0].value;
+            const bloomDetune = bloomOsc1.detune.setValueAtTime.mock.calls[0][0];
+
+            // The plain detune range is ±2 (from (Math.random()-0.5)*4); bloom
+            // adds an additional ±3 (from bloomDetune branch). Test the spread
+            // is wider by running many samples — single-sample comparison
+            // would be flaky.
+            const samples = 40;
+            const plain: number[] = [];
+            const bloom: number[] = [];
+            for (let i = 0; i < samples; i++) {
+                vi.clearAllMocks();
+                harmony.activeVoices = [];
+                playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs');
+                plain.push(
+                    playback.audio.createOscillator.mock.results[0].value.detune.setValueAtTime.mock
+                        .calls[0][0],
+                );
+
+                vi.clearAllMocks();
+                harmony.activeVoices = [];
+                playHarmonyNote(
+                    getState(),
+                    440,
+                    10,
+                    1.0,
+                    0.4,
+                    'stabs',
+                    null,
+                    0,
+                    0,
+                    { rate: 0, depth: 0 },
+                    false,
+                    true,
+                    false,
+                );
+                bloom.push(
+                    playback.audio.createOscillator.mock.results[0].value.detune.setValueAtTime.mock
+                        .calls[0][0],
+                );
+            }
+            const stddev = (xs: number[]): number => {
+                const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+                return Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length);
+            };
+            // Bloom detune spread should be measurably wider than plain.
+            expect(stddev(bloom)).toBeGreaterThan(stddev(plain));
+            // Quiet the single-sample unused-locals warning.
+            void plainDetune;
+            void bloomDetune;
+        });
+
+        it('latched note has a longer release than a plain stab', () => {
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs');
+            const plainGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const plainRelease = getReleaseTau(plainGain);
+
+            vi.clearAllMocks();
+            harmony.activeVoices = [];
+
+            playHarmonyNote(
+                getState(),
+                440,
+                10,
+                1.0,
+                0.4,
+                'stabs',
+                null,
+                0,
+                0,
+                { rate: 0, depth: 0 },
+                false, // isLegato
+                false, // isBloom
+                true, // isLatched
+            );
+            const latchedGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const latchedRelease = getReleaseTau(latchedGain);
+
+            // Latched release should be 1.6× the plain release. Here
+            // duration=1 (well over the cap), plain release=0.1, so 0.1*1.6=0.16.
+            expect(latchedRelease).toBeGreaterThan(plainRelease);
+            expect(latchedRelease).toBeCloseTo(plainRelease * 1.6, 5);
+        });
+
+        // why: the engine typically emits latched hits with `durationSteps: 1`
+        // (≈0.125 s at 120 BPM). The original `min(release*1.6, duration*0.5)`
+        // cap shrank latched release BELOW the plain release at these
+        // durations, inverting the gesture. This guards against re-introducing
+        // a sub-plain-release cap.
+        it('latched release never falls below plain at engine-realistic short durations', () => {
+            const shortDuration = 0.125;
+
+            playHarmonyNote(getState(), 440, 10, shortDuration, 0.4, 'stabs');
+            const plainGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const plainRelease = getReleaseTau(plainGain);
+
+            vi.clearAllMocks();
+            harmony.activeVoices = [];
+
+            playHarmonyNote(
+                getState(),
+                440,
+                10,
+                shortDuration,
+                0.4,
+                'stabs',
+                null,
+                0,
+                0,
+                { rate: 0, depth: 0 },
+                false,
+                false,
+                true, // isLatched
+            );
+            const latchedGain =
+                playback.audio.createGain.mock.results[
+                    playback.audio.createGain.mock.results.length - 1
+                ].value.gain;
+            const latchedRelease = getReleaseTau(latchedGain);
+
+            expect(latchedRelease).toBeGreaterThanOrEqual(plainRelease);
+        });
+    });
 });

@@ -81,7 +81,6 @@ interface HarmonyNote {
     style: string | undefined;
     isLatched: boolean;
     isBloom: boolean;
-    isResponse: boolean;
     isChordStart: boolean;
     /**
      * True when this note is a legato continuation of a voice that was already
@@ -745,6 +744,21 @@ function finalizeHarmonyNotes(
         if (feel === 'Neo-Soul') {
             offset += 0.02; // Dilla lag
         }
+        // why: epic-harmony-polish S4 — `isResponse` marks an antiphonal answer
+        // fired after the soloist's phrase ends (playShadowMode tag 1). A
+        // call-and-response answer sits a hair behind the beat — that's what
+        // makes it sound conversational rather than as if the harmony was
+        // tracking the soloist. 5 ms is within the per-voice jitter range
+        // (timingJitter defaults to 0.008 → [0, 8 ms]) but as a *consistent*
+        // additive offset it accumulates into a perceptible backbeat lag,
+        // while still well under the ~20 ms Dilla lag so it stays musical.
+        // Folded into `offset` (not a synth-side path) because `timingOffset`
+        // is the established schedule accumulator (pocketOffset, stagger,
+        // jitter, Neo-Soul lag); keeping one source of truth means
+        // `note.isResponse` does not need to ship on the schema.
+        if (isResponse) {
+            offset += 0.005;
+        }
 
         const isLegato = priorMidiSet.has(midi);
         notes.push({
@@ -756,7 +770,6 @@ function finalizeHarmonyNotes(
             style: styleConfig.activeStyle,
             isLatched: !!isLatched,
             isBloom: !!isBloom,
-            isResponse: !!isResponse,
             isChordStart: true,
             isLegato,
         });

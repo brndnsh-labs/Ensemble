@@ -1026,6 +1026,8 @@ function scheduleHarmonies(
                 slideDuration,
                 vibrato,
                 isLegato,
+                isBloom,
+                isLatched,
             } = n;
             const playTime = time + (timingOffset || 0);
             const m = noteMidi || getMidi(freq);
@@ -1047,6 +1049,8 @@ function scheduleHarmonies(
                     slideDuration,
                     vibrato,
                     !!isLegato,
+                    !!isBloom,
+                    !!isLatched,
                 );
                 dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration);
 

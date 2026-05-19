@@ -47,6 +47,12 @@ export function playHarmonyNote(
     slideDuration = 0,
     vibrato = { rate: 0, depth: 0 },
     isLegato = false,
+    // epic-harmony-polish S4 — gesture flags. The engine already shapes voicing
+    // and velocity for blooms / latched anchors; the synth side completes the
+    // gesture by shaping attack, detune, and release so the note is audibly
+    // distinct from a plain stab. See engine-side comments in harmonies.ts.
+    isBloom = false,
+    isLatched = false,
 ) {
     const { playback, harmony, groove } = state;
     if (!Number.isFinite(freq) || !playback.audio) {
@@ -440,7 +446,7 @@ export function playHarmonyNote(
     const isFastAttack = style === 'stabs' || style === 'plucks' || style === 'organ';
     const baseAttack = isFastAttack ? 0.01 : 0.2;
     const attackFloor = retriggerProfile?.attackFloor || 0.005;
-    const attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
+    let attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
     let release = 0.5;
     if (style === 'stabs') {
         release = 0.1;
@@ -449,10 +455,56 @@ export function playHarmonyNote(
         release = 0.02;
     }
 
+    // why: epic-harmony-polish S4 — `isBloom` marks a harmonic-bloom hit on a
+    // soloist anchor (playShadowMode tag 2 with seedNote.isAnchor). The engine
+    // already thickens the voicing and boosts velocity (×1.8 in harmonies.ts);
+    // a swell-in attack completes the gesture so the bloom hears as a lush
+    // rise rather than a louder stab. We take the MAX of a 20% bump and a
+    // fixed +5 ms additive bump: on pad-style voices (baseAttack 0.2) the
+    // multiplicative form wins (≈+40 ms swell, the gesture's main territory);
+    // on fast-attack styles (stabs/plucks/organ) the velocity boost from
+    // ×1.8 pins `attack` at the floor (0.005), so a multiplicative bump alone
+    // is inaudible (≈1 ms) — the additive +5 ms doubles it to 10 ms, just
+    // above the human onset-discrimination threshold.
+    if (isBloom) {
+        attack = Math.max(attack * 1.2, attack + 0.005);
+    }
+    // why: epic-harmony-polish S4 — `isLatched` marks a held seed-anchor
+    // reinforcement (playShadowMode tags 2/3, ska-punk hook latch tag B).
+    // The musical intent is "this voice should linger across the next beat
+    // boundary" — slow the decay (60% longer time constant) so the latched
+    // anchor actually rings out. setTargetAtTime's start-time is
+    // `playTime + duration - release`, which can land before `playTime` for
+    // styles whose plain release already exceeds the note's duration (pads
+    // with release 0.5 emitted at duration 0.125 = 125 ms). That's allowed
+    // by Web Audio (the decay just runs from the past) and is the existing
+    // behavior for plain pads; we leave the start-time alone and only bump
+    // the time constant. Cap at `duration + 0.4` so we stay inside the
+    // oscillator's lifetime (`stopTime = playTime + duration + 0.5`); floor
+    // at the plain release so a latched note never decays *faster* than a
+    // plain one — that would invert the gesture (latched pads at 125 ms
+    // duration with the old `min(0.16, duration*0.5)` cap decayed 8× faster
+    // than plain, opposite of "linger").
+    if (isLatched) {
+        const plainRelease = release;
+        release = Math.max(plainRelease, Math.min(plainRelease * 1.6, duration + 0.4));
+    }
+
     const detuneMult = 1.0 + finalVol * 0.5;
-    osc1.detune.setValueAtTime((Math.random() - 0.5) * 4, playTime);
+    // why: epic-harmony-polish S4 — `isBloom` adds an extra 3-cent random
+    // detune to each oscillator, widening the chorus on bloom hits. This
+    // gives the bloom a lusher, slightly-out-of-tune attack that's
+    // timbrally distinct from a clean stab. 3 cents is small enough that
+    // the voicing's pitch identity is preserved, but audible as added body.
+    const bloomDetune = isBloom ? 3 : 0;
+    osc1.detune.setValueAtTime(
+        (Math.random() - 0.5) * 4 + (Math.random() - 0.5) * 2 * bloomDetune,
+        playTime,
+    );
     osc2.detune.setValueAtTime(
-        (style === 'stabs' ? 12 : 8) * detuneMult + (Math.random() - 0.5) * 4,
+        (style === 'stabs' ? 12 : 8) * detuneMult +
+            (Math.random() - 0.5) * 4 +
+            (Math.random() - 0.5) * 2 * bloomDetune,
         playTime,
     );
 
