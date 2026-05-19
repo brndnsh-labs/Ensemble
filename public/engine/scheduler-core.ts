@@ -684,7 +684,8 @@ function scheduleBass(
     if (notes && notes.length > 0) {
         notes.forEach((noteEntry: any) => {
             if (noteEntry?.freq) {
-                const { freq, durationSteps, velocity, timingOffset, muted } = noteEntry;
+                const { freq, durationSteps, velocity, timingOffset, muted, bendStartInterval } =
+                    noteEntry;
                 const { chord } = chordData as any;
                 const adjustedTime = time + (timingOffset || 0);
                 (bass as Mutable<typeof bass>).lastPlayedFreq = freq; // @direct-mutation
@@ -710,7 +711,15 @@ function scheduleBass(
                         duration,
                     });
                 }
-                playBassNote(state, freq || 0, adjustedTime, duration, finalVel, muted);
+                playBassNote(
+                    state,
+                    freq || 0,
+                    adjustedTime,
+                    duration,
+                    finalVel,
+                    muted,
+                    bendStartInterval || 0,
+                );
                 if (!muted) {
                     // Bass is strictly monophonic, so we force Mono mode to kill previous notes
                     dispatchMidiBass(state, midiNum, finalVel, adjustedTime, duration);

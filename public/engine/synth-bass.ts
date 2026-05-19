@@ -30,6 +30,7 @@ export function playBassNote(
     duration: number,
     velocity = 1.0,
     muteAmount = 0,
+    bendStartInterval = 0,
 ): void {
     const { playback, bass, groove } = state;
     if (!playback.audio) {
@@ -60,14 +61,28 @@ export function playBassNote(
         const mainGain = playback.audio.createGain();
         mainGain.gain.setValueAtTime(0, startTime);
 
+        // why: bendStartInterval !== 0 means the note begins detuned and ramps to freq —
+        //   used by the funk walking-approach bend and the hip-hop 808 slide gesture
+        //   (FOLLOWUPS §C / Epic 5 S3 + S7). Mirrors synth-soloist applyPitchEnvelope:
+        //   schedule the offset start freq, then exp-ramp to the target over
+        //   min(0.1s, duration/2). Source: Epic 9 S3(c) — plumbs gestures the engine
+        //   was already writing but the synth was silently dropping.
+        const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
+        const bendRampTime = Math.min(0.1, duration * 0.5);
+
         // --- 1. The Thump (Fundamental + Passive Saturation) ---
         const oscSine = playback.audio.createOscillator();
         oscSine.type = 'sine';
-        oscSine.frequency.setValueAtTime(freq, startTime);
+        oscSine.frequency.setValueAtTime(startFreq, startTime);
 
         const oscTri = playback.audio.createOscillator();
         oscTri.type = 'triangle';
-        oscTri.frequency.setValueAtTime(freq, startTime);
+        oscTri.frequency.setValueAtTime(startFreq, startTime);
+
+        if (bendStartInterval !== 0) {
+            oscSine.frequency.exponentialRampToValueAtTime(freq, startTime + bendRampTime);
+            oscTri.frequency.exponentialRampToValueAtTime(freq, startTime + bendRampTime);
+        }
 
         const bodyMix = playback.audio.createGain();
         oscSine.connect(bodyMix);
@@ -81,7 +96,10 @@ export function playBassNote(
         // --- 2. The Growl (Flatwound Roll-off) ---
         const oscGrowl = playback.audio.createOscillator();
         oscGrowl.type = 'sawtooth';
-        oscGrowl.frequency.setValueAtTime(freq, startTime);
+        oscGrowl.frequency.setValueAtTime(startFreq, startTime);
+        if (bendStartInterval !== 0) {
+            oscGrowl.frequency.exponentialRampToValueAtTime(freq, startTime + bendRampTime);
+        }
 
         const lp1 = playback.audio.createBiquadFilter();
         const lp2 = playback.audio.createBiquadFilter();
