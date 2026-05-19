@@ -142,4 +142,168 @@ describe('Hip Hop Drummer Critique', () => {
         // the test runs at high intensity where dense hihat is the claim.
         expect(hiHatDensity).toBeGreaterThan(10.0);
     });
+
+    it('motif-2 trap-roll burst: monotonic velocity ramp on one beat per bar, minority of bars', () => {
+        // drums.md P1 #8: motif 2 is labeled "Trap Skitter (Hi-hat rolls)"
+        // but old code only ever added a single extra 16th via skitterHit.
+        // New gesture: when activeMotif >= 2 AND rollPhraseSeed > 0.7, fire
+        // HiHat on ALL 4 16ths of one chosen beat with a MONOTONICALLY
+        // INCREASING velocity ramp (0.55 → 0.6 → 0.7 → 0.85) — the "rush"
+        // toward the next downbeat. The base motif-≥1 hat pattern also
+        // hits all 4 16ths per beat but uses a TIERED velocity profile
+        // (0.84/0.42/0.64/0.42) — NOT monotonic. So the burst signature is
+        // the strict velocity ramp, not the hit count.
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.85 },
+            groove: { creativity: true, genreFeel: 'Hip Hop' },
+        });
+
+        const RAMP_EPSILON = 0.01; // velocity ramp tolerance for scaleVelocity adjustments
+        let burstBars = 0;
+        let burstBeats = 0;
+        let burstsOnBeatZero = 0;
+        let openHitsOnBurstBeat = 0;
+        const burstFinalVelocities = [];
+        const burstStartVelocities = [];
+        performance.forEach((bar) => {
+            const velPerStepInBeat = [
+                [null, null, null, null],
+                [null, null, null, null],
+                [null, null, null, null],
+                [null, null, null, null],
+            ];
+            const openHitsPerBeat = [0, 0, 0, 0];
+            bar.forEach((stepData) => {
+                const hit = stepData.instruments.HiHat;
+                const beat = Math.floor(stepData.loopStep / 4);
+                if (hit) {
+                    const slot = stepData.loopStep % 4;
+                    velPerStepInBeat[beat][slot] = hit.velocity;
+                }
+                if (stepData.instruments.Open) {
+                    openHitsPerBeat[beat]++;
+                }
+            });
+            let barHasBurst = false;
+            velPerStepInBeat.forEach((slots, beat) => {
+                // All 4 16ths fired AND strictly increasing velocity =
+                // burst signature.
+                if (slots.every((v) => v !== null)) {
+                    const ramping =
+                        slots[1] > slots[0] + RAMP_EPSILON &&
+                        slots[2] > slots[1] + RAMP_EPSILON &&
+                        slots[3] > slots[2] + RAMP_EPSILON;
+                    if (ramping) {
+                        barHasBurst = true;
+                        burstBeats++;
+                        if (beat === 0) {
+                            burstsOnBeatZero++;
+                        }
+                        // Positive guard: an Open hit on the burst beat
+                        // would punch through the ramp peak and break the
+                        // roll character (drums.md P1 #8 review found this
+                        // collision silently passing the prior burst test).
+                        openHitsOnBurstBeat += openHitsPerBeat[beat];
+                        burstStartVelocities.push(slots[0]);
+                        burstFinalVelocities.push(slots[3]);
+                    }
+                }
+            });
+            if (barHasBurst) {
+                burstBars++;
+            }
+        });
+
+        console.log('\n--- HIP HOP TRAP-ROLL BURST CRITIQUE ---');
+        console.log(`[Bars w/ burst]         ${burstBars}/${numBars}`);
+        console.log(`[Total burst beats]     ${burstBeats}`);
+        console.log(`[Bursts on beat 0]      ${burstsOnBeatZero} (must be 0)`);
+        console.log(`[Open hits on burst]    ${openHitsOnBurstBeat} (must be 0)`);
+        if (burstFinalVelocities.length > 0) {
+            const avgStart =
+                burstStartVelocities.reduce((a, b) => a + b, 0) / burstStartVelocities.length;
+            const avgFinal =
+                burstFinalVelocities.reduce((a, b) => a + b, 0) / burstFinalVelocities.length;
+            console.log(`[Avg start vel]         ${avgStart.toFixed(3)}`);
+            console.log(`[Avg final vel]         ${avgFinal.toFixed(3)}`);
+        }
+        console.log('-----------------------------------------\n');
+
+        // CRITICAL: bursts must actually happen. At intensity 0.85 with
+        // creativity:true, motif >= 2 fires for ~70% of bars; of those
+        // rollPhraseSeed > 0.7 → ~30%. Expected ~30 burst bars per 128.
+        // Threshold pinned at 5 to absorb seed-sample variance and the
+        // narrowness of the > 0.7 gate.
+        expect(burstBars).toBeGreaterThanOrEqual(5);
+
+        // CRITICAL: bursts must be a MINORITY — they're a bar-level accent,
+        // not every-bar wallpaper. Engine gates on phraseSeed > 0.7 so
+        // expected ratio is ~30%. Threshold pinned at 60% to catch a
+        // regression where the gate is removed or inverted.
+        expect(burstBars / numBars).toBeLessThan(0.6);
+
+        // CRITICAL: bursts must never land on beat 0 — the kick on the One
+        // is sacred (drums.md P1 #8 fix sketch). Engine picks from {1, 2, 3}.
+        expect(burstsOnBeatZero).toBe(0);
+
+        // CRITICAL: no Open-hat hits on a burst beat. The trap-roll IS the
+        // gesture on that beat — an Open release mid-burst at vel ~1.02
+        // punches through the ramp peak and converts "tk-tk-tk-TK" into
+        // open-splash-mid-bar, a different idiom. The original burst test
+        // missed this because Open-converted slots silently dropped the
+        // burst from the count rather than failing it (reviewer P0).
+        expect(openHitsOnBurstBeat).toBe(0);
+
+        // CRITICAL: the burst "rushes" toward the next downbeat — the final
+        // "a" velocity must average noticeably louder than the start. Engine
+        // ramps 0.55 → 0.85 (raw) then scaleVelocity bumps it ~0.025. The
+        // final velocity should sit ~0.3 above the start.
+        if (burstFinalVelocities.length > 0) {
+            const avgStart =
+                burstStartVelocities.reduce((a, b) => a + b, 0) / burstStartVelocities.length;
+            const avgFinal =
+                burstFinalVelocities.reduce((a, b) => a + b, 0) / burstFinalVelocities.length;
+            expect(avgFinal - avgStart).toBeGreaterThan(0.15);
+        }
+
+        // CRITICAL: non-burst bars still have a dense hat pattern (the
+        // existing motif-≥1 16th grid). Bars without a burst should still
+        // average > 10 HiHat hits — the genre claim from the main test.
+        let nonBurstHits = 0;
+        let nonBurstBars = 0;
+        performance.forEach((bar) => {
+            const velPerBeat = [
+                [null, null, null, null],
+                [null, null, null, null],
+                [null, null, null, null],
+                [null, null, null, null],
+            ];
+            let barHits = 0;
+            bar.forEach((stepData) => {
+                const hit = stepData.instruments.HiHat;
+                if (hit) {
+                    barHits++;
+                    const beat = Math.floor(stepData.loopStep / 4);
+                    velPerBeat[beat][stepData.loopStep % 4] = hit.velocity;
+                }
+            });
+            const hasBurst = velPerBeat.some(
+                (slots) =>
+                    slots.every((v) => v !== null) &&
+                    slots[1] > slots[0] + RAMP_EPSILON &&
+                    slots[2] > slots[1] + RAMP_EPSILON &&
+                    slots[3] > slots[2] + RAMP_EPSILON,
+            );
+            if (!hasBurst) {
+                nonBurstHits += barHits;
+                nonBurstBars++;
+            }
+        });
+        const nonBurstDensity = nonBurstHits / Math.max(1, nonBurstBars);
+        console.log(
+            `[Non-burst HiHat dens.] ${nonBurstDensity.toFixed(2)} hits/bar (Target: > 10.0)`,
+        );
+        expect(nonBurstDensity).toBeGreaterThan(10.0);
+    });
 });

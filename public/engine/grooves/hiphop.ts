@@ -137,6 +137,27 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         const skitterHit =
             activeMotif >= 2 && (skitterUsesA ? isAOfBeat : isEOfBeat) && beatIndex === skitterBeat;
 
+        // why: drums.md P1 #8 — motif 2 is labeled "Trap Skitter (Hi-hat rolls)"
+        // but the old code only added a single extra 16th via `skitterHit`. The
+        // genre-defining gesture is a stutter burst that announces the beat —
+        // at our 16th-note grid that's all 4 16ths of one beat fired in
+        // succession with a velocity ramp + forward time-skew (the "rush" toward
+        // the next downbeat). We gate it on phraseSeed > 0.7 so the burst is a
+        // bar-level accent, not every-bar wallpaper. A distinct salt isolates
+        // this seed from the existing skitter `phraseSeed` above so the two
+        // phrase decisions don't lock-step.
+        const rollPhraseSeed = getPhraseSeed(sectionSeed, barIndex, 1, 11);
+        const trapRollActive = activeMotif >= 2 && rollPhraseSeed > 0.7;
+        // Pick burst beat from {1, 2, 3} — avoid beat 0 so the kick on the
+        // downbeat stays clean (the burst is an accent AGAINST the One, not
+        // ON it). Weighted toward beat 3: a trap roll's musical job is to
+        // rush INTO the next bar's downbeat, so the lead-in slot deserves
+        // the largest share. Beat 2 (rushing INTO snare-on-3) is the
+        // second-strongest gesture. Beat 1 (right after kick-on-1) is the
+        // weakest "rush" target since the next downbeat is 3 steps away.
+        const rollBeat = rollPhraseSeed < 0.8 ? 3 : rollPhraseSeed < 0.9 ? 2 : 1;
+        const trapRollHere = trapRollActive && beatIndex === rollBeat;
+
         if (activeMotif === 0) {
             if (isBeatStart || isOffbeat) {
                 shouldPlay = true;
@@ -166,15 +187,45 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 velocity += 0.07;
             }
 
-            if (skitterHit) {
+            if (skitterHit && !trapRollHere) {
                 shouldPlay = true;
                 soundName = 'HiHat';
                 velocity = activeMotif === 2 ? 0.33 : 0.37;
                 instTimeOffset += skitterUsesA ? 0.0025 : -0.001;
             }
+
+            // why: trap-roll burst — all 4 16ths of one beat with a velocity
+            // ramp (0.55 → 0.6 → 0.7 → 0.85) and forward `instTimeOffset` skew
+            // so the burst "rushes" toward the next downbeat. Overrides the
+            // normal motif-2 skitter on this beat (handled by the `&& !trapRollHere`
+            // guard above); the other 3 beats keep their normal articulation.
+            // drums.md P1 #8.
+            if (trapRollHere) {
+                shouldPlay = true;
+                soundName = 'HiHat';
+                if (isBeatStart) {
+                    velocity = 0.55;
+                    instTimeOffset += 0.001;
+                } else if (isEOfBeat) {
+                    velocity = 0.6;
+                    instTimeOffset += 0.0015;
+                } else if (isOffbeat) {
+                    velocity = 0.7;
+                    instTimeOffset += 0.002;
+                } else if (isAOfBeat) {
+                    velocity = 0.85;
+                    instTimeOffset += 0.0025;
+                }
+            }
         }
 
-        if (boomBapOpen || trapOpen) {
+        // why: Open-release is suppressed on the burst beat. The trap-roll
+        // gesture IS the release on this beat — a mid-burst Open hat at vel
+        // 1.02 would punch through the ramp peak and turn the closed-hat
+        // rush into an open splash mid-bar (a different idiom — open release,
+        // not roll). Open release continues to fire normally on the 3
+        // non-burst beats.
+        if ((boomBapOpen || trapOpen) && !trapRollHere) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = activeMotif >= 2 ? 1.02 : 0.94;

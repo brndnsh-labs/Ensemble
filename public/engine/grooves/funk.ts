@@ -166,18 +166,33 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Fundamental Backbeat
         if (activeMotif === 2) {
-            // Displaced backbeat: First backbeat is normal, later ones are displaced to the offbeat
-            if (isBackbeat) {
-                if (roll(0.5)) {
-                    shouldPlay = true;
-                    velocity = 1.15;
-                }
-            } else if (isOffbeat && !isPulse) {
-                // Displaced hits on offbeats, higher intensity means more displacement
-                if (roll(0.8, intensity)) {
-                    shouldPlay = true;
-                    velocity = 1.1;
-                }
+            // why: drums.md P1 #9 — "displaced backbeat" was 50/50 coin flips
+            // per step (scatter, not displacement). Real funk displacement
+            // (Stubblefield "Funky Drummer", Garibaldi pocket) commits to a
+            // displacement amount for an entire phrase, then returns. Pick the
+            // displacement ONCE per 2-bar phrase via phraseSeed, then fire
+            // deterministically on both backbeats at the chosen offset.
+            // Salt 17 is distinct from the hat-lane `phraseSeed` above
+            // (salt = activeMotif + 3 = 5 for motif 2) so snare and hat
+            // displacement decisions are independent.
+            const snarePhraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, 17);
+            // Buckets: 40% normal, 35% +1 (laid-back e of backbeat),
+            // 25% +2 (full offbeat shift). The "normal" bucket exists so a
+            // motif-2 section still occasionally returns to the spine
+            // backbeat — the displacement reads as a deliberate gesture, not
+            // a permanent setting.
+            const displacement = snarePhraseSeed < 0.4 ? 0 : snarePhraseSeed < 0.75 ? 1 : 2;
+            const onBackbeatTuple = beatIndex === 1 || beatIndex === 3;
+            const isDisplacedHit =
+                onBackbeatTuple &&
+                ((displacement === 0 && isBackbeat) ||
+                    (displacement === 1 && isEOfBeat) ||
+                    (displacement === 2 && isOffbeat && !isPulse));
+            if (isDisplacedHit) {
+                shouldPlay = true;
+                // why: full-displacement (+2) hits a touch harder — that's the
+                // most overt gesture and drummers play it with more commitment.
+                velocity = displacement === 2 ? 1.18 : 1.15;
             }
         } else {
             if (isBackbeat) {

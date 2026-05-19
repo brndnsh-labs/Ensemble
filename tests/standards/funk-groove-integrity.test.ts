@@ -86,71 +86,61 @@ describe('Funk Groove Integrity', () => {
             mockMath.mockRestore();
         });
 
-        it('should displace the backbeat for Motif 2 (Cold Sweat Style)', () => {
+        it('should displace the backbeat for Motif 2 (Cold Sweat Style) — structural per phrase', () => {
             getState.mockReturnValue(mockState);
-
-            // Force a seed that maps to Motif 2
-            mockState.groove.sectionSeedMap['1'] = 0.5;
-
-            // Motif 2 often moves the later snare backbeat to an offbeat
-            // Early backbeat (e.g. beat 2 in 4/4) should play normally
-            // Late backbeat (e.g. beat 4 in 4/4) should be silent
-            // The following offbeat (e.g. "and" of 4) should play strong
-
+            // drums.md P1 #9: motif 2 picks ONE displacement amount per
+            // 2-bar phrase (via getPhraseSeed salt 17), then fires
+            // deterministically. Old behavior was `roll(0.5)` per step =
+            // scatter. New behavior is structural: BOTH backbeats land at
+            // the same displaced slot within a phrase, and `Math.random`
+            // doesn't affect the snare-displacement decision.
             const ts44 = TIME_SIGNATURES['4/4'];
-            let earlyBackbeatPlayed = false;
-            let lateBackbeatPlayed = false;
-            let offbeatDisplacedPlayed = false;
 
-            let callCount = 0;
-            const mockMath = vi.spyOn(Math, 'random').mockImplementation(() => {
-                callCount++;
-                // Return 0.1 for the first roll() call to pass the first backbeat.
-                // For any subsequent calls, return 0.9 to fail the roll() check.
-                if (callCount === 1) {
-                    return 0.1;
-                }
-                return 0.9;
-            });
-
-            for (let step = 0; step < 16; step++) {
-                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-
-                if (info.isBackbeat || (info.isOffbeat && step >= 8)) {
-                    const params = createParams(step, 'Snare');
-                    const result = applyGrooveOverrides(getState(), params);
-
-                    if (info.isBackbeat) {
-                        if (step < 8 && result.shouldPlay && result.velocity > 0.8) {
-                            earlyBackbeatPlayed = true;
-                        } else if (step >= 8 && result.shouldPlay && result.velocity > 0.8) {
-                            lateBackbeatPlayed = true;
+            // No Math.random mocking — the new path is deterministic.
+            // We sweep multiple section seeds to verify each bucket appears
+            // and that within a single seed, both backbeats land on the
+            // SAME displacement slot.
+            const seenPatterns = new Set();
+            for (const seed of [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]) {
+                mockState.groove.sectionSeedMap['1'] = seed;
+                const strongHits = [];
+                for (let step = 0; step < 16; step++) {
+                    const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                    // Limit scan to the two backbeat regions (steps 4-6 and 12-14)
+                    // so motif-1/3 ghost notes elsewhere don't confuse the test.
+                    if (
+                        (info.beatIndex === 1 || info.beatIndex === 3) &&
+                        (info.isBackbeat || info.isEOfBeat || info.isOffbeat)
+                    ) {
+                        const params = createParams(step, 'Snare');
+                        const result = applyGrooveOverrides(getState(), params);
+                        if (result.shouldPlay && result.velocity > 0.8) {
+                            strongHits.push(step);
                         }
                     }
                 }
-            }
-
-            // We run a second loop resetting Math.random just for the offbeat displacement,
-            // otherwise multiple `roll()` calls per step evaluation drain our mock unexpectedly.
-            mockMath.mockRestore();
-            const _mockMath2 = vi.spyOn(Math, 'random').mockReturnValue(0.1);
-
-            for (let step = 8; step < 16; step++) {
-                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-                if (info.isOffbeat && !info.isBackbeat) {
-                    const params = createParams(step, 'Snare');
-                    const result = applyGrooveOverrides(getState(), params);
-                    if (result.shouldPlay && result.velocity > 0.85) {
-                        offbeatDisplacedPlayed = true;
-                    }
+                if (strongHits.length === 0) {
+                    continue;
+                }
+                const b1 = strongHits.filter((s) => s >= 4 && s <= 6);
+                const b3 = strongHits.filter((s) => s >= 12 && s <= 14);
+                // Each backbeat region: at most one strong hit (the deterministic
+                // displacement target). This is the no-scatter guarantee.
+                expect(b1.length).toBeLessThanOrEqual(1);
+                expect(b3.length).toBeLessThanOrEqual(1);
+                if (b1.length === 1 && b3.length === 1) {
+                    const offsetB1 = b1[0] - 4;
+                    const offsetB3 = b3[0] - 12;
+                    // Both backbeats must displace by the same amount.
+                    expect(offsetB1).toBe(offsetB3);
+                    seenPatterns.add(offsetB1);
                 }
             }
-
-            mockMath.mockRestore();
-
-            expect(earlyBackbeatPlayed).toBe(true);
-            expect(lateBackbeatPlayed).toBe(false);
-            expect(offbeatDisplacedPlayed).toBe(true);
+            // Sweep should hit at least two distinct displacement buckets
+            // (the bucket distribution covers normal/+1/+2 across phraseSeed
+            // space). 10 seeds sampling phraseSeed via salt 17 lands in
+            // multiple buckets.
+            expect(seenPatterns.size).toBeGreaterThanOrEqual(2);
         });
 
         it('should trigger anticipatory hi-hat barks on phrase turnarounds', () => {
