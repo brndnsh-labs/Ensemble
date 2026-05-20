@@ -413,7 +413,20 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
             const spm = seed.loopLengthSteps; // Actually this is loop length. If loop is 1 measure, spm=loopLength.
             // A strong downbeat or half-bar downbeat
             if (nextSeedNote?.isAnchor && nextSeedNote.step % Math.floor(spm / 2) === 0) {
-                const pushProb = loopCount === 0 ? 0.8 : 0.3;
+                // why: Loop 0 is The Head — Loop-0 doctrine (CLAUDE.md
+                // "Dynamic Head / Chorus Evolution") makes anchor support
+                // unconditional (see Melodic-Shadowing reinforceProb=1.0 at
+                // line 389). The anticipation push that *sets up* that
+                // anchor is the same Head gesture — the band locks into the
+                // soloist's downbeat one 8th early — and must fire with the
+                // same certainty. Loop 1+ keeps a probabilistic push
+                // intensity-coupled the way Antiphony (tag 1) is, so the
+                // gesture thins as the form evolves rather than vanishing.
+                // Previous values (0.8 / 0.3) predated the May 2026
+                // Math.random → scrambleHash migration; under deterministic
+                // hashing the 0.8 ceiling was unreachable for common
+                // sectionId seeds and the branch became effectively dead.
+                const pushProb = loopCount === 0 ? 1.0 : 0.2 + playback.bandIntensity * 0.4;
                 // why: tag 3 — hype-man push trigger.
                 if (scrambleHash(context.motif.seed + step * 31 + 3) < pushProb) {
                     return { type: 'reinforce', isLatched: true, isBloom: true, duration: 1 };
