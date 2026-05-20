@@ -1,3 +1,4 @@
+import type { EnsembleState } from '../types.js';
 import {
     binarySearchMap,
     calculateTimingOffset,
@@ -82,6 +83,50 @@ export function motifCapForLoop(loopCount: number): number {
     return Math.min(2, 1 + Math.floor(loopCount / 2));
 }
 
+// why: tick-logic builds this bag inline for every drum tick. Tightening
+// the shape here lets the compiler catch typos in field names (which would
+// silently shadow as `undefined` and corrupt the per-tick groove decision).
+// Test fixtures pass `params: any`, which remains assignable; production
+// `inst` / `tsConfig` keep `any` for compatibility with `Instrument` and
+// `TIME_SIGNATURES[...]` shapes without forcing a wider refactor here.
+export interface GrooveOverrideOptions {
+    stepVal: number;
+    step: number;
+    inst: any;
+    playback: EnsembleState['playback'];
+    groove: EnsembleState['groove'];
+    isDownbeat: boolean;
+    isBeatStart: boolean;
+    isPulse?: boolean;
+    isPulseStart?: boolean;
+    isGroupStart: boolean;
+    isBackbeat: boolean;
+    isOffbeat: boolean;
+    isEOfBeat: boolean;
+    isAOfBeat: boolean;
+    beatIndex: number;
+    tsConfig: any;
+    // why: `mStep` / `stepInGroup` / `groupIndex` are declared but the
+    // tick-logic.ts production caller doesn't pass them today — they
+    // arrive as `undefined` and pass through into the per-genre strategy
+    // `context` bag (line ~213). Marked optional here to make that contract
+    // explicit; promoting them to required would surface in tick-logic.ts
+    // as a real follow-up.
+    mStep?: number;
+    isCompound?: boolean;
+    stepInGroup?: number;
+    groupIndex?: number;
+    sectionId?: string | null;
+    sectionOccurrence: number;
+    isFinalMeasure: boolean;
+    // tick-logic.ts builds the bag with a few extras (`isTurnaround`,
+    // `stepsPerBar`, `loopStep`) that this function recomputes internally
+    // and ignores; declared optional so the call site typechecks.
+    isTurnaround?: boolean;
+    stepsPerBar?: number;
+    loopStep?: number;
+}
+
 export function applyGrooveOverrides(
     state: any,
     {
@@ -108,7 +153,7 @@ export function applyGrooveOverrides(
         sectionId: sectionIdFromTick,
         sectionOccurrence,
         isFinalMeasure,
-    }: any,
+    }: GrooveOverrideOptions,
 ) {
     const { soloist, arranger } = state;
     const arrangerState = { timeSignature: '4/4', ...(arranger || {}) };
@@ -171,7 +216,7 @@ export function applyGrooveOverrides(
 
     const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], step);
     const sectionId = chordEntry?.chord?.sectionId;
-    let sectionSeed = groove.sectionSeedMap?.[sectionId];
+    let sectionSeed = (groove.sectionSeedMap as Record<string, number>)?.[sectionId];
     if (sectionSeed === undefined) {
         // Latin/Bossa requires 2-bar stability for authentic Clave motifs
         const seedBarIndex = config.isLatin ? Math.floor(barIndex / 2) * 2 : barIndex;

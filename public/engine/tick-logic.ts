@@ -190,7 +190,7 @@ export function generateNotesForStep(
         // `isFinalMeasure` doc comment for the musical reasoning.
         //
         // writer: chord-data preamble (this block); readable-after: any producer
-        const totalFormSteps = Number.isFinite(arranger?.totalSteps) ? arranger.totalSteps : 0;
+        const totalFormSteps = Number.isFinite(arranger.totalSteps) ? arranger.totalSteps : 0;
         if (playback.songMode && playback.isEndingPending && totalFormSteps > 0) {
             const stepInForm = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
             // why: `stepInForm + stepsPerMeasure >= total` is true for every step
@@ -198,7 +198,7 @@ export function generateNotesForStep(
             // sketch and handles the boundary case where stepInForm is exactly
             // (total - stepsPerMeasure) — the very first step of the final bar.
             if (stepInForm + stepsPerMeasure >= totalFormSteps) {
-                (coordination as any).isFinalMeasure = true;
+                coordination.isFinalMeasure = true;
             }
         }
 
@@ -368,7 +368,7 @@ export function generateNotesForStep(
                 // fire a Crash + sustained cymbal on the final bar of a song-mode
                 // playback that is ending. Default `false` mirrors the coordination
                 // context default; engines safely gate without an undefined check.
-                isFinalMeasure: (coordination as any).isFinalMeasure === true,
+                isFinalMeasure: coordination.isFinalMeasure === true,
             });
 
             if (!evaluateOnly && result.shouldPlay) {
