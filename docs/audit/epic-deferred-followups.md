@@ -151,9 +151,24 @@ Two items where the same shape is fragmented across engines.
 **Effort:** ~5h. **Model:** opus ((a) needs distribution verification; (b) is a context-shape design). **Reviewer:** music-theory-reviewer + worker-contract-reviewer (new coordination fields cross the worker boundary). **Source:** FOLLOWUPS §C.
 **Status:** Not started.
 
+### S10. Anchor head-note device suppression on the paraphrase loop
+
+Promoted from a FOLLOWUPS entry after a full root-cause diagnosis during the Epic 11 S5 cycle (2026-05-20).
+
+**The bug.** Three `soloist-motivic-response` / `soloist-seeder-hook-shape` integration tests fail (`blues.loop1AnchorExactRate` ~0.25 vs ≥0.75, aggregate ~0.667 vs ≥0.7, Neo-Soul `headC.richContourShare` ~0.5625 vs ≥0.6). `git bisect` pins the trigger to `008b2400` (Epic 10 S2.a), which swapped two head-bypass jitter `Math.random()` draws for the pure `scrambleHash()`. The analysis sweep (`scripts/soloist-analysis-utils.ts` `withSeededRandom`) pins `Math.random` to one seeded stream, so removing draws shifts every downstream consumer. But the jitter migration is *not* the defect — it only exposed one.
+
+**The real defect.** The pitch engine pins `selectedMidi = targetMidi` for a head-bypass anchor (`soloist-pitch-engine.ts:1256-1257`), but melodic-device probability is **not** zeroed for anchors on the paraphrase loop. `soloist-pitch-engine.ts:1293-1295` kills `deviceBaseProb` only for `isHeadBypass && loopCount === 0`. On loop 1 the anchor still carries a non-zero `deviceBaseProb` (`config.deviceProb × (0.5+intensity) × (1+loopCount·0.2) × thematicBoost 2.4 × anchor 0.35`), so a `Math.random()`-gated device can fire on top of the anchor and replace its emitted pitch (observed: anchor MIDI 59 → emitted 65). Whether the device fires depends on RNG-stream position — hence the brittleness. An anchor is the structural skeleton of the head; on the *first* paraphrase loop it should state the head pitch cleanly, not be ornamented off it.
+
+**The fix.** Extend the head-bypass device kill so anchor head-bypass notes on the loop-1 paraphrase emit their exact head pitch — likely `deviceBaseProb = 0` when `isHeadBypass && seedNote?.isAnchor && loopCount === 1` (taste call: whether later loops also tighten, given `laterLoopAnchorExactRate ≥ 0.78` already expects ~80% exact — the current `×0.35` may be enough there, or may want a smaller multiplier). The new critique test must be **stream-alignment-independent** — assert anchors emit exact pitch regardless of where the pinned RNG lands (e.g. sweep multiple seeds / RNG offsets, or assert on the engine's pre-device `selectedMidi` rather than the post-device emission). The three pre-existing failing tests should then pass as a genuine guarantee, not an alignment artifact.
+
+**Acceptance:** loop-1 anchor head notes emit their exact head pitch independent of RNG-stream position; `soloist-motivic-response` + `soloist-seeder-hook-shape` pass; new or extended critique coverage that does not depend on stream alignment; `laterLoopAnchorExactRate` stays ≥ its current thresholds. Listen-test pass (the paraphrase loop should still feel like a paraphrase, not a mechanical head repeat).
+**Effort:** ~3-4h. **Model:** opus (taste call on how clean loop-1 vs later-loop anchors must be + a stream-independent test design). **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS (Epic 11 S5 cycle diagnosis); `soloist.md`-area motivic-fidelity.
+**Status:** Not started.
+
 ## Notes on this epic's shape
 
-- **S1 → S2 dependency:** S1(a) builds the section-boundary lookahead; S2 consumes it. Do S1 first. No other cross-story coupling — S3–S9 touch disjoint files and can run in any order.
+- **S1 → S2 dependency:** S1(a) builds the section-boundary lookahead; S2 consumes it. Do S1 first. No other cross-story coupling — S3–S10 touch disjoint files and can run in any order.
 - **S5** is a pure micro-sweep — one commit per item, no taste calls, sonnet-grade. Good `/cycle` candidate to clear in one session.
 - **S6–S9** are multi-item sweeps in the Epic 9 shape: commit per sub-item at `/done`.
+- **S10** was promoted mid-Epic-11 from a FOLLOWUPS entry after the S5-cycle diagnosis — single-defect opus story, not a sweep.
 - **Out of scope, tracked elsewhere:** soloist-picker `scrambleHash` migration (FOLLOWUPS §F — its own opus story); `arranger.progression` reducer refactor (TECH_DEBT #1 — multi-day); listen-test-gated per-genre tuning (FOLLOWUPS §E remainder — needs playback sessions before it's decidable).
