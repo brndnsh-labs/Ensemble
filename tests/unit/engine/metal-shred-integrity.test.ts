@@ -107,12 +107,20 @@ describe('Metal/Shred Genre Integrity', () => {
     });
 
     describe('Snare Patterns', () => {
-        it('should play Blast Beat at high intensity (coverage for lines 127-132)', () => {
+        it('should play Blast Beat at high intensity (Motif 4 snare alternation)', () => {
+            // why: epic-deferred-followups S8(e) — stale fixture. The drums.md
+            // P1 #6 blast-beat ALTERNATION fix made the Motif-4 snare fire on
+            // the DOWNBEAT eighths (`isBeatStart`, metal.ts ~line 115),
+            // answering the kick's offbeat-eighth alternation. The old fixture
+            // passed `isOffbeat: true`, which exercised the pre-#6
+            // co-articulation that the fix deliberately removed — engine drift,
+            // not an engine bug. Drive the snare on `isBeatStart` to match the
+            // current alternation contract.
             const context = createBaseContext({
                 inst: { name: 'Snare' },
                 playback: { bandIntensity: 0.95 },
                 sectionSeed: 0.9, // Forces Motif 4
-                isOffbeat: true,
+                isBeatStart: true,
             });
             const result = Shred.applyOverrides(context, createBaseState());
             expect(result.shouldPlay).toBe(true);

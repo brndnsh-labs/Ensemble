@@ -164,10 +164,19 @@ describe('HipHop Genre Integrity', () => {
         });
 
         it('should route phrase-release open accents through the open lane', () => {
+            // why: epic-deferred-followups S8(e) — stale fixture. The Open-release
+            // accent is suppressed on a beat where the S6 trap-roll burst fires
+            // (`(boomBapOpen || trapOpen) && !trapRollHere` in hiphop.ts ~line 228).
+            // The old `sectionSeed: 0.5` happened to land `rollBeat === 3`, so the
+            // trap-roll burst owned beat 3 and the Open release never fired —
+            // engine drift from `8224efc6` (S6 trap-roll), not an engine bug.
+            // `sectionSeed: 0.31` yields motif 2, `releaseBeat 3`, and a
+            // `rollPhraseSeed` below the 0.7 trap-roll gate, so the Open release
+            // on beat-3 offbeat fires cleanly as the test intends.
             const openContext = createBaseContext({
                 inst: { name: 'Open' },
                 playback: { bandIntensity: 0.8 },
-                sectionSeed: 0.5,
+                sectionSeed: 0.31,
                 beatIndex: 3,
                 isOffbeat: true,
             });
