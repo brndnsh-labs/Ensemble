@@ -184,6 +184,10 @@ All seven items promoted on 2026-05-19 and shipped via Epic 10 / S1 sub-item com
 
 - **Neo-Soul `soloist-seeder-hook-shape` `headC.richContourShare` failure** (~0.5625 vs ≥0.6). Surfaced bundled into S10 because `git bisect` pinned it to the same trigger commit (`008b2400`, Epic 10 S2.a), but the S10 implementation pass confirmed it is **not** a loop-1 anchor defect: `richContourShare` is a melodic-contour metric on a *loop-0* seed sweep, and Neo-Soul does not emit `bluesTurnaround`. It is an independent RNG-stream-drift artifact — the pinned analysis stream moved when S2.a removed two `Math.random()` draws, so generative non-anchor head tones land on a different (not worse) contour. Decision needed: either re-baseline the `richContourShare` threshold against the post-`008b2400` stream, or harden the seed sweep against stream drift (assert over multiple RNG offsets, like `soloist-loop1-anchor-fidelity.test.ts` does). A test-threshold call, not an engine fix. ~1-2h. *Source: Epic 11 S10 implementation + review (2026-05-20).*
 
+**New entries surfaced during Epic 11 S6:**
+
+- **`bass-chord-change-approach-critique.test.ts` has an under-cushioned unseeded stochastic threshold.** The test asserts `jazzRate > rockRate + 0.1`; the observed gap is only ~1pp (jazz ~27.5% vs rock ~28.4% — note the raw delta is sign-fragile) and the engine path runs on unseeded `Math.random()`. Any new test added before it in full-suite ordering that consumes extra `Math.random()` draws can tip it below threshold (the S6 funk-Clav critique did, until its loop was shortened from 128 to 32 bars as a workaround). Passes 30/30 in isolation. Fix: either seed the bass engine path for this test, or widen the delta cushion to a statistically honest margin. ~30min. *Source: Epic 11 S6 implementation (2026-05-20).*
+
 ## H. Cross-references (already routed to a story — no work tracked here)
 
 Pointers in case someone greps from a finding:
