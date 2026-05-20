@@ -1089,6 +1089,13 @@ export function getBassNote(
         stepInMeasure % ((ts.grouping?.[0] || ts.beats) * ts.stepsPerBeat) === 0,
         hasKickTrigger,
         kickInst ?? null,
+        // why: epic-deferred-followups S2 — section-gated rock anticipation push.
+        // Pass the section-boundary distance so the rock branch can cluster the
+        // push gesture at structural boundaries rather than firing uniformly on
+        // every chord change. undefined when no coordination context is available
+        // (e.g. test mocks that don't supply stepCoordination); the rock branch
+        // treats undefined identically to -1 (no boundary known → 0.15× residual).
+        context?.stepCoordination?.barsUntilSectionChange,
     );
     if (styleResult !== undefined) {
         return styleResult;

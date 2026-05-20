@@ -282,6 +282,7 @@ export function getBassNoteStyle(
     isGroupStart: boolean,
     hasKickTrigger: boolean,
     kickInst: { steps: number[] } | null,
+    barsUntilSectionChange?: number,
 ) {
     const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange } = context;
     if (style === 'whole') {
@@ -655,7 +656,40 @@ export function getBassNoteStyle(
 
         // 2. Fundamental Pulse: Quarter notes are solid roots
         if (isBeatStart) {
-            const isPushPoint = intBeat === ts.beats - 1 && Math.random() < 0.4 + intensity * 0.3;
+            // Section-gated anticipation push (epic-deferred-followups S2).
+            // why: at ~55% probability the push stopped signalling anything — it
+            // became ambient texture rather than a structural signpost. A push is
+            // a *gesture* that tells the listener "something's coming." To restore
+            // that meaning, we (a) drop the base probability to 10–25% and
+            // (b) cluster the gesture at section boundaries where it's most
+            // dramatic (the bass "announcing" an incoming chorus or bridge).
+            //
+            // Section gate multiplier (two-tier):
+            //   barsUntilSectionChange === 0  → last bar before boundary: full probability
+            //   otherwise (undefined / -1):     15% residual — push can still appear
+            //     mid-section on pure chord changes, but is rare enough to feel
+            //     spontaneous rather than routine.
+            //
+            // why two tiers, not three: S1(a)'s `barsUntilSectionChange` is only
+            // published inside `tick-logic.ts`'s `remainingSteps <= stepsPerMeasure`
+            // guard, so it only ever holds 0 (in the final bar) or -1 (the default).
+            // An intermediate "1 bar out, 60%" approach-window tier would be dead
+            // code against that plumbing. Widening the lookahead to the penultimate
+            // bar is S1-infrastructure scope (it would also shift when the drop
+            // mechanic and `upcomingSectionFirstChord` publish) — filed as a
+            // follow-up rather than smuggled in here.
+            //
+            // why 0.15 residual (not 0): completely suppressing mid-section pushes
+            // would make the engine dead-silent on intra-section chord changes in
+            // simpler arrangements that have no section boundary data. A small
+            // residual preserves the Rock/Stones vocabulary without dominating it.
+            // Source: FOLLOWUPS §A (rock anticipation push), bass.md P1 #8.
+            const sectionGateMult =
+                barsUntilSectionChange === 0
+                    ? 1.0 // why: at the boundary — full Stones signpost probability
+                    : 0.15; // why: no boundary imminent — rare, spontaneous feel
+            const pushProb = (0.1 + intensity * 0.15) * sectionGateMult;
+            const isPushPoint = intBeat === ts.beats - 1 && Math.random() < pushProb;
             if (isPushPoint && isChordChangeApproach(nextChord, chord)) {
                 // why: migrated from rootMidi-only comparison to isChordChangeApproach so
                 // slash chords (e.g. G/B → C) are detected correctly — the old predicate

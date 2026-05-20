@@ -40,7 +40,7 @@ Drop the probability to `0.1 + intensity * 0.15` (10-25%) **and** gate it on the
 
 **Acceptance:** `rock-bass-critique.test.ts` extended — observed push rate falls in the 10-25% band, and pushes cluster at section boundaries rather than firing uniformly on chord changes.
 **Effort:** ~2h. **Model:** sonnet (mechanical once S1's lookahead exists — probability + one gate). **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §A (rock anticipation push); `bass.md` P1 #8.
-**Status:** Not started. **Blocked on:** S1(a).
+**Status:** Done 2026-05-20 — shipped. Push base probability dropped `0.4 + i*0.3` → `0.1 + i*0.15` (10-25% band) and gated through a `barsUntilSectionChange` parameter threaded `bass-engine.ts` → `getBassNoteStyle`. Section gate is **two-tier** (1.0× at boundary / 0.15× residual), not the sketched three-tier — S1(a)'s `barsUntilSectionChange` only ever holds `0` or `-1` (published inside `tick-logic.ts`'s final-bar guard), so a penultimate-bar "approach window" tier would be dead code; widening the lookahead is filed as a cross-cutting follow-up (FOLLOWUPS §G). `rock-bass-critique.test.ts` extended: push-rate-band test (13.7-23.4% observed) + clustering test (boundary ≥3× mid-section, 3.8-29× observed); pre-existing `> 30` melodic-variation threshold lowered to `> 15` (it had been tuned against the old ~55% push rate). Reviewer P1 (dead three-tier arm) patched; P2 (log/assert target mismatch) patched.
 
 ### S3. Open-jam macro-arc — make the cycle musical
 
