@@ -28,12 +28,11 @@ import { makeMulberry32 } from '../utils/seeded-random.js';
  * no-stub determinism test is therefore impossible today; that gap is filed
  * in FOLLOWUPS §F as an engine task.
  *
- * First-call warm-up: the very first `getSoloistNote` call in a process sets
- * some module-level state that `RESET_STATE` does not clear, so run #1 in a
- * file can differ at step 0 from runs #2+ (runs #2 and #3 are identical to
- * each other). The test does one discarded warm-up pass before the two
- * measured passes. That step-0 warm-up artifact is itself filed in
- * FOLLOWUPS §F.
+ * No warm-up needed: the soloist's `audio` runtime (`lastMidiPlayed` etc.)
+ * is now cleared by the `RESET_STATE` reducer, so the very first
+ * `getSoloistNote` pass in a process is already byte-identical to every
+ * later pass. (Previously `audio` leaked past the reset and the test ate a
+ * discarded warm-up pass to absorb it — FOLLOWUPS §F, since fixed.)
  */
 
 const NUM_STEPS = 1024; // 64 bars of 16 steps — long enough to exercise loops,
@@ -118,11 +117,6 @@ function countDivergences(a: string[], b: string[]): { count: number; firstAt: n
 describe('Soloist engine-wide determinism (Epic 10 S2.b)', () => {
     it('is byte-identical across two runs under a pinned mulberry32 seed', () => {
         const SEED = 0xa5_3c_91_e0;
-
-        // Discarded warm-up pass — absorbs the documented first-call module
-        // warm-up so the two measured passes start from identical module
-        // state. (FOLLOWUPS §F tracks eliminating the warm-up artifact.)
-        runSoloistPass(SEED);
 
         const runA = runSoloistPass(SEED);
         const runB = runSoloistPass(SEED);
