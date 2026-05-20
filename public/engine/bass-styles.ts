@@ -1078,7 +1078,11 @@ export function getBassNoteStyle(
         const isLastEighth =
             _stepInfo?.mStep ===
             (_stepInfo?.tsConfig?.beats || 4) * (_stepInfo?.tsConfig?.stepsPerBeat || 4) - 2;
-        if (isLastEighth && nextChord && nextChord.rootMidi !== chord.rootMidi && intensity > 0.5) {
+        // why: migrated from rootMidi-only comparison to isChordChangeApproach
+        // so slash chords (e.g. G/B) whose bassMidi differs from rootMidi are
+        // correctly detected as a chord change rather than staying silent on
+        // the chromatic approach. (bass.md micro-cleanup S5.)
+        if (isLastEighth && isChordChangeApproach(nextChord, chord) && intensity > 0.5) {
             const nextTarget = normalizeToRange(nextChord.rootMidi);
             const approach = Math.random() < 0.5 ? nextTarget - 1 : nextTarget + 1;
             const res = result(getFrequency(clampAndNormalize(approach)), 0.8, 1.2);
