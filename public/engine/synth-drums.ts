@@ -187,11 +187,11 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     'CowbellHigh',
     'CowbellLow',
     'Brush',
-    // Toms — handled by `name.includes('Tom')` branch
-    'HighTom',
-    'MidTom',
-    'LowTom',
-    'Tom',
+    // why: no-space tom variants are inert — every fill template emits the
+    // space-form (`'High Tom'`/`'Mid Tom'`/`'Low Tom'`). The
+    // `name.includes('Tom')` substring exemption in `maybeWarnUnknownSound`
+    // also catches the space-form, so the no-space entries added literally
+    // nothing to the warning suppression. Removed to keep the registry honest.
     // Conga / Bongo families — handled by `name.startsWith('Conga'|'Bongo')`
     'HighConga',
     'LowConga',
