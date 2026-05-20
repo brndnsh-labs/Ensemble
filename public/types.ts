@@ -566,6 +566,17 @@ export interface SoloistPhraseContext {
      * — Conclusion lifts, Departure depresses. Lowercase canonical form.
      */
     srdcState: 'statement' | 'restatement' | 'departure' | 'conclusion';
+    /**
+     * The just-finished Statement phrase's signature, captured when the
+     * current phrase derives to `restatement` and the prior phrase was a
+     * `statement`. The rhythm engine echoes this signature's attack grid +
+     * duration shape and the pitch picker echoes its contour directions, so
+     * Restatement audibly *confirms* the Statement instead of sounding like
+     * an independent phrase. `null` whenever the current phrase is not a
+     * Statement-following Restatement. Set by `setupPhraseContext` in
+     * soloist.ts. (SRDC Restatement motif-echo — Epic 11 S4.)
+     */
+    restatementEcho: MotifSignature | null;
 }
 
 /**

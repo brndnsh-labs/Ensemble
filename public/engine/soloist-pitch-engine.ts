@@ -495,6 +495,23 @@ export function selectPitchAndDevices(
     );
     const isRecallSource = responseSource === 'section' || responseSource === 'form';
 
+    // --- SRDC Restatement motif-echo (Epic 11 S4) ---
+    // A Restatement phrase echoes the Statement's contour with *looser
+    // landings* — "yeah, I meant that." The rhythm engine
+    // (buildRestatementEchoPlan) tags each echo node with `responseSource:
+    // 'recent'` plus the Statement note's `responsePitchClass` /
+    // `responseDirection`. We honor that contour here via a DEDICATED branch,
+    // NOT through `isResponseGuided`: that gate is `responseConfig.enabled`-
+    // gated and call/response-specific, but SRDC echo is a structural,
+    // genre-independent behavior (reviewer-confirmed). The predicate keys
+    // purely on the rhythm node's `responseSource === 'recent'` flag the
+    // Restatement plan stamps, so it never fires for a genuine call/response
+    // node (those use 'section'/'form'/'free').
+    const isRestatementEcho =
+        responseSource === 'recent' &&
+        soloistState.session.currentPhrase.context?.srdcState === 'restatement' &&
+        (responsePitchClass !== null || Number.isFinite(rhythmNode.responseDirection));
+
     const hasGreatsProfile =
         isGreatsProfileEnabled && soloistState.session.currentPhrase.context?.profile;
     const isCallResponse =
@@ -518,14 +535,19 @@ export function selectPitchAndDevices(
         soloistState.session?.currentPhrase?.context?.srdcState ||
         'statement'
     ).toLowerCase();
+    // why restatement === 1.0 (was 1.15): Epic 11 S4 moved the SRDC Restatement
+    // distinction OUT of this multiplier and INTO structural motif-echo (the
+    // rhythm engine now replays the Statement's attack grid + contour — see
+    // buildRestatementEchoPlan in soloist-rhythm-engine.ts). A Restatement is
+    // the player echoing the idea with *looser landings* — "yeah, I meant
+    // that" — so it must NOT pull chord tones harder than the Statement it
+    // echoes. The old ×1.15 nudge both (a) did the musically-wrong thing by
+    // tightening landings and (b) was noise-floor — drowned by the chord-tone
+    // (+150/+300) and strong-beat anchors. Baseline 1.0 keeps Restatement's
+    // landings exactly as loose as Statement's; the echoed contour carries the
+    // confirmation, not a chord-tone bias.
     const srdcChordToneMult =
-        srdcPhase === 'conclusion'
-            ? 1.5
-            : srdcPhase === 'departure'
-              ? 0.45
-              : srdcPhase === 'restatement'
-                ? 1.15
-                : 1.0;
+        srdcPhase === 'conclusion' ? 1.5 : srdcPhase === 'departure' ? 0.45 : 1.0;
 
     // Optimization: Pre-compute chord tones into a bitmask to avoid O(N) .some() checks and closure creation in hot loop
     let chordMask = 0;
@@ -1099,6 +1121,49 @@ export function selectPitchAndDevices(
         // top is what lifts the *pair-rate* metric the critique enforces.
         if (lastWasChromaticNeighbor && isChordTone) {
             weight *= 12.0;
+        }
+
+        // --- SRDC Restatement Contour Echo (final-stage multiplier) ---
+        // why: a Restatement should re-trace the Statement's melodic shape so
+        // it audibly *confirms* the idea rather than playing a fresh line over
+        // the echoed rhythm grid. The rhythm engine (buildRestatementEchoPlan)
+        // already replays the attack grid; here we echo the *contour*.
+        // Applied as a final-stage `weight *= mult` per CLAUDE.md "final-stage
+        // multipliers win" — chord-tone bonus (+150/+300), scale-tone boost,
+        // strong-beat anchors, and the dist<=2 ×1.5 all push the pitch line
+        // their own way; an additive contour bonus gets washed out (see
+        // feedback_weight_tuning_multiplier_placement).
+        //
+        // "Looser landings" — the directional bias is the load-bearing cue,
+        // the exact pitch class is a soft secondary nudge:
+        //   • interval-direction match (up/down vs the Statement note): ×3.4.
+        //     This is the primary echo signal — re-tracing the shape. It has
+        //     to be this strong because it competes with the dist<=2 ×1.5
+        //     stepwise pull, chord-tone bonuses (+150/+300 additive), and the
+        //     dynamic-center pull, all of which can favor a wrong-direction
+        //     candidate; an earlier ×1.6 produced only a ~48% contour match
+        //     (still a clear +18pt over baseline, but weak as an echo).
+        //   • wrong-direction motion: ×0.45 — strongly discourage, don't
+        //     forbid (a real paraphrase still drifts).
+        //   • exact pitch-class match: a gentle extra ×1.3 on top. Enough to
+        //     tip otherwise-equal candidates toward the literal Statement
+        //     pitch, not enough to hard-lock it (a real player paraphrasing
+        //     lands *near*, not always *on*, the original note).
+        // Net swing between a contour-matching and a contour-fighting
+        // candidate is ×3.4 vs ×0.45 ≈ 7.5× — a firm shape bias that still
+        // lets chord-tone/strong-beat anchors win individual landings.
+        if (isRestatementEcho) {
+            if (responseDirection !== 0) {
+                const motionDirection = Math.sign(m - lastMidi);
+                if (motionDirection === responseDirection) {
+                    weight *= 3.4;
+                } else if (motionDirection !== 0) {
+                    weight *= 0.45;
+                }
+            }
+            if (responsePitchClass !== null && pc === responsePitchClass) {
+                weight *= 1.3;
+            }
         }
 
         // --- Chromatic Neighbor Rarity Penalty (final-stage multiplier) ---

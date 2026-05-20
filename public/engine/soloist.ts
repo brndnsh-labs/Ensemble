@@ -84,6 +84,7 @@ export function resetSoloistState(state: EnsembleState): void {
     context.lastInterval = null;
     context.signature = null;
     context.responseSignature = null;
+    context.restatementEcho = null;
     context.responseMode = 'free';
     context.responseSource = 'free';
     context.sectionLabel = null;
@@ -627,13 +628,31 @@ function preparePhraseResponseContext(
         nextRole === 'response' ? (loopCount <= 1 ? 'paraphrase' : 'development') : 'free'; // @worker-mutation
     soloist.session.currentPhrase.context.sectionLabel = sectionContext.label; // @worker-mutation
     soloist.session.currentPhrase.context.sectionOccurrence = sectionContext.occurrence; // @worker-mutation
-    soloist.session.currentPhrase.context.srdcState = deriveSrdcPhase(
-        sectionContext,
-        step,
-        stepsPerMeasure,
-    ); // @worker-mutation
 
+    // SRDC Restatement motif-echo (Epic 11 S4). `srdcState` still holds the
+    // PREVIOUS phrase's phase at this point — capture it before the overwrite
+    // so we can detect a Statement→Restatement transition. `context.signature`
+    // was just refreshed by commitTrackedPhraseSignature above and now holds
+    // the just-finished phrase's signature.
+    const previousSrdcPhase = soloist.session.currentPhrase.context.srdcState;
     const lastSignature = soloist.session.currentPhrase.context.signature;
+    const nextSrdcPhase = deriveSrdcPhase(sectionContext, step, stepsPerMeasure);
+    soloist.session.currentPhrase.context.srdcState = nextSrdcPhase; // @worker-mutation
+
+    // why: a Restatement is the player saying "yeah, I meant that" — it should
+    // ECHO the Statement's rhythm + contour, not generate a fresh idea. We only
+    // arm the echo when the *immediately prior* phrase was a Statement and it
+    // produced a usable signature (≥3 notes — a phrase shorter than that has no
+    // contour worth echoing). The rhythm engine reuses this signature's attack
+    // grid; the pitch picker reuses its contour directions with looser landings
+    // (see soloist-pitch-engine.ts srdcChordToneMult). Cleared on every other
+    // transition so a stale echo never leaks into a non-Restatement phrase.
+    soloist.session.currentPhrase.context.restatementEcho =
+        nextSrdcPhase === 'restatement' &&
+        previousSrdcPhase === 'statement' &&
+        (lastSignature?.notes?.length ?? 0) >= 3
+            ? lastSignature
+            : null; // @worker-mutation
     const formArcSignature = formArcCandidate?.signature || null;
     let responseSignature: any = null;
     let responseSource: PhraseResponseSource = 'free';

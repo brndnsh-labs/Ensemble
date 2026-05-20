@@ -114,6 +114,7 @@ export const soloist = deepSignal<SoloistState>({
                 sectionLabel: null,
                 sectionOccurrence: 0,
                 srdcState: 'statement',
+                restatementEcho: null,
             },
         },
         memory: {
@@ -397,6 +398,7 @@ export function instrumentReducer(action: Action): boolean {
             cpCtx.sectionLabel = null;
             cpCtx.sectionOccurrence = 0;
             cpCtx.srdcState = 'statement';
+            cpCtx.restatementEcho = null;
             mem.recentNotes = [];
             mem.hookBuffer = [];
             mem.sharedHookBuffer = [];

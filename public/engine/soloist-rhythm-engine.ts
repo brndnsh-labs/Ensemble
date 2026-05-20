@@ -163,6 +163,101 @@ function buildResponsePlanFromSignature(
     return [...deduped.values()].sort((a, b) => a.stepTarget - b.stepTarget);
 }
 
+/**
+ * SRDC Restatement motif-echo (Epic 11 S4).
+ *
+ * Builds the Restatement phrase's rhythm plan as a near-verbatim echo of the
+ * preceding Statement's signature: same attack grid (`stepOffset`), same
+ * duration shape, same velocity contour. This is deliberately NOT the
+ * call/response paraphrase path — a Restatement confirms an idea, it does not
+ * answer it, so there is no delay/echo/compress transform and no probabilistic
+ * note-dropping. The build is fully deterministic (no `Math.random()`): the
+ * same Statement always echoes the same way, keeping looped playback and the
+ * critique suite coherent.
+ *
+ * "Looser landings" live on the *pitch* side (soloist-pitch-engine.ts relaxes
+ * the chord-tone multiplier for Restatement); here we faithfully reproduce the
+ * rhythm and hand the picker each source note's contour direction +
+ * pitch-class so the melodic shape is echoed too.
+ */
+function buildRestatementEchoPlan(
+    startStep: number,
+    activeSteps: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    intensity: number,
+    signature: any,
+): any[] {
+    if ((signature?.notes?.length ?? 0) === 0) {
+        return [];
+    }
+    const echoNotes = signature.notes
+        .map((sourceNote: any, index: number) => {
+            const stepOffset = Math.max(0, Math.round(sourceNote.stepOffset || 0));
+            if (stepOffset >= activeSteps) {
+                return null;
+            }
+            const stepTarget = startStep + stepOffset;
+            const durationSteps = Math.max(1, Math.round(sourceNote.durationSteps || 1));
+            const strength = getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat);
+            // why: echo the Statement's velocity contour verbatim, only nudged
+            //   by the live band intensity (±8% — same coefficient the
+            //   call/response builder uses) so the Restatement still breathes
+            //   with the section's energy. The 0.45-1.25 clamp matches the
+            //   response-plan builder so a loud Statement note doesn't peg.
+            const velocity = Math.min(
+                1.25,
+                Math.max(0.45, (sourceNote.velocity || 0.72) + intensity * 0.08),
+            );
+            return {
+                stepTarget,
+                velocity,
+                isStrongBeat: strength.isStrongBeat,
+                durationSteps,
+                isSustained: durationSteps > 1,
+                vibrato: durationSteps >= stepsPerBeat,
+                tripletPlacement: sourceNote.tripletPlacement || null,
+                timingOffset: Number.isFinite(sourceNote.timingOffset)
+                    ? sourceNote.timingOffset
+                    : 0,
+                // Hand the picker the Statement's contour so the melodic shape
+                // is echoed, not just the rhythm. The pitch engine's
+                // `isRestatementEcho` branch (soloist-pitch-engine.ts) reads
+                // `responsePitchClass` / `responseDirection` off the rhythm
+                // node and applies them as a final-stage contour multiplier:
+                // interval direction is weighted heavier than exact pitch
+                // class, so the echo is a soft directional bias ("looser
+                // landings"), not a hard recall lock.
+                responsePitchClass: sourceNote.pitchClass,
+                responseDirection: sourceNote.direction || 0,
+                // `responseCadenceTarget` is consumed by the de-dup pass below
+                // (the cadence note survives a same-step collision). The pitch
+                // engine's `isRestatementEcho` branch deliberately does NOT
+                // read entry/cadence targets — a Restatement re-traces the
+                // whole contour, it has no special entry/cadence pitch lock.
+                responseCadenceTarget: index === signature.notes.length - 1,
+                // `responseSource: 'recent'` is the discriminator the pitch
+                // engine keys `isRestatementEcho` on — distinct from the
+                // call/response sources ('section'/'form'/'free').
+                responseSource: 'recent',
+            };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.stepTarget - b.stepTarget);
+
+    // Dedupe collisions on the same step (a Statement signature can carry two
+    // notes at one offset after octave folding); keep the cadence/strong-beat
+    // note so the echo's landings survive.
+    const deduped = new Map<number, any>();
+    for (const node of echoNotes) {
+        const existing = deduped.get(node.stepTarget);
+        if (!existing || node.responseCadenceTarget || node.isStrongBeat) {
+            deduped.set(node.stepTarget, node);
+        }
+    }
+    return [...deduped.values()].sort((a, b) => a.stepTarget - b.stepTarget);
+}
+
 export function generateRhythmPlan(
     startStep: number,
     activeSteps: number,
@@ -201,6 +296,33 @@ export function generateRhythmPlan(
         'free') as ResponseSource;
 
     let notesInPhrase = 0;
+
+    // --- SRDC Restatement motif-echo (Epic 11 S4) ---
+    // Checked BEFORE call/response mirroring: a Restatement that has captured
+    // its Statement's signature always echoes it, regardless of genre or
+    // call/response role. This is a structural SRDC behavior — the player
+    // confirming the idea — not a motivic-response feature, so it is not
+    // gated on `responseConfig.enabled` / `MOTIVIC_RESPONSE_STYLES`.
+    const restatementEcho = soloistState.session.currentPhrase.context?.restatementEcho;
+    if (
+        soloistState.session.currentPhrase.context?.srdcState === 'restatement' &&
+        (restatementEcho?.notes?.length ?? 0) >= 3
+    ) {
+        const echoPlan = buildRestatementEchoPlan(
+            startStep,
+            activeSteps,
+            stepsPerMeasure,
+            stepsPerBeat,
+            intensity,
+            restatementEcho,
+        );
+        if (echoPlan.length >= 3) {
+            return echoPlan;
+        }
+        // Fall through to the normal generation path if the echo collapsed
+        // (e.g. every offset landed past activeSteps) — better a fresh phrase
+        // than a 1-note stub.
+    }
 
     // --- Call & Response: Rhythmic Mirroring ---
     if (
