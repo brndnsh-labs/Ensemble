@@ -456,3 +456,215 @@ describe('Conductor Arc — default playback reaches >=0.5 within 16 bars (S8)',
         expect(passes).toBeGreaterThanOrEqual(27);
     });
 });
+
+// ---------------------------------------------------------------------------
+// PART 3 — Integrated conductor-driven arc.
+//
+// PART 1 pins the backbeat gate at a STATIC bandIntensity 0.35; PART 2 pins
+// the conductor ramp but never measures backbeat routing while it ramps.
+// Neither proves the two compose: that `applyGrooveOverrides` actually reads
+// the conductor's live per-tick `bandIntensity` and routes Snare throughout a
+// real playback arc. PART 3 runs ONE merged loop — conductor ramp + backbeat
+// collection on the same state object — and asserts >=80% Snare on the
+// integrated trace.
+//
+// Revert-confirm note: the overall 32-bar Snare ratio is NOT a tight guard —
+// the conductor ramps intensity clear of the old 0.4 gate within ~1.5 bars, so
+// even with the gate reverted to 0.4 the 32-bar trace still reads ~95% Snare.
+// The teeth are on the OPENING window: backbeats emitted while the conductor-
+// driven intensity is still in the [0.35, 0.4) band (the S8 listening-test
+// concern — the first bars of default playback). With the 216 gate at 0.3
+// those route Snare; reverted to 0.4 they flip to Sidestick. That window is
+// the assertion that fails on revert. It is intrinsically narrow (~3
+// backbeats) — the regression-relevant band is only 0.05 wide and the Funk
+// conductor ramp crosses it in ~1.5 bars — so the test asserts a minimum
+// window size too: a ramp retune that shrank it would fail loudly here
+// rather than silently hollow the guard.
+// ---------------------------------------------------------------------------
+
+/**
+ * Run `numBars` of Funk playback driving the conductor and the groove on a
+ * SINGLE shared state object: each step ramps `bandIntensity` via
+ * `updateAutoConductor`, and each backbeat step routes through
+ * `applyGrooveOverrides` reading that just-updated intensity.
+ *
+ * Returns the routed soundName per backbeat plus the live intensity sampled
+ * at each backbeat (for the console trace).
+ */
+async function runIntegratedFunkArc(
+    numBars: number,
+    randomImpl: () => number,
+): Promise<{ backbeats: Array<'Snare' | 'Sidestick' | 'None'>; intensityAtBackbeat: number[] }> {
+    const { updateAutoConductor } = await import('../../public/engine/conductor.js');
+
+    const mockState = makeAutoIntensityState();
+    // applyGrooveOverrides reads the same live state. creativity:true matches
+    // the PART 1 routing path the >=80% Snare claim is validated against.
+    // bandIntensity stays at the 0.35 default (set by makeAutoIntensityState) —
+    // see the opening-window note on splitTrace for why 0.35, not lower.
+    mockState.groove.creativity = true;
+    getState.mockReturnValue(mockState);
+
+    const dispatch = (type: string, payload: any) => {
+        if (type === ACTIONS.SET_BAND_INTENSITY) {
+            mockState.playback.bandIntensity = payload;
+        } else if (type === ACTIONS.UPDATE_CONDUCTOR_STATE) {
+            Object.assign(mockState.conductor, payload);
+        }
+        // TRIGGER_FILL / SET_GROOVE_SEED / UPDATE_* : noop for this trace.
+    };
+
+    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(randomImpl);
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+
+    const backbeats: Array<'Snare' | 'Sidestick' | 'None'> = [];
+    const intensityAtBackbeat: number[] = [];
+    try {
+        const totalSteps = numBars * STEPS_PER_MEASURE;
+        for (let step = 0; step < totalSteps; step++) {
+            mockState.playback.step = step;
+            if (step % STEPS_PER_MEASURE === 0) {
+                checkSectionTransition(mockState, step, STEPS_PER_MEASURE, dispatch);
+            }
+            // Ramp first, THEN route the backbeat — so the groove reads the
+            // intensity the conductor just produced for this tick.
+            updateAutoConductor(mockState, dispatch);
+
+            const info = getStepInfo(step, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+            if (!info.isBackbeat || !info.isBeatStart) {
+                continue;
+            }
+            const params = {
+                step,
+                inst: { name: 'Snare', muted: false, steps: [] },
+                stepVal: 0,
+                playback: mockState.playback,
+                groove: mockState.groove,
+                isDownbeat: info.isMeasureStart,
+                isPulse: info.isPulse,
+                isBeatStart: info.isBeatStart,
+                isBackbeat: info.isBackbeat,
+                isGroupStart: info.isGroupStart,
+                isOffbeat: info.isOffbeat,
+                isEOfBeat: info.isEOfBeat,
+                isAOfBeat: info.isAOfBeat,
+                beatIndex: info.beatIndex,
+                tsConfig: info.tsConfig,
+            };
+            const result = applyGrooveOverrides(mockState, params);
+            intensityAtBackbeat.push(mockState.playback.bandIntensity);
+            if (!result.shouldPlay) {
+                backbeats.push('None');
+            } else if (result.soundName === 'Sidestick') {
+                backbeats.push('Sidestick');
+            } else {
+                backbeats.push('Snare');
+            }
+        }
+    } finally {
+        randomSpy.mockRestore();
+        nowSpy.mockRestore();
+    }
+
+    return { backbeats, intensityAtBackbeat };
+}
+
+describe('Funk Backbeat Presence — integrated conductor-driven arc (S8 PART 3)', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    // The opening window is the [0.35, 0.4) intensity band — where reverting
+    // the S8 gate (216: `intensity > 0.3`) back to `> 0.4` actually flips
+    // routing. The band's bounds are NOT arbitrary:
+    //   - lower 0.35: funk.ts:255 "low-intensity fallback" re-routes any
+    //     full-velocity backbeat below 0.35 to Sidestick regardless of the
+    //     216 gate, so below 0.35 Sidestick is *correct* and the 216-gate
+    //     revert is invisible. 0.35 is the effective Snare threshold.
+    //   - upper 0.4: at >= 0.4 the OLD gate (`> 0.4`-ish) would also pass, so
+    //     a revert no longer flips routing there.
+    // Only inside [0.35, 0.4) does the gate value decide Snare vs Sidestick.
+    const splitTrace = (
+        backbeats: Array<'Snare' | 'Sidestick' | 'None'>,
+        intensityAtBackbeat: number[],
+    ) => {
+        const openingPlayed: Array<'Snare' | 'Sidestick'> = [];
+        for (let i = 0; i < backbeats.length; i++) {
+            const v = intensityAtBackbeat[i];
+            if (v >= 0.35 && v < 0.4 && backbeats[i] !== 'None') {
+                openingPlayed.push(backbeats[i] as 'Snare' | 'Sidestick');
+            }
+        }
+        const snareCount = backbeats.filter((b) => b === 'Snare').length;
+        const sidestickCount = backbeats.filter((b) => b === 'Sidestick').length;
+        const playedCount = snareCount + sidestickCount;
+        return {
+            openingPlayed,
+            openingSnare: openingPlayed.filter((b) => b === 'Snare').length,
+            snareCount,
+            sidestickCount,
+            playedCount,
+            snareRatio: playedCount > 0 ? snareCount / playedCount : 0,
+        };
+    };
+
+    it('routes every opening-window backbeat to Snare across a 32-bar conductor arc', async () => {
+        const { backbeats, intensityAtBackbeat } = await runIntegratedFunkArc(32, () => 0.5);
+        const m = splitTrace(backbeats, intensityAtBackbeat);
+
+        console.log('\n--- FUNK BACKBEAT PRESENCE — INTEGRATED CONDUCTOR ARC ---');
+        console.log(`[Bars]                32 (conductor-driven, not static)`);
+        console.log(`[Initial intensity]   0.35 -> conductor ramps per tick`);
+        console.log(
+            `[Intensity range]     ${Math.min(...intensityAtBackbeat).toFixed(2)} -> ${Math.max(...intensityAtBackbeat).toFixed(2)}`,
+        );
+        console.log(`[Backbeats played]    ${m.playedCount}/${backbeats.length}`);
+        console.log(
+            `[Opening window]      ${m.openingSnare}/${m.openingPlayed.length} Snare (intensity [0.35, 0.4))`,
+        );
+        console.log(`[Snare ratio]         ${(m.snareRatio * 100).toFixed(1)}% (Target: >=80%)`);
+        console.log('---------------------------------------------------------\n');
+
+        expect(m.playedCount).toBeGreaterThan(0);
+        // The opening window must hold at least 3 backbeats (the count at the
+        // current Funk ramp rate). A floor, not `> 0`: a ramp retune that
+        // shrank the window would fail HERE — loudly — instead of quietly
+        // leaving a near-vacuous guard.
+        expect(m.openingPlayed.length).toBeGreaterThanOrEqual(3);
+        // Teeth: every backbeat the conductor emits while intensity is still in
+        // the [0.35, 0.4) band routes Snare. This is what the 216 gate revert
+        // (0.3 -> 0.4) breaks, and it proves the groove reads the live
+        // conductor-driven intensity, not a stale value.
+        expect(m.openingSnare).toBe(m.openingPlayed.length);
+        // Smoke: the integrated 32-bar trace stays >=80% Snare overall (S8).
+        expect(m.snareRatio).toBeGreaterThanOrEqual(0.8);
+    });
+
+    it('reliability sweep: >=27/30 seeds route every opening backbeat to Snare', async () => {
+        const SEEDS = Array.from({ length: 30 }, (_, i) => 0xabcd0000 + i * 0x101);
+        let passes = 0;
+        const openingShares: number[] = [];
+        for (const seed of SEEDS) {
+            const prng = makeMulberry32(seed);
+            const { backbeats, intensityAtBackbeat } = await runIntegratedFunkArc(32, prng);
+            const m = splitTrace(backbeats, intensityAtBackbeat);
+            openingShares.push(
+                m.openingPlayed.length > 0 ? m.openingSnare / m.openingPlayed.length : 0,
+            );
+            // A seed passes only if the opening window exists AND every opening
+            // backbeat routed Snare.
+            if (m.openingPlayed.length > 0 && m.openingSnare === m.openingPlayed.length) {
+                passes++;
+            }
+        }
+        console.log('\n--- INTEGRATED ARC RELIABILITY SWEEP ---');
+        console.log(`[Seeds]              30 (mulberry32)`);
+        console.log(`[Passes]             ${passes}/30 (Target: >=27/30)`);
+        console.log(
+            `[Opening Snare mean] ${((openingShares.reduce((a, b) => a + b, 0) / openingShares.length) * 100).toFixed(1)}%`,
+        );
+        console.log('-----------------------------------------\n');
+
+        expect(passes).toBeGreaterThanOrEqual(27);
+    });
+});
