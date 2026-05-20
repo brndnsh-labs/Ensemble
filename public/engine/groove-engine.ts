@@ -277,7 +277,10 @@ export function applyGrooveOverrides(
             // keeps whatever the genre strategy decided. At intensity < 0.45 we leave the
             // Open lane to its strategy default — no crash on a quiet intro return.
             currentState.shouldPlay = true;
-            currentState.soundName = 'Crash';
+            // why: epic-deferred-followups S8(b) — splash the genre's declared
+            // accent cymbal (Metal → China) on the post-turnaround boundary.
+            // Default 'Crash' preserves every other genre's behavior.
+            currentState.soundName = config.accentCymbal ?? 'Crash';
             currentState.velocity = 1.2;
         }
     }
@@ -296,7 +299,10 @@ export function applyGrooveOverrides(
                 // the duplicate-Crash artifact cumulatively dominated a song with an active
                 // soloist. The HiHat lane stays on whatever the strategy chose.
                 currentState.shouldPlay = true;
-                currentState.soundName = 'Crash';
+                // why: S8(b) — crash-catch accents use the genre's declared
+                // accent cymbal (Metal → China) so a soloist peak on a metal
+                // section splashes China, consistent with the boundary block.
+                currentState.soundName = config.accentCymbal ?? 'Crash';
                 currentState.velocity = 1.25;
             }
         } else if (accent.type === 'snare-stab') {

@@ -15,6 +15,11 @@ export const config = {
     entropyMultiplier: 0.05, // Rock solid precision
     blockAdjacentSnare: false,
     backbeatCrack: true,
+    // why: S8(b) — Metal already splashes China on downbeats at high intensity
+    // (see the Crash branch ~line 171); the post-turnaround section-boundary
+    // accent + soloist crash-catch should match that voice rather than dropping
+    // to a plain Crash. Shred inherits this via `...Metal.config`.
+    accentCymbal: 'China' as 'Crash' | 'China',
 };
 
 /**

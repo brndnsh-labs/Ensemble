@@ -112,6 +112,14 @@ export const DEFAULT_CONFIG = {
     dillaFeel: false,
     backbeatCrack: false,
     isLatin: false,
+    // why: epic-deferred-followups S8(b) — the post-turnaround section-boundary
+    // splash + soloist crash-catch hard-coded `'Crash'`. On Metal at high
+    // intensity the genre already splashes China on every downbeat (metal.ts
+    // line ~171) but reverted to a plain Crash on the strongest accent, which
+    // is the wrong cymbal for the section. Genre strategies declare the accent
+    // cymbal here; groove-engine.ts reads `config.accentCymbal` for both the
+    // section-boundary and crash-catch blocks. Default 'Crash' = legacy.
+    accentCymbal: 'Crash' as 'Crash' | 'China',
 };
 
 function pickBySeed(seed: number, picks: ([number, number] | number)[]): number {
