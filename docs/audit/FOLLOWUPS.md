@@ -164,6 +164,10 @@ All seven items promoted on 2026-05-19 and shipped via Epic 10 / S1 sub-item com
 - **Dead role-switch arms in `conductor.ts`** → Epic 10 / S1 (conductor) ✅ (also patched the companion switch in `tick-logic.ts:642-668`)
 - **Hype Man branch never fires in either of its test fixtures** → Epic 9 / S6 ✅ (shipped 2026-05-19; gate ceiling was below the scrambleHash quantile for the common test seed after the May 2026 Math.random→scrambleHash migration — Loop 0 raised to 1.0, Loop 1+ to `0.2 + bandIntensity * 0.4`).
 
+### New (post-2026-05-19)
+
+- **`CoordinationContext` interface does not declare the S1 lookahead/drop fields.** `tick-logic.ts` writes `upcomingSectionLabel`, `upcomingSectionEnergyDelta`, `barsUntilSectionChange`, `dropMuteActive`, `dropCrashPending` via `(coordination as any).field = …` and consumers read them the same way. This follows the pre-existing `(coordination as any)` pattern across the whole file (`tick-logic.ts:68` types `coordination: any`), so it is consistent debt, not new — but declaring the five fields on the `CoordinationContext` interface in `coordination-engine.ts` would give `drop-mechanic.ts` + the future Epic 11 S2 rock-push real type safety. Best done as part of a broader `coordination: any` → typed sweep, not piecemeal. ~30min for the five fields alone. *Source: Epic 11 S1 review (state-discipline-reviewer, 2026-05-20).*
+
 **New entries surfaced during Epic 10 S1:**
 
 - **Two pre-existing unit-test failures unrelated to S1 cycle.** `tests/unit/engine/hiphop-integrity.test.ts` — "should route phrase-release open accents through the open lane" (line 166); `tests/unit/engine/metal-shred-integrity.test.ts` — "should play Blast Beat at high intensity (coverage for lines 127-132)". Both failures confirmed pre-existing by checking out `33374236` (cycle-start HEAD) and re-running; they fail there too. Likely drift from a recent groove change that wasn't caught by the test suite at commit time, OR fixtures grew stale. Not blocking; not in S1 scope. ~30min each to diagnose. *Source: Epic 10 S1 sweep (2026-05-19).*

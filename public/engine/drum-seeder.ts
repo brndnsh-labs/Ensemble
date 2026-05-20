@@ -68,15 +68,25 @@ export function generateDrumOrchestration(
                 normalized.includes('breakdown')
             );
         });
+        // why: epic-deferred-followups S1(b) — a "Drop" is the energy PEAK of
+        // the form (form-analysis.ts maps drop=1.0 vs chorus=0.9), not a plain
+        // chorus. Aliasing `drop`→`Chorus` here erased that. Give Drop its own
+        // role so the energy boost reflects the label; ride/snare/motif still
+        // mirror Chorus (a drop drum part IS a maxed-out chorus drum part).
+        // "breakdown" is intentionally NOT routed to a peak role — it is the
+        // energy FLOOR (form-analysis.ts maps breakdown=0.3); it falls through
+        // to Verse / the low-energy gates below, which is musically correct.
         const role = label.includes('intro')
             ? 'Intro'
-            : label.includes('chorus') || label.includes('drop')
-              ? 'Chorus'
-              : label.includes('outro') || label.includes('end')
-                ? 'Outro'
-                : label.includes('bridge')
-                  ? 'Bridge'
-                  : 'Verse';
+            : label.includes('drop')
+              ? 'Drop'
+              : label.includes('chorus')
+                ? 'Chorus'
+                : label.includes('outro') || label.includes('end')
+                  ? 'Outro'
+                  : label.includes('bridge')
+                    ? 'Bridge'
+                    : 'Verse';
 
         // 1. Calculate Section Energy Level
         let energyLevel = intensity;
@@ -86,14 +96,25 @@ export function generateDrumOrchestration(
         if (role === 'Chorus') {
             energyLevel += 0.2;
         }
+        // why: a Drop is the energy ceiling of the form (form-analysis.ts:
+        // drop=1.0 vs chorus=0.9). +0.3 lifts it above Chorus's +0.2 so the
+        // seeder's energy-gated decisions (motif complexity, ride wash) reflect
+        // "this is the biggest section." Note `energyLevel` is clamped to 1.0
+        // below, so the boost only separates Drop from Chorus in the mid
+        // intensity band (~0.5–0.7); above that both saturate at the ceiling.
+        if (role === 'Drop') {
+            energyLevel += 0.3;
+        }
         if (role === 'Outro') {
             energyLevel -= 0.3;
         }
         energyLevel = Math.max(0.1, Math.min(1.0, energyLevel));
 
         // 2. Select Ride Voice
+        // why: Drop shares Chorus's ride logic — a drop drum part is a maxed-out
+        // chorus part, so the same energy-gated Ride/Open selection applies.
         let rideVoice = 'HiHat-Closed';
-        if (role === 'Chorus') {
+        if (role === 'Chorus' || role === 'Drop') {
             const r = prng();
             // At higher intensities, prefer ride definition over fully open wash.
             if (energyLevel > 0.82) {

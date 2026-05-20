@@ -75,8 +75,13 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 // Mock form analysis
+// why: tick-logic.ts (reached transitively via midi-worker-logic) now imports
+// `getSectionEnergy` for the S1 section-boundary lookahead. The mock must export
+// it or the export path throws on `undefined()`. A flat 0.5 is fine here — this
+// test exercises velocity clamping, not section energy.
 vi.mock('../../../public/form-analysis.js', () => ({
     analyzeForm: vi.fn(() => ({ sequence: 'A', sections: [] })),
+    getSectionEnergy: vi.fn(() => 0.5),
 }));
 
 import { getState } from '../../../public/state.js';

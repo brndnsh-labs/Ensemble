@@ -274,6 +274,58 @@ export function createCoordinationContext(
         // on the first tick before the soloist producer has written.
         soloistResting: true,
         soloistNotesInPhrase: 0,
+        // why: epic-deferred-followups S1(a) — section-boundary lookahead.
+        // `upcomingSectionFirstChord` (above) already publishes WHICH chord
+        // the next section opens on; these three fields publish the surrounding
+        // STRUCTURAL context so the conductor / engines can anticipate a section
+        // change rather than hit it cold:
+        //
+        //   - `upcomingSectionLabel`: the raw label of the next section
+        //     (e.g. "Drop", "Breakdown", "Chorus"). null when the next section
+        //     can't be resolved (no sectionMap, or the chart is single-section).
+        //   - `upcomingSectionEnergyDelta`: `getSectionEnergy(next) -
+        //     getSectionEnergy(current)` from form-analysis.ts's energy map
+        //     (drop=1.0, breakdown=0.3, chorus=0.9, verse=0.5, …). A large
+        //     positive delta means "the band is about to lift hard"; a large
+        //     negative delta means "about to drop to a breakdown." 0 when the
+        //     next label is unknown.
+        //   - `barsUntilSectionChange`: whole measures remaining until the
+        //     section boundary. 0 means "we are IN the last bar before the
+        //     change." -1 is the sentinel for "no upcoming change resolvable"
+        //     (matches the upcomingSectionFirstChord null contract — both are
+        //     only populated in the last measure of a section).
+        //
+        // S1(b)'s Drop/Breakdown mechanic and S2's section-gated rock push
+        // both consume these. Defaults (null / 0 / -1) mean "no lookahead
+        // signal" so consumers can gate cleanly without an undefined check.
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        upcomingSectionLabel: null as string | null,
+        upcomingSectionEnergyDelta: 0,
+        barsUntilSectionChange: -1,
+        // why: epic-deferred-followups S1(b) — Drop/Breakdown structural mechanic.
+        // A drop is not a loud chorus; it is a STRUCTURAL EVENT — the band cuts
+        // for one bar, a crash marks the gap, then everyone slams back on the
+        // next downbeat. These two flags carry that event band-wide:
+        //
+        //   - `dropMuteActive`: true for every step of the 1-bar pre-drop mute
+        //     window (the LAST bar before a drop/breakdown section). When true,
+        //     bass / chords / harmony / soloist emit nothing — the cut. Drums
+        //     are exempt (they carry the crash).
+        //   - `dropCrashPending`: true ONLY on the downbeat (first step) of the
+        //     mute bar. The drum layer fires a single Crash here to mark the
+        //     gap; the rest of the bar is silent across all engines.
+        //
+        // The mute is exactly 1 bar — long enough for the cut to register as
+        // intentional, short enough that the slam-back still feels like the
+        // same phrase. Both default false (no drop pending). Genre-gated to
+        // high-energy styles (Rock/Metal/Shred/Hip-Hop/Disco/Ska-Punk) — a
+        // drop cut is idiomatic there and alien to jazz/bossa/acoustic.
+        //
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        dropMuteActive: false,
+        dropCrashPending: false,
     };
 }
 

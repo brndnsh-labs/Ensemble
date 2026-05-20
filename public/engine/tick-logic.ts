@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import { getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import {
     binarySearchMap,
@@ -19,6 +20,7 @@ import {
     isTensionChordForSoloist,
     updateCoordinationContext,
 } from './coordination-engine.js';
+import { shouldFireDropMute } from './drop-mechanic.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { getSoloistNote } from './soloist.js';
@@ -146,7 +148,64 @@ export function generateNotesForStep(
             );
             if (nextSectionChordData?.chord) {
                 (coordination as any).upcomingSectionFirstChord = nextSectionChordData.chord;
+
+                // --- Section-boundary lookahead (epic-deferred-followups S1(a)) ---
+                // why: `upcomingSectionFirstChord` only tells engines WHICH chord
+                // the next section opens on. The conductor / drop mechanic also
+                // need the STRUCTURAL context: which section, how much louder, and
+                // how many bars away. We publish all three here — pure functions
+                // of the lookahead chord — so no producer re-derives them. They
+                // are only meaningful in the last measure of a section (the same
+                // window `upcomingSectionFirstChord` is populated in), hence the
+                // shared `remainingSteps <= stepsPerMeasure` guard.
+                const upcomingLabel = (nextSectionChordData.chord as any)?.sectionLabel ?? null;
+                (coordination as any).upcomingSectionLabel = upcomingLabel;
+                // why: energy delta uses form-analysis.ts's 0..1 SECTION_ENERGY_MAP
+                // (drop=1.0, breakdown=0.3, chorus=0.9, …). A large positive delta
+                // means "the band is about to lift hard"; the drop mechanic and
+                // S2's rock push both gate on it.
+                (coordination as any).upcomingSectionEnergyDelta =
+                    getSectionEnergy(upcomingLabel) -
+                    getSectionEnergy((currentChord as any)?.sectionLabel);
+                // why: whole measures remaining until the boundary. `remainingSteps`
+                // is steps until `sectionEnd`; floor-dividing by `stepsPerMeasure`
+                // and subtracting the trailing partial bar gives "0 = we are IN the
+                // last bar before the change." Clamped at 0 — when the lookahead is
+                // available we are by construction within the final measure.
+                (coordination as any).barsUntilSectionChange = Math.max(
+                    0,
+                    Math.floor((remainingSteps - 1) / stepsPerMeasure),
+                );
             }
+        }
+
+        // --- Drop / Breakdown structural mechanic (epic-deferred-followups S1(b)) ---
+        // why: FOLLOWUPS §A (DECIDED 2026-05-20: build the real mechanic). When a
+        // drop/breakdown section is approaching, the band CUTS for the last bar
+        // before the boundary (a single crash marks the gap) and SLAMS back on the
+        // drop's downbeat. `shouldFireDropMute` owns the genre gate + energy-delta
+        // threshold; here we translate "this is a cut bar" into the two band-wide
+        // flags the producers read. The mute spans the whole cut bar; the crash
+        // fires only on its downbeat.
+        //
+        // The producer call-sites below (soloist/bass/chords/harmony) check
+        // `dropMuteActive` and skip emission entirely — a uniform 1-bar silence,
+        // unlike the staggered per-engine intro/outro mutes. Drums are exempt:
+        // the drum block emits the marking Crash on `dropCrashPending`.
+        if (
+            shouldFireDropMute(
+                groove.genreFeel,
+                (coordination as any).barsUntilSectionChange,
+                (coordination as any).upcomingSectionLabel,
+                (coordination as any).upcomingSectionEnergyDelta,
+            )
+        ) {
+            (coordination as any).dropMuteActive = true;
+            // why: the crash marks the START of the empty bar — fire it on the
+            // measure downbeat only, then leave the rest of the bar silent.
+            (coordination as any).dropCrashPending = stepInfo
+                ? stepInfo.isMeasureStart
+                : step % stepsPerMeasure === 0;
         }
 
         // --- Section-occurrence publication (epic-form-arrangement S2) ---
@@ -273,7 +332,41 @@ export function generateNotesForStep(
 
     let fillPlayed = false;
 
-    if (groove.fillActive) {
+    // --- Drop / Breakdown cut bar (epic-deferred-followups S1(b)) ---
+    // why: during the 1-bar pre-drop mute the drums also cut — the ONLY
+    // percussion event is a single Crash on the downbeat marking the empty
+    // bar. We branch BEFORE the fill / pattern logic so a scheduled fill or
+    // the base groove cannot smuggle hits into the cut bar. `kickHit` /
+    // `snareHit` stay false (already their defaults) so any consumer reading
+    // them sees the silence honestly. Drum genres that are drop-friendly only
+    // — `shouldFireDropMute` already gated `dropMuteActive` on genre.
+    const dropMuteActive = (coordination as any).dropMuteActive === true;
+    if (dropMuteActive) {
+        if (includeDrums && (coordination as any).dropCrashPending === true) {
+            const crashInst = groove.instruments.find((i) => i.name === 'Crash') || {
+                name: 'Crash',
+                muted: false,
+            };
+            if (!crashInst.muted) {
+                drumHits.push({
+                    shouldPlay: true,
+                    // why: 1.1 — the same value as the fill-transition crash
+                    // (line ~370). The cut bar is otherwise SILENT, so the
+                    // gesture reads from the void around the crash, not from a
+                    // velocity nudge; a transition crash already sits at the top
+                    // of the kit's dynamic range and a crash into silence needs
+                    // no extra push to land.
+                    velocity: 1.1,
+                    soundName: 'Crash',
+                    instTimeOffset: 0,
+                    inst: crashInst,
+                });
+            }
+        }
+        fillPlayed = true; // suppress the base pattern + any scheduled fill below
+    }
+
+    if (!dropMuteActive && groove.fillActive) {
         const fillStep = step - (groove.fillStartStep || 0);
 
         if (fillStep >= 0 && fillStep < (groove.fillLength || 0)) {
@@ -397,8 +490,14 @@ export function generateNotesForStep(
     }
 
     // 2. Soloist Generation (High Priority)
+    // why (`!dropMuteActive`): epic-deferred-followups S1(b) — the drop cut bar
+    // is a uniform band-wide silence. Soloist/bass/chords/harmony all skip
+    // emission for the whole bar; only the drum Crash (above) sounds. We gate
+    // at the producer call-site rather than inside each engine because the cut
+    // is uniform (unlike the staggered per-engine intro/outro mutes), so a
+    // single tick-logic gate is the honest single point of truth.
     let soloResult: any = null;
-    if (includeSoloist) {
+    if (includeSoloist && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
@@ -459,7 +558,8 @@ export function generateNotesForStep(
     }
 
     // 3. Bass Generation (Yields to Soloist, Locks to Kick)
-    if (includeBass) {
+    // `!dropMuteActive`: see the soloist gate above — S1(b) drop cut bar.
+    if (includeBass && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
             if (isBassActive(state, bass.style, step, stepInChord, stepInfo, coordination)) {
@@ -504,7 +604,8 @@ export function generateNotesForStep(
     }
 
     // 4. Chords Generation (Yields Density to Soloist)
-    if (includeChords) {
+    // `!dropMuteActive`: see the soloist gate above — S1(b) drop cut bar.
+    if (includeChords && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
             const chordNotes = getAccompanimentNotes(
@@ -531,7 +632,8 @@ export function generateNotesForStep(
     }
 
     // 5. Harmony Generation (Yields to All)
-    if (includeHarmony) {
+    // `!dropMuteActive`: see the soloist gate above — S1(b) drop cut bar.
+    if (includeHarmony && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
