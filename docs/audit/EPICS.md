@@ -32,8 +32,9 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 | 9 | [Coordination & Consistency Sweep](epic-coordination-consistency.md) | no | 6 | 6 | Post-audit promotion of FOLLOWUPS §B/§C/§D + one live bug (§G). Multi-item sweep stories: coord-consumption (register seam + harmony channel; soloist-driven reactions); cross-engine consistency (altered-dom, slash-chord, bendStartInterval); native-style chromatic leading tones (narrowed to rock-only — country already done; pop/soul/gospel non-styles); multiplier hardening; Hype Man dead branch. S1 (a+b) + S2 (a+b) + S3 (a+b+c) + S4 + S5 (a+b+c) + S6 shipped 2026-05-19. **Complete.** |
 | 10 | [Schema & Test Cleanup](epic-schema-test-cleanup.md) | no | 3 | 3 | Post-audit promotion of FOLLOWUPS §F/§G. Multi-item sweep stories: schema cleanup (naming, dead carriers, conductor arms); test rigor — soloist (5 metric reshapes); test rigor — harmony/drums/conductor (8 items). S1 (a+b+c+d+e+f+conductor) shipped 2026-05-19; S2 (a+b+c+d+e — soloist test rigor) shipped 2026-05-19; S3 (a+b+c+e+f+g+h shipped, d deferred-by-design) shipped 2026-05-19. **Complete.** |
+| 11 | [Deferred Follow-ups & Product-Decision Backlog](epic-deferred-followups.md) | no | 9 | 0 | Post-audit promotion of FOLLOWUPS §A–§G remainder + TECH_DEBT #2. S1–S4 implement the four 2026-05-20 product decisions (drop/breakdown mechanic; open-jam macro-arc; SRDC Restatement; rock push). S5 micro-cleanup sweep (16 items). S6–S9 medium engine follow-ups (chords/comping; soloist/bass idiom; drums; cross-engine). **Active — not started.** |
 
-**Total: 50 stories shipped (Epics 1-8) + 6 shipped (Epic 9 complete) + 3 shipped (Epic 10 complete). All epics complete — the 2026-05-16 audit cycle and its two post-audit sweep epics are fully shipped.**
+**Total: 50 stories shipped (Epics 1-8) + 6 shipped (Epic 9) + 3 shipped (Epic 10). Epics 1-10 complete. Epic 11 (9 stories) opened 2026-05-20 — post-audit follow-up backlog, in progress.**
 
 ## Phased rollout
 

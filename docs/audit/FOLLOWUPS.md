@@ -15,12 +15,14 @@ A follow-up that's been sitting here for >2 months without being touched is sign
 
 ---
 
-## A. Product calls needed (decide before any coding)
+## A. Product calls — SETTLED 2026-05-20
 
-- **`breakdown` / `drop` semantics** — `form-arranger.md` P1 #5. Genre-dependent. Either implement as a structural mute+slam bar, or delete from the energy map. Discuss before picking up. *Source: Epic 2 Deferred.*
-- **Macro-arc grand cycle** — `form-arranger.md` P1 #5 + P2 #10/#11. `formIteration % 8` placeholder; replacing it is a product conversation, not engine work. *Source: Epic 2 Deferred.*
-- **SRDC Restatement multiplier** — `soloist.md` P1 #5. Currently ×1.15 sits inside the noise floor. Bump to ×1.3, OR refold Restatement into contour/repetition logic. Open question whether Restatement should feel pitch-wise ("I meant that") or motivic-recall rhythm-wise. *Source: Epic 4 Deferred.*
-- **Rock harmonic-anticipation push tuning** — `bass.md` P1 #8. Needs a "Stones-y vs classic 70s" feel call. *Source: Epic 5 Notes.*
+All four decided in a product-decision session. Now story-ready; promote to an epic file.
+
+- **`breakdown` / `drop` semantics** — `form-arranger.md` P1 #5. **DECIDED: build the real mechanic.** Add a 1-bar pre-drop mute + crash hit, then all engines slam back on the downbeat. Trigger when `currentSection.label` includes "drop"/"breakdown" or the next section's energy delta crosses +0.3. Genre-dependent feel — listen-test pass required (EDM/hip-hop/rock/metal). ~half-day engine story. *Source: Epic 2 Deferred.*
+- **Macro-arc grand cycle** — `form-arranger.md` P1 #5 + P2 #10/#11. **DECIDED: keep a cycle, make it musical.** Replace the rigid `formIteration % 8` fallback (`conductor.ts:421`) with a less mechanical wave for timer-less jams — longer cycle, slight per-pass randomized variation, and/or genre-aware cycle length. Still no fixed endpoint; the timer arc path is unchanged. *Source: Epic 2 Deferred.*
+- **SRDC Restatement** — `soloist.md` P1 #5. **DECIDED: confirm by echoing the motif.** Don't just bump the ×1.15 multiplier — refold Restatement into contour/repetition logic: reuse the Statement's rhythm + melodic contour with looser landings. Needs a new critique test (current SRDC test only measures Conclusion-vs-Departure). *Source: Epic 4 Deferred.*
+- **Rock harmonic-anticipation push** — `bass.md` P1 #8. **DECIDED: rare, section-boundary-gated.** Drop probability to `0.1 + intensity * 0.15` (10-25%) AND gate on section-boundary lookahead so the push mostly fires when a real section change is coming — restores it as a signpost gesture. `bass-styles.ts:432-438`. *Source: Epic 5 Notes.*
 
 ## B. Multiplier placement & architecture trade-offs
 
