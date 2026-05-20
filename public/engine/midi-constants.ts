@@ -9,6 +9,11 @@ export const DRUM_MAP: Record<string, number> = {
     Rim: 37,
     Clap: 39,
     Cowbell: 56,
+    // why: GM has no dedicated brush note; the live engine renders 'Brush' as
+    // a soft sweep on the snare voice. Side Stick (37) is the softest GM
+    // snare-family note and round-trips the gesture without spuriously
+    // triggering a hard backbeat on import.
+    Brush: 37,
     Shaker: 70,
     Clave: 75,
     Conga: 63,

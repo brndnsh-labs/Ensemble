@@ -598,6 +598,19 @@ export class ExportProcessor {
                         } else {
                             midi = (DRUM_MAP as any)['High Conga'];
                         }
+                    } else if (name.includes('Cowbell')) {
+                        // why: live drum engine (synth-drums.ts:1085-1098) emits
+                        // 'CowbellHigh'/'CowbellLow' for the disco octave-cowbell
+                        // motif (Epic 7 S2). Without this branch the variants
+                        // would fall through and silently drop from MIDI export
+                        // while still rendering in audio. GM has only one cowbell
+                        // note (56), so high/low both map to it — the per-voice
+                        // pitch shift is a synth-side effect, not a MIDI feature.
+                        midi = (DRUM_MAP as any).Cowbell;
+                    } else if (name.includes('Brush')) {
+                        // why: any 'Brush'-named variant routes to the bare
+                        // Brush mapping (Side Stick 37) — see midi-constants.ts.
+                        midi = (DRUM_MAP as any).Brush;
                     }
                 }
 
@@ -630,6 +643,13 @@ export class ExportProcessor {
                         volMultiplier = 0.5;
                     } else if (name === 'Shaker') {
                         volMultiplier = 0.45;
+                    } else if (name.includes('Cowbell')) {
+                        // matches live cowbell perceived loudness vs other perc.
+                        volMultiplier = 0.6;
+                    } else if (name.includes('Brush')) {
+                        // soft sweep — exported via Side Stick (37); damp to
+                        // avoid triggering an importer's hard-accent threshold.
+                        volMultiplier = 0.5;
                     }
 
                     const scaledVelocity = hit.velocity * volMultiplier;
