@@ -1008,11 +1008,20 @@ export function getHarmonyNotes(
     }
 
     // 2. CONTEXT OBJECT
-    // why: include `activeStyle` in the cache key — the Reggae organ-bubble
-    // (S1.b) branches the pattern on activeStyle, so a session that toggles
-    // style needs a fresh cell rather than serving the wrong-feel pattern
-    // from a prior cache hit.
-    const sectionKey = `${chord.sectionId ?? ''}|${activeStyle}`;
+    // why: key on every input that branches generateCompingPattern's body.
+    //   - feel: the top-level feel branches produce completely different
+    //     patterns (Jazz Charleston vs Funk 16ths vs Reggae bubble vs …).
+    //   - activeStyle: Reggae organ-bubble (S1.b) branches on activeStyle.
+    //   - bandIntensity tier: defensive — any future generateCompingPattern
+    //     extension that gates on intensity will need the tier in the key.
+    //   - complexity: same defensive rationale as bandIntensity tier.
+    // Without feel in the key, switching genre mid-session would serve the
+    // previous feel's pattern until the sectionId changes.
+    const intensityTier =
+        playback.bandIntensity < 0.4 ? 'lo' : playback.bandIntensity < 0.7 ? 'mid' : 'hi';
+    const complexityTier =
+        playback.complexity < 0.4 ? 'lo' : playback.complexity < 0.7 ? 'mid' : 'hi';
+    const sectionKey = `${chord.sectionId ?? ''}|${feel}|${activeStyle}|${intensityTier}|${complexityTier}`;
     if (!motifCache.has(sectionKey)) {
         const seed = Math.abs(
             chord.sectionId
