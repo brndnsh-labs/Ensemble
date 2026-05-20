@@ -323,19 +323,16 @@ describe('Soloist Jazz Critique', () => {
     // picker-specific behavior in isolation isn't possible without engine
     // instrumentation — devices and picker write to the same output stream.
     //
-    // What this test ratchets: the *combined* chromatism ratio is now reliably
-    // above 30.5% on a 512-bar Bird-profile session, which is above the
-    // un-patched ceiling. Empirically, with the picker admission gate reverted
-    // the 512-bar ratio runs 28.7-30.6% (max 30.6% in an 8-run sweep), while
-    // post-patch the same window runs 31.0-34.2% (30-run sweep, min 31.0%).
-    // The 30.5% floor leaves ~0.5pt headroom on the patched side and rejects
-    // the un-patched distribution >90% of the time — not a perfect ratchet,
-    // but a measurable one. The acceptance metric from epic-soloist-idiom.md
-    // S1 ("≥ 8% pair-rate") couldn't be enforced cleanly: device-emitted
-    // chromatic content already produces ~6-7% pair-rate baseline, leaving no
-    // headroom for a tight assertion. A picker-output-only metric needs
-    // engine instrumentation (deferred to FOLLOWUPS.md).
-    it('Bird-profile chromatism ratio is ≥ 30.5% over a 512-bar performance', () => {
+    // SUPERSEDED as the S1 ratchet by `soloist-bird-picker-chromatism.test.ts`
+    // (Epic 10 S2.c). That test surfaces the engine's test-mode `source` tag
+    // and measures the picker-emitted chromatic share IN ISOLATION — the
+    // direct S1 fix path — with ~2pt headroom on each side of the pre/post-fix
+    // gap, instead of the ~0.5pt headroom this combined metric could offer.
+    //
+    // This test is retained only as a loose COMBINED-output sanity check:
+    // picker + device chromatic content together should stay in a plausible
+    // bebop band. It is intentionally NOT the regression guard for S1.
+    it('Bird-profile combined chromatism ratio stays in a plausible bebop band (sanity check)', () => {
         const numBars = 512;
         const notes = simulatePerformance(numBars, 'bird');
 
@@ -368,12 +365,10 @@ describe('Soloist Jazz Critique', () => {
         );
 
         expect(notes.length).toBeGreaterThan(200);
-        // S1 set floor at 30.5% over an un-patched ceiling of 30.6%.
-        // S6 stripped bird's P4 (`5`) from targetExtensions because P4 is an
-        // avoid note on most chord qualities, shifting the distribution center
-        // from ~30.8% to ~30.7% with min observed 29.7% over 20 reliability
-        // runs. Floor relaxed to 29% to absorb the new variance while still
-        // detecting the S1 chromatic-neighbor admission (un-patched < 25%).
+        // Loose sanity floor only — the S1 chromatic-neighbor regression guard
+        // now lives in soloist-bird-picker-chromatism.test.ts (picker-only
+        // metric). 29% is well below the ~30.7% combined-metric center; it just
+        // catches a gross collapse of bird-profile chromatism, not an S1 revert.
         expect(chromatismRatio).toBeGreaterThanOrEqual(0.29);
     });
 

@@ -115,11 +115,11 @@ Taste-driven gestures or per-genre values still flat. Each one is a future-story
 
 Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / S3 (harmony/drums/conductor)**. One item still here.
 
-- **Deterministic-seeding of head-bypass jitter PRNG** → Epic 10 / S2 (a).
-- **Engine-wide determinism test** → Epic 10 / S2 (b).
-- **Picker-output-only chromatism metric for Epic 4 S1** → Epic 10 / S2 (c).
-- **Soloist test fixtures don't seed `Math.random`** → Epic 10 / S2 (d).
-- **Evans cadence test doesn't isolate phrase-end attacks** → Epic 10 / S2 (e).
+- **Deterministic-seeding of head-bypass jitter PRNG** → Epic 10 / S2 (a) ✅ (shipped 2026-05-19).
+- **Engine-wide determinism test** → Epic 10 / S2 (b) ✅ (shipped 2026-05-19; see new-entry note below — a no-stub determinism test remains blocked on the soloist picker).
+- **Picker-output-only chromatism metric for Epic 4 S1** → Epic 10 / S2 (c) ✅ (shipped 2026-05-19).
+- **Soloist test fixtures don't seed `Math.random`** → Epic 10 / S2 (d) ✅ (shipped 2026-05-19; `tests/utils/seeded-random.ts`).
+- **Evans cadence test doesn't isolate phrase-end attacks** → Epic 10 / S2 (e) ✅ (shipped 2026-05-19).
 - **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a).
 - **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b).
 - **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c).
@@ -133,6 +133,16 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 
 - **`instHash` for drum lanes uses bare polynomial hash.** Epic 2 S3, `groove-engine.ts`. No canonical `scrambleHash` pre-scrambling. Empirically fine, future cleanup. ~30min. *Source: Epic 2 S3 review.*
 - **`reggae-harmony-critique.test.ts` and `reggae-harmony-organ-critique.test.ts` share a near-identical 128-bar critique case.** S1.b kept both files for naming clarity (the organ-critique adds unit + non-organ regression cases the other lacks); the headline 128-bar critique is duplicated. Either fold the shared assertion into a util, or accept the duplication as cheap. ~15min. *Source: Epic 9 S1 review (2026-05-19).*
+
+**New entries surfaced during Epic 10 S2:**
+
+- **Soloist pitch picker still uses un-seeded `Math.random()`.** The S2 (b) engine-wide determinism test (`soloist-engine-determinism.test.ts`) asserts byte-reproducibility only UNDER a pinned mulberry32 spy. A no-stub determinism test is impossible today: the picker's weighted roulette (`soloist-pitch-engine.ts` ~line 1182, `Math.random() * totalWeight`), the device-trigger gates, and timing jitter all draw from un-seeded `Math.random()` — two un-stubbed 1024-step runs diverge at ~338 positions. The May 2026 `scrambleHash` migration (S4/S5) covered bass / harmonies / grooves but NOT the soloist picker. Migrating the picker roulette + device gates to a `scrambleHash` source keyed by `(barIndex, sectionId, step)` would make the soloist deterministic by construction and let the S2.b test drop the seeded-spy requirement. ~3-4h, musically sensitive (roulette seed must not correlate adjacent steps). *Source: Epic 10 S2.b (2026-05-19).*
+
+- **First-call module warm-up artifact in `getSoloistNote`.** The very first `getSoloistNote` call in a process sets module-level state that `RESET_STATE` does not clear; run #1 of a test file can differ at step 0 from runs #2+ (runs #2/#3 are identical to each other). `soloist-engine-determinism.test.ts` works around it with a discarded warm-up pass. Low impact (only step 0 of a fresh process) but the registry is dishonest — `resetSoloistState` should fully reset whatever step-0 reads. ~1h to locate and clear. *Source: Epic 10 S2.b (2026-05-19).*
+
+- **`isEvansCadence` early-exit is a weak lever.** The S2 (e) finding's premise held — the legacy Evans-cadence test passed with the guard reverted — but the deeper cause is that the `isEvansCadence` early-exit (`soloist-pitch-engine.ts` ~line 757, skip the Evans extension boost at phrase-end response attacks) shifts the phrase-end home rate only ~4.6pt (39.3% → 43.9%, 20-seed aggregate). The picker's phrase-end ×4.0 root/5th pull and `isCallResponse ×8.0` boost already dominate the ×3.5 Evans extension boost the guard suppresses. The new `soloist-evans-cadence-critique.test.ts` guards it via a 20-seed aggregate, but the headroom is intrinsically thin. If the V→I cadence at Evans phrase-ends is meant to be a stronger musical signal, the guard should additionally *boost* root/5th (not merely *skip* the extension boost). ~1-2h, needs a listen test. *Source: Epic 10 S2.e (2026-05-19).*
+
+- **`dispatch(ACTIONS.UPDATE_PLAYBACK, ...)` in `jazz-soloist-authenticity.test.ts:12` is a silent no-op.** `UPDATE_PLAYBACK` is not a real action — playback flags use `ACTIONS.SET_PARAM` with `{ module: 'playback', param, value }`. The legacy test's `beforeEach` line `dispatch(ACTIONS.UPDATE_PLAYBACK, { debugSoloist: true })` therefore never set `debugSoloist`; the file's tests don't depend on it so they still pass, but the line is misleading. Fix to `SET_PARAM` or delete. ~5min. *Source: Epic 10 S2.e (2026-05-19).*
 
 ## G. Schema cleanup & stale carriers
 

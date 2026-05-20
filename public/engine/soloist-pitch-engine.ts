@@ -316,11 +316,32 @@ export function selectPitchAndDevices(
     );
 
     // Helper to finalize note (formerly inline in getSoloistNote)
-    const finalizeNote = (res: any): any => {
+    // why: Epic 10 S2 (c)+(e) — surface a small amount of provenance ONLY
+    // when the soloist debug flag is on, so critique tests can isolate the
+    // exact engine path being guarded without bloating the production note
+    // schema. `source` distinguishes a picker-emitted attack from a
+    // device-emitted one (S2.c chromatism metric); `isPhraseEnd` echoes the
+    // rhythm engine's phrase-boundary mark so the Evans-cadence test can
+    // filter to phrase-end attacks (S2.e). Both are stripped in production
+    // (debugSoloist is false on real sessions).
+    const testModeInstrumentation = playback.debugSoloist === true;
+    const finalizeNote = (res: any, source: 'picker' | 'device'): any => {
         if (!res) {
             return null;
         }
         const primary = Array.isArray(res) ? res[res.length - 1] : res;
+
+        if (testModeInstrumentation) {
+            primary.source = source;
+            primary.isPhraseEnd = rhythmNode?.isPhraseEnd === true;
+            // isHeadBypass distinguishes a seed-tone attack routed through the
+            // head-bypass path (selectedMidi = jittered targetMidi) from a
+            // generative-picker attack at the same step (the seed note was
+            // gated and the engine fell through). The S2.a jitter-determinism
+            // test needs that distinction; a gated-then-generative attack is
+            // legitimately RNG-driven and not a jitter probe.
+            primary.isHeadBypass = isHeadBypass;
+        }
 
         soloistState.audio.lastMidiPlayed = primary.midi; // @worker-mutation
 
@@ -1300,7 +1321,7 @@ export function selectPitchAndDevices(
         if (res) {
             soloistState.session.rhythm.embellishmentBuffer = res.buffer; // @worker-mutation
             soloistState.session.phrasing.busySteps = res.busySteps; // @worker-mutation
-            return finalizeNote(res.first);
+            return finalizeNote(res.first, 'device');
         }
     }
 
@@ -1428,7 +1449,7 @@ export function selectPitchAndDevices(
             if (res) {
                 soloistState.session.rhythm.deviceBuffer = res.buffer; // @worker-mutation
                 soloistState.session.phrasing.busySteps = res.busySteps; // @worker-mutation
-                return finalizeNote(res.first);
+                return finalizeNote(res.first, 'device');
             }
         }
     }
@@ -1577,9 +1598,9 @@ export function selectPitchAndDevices(
             // But if the next rhythm plan step targets the middle of this duration, we just let it interrupt or something?
             // Actually, the rhythm plan already spaced the notes by 'gap', so the next attack is at least 'durationSteps' away.
             // So we don't need to set busySteps for regular single notes or double stops here!
-            return finalizeNote(polyResult);
+            return finalizeNote(polyResult, 'picker');
         }
     }
 
-    return finalizeNote(result);
+    return finalizeNote(result, 'picker');
 }

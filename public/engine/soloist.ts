@@ -23,6 +23,22 @@ import { getScaleForChord } from './theory-scales.js';
 
 type PhraseResponseSource = 'free' | 'form' | 'seed' | 'section' | 'recent';
 
+// mulberry32 — 32-bit scrambled hash for deterministic seeded PRNG.
+// why: the head-bypass / themed-improv jitter (Epic 4 S4) was scale-clamped
+// but still drew from un-seeded Math.random(), so the same (barIndex,
+// sectionId) replayed a different jitter sequence on every engine run —
+// looped playback drifted and critique tests couldn't assert determinism.
+// Identical to scrambleHash in bass-engine.ts (S4) / harmonies.ts (S5) /
+// groove-engine.ts; copied locally to avoid a cross-file helper refactor in
+// this story. A bare LCG correlates on small integer seeds — mulberry32's
+// avalanche keeps adjacent (barIndex, sectionId) seeds well-separated.
+const scrambleHash = (seed: number): number => {
+    let t = (seed + 0x6d2b79f5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+};
+
 const MOTIVIC_RESPONSE_STYLES = new Set([
     'blues',
     'jazz',
@@ -871,6 +887,16 @@ export function getSoloistNote(
         const results = Array.isArray(res) ? res : [res];
         const primary = results[results.length - 1];
 
+        // why: Epic 10 S2 (c) — this finalizeNote only handles embellishment /
+        // device buffer drains, so every note it emits is device-sourced.
+        // Tag it (test-mode only) so critique tests measuring picker-vs-device
+        // chromatism don't see these as "untagged" attacks. isPhraseEnd is
+        // carried from the buffered node if present.
+        if (playback.debugSoloist === true) {
+            primary.source = 'device';
+            primary.isPhraseEnd = primary.isPhraseEnd === true;
+        }
+
         // Coordination: Mark as busy if playing short durations or dense phrases
         primary.isBusy =
             (soloist.session.phrasing.busySteps || 0) > 0 || (primary.durationSteps || 1) < 1.0;
@@ -1076,7 +1102,23 @@ export function getSoloistNote(
                             ? 2
                             : 1;
                     const jitterProb = isFirstRestatementLoop ? 0.16 : 0.32;
-                    if (Math.random() < jitterProb) {
+                    // why: seed the jitter PRNG deterministically (Epic 10 S2.a).
+                    // Keyed by (barIndex, sectionId) so the same head note in the
+                    // same bar of the same section occurrence always jitters the
+                    // same way — loops stay coherent and critique tests can assert
+                    // determinism. sectionId folds the section label's char codes
+                    // with the occurrence so Verse-1 and Verse-2 get distinct
+                    // jitter streams. headNote.step disambiguates multiple seed
+                    // notes within one bar; +0 / +1 offsets separate the two
+                    // draws (gate vs. step-offset).
+                    const jitterBarIndex = Math.floor(headStepInForm / stepsPerMeasure);
+                    let sectionId = sectionContext.occurrence * 131;
+                    for (let c = 0; c < sectionContext.label.length; c++) {
+                        sectionId = (sectionId * 31 + sectionContext.label.charCodeAt(c)) | 0;
+                    }
+                    const jitterSeedBase =
+                        (jitterBarIndex * 2749 + sectionId * 17 + headNote.step * 7) | 0;
+                    if (scrambleHash(jitterSeedBase) < jitterProb) {
                         // why: chromatic ±N jitter can turn a 5th into a b5 or a 3 into a b3,
                         // producing out-of-key pitches that sound like mistakes. Walk by
                         // scale-degree steps instead — collect every scale-tone MIDI in a
@@ -1108,7 +1150,9 @@ export function getSoloistNote(
                                 }
                             }
                             const stepOffset =
-                                Math.floor(Math.random() * (jitterRange * 2 + 1)) - jitterRange;
+                                Math.floor(
+                                    scrambleHash(jitterSeedBase + 1) * (jitterRange * 2 + 1),
+                                ) - jitterRange;
                             const targetIdx = Math.max(
                                 0,
                                 Math.min(scaleNeighbors.length - 1, seedIdx + stepOffset),
