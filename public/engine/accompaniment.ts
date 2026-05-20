@@ -1718,17 +1718,18 @@ export function getAccompanimentNotes(
         const rootMidi = chord.rootMidi;
         let cadenceMidis = cadenceIntervals.map((iv) => rootMidi + iv);
         // why: target the lower half of the chord slot (52-68) — a final cadence
-        // is grounded, not airy. If the rootMidi is below the bass-aware floor,
-        // shift up; if above 68, shift the whole voicing down an octave.
+        // is grounded, not airy. Floor at 52 (chord-slot bottom); ceiling at 68
+        // keeps the cluster in the mid-register so it reads as grounded, not high.
         //
-        // Bass-aware floor (epic-coordination-consistency S1.a): when the band
-        // bassist is grounded high (e.g. MIDI 55 = G3) and the cadence root
-        // would sit at 52 (E3), the cluster crashes the bass register at the
-        // most important bar of the song. `max(52, bassMidi + 7)` reserves a
-        // perfect fifth of separation above the bassist (mirrors harmony main
-        // path at harmonies.ts:627); fallback to 52 when bass isn't running.
-        const cadenceBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
-        const cadenceFloor = Math.max(52, cadenceBassMidi + 7);
+        // Note: unlike the main comping path, we do NOT apply the bass-avoidance
+        // guard (`max(52, bassMidi + 7)`) here. At the cadence the cluster is
+        // allowed to overlap the bass for exactly one bar. The avoidance guard
+        // would push the chord cluster too high when the bassist is grounded high
+        // (e.g. G3/MIDI 55 → floor 62), producing an airy top-register landing
+        // instead of the grounded resolution a cadence needs. One bar of overlap
+        // at the final measure causes no sustained voice-masking — playback ends
+        // immediately after. (S5 micro-cleanup item 6.)
+        const cadenceFloor = 52;
         while (cadenceMidis[0] < cadenceFloor) {
             cadenceMidis = cadenceMidis.map((m) => m + 12);
         }
@@ -2230,10 +2231,17 @@ export function getAccompanimentNotes(
         let isHit = compingState.currentCell[measureStep % spm] === 1;
 
         // Conversational Displacement: Occasionally shift a hit by 16th if complexity is high
+        // why: migrated from soloist.session.phrasing.busySteps (session-state
+        // direct read) to coordination.soloistBusy (coordination-context field)
+        // so the predicate is consistent with the rest of the comp engine and
+        // doesn't bypass the coordination layer. (S5 micro-cleanup.)
+        // note: soloistBusy is a superset of the old busySteps>0 test — it also
+        // fires on short sub-step soloist notes (durationSteps < 1.0), so this
+        // slightly widens the displacement trigger. Musically intended.
         if (
             isHit &&
             playback.complexity > 0.7 &&
-            (soloist.session.phrasing.busySteps || 0) > 0 &&
+            coordination?.soloistBusy === true &&
             Math.random() < 0.4
         ) {
             isHit = false;
@@ -2393,9 +2401,16 @@ export function getAccompanimentNotes(
 
     if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
         // Conversational Displacement for Jazz/Blues
+        // why: migrated from soloist.session.phrasing.busySteps (session-state
+        // direct read) to coordination.soloistBusy (coordination-context field)
+        // so the predicate is consistent with the rest of the comp engine and
+        // doesn't bypass the coordination layer. (S5 micro-cleanup.)
+        // note: soloistBusy is a superset of the old busySteps>0 test — it also
+        // fires on short sub-step soloist notes (durationSteps < 1.0), so this
+        // slightly widens the displacement trigger. Musically intended.
         if (
             isHit &&
-            (soloist.session.phrasing.busySteps || 0) > 0 &&
+            coordination?.soloistBusy === true &&
             playback.complexity > 0.6 &&
             Math.random() < 0.3
         ) {
