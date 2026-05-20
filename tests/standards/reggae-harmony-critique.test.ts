@@ -54,6 +54,12 @@ describe('Reggae Harmony Critique', () => {
         const totalSteps = totalMeasures * 16;
 
         // Bubble offbeats — eighth-note positions between skank backbeats.
+        // NOTE: BUBBLE_STEPS/SKANK_STEPS are intentionally duplicated in
+        // reggae-harmony-organ-critique.test.ts. That sibling exercises a
+        // different engine entry point (generateCompingPattern unit) vs this
+        // file's getHarmonyNotes integration path; the only overlap is these
+        // two constant arrays. Hoisting them to a shared util would couple two
+        // otherwise-independent critique files for ~2 lines — not worth it.
         const BUBBLE_STEPS = [2, 6, 10, 14, 18, 22, 26, 30];
         // Skank backbeats — owned by the chord channel post-S5.
         const SKANK_STEPS = [4, 12, 20, 28];
