@@ -404,7 +404,7 @@ export function generateRhythmPlan(
             // Use the config's rhythmicDensity as the 'medium' point (0.5 intensity).
             // Scale between 50% and 150% of the baseline density based on intensity.
             const rhythmicDensity = _config.rhythmicDensity || 0.5;
-            let densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
+            const densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
             // why: epic-form-arrangement S6 — +15% density per loop. Pitch engine
             // already escalates devices +20%/loop (soloist-pitch-engine.ts:1004);
             // rhythm side now mirrors. Loop 0 unchanged; Loop 2 → density ×1.30;
@@ -412,8 +412,16 @@ export function generateRhythmPlan(
             // counts don't drive attackProb into permanent saturation — the
             // pitch engine clamps device boost at loopCount=3 in liveLoopLift
             // (soloist-pitch-engine.ts:395); we follow the same ceiling spirit.
+            // why placement: epic-coordination-consistency S5.a — multiplier applied
+            // as final-stage post-multiplier on `attackProb` below (just before the
+            // attack-jitter), NOT on `densityScale` here. Reason: four downstream
+            // additive boosts (`+= 0.4` Dynamic-Head seed, `+= 0.2` downbeat,
+            // `+= 0.2` kick, `+= 0.2` snare) bypass any multiplier sitting on
+            // densityScale — a 0.5 → 0.65 bump on the base gets washed when the
+            // additive boosts stack the prob to 0.9+. Canonical pattern is
+            // weight-tuning-multiplier-placement (project memory). Loop 0 still
+            // unchanged because the multiplier site below is gated `loopForRhythm > 0`.
             const loopForRhythm = Math.min(4, Math.max(0, loopCount));
-            densityScale *= 1 + loopForRhythm * 0.15;
             const intensityScale = rhythmicDensity * densityScale * 2.0; // Normalized to ~1.0 at medium
 
             let attackProb = baseAttackProb * intensityScale * warmUpScale;
@@ -549,6 +557,27 @@ export function generateRhythmPlan(
             }
             if (isSectionDownbeat) {
                 attackProb = 1.0;
+            }
+
+            // why: epic-coordination-consistency S5.a — +15%/loop density bump
+            // applied here as a final-stage multiplier on `attackProb` AFTER all
+            // additive boosts (seed +0.4, downbeat/kick/snare/measureEnd +0.2)
+            // and the bypass overrides, mirroring the pitch-engine final-stage
+            // weight-multiplier pattern (project memory:
+            // feedback_weight_tuning_multiplier_placement). Placing it on
+            // `densityScale` (where it originally lived in epic-form-arrangement
+            // S6) gets washed out in production when additive boosts stack
+            // `attackProb` to 1.0+ before the multiplier — the existing critique
+            // fixture doesn't exercise those active-coordination boosts (no
+            // kickHit/snareHit/seed in its synthetic stepCoordination), so the
+            // realized fixture delta is unchanged at +25%; the production
+            // delta is expected to track closer to audit-doc target +30% once
+            // a fixture extension exercises active coordination (filed for
+            // FOLLOWUPS §F). Gated `attackProb < 1.0` so the bypassRhythm /
+            // isSectionDownbeat forced-attack landmarks stay at exactly 1.0 —
+            // the multiplier can't saturate further beyond a guaranteed hit.
+            if (loopForRhythm > 0 && attackProb < 1.0) {
+                attackProb *= 1 + loopForRhythm * 0.15;
             }
 
             // why: epic-form-arrangement S6 — attack-jitter grows +5%/loop.
