@@ -239,6 +239,30 @@ export function getIntervals(
         }
     }
 
+    // 3a. MODERATE-INTENSITY COLOR (chords.md P1 #11 / Epic 11 S6(c))
+    // why: a plain major triad at intensity 0.5 in Acoustic/Neo-Soul reads as
+    // bare — those genres' whole sound lives in the color tones (add9, 6/9,
+    // sus2), and a comper reaches for color without needing the part to be loud.
+    // Extend the 9th's reach down to intensity >= 0.35 (a comfortably-mid
+    // dynamic, above the soft-pad floor) for color-friendly genres on a plain
+    // major triad only — not 7ths (a b7 at moderate dynamics implies dominant
+    // function the chart didn't ask for) and not Rock/Jazz/Funk (Rock wants
+    // power-triad clarity, Jazz/Funk own dedicated voicing lanes). The full 0.6
+    // block below still adds the 7th and re-adds the 9 above high intensity;
+    // this is purely a downward reach of the add9 color. Genre keys are the
+    // canonical `groove.genreFeel` values (groove-engine.ts strategies map).
+    const COLOR_FRIENDLY_GENRES = ['Acoustic', 'Neo-Soul', 'Country'];
+    if (
+        intensity >= 0.35 &&
+        intensity < 0.6 &&
+        quality === 'major' &&
+        !is7th &&
+        COLOR_FRIENDLY_GENRES.includes(genre) &&
+        !intervals.includes(14)
+    ) {
+        intervals.push(14); // add9 color
+    }
+
     // 3. INTENSITY-BASED EXTENSIONS
     // 0.6 - 0.7: Add 7ths/9ths (Targeting Pop/Rock/Acoustic)
     if (
