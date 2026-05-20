@@ -90,6 +90,76 @@ describe('Funk Piano Critique', () => {
         expect(leanRatio).toBeGreaterThan(0.9);
     });
 
+    it('voices funk stabs as a 3-note Clav cell, not a 2-note jazz shell', () => {
+        // why: chords.md P2 #17 / Epic 11 S6(b) — the funk lane previously
+        //      targeted a 2-voice cluster (`selectCompactCluster(..., 2, ...)`),
+        //      which reads as a jazz guide-tone shell. Authentic clav funk
+        //      comping (Stevie Wonder "Superstition," Stubblefield-era JB) is a
+        //      3-note cell. With the target bumped to 3, the dominant stab
+        //      voicing across a long performance should be 3 notes — while the
+        //      "lean voicing" critique above still holds (`<= 3`).
+        const chordC9 = {
+            rootMidi: 60,
+            quality: '9',
+            // root, 3, 5, b7, 9 — a real C9 voicing so the 3-note Clav cell
+            // (3 + b7 + 9) can actually form.
+            intervals: [0, 4, 7, 10, 14],
+            freqs: [261.63, 329.63, 392.0, 466.16, 587.33],
+            sectionId: 'A',
+        };
+        mockState.arranger.progression = [chordC9];
+        // why: 32 bars is ample for a near-deterministic ratio metric (the
+        //      voicing math doesn't vary per bar) — keeping the loop short
+        //      limits how many Math.random() draws this test consumes from the
+        //      shared stream, so it does not shift the random state that later
+        //      stochastic critique tests inherit in a full-suite run.
+        const totalSteps = 32 * 16;
+
+        let clavCell = 0;
+        let totalStabs = 0;
+        for (let i = 0; i < totalSteps; i++) {
+            mockState.playback.step = i;
+            const stepInMeasure = i % 16;
+            const notes = getAccompanimentNotes(
+                getState(),
+                chordC9,
+                i,
+                stepInMeasure,
+                stepInMeasure,
+                { isBeatStart: stepInMeasure % 4 === 0 },
+                {},
+            );
+            // Audible stabs only — drop muted ghost "chucks".
+            const audible = notes.filter((n) => n.midi > 0 && !n.muted);
+            if (audible.length > 0) {
+                totalStabs++;
+                // why: assert on voicing *content*, not note count — a 3-5-b7
+                //      shell is also 3 notes but is not a Clav cell. The Clav
+                //      idiom is the *gapped* 3 + b7 + 9: pitch classes 4, 10
+                //      and 2 (relative to root 60) present, the 5th (pc 7)
+                //      deliberately dropped so the 9 reads as the color voice.
+                const pcs = new Set(audible.map((n) => (((n.midi - 60) % 12) + 12) % 12));
+                const isGappedClavCell = pcs.has(4) && pcs.has(10) && pcs.has(2) && !pcs.has(7);
+                if (isGappedClavCell) {
+                    clavCell++;
+                }
+            }
+        }
+
+        const clavCellRatio = clavCell / totalStabs;
+        console.log(
+            '\n--- FUNK 3-NOTE CLAV CRITIQUE ---\n' +
+                `[gapped 3+b7+9 cells]   ${(clavCellRatio * 100).toFixed(1)}%\n` +
+                '----------------------------------\n',
+        );
+        // why: every funk stab over a C9 should voice the gapped Clav cell.
+        //      Guard at 0.95 — well below 100% to absorb any phrase-end/ghost
+        //      edge cases without flaking, but high enough that a regression
+        //      back to a 3-5-b7 dominant shell (which lands near 0% because
+        //      pc 7 would be present and pc 2 absent) fails loudly.
+        expect(clavCellRatio).toBeGreaterThan(0.95);
+    });
+
     // why: chords.md P0 #1 / epic-deterministic-phrasing S1. Funk comping must be
     //      a deterministic cell bank keyed by (sectionId, funkRotationIndex), not a
     //      per-bar Math.random() scatter. These tests prove (a) the bank has

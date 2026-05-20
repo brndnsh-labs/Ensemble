@@ -2315,20 +2315,42 @@ export function getAccompanimentNotes(
             );
             const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
 
-            let voicing: number[] = chord.freqs
+            // why: chords.md P2 #17 — the funk Clav idiom (Stevie Wonder
+            // "Superstition," Stubblefield-era JB) is the *gapped* 3rd + b7 + 9
+            // cell: the 5th is deliberately dropped so the 9 reads as the
+            // signature color. Build the cell by pitch-class identity — handing
+            // the full sorted chord [R,3,5,b7,9] to selectCompactCluster's
+            // contiguous-window picker can only ever return {3,5,b7} (a
+            // dominant shell), never the gapped {3,b7,9}.
+            const chordMidis: number[] = chord.freqs
                 .map((f: number) => getMidi(f))
                 .filter((midi: number | null): midi is number => Number.isFinite(midi));
-
-            if (voicing.length === 0) {
-                voicing = [chord.rootMidi + 4, chord.rootMidi + 10];
+            const pcFromRoot = (m: number) => (((m - chord.rootMidi) % 12) + 12) % 12;
+            // pick a real chord tone matching the degree's pitch class; fall
+            // back to a synthesized interval above the root when absent (e.g.
+            // chord.freqs empty, or a triad with no extension).
+            const pickClavDegree = (pcs: number[], fallbackInterval: number) =>
+                chordMidis.find((m: number) => pcs.includes(pcFromRoot(m))) ??
+                chord.rootMidi + fallbackInterval;
+            // why: `startsWith('m') && !startsWith('maj')` is the codebase's
+            // canonical minor-quality predicate (chords-styles.ts:31) — a bare
+            // `/^m/` would wrongly flag maj7/maj9 as minor and synthesize a b3
+            // fallback over a major chord.
+            const clavQuality = chord.quality || '';
+            const isMinorQuality =
+                (clavQuality.startsWith('m') && !clavQuality.startsWith('maj')) ||
+                clavQuality.includes('dim');
+            const clavThird = pickClavDegree([3, 4], isMinorQuality ? 3 : 4);
+            const clavSeventh = pickClavDegree([10, 11], 10);
+            // the 9 is rarely a literal chord tone — default to a synthesized
+            // major 9th so the gapped cell is guaranteed its color voice.
+            const clavNinth = pickClavDegree([2], 14);
+            let voicing: number[] = [clavThird, clavSeventh, clavNinth];
+            if (groundingRequired) {
+                // grounded practice voicing keeps a low root anchor under the
+                // 3-note cell (4 voices total) for harmonic stability.
+                voicing.unshift(chord.rootMidi);
             }
-
-            voicing = selectCompactCluster(
-                voicing,
-                compingState.lastVoicingMidis,
-                groundingRequired ? Math.min(4, voicing.length) : 2,
-                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
-            );
             voicing = recenterVoicing(
                 voicing,
                 compingState.lastVoicingMidis,
