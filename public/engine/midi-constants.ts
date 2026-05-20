@@ -27,11 +27,16 @@ export const DRUM_MAP: Record<string, number> = {
     Agogo: 67,
     'High Agogo': 67,
     'Low Agogo': 68,
-    'High Bongo': 60,
-    'Low Bongo': 61,
-    'High Conga': 62,
-    'Low Conga': 64,
-    'Open Conga': 63,
-    'Mute Conga': 62,
-    'Slap Conga': 63,
+    // why: epic-deferred-followups S8(d) — Conga/Bongo variant keys use the
+    // suffix-first convention (`<Root><Variant>`), matching Agogo/Cowbell in
+    // KNOWN_SOUND_NAMES / DISPATCHER_FAMILIES (synth-drums.ts). Previously the
+    // three layers disagreed (DRUM_MAP space-form, KNOWN_SOUND_NAMES
+    // modifier-first, dispatcher suffix-first). General-MIDI conga/bongo notes.
+    BongoHigh: 60,
+    BongoLow: 61,
+    CongaHigh: 62,
+    CongaLow: 64,
+    CongaOpen: 63,
+    CongaMute: 62,
+    CongaSlap: 63,
 };

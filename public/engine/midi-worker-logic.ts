@@ -581,22 +581,26 @@ export class ExportProcessor {
                             midi = (DRUM_MAP as any)['High Agogo'];
                         }
                     } else if (name.includes('Bongo')) {
+                        // why: S8(d) — DRUM_MAP keys are suffix-first
+                        // (`Bongo<Variant>`), matching Agogo/Cowbell.
                         if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any)['Low Bongo'];
+                            midi = (DRUM_MAP as any).BongoLow;
                         } else {
-                            midi = (DRUM_MAP as any)['High Bongo'];
+                            midi = (DRUM_MAP as any).BongoHigh;
                         }
                     } else if (name.includes('Conga')) {
+                        // why: S8(d) — DRUM_MAP keys are suffix-first
+                        // (`Conga<Variant>`), matching Agogo/Cowbell.
                         if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any)['Low Conga'];
+                            midi = (DRUM_MAP as any).CongaLow;
                         } else if (name.includes('Open')) {
-                            midi = (DRUM_MAP as any)['Open Conga'];
+                            midi = (DRUM_MAP as any).CongaOpen;
                         } else if (name.includes('Mute')) {
-                            midi = (DRUM_MAP as any)['Mute Conga'];
+                            midi = (DRUM_MAP as any).CongaMute;
                         } else if (name.includes('Slap')) {
-                            midi = (DRUM_MAP as any)['Slap Conga'];
+                            midi = (DRUM_MAP as any).CongaSlap;
                         } else {
-                            midi = (DRUM_MAP as any)['High Conga'];
+                            midi = (DRUM_MAP as any).CongaHigh;
                         }
                     } else if (name.includes('Cowbell')) {
                         // why: live drum engine (synth-drums.ts:1085-1098) emits

@@ -193,15 +193,17 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     // `name.includes('Tom')` substring exemption in `maybeWarnUnknownSound`
     // also catches the space-form, so the no-space entries added literally
     // nothing to the warning suppression. Removed to keep the registry honest.
-    // Conga / Bongo families — handled by `name.startsWith('Conga'|'Bongo')`
-    'HighConga',
-    'LowConga',
-    'OpenConga',
-    'MuteConga',
-    'SlapConga',
+    // Conga / Bongo families — handled by `name.startsWith('Conga'|'Bongo')`.
+    // why: S8(d) — suffix-first (`<Root><Variant>`), matching Agogo/Cowbell
+    // above and DRUM_MAP / DISPATCHER_FAMILIES. The three layers now agree.
+    'CongaHigh',
+    'CongaLow',
+    'CongaOpen',
+    'CongaMute',
+    'CongaSlap',
     'Conga',
-    'HighBongo',
-    'LowBongo',
+    'BongoHigh',
+    'BongoLow',
     'Bongo',
 ]);
 
