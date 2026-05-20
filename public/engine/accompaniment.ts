@@ -2345,18 +2345,64 @@ export function getAccompanimentNotes(
             // the 9 is rarely a literal chord tone — default to a synthesized
             // major 9th so the gapped cell is guaranteed its color voice.
             const clavNinth = pickClavDegree([2], 14);
-            let voicing: number[] = [clavThird, clavSeventh, clavNinth];
-            if (groundingRequired) {
-                // grounded practice voicing keeps a low root anchor under the
-                // 3-note cell (4 voices total) for harmonic stability.
-                voicing.unshift(chord.rootMidi);
+            // why: the gapped cell's three pitch classes are fixed, but its
+            // ABSOLUTE register has to voice-lead from the prior cell. Building
+            // it as raw `root + interval` pins the cell to `chord.rootMidi`,
+            // which is NOT octave-stable across a progression (the `changes`
+            // arrangement seats Am7 at root 57 but A7 at root 69) — so a
+            // high-rooted chord's cell leaps a near-octave clear of its
+            // neighbors. `recenterVoicing` alone cannot recover it: it only
+            // shifts the whole block by octaves, and when the cell is jammed
+            // against the 84 ceiling it has no upward headroom left. Instead,
+            // expand the three pitch classes across the 52-84 chord register
+            // and let `selectCompactCluster` — the same continuous-slide
+            // voice-leader the pre-S6b shell used — pick the most compact
+            // inversion nearest a target center. The 5th never enters the
+            // pool, so the gapped {3,b7,9} identity is preserved (any 3-window
+            // of three distinct cycling pitch classes is a cell inversion).
+            const clavFloor =
+                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state);
+            const cellPcs = [clavThird, clavSeventh, clavNinth].map((m) => ((m % 12) + 12) % 12);
+            const cellPool: number[] = [];
+            for (let octave = 48; octave <= 84; octave += 12) {
+                for (const pc of cellPcs) {
+                    const m = octave + pc;
+                    if (m >= 48 && m <= 84) {
+                        cellPool.push(m);
+                    }
+                }
             }
-            voicing = recenterVoicing(
-                voicing,
-                compingState.lastVoicingMidis,
-                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
-                84,
+            // why: target a blend of the previous cell's center and a fixed
+            // home pocket (~67, the register the pre-S6b shell sat in). Pure
+            // relative voice-leading has no absolute anchor — each step's
+            // window-discretization bias ratchets the cell upward until it
+            // jams the ceiling over a long progression. The 0.4 pull toward
+            // HOME is a low-pass that keeps the comp tracking chord-to-chord
+            // while holding station in the clav register.
+            const CLAV_HOME_CENTER = 67;
+            const clavTargetCenter =
+                compingState.lastVoicingMidis.length > 0
+                    ? 0.6 * averageMidi(compingState.lastVoicingMidis) + 0.4 * CLAV_HOME_CENTER
+                    : CLAV_HOME_CENTER;
+            let voicing: number[] = selectCompactCluster(
+                cellPool,
+                [Math.round(clavTargetCenter)],
+                3,
+                clavFloor,
             );
+            if (groundingRequired) {
+                // grounded practice voicing keeps a low root anchor an octave
+                // under the 3-note cell (4 voices total) for harmonic stability.
+                const cellLow = Math.min(...voicing);
+                let rootAnchor = ((chord.rootMidi % 12) + 12) % 12;
+                while (rootAnchor + 12 < cellLow) {
+                    rootAnchor += 12;
+                }
+                if (rootAnchor >= 36 && rootAnchor < cellLow) {
+                    voicing.unshift(rootAnchor);
+                }
+            }
+            voicing = recenterVoicing(voicing, compingState.lastVoicingMidis, clavFloor, 84);
             // why: Imperfect-Symmetry rotation before caching — same reasoning
             // as the Neo-Soul lane, lets the cascade carry forward.
             voicing = rotateVoicingMidi(voicing);

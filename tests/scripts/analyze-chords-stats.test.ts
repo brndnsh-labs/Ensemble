@@ -200,6 +200,12 @@ describe('Chord audit scripts', () => {
 
         expect(voiceJumpMeasures).toHaveLength(0);
         expect(Math.max(...rows.map((row) => Math.abs(row.centerDrift)))).toBeLessThanOrEqual(7);
-        expect(rows.every((row) => row.avgVoices <= 2.1)).toBe(true);
+        // Epic 11 S6b voiced the funk lane as the gapped 3-voice {3,b7,9} clav
+        // cell (Stevie/JB idiom); the prior `<= 2.1` encoded the pre-S6b
+        // 2-voice guide-tone shell. The cell is 3 voices by design (4 when a
+        // grounded practice voicing prepends a root anchor) — the ceiling is
+        // raised to `<= 3.1` so the assertion guards "no accidental pile-up"
+        // without contradicting the deliberate 3-voice cell.
+        expect(rows.every((row) => row.avgVoices <= 3.1)).toBe(true);
     });
 });
