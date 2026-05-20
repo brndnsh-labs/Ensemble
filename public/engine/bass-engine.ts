@@ -995,13 +995,29 @@ export function getBassNote(
                 : (chord.bassMidi ?? chord.rootMidi);
             const targetRoot = normalizeToRange(targetSource as number);
 
-            // why: pick ±1 semitone direction by smaller motion from prevMidi
-            // for smooth voice-leading; tie-break to BELOW (the half-step
-            // leading tone is the canonical chromatic walk-in across genres,
-            // and reggae bass favors deep grounded approaches from below into
-            // the downbeat).
-            const fromBelow = targetRoot - 1;
-            const fromAbove = targetRoot + 1;
+            // why: choose the approach pitch by trigger type.
+            //  - Chord-change approach: a chromatic half-step neighbor of the
+            //    NEW root is functional voice-leading into a different chord —
+            //    the canonical reggae/dub walk-in (kept as-is).
+            //  - Phrase-end-only: the chord is NOT changing, so a chromatic
+            //    half-step against the SAME chord is a jazz-style chromatic
+            //    rub, not a reggae idiom. The 54-46 riddim already fills
+            //    step 14 with a clean lock-in root, and substituting a b9/maj7
+            //    rub there reads as a different player. Walk in from a
+            //    SCALE TONE adjacent to the root instead (typically the 7 or
+            //    b7 below / the 2 above) — a diatonic walk-in that lands the
+            //    root cleanly on the downbeat.
+            // why: scale tones adjacent to PC 0. `scale` is the chord's
+            // diatonic interval set including 0; scale[1] is the step above
+            // the root, scale[last]-12 is the step below.
+            const scaleStepAbove = scale.length > 1 ? scale[1] : 2;
+            const scaleStepBelow = scale.length > 1 ? scale[scale.length - 1] - 12 : -2;
+            const fromBelow = reggaeChordChange
+                ? targetRoot - 1 // chromatic leading tone into the NEW root
+                : targetRoot + scaleStepBelow; // diatonic walk-in below same root
+            const fromAbove = reggaeChordChange
+                ? targetRoot + 1 // chromatic upper neighbor into the NEW root
+                : targetRoot + scaleStepAbove; // diatonic walk-in above same root
             let approachMidi: number;
             if (prevMidi !== null) {
                 const distBelow = Math.abs(fromBelow - prevMidi);

@@ -234,14 +234,19 @@ describe('Reggae Bassist Critique', () => {
         expect(step8Hits).toBe(32);
     });
 
-    it('S2.b: phrase-end-fill approach lands within ±1 semitone of upcoming root', () => {
-        // The approach note is chromatic: targetRoot ± 1 semitone. With no
-        // chord change (nextChord = null), it targets the CURRENT chord's
-        // root (rootMidi 36 = C2). With the reggae register clamp (≤ 38),
-        // the approach must be at 36 ± 1 transposed into ≤38 range.
-        // Specifically: from below = 35 (B1), from above = 37 (C#2). Both
-        // are ≤ 38 and ≥ absMin (23). Direction is whichever is closer to
-        // prevMidi; without prev, tie-breaks to BELOW.
+    it('S7(c): phrase-end-only fill lands a SCALE-tone walk-in, not a chromatic rub', () => {
+        // why: Epic deferred-followups S7 (c). The phrase-end-only branch used
+        // to substitute a chromatic ±1 neighbor of the CURRENT chord's root —
+        // a half-step rub against the same chord (a jazz move, not a reggae
+        // idiom; and on the 54-46 riddim it replaced a clean lock-in root).
+        // The fix walks in from a SCALE TONE of the current chord instead.
+        //
+        // Current chord C7 (rootMidi 36). dub style + dominant + default
+        // tension → MIXOLYDIAN {0,2,4,5,7,9,10}. The walk-in candidates are
+        // the diatonic neighbors of the root: b7 below (pc 10, Bb) or 9 above
+        // (pc 2, D). Direction is whichever is closer to prevMidi; the riddim
+        // keeps prevMidi deep so the below candidate (pc 10) is typical.
+        const MIXOLYDIAN_PCS = new Set([0, 2, 4, 5, 7, 9, 10]);
         const phraseEndCoord = () => ({
             soloistResting: true,
             soloistNotesInPhrase: 5,
@@ -255,14 +260,57 @@ describe('Reggae Bassist Critique', () => {
         const step14Notes = performance.filter((p) => p.loopStep === 14);
         expect(step14Notes.length).toBeGreaterThan(0);
         for (const p of step14Notes) {
-            // Target root pc = 0 (C). Approach must be pc 11 (B = -1) or
-            // pc 1 (C# = +1). Octave can be anywhere in reggae deep-bass.
             const pc = p.note.midi % 12;
-            expect([11, 1]).toContain(pc);
+            // Core S7(c) contract: the walk-in is a diatonic scale tone of the
+            // current chord — NEVER a chromatic half-step rub. The pc 1/pc 11
+            // exclusion below is specific to this DOMINANT fixture (C7): on a
+            // major chord the below-walk-in is the maj7 (pc 11), which is the
+            // diatonic leading tone resolving up to the root — a scale tone,
+            // not a rub. The b7 of mixolydian (pc 10) makes pc 11 chromatic
+            // here, so the exclusion is valid for this chord quality only.
+            expect(MIXOLYDIAN_PCS.has(pc)).toBe(true);
+            expect([1, 11]).not.toContain(pc);
+            // And specifically a STEP neighbor of the root (the 9 or the b7),
+            // so the next downbeat resolves the root cleanly.
+            expect([2, 10]).toContain(pc);
             // Reggae register constraint: the dub branch normally forces
             // ≤ 38; the approach respects the same ceiling.
             expect(p.note.midi).toBeLessThanOrEqual(38);
             expect(p.note.midi).toBeGreaterThanOrEqual(23);
+        }
+    });
+
+    it('S7(c): 54-46 riddim phrase-end lands a clean root or scale-tone, never a chromatic rub', () => {
+        // why: Epic deferred-followups S7 (c) names the 54-46 riddim
+        // specifically — it is the only riddim with a step-14 root entry, so a
+        // phrase-end-only fill there REPLACES a clean lock-in root. The fix
+        // must guarantee that replacement is itself musical: a diatonic
+        // scale-tone walk-in (or the root itself), never a chromatic neighbor.
+        // 54-46 selects at intensity > 0.45 (bass-styles.ts riddim bands).
+        const MIXOLYDIAN_PCS = new Set([0, 2, 4, 5, 7, 9, 10]);
+        const phraseEndCoord = () => ({
+            soloistResting: true,
+            soloistNotesInPhrase: 5,
+        });
+        const performance = simulatePerformance(
+            16,
+            { playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 } }, // 54-46 band
+            { coordinationFactory: phraseEndCoord },
+        );
+
+        const step14Notes = performance.filter((p) => p.loopStep === 14);
+        console.log(
+            `[Reggae S7c] 54-46 phrase-end — ${step14Notes.length} step-14 emissions; ` +
+                `pcs: [${step14Notes.map((p) => p.note.midi % 12).join(',')}]`,
+        );
+
+        // 54-46 fills step 14 every bar; the phrase-end fill replaces it.
+        expect(step14Notes.length).toBeGreaterThan(0);
+        for (const p of step14Notes) {
+            const pc = p.note.midi % 12;
+            // Clean root (pc 0) OR a diatonic scale tone — never pc 1 / pc 11.
+            expect(MIXOLYDIAN_PCS.has(pc)).toBe(true);
+            expect([1, 11]).not.toContain(pc);
         }
     });
 
