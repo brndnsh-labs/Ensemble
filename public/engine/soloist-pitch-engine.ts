@@ -217,6 +217,11 @@ export function selectPitchAndDevices(
     stepInChord: number,
     coordination: any,
     playback: GlobalContext,
+    // soloistState is the SoloistState slice, but kept `any` here: the picker
+    // performs `@worker-mutation` writes to `readonly` fields (audio.lastMidiPlayed,
+    // session.currentPhrase.context.*) that the immutable interface would reject.
+    // The test-relevant shape — an optional top-level `srdcState` override — is
+    // declared on `SoloistState` in types.ts (`@test-only`) for documentation.
     soloistState: any,
     groove: any,
     _arranger: any,

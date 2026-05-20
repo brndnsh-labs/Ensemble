@@ -565,7 +565,7 @@ export interface SoloistPhraseContext {
      * (`deriveSrdcPhase`). Read by the pitch picker to bias chord-tone weight
      * — Conclusion lifts, Departure depresses. Lowercase canonical form.
      */
-    srdcState: 'statement' | 'restatement' | 'departure' | 'conclusion';
+    srdcState: SrdcPhase;
     /**
      * The just-finished Statement phrase's signature, captured when the
      * current phrase derives to `restatement` and the prior phrase was a
@@ -719,6 +719,13 @@ export interface SoloistAudio {
     readonly lastNoteEnd: number;
 }
 
+/**
+ * SRDC arc position — Statement / Restatement / Departure / Conclusion.
+ * Lowercase canonical form. Derived per phrase by `deriveSrdcPhase` in
+ * soloist.ts and read by the pitch picker to bias chord-tone weight.
+ */
+export type SrdcPhase = 'statement' | 'restatement' | 'departure' | 'conclusion';
+
 export interface SoloistState {
     // === Configuration (user-settable, persisted) — flat at the top of the
     // slice to preserve persistence / hydration / UI / worker-sync compat.
@@ -757,6 +764,16 @@ export interface SoloistState {
 
     // === Main-thread synth / voice tracking ===
     readonly audio: SoloistAudio;
+
+    /**
+     * @test-only Top-level SRDC-phase override. Production never writes this —
+     * the canonical phase lives at `session.currentPhrase.context.srdcState`
+     * (written every tick by `deriveSrdcPhase`). The pitch picker reads this
+     * top-level slot FIRST (see `selectPitchAndDevices` in
+     * soloist-pitch-engine.ts) so critique tests can pin a phase on the mock
+     * without it being clobbered by per-tick production writes.
+     */
+    readonly srdcState?: SrdcPhase;
 }
 
 export interface HarmonyState {
