@@ -337,12 +337,13 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         // masks the chord. Different mitigations per device shape:
         //
         //   - enclosure (notes [+1, −1, selectedMidi] regardless of approach
-        //     direction; approach only sets order): if EITHER ±1 neighbor is
-        //     on a unison PC, both will be emitted — flipping approach can't
-        //     route around it. Skip the device entirely; the picker's single-
-        //     note fallback at selectedMidi is already biased away from unison
-        //     PCs by the final-stage 0.05× multiplier (soloist-pitch-engine.ts
-        //     :1154). Better to drop a 3-note gesture than smear it.
+        //     direction; approach only sets order): if BOTH ±1 neighbors are
+        //     on unison PCs there is no safe neighbor — skip. If only ONE of
+        //     the two neighbors is a unison, the other is clean so the gesture
+        //     still reads as an enclosure (partial 1-of-3 vs full skip). This
+        //     is less aggressive than the run's full-skip veto: an enclosure
+        //     with one clean neighbor still frames the target; a run with ANY
+        //     unison in its 2-step span sounds like a masked chord tone.
         //
         //   - run (notes [+approach×2, +approach, selectedMidi], all on the
         //     SAME side): if the chosen direction has unison on either step,
@@ -352,11 +353,16 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         // selectedMidi itself has already been biased away from unison PCs by
         // the picker; this floor closes the device-system's neighbor-pitch gap.
         let approach = motifApproach;
+        // why: hoisted out of the `if (accompPcSet)` branch so it isn't re-created
+        // on every call regardless of whether accompPcSet is present. Pure function
+        // of selectedMidi — safe to define unconditionally.
+        const pcAt = (delta: number) => (((selectedMidi + delta) % 12) + 12) % 12;
         if (accompPcSet) {
-            const pcAt = (delta: number) => (((selectedMidi + delta) % 12) + 12) % 12;
             if (deviceType === 'enclosure') {
-                // Both ±1 neighbors always emit. If either is unison, skip.
-                if (accompPcSet.has(pcAt(1)) || accompPcSet.has(pcAt(-1))) {
+                // Skip only when BOTH neighbors are unison (no clean approach).
+                // A single unison neighbor still lets the other neighbor frame
+                // the target — partial enclosure is better than no gesture.
+                if (accompPcSet.has(pcAt(1)) && accompPcSet.has(pcAt(-1))) {
                     return null;
                 }
             } else {
