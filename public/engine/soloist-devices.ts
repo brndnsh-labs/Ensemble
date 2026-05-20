@@ -525,26 +525,37 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         // the line played forward ascends into the resolution.
         const stepBack = motifApproach >= 0 ? 1 : -1;
 
-        // why: bebop passing-tone selection by chord quality.
+        // why: bebop passing-tone selection by chord quality. Every branch
+        // inserts ONE chromatic tone that is NOT in the chord's diatonic scale,
+        // so the walk always carries a genuine chromatic passing tone.
         //  - Dominant (default): major-7 between b7 and root (Parker / dominant bebop).
         //  - Major: b6 between 5 and 6 (major bebop scale).
         //  - Minor (m, m7, min7, m9, m11, m13, but NOT maj*): major-3 between b3 and 4 (dorian bebop).
-        // halfdim ('halfdim') doesn't start with 'm' so falls through to
-        // dominant default — musically reasonable for ø7 (locrian-bebop is
-        // a future style refinement, tracked in FOLLOWUPS.md).
-        const isMinorQuality = quality.startsWith('m') && !quality.startsWith('maj');
-        // why: include `augmaj7` (augmented-major-7) in the major family — it has a
-        // maj3 and maj7. Note: b6 PC (rootPc+8) IS the augmaj7 #5, so no chromatic
-        // passing tone is actually inserted — the walk degenerates to a clean
-        // Lydian-Augmented scalar line. Documented limitation; locrian-bebop / aug
-        // bebop variants tracked in FOLLOWUPS.md.
-        const isMajorQuality =
-            quality === 'major' || quality.startsWith('maj') || quality === 'augmaj7';
-        const passingPc = isMajorQuality
-            ? (rootPc + 8) % 12 // b6 — bridges 5 and 6 in the major bebop scale
-            : isMinorQuality
-              ? (rootPc + 4) % 12 // major 3 — bridges b3 and 4 in dorian bebop
-              : (rootPc + 11) % 12; // major 7 — bridges b7 and root in dominant bebop
+        //  - halfdim (ø7): natural-3 between b3 and 4 of the locrian scale —
+        //    locrian-bebop. The major-7 dominant default would land between b7
+        //    and root, which is fine, but the nat-3 is the canonical
+        //    locrian-bebop chromatic and rootPc+4 is guaranteed absent from the
+        //    locrian set {0,1,3,5,6,8,10}.
+        //  - augmaj7: b7 (rootPc+10) bridges the 6 and maj7 of the
+        //    lydian-augmented scale {0,2,4,6,8,9,11}. The naive b6 (rootPc+8)
+        //    IS the augmaj7 #5 — a chord tone, not a passing tone — so it would
+        //    degenerate the walk to a chromaticism-free scalar line. b7 is the
+        //    canonically-bebop alternative and is absent from the lydian-aug set.
+        const isHalfDim = quality === 'halfdim';
+        const isAugMaj7 = quality === 'augmaj7';
+        const isMinorQuality = !isHalfDim && quality.startsWith('m') && !quality.startsWith('maj');
+        // why: `augmaj7` has a maj3 and maj7 (major family) but is routed to its
+        // own passing-tone branch below, so it is excluded from `isMajorQuality`.
+        const isMajorQuality = !isAugMaj7 && (quality === 'major' || quality.startsWith('maj'));
+        const passingPc = isHalfDim
+            ? (rootPc + 4) % 12 // natural 3 — bridges b3 and 4 in locrian bebop
+            : isAugMaj7
+              ? (rootPc + 10) % 12 // b7 — bridges 6 and maj7 in lydian-aug bebop
+              : isMajorQuality
+                ? (rootPc + 8) % 12 // b6 — bridges 5 and 6 in the major bebop scale
+                : isMinorQuality
+                  ? (rootPc + 4) % 12 // major 3 — bridges b3 and 4 in dorian bebop
+                  : (rootPc + 11) % 12; // major 7 — bridges b7 and root in dominant bebop
 
         // Bebop-scale PC set: chord's diatonic scale plus the chromatic passing tone.
         const bebopPcSet = new Set<number>();
