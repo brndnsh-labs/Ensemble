@@ -63,6 +63,24 @@ const DROP_FRIENDLY_GENRES: readonly string[] = [
 export const DROP_ENERGY_DELTA_THRESHOLD = 0.3;
 
 /**
+ * Fraction of the unrolled form a playback must have passed before an
+ * energy-delta-INFERRED cut (a verse→chorus lift with no literal "drop" label)
+ * is allowed to fire. Literal Drop/Breakdown labels are NOT gated by this.
+ *
+ * why 0.6: a full-band cut before a chorus is a "you know what's coming — here
+ * comes the big one" gesture. It earns its impact from contrast and from being
+ * rare. Firing it on the first chorus is premature — the listener has not yet
+ * heard a chorus, so there is no established norm to play against, and the
+ * payoff is spent before it is set up. Reserving the inferred cut for the back
+ * 40% of the form turns it into a genuine late-song device (final chorus,
+ * post-bridge climax) instead of an every-chorus habit. Confirmed by listen-test
+ * 2026-05-20 — 0.6 chosen over 0.5 to make the gesture land later and harder.
+ *
+ * Authored Drop/Breakdown sections are explicit intent and fire at any position.
+ */
+export const DROP_INFERRED_MIN_FORM_PROGRESS = 0.6;
+
+/**
  * True iff the genre is one for which the drop/breakdown cut should fire.
  * `genreFeel` is the canonical genre string on `groove.genreFeel`.
  */
@@ -91,9 +109,12 @@ export function isDropSectionLabel(label: string | undefined | null): boolean {
  * Decides whether the 1-bar pre-drop mute should fire.
  *
  * The mute fires in the LAST bar before a section boundary when EITHER:
- *   - the upcoming section is literally labelled a Drop/Breakdown, OR
+ *   - the upcoming section is literally labelled a Drop/Breakdown (authored
+ *     intent — fires at ANY position in the form), OR
  *   - the energy delta into the upcoming section crosses
- *     `DROP_ENERGY_DELTA_THRESHOLD` (a structural lift even without the label).
+ *     `DROP_ENERGY_DELTA_THRESHOLD` AND the playback has passed
+ *     `DROP_INFERRED_MIN_FORM_PROGRESS` of the form. The inferred cut is a
+ *     back-half gesture only — see that constant's doc for the reasoning.
  *
  * Musical reasoning for "last bar before the change" (rather than "first bar of
  * the drop"): the cut has to happen BEFORE the drop so the drop's downbeat is
@@ -123,12 +144,15 @@ export function isDropSectionLabel(label: string | undefined | null): boolean {
  * @param barsUntilSectionChange `coordination.barsUntilSectionChange` (0 = last bar)
  * @param upcomingSectionLabel   `coordination.upcomingSectionLabel`
  * @param upcomingEnergyDelta    `coordination.upcomingSectionEnergyDelta`
+ * @param formProgress           position in the unrolled form, 0..1
+ *                               (`stepInForm / totalFormSteps`)
  */
 export function shouldFireDropMute(
     genreFeel: string | undefined | null,
     barsUntilSectionChange: number,
     upcomingSectionLabel: string | undefined | null,
     upcomingEnergyDelta: number,
+    formProgress: number,
 ): boolean {
     if (!isDropFriendlyGenre(genreFeel)) {
         return false;
@@ -137,13 +161,20 @@ export function shouldFireDropMute(
     if (barsUntilSectionChange !== 0) {
         return false;
     }
-    return (
-        isDropSectionLabel(upcomingSectionLabel) ||
-        // Strict-greater with a float-noise margin: the canonical
-        // pre-chorus→chorus lift is +0.3 EXACTLY and must NOT fire. The energy
-        // map stores tenths, so `0.9 - 0.6` evaluates to 0.30000000000000004 —
-        // a bare `> 0.3` would let it through. The 1e-6 margin discards that
-        // noise; real qualifying deltas (+0.4 and up) clear it by a wide gap.
-        upcomingEnergyDelta - DROP_ENERGY_DELTA_THRESHOLD > 1e-6
-    );
+    // Path 1 — literal Drop/Breakdown label: authored intent, fires anywhere.
+    if (isDropSectionLabel(upcomingSectionLabel)) {
+        return true;
+    }
+    // Path 2 — energy-delta inference: a back-half gesture only. An inferred
+    // cut before an early chorus spends the payoff before it is set up; gate it
+    // on form position so it lands as a late-song climax device.
+    if (formProgress < DROP_INFERRED_MIN_FORM_PROGRESS) {
+        return false;
+    }
+    // Strict-greater with a float-noise margin: the canonical pre-chorus→chorus
+    // lift is +0.3 EXACTLY and must NOT fire. The energy map stores tenths, so
+    // `0.9 - 0.6` evaluates to 0.30000000000000004 — a bare `> 0.3` would let it
+    // through. The 1e-6 margin discards that noise; real qualifying deltas
+    // (+0.4 and up) clear it by a wide gap.
+    return upcomingEnergyDelta - DROP_ENERGY_DELTA_THRESHOLD > 1e-6;
 }

@@ -78,13 +78,16 @@ const TS = TIME_SIGNATURES['4/4'];
 const SPB = TS.beats * TS.stepsPerBeat; // 16 steps per bar
 
 // --- Chart fixtures ----------------------------------------------------------
-// Form: 4-bar Verse → 4-bar Drop. The cut bar is bar 3 of the Verse
-// (steps 48..63); the slam-back is the Drop downbeat (step 64).
-const VERSE_BARS = 4;
-const DROP_BARS = 4;
+// Form: 8 bars total. By default a 4-bar first section → 4-bar second section,
+// so the cut bar is bar 3 (steps 48..63) and the boundary sits at form-fraction
+// 0.5. `makeState({ firstSectionBars })` slides the boundary: a large first
+// section pushes the cut bar past `DROP_INFERRED_MIN_FORM_PROGRESS` (0.6), a
+// small one keeps it early — used to exercise the form-position gate on the
+// energy-delta-inferred cut.
+const TOTAL_BARS = 8;
+const VERSE_BARS = 4; // default first-section length
 const VERSE_STEPS = VERSE_BARS * SPB; // 64
-const DROP_STEPS = DROP_BARS * SPB; // 64
-const TOTAL = VERSE_STEPS + DROP_STEPS; // 128
+const TOTAL = TOTAL_BARS * SPB; // 128
 
 function makeChord(sectionId: string, sectionLabel: string) {
     return {
@@ -106,12 +109,15 @@ function makeState(
         nextLabel?: string;
         genreFeel?: string;
         includeDrums?: boolean;
+        firstSectionBars?: number;
     } = {},
 ) {
     const currentLabel = opts.currentLabel ?? 'Verse';
     const nextLabel = opts.nextLabel ?? 'Drop';
     const firstChord = makeChord('sec-1', currentLabel);
     const secondChord = makeChord('sec-2', nextLabel);
+    // Boundary step — where the first section ends / the second begins.
+    const splitStep = (opts.firstSectionBars ?? VERSE_BARS) * SPB;
     // why: include the full base kit (Kick/Snare/HiHat) — not just the Crash —
     // so the cut-bar silence assertion is real. With only a Crash instrument
     // present, "no base groove" would be vacuously true; the base voices must
@@ -130,22 +136,22 @@ function makeState(
             stepMap: [
                 {
                     start: 0,
-                    end: VERSE_STEPS,
+                    end: splitStep,
                     chord: firstChord,
                     sectionStart: 0,
-                    sectionEnd: VERSE_STEPS,
+                    sectionEnd: splitStep,
                 },
                 {
-                    start: VERSE_STEPS,
+                    start: splitStep,
                     end: TOTAL,
                     chord: secondChord,
-                    sectionStart: VERSE_STEPS,
+                    sectionStart: splitStep,
                     sectionEnd: TOTAL,
                 },
             ],
             sectionMap: [
-                { id: 'sec-1', start: 0, end: VERSE_STEPS, label: currentLabel },
-                { id: 'sec-2', start: VERSE_STEPS, end: TOTAL, label: nextLabel },
+                { id: 'sec-1', start: 0, end: splitStep, label: currentLabel },
+                { id: 'sec-2', start: splitStep, end: TOTAL, label: nextLabel },
             ],
             progression: [firstChord, secondChord],
             key: 'C',
@@ -407,16 +413,57 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         expect(totalNotes).toBeGreaterThan(0);
     });
 
-    it('FIRES on a Verse→Chorus change via the energy-delta threshold (+0.4 ≥ 0.3)', () => {
-        // why: the mechanic must also catch a structural lift even without a
-        // literal "drop" label. Verse 0.5 → Chorus 0.9 = +0.4, over the +0.3
-        // threshold — the cut should fire.
-        const state = makeState({ nextLabel: 'Chorus', genreFeel: 'Rock' });
+    it('FIRES an energy-delta-inferred cut LATE in the form (+0.4, past 0.6)', () => {
+        // why: the mechanic catches a structural lift even without a literal
+        // "drop" label (Verse 0.5 → Chorus 0.9 = +0.4). But an inferred cut is
+        // a back-half gesture — gated on form position. Here the first section
+        // is 7 bars, so the cut bar (bar 6, downbeat step 96) sits at
+        // form-fraction 0.75, past DROP_INFERRED_MIN_FORM_PROGRESS (0.6).
+        const state = makeState({ nextLabel: 'Chorus', genreFeel: 'Rock', firstSectionBars: 7 });
         const cursors = freshCursors();
 
-        const r = generateNotesForStep(state, 3 * SPB, cursors, ALL_ENGINES);
+        const r = generateNotesForStep(state, 6 * SPB, cursors, ALL_ENGINES);
         expect(r.coordination.upcomingSectionEnergyDelta).toBeCloseTo(0.4, 5);
         expect(r.coordination.dropMuteActive).toBe(true);
+    });
+
+    it('does NOT fire an energy-delta-inferred cut EARLY in the form (+0.4, before 0.6)', () => {
+        // why: the listen-test (2026-05-20) flagged the inferred cut firing on
+        // early choruses as too aggressive — the gesture spends its payoff
+        // before a chorus norm is even established. Here the first section is
+        // only 2 bars, so the cut bar (bar 1, steps 16..31) sits at
+        // form-fraction ~0.12, well below 0.6 — the +0.4 lift still qualifies on
+        // energy, but the position gate suppresses it. This is the core guard
+        // for the form-position fix.
+        const state = makeState({ nextLabel: 'Chorus', genreFeel: 'Rock', firstSectionBars: 2 });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 1 * SPB; step < 2 * SPB; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            // Energy delta still qualifies — only position holds the cut back.
+            expect(r.coordination.upcomingSectionEnergyDelta).toBeCloseTo(0.4, 5);
+            expect(r.coordination.dropMuteActive).toBe(false);
+        }
+        expect(totalNotes).toBeGreaterThan(0);
+    });
+
+    it('FIRES a literal Drop EARLY in the form (authored intent is not position-gated)', () => {
+        // why: the form-position gate applies ONLY to the energy-delta-inferred
+        // cut. A section explicitly labelled "Drop" is authored intent and must
+        // fire wherever it sits — even as the second section of the form. Cut
+        // bar is bar 1 (steps 16..31), form-fraction ~0.12.
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Rock', firstSectionBars: 2 });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 1 * SPB; step < 2 * SPB; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            expect(r.coordination.dropMuteActive).toBe(true);
+        }
+        expect(totalNotes).toBe(0);
     });
 
     it('does NOT fire on a Pre-Chorus→Chorus change (+0.3 exactly — strict `>`)', () => {
@@ -426,15 +473,20 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         // band before every chorus entry would make the gesture ambient. Only
         // harder, multi-step lifts (+0.4 and up) qualify. Boundary regression
         // guard: if this flips to `>=`, the cut fires on every chorus.
+        //
+        // firstSectionBars: 7 puts the cut bar at form-fraction 0.75 — PAST the
+        // position gate — so the strict `>` is the ONLY thing suppressing it.
+        // (At the default early position the position gate would mask this.)
         const state = makeState({
             currentLabel: 'Pre-Chorus',
             nextLabel: 'Chorus',
             genreFeel: 'Rock',
+            firstSectionBars: 7,
         });
         const cursors = freshCursors();
 
         let totalNotes = 0;
-        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+        for (let step = 6 * SPB; step < 7 * SPB; step++) {
             const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
             totalNotes += r.notes.length;
             expect(r.coordination.upcomingSectionEnergyDelta).toBeCloseTo(0.3, 5);

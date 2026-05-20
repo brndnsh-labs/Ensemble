@@ -192,12 +192,26 @@ export function generateNotesForStep(
         // `dropMuteActive` and skip emission entirely — a uniform 1-bar silence,
         // unlike the staggered per-engine intro/outro mutes. Drums are exempt:
         // the drum block emits the marking Crash on `dropCrashPending`.
+        //
+        // why formProgress: an energy-delta-INFERRED cut (a verse→chorus lift
+        // with no literal "drop" label) is gated to the back of the form so it
+        // reads as a late-song climax rather than firing on every early chorus
+        // (listen-test 2026-05-20). `step` is cumulative, so `step % total` is
+        // the position within the unrolled form. Default 1 when total is
+        // unknown (degenerate empty arrangement) — never suppress on bad data.
+        const dropTotalFormSteps = Number.isFinite(arranger.totalSteps) ? arranger.totalSteps : 0;
+        const dropFormProgress =
+            dropTotalFormSteps > 0
+                ? (((step % dropTotalFormSteps) + dropTotalFormSteps) % dropTotalFormSteps) /
+                  dropTotalFormSteps
+                : 1;
         if (
             shouldFireDropMute(
                 groove.genreFeel,
                 (coordination as any).barsUntilSectionChange,
                 (coordination as any).upcomingSectionLabel,
                 (coordination as any).upcomingSectionEnergyDelta,
+                dropFormProgress,
             )
         ) {
             (coordination as any).dropMuteActive = true;
