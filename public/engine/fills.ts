@@ -439,12 +439,85 @@ export const FILL_TEMPLATES: Record<string, GenreFills> = {
                 instruments: ['Snare', 'Snare', 'Snare', 'Snare', 'Snare', 'Crash'],
                 velocities: [0.6, 0.7, 0.8, 0.9, 1.0, 1.2],
             },
+            // why: epic-deferred-followups S8(a) — Ska-Punk tom fill. The
+            // Travis Barker / Tim Armstrong vocabulary is tom-laden: a fast
+            // H→M→L descent across the back of the bar, the fill displacing
+            // the final two skank upstrokes (steps 10/14). Velocities ride hot
+            // (the genre plays loud) and the final Low Tom lands as the pickup
+            // into the next bar's "one".
+            {
+                steps: [10, 11, 12, 13, 14, 15],
+                instruments: ['High Tom', 'High Tom', 'Mid Tom', 'Mid Tom', 'Low Tom', 'Low Tom'],
+                velocities: [0.85, 0.9, 0.95, 1.0, 1.05, 1.15],
+            },
         ],
         high: [
             {
                 steps: [0, 2, 4, 6, 8, 10, 12, 14],
                 instruments: ['Kick', 'Crash', 'Kick', 'Crash', 'Kick', 'Crash', 'Snare', 'Crash'],
                 velocities: [1.2, 1.1, 1.2, 1.1, 1.2, 1.1, 1.2, 1.3],
+            },
+            // why: S8(a) — high-energy Ska-Punk tom blitz. A 16th-note
+            // snare→tom descent (Barker "fast-fill" idiom) that tumbles down
+            // the kit and slams a Crash over the bar line. Toms interleave
+            // with snare so the fill reads as a frantic punk roll, not a
+            // metronomic tom-tom march.
+            {
+                steps: [8, 9, 10, 11, 12, 13, 14, 15],
+                instruments: [
+                    'Snare',
+                    'High Tom',
+                    'Snare',
+                    'Mid Tom',
+                    'Snare',
+                    'Low Tom',
+                    'Low Tom',
+                    'Crash',
+                ],
+                velocities: [0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.25],
+            },
+        ],
+    },
+    Reggae: {
+        // why: S8(a) — Reggae was trimmed from the Epic 7 S4 tom-template
+        // sweep, but the One Drop has real tom vocabulary. The defining
+        // gesture is the beat-1 silence (no kick/snare on the One) — Carlton
+        // Barrett famously walked a tom-down OUT of that gap. These templates
+        // keep the back-of-bar emphasis and resolve toward (not over) the
+        // empty downbeat that follows.
+        low: [
+            // Sparse rim/snare pickup — minimal One Drop fill
+            { steps: [14], instruments: ['Snare'], velocities: [0.6] },
+            { steps: [12, 14], instruments: ['Sidestick', 'Snare'], velocities: [0.5, 0.65] },
+        ],
+        medium: [
+            // Carlton Barrett tom-down — a relaxed H→M→L descent across the
+            // back half of the bar landing a Mid Tom on the "and" of 4. The
+            // gesture walks INTO the next bar's silent One, so it resolves
+            // soft (no Crash, no kick punch) — the empty downbeat is the
+            // payoff, not a cymbal splash.
+            {
+                steps: [10, 12, 14],
+                instruments: ['High Tom', 'Mid Tom', 'Low Tom'],
+                velocities: [0.7, 0.75, 0.8],
+            },
+            // Snare-led pickup with a single Mid Tom punctuation — the
+            // "talking" One Drop fill that keeps the rim feel.
+            {
+                steps: [11, 13, 14, 15],
+                instruments: ['Sidestick', 'Mid Tom', 'Low Tom', 'Snare'],
+                velocities: [0.6, 0.75, 0.8, 0.7],
+            },
+        ],
+        high: [
+            // High-energy One Drop tom roll — a fuller H→M→L tumble on the
+            // 8th grid. Still resolves to a Snare (not a Crash) so the
+            // following silent downbeat reads as the drop, the way a roots
+            // drummer (Sly Dunbar) phrases a section change.
+            {
+                steps: [8, 10, 12, 13, 14, 15],
+                instruments: ['High Tom', 'High Tom', 'Mid Tom', 'Mid Tom', 'Low Tom', 'Snare'],
+                velocities: [0.75, 0.8, 0.85, 0.9, 0.95, 0.85],
             },
         ],
     },

@@ -105,6 +105,12 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             'Hip Hop',
             'Disco',
             'Acoustic',
+            // why: epic-deferred-followups S8(a) — Reggae + Ska-Punk were
+            // trimmed from the Epic 7 S4 tom-template sweep; both have real
+            // tom vocabulary (One Drop tom-down out of the beat-1 gap;
+            // Travis Barker / Tim Armstrong tom-laden punk fills).
+            'Reggae',
+            'Ska-Punk',
         ];
 
         expectedTomGenres.forEach((genre) => {
@@ -152,6 +158,12 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             'Hip Hop',
             'Disco',
             'Acoustic',
+            // why: epic-deferred-followups S8(a) — Reggae + Ska-Punk were
+            // trimmed from the Epic 7 S4 tom-template sweep; both have real
+            // tom vocabulary (One Drop tom-down out of the beat-1 gap;
+            // Travis Barker / Tim Armstrong tom-laden punk fills).
+            'Reggae',
+            'Ska-Punk',
         ];
         const SEEDS = 120;
 
@@ -195,6 +207,12 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             'Hip Hop',
             'Disco',
             'Acoustic',
+            // why: epic-deferred-followups S8(a) — Reggae + Ska-Punk were
+            // trimmed from the Epic 7 S4 tom-template sweep; both have real
+            // tom vocabulary (One Drop tom-down out of the beat-1 gap;
+            // Travis Barker / Tim Armstrong tom-laden punk fills).
+            'Reggae',
+            'Ska-Punk',
         ];
         const SEEDS = 120;
 
@@ -240,6 +258,9 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             'Acoustic',
             'Neo-Soul',
             'Hip Hop',
+            // why: S8(a) — Reggae + Ska-Punk tom-template additions.
+            'Reggae',
+            'Ska-Punk',
         ];
 
         expectedTomGenres.forEach((genre) => {
