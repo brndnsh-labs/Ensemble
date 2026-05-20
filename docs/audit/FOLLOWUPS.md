@@ -145,7 +145,7 @@ All seven items promoted on 2026-05-19. Six to **Epic 10 / S1 (schema cleanup sw
 - **`KNOWN_SOUND_NAMES` carries inert no-space tom variants** → Epic 10 / S1 (e).
 - **Legato-extension `voice.duration` grows monotonically across chains** → Epic 10 / S1 (f).
 - **Dead role-switch arms in `conductor.ts:401-428`** → Epic 10 / S1 (also).
-- **Hype Man branch never fires in either of its test fixtures** → **Epic 9 / S6** (live bug, standalone story).
+- **Hype Man branch never fires in either of its test fixtures** → Epic 9 / S6 ✅ (shipped 2026-05-19; gate ceiling was below the scrambleHash quantile for the common test seed after the May 2026 Math.random→scrambleHash migration — Loop 0 raised to 1.0, Loop 1+ to `0.2 + bandIntensity * 0.4`).
 
 ## H. Cross-references (already routed to a story — no work tracked here)
 
