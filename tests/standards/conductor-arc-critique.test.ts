@@ -50,7 +50,7 @@
  * Source: docs/audit/epic-form-arrangement.md S7; docs/audit/form-arranger.md P2 #14.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSectionTransition } from '../../public/engine/conductor.js';
+import { checkSectionTransition, MACRO_JITTER_RANGE } from '../../public/engine/conductor.js';
 import { getJamMacroArc, JAM_CYCLE_LENGTHS } from '../../public/form-analysis.js';
 import { ACTIONS } from '../../public/types.js';
 
@@ -381,7 +381,8 @@ describe('Conductor Arc Critique (S7)', () => {
     //    the macro-arc claims. Targets must hold across the engine's natural
     //    jitter envelope, not just at the convenient 0.5 stub.
     //
-    //    The jitter adds Math.random()*0.15 - 0.075, range [-0.075, +0.075]:
+    //    The jitter adds Math.random()*MACRO_JITTER_RANGE - MACRO_JITTER_RANGE/2,
+    //    range [-MACRO_JITTER_RANGE/2, +MACRO_JITTER_RANGE/2]:
     //      warmup    p=0.10: 0.45 +/- 0.075 -> [0.375, 0.525]
     //      climax    p=0.75: 0.90 +/- 0.075 -> [0.825, 0.975]
     //      cool-down p=0.95: 0.50 +/- 0.075 -> [0.425, 0.575]
@@ -434,7 +435,9 @@ describe('Conductor Arc Critique (S7)', () => {
             // ceiling — surfaces here as a deliberate failure instead of
             // silently eating the old 0.025 cushion.
             const COOLDOWN_CEILING = 0.5; // macro ladder, conductor.ts:417
-            const JITTER_HALF_RANGE = 0.075; // = 0.15 / 2, conductor.ts:510
+            // why: derive from MACRO_JITTER_RANGE so a change to the constant
+            // automatically tightens or loosens this envelope assertion too.
+            const JITTER_HALF_RANGE = MACRO_JITTER_RANGE / 2; // = 0.075
             const WORST_CASE = COOLDOWN_CEILING + JITTER_HALF_RANGE; // 0.575
             const EPS = 1e-9;
             let passes = 0;

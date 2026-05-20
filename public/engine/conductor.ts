@@ -48,6 +48,20 @@ const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     'Bossa Nova': 0.3,
 };
 
+/**
+ * Amplitude of the ±jitter applied to `targetEnergy` during the session-timer
+ * macro-arc (`conductor.ts:501`). The jitter adds `Math.random() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2`
+ * so the realized target varies by ±MACRO_JITTER_RANGE/2 around the ladder value.
+ *
+ * why: 0.15 is wide enough for the band to breathe naturally between arc
+ * waypoints without the energy ladder feeling metronomic, but narrow enough
+ * that it can't accidentally push from one arc window (e.g. warmup ceiling 0.45)
+ * into an adjacent window's floor (development floor 0.40 — gap is 0.05).
+ * Exported so critique tests can assert the exact jitter band without
+ * hard-coding the 0.15 literal independently.
+ */
+export const MACRO_JITTER_RANGE = 0.15;
+
 export function analyzeFormUI(arranger: EnsembleState['arranger'], dispatch?: Dispatch) {
     const form = analyzeForm(arranger);
     if (form && dispatch) {
@@ -498,7 +512,7 @@ export function checkSectionTransition(
                     }
 
                     targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
-                    targetEnergy += Math.random() * 0.15 - 0.075;
+                    targetEnergy += Math.random() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2;
 
                     // why: genre-specific floors keep the auto-intensity above each
                     // genre's Snare-vs-Sidestick gate. Applied AFTER the random jitter
