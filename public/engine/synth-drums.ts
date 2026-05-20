@@ -811,7 +811,11 @@ export function playDrumSound(
     let panValue = 0;
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
         panValue = 0.35;
-    } else if (name === 'Snare' || name === 'Sidestick') {
+    } else if (name === 'Snare' || name === 'Sidestick' || name === 'Brush') {
+        // why: Brush is the low-intensity jazz substitute for the snare/sidestick
+        // and occupies the same physical drum, so it shares their slight-left
+        // placement. Without this it would fall through to center (0) and the
+        // Brush->Sidestick swap at the intensity boundary would jump the pan.
         panValue = -0.1;
     } else if (name.includes('Tom') || name.includes('Conga') || name.includes('Bongo')) {
         panValue = (Math.random() * 2 - 1) * 0.25;
@@ -1389,9 +1393,14 @@ export function playDrumSound(
         // wire-on-coated-snare rather than full-spectrum noise (which sounds like a hi-hat).
         const vol = masterVol * 0.55 * rr();
 
-        // 1. The "swish" — long noise sweep with slow attack (~35ms) and a bandpass that
-        // moves DOWNWARD from ~2.4kHz to ~1.4kHz over the sweep, mimicking the wire bristles
-        // dragging across the head as they decelerate.
+        // 1. The "swish" — the heart of the brush voice. A long, slow-attack
+        // noise sweep voiced through a bandpass that glides DOWNWARD from
+        // ~2.4kHz to ~1.4kHz. The descending centre frequency is the artistic
+        // choice that sells the gesture: a real brush is brightest at the
+        // moment of contact and darkens as the bristles fan out and lose speed
+        // across the coated head. A static or rising filter would read as a
+        // hi-hat tick; this gentle downward glide is what makes the ear hear a
+        // hand sweeping a snare rather than a burst of noise.
         const noise = playback.audio.createBufferSource();
         noise.buffer = groove.audioBuffers.noise;
         noise.loop = true;
@@ -1415,6 +1424,12 @@ export function playDrumSound(
         // at BPM<=130 (jazz ballad target).
         gain.gain.setTargetAtTime(vol * 0.4, playTime + 0.05, 0.08);
         gain.gain.setTargetAtTime(0, playTime + 0.2, 0.09);
+        // why: setTargetAtTime decays asymptotically and never truly reaches 0,
+        // so stopping the looping noise source at +0.45 with residual gain
+        // produces an audible click. A fast (20ms) tail-cut starting at +0.4
+        // drives the gain ~12x lower than the prior envelope (~6% -> ~0.5%
+        // residual) before noise.stop fires — inaudible, though not literally 0.
+        gain.gain.setTargetAtTime(0, playTime + 0.4, 0.02);
 
         noise.connect(hp);
         hp.connect(bp);
