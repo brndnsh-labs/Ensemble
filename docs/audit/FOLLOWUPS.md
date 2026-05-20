@@ -136,16 +136,24 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 
 ## G. Schema cleanup & stale carriers
 
-All seven items promoted on 2026-05-19. Six to **Epic 10 / S1 (schema cleanup sweep)**; the live bug to **Epic 9 / S6**.
+All seven items promoted on 2026-05-19 and shipped via Epic 10 / S1 sub-item commits (`refactor(soloist): rename per-section isFinalMeasure` through `refactor(conductor): rename dead role-switch arms`). The live bug went to Epic 9 / S6.
 
-- **Naming collision: `soloist.ts:1257 isFinalMeasure` vs `coordination.isFinalMeasure`** → Epic 10 / S1 (a).
-- **Three state-discipline NITs at Epic 2 S4** → Epic 10 / S1 (b).
-- **MIDI export silently drops `CowbellHigh`/`CowbellLow`** → Epic 10 / S1 (c).
-- **`KNOWN_SOUND_NAMES` substring-exemption too broad** → Epic 10 / S1 (d).
-- **`KNOWN_SOUND_NAMES` carries inert no-space tom variants** → Epic 10 / S1 (e).
-- **Legato-extension `voice.duration` grows monotonically across chains** → Epic 10 / S1 (f).
-- **Dead role-switch arms in `conductor.ts:401-428`** → Epic 10 / S1 (also).
+- **Naming collision: `soloist.ts:1257 isFinalMeasure` vs `coordination.isFinalMeasure`** → Epic 10 / S1 (a) ✅
+- **Three state-discipline NITs at Epic 2 S4** → Epic 10 / S1 (b) ✅
+- **MIDI export silently drops `CowbellHigh`/`CowbellLow`** → Epic 10 / S1 (c) ✅
+- **`KNOWN_SOUND_NAMES` substring-exemption too broad** → Epic 10 / S1 (d) ✅
+- **`KNOWN_SOUND_NAMES` carries inert no-space tom variants** → Epic 10 / S1 (e) ✅
+- **Legato-extension `voice.duration` grows monotonically across chains** → Epic 10 / S1 (f) ✅
+- **Dead role-switch arms in `conductor.ts`** → Epic 10 / S1 (conductor) ✅ (also patched the companion switch in `tick-logic.ts:642-668`)
 - **Hype Man branch never fires in either of its test fixtures** → Epic 9 / S6 ✅ (shipped 2026-05-19; gate ceiling was below the scrambleHash quantile for the common test seed after the May 2026 Math.random→scrambleHash migration — Loop 0 raised to 1.0, Loop 1+ to `0.2 + bandIntensity * 0.4`).
+
+**New entries surfaced during Epic 10 S1:**
+
+- **Two pre-existing unit-test failures unrelated to S1 cycle.** `tests/unit/engine/hiphop-integrity.test.ts` — "should route phrase-release open accents through the open lane" (line 166); `tests/unit/engine/metal-shred-integrity.test.ts` — "should play Blast Beat at high intensity (coverage for lines 127-132)". Both failures confirmed pre-existing by checking out `33374236` (cycle-start HEAD) and re-running; they fail there too. Likely drift from a recent groove change that wasn't caught by the test suite at commit time, OR fixtures grew stale. Not blocking; not in S1 scope. ~30min each to diagnose. *Source: Epic 10 S1 sweep (2026-05-19).*
+
+- **`mStep` / `stepInGroup` / `groupIndex` arrive as `undefined` in `applyGrooveOverrides` and re-pass into per-genre strategy context.** Discovered while typing the parameter bag in S1.b — tick-logic.ts:338 builds the bag without these three fields, but `GrooveOverrideOptions` declared them required until the call-site error surfaced; marked optional with a doc-comment pointing here. Strategies that read `context.mStep` etc. (some in `grooves/*.ts`) are silently consuming `undefined`. ~1h to audit consumers and either pass the values from tick-logic or remove the parameters. *Source: Epic 10 S1.b (2026-05-19).*
+
+- **DRUM_MAP / dispatcher namespace asymmetry for Conga & Bongo families.** MIDI export uses space-form keys (`'High Conga'`, `'Low Bongo'`); live `synth-drums.ts` dispatcher uses `name.startsWith('Conga')`/`startsWith('Bongo')` with suffix-first names (`'CongaHigh'`); KNOWN_SOUND_NAMES currently lists modifier-first names (`'HighConga'`) which match NEITHER side. No actual emitter writes any Conga/Bongo name today (Bongo was checked too), so the entries are inert like the toms removed in S1.e. Two clean-up paths: (1) reconcile DRUM_MAP + dispatcher + KNOWN_SOUND_NAMES on a single naming convention (probably suffix-first, matching Agogo/Cowbell), then remove inert variants; (2) leave it until an emitter actually writes a Conga/Bongo name. ~1h if pursued. *Source: Epic 10 S1.d (2026-05-19).*
 
 ## H. Cross-references (already routed to a story — no work tracked here)
 
