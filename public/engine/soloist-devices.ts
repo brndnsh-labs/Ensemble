@@ -90,10 +90,29 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         responseDirection = 0,
         responseEntryTarget = false,
         responseCadenceTarget = false,
+        accompanimentMidis,
     } = ctx;
 
     const devBaseVel = 0.5 + effectiveIntensity * 0.6;
     let deviceBuffer: any[] = [];
+
+    // why: epic-coordination-consistency S5.b — precompute the unison PC set
+    // from the already-published `coordination.stepCoordination.accompanimentMidis`.
+    // The enclosure/run branch consults this to flip neighbor direction when the
+    // FIRST-FIRED neighbor (the device's "approach" note, the one the listener
+    // actually hears as the gesture's voice) would land on a unison PC. Keeps
+    // the device shape — 3-note approach into selectedMidi — but routes the
+    // approach around the chord stab. selectedMidi itself has already been
+    // biased away from unison PCs by the picker (final-stage 0.05× at
+    // soloist-pitch-engine.ts:1154); this floor closes the device-system gap.
+    const accompPcSet =
+        accompanimentMidis && accompanimentMidis.length > 0
+            ? new Set<number>(
+                  accompanimentMidis.map(
+                      (m: number) => ((((m as number) % 12) + 12) % 12) as number,
+                  ),
+              )
+            : null;
     const canUseMotifShape = ['blues', 'jazz', 'bird', 'neo', 'bossa', 'scalar'].includes(
         activeStyle,
     );
@@ -312,18 +331,62 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             curr = n;
         }
     } else if (deviceType === 'run' || deviceType === 'enclosure') {
+        // why: epic-coordination-consistency S5.b — the device emits 2 non-target
+        // pitches ("approach" notes) around selectedMidi. If any approach lands on
+        // a PC that's currently in the chord stab (accompPcSet), the device's voice
+        // masks the chord. Different mitigations per device shape:
+        //
+        //   - enclosure (notes [+1, −1, selectedMidi] regardless of approach
+        //     direction; approach only sets order): if EITHER ±1 neighbor is
+        //     on a unison PC, both will be emitted — flipping approach can't
+        //     route around it. Skip the device entirely; the picker's single-
+        //     note fallback at selectedMidi is already biased away from unison
+        //     PCs by the final-stage 0.05× multiplier (soloist-pitch-engine.ts
+        //     :1154). Better to drop a 3-note gesture than smear it.
+        //
+        //   - run (notes [+approach×2, +approach, selectedMidi], all on the
+        //     SAME side): if the chosen direction has unison on either step,
+        //     try flipping approach; if both directions still have a unison
+        //     in their 2-step span, skip.
+        //
+        // selectedMidi itself has already been biased away from unison PCs by
+        // the picker; this floor closes the device-system's neighbor-pitch gap.
+        let approach = motifApproach;
+        if (accompPcSet) {
+            const pcAt = (delta: number) => (((selectedMidi + delta) % 12) + 12) % 12;
+            if (deviceType === 'enclosure') {
+                // Both ±1 neighbors always emit. If either is unison, skip.
+                if (accompPcSet.has(pcAt(1)) || accompPcSet.has(pcAt(-1))) {
+                    return null;
+                }
+            } else {
+                // run: 2-step span on one side. Try the original direction; if
+                // either of its two pitches is unison, try the opposite. If both
+                // sides have a unison hit in their span, skip.
+                const origDirHasUnison =
+                    accompPcSet.has(pcAt(approach)) || accompPcSet.has(pcAt(approach * 2));
+                const oppDirHasUnison =
+                    accompPcSet.has(pcAt(-approach)) || accompPcSet.has(pcAt(-approach * 2));
+                if (origDirHasUnison && oppDirHasUnison) {
+                    return null;
+                }
+                if (origDirHasUnison && !oppDirHasUnison) {
+                    approach = -approach;
+                }
+            }
+        }
         const upperNeighbor = selectedMidi + 1;
         const lowerNeighbor = selectedMidi - 1;
         if (deviceType === 'run') {
             deviceBuffer = [
                 {
-                    midi: selectedMidi + motifApproach * 2,
+                    midi: selectedMidi + approach * 2,
                     velocity: devBaseVel * 0.9,
                     durationSteps: 1,
                     style: activeStyle,
                 },
                 {
-                    midi: selectedMidi + motifApproach,
+                    midi: selectedMidi + approach,
                     velocity: devBaseVel * 1.1,
                     durationSteps: 1,
                     style: activeStyle,
@@ -336,8 +399,8 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
                 },
             ];
         } else {
-            const firstNeighbor = motifApproach > 0 ? upperNeighbor : lowerNeighbor;
-            const secondNeighbor = motifApproach > 0 ? lowerNeighbor : upperNeighbor;
+            const firstNeighbor = approach > 0 ? upperNeighbor : lowerNeighbor;
+            const secondNeighbor = approach > 0 ? lowerNeighbor : upperNeighbor;
             deviceBuffer = [
                 {
                     midi: firstNeighbor,

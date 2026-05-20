@@ -1277,6 +1277,15 @@ export function selectPitchAndDevices(
         responseDirection,
         responseEntryTarget: isResponseEntryTarget,
         responseCadenceTarget: isResponseCadenceTarget,
+        // why: epic-coordination-consistency S5.b — the device generator emits
+        // neighbor/approach pitches around `selectedMidi` (enclosure ±1, run
+        // ±motifApproach × {1,2}). The picker has already biased selectedMidi
+        // away from accompaniment PCs (final-stage 0.05× at :1154), but those
+        // device-generated neighbor pitches can themselves land on a unison
+        // PC, masking the device gesture against the chord stab. Forward the
+        // already-published `accompanimentMidis` so the device picker can
+        // reject candidate devices whose generated buffer lands on unison PCs.
+        accompanimentMidis: coordination.stepCoordination?.accompanimentMidis,
     };
 
     // --- Structural Awareness: Turnaround Handling ---
