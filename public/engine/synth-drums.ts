@@ -186,6 +186,7 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     'Agogo',
     'CowbellHigh',
     'CowbellLow',
+    'Cowbell',
     'Brush',
     // why: no-space tom variants are inert — every fill template emits the
     // space-form (`'High Tom'`/`'Mid Tom'`/`'Low Tom'`). The
@@ -206,25 +207,57 @@ const KNOWN_SOUND_NAMES = new Set<string>([
 
 const warnedUnknownSounds = new Set<string>();
 
+// why: enumerate the exact suffix vocabulary that each per-family dispatcher
+// branch in `playDrum` actually recognizes. Substring matching like
+// `name.startsWith('Cowbell')` was too lax — a typo like `'CowbellMid'` would
+// be exempt from the warning AND would silently render as the low-bias variant
+// because the dispatcher's `isHigh = (name === 'CowbellHigh')` check returns
+// false. Listing the legal suffixes here makes typos warn loudly while
+// preserving the exemption for canonical names. Each entry is a tuple of
+// `{ root, suffixes, spacedForm }`:
+//   - `root` matches both the bare name (`'Cowbell'`) and `<root><suffix>`.
+//   - `suffixes` are the exact dispatcher-recognized variants.
+//   - `spacedForm` allows the `'<Suffix> <Root>'` emission style used by Toms
+//     (live grooves emit `'High Tom'`, which the dispatcher matches via
+//     `name.includes('Tom')`).
+const DISPATCHER_FAMILIES: ReadonlyArray<{
+    root: string;
+    suffixes: readonly string[];
+    spacedForm?: boolean;
+}> = [
+    { root: 'Tom', suffixes: ['High', 'Mid', 'Low'], spacedForm: true },
+    { root: 'Conga', suffixes: ['High', 'Low', 'Open', 'Mute', 'Slap'] },
+    { root: 'Bongo', suffixes: ['High', 'Low'] },
+    { root: 'Agogo', suffixes: ['High', 'Low'] },
+    { root: 'Cowbell', suffixes: ['High', 'Low'] },
+];
+
+function isDispatcherRecognizedFamilyName(name: string): boolean {
+    for (const { root, suffixes, spacedForm } of DISPATCHER_FAMILIES) {
+        if (name === root) {
+            return true;
+        }
+        for (const sfx of suffixes) {
+            if (name === root + sfx) {
+                return true;
+            }
+            if (spacedForm && name === `${sfx} ${root}`) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Emit a single console.warn for any unknown drum soundName. Once per name
  * per session — drummer engines should never crash playback, just degrade.
- * Tom/Conga/Bongo names are matched by `includes/startsWith` in the dispatcher,
- * so any name containing those tokens is implicitly known.
+ * Family names (Tom/Conga/Bongo/Agogo/Cowbell) are exempted only for the
+ * exact suffix variants the dispatcher actually renders (see
+ * `DISPATCHER_FAMILIES` above); typos like `'CowbellMid'` will warn.
  */
 function maybeWarnUnknownSound(name: string): void {
-    if (KNOWN_SOUND_NAMES.has(name)) {
-        return;
-    }
-    // why: dispatcher uses substring matching for the drum-family branches —
-    // anything containing 'Tom'/'Conga'/'Bongo'/'Agogo'/'Cowbell' will route somewhere.
-    if (
-        name.includes('Tom') ||
-        name.startsWith('Conga') ||
-        name.startsWith('Bongo') ||
-        name.startsWith('Agogo') ||
-        name.startsWith('Cowbell')
-    ) {
+    if (KNOWN_SOUND_NAMES.has(name) || isDispatcherRecognizedFamilyName(name)) {
         return;
     }
     if (warnedUnknownSounds.has(name)) {
