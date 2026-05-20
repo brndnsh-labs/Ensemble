@@ -215,8 +215,12 @@ describe('Soloist head-bypass jitter — PRNG determinism (Epic 10 S2.a)', () =>
 
         // Need a non-trivial sample of picker-sourced seed-step attacks for the
         // assertion to mean anything. 64 bars × 4 seed steps = 256 attacks;
-        // even with device firings removing some, well over 100 stay picker.
-        expect(comparable).toBeGreaterThan(100);
+        // device firings on the loop-2 (exploratory) head-bypass notes claim a
+        // share of them. Floor lowered 100 → 80 (measured 92, deterministic
+        // fixed seeds): later-Epic-11 device-distribution changes raised the
+        // loop-2 device rate, which is by-design progressive ornamentation —
+        // 80+ clean probes is still a decisive sample for the 0-mismatch check.
+        expect(comparable).toBeGreaterThan(80);
         // The jitter is seeded by (barIndex, sectionId, headNote.step) — no
         // dependence on the Math.random stream. Two different streams MUST
         // produce identical device-free seed-step MIDIs. Pre-fix (un-seeded
