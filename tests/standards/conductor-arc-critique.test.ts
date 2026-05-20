@@ -339,6 +339,40 @@ describe('Conductor Arc Critique (S7)', () => {
             // Threshold 0.20 with 0.05 cushion below worst-case.
             expect(climax - coolDown).toBeGreaterThanOrEqual(0.2);
         });
+
+        // ---------------------------------------------------------------
+        // Low-energy section coverage. Every test above uses a Chorus
+        // next-section (getSectionEnergy = 0.9), which exceeds every
+        // macroCeiling in the ladder — so `Math.min(macroCeiling, energy)`
+        // ALWAYS resolves to the ceiling and the section-energy term is
+        // never actually observed. This companion drives a transition INTO
+        // a Verse (energy 0.5) at progress 0.25: the development window is
+        // [0.40, 0.70], so 0.5 sits strictly inside the clamp and passes
+        // through untouched. The realized target therefore reads
+        // getSectionEnergy('Verse') directly, not the ceiling. If the
+        // engine wrongly clamped to macroCeiling (or dropped the
+        // section-energy term), this would land at 0.70 instead of 0.5.
+        // ---------------------------------------------------------------
+        it('low-energy next section -> targetIntensity is the section energy, not the ceiling', () => {
+            const state = makeMockState();
+            // makeMockState sets `conductor.form = null` (the production path —
+            // see header note), so the role-switch at conductor.ts:441-504 is
+            // skipped and the `else` fallback at conductor.ts:506 runs:
+            // `targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel)`.
+            // That's the line under test — relabel the stepMap chord B (the
+            // section the step-16 transition lands in) to Verse. `sections[1]`
+            // is relabelled too only to keep the mock internally consistent;
+            // with form=null nothing reads `sections[].label`.
+            state.arranger.sections[1].label = 'Verse';
+            state.arranger.stepMap[1].chord.sectionLabel = 'Verse';
+
+            const { targetIntensity } = runTransitionAtProgress(0.25, { mockState: state });
+            // why 0.5: getSectionEnergy('Verse') = 0.5; development-window clamp
+            // [0.40, 0.70] leaves it untouched; Math.random stub 0.5 -> jitter 0;
+            // Rock genre floor 0.35 < 0.5, so no lift. Ceiling here is 0.70 — a
+            // ceiling-clamp regression would surface as 0.70.
+            expect(targetIntensity).toBeCloseTo(0.5, 5);
+        });
     });
 
     // ---------------------------------------------------------------------
@@ -390,7 +424,18 @@ describe('Conductor Arc Critique (S7)', () => {
             expect(passes).toBeGreaterThanOrEqual(30);
         });
 
-        it('cool-down window: target < 0.6 across 30 seeds', () => {
+        it('cool-down window: target stays inside the jitter envelope across 30 seeds', () => {
+            // The cool-down macroCeiling is 0.5; the jitter at conductor.ts:510
+            // is `Math.random() * 0.15 - 0.075`, range [-0.075, +0.075). So the
+            // realized target cannot exceed 0.5 + 0.075 = 0.575. Asserting
+            // against THAT envelope edge (rather than a loose < 0.6) means a
+            // regression that widens the jitter — or raises the cool-down
+            // ceiling — surfaces here as a deliberate failure instead of
+            // silently eating the old 0.025 cushion.
+            const COOLDOWN_CEILING = 0.5; // macro ladder, conductor.ts:417
+            const JITTER_HALF_RANGE = 0.075; // = 0.15 / 2, conductor.ts:510
+            const WORST_CASE = COOLDOWN_CEILING + JITTER_HALF_RANGE; // 0.575
+            const EPS = 1e-9;
             let passes = 0;
             const samples: number[] = [];
             for (const seed of SEEDS) {
@@ -398,32 +443,35 @@ describe('Conductor Arc Critique (S7)', () => {
                 const { targetIntensity } = runTransitionAtProgress(0.95, {
                     randomImpl: prng,
                 });
-                samples.push(targetIntensity ?? 0);
-                if ((targetIntensity ?? 0) < 0.6) {
+                const v = targetIntensity ?? 0;
+                samples.push(v);
+                if (v <= WORST_CASE + EPS) {
                     passes++;
                 }
             }
+            const maxSample = Math.max(...samples);
             console.log('\n--- CONDUCTOR ARC CRITIQUE — COOL-DOWN SWEEP ---');
             console.log(`[Seeds]              30 (mulberry32)`);
             console.log(`[Target window]      progress 0.95 (cool-down: macro [0.2, 0.5])`);
-            console.log(`[Assertion]          targetIntensity < 0.6`);
+            console.log(`[Assertion]          targetIntensity <= ${WORST_CASE} (ceiling + jitter)`);
             console.log(`[Audit-doc claim]    "drops < 0.5 in final 15%"`);
             console.log(
-                `[Engine reality]     clamps at ceiling 0.5; +/-0.075 jitter -> [0.425, 0.575]`,
+                `[Engine reality]     clamps at ceiling 0.5; +/-0.075 jitter -> [0.425, 0.575)`,
             );
             console.log(`[Passes]             ${passes}/30`);
             console.log(
                 `[Sample mean]        ${(samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(3)}`,
             );
             console.log(
-                `[Sample min/max]     ${Math.min(...samples).toFixed(3)} / ${Math.max(...samples).toFixed(3)}`,
+                `[Sample min/max]     ${Math.min(...samples).toFixed(3)} / ${maxSample.toFixed(3)}`,
             );
             console.log('-------------------------------------------------\n');
 
-            // Engine reality: max realized value is 0.5 + 0.075 = 0.575 (with
-            // Chorus-label clamp at ceiling 0.5). 0.6 with 0.025 cushion above
-            // the engine's worst-case sample.
+            // Every seed must land at or below the engine's worst-case sample
+            // (ceiling + half-jitter). Pinned to the jitter constant above —
+            // if conductor.ts:510 widens the envelope, this fails on purpose.
             expect(passes).toBeGreaterThanOrEqual(30);
+            expect(maxSample).toBeLessThanOrEqual(WORST_CASE + EPS);
         });
 
         it('arc-direction: climax > cool-down for every seed', () => {

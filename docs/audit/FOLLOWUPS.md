@@ -120,12 +120,12 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 - **Picker-output-only chromatism metric for Epic 4 S1** → Epic 10 / S2 (c) ✅ (shipped 2026-05-19).
 - **Soloist test fixtures don't seed `Math.random`** → Epic 10 / S2 (d) ✅ (shipped 2026-05-19; `tests/utils/seeded-random.ts`).
 - **Evans cadence test doesn't isolate phrase-end attacks** → Epic 10 / S2 (e) ✅ (shipped 2026-05-19).
-- **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a).
-- **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b).
+- **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a) ✅ (shipped 2026-05-19).
+- **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b) ✅ (shipped 2026-05-19).
 - **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c).
 - **Sparse-vibe cell collapse + active-vibe ornament collision** → Epic 10 / S3 (d).
-- **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e).
-- **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f).
+- **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e) ✅ (shipped 2026-05-19).
+- **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f) ✅ (shipped 2026-05-19).
 - **S8 funk-backbeat-presence integration coverage** → Epic 10 / S3 (h).
 - **Pad-sustain test doesn't exercise scheduler or synth legato paths** → Epic 10 / S3 (g).
 
@@ -141,6 +141,10 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 - **First-call module warm-up artifact in `getSoloistNote`.** The very first `getSoloistNote` call in a process sets module-level state that `RESET_STATE` does not clear; run #1 of a test file can differ at step 0 from runs #2+ (runs #2/#3 are identical to each other). `soloist-engine-determinism.test.ts` works around it with a discarded warm-up pass. Low impact (only step 0 of a fresh process) but the registry is dishonest — `resetSoloistState` should fully reset whatever step-0 reads. ~1h to locate and clear. *Source: Epic 10 S2.b (2026-05-19).*
 
 - **`isEvansCadence` early-exit is a weak lever.** The S2 (e) finding's premise held — the legacy Evans-cadence test passed with the guard reverted — but the deeper cause is that the `isEvansCadence` early-exit (`soloist-pitch-engine.ts` ~line 757, skip the Evans extension boost at phrase-end response attacks) shifts the phrase-end home rate only ~4.6pt (39.3% → 43.9%, 20-seed aggregate). The picker's phrase-end ×4.0 root/5th pull and `isCallResponse ×8.0` boost already dominate the ×3.5 Evans extension boost the guard suppresses. The new `soloist-evans-cadence-critique.test.ts` guards it via a 20-seed aggregate, but the headroom is intrinsically thin. If the V→I cadence at Evans phrase-ends is meant to be a stronger musical signal, the guard should additionally *boost* root/5th (not merely *skip* the extension boost). ~1-2h, needs a listen test. *Source: Epic 10 S2.e (2026-05-19).*
+
+**New entries surfaced during Epic 10 S3:**
+
+- **Conductor macro-arc jitter is an un-named inline literal.** `conductor.ts:510` is `targetEnergy += Math.random() * 0.15 - 0.075`. The S3 (e) cool-down test now pins its bound to this envelope (`JITTER_HALF_RANGE = 0.075`) but has to hand-copy the constant with a line-ref comment, which rots if the line moves. Naming it at module scope (`MACRO_JITTER_RANGE = 0.15`) and importing it into `conductor-arc-critique.test.ts` would make the test self-updating. ~15min, mechanical. *Source: Epic 10 S3.e review (2026-05-19).*
 
 - **`dispatch(ACTIONS.UPDATE_PLAYBACK, ...)` in `jazz-soloist-authenticity.test.ts:12` is a silent no-op.** `UPDATE_PLAYBACK` is not a real action — playback flags use `ACTIONS.SET_PARAM` with `{ module: 'playback', param, value }`. The legacy test's `beforeEach` line `dispatch(ACTIONS.UPDATE_PLAYBACK, { debugSoloist: true })` therefore never set `debugSoloist`; the file's tests don't depend on it so they still pass, but the line is misleading. Fix to `SET_PARAM` or delete. ~5min. *Source: Epic 10 S2.e (2026-05-19).*
 
