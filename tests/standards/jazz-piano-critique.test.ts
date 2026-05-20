@@ -158,11 +158,25 @@ describe('Jazz Piano Critique', () => {
     //      `STICKY_GENRES` list update: if Jazz/Bossa/Blues aren't added, the
     //      non-STICKY branch leaves the per-bar re-roll path live and loop-
     //      equality fails.
+    // why: Bossa post-S5.c-followup uses its own 4-cell partido-alto bank, sourced
+    //      from a dedicated `bossaRotationIndex` counter that advances once per
+    //      STICKY picker call (2-bar retention pinned for Bossa). The picker treats
+    //      `phraseIndex` as the rotation counter directly (no internal shift).
+    //      Jazz/Blues retain the 4-bar Charleston-family `barIndex >> 2` shift
+    //      inside the picker. `phraseIndex(bar)` reflects this: Bossa hands the
+    //      picker `bar >> 1` (the simulated rotation-counter value at the start
+    //      of each 2-bar phrase), Jazz/Blues hand it the raw bar. `phraseLength`
+    //      is the number of bars sharing a single cell (= STICKY retention).
     describe.each([
-        { genre: 'Jazz', bankSize: 5 },
-        { genre: 'Bossa', bankSize: 5 },
-        { genre: 'Blues', bankSize: 4 },
-    ])('$genre comping cell bank (S2: phrase-stable Charleston picker)', ({ genre, bankSize }) => {
+        { genre: 'Jazz', bankSize: 5, phraseLength: 4, phraseIndexFor: (bar: number) => bar },
+        { genre: 'Bossa', bankSize: 4, phraseLength: 2, phraseIndexFor: (bar: number) => bar >> 1 },
+        { genre: 'Blues', bankSize: 4, phraseLength: 4, phraseIndexFor: (bar: number) => bar },
+    ])('$genre comping cell bank (S2: phrase-stable Charleston picker)', ({
+        genre,
+        bankSize,
+        phraseLength,
+        phraseIndexFor,
+    }) => {
         const ts4 = { beats: 4, stepsPerBeat: 4, backbeat: [1, 3] };
         // generateCompingPattern reads only playback.bandIntensity/complexity off
         // state, so a minimal stub is enough for direct-bank assertions.
@@ -186,6 +200,7 @@ describe('Jazz Piano Critique', () => {
             compingState.lastSectionId = null;
             compingState.lastVoicingMidis = [];
             compingState.funkRotationIndex = 0;
+            compingState.bossaRotationIndex = 0;
         };
 
         // why: every test in this describe runs against the parametrized genre,
@@ -195,26 +210,37 @@ describe('Jazz Piano Critique', () => {
             mockState.groove.genreFeel = genre;
         });
 
-        it(`holds the same cell across all 4 bars of one phrase (phrase stability)`, () => {
-            // why: THE core S2 acceptance — `(sectionId, barIndex >> 2)` hash
-            //      means bars 0-3 share the same picker output, bars 4-7 share
-            //      a (different or same) picker output, etc. Cell IDENTITY,
-            //      not just "rhythmic density similar" — the named claim is
-            //      cell-stability across the phrase, so we measure cell equality
-            //      directly. Smell (c) guard: no density proxy.
-            for (const phraseStart of [0, 4, 8, 12]) {
+        it(`holds the same cell across all ${phraseLength} bars of one phrase (phrase stability)`, () => {
+            // why: THE core S2 acceptance — `(sectionId, barIndex >> shift)` hash
+            //      means consecutive bars within one phrase share the same
+            //      picker output. Jazz/Blues use a 4-bar phrase (`>> 2`); Bossa
+            //      post-S5.c uses a 2-bar phrase (`>> 1`, partido-alto's
+            //      shorter clave-cycle). Cell IDENTITY, not just "rhythmic
+            //      density similar" — the named claim is cell-stability across
+            //      the phrase, so we measure cell equality directly. Smell (c)
+            //      guard: no density proxy.
+            const phraseStarts = [0, phraseLength, phraseLength * 2, phraseLength * 3];
+            for (const phraseStart of phraseStarts) {
                 const phraseCells = [];
-                for (let bar = phraseStart; bar < phraseStart + 4; bar++) {
+                for (let bar = phraseStart; bar < phraseStart + phraseLength; bar++) {
                     phraseCells.push(
                         cellKey(
-                            generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, bar, 'A'),
+                            generateCompingPattern(
+                                stateStub,
+                                genre,
+                                'balanced',
+                                ts4,
+                                16,
+                                phraseIndexFor(bar),
+                                'A',
+                            ),
                         ),
                     );
                 }
-                // All 4 bars of one phrase produce the same cell.
-                expect(phraseCells[1]).toEqual(phraseCells[0]);
-                expect(phraseCells[2]).toEqual(phraseCells[0]);
-                expect(phraseCells[3]).toEqual(phraseCells[0]);
+                // All bars within one phrase produce the same cell.
+                for (let i = 1; i < phraseLength; i++) {
+                    expect(phraseCells[i]).toEqual(phraseCells[0]);
+                }
             }
         });
 
@@ -232,7 +258,7 @@ describe('Jazz Piano Critique', () => {
                     'balanced',
                     ts4,
                     16,
-                    bar,
+                    phraseIndexFor(bar),
                     'A',
                 );
                 seen.add(cellKey(cell));
@@ -256,15 +282,39 @@ describe('Jazz Piano Critique', () => {
             for (let bar = 0; bar <= 12; bar++) {
                 sequential.push(
                     cellKey(
-                        generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, bar, 'A'),
+                        generateCompingPattern(
+                            stateStub,
+                            genre,
+                            'balanced',
+                            ts4,
+                            16,
+                            phraseIndexFor(bar),
+                            'A',
+                        ),
                     ),
                 );
             }
             const restartAt12 = cellKey(
-                generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, 12, 'A'),
+                generateCompingPattern(
+                    stateStub,
+                    genre,
+                    'balanced',
+                    ts4,
+                    16,
+                    phraseIndexFor(12),
+                    'A',
+                ),
             );
             const restartAt8 = cellKey(
-                generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, 8, 'A'),
+                generateCompingPattern(
+                    stateStub,
+                    genre,
+                    'balanced',
+                    ts4,
+                    16,
+                    phraseIndexFor(8),
+                    'A',
+                ),
             );
             expect(restartAt12).toEqual(sequential[12]);
             expect(restartAt8).toEqual(sequential[8]);
@@ -285,10 +335,26 @@ describe('Jazz Piano Critique', () => {
             const phraseStarts = [0, 4, 8, 12, 16];
             for (const bar of phraseStarts) {
                 const a = cellKey(
-                    generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, bar, 'A'),
+                    generateCompingPattern(
+                        stateStub,
+                        genre,
+                        'balanced',
+                        ts4,
+                        16,
+                        phraseIndexFor(bar),
+                        'A',
+                    ),
                 );
                 const b = cellKey(
-                    generateCompingPattern(stateStub, genre, 'balanced', ts4, 16, bar, 'B'),
+                    generateCompingPattern(
+                        stateStub,
+                        genre,
+                        'balanced',
+                        ts4,
+                        16,
+                        phraseIndexFor(bar),
+                        'B',
+                    ),
                 );
                 if (a !== b) {
                     diffs++;
@@ -365,13 +431,19 @@ describe('Jazz Piano Critique', () => {
             const distinctCells = new Set(loop1).size;
             console.log(
                 `\n--- ${genre.toUpperCase()} COMPING LOOP DETERMINISM ---\n` +
-                    `[Distinct cells across 32 bars] ${distinctCells} (bank=${bankSize})\n` +
+                    `[Distinct cells across 32 bars] ${distinctCells} (bank=${bankSize}, phraseLength=${phraseLength})\n` +
                     `--------------------------------------\n`,
             );
-            // why: 32 bars / 4-bar phrases = 8 phrases. With a non-degenerate
-            //      hash and a bank of size N, expected distinct ≈ N (the bank
-            //      should be fully covered). Threshold = full bank size, no
-            //      sub-baseline slack.
+            // why: 32 bars / STICKY retention = picks per loop. With a non-
+            //      degenerate hash and a bank of size N, expected distinct ≈ N
+            //      (the bank should be fully covered).
+            //
+            //      Bossa (post-S5.c-followup): the bar-A/bar-B aliasing flagged in
+            //      review is now fixed — Bossa uses 2-bar STICKY retention plus a
+            //      dedicated `bossaRotationIndex` counter advancing 1-per-pick.
+            //      32 bars / 2 = 16 picks → cells walk 0,1,2,3,0,1,... → all 4
+            //      bank entries reached → bar-A/bar-B alternation structurally
+            //      produced. Full-bank coverage is the right assertion now.
             expect(distinctCells).toBeGreaterThanOrEqual(bankSize);
         });
     });

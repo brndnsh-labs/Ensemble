@@ -32,6 +32,14 @@ interface CompingState {
     //      is tied to rotation events, not to bar arithmetic that collides with
     //      the rotation-length snap interval. Reset on section change.
     funkRotationIndex: number;
+    // why: epic-coordination-consistency S5.c follow-up — same shape as
+    //      funkRotationIndex but for Bossa. Bossa partido-alto needs 2-bar
+    //      STICKY retention (call/answer alternation across bar A and bar B is
+    //      the genre's defining cycle); the original `barIndex >> 1` hash aliased
+    //      against the 4/8-bar STICKY retention to one or two reachable cells.
+    //      A dedicated rotation counter advances by 1 per picker call so the cell
+    //      bank sweeps consecutively. Reset on section change.
+    bossaRotationIndex: number;
 }
 
 /**
@@ -52,6 +60,7 @@ export const compingState: CompingState = {
     lastSectionId: null,
     lastVoicingMidis: [],
     funkRotationIndex: 0,
+    bossaRotationIndex: 0,
 };
 
 // why: STICKY genres retain the comping cell across multiple bars instead of
@@ -212,6 +221,65 @@ const JAZZ_COMPING_CELLS: readonly (readonly number[])[] = [
     //      anticipation note before the next bar. Threshold 0.0–0.1 in the old
     //      picker (rarest), preserved as the most spacious bank entry.
     [14],
+] as const;
+
+/**
+ * Bossa partido-alto comping cell bank.
+ *
+ * Source: chords.md P0 #2 / epic-deterministic-phrasing S2 follow-up;
+ * epic-coordination-consistency S5.c.
+ *
+ * Bossa nova partido-alto is a clave-derived 2-bar 16th-note cell, NOT American
+ * swing Charleston. The previous picker routed Bossa through `JAZZ_COMPING_CELLS`
+ * as a port-for-fidelity choice, which preserved the determinism win of S2 but
+ * left Bossa speaking Charleston dialect — flat-half-note pulse — instead of the
+ * partido-alto pattern that defines the genre (bossa-guitar right-hand thumb-
+ * and-fingers comping, ANSWERED by the singer on the &-of-4 anticipation-of-1).
+ *
+ * The canonical partido-alto figure ANTICIPATES beat 1 of the next bar with a
+ * tied &-of-4 hit (step 14) — this is the genre's signature gesture. Every cell
+ * here includes step 14 so anticipation-of-1 fires on chord-change downbeats
+ * (the consumer at `getAccompanimentNotes` interprets a step-14 hit immediately
+ * before a chord change as a tie INTO the new chord's downbeat).
+ *
+ * 16th-grid nomenclature (beat-N at step 4*(N-1); e=+1; &=+2; a=+3):
+ *   Steps:  0  1  2  3   4  5  6  7   8  9 10 11  12 13 14 15
+ *   Names:  1  e  &  a   2  e  &  a   3  e  &  a   4  e  &  a
+ *
+ * 4 distinct cells (vs Jazz's 5) — Bossa's identity is the &-of-4 anticipation
+ * plus the &-of-2 / &-of-3 syncopation; the deep cell variety lives in the
+ * 2-bar answer pattern (sectionHash + phraseHash modulating cell choice), not
+ * in flat cell count. Keyed by `(sectionId, bossaRotationIndex)` — the picker
+ * fires every 2 bars (Bossa-pinned STICKY retention) and the counter advances
+ * by 1 per pick, so consecutive bars-A/B sweep consecutive cells.
+ *
+ * Indices computed against 4/4 with stepsPerBeat=4 (the dominant Bossa time
+ * signature). Other time signatures fall through to the Jazz Charleston bank.
+ */
+const BOSSA_PARTIDO_ALTO_CELLS: readonly (readonly number[])[] = [
+    // why: partido-alto principal cell (One + offbeat trio: &-of-2 + &-of-3 +
+    //      &-of-4). Most common partido-alto figure; the &-of-4 closes the bar
+    //      with anticipation of the NEXT bar's downbeat — the genre's "thumb
+    //      plays the One, fingers answer on every offbeat" signature. (Note:
+    //      this is NOT a 2-3 son clave — son clave is a 2-bar inter-bar contour,
+    //      not a single-bar pattern; the rename clarifies the actual provenance.)
+    [0, 6, 10, 14],
+    // why: answering bar (3-2 son inversion). Drops the downbeat (right hand
+    //      rests on 1), syncopates &-of-1 → &-of-2 → &-of-3 → &-of-4. Sits in
+    //      pure offbeat space; tied to anticipation-of-1 via step 14. The
+    //      classic alternate-bar bossa-guitar right-hand groove.
+    [2, 6, 10, 14],
+    // why: "fat bossa" thickening (One + &-of-1 + &-of-2 + &-of-3 + &-of-4) — five-
+    //      hit cell that doubles the principal-cell offbeat pulse with an extra
+    //      &-of-1 hit, keeping the thumb on One and adding a continuous offbeat
+    //      sweep through the bar. Idiomatic partido-alto thickening (vs the earlier
+    //      [1, 3, ...] e-of-1+a-of-1 push, which read as samba-percussion fill,
+    //      not bossa-guitar right-hand vocabulary). Step 14 anchors the anticipation.
+    [0, 2, 6, 10, 14],
+    // why: sparse breath cell (One + &-of-3 + &-of-4). Three-hit minimal
+    //      partido-alto — when the soloist is busy, the comper drops back to
+    //      this stripped figure while still landing the anticipation-of-1.
+    [0, 10, 14],
 ] as const;
 
 /**
@@ -873,6 +941,65 @@ export function generateCompingPattern(
         return pattern;
     }
 
+    if (genre === 'Bossa' && ts.beats >= 4 && spb === 4) {
+        // why: epic-coordination-consistency S5.c — partido-alto cell bank,
+        //      distinct from Jazz Charleston. The picker mirrors the Jazz
+        //      branch structure (`(sectionId, phraseHash)` keyed cell pick,
+        //      vibe modulates the cell rather than re-rolls the pick) and the
+        //      partido-alto bank. `ts.beats >= 4 && spb === 4` preserves the
+        //      Jazz-Charleston fallback for non-standard Bossa time signatures
+        //      (rare) — partido-alto is structurally a 4/4 16th-note idiom.
+        //
+        //      S5.c follow-up: `phraseIndex` here is `compingState.bossaRotationIndex`
+        //      (caller — see `updateRhythmicIntent`), a counter advancing by 1 per
+        //      picker call. The original `barIndex >> 1` hash aliased against the
+        //      {4, 8}-bar STICKY retention to one or two reachable cells, erasing
+        //      the genre-defining bar-A/bar-B alternation. With 2-bar retention
+        //      pinned for Bossa, the counter walks 0,1,2,3,... and we use it
+        //      directly (no shift) so the cell bank sweeps consecutively.
+        const phraseHash = phraseIndex;
+        const sectionHash = hashSectionId(sectionId);
+        const cellIndex =
+            (((sectionHash * 17 + phraseHash * 31) % BOSSA_PARTIDO_ALTO_CELLS.length) +
+                BOSSA_PARTIDO_ALTO_CELLS.length) %
+            BOSSA_PARTIDO_ALTO_CELLS.length;
+        const cell = BOSSA_PARTIDO_ALTO_CELLS[cellIndex];
+
+        // why: anticipation-of-1 (step 14) is the load-bearing partido-alto
+        //      gesture. Even on `sparse` vibe we keep step 14 because
+        //      dropping it would erase the genre signature — instead, sparse
+        //      drops the EARLIEST hit (the downbeat or e-of-1) so the bar
+        //      breathes while still landing the anticipation.
+        if (vibe === 'sparse') {
+            if (cell.length <= 1) {
+                hit(cell[0] ?? 14);
+                return pattern;
+            }
+            // Drop the first (earliest) hit; keep step 14 (always last).
+            for (let i = 1; i < cell.length; i++) {
+                hit(cell[i]);
+            }
+            return pattern;
+        }
+
+        for (let i = 0; i < cell.length; i++) {
+            hit(cell[i]);
+        }
+
+        // why: `active` vibe adds one ornament on e-of-3 (step 9) — a 16th
+        //      that thickens the bar's middle without colliding with any
+        //      cell's existing hits (every cell sits on steps {0,1,2,3,6,
+        //      10,14}, none on 9). Phrase-gated so it doesn't fire on every
+        //      active bar.
+        if (vibe === 'active') {
+            const ornamentStep = 9; // e-of-3
+            if (pattern[ornamentStep] !== 1 && (sectionHash + phraseHash) % 2 === 0) {
+                hit(ornamentStep);
+            }
+        }
+        return pattern;
+    }
+
     if (genre === 'Jazz' || genre === 'Bossa') {
         // why: chords.md P0 #2 / epic-deterministic-phrasing S2 — Jazz/Bossa
         //      Charleston-family comping is phrase-stable. Pick one cell from
@@ -1071,6 +1198,7 @@ function updateRhythmicIntent(
         //      restarts at index 0 on every section change — same arranger position
         //      across loops produces the same cell.
         compingState.funkRotationIndex = 0;
+        compingState.bossaRotationIndex = 0;
     }
 
     if (step < compingState.lockedUntil) {
@@ -1113,6 +1241,17 @@ function updateRhythmicIntent(
 
     // --- Sticky Groove Logic ---
     if (STICKY_GENRES.includes(genre)) {
+        // why: epic-coordination-consistency S5.c follow-up — Bossa partido-alto's
+        //      bar-A/bar-B call/response cycle is the genre's load-bearing identity.
+        //      Default {4, 8}-bar STICKY retention (set by the rotation-reset block
+        //      below for Funk and inherited by other STICKY genres) holds cells too
+        //      long, structurally erasing the 2-bar alternation. Force 2-bar
+        //      retention here so each `bossaRotationIndex` increment lands a fresh
+        //      cell; idempotent and applied on every Bossa tick (covers the initial
+        //      section bar where maxGrooveLength may be stale from a prior section).
+        if (genre === 'Bossa') {
+            compingState.maxGrooveLength = 2;
+        }
         compingState.grooveRetentionCount++;
 
         // Only retain if we are NOT on the first bar of the groove
@@ -1139,8 +1278,15 @@ function updateRhythmicIntent(
             //      Partial fix for chords.md P2 #13 — full arranger-aware snap is
             //      tracked separately. Weighting `{4: 0.5, 8: 0.5}` (mod 2); the
             //      optional 16-bar bucket from chords.md is deferred.
-            const rotateHash = hashSectionId(sectionId) + compingState.funkRotationIndex + 1;
-            compingState.maxGrooveLength = rotateHash % 2 === 0 ? 4 : 8;
+            if (genre === 'Bossa') {
+                // why: keep Bossa pinned to 2-bar retention through rotation events
+                //      (see top of STICKY block). The {4, 8} draw is Funk-shaped and
+                //      would re-erase the partido-alto bar-A/bar-B alternation.
+                compingState.maxGrooveLength = 2;
+            } else {
+                const rotateHash = hashSectionId(sectionId) + compingState.funkRotationIndex + 1;
+                compingState.maxGrooveLength = rotateHash % 2 === 0 ? 4 : 8;
+            }
         }
     } else {
         // Non-sticky genres (Jazz, Rock, etc.) always refresh or have standard logic
@@ -1175,7 +1321,17 @@ function updateRhythmicIntent(
         // valid for *this* rotation event (initial pick = 0, then 1, 2, ...).
         compingState.funkRotationIndex = funkPickIndex + 1;
     }
-    const pickerBarIndex = genre === 'Funk' ? funkPickIndex : barIndex;
+    const bossaPickIndex = compingState.bossaRotationIndex;
+    if (genre === 'Bossa') {
+        // why: same shape as Funk above — snapshot pre-increment so this pick uses
+        //      the index valid for *this* rotation event, then advance. With 2-bar
+        //      STICKY retention forced above, picker fires every 2 bars and the
+        //      counter walks 0,1,2,3 → cells A,B,C,D consecutively → bar-A/bar-B
+        //      alternation is structurally produced.
+        compingState.bossaRotationIndex = bossaPickIndex + 1;
+    }
+    const pickerBarIndex =
+        genre === 'Funk' ? funkPickIndex : genre === 'Bossa' ? bossaPickIndex : barIndex;
     let newCell = generateCompingPattern(
         state,
         genre,

@@ -30,6 +30,16 @@ All three items promoted to **Epic 9 / S5 (Multiplier placement hardening)** on 
 - **Epic 1 S5 — soloist-devices unison floor** → Epic 9 / S5 (b). `soloist-devices.ts` enclosure/run/approach picker doesn't consult `accompanimentMidis`.
 - **Epic 3 S2 — Bossa Charleston bank is a Jazz port** → Epic 9 / S5 (c). Anticipation-of-1 idiom missing; partido-alto-specific bank needed.
 
+**Not promoted (still deferred from Epic 9 S5 review):**
+
+- **Soloist rhythm critique fixture doesn't exercise active stepCoordination boosts.** Epic 9 S5.a moved the `1 + loopCount * 0.15` multiplier from `densityScale` to a final-stage `attackProb *=`, which is the canonical placement (mirrors pitch-engine). But the existing critique fixture (`soloist-chorus-evolution-rhythm.test.ts`) feeds a synthetic `stepCoordination` with no `kickHit` / `snareHit` / seed steps, so the additive boost-stack the audit-doc described (`+= 0.4` seed + `+= 0.2` per landmark = `attackProb` near 1.0 BEFORE the multiplier, where the move matters most) isn't observable — realized fixture delta is unchanged at +25%. The placement is correct for production; the test is just blind to the production-relevant case. Extend the fixture (or add a second case) with active `stepCoordination` boosts so the test guards the wash-out the placement prevents. ~1h. *Source: Epic 9 S5 review (2026-05-19).*
+
+- **`accompanimentMidis` device-floor scope is run/enclosure only.** Epic 9 S5.b added a skip-or-flip unison floor to `run` and `enclosure` devices in `soloist-devices.ts`. Other devices (`bebopScale`, `bluesLick`, `chickenPick`, `quartal`, `birdFlurry`) walk chord tones by genre-defining design, so they're correctly left alone — the realized 23.1pp mean-abs-gap (vs audit-doc target 30pp) is the structural ceiling under the current device set. If a future story wants to push the absolute drop higher, the lever isn't widening the floor's scope but biasing device *selection* away from chord-tone walkers when the comper is dense. ~2h if pursued; flagged as a known structural limit, not a defect. *Source: Epic 9 S5 review (2026-05-19).*
+
+- **`enclosure` device full-veto vs `run` flip is asymmetric.** Epic 9 S5.b vetoes enclosure when *either* ±1 neighbor is in the chord stab; `run` only flips direction when one of its 2-step spans collides. Vetoing on single-neighbor collision (when the other neighbor is clean) over-rejects ~50% of diatonic enclosure targets over chord stabs. Future refinement: allow enclosure to play if at least one neighbor is non-unison, accepting 1-of-3 partial unison (33%) vs the current full-skip. ~30min. *Source: Epic 9 S5 review (2026-05-19) P2 #5.*
+
+- **`pcAt` closure could be hoisted from the run/enclosure branch.** Style nit — `soloist-devices.ts` ~line 356, `const pcAt = (delta) => ((selectedMidi + delta) % 12 + 12) % 12;` is created every call to the device branch. Hoist to module scope or above the `if (accompPcSet)` guard for consistency with the `accompPcSet` precompute pattern. ~5min. *Source: Epic 9 S5 review (2026-05-19) NIT.*
+
 ## C. Cross-engine consistency (same fix-shape repeated elsewhere)
 
 Three items promoted on 2026-05-19; remainder still here as not-yet-load-bearing.
