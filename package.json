@@ -20,6 +20,7 @@
         "test:e2e": "npm run build:quiet && npx playwright test",
         "test:coverage": "npx vitest run --coverage",
         "test:bench": "npx vitest run --config vitest.bench.config.ts tests/bench",
+        "test:loop": "node scripts/test-loop.ts",
         "drums:report": "tsx scripts/evaluate-groove.ts",
         "ensemble:report": "tsx scripts/evaluate-ensemble.ts",
         "mix:report": "tsx scripts/mix-report.ts",

@@ -52,11 +52,11 @@ Statistical ranges, not binary snapshots. If your change replaces a range with a
 6. **Implement.** Make the change. Add `// why:` comments for any new probability/offset/multiplier. Respect the patterns above.
 7. **Typecheck.** Run `npm run typecheck`. Must be clean before claiming done.
 8. **Run the targeted critique test.** From the story's acceptance criteria, find the test (e.g. `npx vitest run tests/standards/funk-bass-critique.test.ts`). Single-run must pass.
-9. **Reliability loop where appropriate.** If you set or modified a threshold on stochastic output, run the 30-run loop:
+9. **Reliability loop where appropriate.** If you set or modified a threshold on stochastic output, run the 30-run loop with the dedicated script:
    ```bash
-   for i in $(seq 1 30); do npx vitest run tests/standards/<file>.test.ts 2>&1 | grep -E "FAIL|metric|Target"; done
+   npm run test:loop -- tests/standards/<file>.test.ts
    ```
-   30/30 passes is the bar. If it flakes, tighten or loosen the threshold with a documented headroom argument — don't ship a flaky test.
+   `test:loop` runs the file 30 times (pass a count as a second arg for more, e.g. `… <file> 50`) and prints an `N/N passed` summary plus the first failing run's output. Use it instead of hand-rolling a `for` loop — a single `npm run` command is permission-pre-approved, so it runs without prompts. 30/30 passes is the bar. If it flakes, tighten or loosen the threshold with a documented headroom argument — don't ship a flaky test.
 10. **Report.** Use the format below.
 
 ## Reporting format

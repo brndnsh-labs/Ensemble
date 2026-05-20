@@ -55,7 +55,7 @@ These are seductive because the numbers look clean. They are musically wrong:
 2. **Run the critique tests if the change is engine-side.** `npx vitest run tests/standards/<file>` — read the Critique Report output, not just pass/fail. If a metric just barely clears its threshold, that's worth flagging even if green.
 3. **Verify musical claims against theory.** When code or tests use terminology (modes, chord functions, rhythmic idioms), confirm the implementation matches the term. WebSearch is fair game for verifying genre-specific idioms (e.g. "what positions define a 3-2 son clave," "what's the snare placement in a Steppers reggae groove") if you're not sure.
 4. **Check the WHY comments.** Every probability, offset, multiplier, and threshold in generative code should have a musical reason adjacent to it. If it doesn't, ask for one — and if the author can't give one, the value is probably wrong.
-5. **Watch for the "reliability check" gap.** Statistical assertions that passed once on the author's machine often flake. The proven recipe is a 20–30 run loop (`for i in $(seq 1 30); do npx vitest run … | grep -E "FAIL|metric"; done`) before locking in a threshold.
+5. **Watch for the "reliability check" gap.** Statistical assertions that passed once on the author's machine often flake. The proven recipe is a 20–30 run loop — use `npm run test:loop -- tests/standards/<file>.test.ts` (runs the file 30 times, prints an `N/N passed` summary; append a count for more) before trusting a threshold. It's a single permission-pre-approved command, so it loops without prompts.
 
 ## Report format
 

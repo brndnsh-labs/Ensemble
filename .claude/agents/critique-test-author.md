@@ -42,9 +42,9 @@ Spread `...info` into the params object the engine receives. Don't cherry-pick 3
 ### 30-run reliability loop
 Before declaring a threshold:
 ```bash
-for i in $(seq 1 30); do npx vitest run tests/standards/<file>.test.ts 2>&1 | grep -E "FAIL|<metric-name>"; done
+npm run test:loop -- tests/standards/<file>.test.ts
 ```
-Count passes. 30/30 is the bar. If 28/30 or worse, the threshold is too tight OR the engine is too stochastic — pick the right diagnosis and either loosen the threshold (documenting the headroom) or flag it as an engine reliability issue.
+`test:loop` runs the file 30 times (append a count for more, e.g. `… <file> 50`) and prints an `N/N passed` summary plus the first failing run's output. Use it instead of a hand-rolled `for` loop — a single `npm run` command is permission-pre-approved, so the loop runs without prompts. 30/30 is the bar. If 28/30 or worse, the threshold is too tight OR the engine is too stochastic — pick the right diagnosis and either loosen the threshold (documenting the headroom) or flag it as an engine reliability issue.
 
 ### Statistical ranges, not rigid snapshots
 The engine's pitch picker chooses between candidate notes weighted by ~15 simultaneous biases. Asserting that a specific note appears at a specific step is wrong unless the engine is deterministic by construction at that point. Prefer:
