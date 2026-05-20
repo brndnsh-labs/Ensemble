@@ -413,6 +413,20 @@ export function instrumentReducer(action: Action): boolean {
             con.trend = 'Static';
             con.direction = 1;
             con.steps = 0;
+            // why: the `audio` runtime carries cross-call voice-leading state —
+            // `lastMidiPlayed` feeds the pitch engine's interval decision at
+            // soloist-pitch-engine.ts (`const lastMidi = audio.lastMidiPlayed`).
+            // Every other session.* field was rebuilt above but `audio` was
+            // skipped, so a transport reset left the soloist voice-leading off
+            // the previous session's final pitch (and leaked it across seeded
+            // determinism-test runs). activeVoices/buffer are main-thread synth
+            // tracking — left to the synth's own lifecycle, not reset here.
+            const aud = s.audio as Mutable<typeof s.audio>;
+            aud.lastFreq = null;
+            aud.lastMidiPlayed = null;
+            aud.lastRenderedFreq = null;
+            aud.lastPlayedFreq = null;
+            aud.lastNoteEnd = 0;
 
             h.enabled = false;
             h.volume = 1.0;

@@ -53,9 +53,9 @@ const MOTIVIC_RESPONSE_STYLES = new Set([
  * Resets the internal generative state of the soloist.
  * Called when the transport is flushed or reset.
  *
- * @worker-mutation — clears the entire `session` sub-tree to its initial
- * shape. `sessionSeed` is owned by `state-effects.generateSessionSeed()`
- * and is not touched here.
+ * @worker-mutation — clears the `session` sub-tree and the `audio` runtime
+ * (`lastMidiPlayed` / `lastFreq` etc.) to their initial shape. `session.seed`
+ * is owned by `state-effects.generateSessionSeed()` and is not touched here.
  */
 export function resetSoloistState(state: EnsembleState): void {
     const session = state.soloist.session as Mutable<typeof state.soloist.session>;
@@ -99,6 +99,18 @@ export function resetSoloistState(state: EnsembleState): void {
     memory.formArcRecall = {};
 
     rhythm.deviceBuffer = [];
+
+    // why: the `audio` runtime carries cross-call voice-leading state —
+    // `lastMidiPlayed` feeds the pitch engine's interval decision. A reset that
+    // left it stale made the first note after a transport flush voice-lead off
+    // the previous session's final pitch. activeVoices/buffer are main-thread
+    // synth voice tracking — owned by the synth lifecycle, not cleared here.
+    const audio = state.soloist.audio as Mutable<typeof state.soloist.audio>;
+    audio.lastFreq = null;
+    audio.lastMidiPlayed = null;
+    audio.lastRenderedFreq = null;
+    audio.lastPlayedFreq = null;
+    audio.lastNoteEnd = 0;
 }
 
 // getSectionContext + normalizeLoopStep moved to ./arranger-utils.ts (S2,
