@@ -123,7 +123,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 - **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a) ✅ (shipped 2026-05-19).
 - **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b) ✅ (shipped 2026-05-19).
 - **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c) ✅ (shipped 2026-05-19).
-- **Sparse-vibe cell collapse + active-vibe ornament collision** → Epic 10 / S3 (d).
+- **Sparse-vibe cell collapse + active-vibe ornament collision** → Epic 10 / S3 (d): consciously NOT addressed in the S3 sweep — a pre-existing Epic 3 S2 engine issue (not a test-rigor gap). Stays deferred; see the deferred entry below.
 - **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e) ✅ (shipped 2026-05-19).
 - **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f) ✅ (shipped 2026-05-19).
 - **S8 funk-backbeat-presence integration coverage** → Epic 10 / S3 (h) ✅ (shipped 2026-05-19; new PART 3 — integrated conductor-driven arc).
@@ -131,6 +131,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 
 **Not promoted (still deferred):**
 
+- **Sparse-vibe cell collapse + active-vibe ornament collision (Epic 3 S2).** Reviewer-flagged during the Epic 3 S2 (Jazz/Bossa/Blues Charleston picker) work: at sparse vibe the comping cell can collapse to near-silence, and at active vibe an ornament can collide with the cell's own hit. Both are engine-behavior issues in the chords/accompaniment vibe path, not test-rigor gaps — they need a musical-taste call + listen test, so they were routed to S3 (d) as a placeholder and consciously left deferred there. Promote to a real Epic 6 (chord voicing) follow-up story when the vibe path is next revisited. *Source: Epic 3 S2 review; re-confirmed deferred at Epic 10 S3 (2026-05-19).*
 - **`instHash` for drum lanes uses bare polynomial hash.** Epic 2 S3, `groove-engine.ts`. No canonical `scrambleHash` pre-scrambling. Empirically fine, future cleanup. ~30min. *Source: Epic 2 S3 review.*
 - **`reggae-harmony-critique.test.ts` and `reggae-harmony-organ-critique.test.ts` share a near-identical 128-bar critique case.** S1.b kept both files for naming clarity (the organ-critique adds unit + non-organ regression cases the other lacks); the headline 128-bar critique is duplicated. Either fold the shared assertion into a util, or accept the duplication as cheap. ~15min. *Source: Epic 9 S1 review (2026-05-19).*
 
