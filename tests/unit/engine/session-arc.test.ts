@@ -72,11 +72,17 @@ describe('Session Timer Intensity Arc', () => {
         });
     });
 
-    it('should fall back to loop-based logic if session timer is 0', () => {
+    it('should fall back to the open-jam macro-arc when session timer is 0', () => {
         mockState.playback.sessionTimer = 0;
-        mockState.conductor.formIteration = 3; // Will increment to 4 -> High Intensity (0.6 - 1.0)
+        mockState.conductor.formIteration = 3;
 
+        // Epic 11 S3 replaced the rigid `formIteration % 8` ladder (which
+        // mapped iteration 4 to a fixed "high" 0.6-1.0 tier) with the
+        // genre-aware raised-cosine swell from getJamMacroArc. The fallback
+        // path now yields a smooth swell value rather than a stepped tier, so
+        // assert it lands inside the swell's valid band.
         const target = runTransitionCheck(1);
-        expect(target).toBeGreaterThanOrEqual(0.6);
+        expect(target).toBeGreaterThan(0.1);
+        expect(target).toBeLessThanOrEqual(1.0);
     });
 });

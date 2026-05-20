@@ -104,7 +104,13 @@ vi.mock('../../public/persistence.js', () => ({
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn(), flushWorker: vi.fn() }));
 vi.mock('../../public/engine/fills.js', () => ({ generateProceduralFill: vi.fn(() => ({})) }));
 vi.mock('../../public/ui.js', () => ({ triggerFlash: vi.fn() }));
-vi.mock('../../public/form-analysis.js', () => ({ getSectionEnergy: vi.fn(() => 0.5) }));
+// Partial mock: stub getSectionEnergy but keep the real getJamMacroArc — the
+// conductor's timer-less fallback (Epic 11 S3) calls it directly, and it is a
+// pure, dep-light helper that needs no stubbing.
+vi.mock('../../public/form-analysis.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    getSectionEnergy: vi.fn(() => 0.5),
+}));
 
 describe('Soloist Trading Logic', () => {
     beforeEach(() => {
