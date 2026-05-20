@@ -963,6 +963,38 @@ export function getSoloistNote(
     };
 
     // --- 1. Busy/Device Handling ---
+    // why: a cadential device (e.g. bluesTurnaround, a 16-step deviceBuffer) fired
+    // near the end of loop 0 can still have queued tail steps when loop 1 begins.
+    // Draining that stale tail here — before the head-bypass path runs — would
+    // clobber the loop-1 head anchor with a leftover turnaround pitch. Musically a
+    // turnaround is a setup gesture that must resolve INTO the next chorus's
+    // downbeat, never bleed PAST it. So when the current step is a loop-1
+    // (paraphrase) head anchor, discard any carried-over device/embellishment
+    // buffer rather than draining it: the head's opening anchor wins outright. A
+    // turnaround that overruns the chorus boundary is already wrong; cutting its
+    // tail is the correct resolution, not a regression.
+    if (isFirstRestatementLoop && headNotes.some((n: any) => n?.isAnchor)) {
+        const rhythm = soloist.session.rhythm as Mutable<typeof soloist.session.rhythm>;
+        const staleBuffers =
+            (rhythm.deviceBuffer && rhythm.deviceBuffer.length > 0) ||
+            (rhythm.embellishmentBuffer && rhythm.embellishmentBuffer.length > 0);
+        // why: a carried device tail clobbers the anchor two ways — its queued
+        // notes drain on top of the anchor step, AND a long device note drained
+        // on the PRECEDING step leaves busySteps > 0 which silences the anchor
+        // entirely (returns null below). Clear both so the loop-1 head anchor is
+        // guaranteed to emit its exact seed pitch regardless of where the loop-0
+        // turnaround happened to land relative to the chorus boundary.
+        if (staleBuffers || (soloist.session.phrasing.busySteps || 0) > 0) {
+            if (staleBuffers) {
+                logDebug(
+                    '[Head Anchor] Discarding stale device/embellishment buffer carried across the loop boundary so the loop-1 head anchor emits its exact seed pitch.',
+                );
+                rhythm.deviceBuffer = []; // @worker-mutation
+                rhythm.embellishmentBuffer = []; // @worker-mutation
+            }
+            phr.busySteps = 0; // @worker-mutation
+        }
+    }
     if (
         soloist.session.rhythm.embellishmentBuffer &&
         soloist.session.rhythm.embellishmentBuffer.length > 0

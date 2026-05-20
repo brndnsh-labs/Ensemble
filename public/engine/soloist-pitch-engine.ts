@@ -1293,6 +1293,22 @@ export function selectPitchAndDevices(
     if (isHeadBypass && loopCount === 0) {
         deviceBaseProb = 0;
     }
+    // why: an anchor is the structural skeleton of the head. On the FIRST
+    // paraphrase loop (loop 1) the listener is hearing the head restated for
+    // the first time with variation — the anchors must land their exact head
+    // pitch cleanly so the paraphrase still reads as the same melody. Without
+    // this hard kill the anchor still carries deviceBaseProb (deviceProb ×
+    // (0.5+intensity) × loop-1.2× × thematicBoost 2.4 × anchor 0.35), so a
+    // Math.random()-gated device can fire on top of the pinned selectedMidi
+    // and replace the emitted pitch (observed: anchor MIDI 59 -> 65).
+    // Loops 2+ are deliberately NOT killed here: by then the soloist is in
+    // exploratory territory where ornamenting around the anchor is musically
+    // wanted, and the existing anchor ×0.35 multiplier already holds
+    // laterLoopAnchorExactRate at ~80% — clean enough to keep the skeleton
+    // legible without freezing the line into a mechanical head repeat.
+    if (isHeadBypass && seedNote?.isAnchor && loopCount === 1) {
+        deviceBaseProb = 0;
+    }
     if (isLaterHeadBypass) {
         const thematicBoost = isLineStyle
             ? loopCount === 1
@@ -1380,11 +1396,21 @@ export function selectPitchAndDevices(
     };
 
     // --- Structural Awareness: Turnaround Handling ---
+    // why: the blues turnaround device emits its own pitch buffer and fully
+    // replaces the picker's emission — it bypasses the deviceBaseProb gate via
+    // a separate Math.random() roll. On the loop-1 paraphrase a head-bypass
+    // anchor is the structural skeleton of the head and must state its exact
+    // head pitch (selectedMidi = targetMidi), so suppress the turnaround
+    // substitution here for the same reason deviceBaseProb is zeroed above.
+    // Loops 2+ keep the turnaround — by then exploratory reharmonization of an
+    // anchor over a turnaround chord is musically wanted, not a defect.
+    const isLoop1AnchorHeadBypass = isHeadBypass && seedNote?.isAnchor === true && loopCount === 1;
     if (
         activeStyle === 'blues' &&
         (coordination as any).isTurnaround &&
         !headMeasureHasTripletSeed &&
         !isResponseGuidedPhrase &&
+        !isLoop1AnchorHeadBypass &&
         Math.random() < 0.6
     ) {
         const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);
