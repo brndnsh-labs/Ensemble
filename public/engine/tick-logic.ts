@@ -458,6 +458,24 @@ export function generateNotesForStep(
                 isEOfBeat: stepInfo.isEOfBeat,
                 isAOfBeat: stepInfo.isAOfBeat,
                 tsConfig: stepInfo.tsConfig,
+                // why: epic-deferred-followups S8(c) — `mStep` / `stepInGroup` /
+                // `groupIndex` / `isCompound` were declared on GrooveOverrideOptions
+                // but never passed here, so per-genre strategies silently consumed
+                // `undefined` — `tsConfig.pulse.includes(undefined)` is always false,
+                // and the compound-meter skip-beat branch keyed off `stepInGroup ===
+                // groupSteps - 1` could never fire. `stepInfo` already carries all
+                // four (computed in utils.ts `getStepInfo`); thread them through.
+                // `isPulse` / `isPulseStart` are likewise stepInfo-sourced. NOTE: the
+                // blast radius is wider than jazz.ts — funk.ts (`isPulse` ×3),
+                // latin.ts and reggae.ts (`isPulseStart` ×3 each) all read these from
+                // the context bag, so S8(c) re-activates previously-dead idiom
+                // branches in four genres (jazz/funk/latin/reggae), not just jazz.
+                mStep: stepInfo.mStep,
+                stepInGroup: stepInfo.stepInGroup,
+                groupIndex: stepInfo.groupIndex,
+                isCompound: stepInfo.isCompound,
+                isPulse: stepInfo.isPulse,
+                isPulseStart: stepInfo.isPulseStart,
                 isTurnaround,
                 stepsPerBar,
                 loopStep: drumStep,

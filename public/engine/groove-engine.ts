@@ -106,12 +106,12 @@ export interface GrooveOverrideOptions {
     isAOfBeat: boolean;
     beatIndex: number;
     tsConfig: any;
-    // why: `mStep` / `stepInGroup` / `groupIndex` are declared but the
-    // tick-logic.ts production caller doesn't pass them today — they
-    // arrive as `undefined` and pass through into the per-genre strategy
-    // `context` bag (line ~213). Marked optional here to make that contract
-    // explicit; promoting them to required would surface in tick-logic.ts
-    // as a real follow-up.
+    // why: `mStep` / `stepInGroup` / `groupIndex` / `isCompound` are sourced
+    // from `stepInfo` (utils.ts `getStepInfo`) and threaded through by the
+    // tick-logic.ts production caller (epic-deferred-followups S8(c)). Per-genre
+    // strategies (jazz.ts reads all four for compound-meter ride/skip-beat
+    // logic) consume them via the `context` bag below. Kept optional so test
+    // fixtures that don't exercise compound meters can omit them.
     mStep?: number;
     isCompound?: boolean;
     stepInGroup?: number;
