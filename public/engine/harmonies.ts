@@ -754,11 +754,12 @@ function finalizeHarmonyNotes(
         chord.rootMidi,
         targetIntervals,
         harmony.lastMidis,
-        false,
-        targetOctave,
-        safetyFloor,
-        100,
-        styleConfig.rhythmicStyle,
+        {
+            anchor: targetOctave,
+            min: safetyFloor,
+            max: 100,
+            style: styleConfig.rhythmicStyle,
+        },
     );
 
     if (currentMidis.length === 0) {

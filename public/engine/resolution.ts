@@ -133,17 +133,11 @@ export function generateResolutionNotes(
             playRoot += 12;
         }
 
-        const voicings = getBestInversion(
-            state,
-            playRoot,
-            intervals,
-            lastMidis,
-            false,
+        const voicings = getBestInversion(state, playRoot, intervals, lastMidis, {
             anchor,
-            48,
-            80,
-            'stabs',
-        );
+            min: 48,
+            max: 80,
+        });
         lastMidis = voicings;
 
         // --- CHORDS ---

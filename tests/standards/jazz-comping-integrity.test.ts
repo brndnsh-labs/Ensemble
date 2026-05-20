@@ -401,6 +401,33 @@ describe('Jazz Comping Integrity', () => {
         });
     });
 
+    it('enables the S1 voice-leading pass in the production jazz comping path', () => {
+        // why: Epic 11 S6(a) — Epic 6 S1 added the opt-in `enableVoiceLeading`
+        //      pass but no production caller passed `true`. `parseProgressionPart`
+        //      now gates it on `genreFeel ∈ {Jazz, Bossa Nova, Blues}`. This proves
+        //      the production path (validateProgression) produces the canonical
+        //      common-tone hold: in the textbook Dm7→G7 motion, F (pc 5) is the
+        //      b3 of Dm7 and the b7 of G7 — the guide tone shared by both
+        //      chords. With the pass on, the SAME MIDI value must appear in
+        //      both voicings, not just the same pitch class.
+        const freqToMidi = (f) => Math.round(12 * Math.log2(f / 440) + 69);
+        arranger.key = 'C';
+        arranger.isMinor = false;
+
+        groove.genreFeel = 'Jazz';
+        arranger.sections = [{ id: 'A', value: 'Dm7 | G7' }];
+        validateProgression(getState());
+        const jazzProg = arranger.progression;
+        const dm7Midis = jazzProg[0].freqs.map(freqToMidi);
+        const g7Midis = jazzProg[1].freqs.map(freqToMidi);
+        const dm7Fs = dm7Midis.filter((m) => m % 12 === 5);
+        const g7Fs = g7Midis.filter((m) => m % 12 === 5);
+        expect(dm7Fs.length).toBeGreaterThan(0);
+        expect(g7Fs.length).toBeGreaterThan(0);
+        // Common-tone hold: same MIDI in both, not an octave jump.
+        expect(dm7Fs.some((m) => g7Fs.includes(m))).toBe(true);
+    });
+
     it('should use "Sticky Grooves" for Neo-Soul but not for Jazz', () => {
         const chord = {
             rootMidi: 60,

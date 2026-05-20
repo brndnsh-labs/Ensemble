@@ -199,18 +199,35 @@ export function getChordDetails(symbol: string): ChordDetails {
  *
  * Resolves chord root midi to an absolute note, searching octaves.
  */
+interface InversionOptions {
+    isPivot?: boolean;
+    anchor?: number | null;
+    min?: number;
+    max?: number;
+    style?: string;
+    /**
+     * Opt-in jazz-style voice-leading second pass (common-tone holds + guide-tone
+     * resolution). Off by default — pocket genres want voicing stability. Production
+     * comping callers gate this on `style ∈ {Jazz, Bossa Nova, Blues}`.
+     */
+    enableVoiceLeading?: boolean;
+}
+
 export function getBestInversion(
     state: any,
     rootMidi: number,
     intervals: number[],
     previousMidis: number[],
-    isPivot: boolean = false,
-    anchor: number | null = null,
-    min: number = 52,
-    max: number = 84,
-    style: string = 'stabs',
-    enableVoiceLeading: boolean = false,
+    options: InversionOptions = {},
 ): number[] {
+    const {
+        isPivot = false,
+        anchor = null,
+        min = 52,
+        max = 84,
+        style = 'stabs',
+        enableVoiceLeading = false,
+    } = options;
     const { chords } = state;
     const homeAnchor = anchor || chords.octave || 60;
 
@@ -846,16 +863,22 @@ function parseProgressionPart(
                 // Reduce mud: keep the comping pocket above the bass lane when that lane is active.
                 const pianoMin = getBassSpaceFloor(state);
                 const isPivot = parsed.length === 0;
-                let currentMidis = getBestInversion(
-                    state,
-                    rootMidi,
-                    intervals,
-                    lastMidis,
+                // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
+                // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
+                // holds across ii–V–I motion, so the voice-leading second pass is
+                // idiomatic there. Pocket genres (Funk/Neo-Soul/Reggae/Rock) want
+                // voicing stability and keep the pass off. genreFeel is the canonical
+                // genre key ('Bossa Nova', not 'Bossa').
+                const vlGenre = groove.genreFeel;
+                const enableVoiceLeading =
+                    vlGenre === 'Jazz' || vlGenre === 'Bossa Nova' || vlGenre === 'Blues';
+                let currentMidis = getBestInversion(state, rootMidi, intervals, lastMidis, {
                     isPivot,
-                    chords.octave,
-                    pianoMin,
-                    84,
-                );
+                    anchor: chords.octave,
+                    min: pianoMin,
+                    max: 84,
+                    enableVoiceLeading,
+                });
                 if (bassMidi !== null) {
                     currentMidis = ensurePitchClassAboveFloor(
                         currentMidis,

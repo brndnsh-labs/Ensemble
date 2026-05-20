@@ -539,11 +539,19 @@ describe('Jazz Piano Critique', () => {
             chords: { octave: 60 },
         };
 
-        // Position 9 of `getBestInversion` is the opt-in `enableVoiceLeading` flag;
-        // positions 5-8 are `isPivot`, `anchor`, `min`, `max` and we accept their
-        // defaults. Spelling them out keeps the call site readable when the test
-        // breaks in the future.
-        const vlArgs = [false, null, 52, 84, 'stabs', true] as const;
+        // `getBestInversion`'s 5th argument is an options object; the opt-in
+        // `enableVoiceLeading` flag is what these fixtures exercise. The other
+        // fields (`isPivot`, `anchor`, `min`, `max`, `style`) are left at their
+        // defaults — spelling them out keeps the call site readable when the
+        // test breaks in the future.
+        const vlOpts = {
+            isPivot: false,
+            anchor: null,
+            min: 52,
+            max: 84,
+            style: 'stabs',
+            enableVoiceLeading: true,
+        } as const;
 
         it.each(PROGS_C)('holds common-tone F across Dm7→G7 (C major, $name)', ({ chords }) => {
             // why: the canonical "F held" claim from the story. F is the b3 of
@@ -557,14 +565,14 @@ describe('Jazz Piano Critique', () => {
                 chords[0].root,
                 chords[0].intervals,
                 [],
-                ...vlArgs,
+                vlOpts,
             );
             const g7 = getBestInversion(
                 stateStub,
                 chords[1].root,
                 chords[1].intervals,
                 dm7,
-                ...vlArgs,
+                vlOpts,
             );
             // F-pitch-class MIDIs present in each chord:
             const dm7Fs = dm7.filter((m) => m % 12 === 5);
@@ -582,13 +590,7 @@ describe('Jazz Piano Critique', () => {
             for (let i = 0; i < chords.length; i++) {
                 const prev = i === 0 ? [] : withVL[i - 1];
                 withVL.push(
-                    getBestInversion(
-                        stateStub,
-                        chords[i].root,
-                        chords[i].intervals,
-                        prev,
-                        ...vlArgs,
-                    ),
+                    getBestInversion(stateStub, chords[i].root, chords[i].intervals, prev, vlOpts),
                 );
             }
 
@@ -650,7 +652,7 @@ describe('Jazz Piano Critique', () => {
                                 chords[i].root,
                                 chords[i].intervals,
                                 prev,
-                                ...vlArgs,
+                                vlOpts,
                             ),
                         );
                     }
@@ -719,7 +721,7 @@ describe('Jazz Piano Critique', () => {
                                 chords[i].root,
                                 chords[i].intervals,
                                 prev,
-                                ...vlArgs,
+                                vlOpts,
                             ),
                         );
                     }
