@@ -270,11 +270,6 @@ function maybeWarnUnknownSound(name: string): void {
     console.warn(`[synth-drums] unknown soundName "${name}" — no audio voice will play.`);
 }
 
-/** Test hook: clears the "already warned" registry so each test sees fresh warnings. */
-export function _resetUnknownSoundWarnings(): void {
-    warnedUnknownSounds.clear();
-}
-
 export { KNOWN_SOUND_NAMES };
 
 const TAU = Math.PI * 2;
