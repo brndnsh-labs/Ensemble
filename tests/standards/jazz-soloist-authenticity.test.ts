@@ -9,7 +9,7 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         dispatch(ACTIONS.RESET_STATE);
         dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Jazz', enabled: true });
         dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'jazz' });
-        dispatch(ACTIONS.UPDATE_PLAYBACK, { debugSoloist: true });
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'debugSoloist', value: true });
     });
 
     it('should alternate between Call and Response roles in Jazz', () => {
