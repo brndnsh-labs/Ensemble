@@ -122,7 +122,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 - **Evans cadence test doesn't isolate phrase-end attacks** → Epic 10 / S2 (e) ✅ (shipped 2026-05-19).
 - **Accompaniment S3 test fixture primary seed lands target=0** → Epic 10 / S3 (a) ✅ (shipped 2026-05-19).
 - **Drums-not-muted regression test asserts Kick only** → Epic 10 / S3 (b) ✅ (shipped 2026-05-19).
-- **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c).
+- **`withOctaveJump` PC-fold metric** → Epic 10 / S3 (c) ✅ (shipped 2026-05-19).
 - **Sparse-vibe cell collapse + active-vibe ornament collision** → Epic 10 / S3 (d).
 - **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e) ✅ (shipped 2026-05-19).
 - **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f) ✅ (shipped 2026-05-19).

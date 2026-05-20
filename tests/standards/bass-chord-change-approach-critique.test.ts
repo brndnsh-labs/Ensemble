@@ -230,19 +230,24 @@ const measureFunkApproachRateOnA = (
 };
 
 /**
- * Measures the absolute MIDI distance (not pitch-class distance) between
- * each approach note and the next chord's target root. This catches octave-jump
- * violations: a correct chromatic approach is ±1 semitone in absolute pitch, not
- * ±1 pc that has been displaced by an octave (making it a 13-semitone jump).
+ * Measures the absolute MIDI distance (not pitch-class distance) between each
+ * approach note and the engine's own target root — `note.approachTargetRoot`,
+ * which is `normalizeToRange(nextTarget)`, the single octave the engine aimed
+ * at. This catches octave-jump violations: a correct chromatic approach is ±1
+ * semitone in absolute pitch, not ±1 pc displaced by an octave (a 13-semitone
+ * jump).
  *
  * why: S3 (bass.md P0 #2) — withOctaveJump was applying ±12 to approach notes,
  * turning half-step landings into leaps. After S3, the absolute distance must
- * be ≤5 for all approach notes (±1 chromatic, ±5 perfect-fourth-below, ±7 fifth-above).
- * We allow ≤7 to accommodate the +7 fifth-above candidate that can appear in the
- * non-chromatic fallback branch.
+ * be ≤7 for all approach notes (±1 chromatic, −5 perfect-fourth-below,
+ * +7 fifth-above).
  *
- * Returns { maxDist, violations } so tests can assert both the worst case and the
- * total violation count.
+ * Measuring against the engine's surfaced target (rather than the closest of
+ * all octaves of the chart root) is what makes the metric able to SEE the
+ * regression: a closest-octave search re-folds any ±12 displacement away.
+ *
+ * Returns { maxDist, violations } so tests can assert both the worst case and
+ * the total violation count.
  */
 const measureApproachDistances = (
     numBars: number,
@@ -293,39 +298,41 @@ const measureApproachDistances = (
         // Sample step 14 (the "& of beat 4") when next bar has a different root
         if (stepInMeasure === 14 && nextChord && nextChord.rootMidi !== currentChord.rootMidi) {
             if (note && !note.muted) {
-                total++;
-                // why: chart-side nextChord.rootMidi may sit anywhere on the keyboard,
-                // but the engine builds the approach off `normalizeToRange(nextTarget)`
-                // — i.e. the closest octave to the bass register. To detect octave-jump
-                // violations introduced by withOctaveJump, we measure distance from the
-                // approach note to the *closest octave* of the target root, not the raw
-                // chart MIDI. After folding, distance must be ≤7: ±1 chromatic,
-                // −5 perfect-fourth-below, +7 perfect-fifth-above. A withOctaveJump
-                // call would add ±12, pushing the folded distance to ≥5+12=17 or
-                // ≥7+12=19 — both clearly out of range.
-                // Compute distance to each candidate octave of the target; take the min.
-                // Allows ±1 (chromatic), −5 (fourth below), +7 (fifth above) and
-                // rejects ±12 octave-jump displacements.
-                const rawTarget = nextChord.bassMidi ?? nextChord.rootMidi;
-                const targetOctaves = [
-                    rawTarget - 24,
-                    rawTarget - 12,
-                    rawTarget,
-                    rawTarget + 12,
-                    rawTarget + 24,
-                ];
-                let minDist = Infinity;
-                for (const t of targetOctaves) {
-                    const d = Math.abs(note.midi - t);
-                    if (d < minDist) {
-                        minDist = d;
+                // why: the engine builds the chromatic approach off a SINGLE
+                // octave — `targetRoot = normalizeToRange(nextTarget)`, the
+                // octave of the next root nearest the bass register. The engine
+                // surfaces that exact value as `note.approachTargetRoot` (a
+                // test-observability field, bass-engine.ts) and we measure the
+                // landing distance against it directly.
+                //
+                // The prior metric measured distance to the *closest of all
+                // octaves* of the chart root. That re-folded any ±12
+                // displacement away: a withOctaveJump call adds ±12, but the
+                // min-over-octaves search then just picked the adjacent octave
+                // candidate and reported distance ≈1 again — so the regression
+                // the test claims to guard was invisible to it. Measured
+                // against the single engine target, an octave jump reads as a
+                // ≥13-semitone miss and trips the violation count.
+                //
+                // Scope: this guards ANY octave displacement of the approach
+                // note relative to the engine's aimed-at root — a re-added
+                // withOctaveJump, OR a `clampAndNormalizeMidi` register-clamp
+                // that octave-shifts the chromatic candidate after targetRoot
+                // is captured. Both are real "this isn't a half-step landing"
+                // bugs; the metric does not need to distinguish them.
+                const engineTarget = note.approachTargetRoot;
+                if (typeof engineTarget === 'number') {
+                    total++;
+                    // Distance must be ≤7: ±1 chromatic, −5 perfect-fourth
+                    // below, +7 perfect-fifth above. withOctaveJump would add
+                    // ±12, pushing this to ≥12 — clearly out of range.
+                    const dist = Math.abs(note.midi - engineTarget);
+                    if (dist > maxDist) {
+                        maxDist = dist;
                     }
-                }
-                if (minDist > maxDist) {
-                    maxDist = minDist;
-                }
-                if (minDist > 7) {
-                    violations++;
+                    if (dist > 7) {
+                        violations++;
+                    }
                 }
             }
         }

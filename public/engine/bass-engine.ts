@@ -515,6 +515,14 @@ export function getBassNote(
         velocityParam: number = 1.0,
         muted: number = 0,
         bendStartInterval: number = 0,
+        // Test-observability only: the engine-computed chromatic-approach
+        // target (`normalizeToRange(nextTarget)`). Set on the two
+        // chord-change-approach return paths so a critique test can measure
+        // landing distance against the SAME single octave the engine aimed at,
+        // rather than re-folding across all octaves (which hides ±12 octave
+        // jumps). Undefined on every other return path; inert in production —
+        // the scheduler / MIDI export never read it.
+        approachTargetRoot?: number,
     ) => {
         let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
@@ -600,6 +608,7 @@ export function getBassNote(
             timingOffset,
             muted,
             bendStartInterval,
+            approachTargetRoot,
         };
     };
 
@@ -1143,6 +1152,7 @@ export function getBassNote(
                 velocity,
                 0,
                 Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0,
+                targetRoot,
             );
         } else {
             const valid = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7].filter(
@@ -1160,6 +1170,9 @@ export function getBassNote(
                 ),
                 null,
                 velocity,
+                0,
+                0,
+                targetRoot,
             );
         }
     }
