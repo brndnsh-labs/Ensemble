@@ -127,7 +127,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 - **Conductor cool-down jitter headroom is thin** → Epic 10 / S3 (e) ✅ (shipped 2026-05-19).
 - **Conductor critique only exercises ceiling-clamped section** → Epic 10 / S3 (f) ✅ (shipped 2026-05-19).
 - **S8 funk-backbeat-presence integration coverage** → Epic 10 / S3 (h).
-- **Pad-sustain test doesn't exercise scheduler or synth legato paths** → Epic 10 / S3 (g).
+- **Pad-sustain test doesn't exercise scheduler or synth legato paths** → Epic 10 / S3 (g) ✅ (shipped 2026-05-19; new `scheduler-harmony-legato.test.ts`).
 
 **Not promoted (still deferred):**
 

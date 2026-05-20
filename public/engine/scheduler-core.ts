@@ -953,8 +953,12 @@ function scheduleChords(
 /**
  * Schedules harmony notes (pads, stabs) from the worker buffer.
  * Handles voice killing for smoother transitions.
+ *
+ * Exported for `tests/unit/engine/scheduler-harmony-legato.test.ts` — the
+ * pad-mode legato survivor-retention partition (the `legatoMidis` block below)
+ * is otherwise reachable only via the full `scheduleGlobalEvent` tick.
  */
-function scheduleHarmonies(
+export function scheduleHarmonies(
     state: EnsembleState,
     _chordData: ChordAtStep,
     step: number,
