@@ -70,7 +70,13 @@ export function playHarmonyNote(
 
     for (let i = harmony.activeVoices.length - 1; i >= 0; i--) {
         const voice = harmony.activeVoices[i];
-        if (voice.time + voice.duration + 1.0 <= playTime) {
+        // why: `lastExtendedAt` is set on every legato extension below; without
+        // it, voice.time stays anchored at the original first-attack, which
+        // would make a legato chain look stale immediately even while a
+        // recently-extended voice is still ringing. Falls back to voice.time
+        // for voices that were never extended (the common case).
+        const lastAttackTime = voice.lastExtendedAt ?? voice.time;
+        if (lastAttackTime + voice.duration + 1.0 <= playTime) {
             harmony.activeVoices.splice(i, 1); // @worker-mutation
         }
     }
@@ -128,7 +134,16 @@ export function playHarmonyNote(
             );
             // Update the voice record so subsequent legato extensions chain
             // correctly and the stale-voice GC sees the new end time.
-            existing.duration = newEnd - existing.time;
+            // why: track `lastExtendedAt` separately rather than accumulating
+            // into `duration`. Previously `duration = newEnd - existing.time`
+            // grew monotonically across N consecutive chord-change extensions
+            // (~N × bar_length after N extensions), which is bookkeeping
+            // garbage even though it didn't affect playback (activeVoices is
+            // hard-capped at 3). New invariant: `duration` is the duration of
+            // the most recent attack window; `lastExtendedAt` is when that
+            // attack fired. GC keys on `lastExtendedAt + duration + 1.0`.
+            existing.lastExtendedAt = playTime;
+            existing.duration = duration;
             // Push oscillator stop times out to the new end (best-effort —
             // not every voice's nodes implement .stop; that's fine, the gain
             // ramp to 0 is the audible truth and stale-voice GC will clean up).
