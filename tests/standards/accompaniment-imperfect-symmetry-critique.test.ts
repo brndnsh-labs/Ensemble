@@ -220,6 +220,28 @@ describe('Accompaniment Imperfect Symmetry (epic-form-arrangement S3)', () => {
         expect(voicingDiffBars).toBeLessThanOrEqual(PHRASE_BARS);
     });
 
+    it('rotation cascades from a mid-phrase target bar (target > 0)', () => {
+        // why: the primary fixture ('sec-verse-A') seeds compTargetBarInPhrase=0,
+        // so EVERY bar of the phrase rotates — which means the test above cannot
+        // distinguish the real cascade gate (`compBarInPhrase >= target`) from a
+        // single-bar `=== target`. 'sec-bb' seeds target=1 at occurrence 2:
+        //   - bar 0 is BEFORE the target → stays in the Statement register;
+        //   - bars 1,2,3 are AT/AFTER the target → all rotate (the "commit to
+        //     the new register for the rest of the phrase" cascade).
+        // Reverting the `>=` to `===` would leave bars 2 and 3 un-rotated and
+        // turn the two cascade assertions below red.
+        const v1 = generatePhrase(1, 'sec-bb'); // Statement — gesture gated off
+        const v2 = generatePhrase(2, 'sec-bb'); // Restatement — target bar = 1
+
+        // Bar 0 is before the target bar: voicing must match the Statement.
+        expect(v2[0], 'bar 0 (before target) should not rotate').toEqual(v1[0]);
+        // Bar 1 is the target bar: the rotation fires here.
+        expect(v2[1], 'bar 1 (target) should rotate').not.toEqual(v1[1]);
+        // Bars 2,3 are after the target: the cascade keeps them rotated.
+        expect(v2[2], 'bar 2 (cascade) should stay rotated').not.toEqual(v1[2]);
+        expect(v2[3], 'bar 3 (cascade) should stay rotated').not.toEqual(v1[3]);
+    });
+
     it('rotation preserves pitch-class set (no pitch substitution)', () => {
         const v1 = generatePhrase(1);
         const v2 = generatePhrase(2);

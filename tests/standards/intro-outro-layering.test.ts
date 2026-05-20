@@ -837,81 +837,112 @@ describe.each([0.05, 0.95])('Intro/Outro layering — Harmony (Math.random=%s)',
 
 // --- Drums do NOT mute (regression guard) ----------------------------------
 
+// Minimal Rock-groove state for the drum-exemption tests: an Intro section,
+// no soloist, no orchestration overrides — just enough for applyGrooveOverrides
+// to resolve a base drum hit.
+function makeDrumExemptState() {
+    return {
+        playback: {
+            bandIntensity: 0.6,
+            bpm: 120,
+            songMode: false,
+            currentLoopCount: 0,
+            complexity: 0.5,
+            intent: {},
+        },
+        groove: {
+            genreFeel: 'Rock',
+            creativity: false,
+            lastDrumPreset: 'Rock',
+            instruments: [],
+            accentMap: null,
+            fillMap: null,
+            sectionSeedMap: {},
+            seedTimelineStartStep: 0,
+            orchestrationMap: null,
+        },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        arranger: {
+            timeSignature: '4/4',
+            sectionMap: [{ id: 'sec-intro', start: 0, end: INTRO_STEPS, label: 'Intro' }],
+            stepMap: [{ start: 0, end: INTRO_STEPS, chord: { sectionId: 'sec-intro' } }],
+            totalSteps: INTRO_STEPS,
+        },
+    };
+}
+
 describe('Intro/Outro layering — Drums NOT muted (epic-form-arrangement S5)', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('plays through bar 0 of the Intro (drums-only opening is the whole point)', () => {
-        // why: regression — drums are intentionally OUT of INTRO_MUTES /
-        // OUTRO_MUTES. The drums-only opening / final-bar landing is the
-        // entire musical reason for the layering. A regression that added
-        // drums to the map would silence the intro entirely.
-        const mockState = {
-            playback: {
-                bandIntensity: 0.6,
-                bpm: 120,
-                songMode: false,
-                currentLoopCount: 0,
-                complexity: 0.5,
-                intent: {},
-            },
-            groove: {
-                genreFeel: 'Rock',
-                creativity: false,
-                lastDrumPreset: 'Rock',
-                instruments: [],
-                accentMap: null,
-                fillMap: null,
-                sectionSeedMap: {},
-                seedTimelineStartStep: 0,
-                orchestrationMap: null,
-            },
-            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
-            arranger: {
-                timeSignature: '4/4',
-                sectionMap: [{ id: 'sec-intro', start: 0, end: INTRO_STEPS, label: 'Intro' }],
-                stepMap: [{ start: 0, end: INTRO_STEPS, chord: { sectionId: 'sec-intro' } }],
-                totalSteps: INTRO_STEPS,
-            },
-        };
-        getState.mockReturnValue(mockState);
-
-        const stepInfo = getStepInfo(0, TS_CONFIG, [], TIME_SIGNATURES);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        const result = applyGrooveOverrides(mockState, {
-            step: 0,
-            inst: { name: 'Kick', muted: false, steps: [] },
-            stepVal: 1,
-            playback: mockState.playback,
-            groove: mockState.groove,
-            isDownbeat: stepInfo.isMeasureStart,
-            isBeatStart: stepInfo.isBeatStart,
-            isPulse: stepInfo.isPulse,
-            isPulseStart: stepInfo.isPulseStart,
-            isGroupStart: stepInfo.isGroupStart,
-            isBackbeat: stepInfo.isBackbeat,
-            isOffbeat: stepInfo.isOffbeat,
-            isEOfBeat: stepInfo.isEOfBeat,
-            isAOfBeat: stepInfo.isAOfBeat,
-            beatIndex: stepInfo.beatIndex,
-            tsConfig: stepInfo.tsConfig,
-            mStep: stepInfo.mStep,
-            isCompound: false,
-            stepInGroup: 0,
-            groupIndex: 0,
-            sectionId: 'sec-intro',
-            sectionOccurrence: 1,
-            isFinalMeasure: false,
-            // applyGrooveOverrides currently does NOT consume introBarsElapsed
-            // or outroBarsRemaining — confirming this here. If a future
-            // regression adds drum muting, this test should be the place to
-            // catch it.
-        });
-
-        // Kick must fire — drums are exempt from layering.
-        expect(result.shouldPlay).toBe(true);
+    it('the mute config keys stay within the layered non-drum roles', () => {
+        // why: config-shape canary. The intro/outro layering schedule should
+        // only ever carry the three non-drum roles — drums are deliberately
+        // exempt so the drums-only opening / final-bar landing survive. A
+        // subset check (rather than a drum-family denylist) is regression-proof:
+        // ANY new key — `kick`, `ride`, `tom`, anything — fails it.
+        // Scope note: this guards the config SHAPE only. A drum-mute gate added
+        // inside a groove file would not surface here — the per-voice bar-scan
+        // tests below are the behavior guard for that.
+        const LAYERED_ROLES = ['bass', 'chords', 'harmony'];
+        for (const map of [INTRO_MUTES, OUTRO_MUTES]) {
+            for (const key of Object.keys(map)) {
+                expect(LAYERED_ROLES, `unexpected mute role "${key}"`).toContain(key);
+            }
+        }
     });
+
+    // Each percussion voice must emit somewhere inside bar 0 of the Intro —
+    // drums are exempt from layering, so a hit present in the base pattern
+    // (stepVal=1) is never suppressed by the intro gate. Scanning the whole
+    // bar (rather than a hand-picked step) keeps the test groove-agnostic:
+    // Kick lands on the downbeat, Snare on the backbeats, HiHat across the
+    // 8th-note grid — all we assert is that at least one survives.
+    for (const drumName of ['Kick', 'Snare', 'HiHat'] as const) {
+        it(`${drumName} fires during bar 0 of the Intro (exempt from layering)`, () => {
+            const mockState = makeDrumExemptState();
+            getState.mockReturnValue(mockState);
+            vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+            let firedSteps = 0;
+            for (let step = 0; step < STEPS_PER_BAR; step++) {
+                const stepInfo = getStepInfo(step, TS_CONFIG, [], TIME_SIGNATURES);
+                const result = applyGrooveOverrides(mockState, {
+                    step,
+                    inst: { name: drumName, muted: false, steps: [] },
+                    stepVal: 1,
+                    playback: mockState.playback,
+                    groove: mockState.groove,
+                    isDownbeat: stepInfo.isMeasureStart,
+                    isBeatStart: stepInfo.isBeatStart,
+                    isPulse: stepInfo.isPulse,
+                    isPulseStart: stepInfo.isPulseStart,
+                    isGroupStart: stepInfo.isGroupStart,
+                    isBackbeat: stepInfo.isBackbeat,
+                    isOffbeat: stepInfo.isOffbeat,
+                    isEOfBeat: stepInfo.isEOfBeat,
+                    isAOfBeat: stepInfo.isAOfBeat,
+                    beatIndex: stepInfo.beatIndex,
+                    tsConfig: stepInfo.tsConfig,
+                    mStep: stepInfo.mStep,
+                    isCompound: false,
+                    stepInGroup: 0,
+                    groupIndex: 0,
+                    sectionId: 'sec-intro',
+                    sectionOccurrence: 1,
+                    isFinalMeasure: false,
+                });
+                if (result.shouldPlay) {
+                    firedSteps++;
+                }
+            }
+            // why: drums are exempt from INTRO_MUTES — at least one hit must
+            // survive across bar 0. A regression adding drum muting would
+            // zero this out.
+            expect(firedSteps).toBeGreaterThan(0);
+        });
+    }
 });
 
 // Reliability target: 30/30. Run via
