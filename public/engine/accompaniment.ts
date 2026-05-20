@@ -1901,6 +1901,30 @@ export function getAccompanimentNotes(
                 }
             }
 
+            // why: chords.md / Epic 11 S6(d) — register-collision yield. The
+            // boom-chick "boom" lands a note in the bass register (MIDI ≤ 55-60)
+            // on the chord channel. When a dedicated band bassist is running,
+            // two engines occupying the same register on the same step is mud,
+            // not reinforcement. Yield the bass register to the band bass: lift
+            // the boom leg up by octaves until it clears the bass-side floor
+            // (band-bass MIDI + 5, a P4 of separation) and sits inside the
+            // chord-register slot (≥ 52). The guitarist still plays the R-5
+            // alternation on beats 1 & 3 — it just sounds as a low chord-voice
+            // rather than a unison doubling of the bassist. When bass is absent
+            // the original low-register boom is kept (the guitar IS the bass).
+            const boomBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+            if (bass.enabled && boomBassMidi > 0) {
+                const boomFloor = Math.max(52, boomBassMidi + 5);
+                // cap the lift at the chord-register ceiling (84) so an
+                // unusually high band-bass note (the un-clamped `bass.lastFreq`
+                // fallback path) can't push the boom out of the slot — the
+                // downstream enforceRegisterSlotting('chords') is the backstop,
+                // this just keeps the leg in range before it.
+                while (note < boomFloor && note + 12 <= 84) {
+                    note += 12;
+                }
+            }
+
             notes.push({
                 midi: note,
                 velocity: 0.6 + intensity * 0.2,

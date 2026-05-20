@@ -340,4 +340,83 @@ describe('Country Piano Critique', () => {
         expect(leaks7).toBe(0);
         expect(leaks9).toBe(0);
     });
+
+    // why: chords.md / Epic 11 S6(d) — the boom-chick "boom" leg used to write a
+    // note in the bass register (MIDI ≤ 55-60) on the chord channel with no
+    // awareness of the band bassist. Two engines in the same register on the
+    // same step is mud. With a band bassist running, the boom leg must yield the
+    // bass register — lift to clear `bassMidi + 5` (a P4 of separation) and sit
+    // inside the chord-register slot (≥ 52).
+    it('boom-chick bass leg yields the bass register to the band bassist', () => {
+        const cmaj = {
+            rootMidi: 48,
+            quality: 'maj',
+            intervals: [0, 4, 7],
+            freqs: [130.81, 164.81, 196.0],
+            sectionId: 'A',
+        };
+        mockState.arranger.progression = [cmaj];
+        // Band bassist grounded at MIDI 43 (G2) — squarely in the register the
+        // boom leg's root (48) / fifth (55) would otherwise occupy.
+        const BAND_BASS_MIDI = 43;
+        const boomFloor = Math.max(52, BAND_BASS_MIDI + 5);
+        const spm = 16;
+
+        const boomNotes: number[] = [];
+        for (let step = 0; step < 4 * spm; step++) {
+            const measureStep = step % spm;
+            mockState.playback.step = step;
+            const notes = getAccompanimentNotes(
+                getState(),
+                cmaj,
+                step,
+                step,
+                measureStep,
+                makeStepInfo(measureStep),
+                { bassMidi: BAND_BASS_MIDI },
+            );
+            // Boom-leg steps (beats 1 & 3) return a single-note event.
+            if ((measureStep === 0 || measureStep === 8) && notes.length === 1) {
+                boomNotes.push(notes[0].midi);
+            }
+        }
+
+        console.log(
+            '\n--- COUNTRY BOOM-CHICK REGISTER YIELD (S6d) ---\n' +
+                `[Band bass MIDI]        ${BAND_BASS_MIDI}\n` +
+                `[Boom floor]            ${boomFloor}\n` +
+                `[Boom notes]            ${JSON.stringify(boomNotes)}\n` +
+                '------------------------------------------------\n',
+        );
+
+        expect(boomNotes.length).toBe(8);
+        // No boom note may land in the bass register the band bassist owns.
+        for (const m of boomNotes) {
+            expect(m).toBeGreaterThanOrEqual(boomFloor);
+            // Still inside the chord-register slot.
+            expect(m).toBeLessThanOrEqual(84);
+        }
+    });
+
+    it('keeps the low-register boom when no band bassist is present', () => {
+        // why: when bass is disabled the country guitar IS the bass — the boom
+        //      leg must keep its low-register R-5, not get lifted needlessly.
+        mockState.bass.enabled = false;
+        const cmaj = {
+            rootMidi: 48,
+            quality: 'maj',
+            intervals: [0, 4, 7],
+            freqs: [130.81, 164.81, 196.0],
+            sectionId: 'A',
+        };
+        const events = simulateBars(cmaj, 4);
+        const boomNotes = events
+            .filter((e) => (e.measureStep === 0 || e.measureStep === 8) && e.notes.length === 1)
+            .map((e) => e.notes[0].midi);
+        expect(boomNotes.length).toBe(8);
+        // Original low-register boom: root clamped ≤ 55, fifth ≤ 60.
+        for (const m of boomNotes) {
+            expect(m).toBeLessThanOrEqual(60);
+        }
+    });
 });
