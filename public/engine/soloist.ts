@@ -1254,7 +1254,10 @@ export function getSoloistNote(
     const totalFormSteps = arranger.totalSteps > 0 ? arranger.totalSteps : 999999;
     const stepInForm = ((step % totalFormSteps) + totalFormSteps) % totalFormSteps;
     const remainingSteps = coordination.sectionEnd - stepInForm;
-    const isFinalMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
+    // why: per-section name (final measure of THIS section) — distinct from
+    // `coordination.isFinalMeasure` (per-song, last measure of the whole arrangement)
+    // which is plumbed by tick-logic and consumed by drums/bass cadence gates.
+    const isLastSectionMeasure = remainingSteps <= stepsPerMeasure && remainingSteps > 0;
 
     // --- Structural Structural Influence Rotation ---
     // At the start of a section, the soloist adopts a new "state of mind" (influence)
@@ -1280,7 +1283,7 @@ export function getSoloistNote(
     }
 
     // Transition evaluation at structural points (Downbeat of final measure)
-    if (isFinalMeasure && isDownbeat) {
+    if (isLastSectionMeasure && isDownbeat) {
         // PRE-HEAT: If we are at the start of the song, preserve the forced lead_in
         const isStartOfSong = step < 0 && step === -stepsPerMeasure;
         if (!isStartOfSong || soloist.session.phrasing.transitionState === null) {
@@ -1293,7 +1296,7 @@ export function getSoloistNote(
         // This locks the variation for the next section, preserving micro-level predictability
         const shiftScale = 0.2 + effectiveIntensity * 0.4; // Max 0.6 shift at high intensity
         rhy.entropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
-    } else if (!isFinalMeasure && stepInForm !== coordination.sectionStart) {
+    } else if (!isLastSectionMeasure && stepInForm !== coordination.sectionStart) {
         phr.transitionState = null; // @worker-mutation
     }
 
@@ -1311,7 +1314,7 @@ export function getSoloistNote(
     }
 
     if (
-        isFinalMeasure &&
+        isLastSectionMeasure &&
         (soloist.session.phrasing.transitionState || null) === 'rest' &&
         !isStrictHeadPlayback
     ) {
@@ -1347,7 +1350,7 @@ export function getSoloistNote(
                 (measureStep % (stepsPerBeat / 2) === 0 &&
                     Math.random() < intentBehavior.syncopationBias);
             const preventBreakout =
-                isFinalMeasure &&
+                isLastSectionMeasure &&
                 (soloist.session.phrasing.transitionState || null) === 'rest' &&
                 Math.floor(measureStep / stepsPerBeat) >= 2;
 

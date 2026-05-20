@@ -164,7 +164,7 @@ export function generateNotesForStep(
 
         // --- Final-measure publication (epic-form-arrangement S4) ---
         // why: form-arranger.md P1 #6 — only the soloist senses the form's end
-        // today (`soloist.ts:1257` derives a per-section `isFinalMeasure`). Bass,
+        // today (`soloist.ts` derives a per-section `isLastSectionMeasure`). Bass,
         // chords, harmony, and drums hit the loop boundary cold. Publish a clear
         // band-wide "this is the final bar of a song-mode playback that is
         // ending" signal so:
