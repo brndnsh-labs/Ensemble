@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { generateMelodicDevice } from '../../public/engine/soloist-devices.js';
+import { pickByRank } from '../../public/engine/soloist-pitch-engine.js';
 import { getState } from '../../public/state.js';
 import { makeSoloistMock } from '../utils/mock-soloist.js';
 
@@ -293,19 +295,28 @@ describe('Soloist Jazz Critique', () => {
         );
 
         // why: at seed steps the soloist routes through (a) the head-bypass jitter
-        // codepath we just scale-clamped, or (b) selectPitchAndDevices when the
-        // seed tone is protected. Path (a) is now strictly in-scale; path (b) is
-        // intentionally allowed to be chromatic (passing tones / approach notes).
-        // Pre-fix, jitter contributed ~16% out-of-key on top of path (b)'s
-        // baseline so the seed-step rate ran ~25-30%. Post-fix only path (b)
-        // contributes; a 30-iteration sweep showed the residual sitting at the
-        // 7-12% band, so we set the threshold at 0.15 — comfortably below the
-        // pre-fix figure and well below the global ~42% chromatic baseline, but
-        // with enough headroom that binomial variance on the jitter PRNG does
-        // not flake the build. Tighter assertion is a follow-up that needs the
-        // jitter to be deterministically seeded.
+        // codepath that epic-soloist-idiom S4 scale-clamped, or (b)
+        // selectPitchAndDevices when the seed tone is protected. Path (a) is
+        // strictly in-scale; path (b) is intentionally allowed to be chromatic
+        // (passing tones / approach notes). This metric counts BOTH, so it is a
+        // jitter-clamp regression guard with a path-(b) chromatic floor mixed in.
+        //
+        // Threshold widened to 0.27 by Epic deferred-followups S7 (a). S7(a)
+        // changed the device picker from a uniform draw over `fittedAllowed`
+        // to a rank-weighted one — in the loop-3 themed-improv context the
+        // top-ranked devices (enclosure, run, bebopScale, chromaticEnclosure)
+        // are the chromatic-by-design ones, so path (b) now contributes more
+        // out-of-key seed-step tones. A 30-run unseeded sweep post-S7(a)
+        // measured the rate at 7.0-20.3% (median ~12.5%); pre-S7(a) sat
+        // ~6-14%. 0.27 sits ~7pt above the worst observed run — honest
+        // headroom for the unseeded jitter PRNG, while still rejecting a
+        // true jitter-clamp regression (which pre-S4 ran the combined rate
+        // to ~25-30% on top of this already-chromatic path-(b) baseline,
+        // i.e. ~40-45% combined). A tighter, jitter-isolated assertion
+        // remains a follow-up that needs the jitter PRNG deterministically
+        // seeded.
         expect(seedStepAttacks).toBeGreaterThan(0);
-        expect(outOfKeyRate).toBeLessThan(0.15);
+        expect(outOfKeyRate).toBeLessThan(0.27);
     });
 
     // why: Epic 4 / S1 — chromatic neighbors of chord-tone PCs are admitted
@@ -619,5 +630,201 @@ describe('Soloist Jazz Critique', () => {
                 expect(passingRate(b)).toBeGreaterThan(BUCKET_THRESHOLDS[name]);
             }
         }
+    });
+
+    // why: Epic deferred-followups S7 (b) — the bebopScale device used to route
+    // `halfdim` to the dominant-default passing PC (maj7) — fine by accident —
+    // but folded `augmaj7` into the major family, where its b6 passing PC
+    // (rootPc+8) IS the augmaj7 #5: a chord tone, NOT a passing tone. The walk
+    // degenerated to a chromaticism-free Lydian-Augmented scalar line. The fix
+    // adds explicit branches: halfdim → nat-3 (locrian bebop), augmaj7 → b7
+    // (lydian-aug bebop). Both passing PCs are guaranteed absent from the
+    // chord's diatonic scale, so the walk carries a real chromatic tone.
+    //
+    // This is a DIRECT device-call test, not a getSoloistNote route — the
+    // picker rarely admits bebopScale on these exotic qualities, so a routed
+    // statistical sweep would under-sample. We call `generateMelodicDevice`
+    // with a chord-tone `selectedMidi` (the picker's precondition) and assert
+    // the emitted buffer contains a pitch class outside the chord's diatonic
+    // scale: the chromatic passing tone.
+    it('bebopScale carries a real chromatic passing tone over halfdim and augmaj7', () => {
+        // Minimal state for getScaleForChord — `activeStyle: 'jazz'` (not
+        // 'smart') so the smart→genre style remap is skipped (the config mock
+        // intentionally omits resolveMappedStyle).
+        const deviceState = {
+            groove: { genreFeel: 'Jazz', pocket: 0 },
+            soloist: { session: { tension: 0.3 } },
+            arranger: { key: 'C', isMinor: false, timeSignature: '4/4' },
+        };
+
+        // Diatonic scales (theory-scales.ts): halfdim → LOCRIAN {0,1,3,5,6,8,10};
+        // augmaj7 → Lydian-Augmented {0,2,4,6,8,9,11}. A "real chromatic
+        // passing tone" is any buffer PC (relative to root) NOT in this set.
+        //
+        // The 3-step walk only USES the chromatic passing tone when it crosses
+        // the gap the passing tone bridges (halfdim: b3↔4; augmaj7: 6↔maj7).
+        // The walk builds AWAY from `selectedMidi`: `responseDirection: 1` →
+        // walk down, `responseDirection: -1` → walk up. So per direction we
+        // anchor `selectedMidi` on the chord tone whose walk crosses the gap.
+        const cases = [
+            {
+                label: 'halfdim',
+                quality: 'halfdim',
+                rootMidi: 62, // D half-diminished — chord tones {D,F,Ab,C}
+                scalePcs: new Set([0, 1, 3, 5, 6, 8, 10]),
+                expectedPassingRel: 4, // nat-3 (rootPc+4), bridges b3↔4
+                // walk down: anchor on b5 (Ab) → 6,5,4,3 crosses PC4.
+                // walk up:   anchor on b3 (F)  → 3,4,5,6 crosses PC4.
+                downAnchorMidi: 62 + 6, // Ab — b5 chord tone
+                upAnchorMidi: 62 + 3, // F  — b3 chord tone
+            },
+            {
+                label: 'augmaj7',
+                quality: 'augmaj7',
+                rootMidi: 60, // C aug-maj7 — chord tones {C,E,G#,B}
+                scalePcs: new Set([0, 2, 4, 6, 8, 9, 11]),
+                expectedPassingRel: 10, // b7 (rootPc+10), bridges 6↔maj7
+                // walk down: anchor on maj7 (B) → 11,10,9,8 crosses PC10.
+                // walk up:   anchor on G# (#5) → 8,9,10,11 crosses PC10.
+                downAnchorMidi: 60 + 11, // B  — maj7 chord tone
+                upAnchorMidi: 60 + 8, // G# — #5 chord tone
+            },
+        ];
+
+        for (const c of cases) {
+            const targetChord = {
+                rootMidi: c.rootMidi,
+                quality: c.quality,
+                beats: 4,
+            };
+            // responseDirection drives the walk direction; exercise both so a
+            // direction-dependent regression can't hide.
+            for (const dir of [1, -1]) {
+                const anchorMidi = dir === 1 ? c.downAnchorMidi : c.upAnchorMidi;
+                const buffer = generateMelodicDevice('bebopScale', {
+                    state: deviceState,
+                    selectedMidi: anchorMidi,
+                    targetChord,
+                    activeStyle: 'jazz',
+                    effectiveIntensity: 0.7,
+                    minMidi: 48,
+                    maxMidi: 96,
+                    lastMidi: anchorMidi,
+                    playback: { bpm: 140 },
+                    // the post-buffer octave shifter reads
+                    // soloist.session.phrasing.isResting (soloist-devices.ts:670)
+                    soloist: { session: { phrasing: { isResting: false } } },
+                    isPolyphonic: false,
+                    isPiano: false,
+                    dynamicCenter: 70,
+                    responseSource: 'section',
+                    responseMode: 'paraphrase',
+                    responseDirection: dir,
+                });
+
+                expect(Array.isArray(buffer)).toBe(true);
+                expect(buffer.length).toBeGreaterThanOrEqual(4);
+
+                const relPcs = buffer.map((n) => (((n.midi - c.rootMidi) % 12) + 12) % 12);
+                const chromaticPcs = relPcs.filter((pc) => !c.scalePcs.has(pc));
+
+                console.log(
+                    `\n--- BEBOP ${c.label.toUpperCase()} (dir ${dir}) ---\n` +
+                        `[Buffer rel PCs]   ${relPcs.join(',')}\n` +
+                        `[Chromatic PCs]    ${chromaticPcs.join(',') || '(none)'}\n` +
+                        `[Expected passing] ${c.expectedPassingRel}\n` +
+                        '------------------------------------\n',
+                );
+
+                // Core S7(b) contract: the bebop walk MUST carry at least one
+                // chromatic (non-scale) passing tone — the old augmaj7 fold
+                // produced ZERO here.
+                expect(chromaticPcs.length).toBeGreaterThan(0);
+                // And the chromatic tone is the quality-correct bebop choice:
+                // halfdim → nat-3, augmaj7 → b7. The findNextBebopMidi walk
+                // visits the passing PC opportunistically; with a chord-tone
+                // anchor and a 3-step walk it lands the expected PC reliably.
+                expect(relPcs).toContain(c.expectedPassingRel);
+            }
+        }
+    });
+
+    // why: Epic deferred-followups S7 (a) — the device picker used to draw
+    // UNIFORM-random over `fittedAllowed`, a list that is already ordered
+    // best-first (motif priorities, then the profile-prioritized devices).
+    // Uniform selection threw the ranking away — the lowest-ranked fallback
+    // fired as often as the idiomatic top pick. `pickByRank` applies linear
+    // rank weighting: rank 0 gets weight N, the last gets weight 1.
+    //
+    // This test measures the distribution directly against the pure picker so
+    // it is deterministic and not masked by competing picker biases.
+    it('device pick distribution tracks the candidate ranking (S7 a)', () => {
+        // Deterministic mulberry32 RNG so the measured distribution is a fixed
+        // value, not a flaky band.
+        const makeRng = (seed) => {
+            let s = seed >>> 0;
+            return () => {
+                s = (s + 0x6d_2b_79_f5) >>> 0;
+                let t = s;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+            };
+        };
+
+        // A representative 5-device ranked list (best-first).
+        const ranked = ['enclosure', 'run', 'bebopScale', 'graceNote', 'slide'];
+        const N = ranked.length;
+        const rng = makeRng(0x5e_7d_10_a1);
+
+        const counts = Object.fromEntries(ranked.map((d) => [d, 0]));
+        const draws = 60_000;
+        for (let i = 0; i < draws; i++) {
+            counts[pickByRank(ranked, rng)]++;
+        }
+
+        // Expected share under linear rank weighting: rank i → (N-i)/sum(1..N).
+        const totalWeight = (N * (N + 1)) / 2;
+        const expectedShare = ranked.map((_, i) => (N - i) / totalWeight);
+        const actualShare = ranked.map((d) => counts[d] / draws);
+
+        console.log(
+            `\n--- DEVICE PICK RANK-WEIGHTING (S7 a) ---\n${ranked
+                .map(
+                    (d, i) =>
+                        `[rank ${i}] ${d.padEnd(12)} ${(actualShare[i] * 100).toFixed(1)}% ` +
+                        `(expected ${(expectedShare[i] * 100).toFixed(1)}%)`,
+                )
+                .join('\n')}\n-----------------------------------------\n`,
+        );
+
+        // (1) Strictly monotone decreasing: each rank fires LESS than the one
+        //     above it — the defining property of rank weighting. A uniform
+        //     draw would make all five ~equal and fail this outright.
+        for (let i = 1; i < N; i++) {
+            expect(actualShare[i]).toBeLessThan(actualShare[i - 1]);
+        }
+
+        // (2) The empirical share matches the linear-weight prediction within
+        //     1.5pp — 60k draws of a deterministic RNG converge tightly. This
+        //     guards the WEIGHT SHAPE, not just monotonicity: a steeper or
+        //     flatter curve would still be monotone but miss these bands.
+        for (let i = 0; i < N; i++) {
+            expect(Math.abs(actualShare[i] - expectedShare[i])).toBeLessThan(0.015);
+        }
+
+        // (3) The top device fires ~N× as often as the worst — concretely the
+        //     ratio sits in [3.5, 6.5] for N=5 (exact prediction is 5.0).
+        const topToBottom = actualShare[0] / actualShare[N - 1];
+        expect(topToBottom).toBeGreaterThan(3.5);
+        expect(topToBottom).toBeLessThan(6.5);
+
+        // (4) Variety is preserved — even the lowest-ranked device keeps a
+        //     real, non-trivial chance (rank weighting is a bias, not a sort).
+        expect(actualShare[N - 1]).toBeGreaterThan(0.03);
+
+        // Degenerate inputs.
+        expect(pickByRank([], rng)).toBe(null);
+        expect(pickByRank(['only'], rng)).toBe('only');
     });
 });

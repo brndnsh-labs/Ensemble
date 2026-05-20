@@ -96,6 +96,40 @@ function pushUniqueDevice(devices: string[], device: string | null | undefined):
     }
 }
 
+/**
+ * Pick one item from a rank-ordered (best-first) list, weighted by rank.
+ *
+ * why: the device candidate list (`fittedAllowed` in `selectPitchAndDevices`)
+ * is ordered best-first — motif priorities, then the profile-prioritized
+ * `allowed` list. A uniform draw threw that ranking away and let the lowest-
+ * ranked fallback fire as often as the idiomatic top pick. Linear rank
+ * weighting gives rank 0 weight N, rank 1 weight N-1, … the last weight 1, so
+ * the top device is N× as likely as the worst while every candidate keeps a
+ * non-zero chance (variety is preserved — this is a bias, not a hard sort).
+ *
+ * Exported so the device-selection critique test can measure the distribution
+ * deterministically with an injected RNG.
+ */
+export function pickByRank<T>(ranked: T[], random: () => number = Math.random): T | null {
+    if (ranked.length === 0) {
+        return null;
+    }
+    if (ranked.length === 1) {
+        return ranked[0];
+    }
+    const n = ranked.length;
+    const totalWeight = (n * (n + 1)) / 2; // sum of N..1
+    let roll = random() * totalWeight;
+    for (let i = 0; i < n; i++) {
+        const weight = n - i; // rank 0 → N (heaviest), last → 1
+        if (roll < weight) {
+            return ranked[i];
+        }
+        roll -= weight;
+    }
+    return ranked[0]; // float-epsilon guard
+}
+
 export interface MotifDevicePrioritiesOptions {
     activeStyle: string;
     responseMode: string;
@@ -1536,10 +1570,9 @@ export function selectPitchAndDevices(
             }
             return deviceFitsHere(device, soloistState, step);
         });
-        const deviceType =
-            fittedAllowed.length > 0
-                ? fittedAllowed[Math.floor(Math.random() * fittedAllowed.length)]
-                : null;
+        // why: pick weighted by rank, not uniform — `fittedAllowed` is ordered
+        // best-first, and a uniform draw discarded that ranking. See `pickByRank`.
+        const deviceType = pickByRank(fittedAllowed);
         if (deviceType) {
             const res = applyDeviceBuffer(deviceType, deviceContextOptions);
             if (res) {
