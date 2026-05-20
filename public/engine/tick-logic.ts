@@ -639,28 +639,36 @@ export function applyWorkerTransition(
                 (s: any) => s.id === currentSectionId,
             );
             if (currentSection) {
+                // why: see companion switch in `conductor.ts` — same dead-arm
+                // rename. This copy uses the simpler `macroFloor` for Bridge
+                // (always-down) vs conductor.ts's bidirectional invert; that
+                // asymmetry is intentional (different tick, different purpose).
                 const role = currentSection.role;
                 switch (role) {
-                    case 'Exposition':
+                    case 'Intro':
                         targetEnergy = macroFloor + 0.1;
                         break;
-                    case 'Development':
+                    case 'Outro':
+                        targetEnergy = macroFloor - 0.1;
+                        break;
+                    case 'Peak':
+                        targetEnergy = macroCeiling + 0.1;
+                        break;
+                    case 'Main Theme':
+                    case 'Theme B':
                         targetEnergy = (macroFloor + macroCeiling) / 2 + 0.1;
                         break;
-                    case 'Contrast':
+                    case 'Variation':
+                        targetEnergy = (macroFloor + macroCeiling) / 2 + 0.15;
+                        break;
+                    case 'Bridge':
                         targetEnergy = macroFloor;
+                        break;
+                    case 'Refrain':
+                        targetEnergy = macroFloor + 0.2;
                         break;
                     case 'Build':
                         targetEnergy = macroCeiling;
-                        break;
-                    case 'Climax':
-                        targetEnergy = macroCeiling + 0.1;
-                        break;
-                    case 'Recapitulation':
-                        targetEnergy = macroFloor + 0.2;
-                        break;
-                    case 'Resolution':
-                        targetEnergy = macroFloor - 0.1;
                         break;
                     default:
                         targetEnergy = 0.5;

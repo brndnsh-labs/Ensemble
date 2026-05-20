@@ -357,23 +357,27 @@ describe('Conductor Logic', () => {
             ];
 
             conductor.form = {
-                sections: [{ id: 's2', role: 'Climax', flux: 3.0, iteration: 2 }],
+                sections: [{ id: 's2', role: 'Peak', flux: 3.0, iteration: 2 }],
             };
 
             // Transitioning from s1 -> s2
             checkSectionTransition(getState(), 0, 16, dispatch);
 
-            // Expected target energy should be influenced by 'Climax' role and high flux
+            // Expected target energy should be influenced by 'Peak' role and high flux
             expect(conductor.targetIntensity).toBeGreaterThan(0.6);
 
-            // Test other roles for coverage
+            // Test other roles for coverage — must intersect with analyzeForm's
+            // emitted vocabulary (Intro/Outro/Peak/Main Theme/Theme B/Bridge/
+            // Variation/Refrain/Build).
             const roles = [
-                'Exposition',
-                'Development',
-                'Contrast',
+                'Intro',
+                'Outro',
+                'Main Theme',
+                'Theme B',
+                'Bridge',
+                'Variation',
+                'Refrain',
                 'Build',
-                'Recapitulation',
-                'Resolution',
             ];
             for (const role of roles) {
                 conductor.form.sections[0].role = role;

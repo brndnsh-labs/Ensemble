@@ -443,31 +443,50 @@ export function checkSectionTransition(
                             (s: any) => s.id === (nextEntry.chord as any).sectionId,
                         );
                         if (nextSection) {
+                            // why: switch arms used to enumerate a formal-music
+                            // vocabulary (Exposition/Development/Climax/...)
+                            // that `analyzeForm` never emits — only `Build`
+                            // overlapped, so six of seven arms were dead and
+                            // every section fell through to the
+                            // `getSectionEnergy(label)` default. Renamed to
+                            // mirror `analyzeForm`'s actual output (Intro,
+                            // Outro, Peak, Main Theme, Theme B, Bridge,
+                            // Variation, Refrain, Build) with energies that
+                            // preserve the musical intent of the old arms
+                            // (Intro ≈ Exposition, Peak ≈ Climax, Outro ≈
+                            // Resolution, Refrain ≈ Recapitulation, Bridge ≈
+                            // Contrast). `Variation` (only emitted when
+                            // section flux > 2.8) sits slightly hotter than
+                            // `Theme B` to honor the flux signal.
                             const role = nextSection.role;
                             switch (role) {
-                                case 'Exposition':
+                                case 'Intro':
                                     targetEnergy = macroFloor + 0.1;
                                     break;
-                                case 'Development':
+                                case 'Outro':
+                                    targetEnergy = macroFloor - 0.1;
+                                    break;
+                                case 'Peak':
+                                    targetEnergy = macroCeiling + 0.1;
+                                    break;
+                                case 'Main Theme':
+                                case 'Theme B':
                                     targetEnergy = (macroFloor + macroCeiling) / 2 + 0.1;
                                     break;
-                                case 'Contrast':
+                                case 'Variation':
+                                    targetEnergy = (macroFloor + macroCeiling) / 2 + 0.15;
+                                    break;
+                                case 'Bridge':
                                     targetEnergy =
                                         currentInt > (macroFloor + macroCeiling) / 2
                                             ? macroFloor
                                             : macroCeiling;
                                     break;
-                                case 'Build':
-                                    targetEnergy = macroCeiling;
-                                    break;
-                                case 'Climax':
-                                    targetEnergy = macroCeiling + 0.1;
-                                    break;
-                                case 'Recapitulation':
+                                case 'Refrain':
                                     targetEnergy = macroFloor + 0.2;
                                     break;
-                                case 'Resolution':
-                                    targetEnergy = macroFloor - 0.1;
+                                case 'Build':
+                                    targetEnergy = macroCeiling;
                                     break;
                                 default:
                                     targetEnergy = getSectionEnergy(nextSection.label);
