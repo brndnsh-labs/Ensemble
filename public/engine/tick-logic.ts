@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getSectionEnergy } from '../form-analysis.js';
+import { getJamMacroArc, getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import {
     binarySearchMap,
@@ -801,15 +801,17 @@ export function applyWorkerTransition(
             (playback as Mutable<typeof playback>).bandIntensity = newIntensity; // @worker-mutation
         }
     } else if (playback.autoIntensity && modStep === 0 && conductorState.formIteration > 0) {
-        const grandCycle = conductorState.formIteration % 8;
-        let target = 0.5;
-        if (grandCycle < 3) {
-            target = 0.6;
-        } else if (grandCycle < 5) {
-            target = 0.9;
-        } else {
-            target = 0.4;
-        }
+        // Timer-less open-jam fallback (offline export, no totalLoops). Was a
+        // rigid `formIteration % 8` 3-step sawtooth; now follows the same
+        // `getJamMacroArc` raised-cosine swell the conductor uses on the live
+        // path, so an exported open jam breathes instead of churning on a
+        // hard period-8 step. Target = the swell's centre (floor/ceiling
+        // midpoint) since this path drives a single intensity, not a band.
+        const { macroFloor, macroCeiling } = getJamMacroArc(
+            conductorState.formIteration,
+            groove.genreFeel,
+        );
+        const target = (macroFloor + macroCeiling) / 2;
         (playback as Mutable<typeof playback>).bandIntensity =
             playback.bandIntensity + (target - playback.bandIntensity) * 0.5; // @worker-mutation
     }

@@ -1,4 +1,4 @@
-import { analyzeForm, getSectionEnergy } from '../form-analysis.js';
+import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../form-analysis.js';
 import { debounceSaveState, saveCurrentState } from '../persistence.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
@@ -417,24 +417,15 @@ export function checkSectionTransition(
                             macroCeiling = 0.5;
                         }
                     } else {
-                        // Fallback: Repetition-Based Logic (5+ Minute Jam Logic)
-                        const grandCycle = conductor.formIteration % 8;
-                        if (grandCycle === 0) {
-                            macroFloor = 0.15;
-                            macroCeiling = 0.45;
-                        } else if (grandCycle < 3) {
-                            macroFloor = 0.35;
-                            macroCeiling = 0.75;
-                        } else if (grandCycle < 5) {
-                            macroFloor = 0.6;
-                            macroCeiling = 1.0;
-                        } else if (grandCycle < 7) {
-                            macroFloor = 0.3;
-                            macroCeiling = 0.6;
-                        } else {
-                            macroFloor = 0.1;
-                            macroCeiling = 0.35;
-                        }
+                        // Fallback: open-ended jam (no session timer) — a
+                        // genre-aware raised-cosine swell with deterministic
+                        // per-cycle variation, replacing the old rigid
+                        // `formIteration % 8` sawtooth that snapped the energy
+                        // band back to a quiet intro every 8 form-repeats.
+                        ({ macroFloor, macroCeiling } = getJamMacroArc(
+                            conductor.formIteration,
+                            groove.genreFeel,
+                        ));
                     }
 
                     // --- 2. THE LOCAL FUNCTIONAL ROLE ---

@@ -27,6 +27,108 @@ export function getSectionEnergy(label: string | null | undefined): number {
     return 0.5; // Default
 }
 
+// why: canonical mulberry32 scramble — identical to the helper in
+// bass-engine.ts / harmonies.ts / groove-engine.ts. Homed here (worker-safe,
+// dep-light) so both the conductor (main thread) and tick-logic (worker /
+// offline export) consume one copy of the timer-less jam macro-arc. A bare
+// `seed % N` would sawtooth on small integer seeds (see
+// feedback-seeded-prng-mulberry32) — mulberry32 pre-scrambles so consecutive
+// cycles get well-distributed offsets.
+const scrambleHash = (seed: number): number => {
+    let t = (seed + 0x6d2b79f5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+};
+
+/**
+ * Per-genre macro-arc cycle length (in form repeats) for the timer-less jam.
+ *
+ * why: an open-ended jam has no song arc, so the macro-arc is a slow swell
+ * rather than a structured build. A genre that naturally stretches out
+ * (jazz/bossa — long-form blowing, players take many choruses) wants a longer
+ * swell so the energy doesn't churn; a high-energy genre (funk/disco/rock)
+ * wants a shorter cycle so the jam keeps re-cresting. Genres absent from the
+ * map use `JAM_CYCLE_DEFAULT`.
+ */
+export const JAM_CYCLE_LENGTHS: Record<string, number> = {
+    // why: jazz/bossa long-form blowing — one slow swell over many choruses.
+    Jazz: 18,
+    'Bossa Nova': 18,
+    // why: funk/disco re-crest often — the pocket wants frequent fresh peaks.
+    Funk: 9,
+    Disco: 9,
+    // why: rock/metal sit between — a moderate swell that still rebuilds.
+    Rock: 11,
+    Metal: 11,
+};
+// why 13: shares no common factor with the usual 4- and 8-bar section counts,
+// so the swell does not phase-lock to the form (a multiple like 12 would
+// re-crest on the same form-repeat every cycle).
+export const JAM_CYCLE_DEFAULT = 13;
+
+/**
+ * Timer-less open-jam macro-arc.
+ *
+ * Replaces the old rigid `formIteration % 8` ladder, which hard-reset the
+ * energy band every 8 form-repeats — every cycle byte-identical, the snap
+ * from quiet-outro back to quiet-intro audibly robotic (form-arranger.md
+ * P1 #5 / P2 #10-11).
+ *
+ * Shape: a raised-cosine swell over `cycleLen` form repeats. Phase 0 sits at
+ * the trough (quiet), phase 0.5 at the crest (loud), so the band rises and
+ * falls smoothly instead of stepping. The floor and ceiling both track the
+ * same swell, keeping a roughly constant ~0.3 dynamic window that itself
+ * breathes slightly.
+ *
+ * Per-cycle variation: each grand-cycle is seeded by its cycle index, so
+ * successive cycles get a small deterministic offset to crest height, trough
+ * depth, and phase — the swell is no longer a fixed-period sawtooth. The
+ * variation is reproducible (loop-comparison safe) because it is hashed, not
+ * `Math.random()`.
+ *
+ * Output range stays inside roughly 0.1–1.0, matching the band the old ladder
+ * spanned.
+ */
+export function getJamMacroArc(
+    formIteration: number,
+    genreFeel: string,
+): {
+    macroFloor: number;
+    macroCeiling: number;
+} {
+    const cycleLen = JAM_CYCLE_LENGTHS[genreFeel] ?? JAM_CYCLE_DEFAULT;
+    const cycleIndex = Math.floor(formIteration / cycleLen);
+    // phase in [0, 1) across the current grand-cycle.
+    const phaseRaw = (formIteration % cycleLen) / cycleLen;
+
+    // why: per-cycle seeded offsets. Each draw is a fresh hash slot off the
+    // cycle index so cycle N+1 never reproduces cycle N. Magnitudes are kept
+    // small (±) so the swell stays recognizably the same gesture — a jam that
+    // breathes, not one that lurches.
+    // - phaseShift ±0.12 of a cycle: shifts where the crest lands so the peak
+    //   doesn't always fall on the same form-repeat.
+    const phaseShift = (scrambleHash(cycleIndex * 7 + 1) - 0.5) * 0.24;
+    // - crestLift ±0.1: some cycles peak hotter, some stay cooler.
+    const crestLift = (scrambleHash(cycleIndex * 7 + 2) - 0.5) * 0.2;
+    // - windowBreath ±0.06: the floor/ceiling gap widens or narrows a touch.
+    const windowBreath = (scrambleHash(cycleIndex * 7 + 3) - 0.5) * 0.12;
+
+    const phase = phaseRaw + phaseShift;
+    // Raised cosine: 0 at phase 0/1 (trough), 1 at phase 0.5 (crest).
+    const swell = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
+
+    // why: base band — trough centers near 0.2, crest near 0.85. The swell
+    // interpolates the centre between those, then crestLift nudges the whole
+    // cycle's hotness and windowBreath flexes the floor/ceiling spread.
+    const centre = 0.2 + swell * (0.65 + crestLift);
+    const halfWindow = 0.18 + swell * 0.06 + windowBreath;
+
+    const macroFloor = Math.max(0.1, centre - halfWindow);
+    const macroCeiling = Math.min(1.0, centre + halfWindow);
+    return { macroFloor, macroCeiling };
+}
+
 function calculateHarmonicFlux(sectionSteps: Array<{ chord: Chord }>): number {
     if (!sectionSteps.length) {
         return 0;

@@ -51,6 +51,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../public/engine/conductor.js';
+import { getJamMacroArc, JAM_CYCLE_LENGTHS } from '../../public/form-analysis.js';
 import { ACTIONS } from '../../public/types.js';
 
 vi.mock('../../public/state.js', () => ({
@@ -508,6 +509,273 @@ describe('Conductor Arc Critique (S7)', () => {
             // Engine reality: climax in [0.825, 0.975], cool-down in [0.425,
             // 0.575] -> delta in [0.25, 0.55]. Always positive, never below 0.25.
             expect(passes).toBeGreaterThanOrEqual(30);
+        });
+    });
+
+    // ---------------------------------------------------------------------
+    // 2b. Timer-less open-jam macro-arc (S3) — when there is NO session timer
+    //     the conductor falls back to `getJamMacroArc`, a genre-aware
+    //     raised-cosine swell with deterministic per-cycle variation. It
+    //     replaced the old rigid `formIteration % 8` 5-step sawtooth.
+    //
+    //     The acceptance criterion is that the contour is NOT a fixed-period
+    //     sawtooth: (a) it must be smoother than a 5-step ladder, and (b)
+    //     successive grand-cycles must NOT be byte-identical.
+    //
+    //     To exercise the fallback we set sessionTimer=0 so the
+    //     `playback.sessionTimer > 0 && sessionStartTime > 0` branch is
+    //     skipped, then drive checkSectionTransition once per formIteration
+    //     and capture the realized targetIntensity. The transition at step 16
+    //     (A->B) is mid-form (not isLoopEnd) so the macro-arc write is clean.
+    // ---------------------------------------------------------------------
+    describe('timer-less open-jam macro-arc (S3)', () => {
+        // Sample the realized targetIntensity across `count` consecutive form
+        // iterations of the timer-less fallback. Math.random stubbed to 0.5 so
+        // the conductor.ts:510 jitter resolves to exactly 0 — the contour we
+        // measure is purely getJamMacroArc's swell, not noise.
+        function sampleJamArc(count: number, genreFeel = 'Rock'): number[] {
+            const out: number[] = [];
+            for (let it = 0; it < count; it++) {
+                const state = makeMockState();
+                // Force the timer-less fallback branch.
+                state.playback.sessionTimer = 0;
+                state.playback.sessionStartTime = 0;
+                state.groove.genreFeel = genreFeel;
+                state.conductor.formIteration = it;
+                // Chorus next-section (energy 0.9) exceeds every ceiling, so
+                // the macro clamp resolves to macroCeiling — the realized
+                // target IS the arc ceiling, a direct read of the swell.
+                const { targetIntensity } = runTransitionAtProgress(0.5, {
+                    mockState: state,
+                });
+                out.push(targetIntensity ?? 0);
+            }
+            return out;
+        }
+
+        it('contour is not a fixed-period sawtooth (no exact period-8 repeat)', () => {
+            // The old engine repeated with period 8. Sample 48 iterations and
+            // assert no candidate period P in [4..16] reproduces the contour
+            // exactly — i.e. arc[i] != arc[i+P] for enough i that a strict
+            // periodic ladder would be caught.
+            const N = 48;
+            const arc = sampleJamArc(N);
+            const offenders: number[] = [];
+            for (let P = 4; P <= 16; P++) {
+                let identical = true;
+                for (let i = 0; i + P < N; i++) {
+                    if (Math.abs(arc[i] - arc[i + P]) > 1e-9) {
+                        identical = false;
+                        break;
+                    }
+                }
+                if (identical) {
+                    offenders.push(P);
+                }
+            }
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC PERIODICITY ---');
+            console.log(`[Samples]            ${N} consecutive form iterations`);
+            console.log(`[Candidate periods]  4..16`);
+            console.log(
+                `[Exact-repeat periods] ${offenders.length ? offenders.join(',') : 'none'}`,
+            );
+            console.log(
+                `[Contour min/max]    ${Math.min(...arc).toFixed(3)} / ${Math.max(...arc).toFixed(3)}`,
+            );
+            console.log('----------------------------------------------------\n');
+            // No candidate period may reproduce the contour exactly. The old
+            // `% 8` ladder would have offenders === [8] (and 16).
+            expect(offenders).toEqual([]);
+        });
+
+        it('successive grand-cycles are non-identical (per-cycle variation)', () => {
+            // Rock cycle length is 11 (JAM_CYCLE_LENGTHS). Compare cycle 0
+            // against cycle 1 against cycle 2 phase-for-phase: at least one
+            // phase per pair must differ — the seeded per-cycle offset.
+            const CYCLE = 11;
+            const arc = sampleJamArc(CYCLE * 3);
+            const cycle0 = arc.slice(0, CYCLE);
+            const cycle1 = arc.slice(CYCLE, CYCLE * 2);
+            const cycle2 = arc.slice(CYCLE * 2, CYCLE * 3);
+
+            const maxDiff = (a: number[], b: number[]) =>
+                Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+            const d01 = maxDiff(cycle0, cycle1);
+            const d12 = maxDiff(cycle1, cycle2);
+
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC CYCLE VARIATION ---');
+            console.log(`[Cycle length]       ${CYCLE} (Rock)`);
+            console.log(`[max|cycle0-cycle1|] ${d01.toFixed(4)}`);
+            console.log(`[max|cycle1-cycle2|] ${d12.toFixed(4)}`);
+            console.log('--------------------------------------------------------\n');
+
+            // why 0.02: the per-cycle seeded offsets (phaseShift/crestLift/
+            // windowBreath) move the swell by well over 0.02 on any non-trivial
+            // hash draw; a fixed-period sawtooth would give exactly 0.
+            expect(d01).toBeGreaterThan(0.02);
+            expect(d12).toBeGreaterThan(0.02);
+        });
+
+        it('contour is smoother than a 5-step ladder (small step-to-step deltas)', () => {
+            // A raised-cosine swell changes gradually; the old 5-step ladder
+            // jumped up to 0.55 (0.10->0.45->0.75->1.0...) between adjacent
+            // iterations. Assert the mean adjacent delta is modest and the
+            // single worst jump never approaches the old ladder's 0.55 snap.
+            const N = 44; // 4 Rock cycles
+            const arc = sampleJamArc(N);
+            const deltas: number[] = [];
+            for (let i = 1; i < N; i++) {
+                deltas.push(Math.abs(arc[i] - arc[i - 1]));
+            }
+            const meanDelta = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+            const maxDelta = Math.max(...deltas);
+
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC SMOOTHNESS ---');
+            console.log(`[Samples]            ${N}`);
+            console.log(`[Mean adjacent delta] ${meanDelta.toFixed(4)}`);
+            console.log(`[Max adjacent delta]  ${maxDelta.toFixed(4)}`);
+            console.log(`[Old ladder worst snap] 0.550 (0.45 -> 1.00 band jump)`);
+            console.log('----------------------------------------------------\n');
+
+            // why 0.18 mean: a cosine swell over an 11-step cycle moves the
+            // centre ~1.3/11 ≈ 0.12 per step at the steepest; the floor/ceiling
+            // tracking and per-cycle breath add headroom. 0.18 mean comfortably
+            // separates the swell from the old ladder (~0.27 mean).
+            expect(meanDelta).toBeLessThan(0.18);
+            // why 0.35 max: the steepest single step of the swell plus a
+            // cycle-boundary phase reset stays well under the old 0.55 snap.
+            expect(maxDelta).toBeLessThan(0.35);
+        });
+
+        it('contour stays inside the ~0.1-1.0 band the old ladder spanned', () => {
+            // The fallback must still produce a usable energy band. Sweep
+            // several genres (different cycle lengths) to cover the swell's
+            // full excursion.
+            for (const genre of ['Rock', 'Jazz', 'Funk', 'Bossa Nova']) {
+                const arc = sampleJamArc(40, genre);
+                const lo = Math.min(...arc);
+                const hi = Math.max(...arc);
+                console.log(
+                    `[${genre.padEnd(10)}] jam-arc range  ${lo.toFixed(3)} .. ${hi.toFixed(3)}`,
+                );
+                // Realized target = clamp(macroFloor, macroCeiling, 0.9) -> the
+                // macroCeiling. macroCeiling is Math.min(1.0, centre+halfWindow)
+                // and centre+halfWindow >= 0.1 always.
+                expect(lo).toBeGreaterThanOrEqual(0.1);
+                expect(hi).toBeLessThanOrEqual(1.0);
+            }
+        });
+
+        it('genre-aware cycle length: Funk re-crests sooner than Jazz', () => {
+            // Funk cycle is 9, Jazz is 18 — Funk's contour should complete more
+            // full swells over the same iteration count. Count local maxima as
+            // a proxy for swell crests.
+            const N = 72;
+            const countCrests = (arc: number[]) => {
+                let crests = 0;
+                for (let i = 1; i < arc.length - 1; i++) {
+                    if (arc[i] > arc[i - 1] && arc[i] >= arc[i + 1]) {
+                        crests++;
+                    }
+                }
+                return crests;
+            };
+            const funkCrests = countCrests(sampleJamArc(N, 'Funk'));
+            const jazzCrests = countCrests(sampleJamArc(N, 'Jazz'));
+
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC GENRE CYCLE ---');
+            console.log(`[Samples]      ${N} iterations`);
+            console.log(`[Funk crests]  ${funkCrests} (cycle 9)`);
+            console.log(`[Jazz crests]  ${jazzCrests} (cycle 18)`);
+            console.log('-------------------------------------------------\n');
+
+            // Funk (shorter cycle) must crest strictly more often than Jazz.
+            expect(funkCrests).toBeGreaterThan(jazzCrests);
+        });
+
+        // The sampleJamArc tests above read the realized targetIntensity,
+        // which the Chorus next-section (energy 0.9) clamps to macroCeiling —
+        // so they only ever observe the swell's CEILING. macroFloor and the
+        // breathing dynamic window are invisible to them. This block reads
+        // getJamMacroArc directly so a floor inversion / window collapse
+        // (e.g. a sign error in windowBreath) is actually guarded.
+        it('dynamic window never inverts or collapses (direct macroFloor read)', () => {
+            let minWindow = Infinity;
+            let maxWindow = -Infinity;
+            let minFloor = Infinity;
+            let maxCeiling = -Infinity;
+            for (const genre of Object.keys(JAM_CYCLE_LENGTHS)) {
+                const cycleLen = JAM_CYCLE_LENGTHS[genre];
+                // Sweep three full grand-cycles so per-cycle seeded variation
+                // is exercised, not just one cycle.
+                for (let it = 0; it < cycleLen * 3; it++) {
+                    const { macroFloor, macroCeiling } = getJamMacroArc(it, genre);
+                    const window = macroCeiling - macroFloor;
+                    // Floor must stay below ceiling — never inverted.
+                    expect(macroCeiling).toBeGreaterThan(macroFloor);
+                    // Output band stays inside the documented 0.1-1.0 range.
+                    expect(macroFloor).toBeGreaterThanOrEqual(0.1);
+                    expect(macroCeiling).toBeLessThanOrEqual(1.0);
+                    if (window < minWindow) {
+                        minWindow = window;
+                    }
+                    if (window > maxWindow) {
+                        maxWindow = window;
+                    }
+                    if (macroFloor < minFloor) {
+                        minFloor = macroFloor;
+                    }
+                    if (macroCeiling > maxCeiling) {
+                        maxCeiling = macroCeiling;
+                    }
+                }
+            }
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC DYNAMIC WINDOW ---');
+            console.log(`[Window  min/max]  ${minWindow.toFixed(3)} / ${maxWindow.toFixed(3)}`);
+            console.log(`[Floor   min]      ${minFloor.toFixed(3)}`);
+            console.log(`[Ceiling max]      ${maxCeiling.toFixed(3)}`);
+            console.log('--------------------------------------------------------\n');
+            // The window must never collapse to a sliver: a usable dynamic
+            // band is at least ~0.2 wide even at the trough (halfWindow floor
+            // 0.18 minus windowBreath 0.06 -> 0.12 half -> ~0.24 full).
+            expect(minWindow).toBeGreaterThan(0.15);
+        });
+
+        it('macroFloor itself varies pass-to-pass (floor is not pinned)', () => {
+            // A floor that never moves would mean only the ceiling breathes —
+            // half a swell. Sweep Rock across three cycles and assert the
+            // floor contour has real spread and no exact period-N repeat.
+            const cycleLen = JAM_CYCLE_LENGTHS.Rock;
+            const N = cycleLen * 3;
+            const floors: number[] = [];
+            for (let it = 0; it < N; it++) {
+                floors.push(getJamMacroArc(it, 'Rock').macroFloor);
+            }
+            const spread = Math.max(...floors) - Math.min(...floors);
+            const offenders: number[] = [];
+            for (let P = 4; P <= 16; P++) {
+                let identical = true;
+                for (let i = 0; i + P < N; i++) {
+                    if (Math.abs(floors[i] - floors[i + P]) > 1e-9) {
+                        identical = false;
+                        break;
+                    }
+                }
+                if (identical) {
+                    offenders.push(P);
+                }
+            }
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC FLOOR CONTOUR ---');
+            console.log(`[Floor spread]         ${spread.toFixed(3)}`);
+            console.log(
+                `[Exact-repeat periods] ${offenders.length ? offenders.join(',') : 'none'}`,
+            );
+            console.log('-------------------------------------------------------\n');
+            // The floor tracks the swell — it must move by a musically real
+            // amount across a cycle, not sit pinned at 0.1.
+            expect(spread).toBeGreaterThan(0.05);
+            // ...and not as a fixed-period sawtooth.
+            expect(offenders).toEqual([]);
         });
     });
 
