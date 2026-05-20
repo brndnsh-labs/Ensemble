@@ -445,11 +445,17 @@ export function applyGrooveOverrides(
             // why: also fold the instrument name so Snare and HiHat each get
             // their own target step within the bar — otherwise both lanes
             // would permute on the same 16th, doubling the gesture.
-            let instHash = 0;
+            let instNameHash = 0;
             const instName: string = inst.name ?? '';
             for (let c = 0; c < instName.length; c++) {
-                instHash = (instHash * 31 + instName.charCodeAt(c)) | 0;
+                instNameHash = (instNameHash * 31 + instName.charCodeAt(c)) | 0;
             }
+            // why: a bare djb-style polynomial hash of short instrument names
+            // ("Snare" vs "HiHat") leaves the low bits poorly distributed, so
+            // the XOR below can correlate adjacent lanes. Run it through the
+            // canonical mulberry32 scramble first so each lane gets a
+            // well-mixed 32-bit integer to fold into targetSeed.
+            const instHash = (scrambleHash(instNameHash) * 0x100000000) | 0;
             const targetSeed = scrambleHash(
                 (sectionIdHash ^
                     (sectionOccurrenceSafe * 0x9e3779b1) ^
