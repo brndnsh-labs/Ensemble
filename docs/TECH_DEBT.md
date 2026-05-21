@@ -4,10 +4,10 @@ A running log of state-discipline, worker-contract, and architectural-hygiene fi
 
 Started: 2026-05-16. Each entry is sized so the next reader can decide whether to pick it up without re-deriving the audit.
 
-## Status (2026-05-16)
+## Status (2026-05-20)
 
-- **Open:** 2 — `arranger.progression` bulk write bypasses dispatch flow; soloist picker signature uses `soloistState: any` to allow a test-only escape-hatch slot.
-- **Shipped:** 0.
+- **Open:** 1 — `arranger.progression` bulk write bypasses dispatch flow.
+- **Shipped:** 1 — soloist picker `soloistState: any` discoverability gap (Epic 11 S5).
 
 ## Open findings
 
@@ -36,24 +36,13 @@ Roughly: a multi-day refactor with non-trivial test surgery. Worth doing as its 
 
 **Partial cleanup already shipped (2026-05-16):** dropped a redundant unmarked `Object.assign(arranger, { progression: allChords })` on what was previously line 917 — it duplicated the mutation on line 916 without a marker. Surface paint; the underlying discipline violation remains.
 
-### 2. Soloist picker uses `soloistState: any` to allow a test-only escape-hatch slot
+## Shipped findings
 
-**Location:** `public/engine/soloist-pitch-engine.ts:205` (signature), `:474` (the load-bearing access).
+### 2. Soloist picker `soloistState: any` test-only escape-hatch slot — SHIPPED Epic 11 S5 (`65faccd7`)
 
-**Severity:** `NIT` / type-safety (per `worker-contract-reviewer` taxonomy).
+**Was:** `selectPitchAndDevices` took `soloistState: any`, and the `srdcState` top-level test-override slot it relied on was never declared on `SoloistState` — so a future maintainer tightening the signature would silently break the critique tests that use the override, with an opaque failure message.
 
-**What:** `selectPitchAndDevices` takes `soloistState: any`. That looseness is what lets the picker read `soloistState.srdcState` (a top-level override slot used only by tests, never declared on `SoloistState` in `public/types.ts`) without a compile error. Read order is `soloistState.srdcState || soloistState.session?.currentPhrase?.context?.srdcState || 'statement'` — top-level test override wins, then production-written nested slot, then default. The pattern is documented in memory `feedback_state_mock_vs_production_override.md` and codified in `docs/guides/musical-engine-patterns.md` § Patterns proven (Engine-knows-where-it-is, step 5).
-
-**Why it matters:** A future maintainer tightening the picker signature to `soloistState: SoloistState` would silently break every critique test that uses the top-level override (currently `tests/standards/soloist-musicality.test.ts:109,137`, `tests/unit/engine/soloist-ceiling.test.ts:76`, `tests/unit/engine/soloist-country.test.ts:52`). The error would be a typecheck failure on the test files, not a runtime regression — caught at CI, but the failure message wouldn't obviously point at "your override slot is undeclared." Discoverability is the issue, not correctness.
-
-**Suggested fix:** Two options, both small.
-
-- **(a)** Declare `srdcState?: SrdcPhase` on `SoloistState` in `public/types.ts` with a JSDoc comment marking it `@test-only` (or `@deprecated except in tests` — whichever style fits). The picker can keep `soloistState: any` for now or be tightened in the same change.
-- **(b)** Document the loose-typing decision: a one-line comment on the picker signature noting that `any` is deliberate because of the test override slot, with a pointer to `feedback_state_mock_vs_production_override.md`.
-
-Option (a) is more discoverable; option (b) is zero structural change. Either closes the discoverability gap.
-
-**Scope cost:** ~5 minutes. One type definition or one comment.
+**Resolved:** Epic 11 S5 item 11 took suggested-fix option (a): commit `65faccd7` declares `SrdcPhase` and an optional `srdcState?: SrdcPhase` slot on `SoloistState` in `public/types.ts` with `@test-only` JSDoc (`public/types.ts:727,776`). The picker's `soloistState: any` param was deliberately *kept* — it performs `@worker-mutation` writes against `readonly` fields that a strict `SoloistState` type would reject; that looseness is now a documented intentional choice rather than an undiscoverable accident. The discoverability gap — the actual finding — is closed.
 
 ## Methodology
 
