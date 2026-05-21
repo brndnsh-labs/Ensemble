@@ -236,6 +236,40 @@ function manageVoices(playTime: number, audio: SoloistState['audio'], mode: stri
 
 // --- PRESET IMPLEMENTATIONS ---
 
+// Wire the shared LFO vibrato into a voice's two oscillators. Byte-identical
+// across every preset voice (playTrumpet, playSaxophone, playNeoJuno,
+// playVowel, playShred), so it lives here instead of being copy-pasted five
+// times. Piano mode has no vibrato — bail before building the LFO graph.
+function attachVibrato(
+    state: EnsembleState,
+    ctx: AudioContext,
+    freq: number,
+    playTime: number,
+    duration: number,
+    style: string,
+    vibratoFlag: boolean,
+    voiceObj: SoloistVoice,
+    osc1: OscillatorNode,
+    osc2: OscillatorNode,
+): void {
+    if (isSoloistPianoMode(state.soloist.mode)) {
+        return;
+    }
+    const { vibrato, vibGain, depthModNodes } = createVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+    );
+    vibrato.connect(vibGain);
+    vibGain.connect(osc1.frequency as any);
+    vibGain.connect(osc2.frequency as any);
+    voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
+}
+
 function playTrumpet(
     state: EnsembleState,
     ctx: AudioContext,
@@ -276,21 +310,7 @@ function playTrumpet(
         isSoloistPianoMode(soloist.mode),
     );
 
-    if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain, depthModNodes } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency as any);
-        vibGain.connect(osc2.frequency as any);
-        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
-    }
+    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -385,21 +405,7 @@ function playSaxophone(
         isSoloistPianoMode(soloist.mode),
     );
 
-    if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain, depthModNodes } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency as any);
-        vibGain.connect(osc2.frequency as any);
-        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
-    }
+    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
     const f1 = ctx.createBiquadFilter();
     f1.type = 'bandpass';
@@ -523,21 +529,7 @@ function playNeoJuno(
         isSoloistPianoMode(soloist.mode),
     );
 
-    if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain, depthModNodes } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency as any);
-        vibGain.connect(osc2.frequency as any);
-        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
-    }
+    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -609,21 +601,7 @@ function playVowel(
         isSoloistPianoMode(soloist.mode),
     );
 
-    if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain, depthModNodes } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency as any);
-        vibGain.connect(osc2.frequency as any);
-        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
-    }
+    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
@@ -690,21 +668,7 @@ function playShred(
         isSoloistPianoMode(soloist.mode),
     );
 
-    if (!isSoloistPianoMode(soloist.mode)) {
-        const { vibrato, vibGain, depthModNodes } = createVibrato(
-            state,
-            ctx,
-            freq,
-            playTime,
-            duration,
-            style,
-            vibratoFlag,
-        );
-        vibrato.connect(vibGain);
-        vibGain.connect(osc1.frequency as any);
-        vibGain.connect(osc2.frequency as any);
-        voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
-    }
+    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
