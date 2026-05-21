@@ -55,7 +55,7 @@ export function generateDrumOrchestration(
     const prng = createPRNG(seedStr || generateRandomSeed());
     const orchestrationMap: OrchestrationMapEntry[] = [];
 
-    sectionMap.forEach((sectionRange: any, index: number) => {
+    sectionMap.forEach((sectionRange: any) => {
         const label = (sectionRange.label || 'Verse').toLowerCase();
         const sourceLabels: string[] = Array.isArray(sectionRange.sourceLabels)
             ? sectionRange.sourceLabels
