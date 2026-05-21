@@ -142,13 +142,27 @@ describe('Ska-Punk Genre Integrity', () => {
         // 1. Prime the hook by simulating a motif replay
         // We set isReplayingMotif to FALSE to test the specific Ska-Punk sharedHookBuffer logic
         soloist.isReplayingMotif = false;
-        soloist.session.memory.sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
+        const sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
+        soloist.session.memory.sharedHookBuffer = sharedHookBuffer;
 
         // 2. Harmony should now latch to this step even if it's not a standard stab step
         // Bypass the 85% dropout by mocking Math.random
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
-        const notes = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0, { midi: 72 });
+        // S9(b): the shared-hook buffer reaches harmony via the coordination contract.
+        const notes = getHarmonyNotes(
+            getState(),
+            chord,
+            null,
+            0,
+            0,
+            'horns',
+            0,
+            { midi: 72 },
+            {
+                soloistSharedHookBuffer: sharedHookBuffer,
+            },
+        );
 
         expect(notes.length).toBeGreaterThan(0);
         expect(notes[0].isLatched).toBe(true);

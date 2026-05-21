@@ -512,7 +512,20 @@ describe('Harmony Engine Logic', () => {
             };
             const soloistNote = { midi: 72, freq: 523.25 };
 
-            const notes = getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, soloistNote);
+            // S9(b): the shared-hook buffer now arrives via the coordination
+            // contract (writer: tick-logic soloist producer block).
+            const coord = { soloistSharedHookBuffer: [{ step: 0 }] };
+            const notes = getHarmonyNotes(
+                getState(),
+                chord,
+                null,
+                0,
+                60,
+                'smart',
+                0,
+                soloistNote,
+                coord,
+            );
 
             expect(notes.length).toBeGreaterThan(0);
             expect(notes[0].isLatched).toBe(true);
@@ -524,20 +537,45 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.session.seed = {
+            const seed = {
                 notes: [{ step: 0, midi: 72, isAnchor: true }],
                 loopLengthSteps: 16,
             };
+            _soloist.session.seed = seed;
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
+            // S9(b): the soloist head seed now arrives via the coordination
+            // contract (writer: tick-logic soloist producer block).
+            const coord = { soloistSeed: seed };
+
             // 1. Check an anchor hit (should bloom)
-            const bloomNotes = getHarmonyNotes(getState(), chordC, null, 0, 60, 'smart', 0);
+            const bloomNotes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                0,
+                60,
+                'smart',
+                0,
+                null,
+                coord,
+            );
             expect(bloomNotes.length).toBeGreaterThan(2); // Polyphony boost
             expect(bloomNotes[0].velocity).toBeGreaterThan(0.4); // Velocity boost (with polyphony comp)
 
             // 2. Check a non-anchor hit (standard comping suppressed in Chorus 1)
-            const standardNotes = getHarmonyNotes(getState(), chordC, null, 4, 60, 'smart', 4);
+            const standardNotes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                4,
+                60,
+                'smart',
+                4,
+                null,
+                coord,
+            );
             expect(standardNotes.length).toBe(0);
 
             randomSpy.mockRestore();
@@ -547,10 +585,11 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.session.seed = {
+            const seed = {
                 notes: [{ step: 0, midi: 72, isAnchor: true }],
                 loopLengthSteps: 16,
             };
+            _soloist.session.seed = seed;
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
             const chord = {
@@ -570,7 +609,8 @@ describe('Harmony Engine Logic', () => {
                 'smart',
                 0,
                 { midi: 72 },
-                { soloistActive: true },
+                // S9(b): head seed arrives via the coordination contract.
+                { soloistActive: true, soloistSeed: seed },
             );
 
             expect(notes.length).toBeGreaterThan(0);
@@ -582,15 +622,28 @@ describe('Harmony Engine Logic', () => {
             _soloist.enabled = true;
             _playback.bandIntensity = 0.8;
             _playback.currentLoopCount = 0;
-            _soloist.session.seed = {
+            const seed = {
                 notes: [{ step: 8, midi: 72, isAnchor: true }], // Anchor on beat 3
                 loopLengthSteps: 16,
             };
+            _soloist.session.seed = seed;
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
 
+            // S9(b): head seed arrives via the coordination contract.
+            const coord = { soloistSeed: seed };
             // Step 6 should anticipate the anchor on Step 8
-            const hypeNotes = getHarmonyNotes(getState(), chordC, null, 6, 60, 'smart', 6);
+            const hypeNotes = getHarmonyNotes(
+                getState(),
+                chordC,
+                null,
+                6,
+                60,
+                'smart',
+                6,
+                null,
+                coord,
+            );
             expect(hypeNotes.length).toBeGreaterThan(0);
             expect(hypeNotes[0].isLatched).toBe(true);
 

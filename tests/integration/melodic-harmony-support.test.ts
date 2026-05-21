@@ -58,7 +58,11 @@ describe('Melodic Harmony Support (Behavioral)', () => {
     describe('The Thickener (Parallel Voicing)', () => {
         it('should reinforce ALL soloist anchors during Loop 0', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionId: 'A', beats: 4 };
-            const coordination = { soloistActive: true };
+            // S9(b): the soloist head seed reaches harmony via the coordination contract.
+            const coordination = {
+                soloistActive: true,
+                soloistSeed: mockState.soloist.session.seed,
+            };
 
             // Mock random to ensure reinforcement isn't skipped by chance during this test
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -84,7 +88,11 @@ describe('Melodic Harmony Support (Behavioral)', () => {
 
         it('should follow soloist rhythm during Loop 0 even on non-anchors', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionId: 'A', beats: 4 };
-            const coordination = { soloistActive: true };
+            // S9(b): the soloist head seed reaches harmony via the coordination contract.
+            const coordination = {
+                soloistActive: true,
+                soloistSeed: mockState.soloist.session.seed,
+            };
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
 
@@ -111,7 +119,11 @@ describe('Melodic Harmony Support (Behavioral)', () => {
     describe('The Hype Man (Anticipation)', () => {
         it('should play an anticipation hit before a soloist anchor', () => {
             const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionId: 'A', beats: 4 };
-            const coordination = { soloistActive: false };
+            // S9(b): the soloist head seed reaches harmony via the coordination contract.
+            const coordination = {
+                soloistActive: false,
+                soloistSeed: mockState.soloist.session.seed,
+            };
 
             const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
 

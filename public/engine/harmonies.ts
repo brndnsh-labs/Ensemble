@@ -343,7 +343,7 @@ export function generateCompingPattern(
  * Strictly reinforces the soloist's seeded melody or real-time playing.
  */
 function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
-    const { step, soloist, coordination, playback, feel } = context;
+    const { step, coordination, playback, feel } = context;
     const loopCount = playback.currentLoopCount || 0;
 
     // A. Antiphony (Response)
@@ -357,15 +357,21 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     }
 
     // B. Shared Hook Reinforcement (Ska-Punk)
-    if (feel === 'Ska-Punk' && soloist.session.memory.sharedHookBuffer) {
-        const hookMatch = soloist.session.memory.sharedHookBuffer.find((h: any) => h.step === step);
+    // why: S9(b) — the soloist's shared-hook buffer is published through the
+    // coordination contract (writer: tick-logic soloist producer block) rather
+    // than reached for across the soloist↔harmony engine boundary directly.
+    const sharedHookBuffer = coordination.soloistSharedHookBuffer;
+    if (feel === 'Ska-Punk' && sharedHookBuffer && sharedHookBuffer.length > 0) {
+        const hookMatch = sharedHookBuffer.find((h: any) => h.step === step);
         if (hookMatch) {
             return { type: 'reinforce', isLatched: true, duration: 1 };
         }
     }
 
     // C. Melodic Shadowing
-    const seed = soloist.session.seed;
+    // why: S9(b) — the soloist's SRDC head seed is published through the
+    // coordination contract (writer: tick-logic soloist producer block).
+    const seed = coordination.soloistSeed;
     if (seed?.notes && seed.notes.length > 0) {
         const stepInLoop = step % seed.loopLengthSteps;
         const seedNote = seed.notes.find((n: any) => n.step === stepInLoop);

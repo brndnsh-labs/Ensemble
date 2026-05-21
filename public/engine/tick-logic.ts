@@ -586,6 +586,14 @@ export function generateNotesForStep(
             // writer: soloist producer (these lines); readable-after: soloist producer (bass, chords, harmony)
             coordination.soloistResting = Boolean(soloist.session.phrasing.isResting);
             coordination.soloistNotesInPhrase = soloist.session.currentPhrase.notesInPhrase ?? 0;
+            // why: S9(b) — harmonies.ts previously reached into
+            // `soloist.session.memory.sharedHookBuffer` and `soloist.session.seed`
+            // directly (Ska-Punk shared-hook + melodic-shadowing). Publish both
+            // through coordination so harmony reads only the contract surface.
+            // Written here (soloist producer block) so harmony, which runs later
+            // this tick, sees this tick's session state.
+            coordination.soloistSharedHookBuffer = soloist.session.memory.sharedHookBuffer ?? [];
+            coordination.soloistSeed = soloist.session.seed ?? null;
         }
     }
 

@@ -1,4 +1,4 @@
-import type { StepInfo } from '../types.js';
+import type { SoloistHook, SoloistSessionSeed, StepInfo } from '../types.js';
 
 /**
  * Coordination Context Management and Contract Enforcement
@@ -274,6 +274,29 @@ export function createCoordinationContext(
         // on the first tick before the soloist producer has written.
         soloistResting: true,
         soloistNotesInPhrase: 0,
+        // why: epic-deferred-followups S9(b) — harmonies.ts previously reached
+        // into `soloist.session.memory.sharedHookBuffer` and `soloist.session.seed`
+        // directly (the Ska-Punk shared-hook reinforcement + melodic-shadowing
+        // branches in playShadowMode). That crosses the soloist↔harmony engine
+        // boundary instead of going through the coordination contract. These two
+        // fields publish the same objects through coordination so harmony reads
+        // only the contract surface — and mocked tests exercise the same paths
+        // as production.
+        //
+        //   - `soloistSharedHookBuffer`: hooks the soloist has shared for other
+        //     instruments to echo (Ska-Punk antiphony). Empty array when there
+        //     are none — never null, so harmony can `.find()` without a guard.
+        //   - `soloistSeed`: the SRDC "Head" seed melody for the session, or
+        //     null before the soloist has seeded one (matches
+        //     `soloist.session.seed`'s null boot value).
+        //
+        // Both are worker-internal — computed worker-side from the soloist
+        // session each tick and consumed only by the harmony producer that runs
+        // later in the same tick — so they do NOT need main↔worker sync.
+        // writer: soloist producer (tick-logic.ts, after getSoloistNote)
+        // readable-after: soloist producer (harmony can read this)
+        soloistSharedHookBuffer: [] as SoloistHook[],
+        soloistSeed: null as SoloistSessionSeed | null,
         // why: epic-deferred-followups S1(a) — section-boundary lookahead.
         // `upcomingSectionFirstChord` (above) already publishes WHICH chord
         // the next section opens on; these three fields publish the surrounding
