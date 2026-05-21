@@ -18,7 +18,6 @@ const DOCS_TO_SCAN = [
     '.github/SECURITY.md',
     '.github/CODE_OF_CONDUCT.md',
     'docs/README.md',
-    'docs/ROADMAP.md',
     'docs/guides/WORKER_CONTRACT.md',
     'docs/guides/ENSEMBLE_COORDINATION.md',
     'docs/guides/REFERENCE_TUNING.md',
