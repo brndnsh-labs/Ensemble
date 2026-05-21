@@ -69,6 +69,11 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const state = getState();
         args[4] = 'rock';
         for (let i = 0; i < iterations; i++) {
+            // Epic 12 S1: the picker is deterministic per (step, section, loop).
+            // Vary `step` so each iteration draws a distinct seed — that gives
+            // the genuine distribution the common-tone bonus shifts (a fixed
+            // step would collapse all 100 calls onto one identical pitch).
+            args[0] = i * 16;
             args[9].audio.lastMidiPlayed = 60; // Force back to 60
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 60) {
@@ -86,6 +91,8 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         let dissonantRepeats = 0;
         const iterations = 100;
         for (let i = 0; i < iterations; i++) {
+            // Vary `step` for a genuine seed distribution (Epic 12 S1).
+            args[0] = i * 16;
             args[9].audio.lastMidiPlayed = 61; // Force back to dissonant 61
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 61) {
@@ -104,6 +111,8 @@ describe('Soloist Pitch Engine Deep Dive', () => {
         const iterations = 100;
         const state = getState();
         for (let i = 0; i < iterations; i++) {
+            // Vary `step` for a genuine seed distribution (Epic 12 S1).
+            args[0] = i * 16;
             args[9].audio.lastMidiPlayed = 61; // Force back to 61
             const res = selectPitchAndDevices(state, ...args);
             if (res.midi === 61) {

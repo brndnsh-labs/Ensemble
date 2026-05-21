@@ -67,15 +67,18 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
     it('should scale attack probability during the warm-up period (0-64 steps)', () => {
         const localState = createMockState();
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
-        const randomSpy = vi.spyOn(Math, 'random');
 
         const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         localState.playback.bandIntensity = 0.5;
         localState.soloist.session.sessionSteps = 0;
         localState.soloist.session.currentPhrase.notesInPhrase = 5; // Bypass urgency boost
 
-        // Random 0.99 > attackProb -> null
-        randomSpy.mockReturnValue(0.99);
+        // Epic 12 S1: inject a constant 0.99 RNG via `generateRhythmPlan`'s
+        // `random` parameter. During warm-up (sessionSteps=0) the attack prob
+        // is scaled down below 0.99 everywhere → empty plan; at full warm-up
+        // (sessionSteps=64) the downbeat/measure-end boosts push some steps'
+        // attackProb above 0.99 → a non-empty plan.
+        const fixedRandom = () => 0.99;
         localState.soloist.session.rhythm.plan = undefined;
         const planA = generateRhythmPlan(
             16,
@@ -88,6 +91,8 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
             0,
             localState.soloist,
             null,
+            0,
+            fixedRandom,
         );
         expect(planA.length).toBe(0);
 
@@ -105,10 +110,10 @@ describe('Soloist Phrasing Refinements v2.7.1', () => {
             64,
             localState.soloist,
             null,
+            0,
+            fixedRandom,
         );
         expect(planB.length).toBeGreaterThan(0);
-
-        randomSpy.mockRestore();
     });
 
     it('should transition to rest after IMPROV at end of measure', () => {

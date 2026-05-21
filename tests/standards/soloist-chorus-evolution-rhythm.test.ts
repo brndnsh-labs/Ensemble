@@ -25,8 +25,11 @@
  *      jitter ALSO shifts WHICH steps fire, breaking the metronomic
  *      grid in a way pure density cannot.
  *
- * Determinism: Math.random() is stubbed with a per-test mulberry32
- * PRNG re-seeded to the SAME seed at the start of each generateAtLoop
+ * Determinism: a per-test mulberry32 PRNG is INJECTED into
+ * `generateRhythmPlan` via its optional `random` parameter (Epic 12
+ * S1 — production omits it and gets a `makeSeededStream` keyed on
+ * (startStep, sessionSteps, loopCount); tests inject their own stream).
+ * It is re-seeded to the SAME seed at the start of each generateAtLoop
  * call — so the RNG sequence is identical at Loop 0 and Loop 2, and
  * any difference in output is attributable to the loop-count branches
  * alone, not to RNG drift. A flat constant (e.g. 0.5) is the wrong
@@ -97,31 +100,27 @@ function makeMulberry32(seed: number): () => number {
 }
 
 /**
- * Generate one plan at a given loop count. Math.random is stubbed with
- * a mulberry32 PRNG re-seeded each call so the sequence is identical
- * between Loop 0 and Loop 2 — divergence is attributable to the
- * loop-count branches alone, not to RNG drift.
+ * Generate one plan at a given loop count. A mulberry32 PRNG is INJECTED
+ * via `generateRhythmPlan`'s `random` parameter, re-seeded each call so
+ * the sequence is identical between Loop 0 and Loop 2 — divergence is
+ * attributable to the loop-count branches alone, not to RNG drift.
  */
 function generateAtLoop(loopCount: number, activeSteps = 64, seed = 0xc0ffee) {
     const prng = makeMulberry32(seed);
-    const randomSpy = vi.spyOn(Math, 'random').mockImplementation(prng);
-    try {
-        return generateRhythmPlan(
-            0, // startStep
-            activeSteps,
-            'scalar', // style — picked because it's NOT in the bebop ghost-note branches
-            0.6, // intensity — mid-range so neither low-intensity simplification nor saturation hides the effect
-            16, // stepsPerMeasure
-            4, // stepsPerBeat
-            makeCoordination(activeSteps),
-            256, // sessionSteps (large enough that warmUpScale is at the ceiling 1.0)
-            buildSoloistState(),
-            null, // stepInfo
-            loopCount,
-        );
-    } finally {
-        randomSpy.mockRestore();
-    }
+    return generateRhythmPlan(
+        0, // startStep
+        activeSteps,
+        'scalar', // style — picked because it's NOT in the bebop ghost-note branches
+        0.6, // intensity — mid-range so neither low-intensity simplification nor saturation hides the effect
+        16, // stepsPerMeasure
+        4, // stepsPerBeat
+        makeCoordination(activeSteps),
+        256, // sessionSteps (large enough that warmUpScale is at the ceiling 1.0)
+        buildSoloistState(),
+        null, // stepInfo
+        loopCount,
+        prng, // injected RNG — the Epic 12 S1 test seam
+    );
 }
 
 function attackSteps(plan: any[]): Set<number> {
@@ -235,9 +234,8 @@ describe('Soloist Chorus Evolution — RHYTHM side (S6)', () => {
         // and attackJitter at loopCount=0; this test pins that invariant so a
         // future refactor can't silently start escalating on The Head.
         const planLoop0 = generateAtLoop(0);
-        // Same seed so the PRNG sequence matches generateAtLoop(0) exactly.
+        // Same seed so the injected PRNG sequence matches generateAtLoop(0).
         const prng = makeMulberry32(0xc0ffee);
-        const randomSpy = vi.spyOn(Math, 'random').mockImplementation(prng);
         const planNoLoop = generateRhythmPlan(
             0,
             64,
@@ -249,9 +247,9 @@ describe('Soloist Chorus Evolution — RHYTHM side (S6)', () => {
             256,
             buildSoloistState(),
             null,
-            // loopCount omitted entirely → defaults to 0 per S6 signature change
+            undefined, // loopCount omitted → defaults to 0 per S6 signature change
+            prng, // injected RNG — the Epic 12 S1 test seam
         );
-        randomSpy.mockRestore();
 
         const steps0 = [...attackSteps(planLoop0)].sort((a, b) => a - b);
         const stepsNo = [...attackSteps(planNoLoop)].sort((a, b) => a - b);

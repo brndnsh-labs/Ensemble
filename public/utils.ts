@@ -741,8 +741,19 @@ export function clampFreq(freq: number, max = 24000): number {
 
 /**
  * Calculates a unified timing offset for an instrument based on the global pocket state.
+ *
+ * `random` is an injectable PRNG (Epic 12 S1, the `pickByRank` pattern). It
+ * defaults to `Math.random` so bass / drums / chords callers are byte-for-byte
+ * unchanged; the soloist passes a `scrambleHash`-derived seeded source so its
+ * micro-timing humanization is deterministic by construction (the soloist
+ * engine-determinism critique test needs every emitted field reproducible).
  */
-export function calculateTimingOffset(instrument: string, pocket: any, intensity: number): number {
+export function calculateTimingOffset(
+    instrument: string,
+    pocket: any,
+    intensity: number,
+    random: () => number = Math.random,
+): number {
     if (!pocket) {
         return 0;
     }
@@ -753,7 +764,7 @@ export function calculateTimingOffset(instrument: string, pocket: any, intensity
 
     // 2. Tightness (Inverse variance)
     // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
-    const jitter = (1.0 - pocket.tightness) * (Math.random() - 0.5) * 0.016;
+    const jitter = (1.0 - pocket.tightness) * (random() - 0.5) * 0.016;
 
     let instrumentSpecific = 0;
 
@@ -786,13 +797,22 @@ export function calculateTimingOffset(instrument: string, pocket: any, intensity
 
 /**
  * Applies blues bend styling to a note.
+ *
+ * `random` is an injectable PRNG (Epic 12 S1) — soloist-only consumer; the
+ * soloist passes a `scrambleHash`-derived seeded source so the bend direction
+ * is deterministic. Defaults to `Math.random` for any future caller.
  */
-export function applyBluesBends(primary: any, activeStyle: string, currentChord: any): void {
+export function applyBluesBends(
+    primary: any,
+    activeStyle: string,
+    currentChord: any,
+    random: () => number = Math.random,
+): void {
     if (activeStyle === 'blues') {
         const relativeInterval =
             ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;
         if ((relativeInterval === 3 || relativeInterval === 6) && primary.bendStartInterval === 0) {
-            primary.bendStartInterval = Math.random() < 0.6 ? -0.5 : 0.5;
+            primary.bendStartInterval = random() < 0.6 ? -0.5 : 0.5;
         }
     }
 }

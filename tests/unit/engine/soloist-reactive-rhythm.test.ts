@@ -57,7 +57,6 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
     it('should be more likely to attack when a drum hit is detected in Funk style', () => {
         const localState = createMockState();
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
-        const randomSpy = vi.spyOn(Math, 'random');
 
         const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
 
@@ -65,6 +64,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         const contextBypass = { stepCoordination: { kickHit: true }, bypassRhythm: true };
         localState.soloist.session.rhythm.plan = undefined;
 
+        // Epic 12 S1: the rhythm engine no longer reads `Math.random` directly —
+        // inject a fixed RNG via the `random` parameter (13th positional arg).
         const planBypass = generateRhythmPlan(
             0,
             16,
@@ -76,6 +77,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
             64,
             localState.soloist,
             null,
+            0,
+            () => 0.99,
         );
         expect(planBypass.length).toBeGreaterThan(0);
 
@@ -88,10 +91,7 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         localState.soloist.session.sessionSteps = 64; // Bypass warm-up scaling
 
-        // Force random to 0.99 for all calls so breathing offset doesn't trigger random attacks
-        randomSpy.mockReturnValue(0.99);
-
-        // WITHOUT drum hit: 0.99 > 0.6 (FALSE)
+        // WITHOUT drum hit: injected random 0.99 > 0.6 (FALSE)
         localState.soloist.session.phrasing.busySteps = 0;
         localState.soloist.session.rhythm.plan = undefined;
         const contextWithout = { stepCoordination: { kickHit: false } };
@@ -106,12 +106,12 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
             64,
             localState.soloist,
             null,
+            0,
+            () => 0.99,
         );
         expect(planWithout.length).toBe(0);
 
-        // Change random to 0.7 which is between 0.6 (base) and 0.8 (base + drum hit)
-        randomSpy.mockReturnValue(0.7);
-
+        // Injected random 0.7 is between 0.6 (base) and 0.8 (base + drum hit).
         // WITH drum hit: 0.7 < 0.8 (TRUE)
         const contextWith = { stepCoordination: { kickHit: true } };
         const planWith = generateRhythmPlan(
@@ -125,16 +125,15 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
             64,
             localState.soloist,
             null,
+            0,
+            () => 0.7,
         );
         expect(planWith.length).toBeGreaterThan(0);
-
-        randomSpy.mockRestore();
     });
 
     it('should be less likely to attack on downbeat in Jazz style at low intensity', () => {
         const localState = createMockState();
         vi.spyOn(stateModule, 'getState').mockReturnValue(localState);
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const _chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         localState.playback.bandIntensity = 0.01; // scale = 0.52
@@ -153,7 +152,9 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
         // Therefore hitsNormal was 0, breaking the test.
 
         // Let's change the test to verify what it meant to: Downbeats are played, syncopation is ignored!
-        randomSpy.mockReturnValue(0.2); // allow downbeat (prob 0.364) to pass
+        // Epic 12 S1: inject a fixed 0.2 RNG — allows downbeat (prob 0.364) to
+        // pass while the heavily-penalized 16th syncopation (prob ~0.008) rests.
+        const fixedRandom = () => 0.2;
 
         for (let i = 0; i < iterations; i++) {
             localState.soloist.session.phrasing.busySteps = 0;
@@ -171,6 +172,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
                 64,
                 localState.soloist,
                 null,
+                0,
+                fixedRandom,
             );
             if (planNormal.length > 0) {
                 hitsNormal++;
@@ -191,6 +194,8 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
                 64,
                 localState.soloist,
                 null,
+                0,
+                fixedRandom,
             );
             if (planDownbeat.length > 0) {
                 hitsDownbeat++;
@@ -199,6 +204,5 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
 
         expect(hitsNormal).toBe(0); // Penalized 16th note syncopation!
         expect(hitsDownbeat).toBeGreaterThan(0); // Downbeat survives!
-        randomSpy.mockRestore();
     });
 });

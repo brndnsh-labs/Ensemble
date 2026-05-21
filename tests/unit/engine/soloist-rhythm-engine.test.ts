@@ -13,6 +13,21 @@ function createSoloistState(mode) {
     });
 }
 
+/**
+ * Build a fixed-output RNG to inject into `generateRhythmPlan`'s `random`
+ * parameter (Epic 12 S1 — the rhythm engine no longer reads `Math.random`
+ * directly; tests inject their own deterministic stream).
+ */
+function constantRandom(value) {
+    return () => value;
+}
+
+/** Build a sequence RNG: returns each value once, then repeats the last. */
+function sequenceRandom(values) {
+    let i = 0;
+    return () => values[Math.min(i++, values.length - 1)];
+}
+
 describe('Soloist rhythm engine phrasing modes', () => {
     const coordination = {
         sectionStart: 0,
@@ -26,7 +41,6 @@ describe('Soloist rhythm engine phrasing modes', () => {
     });
 
     it('gives monophonic mode more breath than guitar in dense scalar passages', () => {
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.18);
         const monophonicPlan = generateRhythmPlan(
             0,
             16,
@@ -37,6 +51,9 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             createSoloistState('monophonic'),
+            null,
+            0,
+            constantRandom(0.18),
         );
         const guitarPlan = generateRhythmPlan(
             0,
@@ -48,14 +65,15 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             createSoloistState('guitar'),
+            null,
+            0,
+            constantRandom(0.18),
         );
-        randomSpy.mockRestore();
 
         expect(monophonicPlan.length).toBeLessThan(guitarPlan.length);
     });
 
     it('lets strong-beat monophonic notes ring longer than weak-beat notes', () => {
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
         const plan = generateRhythmPlan(
             0,
             16,
@@ -66,8 +84,10 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             createSoloistState('monophonic'),
+            null,
+            0,
+            constantRandom(0.1),
         );
-        randomSpy.mockRestore();
 
         const strongBeatDurations = plan
             .filter((node) => node.isStrongBeat)
@@ -81,7 +101,6 @@ describe('Soloist rhythm engine phrasing modes', () => {
     });
 
     it('turns response signatures into paraphrase plans with timing metadata', () => {
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
         const soloistState = createSoloistState('monophonic');
         soloistState.session.seed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
         soloistState.session.currentPhrase.context = {
@@ -120,8 +139,10 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             soloistState,
+            null,
+            0,
+            constantRandom(0),
         );
-        randomSpy.mockRestore();
 
         expect(plan).toHaveLength(2);
         expect(plan.map((node) => node.stepTarget)).toEqual([32, 36]);
@@ -135,11 +156,6 @@ describe('Soloist rhythm engine phrasing modes', () => {
     });
 
     it('lets section-recall responses leave more interior space for neo phrases', () => {
-        const randomSpy = vi
-            .spyOn(Math, 'random')
-            .mockReturnValueOnce(0)
-            .mockReturnValueOnce(0.2)
-            .mockReturnValueOnce(0.9);
         const soloistState = createSoloistState('monophonic');
         soloistState.session.seed = { notes: [{ step: 0, midi: 60 }], loopLengthSteps: 16 };
         soloistState.session.currentPhrase.context = {
@@ -172,8 +188,13 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             soloistState,
+            null,
+            0,
+            // First draw is the response-transform roulette; the next draws are
+            // the per-note skip gates. 0/0.2/0.9 keeps the transform 'exact' and
+            // drops the third interior note (0.9 > skipProb) so the plan thins.
+            sequenceRandom([0, 0.2, 0.9]),
         );
-        randomSpy.mockRestore();
 
         expect(plan.map((node) => node.stepTarget)).toEqual([32, 36, 40]);
         expect(plan.every((node) => node.responseSource === 'section')).toBe(true);
@@ -223,12 +244,9 @@ describe('Soloist rhythm engine phrasing modes', () => {
             return soloistState;
         };
 
-        const sectionRandomSpy = vi
-            .spyOn(Math, 'random')
-            .mockReturnValueOnce(0)
-            .mockReturnValueOnce(0.3)
-            .mockReturnValueOnce(0.3)
-            .mockReturnValueOnce(0.9);
+        // Same injected RNG sequence for both runs so the only difference is
+        // responseSource — section recall skips interior notes more
+        // aggressively than form recall (spaceBias × 1 vs × 0.78).
         const sectionPlan = generateRhythmPlan(
             32,
             16,
@@ -239,15 +257,11 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             buildState('section'),
+            null,
+            0,
+            sequenceRandom([0, 0.3, 0.3, 0.9]),
         );
-        sectionRandomSpy.mockRestore();
 
-        const formRandomSpy = vi
-            .spyOn(Math, 'random')
-            .mockReturnValueOnce(0)
-            .mockReturnValueOnce(0.3)
-            .mockReturnValueOnce(0.3)
-            .mockReturnValueOnce(0.9);
         const formPlan = generateRhythmPlan(
             32,
             16,
@@ -258,8 +272,10 @@ describe('Soloist rhythm engine phrasing modes', () => {
             coordination,
             256,
             buildState('form'),
+            null,
+            0,
+            sequenceRandom([0, 0.3, 0.3, 0.9]),
         );
-        formRandomSpy.mockRestore();
 
         expect(formPlan.length).toBeGreaterThan(sectionPlan.length);
         expect(formPlan.every((node) => node.responseSource === 'form')).toBe(true);

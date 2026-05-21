@@ -15,11 +15,11 @@ A follow-up that's been sitting here for >2 months without being touched is sign
 
 ## Open count (reconciled 2026-05-20)
 
-After the post-Epic-11 reconciliation pass, **~29 items remain open**, clustering into three shapes:
+After the post-Epic-11 reconciliation pass — and Epic 12 S1 (2026-05-20) — **~28 items remain open**, clustering into three shapes:
 
 - **~19 per-genre listen-test / taste items** (all of §E) — acceptance is by-ear, not critique-test-gated. Best handled as genre-grouped listening sessions, not stories.
 - **~7 small mechanical nits** (§B, §C, §D, §G) — 5min–2h each. Candidates for a future micro-cleanup sweep in the Epic 11 S5 mould.
-- **3 genuine stories** — the soloist pitch-picker `scrambleHash` migration (§F), `evansIntervals` chord-quality awareness (§E), and profile-rotation sticky-retain (§E). The first is load-bearing (completes the engine-wide PRNG migration, unblocks a no-stub determinism test).
+- **2 genuine stories** — `evansIntervals` chord-quality awareness (§E) and profile-rotation sticky-retain (§E). (The soloist `scrambleHash` migration shipped as Epic 12 S1 on 2026-05-20 — it was the load-bearing one.)
 
 Plus `TECH_DEBT.md` #1 (the `arranger.progression` dispatch refactor) — non-musical, multi-day, tracked separately.
 
@@ -151,7 +151,7 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 
 **New entries surfaced during Epic 10 S2:**
 
-- **Soloist pitch picker still uses un-seeded `Math.random()`.** The S2 (b) engine-wide determinism test (`soloist-engine-determinism.test.ts`) asserts byte-reproducibility only UNDER a pinned mulberry32 spy. A no-stub determinism test is impossible today: the picker's weighted roulette (`soloist-pitch-engine.ts` ~line 1182, `Math.random() * totalWeight`), the device-trigger gates, and timing jitter all draw from un-seeded `Math.random()` — two un-stubbed 1024-step runs diverge at ~338 positions. The May 2026 `scrambleHash` migration covered bass / harmonies / grooves but NOT the soloist picker. Migrating the picker roulette + device gates to a `scrambleHash` source keyed by `(barIndex, sectionId, step)` would make the soloist deterministic by construction and let the S2.b test drop the seeded-spy requirement. **The standout remaining story** — load-bearing (completes the engine-wide PRNG migration; `soloist.ts` still carries a byte-identical copy of `scrambleHash`, left un-consolidated by Epic 11 S9a to pair with this work; `pickByRank` from Epic 11 S7a is the ready injection point). ~3-4h, musically sensitive (roulette seed must not correlate adjacent steps). *Source: Epic 10 S2.b (2026-05-19).*
+- **Soloist engine un-seeded `Math.random()`** → ✅ SHIPPED — Epic 12 S1 (2026-05-20). Re-scoped mid-cycle from picker-only to the full soloist engine once the implementer found `soloist-engine-determinism.test.ts` exercises all of `getSoloistNote`, not just the picker — ~56 draws across `soloist-pitch-engine.ts` / `soloist-rhythm-engine.ts` / `soloist.ts` (the "~338 divergences" figure was whole-engine entropy). All migrated to `scrambleHash` sources keyed on `(step, sectionLabel/sectionStart, occurrence, loopCount)` + per-draw discriminators; the deliberately un-seeded `soloist-rhythm-engine.ts` test seam preserved via injectable `random()`. The engine is now deterministic by construction — `soloist-engine-determinism.test.ts` runs un-stubbed (0 divergences) and dropped its mulberry32 spy. `form-analysis.ts`'s `scrambleHash` copy consolidated in the same commit — no `scrambleHash` body now duplicated outside `hash-utils.ts`. *Source: Epic 10 S2.b (2026-05-19).*
 
 - **First-call module warm-up artifact in `getSoloistNote`.** ✅ RESOLVED 2026-05-20. Both `RESET_STATE` and `resetSoloistState()` now clear the five scalar `soloist.audio` fields; `soloist-engine-determinism.test.ts` dropped its discarded warm-up pass. *Source: Epic 10 S2.b (2026-05-19).*
 
@@ -203,4 +203,4 @@ Pointers in case someone greps from a finding:
 
 ---
 
-**Last reviewed:** 2026-05-20 — full post-Epic-11 reconciliation pass. §A closed (all four product calls shipped via Epic 11 S1–S4). §B/§C/§D/§E/§F/§G shipped entries marked against their Epic 11 story (S5 micro-cleanup sweep, S6–S9 medium engine follow-ups, S10 anchor suppression). §G test-failure entries verified green on `main`. ~29 items remain open — see the "Open count" block at the top.
+**Last reviewed:** 2026-05-20 — full post-Epic-11 reconciliation pass. §A closed (all four product calls shipped via Epic 11 S1–S4). §B/§C/§D/§E/§F/§G shipped entries marked against their Epic 11 story (S5 micro-cleanup sweep, S6–S9 medium engine follow-ups, S10 anchor suppression). §G test-failure entries verified green on `main`. Epic 12 S1 (soloist `scrambleHash` migration) shipped 2026-05-20 — §F entry marked. ~28 items remain open — see the "Open count" block at the top.

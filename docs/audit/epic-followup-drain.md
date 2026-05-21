@@ -8,7 +8,7 @@ Story sizing follows the house rule — one focused session each, one engine tou
 
 | Story | Title | Model | State |
 | :- | :- | :-: | :- |
-| S1 | Soloist pitch-picker `scrambleHash` migration | opus | Ready |
+| S1 | Soloist engine `scrambleHash` migration | opus | Shipped 2026-05-20 |
 | S2 | `evansIntervals` chord-quality awareness | opus | Ready |
 | S3 | Profile-rotation sticky-retain | opus | Ready |
 | S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Ready |
@@ -19,17 +19,23 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**0 / 10 shipped.** S1–S5 are cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**1 / 10 shipped.** S2–S5 are cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
-### S1. Soloist pitch-picker `scrambleHash` migration
+### S1. Soloist engine `scrambleHash` migration
 
-The May 2026 `scrambleHash` migration covered bass / harmonies / grooves but not the soloist picker. `soloist-pitch-engine.ts:1293` (`Math.random() * totalWeight` weighted roulette), the device-trigger gates, and timing jitter all still draw un-seeded `Math.random()` — two un-stubbed 1024-step runs diverge at ~338 positions, so a no-stub determinism test is impossible. Migrate the picker roulette + device gates + jitter to a `scrambleHash` source keyed by `(barIndex, sectionId, step)`. Consolidate `soloist.ts`'s byte-identical `scrambleHash` copy into `hash-utils.ts` (Epic 11 S9a deliberately left it for this story). `pickByRank` (Epic 11 S7a) already takes an injectable `random()` — it is the ready seam.
+The May 2026 `scrambleHash` migration covered bass / harmonies / grooves but skipped the soloist engine entirely. ~56 un-seeded `Math.random()` draws remain across three files, all reachable from `getSoloistNote` and all affecting the emitted note's pitch/rhythm/timing signature:
 
-**Acceptance:** the soloist picker is deterministic by construction; `soloist-engine-determinism.test.ts` drops its pinned-mulberry32-spy requirement and asserts byte-reproducibility on two un-stubbed runs; no `scrambleHash` body remains duplicated outside `hash-utils.ts`; critique suites pass unchanged (the seed must not correlate adjacent steps — verify the chromatism / contour metrics don't drift).
-**Effort:** ~4h. **Model:** opus (musically sensitive — roulette seed independence). **Reviewer:** music-theory-reviewer + worker-contract-reviewer. **Listen-test:** the soloist line should not feel more mechanical or more random than before. **Source:** FOLLOWUPS §F.
-**Status:** Ready.
+- **`soloist-pitch-engine.ts`** (~13 draws) — the weighted roulette (~line 1293), device-trigger gates, timing jitter.
+- **`soloist-rhythm-engine.ts`** (~11 draws) — `generateRhythmPlan` entropy feeding `rhythmNode.durationSteps`, attack probability, sustain length.
+- **`soloist.ts`** (~17 draws) — phrasing-layer gates (`survivalProb`, gap-fill, entropy/timing) + a byte-identical local `scrambleHash` copy (line 38) that Epic 11 S9a deliberately left for this story.
+
+Migrate every draw to a `scrambleHash` source keyed on `(barIndex, sectionId, step)` plus a per-draw discriminator so co-located draws don't collide. The seed must NOT correlate adjacent steps — use canonical `scrambleHash` from `hash-utils.ts` (mulberry32 pre-scramble), never a bare integer seed. Preserve the deliberately un-seeded test seam at `soloist-rhythm-engine.ts:711` via the injectable-`random()` pattern (`pickByRank`, Epic 11 S7a, is the template): production passes the `scrambleHash`-derived source, the loop-count-isolation test injects its own stub. Commit-per-layer (pitch / rhythm / `soloist.ts`) so a regression bisects cleanly.
+
+**Acceptance:** the full `getSoloistNote` engine is deterministic by construction — `tests/standards/soloist-engine-determinism.test.ts` drops its pinned-mulberry32-spy requirement and asserts byte-reproducibility on two genuinely un-stubbed 1024-step runs; no `scrambleHash` body remains duplicated outside `hash-utils.ts`; the `soloist-rhythm-engine.ts:711` loop-count-isolation test still works via injected `random()`; all soloist critique suites pass unchanged — if a chromatism/contour/device-distribution metric drifts, the seed keying is correlating where it shouldn't; fix the keying, don't re-baseline.
+**Effort:** ~8-12h (re-scoped 2026-05-20 from picker-only — the implementer found `soloist-engine-determinism.test.ts` exercises the whole engine, not just the picker; FOLLOWUPS §F's "~338 divergences" is whole-engine entropy, not picker entropy). **Model:** opus (musically sensitive — seed independence across ~56 draws). **Reviewer:** music-theory-reviewer + worker-contract-reviewer. **Listen-test:** the soloist line should not feel more mechanical or more random than before. **Source:** FOLLOWUPS §F.
+**Status:** Shipped 2026-05-20 — full soloist-engine migration (~56 draws across the three files + the `form-analysis.ts` `scrambleHash` copy consolidated). Engine deterministic by construction; `soloist-engine-determinism.test.ts` runs un-stubbed with 0 divergences (mulberry32 spy + negative-control test dropped). All 750 standards + 861 unit-engine tests green; no critique metric drift. Both reviewers clean (music-theory 0 P0/P1/P2 + 1 NIT — the `form-analysis.ts` copy, patched inline; worker-contract 0 findings). Listen-test gate outstanding (cannot be performed by an agent — tracked in `LISTEN_TESTS.md`).
 
 ### S2. `evansIntervals` chord-quality awareness
 

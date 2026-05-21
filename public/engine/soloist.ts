@@ -11,6 +11,7 @@ import type {
 } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import { getSectionContext, normalizeLoopStep } from './arranger-utils.js';
+import { scrambleHash, stringHash31 } from './hash-utils.js';
 import {
     INFLUENCE_POOLS,
     resolveSoloistStyle,
@@ -23,24 +24,44 @@ import { getScaleForChord } from './theory-scales.js';
 
 type PhraseResponseSource = 'free' | 'form' | 'seed' | 'section' | 'recent';
 
-// mulberry32 — 32-bit scrambled hash for deterministic seeded PRNG.
-// why: the head-bypass / themed-improv jitter (Epic 4 S4) was scale-clamped
-// but still drew from un-seeded Math.random(), so the same (barIndex,
-// sectionId) replayed a different jitter sequence on every engine run —
-// looped playback drifted and critique tests couldn't assert determinism.
-// Byte-identical to the canonical `scrambleHash` in engine/hash-utils.ts
-// (Epic 11 S9). Kept as a local copy on purpose: migrating soloist's draw
-// sites is deferred to FOLLOWUPS §F (the soloist-picker scrambleHash
-// migration, its own opus story) — S9 did not touch the soloist to avoid
-// disturbing the seeded streams S10 had just stabilized.
-// A bare LCG correlates on small integer seeds — mulberry32's
-// avalanche keeps adjacent (barIndex, sectionId) seeds well-separated.
-const scrambleHash = (seed: number): number => {
-    let t = (seed + 0x6d2b79f5) | 0;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-};
+// Deterministic PRNG helpers: `scrambleHash` (single-shot) and
+// `makeSeededStream` (advancing stream) are imported from the canonical
+// `hash-utils.ts`. Epic 12 S1 migrated every un-seeded `Math.random()` in the
+// soloist engine onto these — see `soloistSeedBase` below for the per-call
+// seed-keying scheme. (Before S1 this file carried a byte-identical local
+// `scrambleHash` copy that Epic 11 S9a deliberately left for this story.)
+
+/**
+ * soloistSeedBase — fold a soloist call's stable identity into a single
+ * integer seed for `scrambleHash` / `makeSeededStream`.
+ *
+ * why: every soloist decision must replay identically when the same
+ * `(step, section, loop)` recurs — looped playback stays coherent and the
+ * engine-determinism critique test can assert byte-reproducibility WITHOUT
+ * stubbing `Math.random`. The seed folds:
+ *   - `step` — the absolute timeline step (distinguishes every grid position);
+ *   - the section label + occurrence — so Verse-1 and Verse-2 at the same
+ *     bar-relative step get independent streams (no cross-section echo);
+ *   - `loopCount` — so successive choruses of the SAME section step still
+ *     differ (the Chorus-Evolution arc needs per-loop variation).
+ * Callers add a small per-draw discriminator constant so two draws at one
+ * step don't collide. The result is run through `scrambleHash`'s mulberry32
+ * avalanche by the consumer, so adjacent seeds never sawtooth.
+ */
+function soloistSeedBase(
+    step: number,
+    sectionLabel: string,
+    sectionOccurrence: number,
+    loopCount: number,
+): number {
+    return (
+        (step * 2749 +
+            stringHash31(sectionLabel) * 17 +
+            (sectionOccurrence | 0) * 131 +
+            Math.max(0, loopCount) * 5471) |
+        0
+    );
+}
 
 const MOTIVIC_RESPONSE_STYLES = new Set([
     'blues',
@@ -627,15 +648,24 @@ function preparePhraseResponseContext(
         : null;
     const formArcCandidate = getFormArcRecallCandidate(soloist, sectionContext, loopCount);
 
+    // why: seed the call/response role roll deterministically (Epic 12 S1).
+    // Keyed on (step, section, loopCount); the two branches below are mutually
+    // exclusive so they can share discriminator +1 — only one fires per call.
+    const roleSeedBase = soloistSeedBase(
+        step,
+        sectionContext.label,
+        sectionContext.occurrence,
+        loopCount,
+    );
     let nextRole = 'call';
     if (canUseMotivicResponse) {
         const wasCall = (soloist.session.currentPhrase.context.role || 'call') === 'call';
         const responseProb = loopCount <= 1 ? (wasCall ? 0.88 : 0.28) : wasCall ? 0.7 : 0.24;
-        nextRole = Math.random() < responseProb ? 'response' : 'call';
+        nextRole = scrambleHash(roleSeedBase + 1) < responseProb ? 'response' : 'call';
     } else if (['blues', 'jazz', 'rock', 'scalar'].includes(activeStyle)) {
         const wasCall = (soloist.session.currentPhrase.context.role || 'call') === 'call';
         const responseProb = wasCall ? 0.7 : 0.2;
-        nextRole = Math.random() < responseProb ? 'response' : 'call';
+        nextRole = scrambleHash(roleSeedBase + 1) < responseProb ? 'response' : 'call';
     }
 
     soloist.session.currentPhrase.context.role = nextRole; // @worker-mutation
@@ -683,7 +713,9 @@ function preparePhraseResponseContext(
         const shouldPreferSectionRecall = Boolean(
             sectionSignature &&
                 sectionContext.isRestatement &&
-                Math.random() < (responseConfig.sectionRecall || 0),
+                // why: discriminator +2 — distinct from the role roll (+1) so
+                // the recall preference doesn't correlate with the role choice.
+                scrambleHash(roleSeedBase + 2) < (responseConfig.sectionRecall || 0),
         );
         const canUseFormArcRecall = Boolean(
             formArcSignature?.notes?.length &&
@@ -692,7 +724,9 @@ function preparePhraseResponseContext(
         );
         const shouldPreferFormArcRecall = Boolean(
             canUseFormArcRecall &&
-                Math.random() <
+                // why: discriminator +3 — distinct stream from the role roll
+                // (+1) and the section-recall preference (+2).
+                scrambleHash(roleSeedBase + 3) <
                     Math.min(
                         0.96,
                         (responseConfig.formArcRecall || 0) *
@@ -902,6 +936,20 @@ export function getSoloistNote(
 
     const isHeadPerformanceMode = isStrictHeadPlayback || isThemedImprov;
 
+    // why: per-call deterministic seed base (Epic 12 S1). Every `Math.random()`
+    // in the phrasing layer below is migrated onto `scrambleHash(callSeedBase
+    // + <discriminator>)`. Computed once here so all draw sites key off the
+    // same (step, section, loop) identity; `getSectionContext` is the canonical
+    // (label, occurrence) source and reads only `arranger` + `step` — no
+    // new worker-synced state.
+    const callSectionContext = getSectionContext(arranger, step);
+    const callSeedBase = soloistSeedBase(
+        step,
+        callSectionContext.label,
+        callSectionContext.occurrence,
+        loopCount,
+    );
+
     // Use stepInfo for all meter-aware timing calculations
     const measureStep = stepInfo
         ? stepInfo.mStep
@@ -937,10 +985,14 @@ export function getSoloistNote(
 
         (soloist.audio as Mutable<typeof soloist.audio>).lastMidiPlayed = primary.midi; // @worker-mutation
 
+        // why: discriminator 11 — seeded jitter source for the shared
+        // pocket-timing util so the head-bypass note's micro-timing is
+        // deterministic per (step, section, loop).
         let timingOffset = calculateTimingOffset(
             'soloist',
             groove.pocket,
             playback.bandIntensity || 0.5,
+            () => scrambleHash(callSeedBase + 11),
         );
         timingOffset += config.genreGravityOffset || 0;
 
@@ -958,7 +1010,9 @@ export function getSoloistNote(
             const tightness = playback.bandIntensity || 0.5;
             const jitterScale = 1.0 - tightness;
             const jitterMs = config.timingJitter * jitterScale;
-            timingOffset += (Math.random() - 0.5) * (jitterMs / 1000);
+            // why: discriminator 10 — micro-timing jitter. Deterministic per
+            // (step, section, loop) so the same note replays the same push/pull.
+            timingOffset += (scrambleHash(callSeedBase + 10) - 0.5) * (jitterMs / 1000);
         }
 
         // Apply rhythmic entropy for themed improvisation
@@ -973,7 +1027,8 @@ export function getSoloistNote(
             (soloist.audio as Mutable<typeof soloist.audio>).lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        applyBluesBends(primary, activeStyle, currentChord);
+        // why: discriminator 12 — seeded source for the blues bend direction.
+        applyBluesBends(primary, activeStyle, currentChord, () => scrambleHash(callSeedBase + 12));
         return res;
     };
 
@@ -1128,17 +1183,21 @@ export function getSoloistNote(
             // Macro-rest overrides:
             // High intensity soloists "push through" structural boundaries to build tension,
             // while low intensity soloists respect the "Breath Zone" to leave space.
+            // why: discriminators 20/21 — the macro-rest bridge gate and the
+            // survival roll. `headNote.step * 53` disambiguates multiple head
+            // notes folded onto one timeline step so they don't share a draw.
+            const headDrawBase = (callSeedBase + headNote.step * 53) | 0;
             if (
                 isMacroRestZone &&
                 !headNote.isAnchor &&
                 !isStrictHeadPlayback &&
                 !isFirstRestatementLoop &&
-                Math.random() > intentBehavior.phrasingBridgeProb
+                scrambleHash(headDrawBase + 20) > intentBehavior.phrasingBridgeProb
             ) {
                 survivalProb = 0; // Force "Breath"
             }
 
-            if (Math.random() < survivalProb) {
+            if (scrambleHash(headDrawBase + 21) < survivalProb) {
                 // Duration protection: Mark soloist as busy for the duration of the note minus 1.
                 // This ensures we hold the note but don't block the immediately adjacent step.
                 const durationBusySteps = Math.max(0, Math.ceil(headNote.durationSteps || 1) - 1);
@@ -1340,7 +1399,8 @@ export function getSoloistNote(
                 !isCadenceGap &&
                 !leavesRunwayIntoAnchor &&
                 minGap >= fillGapThreshold &&
-                Math.random() < gapFillProb
+                // why: discriminator 30 — gap-fill gate, one roll per call.
+                scrambleHash(callSeedBase + 30) < gapFillProb
             ) {
                 shouldFallThrough = true;
                 // Keep the first restatement's fills short so the next seed note still feels inevitable.
@@ -1377,9 +1437,15 @@ export function getSoloistNote(
         const pool = pools[activeStyle] || [];
         if (pool.length > 0) {
             // High intensity sections might shift influence more frequently (probabilistically)
-            const shouldShift = soloist.session.phraseCount === 0 || Math.random() < 0.8;
+            // why: discriminators 40/41 — section-boundary influence rotation.
+            // 40 gates whether to shift, 41 picks the pool index. Keyed on
+            // (step, section, loop) so the same section boundary always rotates
+            // to the same influence — section recall stays coherent across loops.
+            const shouldShift =
+                soloist.session.phraseCount === 0 || scrambleHash(callSeedBase + 40) < 0.8;
             if (shouldShift) {
-                const nextInfluence = pool[Math.floor(Math.random() * pool.length)];
+                const nextInfluence =
+                    pool[Math.floor(scrambleHash(callSeedBase + 41) * pool.length)];
                 soloist.session.currentPhrase.context.profile = nextInfluence; // @worker-mutation
                 logDebug(`New section influence: ${nextInfluence}`);
             }
@@ -1397,15 +1463,19 @@ export function getSoloistNote(
         // PRE-HEAT: If we are at the start of the song, preserve the forced lead_in
         const isStartOfSong = step < 0 && step === -stepsPerMeasure;
         if (!isStartOfSong || soloist.session.phrasing.transitionState === null) {
+            // why: discriminator 42 — final-measure transition-state choice.
             phr.transitionState =
-                Math.random() < 0.6 - effectiveIntensity * 0.4 ? 'rest' : 'lead_in'; // @worker-mutation
+                scrambleHash(callSeedBase + 42) < 0.6 - effectiveIntensity * 0.4
+                    ? 'rest'
+                    : 'lead_in'; // @worker-mutation
             logDebug(`Selected transition state: ${soloist.session.phrasing.transitionState}`);
         }
 
         // Mutate rhythmic entropy at section boundaries based on intensity
         // This locks the variation for the next section, preserving micro-level predictability
         const shiftScale = 0.2 + effectiveIntensity * 0.4; // Max 0.6 shift at high intensity
-        rhy.entropy = (Math.random() * 2 - 1) * shiftScale; // @worker-mutation
+        // why: discriminator 43 — section-boundary rhythmic-entropy shift.
+        rhy.entropy = (scrambleHash(callSeedBase + 43) * 2 - 1) * shiftScale; // @worker-mutation
     } else if (!isLastSectionMeasure && stepInForm !== coordination.sectionStart) {
         phr.transitionState = null; // @worker-mutation
     }
@@ -1458,7 +1528,8 @@ export function getSoloistNote(
             const isGoodEntry =
                 isBeatStart ||
                 (measureStep % (stepsPerBeat / 2) === 0 &&
-                    Math.random() < intentBehavior.syncopationBias);
+                    // why: discriminator 50 — syncopated wake-up entry gate.
+                    scrambleHash(callSeedBase + 50) < intentBehavior.syncopationBias);
             const preventBreakout =
                 isLastSectionMeasure &&
                 (soloist.session.phrasing.transitionState || null) === 'rest' &&
@@ -1476,8 +1547,9 @@ export function getSoloistNote(
                 mSession.phraseCount = (soloist.session.phraseCount || 0) + 1; // @worker-mutation
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
+                // why: discriminator 51 — phrase active-length roll.
                 let _nextActiveSteps = Math.floor(
-                    baseLength * stepsPerBeat * (0.3 + Math.random() * 1.2),
+                    baseLength * stepsPerBeat * (0.3 + scrambleHash(callSeedBase + 51) * 1.2),
                 );
 
                 if (isStrictHeadPlayback && soloist.session.seed) {
@@ -1570,8 +1642,12 @@ export function getSoloistNote(
             const restMultiplier = config.restBase * (2.0 - effectiveIntensity * 1.5);
             // Fatigue Decay: Shorten breaths as song progresses (0.9x per loop)
             const fatigueMultiplier = Math.max(0.5, 1.0 - Math.max(0, loopCount) * 0.1);
+            // why: discriminator 52 — rest-length roll on phrase resolution.
             const nextRestSteps = Math.floor(
-                stepsPerMeasure * restMultiplier * fatigueMultiplier * (0.5 + Math.random() * 1.5),
+                stepsPerMeasure *
+                    restMultiplier *
+                    fatigueMultiplier *
+                    (0.5 + scrambleHash(callSeedBase + 52) * 1.5),
             );
             phr.restSteps = nextRestSteps; // @worker-mutation
 
@@ -1606,10 +1682,14 @@ export function getSoloistNote(
         // If plan is uninitialized or exhausted but test forces active state, generate it
         if (!soloist.session.phrasing.isResting) {
             const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
+            // why: discriminator 53 — fallback plan-length roll (test-forced
+            // active state with no prior activeSteps).
             const planSteps =
                 soloist.session.phrasing.activeSteps && soloist.session.phrasing.activeSteps > 0
                     ? soloist.session.phrasing.activeSteps
-                    : Math.floor(baseLength * stepsPerBeat * (0.5 + Math.random() * 0.5));
+                    : Math.floor(
+                          baseLength * stepsPerBeat * (0.5 + scrambleHash(callSeedBase + 53) * 0.5),
+                      );
             preparePhraseResponseContext(
                 soloist,
                 activeStyle,

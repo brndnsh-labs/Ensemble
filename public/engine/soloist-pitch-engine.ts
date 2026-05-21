@@ -2,6 +2,7 @@ import type { GlobalContext } from '../state/playback.js';
 import type { EnsembleState } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import { ALTERED_HOOK_QUALITIES } from './accompaniment.js';
+import { scrambleHash } from './hash-utils.js';
 import type { SoloistIntent } from './soloist-config.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';
 import { DEVICE_SPAN_STEPS, generateExtraNotes, generateMelodicDevice } from './soloist-devices.js';
@@ -287,6 +288,17 @@ export function selectPitchAndDevices(
     const seedNote = rhythmNode.seedNote || null;
     const sessionSeed = soloistState.session.seed;
     const loopCount = playback.currentLoopCount || 0;
+
+    // why: per-call deterministic seed base (Epic 12 S1). Every `Math.random()`
+    // in the picker is migrated onto `scrambleHash(pickerSeedBase + N)`.
+    // Keyed on (step, section, loop): `coordination.sectionStart` uniquely
+    // identifies the section (each section has a distinct start step) so two
+    // sections never share a draw stream; `step` distinguishes grid positions;
+    // `loopCount` keeps successive choruses distinct. mulberry32 avalanche
+    // (inside `scrambleHash`) means adjacent seeds never sawtooth. No new
+    // worker-synced state — all three values are already passed in.
+    const pickerSeedBase =
+        (step * 2749 + (coordination?.sectionStart | 0 || 0) * 17 + loopCount * 5471) | 0;
     const soloistMode = resolveSoloistMode(soloistState.mode);
     const isGuitarMode = isSoloistGuitarMode(soloistMode);
     const isMonophonicMode = isSoloistMonophonicMode(soloistMode);
@@ -315,7 +327,12 @@ export function selectPitchAndDevices(
 
     // Anticipation (Lookahead)
     const isLateInChord = stepInChord >= currentChord.beats * stepsPerBeat - 2;
-    if (nextChord && isLateInChord && Math.random() < (config.anticipationProb || 0)) {
+    // why: discriminator 1 — chord-anticipation lookahead gate.
+    if (
+        nextChord &&
+        isLateInChord &&
+        scrambleHash(pickerSeedBase + 1) < (config.anticipationProb || 0)
+    ) {
         targetChord = nextChord;
     }
 
@@ -393,7 +410,11 @@ export function selectPitchAndDevices(
         let timingOffset = isHeadBypass
             ? seedNote?.timingOffset || 0
             : rhythmNode.timingOffset || 0;
-        timingOffset += calculateTimingOffset('soloist', groove.pocket, intensity);
+        // why: discriminator 13 — seeded jitter source for the shared
+        // pocket-timing util so the soloist's micro-timing is deterministic.
+        timingOffset += calculateTimingOffset('soloist', groove.pocket, intensity, () =>
+            scrambleHash(pickerSeedBase + 13),
+        );
 
         // --- Greats Profiles: Timing ---
         if (activeStyle === 'blues' && soloistState.session.currentPhrase.context?.profile) {
@@ -401,8 +422,10 @@ export function selectPitchAndDevices(
             if (profile === 'armstrong' && isBeatStart) {
                 timingOffset += 0.015; // Louis drags behind the beat
             }
-            if (profile === 'monk' && Math.random() < 0.3) {
-                timingOffset += (Math.random() - 0.5) * 0.025; // Monk displacement
+            // why: discriminators 2/3 — Monk's behind-the-beat displacement
+            // (2 gates whether it fires, 3 sets the ±offset magnitude).
+            if (profile === 'monk' && scrambleHash(pickerSeedBase + 2) < 0.3) {
+                timingOffset += (scrambleHash(pickerSeedBase + 3) - 0.5) * 0.025; // Monk displacement
             }
         }
 
@@ -426,7 +449,8 @@ export function selectPitchAndDevices(
             const tightness = intensity;
             const jitterScale = 1.0 - tightness;
             const jitterMs = config.timingJitter * jitterScale;
-            timingOffset += (Math.random() - 0.5) * (jitterMs / 1000);
+            // why: discriminator 4 — style-specific micro-timing jitter.
+            timingOffset += (scrambleHash(pickerSeedBase + 4) - 0.5) * (jitterMs / 1000);
         }
 
         primary.timingOffset = (primary.timingOffset || 0) + timingOffset;
@@ -441,7 +465,10 @@ export function selectPitchAndDevices(
             soloistState.audio.lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        applyBluesBends(primary, activeStyle, currentChord);
+        // why: discriminator 14 — seeded source for the blues bend direction.
+        applyBluesBends(primary, activeStyle, currentChord, () =>
+            scrambleHash(pickerSeedBase + 14),
+        );
 
         return res;
     };
@@ -1290,7 +1317,12 @@ export function selectPitchAndDevices(
     if (isHeadBypass && targetMidi !== null) {
         selectedMidi = targetMidi;
     } else if (totalWeight > 0) {
-        let randomVal = Math.random() * totalWeight;
+        // why: discriminator 5 — the core weighted pitch-selection roulette.
+        // Deterministic per (step, section, loop) so the chosen pitch replays
+        // identically; the weight distribution itself still encodes all the
+        // additive musical biases, so chromatism/contour stay statistically
+        // unchanged.
+        let randomVal = scrambleHash(pickerSeedBase + 5) * totalWeight;
         for (let m = searchMin; m <= searchMax; m++) {
             const w = CANDIDATE_WEIGHTS[m];
             if (w > 0) {
@@ -1333,7 +1365,7 @@ export function selectPitchAndDevices(
     // pitch cleanly so the paraphrase still reads as the same melody. Without
     // this hard kill the anchor still carries deviceBaseProb (deviceProb ×
     // (0.5+intensity) × loop-1.2× × thematicBoost 2.4 × anchor 0.35), so a
-    // Math.random()-gated device can fire on top of the pinned selectedMidi
+    // seeded-gated device can fire on top of the pinned selectedMidi
     // and replace the emitted pitch (observed: anchor MIDI 59 -> 65).
     // Loops 2+ are deliberately NOT killed here: by then the soloist is in
     // exploratory territory where ornamenting around the anchor is musically
@@ -1432,7 +1464,7 @@ export function selectPitchAndDevices(
     // --- Structural Awareness: Turnaround Handling ---
     // why: the blues turnaround device emits its own pitch buffer and fully
     // replaces the picker's emission — it bypasses the deviceBaseProb gate via
-    // a separate Math.random() roll. On the loop-1 paraphrase a head-bypass
+    // a separate seeded roll (discriminator 6). On the loop-1 paraphrase a head-bypass
     // anchor is the structural skeleton of the head and must state its exact
     // head pitch (selectedMidi = targetMidi), so suppress the turnaround
     // substitution here for the same reason deviceBaseProb is zeroed above.
@@ -1445,7 +1477,8 @@ export function selectPitchAndDevices(
         !headMeasureHasTripletSeed &&
         !isResponseGuidedPhrase &&
         !isLoop1AnchorHeadBypass &&
-        Math.random() < 0.6
+        // why: discriminator 6 — blues turnaround-device trigger gate.
+        scrambleHash(pickerSeedBase + 6) < 0.6
     ) {
         const res = applyDeviceBuffer('bluesTurnaround', deviceContextOptions);
         if (res) {
@@ -1461,7 +1494,8 @@ export function selectPitchAndDevices(
             !isProtectedSeedTone &&
             (!isLineStyle || durationSteps >= stepsPerBeat / 2)) ||
         (loopCount > 1 && !isStrongBeat && durationSteps <= stepsPerBeat && !isLineStyle);
-    if (canTriggerDevice && Math.random() < deviceBaseProb) {
+    // why: discriminator 7 — the main melodic-device trigger gate.
+    if (canTriggerDevice && scrambleHash(pickerSeedBase + 7) < deviceBaseProb) {
         let allowed: string[] = [...(config.allowedDevices || [])];
 
         if (isLaterHeadBypass && !isProtectedSeedTone) {
@@ -1572,7 +1606,10 @@ export function selectPitchAndDevices(
         });
         // why: pick weighted by rank, not uniform — `fittedAllowed` is ordered
         // best-first, and a uniform draw discarded that ranking. See `pickByRank`.
-        const deviceType = pickByRank(fittedAllowed);
+        // Discriminator 12: a single seeded draw (`scrambleHash`) supplied as
+        // the `random` source so device selection is deterministic per
+        // (step, section, loop) — `pickByRank` makes exactly one draw.
+        const deviceType = pickByRank(fittedAllowed, () => scrambleHash(pickerSeedBase + 12));
         if (deviceType) {
             const res = applyDeviceBuffer(deviceType, deviceContextOptions);
             if (res) {
@@ -1590,9 +1627,11 @@ export function selectPitchAndDevices(
         durationSteps: durationSteps,
         vibrato: vibrato,
         isSustained: rhythmNode.isSustained,
+        // why: discriminators 8/9 — guitar bend-in (8 gates whether a long
+        // sustained note bends in, 9 picks the bend direction).
         bendStartInterval:
-            isGuitarMode && durationSteps >= 4 && Math.random() < 0.3
-                ? Math.random() < 0.5
+            isGuitarMode && durationSteps >= 4 && scrambleHash(pickerSeedBase + 8) < 0.3
+                ? scrambleHash(pickerSeedBase + 9) < 0.5
                     ? -1
                     : 1
                 : 0,
@@ -1684,7 +1723,8 @@ export function selectPitchAndDevices(
         }
     }
 
-    if (isPolyphonic && Math.random() < Math.min(0.98, doubleStopChance)) {
+    // why: discriminator 11 — double-stop / polyphony trigger gate.
+    if (isPolyphonic && scrambleHash(pickerSeedBase + 11) < Math.min(0.98, doubleStopChance)) {
         const extra = generateExtraNotes({
             soloist: soloistState,
             currentChord,

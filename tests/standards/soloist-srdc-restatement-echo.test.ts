@@ -144,26 +144,24 @@ function makeMulberry32(seed: number): () => number {
 
 /** Generate one non-echo phrase plan at `seed`, with `srdcState`. */
 function generateNormalPlan(seed: number, srdcState: string): any[] {
+    // Epic 12 S1: inject the per-seed PRNG via `generateRhythmPlan`'s `random`
+    // parameter rather than swapping the global `Math.random` — the engine no
+    // longer reads `Math.random` directly.
     const prng = makeMulberry32(seed);
-    const original = Math.random;
-    Math.random = prng;
-    try {
-        return generateRhythmPlan(
-            0,
-            ACTIVE_STEPS,
-            'scalar',
-            0.6,
-            STEPS_PER_MEASURE,
-            STEPS_PER_BEAT,
-            makeCoordination(ACTIVE_STEPS),
-            256,
-            makeNormalSoloist(srdcState),
-            null,
-            0,
-        );
-    } finally {
-        Math.random = original;
-    }
+    return generateRhythmPlan(
+        0,
+        ACTIVE_STEPS,
+        'scalar',
+        0.6,
+        STEPS_PER_MEASURE,
+        STEPS_PER_BEAT,
+        makeCoordination(ACTIVE_STEPS),
+        256,
+        makeNormalSoloist(srdcState),
+        null,
+        0,
+        prng,
+    );
 }
 
 /**
@@ -551,24 +549,20 @@ describe('Soloist SRDC Restatement — motif echo (Epic 11 S4)', () => {
 
 /** Run generateRhythmPlan against an arbitrary soloist mock (deterministic seed). */
 function generateNormalPlanWith(soloist: any): any[] {
+    // Epic 12 S1: inject the PRNG via `generateRhythmPlan`'s `random` parameter.
     const prng = makeMulberry32(0xc0ffee);
-    const original = Math.random;
-    Math.random = prng;
-    try {
-        return generateRhythmPlan(
-            0,
-            ACTIVE_STEPS,
-            'scalar',
-            0.6,
-            STEPS_PER_MEASURE,
-            STEPS_PER_BEAT,
-            makeCoordination(ACTIVE_STEPS),
-            256,
-            soloist,
-            null,
-            0,
-        );
-    } finally {
-        Math.random = original;
-    }
+    return generateRhythmPlan(
+        0,
+        ACTIVE_STEPS,
+        'scalar',
+        0.6,
+        STEPS_PER_MEASURE,
+        STEPS_PER_BEAT,
+        makeCoordination(ACTIVE_STEPS),
+        256,
+        soloist,
+        null,
+        0,
+        prng,
+    );
 }

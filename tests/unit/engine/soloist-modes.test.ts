@@ -364,21 +364,20 @@ describe('Soloist Mode Differentiation Logic', () => {
     });
 
     it('keeps guitar double stops more restrained in jazz than in blues', () => {
-        // Sample the same strong-beat guitar attack each time so only the style policy changes.
-        let randomState = 0;
-        vi.spyOn(Math, 'random').mockImplementation(() => {
-            randomState = (randomState * 1664525 + 1013904223) >>> 0;
-            return randomState / 4294967296;
-        });
-
-        const sampleGuitarAttack = (style) => {
+        // Epic 12 S1: the picker's double-stop gate is deterministic per
+        // (step, section, loop). Sample a strong-beat guitar attack at a
+        // DISTINCT step each iteration (one strong-beat per measure) so the
+        // double-stop rate is a genuine distribution the style policy shifts —
+        // a fixed step would collapse all 400 calls onto one identical result.
+        const sampleGuitarAttack = (style, iteration) => {
             resetModeTestState();
             state.soloist.mode = 'guitar';
             state.playback.currentLoopCount = 3;
             state.soloist.session.phrasing.activeSteps = 8;
+            const sampleStep = iteration * 16 + 4; // strong beat 2 of measure `iteration`
             state.soloist.session.rhythm.plan = [
                 {
-                    stepTarget: 4,
+                    stepTarget: sampleStep,
                     durationSteps: 4,
                     velocity: 0.85,
                     isStrongBeat: true,
@@ -386,18 +385,27 @@ describe('Soloist Mode Differentiation Logic', () => {
                 },
             ];
 
-            return getSoloistNote(getState(), currentChord, null, 4, 261.63, 60, style, 0, {
-                sectionStart: 0,
-                sectionEnd: 64,
-                bypassRhythm: false,
-            });
+            return getSoloistNote(
+                getState(),
+                currentChord,
+                null,
+                sampleStep,
+                261.63,
+                60,
+                style,
+                0,
+                {
+                    sectionStart: 0,
+                    sectionEnd: 64,
+                    bypassRhythm: false,
+                },
+            );
         };
 
         const countDoubleStops = (style, iterations) => {
-            randomState = 0x12345678;
             let doubleStops = 0;
             for (let i = 0; i < iterations; i++) {
-                const note = sampleGuitarAttack(style);
+                const note = sampleGuitarAttack(style, i);
                 if (!note) {
                     throw new Error(
                         `Expected sampled ${style} guitar attack ${i} to produce a note`,

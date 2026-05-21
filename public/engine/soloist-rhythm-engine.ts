@@ -1,5 +1,6 @@
 import type { SoloistState } from '../state/instruments.js';
 import type { SkeletonNode, StepInfo } from '../types.js';
+import { makeSeededStream } from './hash-utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 
@@ -11,6 +12,7 @@ function pickResponseTransform(
     responseConfig: any,
     responseMode: ResponseMode,
     responseSource: ResponseSource = 'recent',
+    random: () => number = Math.random,
 ): ResponseTransform {
     const options: Array<[ResponseTransform, number]> =
         responseMode === 'development'
@@ -36,7 +38,10 @@ function pickResponseTransform(
         options[3][1] += spaceBias * 0.18 * recallSpaceScale;
     }
     const totalWeight = options.reduce((sum, [, weight]) => sum + weight, 0);
-    let roll = Math.random() * totalWeight;
+    // why: response-transform roulette draws from the injected seeded stream
+    // (Epic 12 S1) so a Restatement/response phrase picks the same transform
+    // when its (step, section, loop) recurs — loops stay coherent.
+    let roll = random() * totalWeight;
     for (const [name, weight] of options) {
         roll -= weight;
         if (roll <= 0) {
@@ -69,12 +74,13 @@ function buildResponsePlanFromSignature(
     responseConfig: any,
     responseMode: ResponseMode,
     responseSource: ResponseSource,
+    random: () => number = Math.random,
 ): any[] {
     if (!signature?.notes?.length) {
         return [];
     }
 
-    const transform = pickResponseTransform(responseConfig, responseMode, responseSource);
+    const transform = pickResponseTransform(responseConfig, responseMode, responseSource, random);
     const delaySteps = Math.max(1, Math.floor(stepsPerBeat / 2));
     const maxResponseNotes = Math.max(2, Math.round(responseConfig?.maxResponseNotes || 8));
     const spaceBias = Math.max(0, Math.min(0.75, responseConfig?.spaceBias || 0));
@@ -95,7 +101,7 @@ function buildResponsePlanFromSignature(
                           ? spaceBias * 0.78
                           : spaceBias * 0.6
                     : 0;
-            if (skipProb > 0 && Math.random() < skipProb) {
+            if (skipProb > 0 && random() < skipProb) {
                 return null;
             }
 
@@ -114,7 +120,7 @@ function buildResponsePlanFromSignature(
             }
 
             const keepTriplet =
-                sourceNote.tripletPlacement && Math.random() < (responseConfig?.tripletCarry || 0);
+                sourceNote.tripletPlacement && random() < (responseConfig?.tripletCarry || 0);
             return {
                 stepOffset,
                 sourceNote,
@@ -281,7 +287,23 @@ export function generateRhythmPlan(
     // Defaults to 0 so existing call sites (unit tests, isolated engines)
     // see "Loop 0 Head" behavior — i.e. no loop bias — until they opt in.
     loopCount: number = 0,
+    // why: injectable PRNG (Epic 12 S1). Production omits this and gets a
+    // `makeSeededStream` keyed on `(startStep, sessionSteps, loopCount)` —
+    // the rhythm plan is then deterministic by construction (a phrase replays
+    // identically when its start step + session position recur). The
+    // loop-count-isolation critique test (`soloist-chorus-evolution-rhythm`)
+    // injects its OWN stream so it can hold the RNG sequence fixed across
+    // Loop 0 / Loop 2 and attribute the divergence to the loop-count branches
+    // alone (the test seam formerly held open by the bare `Math.random()` at
+    // the attack-jitter site — see project memory feedback_determinism_test_pattern).
+    random?: () => number,
 ): any[] {
+    // Default seeded stream: keyed on the phrase's stable identity. startStep
+    // distinguishes every phrase; sessionSteps separates successive phrases
+    // that share a startStep modulo the loop; loopCount keeps each chorus
+    // distinct. mulberry32 avalanche means adjacent seeds never sawtooth.
+    const rng: () => number =
+        random ?? makeSeededStream((startStep * 2749 + sessionSteps * 31 + loopCount * 5471) | 0);
     const plan: any[] = [];
     const _config = (STYLE_CONFIG as any)[style] || STYLE_CONFIG.scalar;
     const responseConfig = _config.motivicResponse || null;
@@ -342,6 +364,7 @@ export function generateRhythmPlan(
                 responseConfig,
                 responseMode,
                 responseSource,
+                rng,
             ),
         );
     } else if (
@@ -351,11 +374,11 @@ export function generateRhythmPlan(
         // why: 80% follow-through is a high-level "answer-mirrors-call" gate. The
         // remaining 20% falls through to the main attack-prob path so the response
         // sometimes breathes its own rhythm — a soloist who replies *identically*
-        // every call gets robotic. Threshold is intentionally `Math.random()` and
-        // not deterministic-seeded: this is a gate on whether the entire branch
-        // runs, so a stub or hash here would either lock the test into one path
-        // or never exercise the other (see audit P2 #11 for future tuning hooks).
-        Math.random() < 0.8
+        // every call gets robotic. Draws from the injected seeded stream
+        // (Epic 12 S1): deterministic per phrase, but the response/main split
+        // still varies phrase-to-phrase because each phrase reseeds on its own
+        // (startStep, sessionSteps, loop) — both branches stay reachable.
+        rng() < 0.8
     ) {
         const skeleton = soloistState.session.currentPhrase.context.skeleton as Array<
             number | SkeletonNode
@@ -706,20 +729,20 @@ export function generateRhythmPlan(
             // Final-stage multiplier (after bypassRhythm/isSectionDownbeat
             // overrides so cadence/downbeat anchors stay at 1.0; the jitter
             // can only nudge those *down* below 1.0, never produce a missed
-            // forced attack). Hash-based sign so the jitter is deterministic
-            // per step — same step across two runs gets the same sign; the
-            // PRNG choice is `Math.random()` rather than a seeded helper so
-            // tests can stub Math.random and isolate loop-count effects from
-            // attack-jitter noise (see project memory:
-            // feedback_determinism_test_pattern). Skipped at loopCount=0
-            // so Loop 0 (The Head) stays exactly as before — strict head
-            // adherence per CLAUDE.md § Dynamic Head / Chorus Evolution.
+            // forced attack). Draws from the injected `rng` stream (Epic 12
+            // S1): deterministic per phrase by construction. The loop-count-
+            // isolation test injects its OWN stream (re-seeded identically per
+            // call) so Loop 0 and Loop 2 see the same RNG sequence and the
+            // divergence is attributable to the loop-count branches alone —
+            // the test seam this comment formerly described is preserved via
+            // the `random` parameter, not a bare `Math.random()`. Skipped at
+            // loopCount=0 so Loop 0 (The Head) stays exactly as before.
             if (loopForRhythm > 0 && attackProb < 1.0) {
                 const attackJitter = loopForRhythm * 0.05;
-                attackProb *= 1 + (Math.random() - 0.5) * 2 * attackJitter;
+                attackProb *= 1 + (rng() - 0.5) * 2 * attackJitter;
             }
 
-            if (Math.random() <= attackProb) {
+            if (rng() <= attackProb) {
                 if (isMonophonicMode && silenceSteps >= stepsPerBeat) {
                     notesInPhrase = 0;
                 }
@@ -740,7 +763,7 @@ export function generateRhythmPlan(
                 }
 
                 // Jazz Ghosting
-                if ((style === 'jazz' || style === 'bird') && !isBeatStart && Math.random() < 0.4) {
+                if ((style === 'jazz' || style === 'bird') && !isBeatStart && rng() < 0.4) {
                     stepVelocity *= 0.6; // Soft ghost note
                 }
 
@@ -776,13 +799,13 @@ export function generateRhythmPlan(
                     finalSustainProb *= 0.55;
                 }
 
-                if (Math.random() < finalSustainProb) {
+                if (rng() < finalSustainProb) {
                     isSustained = true;
                     // Held for a logical amount of time (4 steps = 1 beat, 8 steps = 2 beats)
                     const maxSustain = _config.maxSustainSteps || 8;
                     const sustainLength = isBebopStyle
-                        ? 2 + Math.floor(Math.random() * 3)
-                        : Math.floor(3 + Math.random() * maxSustain);
+                        ? 2 + Math.floor(rng() * 3)
+                        : Math.floor(3 + rng() * maxSustain);
                     sustainStepsRemaining = sustainLength;
                 }
 

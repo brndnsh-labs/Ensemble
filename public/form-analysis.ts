@@ -1,3 +1,4 @@
+import { scrambleHash } from './engine/hash-utils.js';
 import type { ArrangerState } from './state/arranger.js';
 import type { Chord } from './types.js';
 
@@ -27,19 +28,11 @@ export function getSectionEnergy(label: string | null | undefined): number {
     return 0.5; // Default
 }
 
-// why: canonical mulberry32 scramble — identical to the helper in
-// bass-engine.ts / harmonies.ts / groove-engine.ts. Homed here (worker-safe,
-// dep-light) so both the conductor (main thread) and tick-logic (worker /
-// offline export) consume one copy of the timer-less jam macro-arc. A bare
-// `seed % N` would sawtooth on small integer seeds (see
-// feedback-seeded-prng-mulberry32) — mulberry32 pre-scrambles so consecutive
-// cycles get well-distributed offsets.
-const scrambleHash = (seed: number): number => {
-    let t = (seed + 0x6d2b79f5) | 0;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-};
+// scrambleHash (canonical mulberry32) is imported from engine/hash-utils.ts —
+// it pre-scrambles so consecutive jam-macro-arc cycles get well-distributed
+// offsets (a bare `seed % N` would sawtooth; see feedback-seeded-prng-mulberry32).
+// hash-utils.ts is worker-safe and dep-light, so the conductor (main thread) and
+// tick-logic (worker / offline export) still consume one shared copy.
 
 /**
  * Per-genre macro-arc cycle length (in form repeats) for the timer-less jam.
