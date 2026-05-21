@@ -34,6 +34,7 @@ Discovery already surfaced three audio-graph hygiene bugs (panner leak, overprom
 
 **Acceptance:** the agent exists and, run against the current tree, independently re-finds the drums panner leak and the bass NaN-guard nit.
 **Effort:** ~3h. **Model:** opus (catalog design). **Reviewer:** none (tooling). **Source:** `shared.md` §5; all reports §5.
+**Status:** Shipped 2026-05-21. Agent written to `.claude/agents/synth-graph-reviewer.md` — catalog: NaN-into-AudioParam, node leaks, ramp misuse, envelope math, clock, dead-node / per-note-alloc. Caveat: custom agent definitions load at session start, so the session that *adds* the agent must self-review the synth seam (or use `general-purpose`) — the agent is invocable from the next session on.
 
 ### S3. Typed audio-graph / FX-bus abstraction
 `engine.ts` `initAudio()` stores the whole graph as loose named properties on `playback` (`playback.chordsGain`, `playback.bassEQ`, `Record<string,GainNode>` casts at `engine.ts:289,300`). Replace with a typed bus/FX-bus object: each instrument bus a typed struct, the master chain explicit. No behavior change — pure refactor enabling S4, S5, and Epic 6.
