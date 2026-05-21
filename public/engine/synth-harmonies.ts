@@ -548,8 +548,8 @@ function playHarmonyNoteCurrent(
     }
 
     gain.connect(panner);
-    if (playback.harmoniesGain) {
-        panner.connect(playback.harmoniesGain);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.harmonies.gain);
     }
 
     // Register active voice

@@ -1,7 +1,7 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import type { GlobalContext } from '../state/playback.js';
-import type { EnsembleState, Mutable } from '../types.js';
+import type { AudioGraph, EnsembleState, InstrumentBus, Mutable } from '../types.js';
 import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -81,9 +81,18 @@ export function initAudio(
             };
         }
 
+        // The audio graph is built into typed locals, then assembled into a
+        // single typed `AudioGraph` object and assigned to `playback.audioGraph`
+        // once every node exists (see assembly block after the module loop).
+        let masterGain: GainNode | null = null;
+        let saturator: WaveShaperNode | null = null;
+        let masterLimiter: DynamicsCompressorNode | null = null;
+        let reverbNode: ConvolverNode | null = null;
+        let reverbPreFilter: BiquadFilterNode | null = null;
+        const buses: Partial<Record<string, InstrumentBus>> = {};
+
         if (playback.audio) {
-            const masterGain = playback.audio.createGain();
-            (playback as Mutable<typeof playback>).masterGain = masterGain; // @direct-mutation
+            masterGain = playback.audio.createGain();
             const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
             masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             masterGain.gain.exponentialRampToValueAtTime(
@@ -93,8 +102,8 @@ export function initAudio(
         }
 
         // Attach the Watchdog
-        if (enableWatchdog && playback.masterGain) {
-            audioWatchdog.attachToMaster(playback.masterGain, playback);
+        if (enableWatchdog && masterGain) {
+            audioWatchdog.attachToMaster(masterGain, playback);
         }
         if (enableWatchdog) {
             audioWatchdog.onRecover = async (pbState: GlobalContext) => {
@@ -104,8 +113,9 @@ export function initAudio(
                         (pbState as Mutable<GlobalContext>).audio = null; // @worker-mutation
                         initAudio(state);
                         restoreGains(state);
-                        if (pbState.masterGain) {
-                            audioWatchdog.attachToMaster(pbState.masterGain, pbState);
+                        const recoveredMaster = pbState.audioGraph?.master.gain;
+                        if (recoveredMaster) {
+                            audioWatchdog.attachToMaster(recoveredMaster, pbState);
                         }
                     });
                 }
@@ -114,13 +124,11 @@ export function initAudio(
         }
 
         if (playback.audio) {
-            const saturator = playback.audio.createWaveShaper();
-            (playback as Mutable<typeof playback>).saturator = saturator; // @direct-mutation
-            saturator.curve = createSoftClipCurve(); // @direct-mutation
-            saturator.oversample = '4x'; // @direct-mutation
+            saturator = playback.audio.createWaveShaper();
+            saturator.curve = createSoftClipCurve();
+            saturator.oversample = '4x';
 
-            const masterLimiter = playback.audio.createDynamicsCompressor();
-            (playback as Mutable<typeof playback>).masterLimiter = masterLimiter; // @direct-mutation
+            masterLimiter = playback.audio.createDynamicsCompressor();
             masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
             masterLimiter.knee.setValueAtTime(3, playback.audio.currentTime);
             masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
@@ -128,22 +136,16 @@ export function initAudio(
             masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
         }
 
-        if (
-            playback.masterGain &&
-            playback.saturator &&
-            playback.masterLimiter &&
-            playback.audio?.destination
-        ) {
-            playback.masterGain.connect(playback.saturator);
-            playback.saturator.connect(playback.masterLimiter);
-            playback.masterLimiter.connect(playback.audio.destination);
+        if (masterGain && saturator && masterLimiter && playback.audio?.destination) {
+            masterGain.connect(saturator);
+            saturator.connect(masterLimiter);
+            masterLimiter.connect(playback.audio.destination);
         }
 
-        if (playback.audio && playback.masterGain) {
-            const reverbNode = playback.audio.createConvolver();
-            (playback as Mutable<typeof playback>).reverbNode = reverbNode; // @direct-mutation
-            reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0); // @direct-mutation
-            reverbNode.connect(playback.masterGain);
+        if (playback.audio && masterGain) {
+            reverbNode = playback.audio.createConvolver();
+            reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
+            reverbNode.connect(masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---
             const reverbHPF = playback.audio.createBiquadFilter();
@@ -156,7 +158,7 @@ export function initAudio(
 
             reverbHPF.connect(reverbLPF);
             reverbLPF.connect(reverbNode);
-            (playback as Mutable<typeof playback>).reverbPreFilter = reverbHPF; // @direct-mutation
+            reverbPreFilter = reverbHPF;
         }
 
         const modules = [
@@ -168,7 +170,7 @@ export function initAudio(
         ];
 
         modules.forEach((m) => {
-            if (!playback.audio || !playback.masterGain) {
+            if (!playback.audio || !masterGain) {
                 return;
             }
             const gainNode = playback.audio.createGain();
@@ -189,6 +191,13 @@ export function initAudio(
             busEQ.type = 'highpass';
             busEQ.frequency.setValueAtTime(20, playback.audio.currentTime); // Neutral by default
 
+            // Per-bus struct fields, populated by the branch below. `busEqEntry`
+            // is the EQ node the bus struct exposes (chords/bass/soloist/harmonies
+            // expose `busEQ`; drums exposes its own highpass).
+            let busEqEntry: BiquadFilterNode = busEQ;
+            let busPanner: StereoPannerNode | null = null;
+            let busSidechain: GainNode | null = null;
+
             if (m.name === 'chords') {
                 const lowShelf = playback.audio.createBiquadFilter();
                 lowShelf.type = 'lowshelf';
@@ -208,10 +217,9 @@ export function initAudio(
                 busEQ.connect(lowShelf);
                 lowShelf.connect(notch);
                 notch.connect(panner);
-                panner.connect(playback.masterGain);
+                panner.connect(masterGain);
 
-                (playback as Mutable<typeof playback>).chordsEQ = busEQ; // @direct-mutation
-                (playback as Mutable<typeof playback>).chordsPanner = panner; // @direct-mutation
+                busPanner = panner;
             } else if (m.name === 'bass') {
                 const sidechain = playback.audio.createGain();
                 sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
@@ -238,10 +246,9 @@ export function initAudio(
                 busEQ.connect(weight);
                 weight.connect(scoop);
                 scoop.connect(definition);
-                definition.connect(playback.masterGain);
+                definition.connect(masterGain);
 
-                (playback as Mutable<typeof playback>).bassSidechain = sidechain; // @direct-mutation
-                (playback as Mutable<typeof playback>).bassEQ = busEQ; // @direct-mutation
+                busSidechain = sidechain;
             } else if (m.name === 'soloist') {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
@@ -251,9 +258,7 @@ export function initAudio(
 
                 gainNode.connect(busEQ);
                 busEQ.connect(presence);
-                presence.connect(playback.masterGain);
-
-                (playback as Mutable<typeof playback>).soloistEQ = busEQ; // @direct-mutation
+                presence.connect(masterGain);
             } else if (m.name === 'harmonies') {
                 const warmth = playback.audio.createBiquadFilter();
                 warmth.type = 'peaking';
@@ -266,9 +271,9 @@ export function initAudio(
                 gainNode.connect(busEQ);
                 busEQ.connect(warmth);
                 warmth.connect(panner);
-                panner.connect(playback.masterGain);
-                (playback as Mutable<typeof playback>).harmoniesEQ = busEQ; // @direct-mutation
-                (playback as Mutable<typeof playback>).harmoniesPanner = panner; // @direct-mutation
+                panner.connect(masterGain);
+
+                busPanner = panner;
             } else if (m.name === 'drums') {
                 const drumsHP = playback.audio.createBiquadFilter();
                 drumsHP.type = 'highpass';
@@ -282,11 +287,11 @@ export function initAudio(
 
                 gainNode.connect(drumsHP);
                 drumsHP.connect(drumsAir);
-                drumsAir.connect(playback.masterGain);
-                (playback as Mutable<typeof playback>).drumsEQ = drumsHP; // @direct-mutation
-            }
+                drumsAir.connect(masterGain);
 
-            (playback as unknown as Record<string, GainNode>)[`${m.name}Gain`] = gainNode;
+                // Drums route through their own highpass, not the neutral `busEQ`.
+                busEqEntry = drumsHP;
+            }
 
             const reverbGain = playback.audio.createGain();
             const targetReverb = Math.max(0.0001, m.state.reverb);
@@ -296,9 +301,50 @@ export function initAudio(
                 playback.audio.currentTime + 0.04,
             );
             gainNode.connect(reverbGain);
-            reverbGain.connect(playback.reverbPreFilter || (playback.reverbNode as AudioNode));
-            (playback as unknown as Record<string, GainNode>)[`${m.name}Reverb`] = reverbGain;
+            if (reverbPreFilter) {
+                reverbGain.connect(reverbPreFilter);
+            } else if (reverbNode) {
+                reverbGain.connect(reverbNode);
+            }
+
+            buses[m.name] = {
+                gain: gainNode,
+                reverb: reverbGain,
+                eq: busEqEntry,
+                panner: busPanner,
+                sidechain: busSidechain,
+            };
         });
+
+        // Assemble the typed graph once every node exists.
+        if (
+            masterGain &&
+            saturator &&
+            masterLimiter &&
+            reverbNode &&
+            reverbPreFilter &&
+            buses.chords &&
+            buses.bass &&
+            buses.soloist &&
+            buses.harmonies &&
+            buses.drums
+        ) {
+            const audioGraph: AudioGraph = {
+                master: {
+                    gain: masterGain,
+                    saturator,
+                    limiter: masterLimiter,
+                    reverbNode,
+                    reverbPreFilter,
+                },
+                chords: buses.chords,
+                bass: buses.bass,
+                soloist: buses.soloist,
+                harmonies: buses.harmonies,
+                drums: buses.drums,
+            };
+            (playback as Mutable<typeof playback>).audioGraph = audioGraph; // @direct-mutation
+        }
 
         const bufSize = playback.audio!.sampleRate * 2;
         const buffer = playback.audio!.createBuffer(1, bufSize, playback.audio!.sampleRate);
@@ -315,44 +361,32 @@ export function initAudio(
     }
 }
 
-export function killChordBus(state: EnsembleState) {
+function killBus(state: EnsembleState, bus: InstrumentBus | undefined) {
     const { playback } = state;
-    if (playback.chordsGain && playback.audio) {
-        playback.chordsGain.gain.cancelScheduledValues(playback.audio.currentTime);
-        playback.chordsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
+    if (bus && playback.audio) {
+        bus.gain.gain.cancelScheduledValues(playback.audio.currentTime);
+        bus.gain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
     }
+}
+
+export function killChordBus(state: EnsembleState) {
+    killBus(state, state.playback.audioGraph?.chords);
 }
 
 export function killBassBus(state: EnsembleState) {
-    const { playback } = state;
-    if (playback.bassGain && playback.audio) {
-        playback.bassGain.gain.cancelScheduledValues(playback.audio.currentTime);
-        playback.bassGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
-    }
+    killBus(state, state.playback.audioGraph?.bass);
 }
 
 export function killSoloistBus(state: EnsembleState) {
-    const { playback } = state;
-    if (playback.soloistGain && playback.audio) {
-        playback.soloistGain.gain.cancelScheduledValues(playback.audio.currentTime);
-        playback.soloistGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
-    }
+    killBus(state, state.playback.audioGraph?.soloist);
 }
 
 export function killHarmonyBus(state: EnsembleState) {
-    const { playback } = state;
-    if (playback.harmoniesGain && playback.audio) {
-        playback.harmoniesGain.gain.cancelScheduledValues(playback.audio.currentTime);
-        playback.harmoniesGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
-    }
+    killBus(state, state.playback.audioGraph?.harmonies);
 }
 
 export function killDrumBus(state: EnsembleState) {
-    const { playback } = state;
-    if (playback.drumsGain && playback.audio) {
-        playback.drumsGain.gain.cancelScheduledValues(playback.audio.currentTime);
-        playback.drumsGain.gain.setTargetAtTime(0, playback.audio.currentTime, 0.005);
-    }
+    killBus(state, state.playback.audioGraph?.drums);
 }
 
 export async function killAllNotes(state: EnsembleState) {
@@ -373,28 +407,34 @@ export function restoreGains(state: EnsembleState) {
         return;
     }
     const t = playback.audio.currentTime;
+    const graph = playback.audioGraph;
     const modules = [
         {
-            node: playback.chordsGain,
+            node: graph?.chords.gain ?? null,
             state: chords,
             mult: MIXER_GAIN_MULTIPLIERS.chords,
             name: 'chords',
         },
-        { node: playback.bassGain, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass, name: 'bass' },
         {
-            node: playback.soloistGain,
+            node: graph?.bass.gain ?? null,
+            state: bass,
+            mult: MIXER_GAIN_MULTIPLIERS.bass,
+            name: 'bass',
+        },
+        {
+            node: graph?.soloist.gain ?? null,
             state: soloist,
             mult: MIXER_GAIN_MULTIPLIERS.soloist,
             name: 'soloist',
         },
         {
-            node: playback.harmoniesGain,
+            node: graph?.harmonies.gain ?? null,
             state: harmony,
             mult: MIXER_GAIN_MULTIPLIERS.harmonies,
             name: 'harmonies',
         },
         {
-            node: playback.drumsGain,
+            node: graph?.drums.gain ?? null,
             state: groove,
             mult: MIXER_GAIN_MULTIPLIERS.drums,
             name: 'drums',

@@ -108,12 +108,14 @@ describe('DSP & Signal Safety', () => {
         // Low intensity
         playback.bandIntensity = 0.2;
         applyConductor(getState(), dispatch);
-        const lowThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[0][0];
+        const lowThreshold =
+            playback.audioGraph.master.limiter.threshold.setTargetAtTime.mock.calls[0][0];
 
         // High intensity
         playback.bandIntensity = 0.9;
         applyConductor(getState(), dispatch);
-        const highThreshold = playback.masterLimiter.threshold.setTargetAtTime.mock.calls[1][0];
+        const highThreshold =
+            playback.audioGraph.master.limiter.threshold.setTargetAtTime.mock.calls[1][0];
 
         // High intensity should have a lower threshold (more compression/limiting)
         expect(highThreshold).toBeLessThan(lowThreshold);

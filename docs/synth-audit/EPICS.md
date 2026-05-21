@@ -34,7 +34,7 @@ This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — 
 4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
 5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
 
-**Current position:** Epic 0 — S1 (voice A/B harness) + S2 (`synth-graph-reviewer`) shipped 2026-05-21. **Next: Epic 0 S3** (typed audio-graph refactor).
+**Current position:** Epic 0 — S1 (voice A/B harness), S2 (`synth-graph-reviewer`), S3 (typed audio-graph) shipped 2026-05-21. **Next: Epic 0 S4** (FDN reverb).
 
 ## The five cross-cutting themes
 
@@ -52,7 +52,7 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 2 | A/B harness, `synth-graph-reviewer`, typed audio graph, FDN reverb, chord de-burial, shared humanization + velocity→timbre helpers. **Do first.** Semi-manual. S1 + S2 shipped 2026-05-21. |
+| 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 3 | A/B harness, `synth-graph-reviewer`, typed audio graph, FDN reverb, chord de-burial, shared humanization + velocity→timbre helpers. **Do first.** Semi-manual. S1–S3 shipped 2026-05-21. |
 | 1 | [Harmony Voice Rebuild](epic-1-harmony.md) | 6 | 0 | "Most toy-ish." Generic soloist skeleton + style switch — needs a real rebuild into named formant voices. Organ branch is good; leave it. |
 | 2 | [Chords → Electric Piano](epic-2-chords.md) | 7 | 0 | Buried by 3 mechanisms. Per-partial additive + inharmonicity + real transient → convincing electric piano. |
 | 3 | [Soloist Expressiveness](epic-3-soloist.md) | 7 | 0 | Highest-risk (most exposed). Frozen sustains, velocity→loudness-only, zero per-note variation. Wakes the dead legato path. |
@@ -60,7 +60,7 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 | 5 | [Bass Finishing](epic-5-bass.md) | 5 | 0 | Synthy-but-good — finishing, not a rebuild. Sub layer, velocity-driven saturation, animated growl cutoff. |
 | 6 | [Pack Infrastructure & First Pack](epic-6-packs.md) | 6 | 0 | Sample-pack system + first pack. Needs instrument-source indirection + non-persisted entitlement. Last. |
 
-**Total: 2 / 46 stories shipped.**
+**Total: 3 / 46 stories shipped.**
 
 ## The honest pack list
 

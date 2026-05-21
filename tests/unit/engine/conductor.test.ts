@@ -218,16 +218,38 @@ describe('Conductor Logic', () => {
 
         it('should adjust master limiter without mutating instrument reverb', () => {
             playback.audio = { currentTime: 1.0 };
-            playback.masterLimiter = {
-                threshold: { setTargetAtTime: vi.fn() },
-                ratio: { setTargetAtTime: vi.fn() },
-                release: { setTargetAtTime: vi.fn() },
+            const eqMock = () => ({
+                type: '',
+                frequency: { setTargetAtTime: vi.fn() },
+                gain: { setTargetAtTime: vi.fn() },
+            });
+            const reverbSend = () => ({ gain: { setTargetAtTime: vi.fn() } });
+            const bus = (extra = {}) => ({
+                gain: { gain: { setTargetAtTime: vi.fn() } },
+                reverb: reverbSend(),
+                eq: eqMock(),
+                panner: { pan: { setTargetAtTime: vi.fn() } },
+                sidechain: null,
+                ...extra,
+            });
+            playback.audioGraph = {
+                master: {
+                    gain: {},
+                    saturator: {},
+                    limiter: {
+                        threshold: { setTargetAtTime: vi.fn() },
+                        ratio: { setTargetAtTime: vi.fn() },
+                        release: { setTargetAtTime: vi.fn() },
+                    },
+                    reverbNode: {},
+                    reverbPreFilter: { frequency: { setTargetAtTime: vi.fn() } },
+                },
+                chords: bus(),
+                bass: bus({ panner: null }),
+                soloist: bus({ panner: null }),
+                harmonies: bus(),
+                drums: bus({ panner: null }),
             };
-            playback.chordsReverb = { gain: { setTargetAtTime: vi.fn() } };
-            playback.bassReverb = { gain: { setTargetAtTime: vi.fn() } };
-            playback.soloistReverb = { gain: { setTargetAtTime: vi.fn() } };
-            playback.harmoniesReverb = { gain: { setTargetAtTime: vi.fn() } };
-            playback.drumsReverb = { gain: { setTargetAtTime: vi.fn() } };
             chords.reverb = 0.31;
             bass.reverb = 0.07;
             soloist.reverb = 0.64;
@@ -237,13 +259,14 @@ describe('Conductor Logic', () => {
 
             applyConductor(getState(), dispatch);
 
-            expect(playback.masterLimiter.threshold.setTargetAtTime).toHaveBeenCalled();
-            expect(playback.masterLimiter.ratio.setTargetAtTime).toHaveBeenCalled();
-            expect(playback.chordsReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
-            expect(playback.bassReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
-            expect(playback.soloistReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
-            expect(playback.harmoniesReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
-            expect(playback.drumsReverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            const graph = playback.audioGraph;
+            expect(graph.master.limiter.threshold.setTargetAtTime).toHaveBeenCalled();
+            expect(graph.master.limiter.ratio.setTargetAtTime).toHaveBeenCalled();
+            expect(graph.chords.reverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(graph.bass.reverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(graph.soloist.reverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(graph.harmonies.reverb.gain.setTargetAtTime).not.toHaveBeenCalled();
+            expect(graph.drums.reverb.gain.setTargetAtTime).not.toHaveBeenCalled();
             expect(chords.reverb).toBe(0.31);
             expect(bass.reverb).toBe(0.07);
             expect(soloist.reverb).toBe(0.64);

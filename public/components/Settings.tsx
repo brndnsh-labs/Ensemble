@@ -83,17 +83,12 @@ export function Settings() {
         const numVal = parseFloat(val.toString());
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
 
-        if (playback.masterGain && playback.audio) {
+        if (playback.audioGraph && playback.audio) {
+            const masterGain = playback.audioGraph.master.gain;
             const target = Math.max(0.0001, numVal * MIXER_GAIN_MULTIPLIERS.master);
-            playback.masterGain.gain.cancelScheduledValues(playback.audio.currentTime);
-            playback.masterGain.gain.setValueAtTime(
-                playback.masterGain.gain.value,
-                playback.audio.currentTime,
-            );
-            playback.masterGain.gain.exponentialRampToValueAtTime(
-                target,
-                playback.audio.currentTime + 0.04,
-            );
+            masterGain.gain.cancelScheduledValues(playback.audio.currentTime);
+            masterGain.gain.setValueAtTime(masterGain.gain.value, playback.audio.currentTime);
+            masterGain.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
         }
         saveCurrentState();
     };

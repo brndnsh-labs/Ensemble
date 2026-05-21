@@ -13,16 +13,8 @@ const { makeSoloistMock } = await vi.hoisted(
 vi.mock('../../../public/state.js', () => {
     const mockPlayback = {
         audio: null,
-        masterGain: null,
+        audioGraph: null,
         masterVolume: 0.5,
-        saturator: null,
-        masterLimiter: null,
-        reverbNode: null,
-        chordsGain: null,
-        bassGain: null,
-        soloistGain: null,
-        harmoniesGain: null,
-        drumsGain: null,
         isPlaying: false,
     };
     const mockChords = { volume: 1.0, enabled: true, reverb: 0.2 };
@@ -158,55 +150,53 @@ describe('Mix & Signal Integrity Audit', () => {
         initAudio(getState());
 
         // Verify Master Chain Connections
-        expect(playback.masterGain.connect).toHaveBeenCalledWith(playback.saturator);
-        expect(playback.saturator.connect).toHaveBeenCalledWith(playback.masterLimiter);
-        expect(playback.masterLimiter.connect).toHaveBeenCalledWith(playback.audio.destination);
+        const { master } = playback.audioGraph;
+        expect(master.gain.connect).toHaveBeenCalledWith(master.saturator);
+        expect(master.saturator.connect).toHaveBeenCalledWith(master.limiter);
+        expect(master.limiter.connect).toHaveBeenCalledWith(playback.audio.destination);
     });
 
     it('should apply safety limiter settings to prevent hard clipping', () => {
         initAudio(getState());
 
         // Threshold should be below 0dB to allow for saturator peaks
-        expect(playback.masterLimiter.threshold.setValueAtTime).toHaveBeenCalledWith(
-            expect.any(Number),
-            0,
-        );
-        expect(playback.masterLimiter.ratio.setValueAtTime).toHaveBeenCalledWith(
-            expect.any(Number),
-            0,
-        );
+        const { limiter } = playback.audioGraph.master;
+        expect(limiter.threshold.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
+        expect(limiter.ratio.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
     });
 
     it('should route all instrument buses through the master gain or EQs', () => {
         initAudio(getState());
 
         // Check instrument gains are connected
-        expect(playback.chordsGain.connect).toHaveBeenCalled();
-        expect(playback.bassGain.connect).toHaveBeenCalled();
-        expect(playback.soloistGain.connect).toHaveBeenCalled();
-        expect(playback.drumsGain.connect).toHaveBeenCalled();
+        const graph = playback.audioGraph;
+        expect(graph.chords.gain.connect).toHaveBeenCalled();
+        expect(graph.bass.gain.connect).toHaveBeenCalled();
+        expect(graph.soloist.gain.connect).toHaveBeenCalled();
+        expect(graph.drums.gain.connect).toHaveBeenCalled();
     });
 
     it('should correctly assemble the Pro Mix v3 bus chain', () => {
         initAudio(getState());
+        const graph = playback.audioGraph;
 
         // Bass Sidechain & EQ
-        expect(playback.bassGain.connect).toHaveBeenCalledWith(playback.bassSidechain);
-        expect(playback.bassSidechain.connect).toHaveBeenCalledWith(playback.bassEQ);
-        expect(playback.bassEQ.connect).toHaveBeenCalled();
+        expect(graph.bass.gain.connect).toHaveBeenCalledWith(graph.bass.sidechain);
+        expect(graph.bass.sidechain.connect).toHaveBeenCalledWith(graph.bass.eq);
+        expect(graph.bass.eq.connect).toHaveBeenCalled();
 
         // Chords EQ & Panner
-        expect(playback.chordsGain.connect).toHaveBeenCalledWith(playback.chordsEQ);
-        expect(playback.chordsPanner).toBeDefined();
+        expect(graph.chords.gain.connect).toHaveBeenCalledWith(graph.chords.eq);
+        expect(graph.chords.panner).toBeDefined();
 
         // Soloist EQ
-        expect(playback.soloistGain.connect).toHaveBeenCalledWith(playback.soloistEQ);
+        expect(graph.soloist.gain.connect).toHaveBeenCalledWith(graph.soloist.eq);
     });
 
     it('should protect the bass bus with its own EQ chain', () => {
         initAudio(getState());
-        expect(playback.bassEQ).toBeDefined();
-        expect(playback.bassEQ.type).toBe('highpass');
+        expect(playback.audioGraph.bass.eq).toBeDefined();
+        expect(playback.audioGraph.bass.eq.type).toBe('highpass');
     });
 
     it('should verify that mixer gain multipliers are correctly applied', () => {
@@ -216,20 +206,21 @@ describe('Mix & Signal Integrity Audit', () => {
         // With unity UI defaults, the hidden trim carries the prior effective balance.
         // Target should be 1.0 * 0.1575 = 0.1575
 
-        const bassTarget = playback.bassGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
+        const bassTarget =
+            playback.audioGraph.bass.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(bassTarget).toBeCloseTo(0.1575, 4);
 
         // Harmony target should be 1.0 * 0.1 = 0.1
         const harmonyTarget =
-            playback.harmoniesGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
+            playback.audioGraph.harmonies.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(harmonyTarget).toBeCloseTo(0.1, 4);
     });
 
     it('should ensure the saturator uses an oversampled soft-clip curve', () => {
         initAudio(getState());
 
-        expect(playback.saturator.curve).toBeDefined();
-        expect(playback.saturator.oversample).toBe('4x');
+        expect(playback.audioGraph.master.saturator.curve).toBeDefined();
+        expect(playback.audioGraph.master.saturator.oversample).toBe('4x');
     });
 
     it('should maintain cumulative gain below 1.0 before the limiter', () => {
@@ -237,11 +228,12 @@ describe('Mix & Signal Integrity Audit', () => {
         restoreGains(getState());
 
         // Check cumulative gain from restoreGains (uses setTargetAtTime)
-        const drumGain = playback.drumsGain.gain.setTargetAtTime.mock.calls[0][0];
-        const bassGain = playback.bassGain.gain.setTargetAtTime.mock.calls[0][0];
-        const chordsGain = playback.chordsGain.gain.setTargetAtTime.mock.calls[0][0];
-        const soloistGain = playback.soloistGain.gain.setTargetAtTime.mock.calls[0][0];
-        const harmonyGain = playback.harmoniesGain.gain.setTargetAtTime.mock.calls[0][0];
+        const graph = playback.audioGraph;
+        const drumGain = graph.drums.gain.gain.setTargetAtTime.mock.calls[0][0];
+        const bassGain = graph.bass.gain.gain.setTargetAtTime.mock.calls[0][0];
+        const chordsGain = graph.chords.gain.gain.setTargetAtTime.mock.calls[0][0];
+        const soloistGain = graph.soloist.gain.gain.setTargetAtTime.mock.calls[0][0];
+        const harmonyGain = graph.harmonies.gain.gain.setTargetAtTime.mock.calls[0][0];
 
         const totalInstrumentGain = drumGain + bassGain + chordsGain + soloistGain + harmonyGain;
 
@@ -260,7 +252,8 @@ describe('Mix & Signal Integrity Audit', () => {
     it('should calculate master gain correctly (Headroom Check)', () => {
         initAudio(getState());
         // Master Gain = ui.masterVol (0.5) * masterMultiplier (0.85) = 0.425
-        const masterGain = playback.masterGain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
+        const masterGain =
+            playback.audioGraph.master.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
         expect(masterGain).toBeCloseTo(0.425, 4);
     });
 });

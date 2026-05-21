@@ -861,55 +861,61 @@ export interface MidiState {
     readonly velocitySensitivity: number;
 }
 
+/**
+ * A single instrument's mix bus: volume gain, reverb send, EQ, and optional
+ * stereo panning / sidechain ducking. Built by `initAudio()` in `engine.ts`.
+ */
+export interface InstrumentBus {
+    /** Bus volume gain node — the bus input that the synth voices connect to. */
+    readonly gain: GainNode;
+    /** Reverb send gain node, tapped off `gain`. */
+    readonly reverb: GainNode;
+    /** Bus EQ entry node (highpass by default; per-instrument tone shaping follows). */
+    readonly eq: BiquadFilterNode;
+    /** Stereo panner — populated for chords and harmonies only, `null` otherwise. */
+    readonly panner: StereoPannerNode | null;
+    /** Sidechain ducking gain node — populated for bass only, `null` otherwise. */
+    readonly sidechain: GainNode | null;
+}
+
+/**
+ * The master output chain: every bus sums into `gain`, then runs
+ * `gain → saturator → limiter → destination`. `reverbNode` is the shared
+ * reverb return, fed via `reverbPreFilter`.
+ */
+export interface MasterChain {
+    /** Master volume gain node — every instrument bus sums here. */
+    readonly gain: GainNode;
+    /** Master soft-clipper / saturator. */
+    readonly saturator: WaveShaperNode;
+    /** Master safety limiter. */
+    readonly limiter: DynamicsCompressorNode;
+    /** The global reverb convolver. */
+    readonly reverbNode: ConvolverNode;
+    /** HPF/LPF pre-filter feeding the reverb (the node bus sends connect to). */
+    readonly reverbPreFilter: BiquadFilterNode;
+}
+
+/**
+ * The full Web Audio routing graph, built once by `initAudio()`. `null` until
+ * the audio context exists. Either fully populated or absent — never partial.
+ */
+export interface AudioGraph {
+    /** The master output / reverb-return chain. */
+    readonly master: MasterChain;
+    /** Per-instrument mix buses. */
+    readonly chords: InstrumentBus;
+    readonly bass: InstrumentBus;
+    readonly soloist: InstrumentBus;
+    readonly harmonies: InstrumentBus;
+    readonly drums: InstrumentBus;
+}
+
 export interface GlobalContext {
     /** The Web Audio API context. */
     readonly audio: AudioContext | null;
-    /** The master volume gain node. */
-    readonly masterGain: GainNode | null;
-    /** The master soft-clipper/saturator. */
-    readonly saturator: WaveShaperNode | null;
-    /** The master safety limiter. */
-    readonly masterLimiter: DynamicsCompressorNode | null;
-    /** The global reverb node. */
-    readonly reverbNode: ConvolverNode | null;
-    /** HPF for reverb cleaning. */
-    readonly reverbPreFilter: BiquadFilterNode | null;
-    /** The gain node for chords. */
-    readonly chordsGain: GainNode | null;
-    /** Reverb send for chords. */
-    readonly chordsReverb: GainNode | null;
-    /** EQ for chords (HP/Notch). */
-    readonly chordsEQ: BiquadFilterNode | null;
-    /** Stereo panner for chords. */
-    readonly chordsPanner: StereoPannerNode | null;
-    /** The gain node for drums. */
-    readonly drumsGain: GainNode | null;
-    /** HP/air EQ for drums bus. */
-    readonly drumsEQ: BiquadFilterNode | null;
-    /** Reverb send for drums. */
-    readonly drumsReverb: GainNode | null;
-    /** The gain node for bass. */
-    readonly bassGain: GainNode | null;
-    /** Reverb send for bass. */
-    readonly bassReverb: GainNode | null;
-    /** Sidechain ducking gain node for bass. */
-    readonly bassSidechain: GainNode | null;
-    /** EQ for bass (HPF/Notch). */
-    readonly bassEQ: BiquadFilterNode | null;
-    /** The gain node for soloist. */
-    readonly soloistGain: GainNode | null;
-    /** Reverb send for soloist. */
-    readonly soloistReverb: GainNode | null;
-    /** EQ for soloist (LPF/Shelf). */
-    readonly soloistEQ: BiquadFilterNode | null;
-    /** The gain node for harmonies. */
-    readonly harmoniesGain: GainNode | null;
-    /** Reverb send for harmonies. */
-    readonly harmoniesReverb: GainNode | null;
-    /** EQ for harmonies (HPF). */
-    readonly harmoniesEQ: BiquadFilterNode | null;
-    /** Stereo panner for harmonies. */
-    readonly harmoniesPanner: StereoPannerNode | null;
+    /** The full Web Audio routing graph (master chain + per-instrument buses), or `null` before `initAudio()` runs. */
+    readonly audioGraph: AudioGraph | null;
     /** Whether the sequencer is currently playing. */
     readonly isPlaying: boolean;
     /** Beats per minute (40-240). */

@@ -65,7 +65,7 @@ describe('Audio Recovery & Platform Integrity', () => {
         };
 
         playback.audio = mockAudioContext;
-        playback.masterGain = mockMasterGain;
+        playback.audioGraph = { master: { gain: mockMasterGain } };
     });
 
     afterEach(() => {

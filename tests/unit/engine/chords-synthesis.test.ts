@@ -49,7 +49,7 @@ vi.mock('../../../public/state.js', () => {
                 connect: vi.fn(),
             })),
         },
-        chordsGain: { connect: vi.fn() },
+        audioGraph: { chords: { gain: { connect: vi.fn() } } },
         sustainActive: false,
         heldNotes: new Set(),
     };

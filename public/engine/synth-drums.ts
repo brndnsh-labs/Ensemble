@@ -828,8 +828,8 @@ function playDrumSoundCurrent(
         panValue = (Math.random() * 2 - 1) * 0.25;
     }
     const panner = createSimplePanner(playback.audio, panValue, playTime);
-    if ((playback as any).drumsGain) {
-        panner.connect((playback as any).drumsGain);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
     }
 
     // Round-robin variation (±1.5%)
@@ -840,8 +840,8 @@ function playDrumSoundCurrent(
         const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
-        if ((playback as any).bassSidechain) {
-            duckGain((playback as any).bassSidechain.gain, 0.45, playTime, 0.005, 0.12);
+        if (playback.audioGraph?.bass.sidechain) {
+            duckGain(playback.audioGraph.bass.sidechain.gain, 0.45, playTime, 0.005, 0.12);
         }
 
         // 1. Beater Snap: Higher velocity = Sharper snap

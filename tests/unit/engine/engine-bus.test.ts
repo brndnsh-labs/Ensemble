@@ -55,14 +55,18 @@ describe('Engine Bus Management', () => {
             },
         };
 
+        const bus = () => ({ gain: mockGain, reverb: {}, eq: {}, panner: null, sidechain: null });
         state = {
             playback: {
                 audio: { currentTime: 10.0 },
-                chordsGain: mockGain,
-                bassGain: mockGain,
-                soloistGain: mockGain,
-                harmoniesGain: mockGain,
-                drumsGain: mockGain,
+                audioGraph: {
+                    master: {},
+                    chords: bus(),
+                    bass: bus(),
+                    soloist: bus(),
+                    harmonies: bus(),
+                    drums: bus(),
+                },
                 modals: {},
             },
             chords: { enabled: true, volume: 1.0 },

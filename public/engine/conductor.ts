@@ -179,47 +179,40 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     dispatch(ACTIONS.SET_PARAM, { module: 'bass', param: 'pocketOffset', value: targetBassPocket });
 
     // --- 5. Intensity-Aware Mix Shaping ---
-    if (playback.audio) {
+    if (playback.audio && playback.audioGraph) {
         const time = playback.audio.currentTime;
         const ramp = 0.5;
+        const graph = playback.audioGraph;
 
         // Master Limiter: Tighter at high intensity to glue the mix
-        if (playback.masterLimiter) {
-            const targetThreshold = -1.5 - intensity * 1.5; // Lower threshold (-1.5 to -3.0 dB)
-            const targetRatio = 4 + intensity * 4; // Transparent ratio (4:1 to 8:1)
-            const targetRelease = 0.08; // Fast release to avoid pumping
+        const limiter = graph.master.limiter;
+        const targetThreshold = -1.5 - intensity * 1.5; // Lower threshold (-1.5 to -3.0 dB)
+        const targetRatio = 4 + intensity * 4; // Transparent ratio (4:1 to 8:1)
+        const targetRelease = 0.08; // Fast release to avoid pumping
 
-            playback.masterLimiter.threshold.setTargetAtTime(targetThreshold, time, ramp);
-            playback.masterLimiter.ratio.setTargetAtTime(targetRatio, time, ramp);
-            playback.masterLimiter.release.setTargetAtTime(targetRelease, time, ramp);
-        }
+        limiter.threshold.setTargetAtTime(targetThreshold, time, ramp);
+        limiter.ratio.setTargetAtTime(targetRatio, time, ramp);
+        limiter.release.setTargetAtTime(targetRelease, time, ramp);
 
         // --- Pro Mix Spectral Slotting & Panning ---
-        if (playback.chordsEQ) {
-            playback.chordsEQ.frequency.setTargetAtTime(250, time, ramp);
+        graph.chords.eq.frequency.setTargetAtTime(250, time, ramp);
+        if (graph.chords.panner) {
+            graph.chords.panner.pan.setTargetAtTime(-0.2, time, ramp);
         }
-        if (playback.chordsPanner) {
-            playback.chordsPanner.pan.setTargetAtTime(-0.2, time, ramp);
+        graph.bass.eq.type = 'highpass'; // @direct-mutation
+        graph.bass.eq.frequency.setTargetAtTime(40, time, ramp);
+
+        graph.soloist.eq.type = 'highshelf'; // @direct-mutation
+        graph.soloist.eq.frequency.setTargetAtTime(8000, time, ramp);
+        graph.soloist.eq.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
+
+        graph.harmonies.eq.frequency.setTargetAtTime(300, time, ramp);
+        if (graph.harmonies.panner) {
+            graph.harmonies.panner.pan.setTargetAtTime(0.2, time, ramp);
         }
-        if (playback.bassEQ) {
-            playback.bassEQ.type = 'highpass'; // @direct-mutation
-            playback.bassEQ.frequency.setTargetAtTime(40, time, ramp);
-        }
-        if (playback.soloistEQ) {
-            playback.soloistEQ.type = 'highshelf'; // @direct-mutation
-            playback.soloistEQ.frequency.setTargetAtTime(8000, time, ramp);
-            playback.soloistEQ.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
-        }
-        if (playback.harmoniesEQ) {
-            playback.harmoniesEQ.frequency.setTargetAtTime(300, time, ramp);
-        }
-        if (playback.harmoniesPanner) {
-            playback.harmoniesPanner.pan.setTargetAtTime(0.2, time, ramp);
-        }
-        if (playback.reverbPreFilter) {
-            // Reverb Cleaning (Abbey Road)
-            playback.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
-        }
+
+        // Reverb Cleaning (Abbey Road)
+        graph.master.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
     }
 
     debounceSaveState();

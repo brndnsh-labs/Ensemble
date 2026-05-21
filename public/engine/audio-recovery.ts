@@ -117,10 +117,11 @@ class AudioHealthMonitor {
         console.log('[AudioWatchdog] Initiating Emergency DSP Reset...');
 
         // 1. Mute everything immediately to stop the static
-        if (playback.masterGain) {
+        if (playback.audioGraph) {
             try {
-                playback.masterGain.disconnect();
-                playback.masterGain.gain.value = 0; // @direct-mutation
+                const masterGain = playback.audioGraph.master.gain;
+                masterGain.disconnect();
+                masterGain.gain.value = 0; // @direct-mutation
             } catch {
                 /* ignore */
             }

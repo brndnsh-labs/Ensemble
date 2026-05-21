@@ -406,8 +406,8 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
     const osc = playback.audio.createOscillator();
     const gain = playback.audio.createGain();
     osc.connect(gain);
-    if (playback.masterGain) {
-        gain.connect(playback.masterGain);
+    if (playback.audioGraph) {
+        gain.connect(playback.audioGraph.master.gain);
     }
     const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
@@ -1146,8 +1146,8 @@ export function scheduleGlobalEvent(
         const osc = playback.audio.createOscillator();
         const g = playback.audio.createGain();
         osc.connect(g);
-        if (playback.masterGain) {
-            g.connect(playback.masterGain);
+        if (playback.audioGraph) {
+            g.connect(playback.audioGraph.master.gain);
         }
         osc.frequency.setValueAtTime(freq, swungTime);
         g.gain.setValueAtTime(0.15, swungTime);

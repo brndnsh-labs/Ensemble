@@ -89,7 +89,9 @@ function playSoloNoteCurrent(
 
     // Common output chain
     gain.connect(pan);
-    pan.connect((playback as any).soloistGain);
+    if (playback.audioGraph) {
+        pan.connect(playback.audioGraph.soloist.gain);
+    }
 
     // We store nodes in a single array for the utility to handle stopping/cleanup
     const voiceObj: SoloistVoice = { gain, time: playTime, duration, nodes: [gain, pan] };

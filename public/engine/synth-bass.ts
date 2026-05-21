@@ -176,8 +176,8 @@ function playBassNoteCurrent(
         growlGain.connect(mainGain);
 
         mainGain.connect(bodyEQ);
-        if (playback.bassGain) {
-            bodyEQ.connect(playback.bassGain);
+        if (playback.audioGraph) {
+            bodyEQ.connect(playback.audioGraph.bass.gain);
         }
 
         // Monophonic Note-Offs
