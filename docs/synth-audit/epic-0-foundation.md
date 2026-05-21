@@ -72,3 +72,4 @@ The #1 cross-cutting "toy" tell is velocity driving loudness but never brightnes
 - S1 (the voice control) and S2 (the reviewer) unblock everything — do them first, in either order. S1 is permanent UI, not throwaway scaffolding — Epic 6 S1 extends its `voice` field.
 - S3 should land before S4/S5 (they extend the graph); S6/S7 are independent helpers and can fan out after S1.
 - After this epic, do a full listening pass before starting Epic 1 — confirm the foundation feels right.
+- Deferred from S1: an e2e guard asserting bass's settings (the new gear button) are reachable. Small; fold into a future session.

@@ -24,6 +24,18 @@ A listener should think *"I can't believe there's nothing to download."* The cor
 
 `implement` → `/review` (`synth-graph-reviewer` for audio-graph hygiene; `state-discipline-reviewer` if state slices change) → **A/B audition by the owner through the Epic 0 S1 harness** → `done`. The listening gate is non-negotiable — no story is done until it has been heard against the old voice and approved.
 
+## Picking up in a new session
+
+This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — those skills are wired to the musical-audit track (`docs/audit/`) and will pick a musical story, not a synth one. Run the synth audit by hand:
+
+1. Read this file for the board; open the relevant `epic-<N>-<slug>.md` for the next story. A story with no **Status:** line is unshipped.
+2. Implement it. For a per-instrument voice story, fill in the `play<X>New` function in the relevant `synth-*.ts` — **never touch `play<X>Current`** (it is the bit-identical original and the `current` toggle position).
+3. Review the diff: `synth-graph-reviewer` for any synth/audio-graph change, `state-discipline-reviewer` if state slices changed.
+4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
+5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
+
+**Current position:** Epic 0 — S1 (voice A/B harness) + S2 (`synth-graph-reviewer`) shipped 2026-05-21. **Next: Epic 0 S3** (typed audio-graph refactor).
+
 ## The five cross-cutting themes
 
 The same handful of root causes produced "toy-ish" across every voice. Epic 0 attacks the shared ones; the per-instrument epics apply them locally.
