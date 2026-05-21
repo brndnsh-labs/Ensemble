@@ -1,6 +1,6 @@
 ---
 name: synth-graph-reviewer
-description: Use this agent when reviewing changes to audio synthesis code — the `public/engine/synth-*.ts` voices, `engine.ts` `initAudio()`, `synth-utils.ts` helpers, or the audio-graph wiring in `scheduler-core.ts`. Specializes in Web Audio graph hygiene: NaN/0 reaching `AudioParam`s, `AudioNode` leaks (created but never disconnected), `exponentialRampToValueAtTime` misuse (ramp from/to zero, missing anchor), envelope decay/release math that can go negative or zero, per-note allocation in hot paths, and UI-clock vs audio-clock scheduling. Invoke for: any synth-audit story that changes a voice or the shared audio graph, after `implement` and before the listening gate. Returns a prioritized list of findings with verbatim line quotes for hard-rule violations. Does NOT judge whether a sound is good — that is the owner's ear via the A/B harness.
+description: Use this agent when reviewing changes to audio synthesis code — the `public/engine/synth-*.ts` voices, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts` helpers, or the audio-graph wiring in `scheduler-core.ts`. Specializes in Web Audio graph hygiene: NaN/0 reaching `AudioParam`s, `AudioNode` leaks (created but never disconnected), `exponentialRampToValueAtTime` misuse (ramp from/to zero, missing anchor), envelope decay/release math that can go negative or zero, feedback-loop stability (self-oscillating reverbs/echoes, the Web Audio `Q`-in-dB trap, cross-coupled `DelayNode` cycles), per-note allocation in hot paths, and UI-clock vs audio-clock scheduling. Invoke for: any synth-audit story that changes a voice or the shared audio graph, after `implement` and before the listening gate. Returns a prioritized list of findings with verbatim line quotes for hard-rule violations. Does NOT judge whether a sound is good — that is the owner's ear via the A/B harness.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -50,6 +50,16 @@ Decay/release arithmetic that can go negative, zero, or past-scheduled:
 - Decay time-constants driven below the audible floor by stacked multipliers (the choked-hihat class — three independent shorteners multiplied, shipped in `synth-drums.ts`).
 - `osc.stop()` scheduled before the envelope has decayed → click.
 
+### FEEDBACK STABILITY (hard rule)
+
+Any `DelayNode` or `BiquadFilterNode` wired into a feedback loop — a reverb, echo, flanger, comb/allpass. The loop gain around every cycle must be provably below 1, at every frequency. The traps that cost ~2 days on the Epic 0 reverb:
+
+- **`BiquadFilterNode.Q` for `lowpass`/`highpass` is in DECIBELS**, not a linear quality factor (the coefficient math uses `10^(Q/20)`). `Q = 0` is already linear-Q 1.0 — a ~+1.25 dB resonant peak; a "small" positive `Q` like `0.2` still resonates *above unity gain*. A resonant filter inside a feedback loop pushes loop gain over 1 and the loop self-oscillates. A damping/tone filter in a loop must use `Q ≤ -3` dB. (For `peaking`/`notch`/`bandpass`, `Q` is linear; for shelves it is unused.) Confirm with `getFrequencyResponse` if unsure.
+- **Cross-coupled `DelayNode` feedback cycles are unstable under Chromium's Web Audio.** Multiple delay lines matrix-mixed so each feeds every other (a feedback-delay network) self-oscillate *regardless of provably sub-unity loop gain* — the math says stable, the renderer disagrees. Each `DelayNode` must sit in its own self-contained feedback loop, never matrix-mixed into a shared web. (This killed the first reverb; it shipped as a Schroeder/Freeverb of single-loop combs + series allpasses instead — see `public/engine/reverb.ts`.)
+- A feedback gain that can ramp or clamp to ≥ 1 — e.g. an RT60→gain formula (`10^(-3·delay/rt60)`) with no hard cap strictly below 1.
+
+Verify: trace every cycle in the diff; for each, the product of gains around it stays < 1 at every frequency. The cheap repro for any doubt is an `OfflineAudioContext` impulse render (see `tests/e2e/reverb-stability.spec.ts`).
+
 ### CLOCK
 
 Scheduling against `Date.now()` / `performance.now()` / a UI clock instead of `playback.audio.currentTime`. All audio scheduling must derive from the audio context clock. A `play*` function should compute `Math.max(time, ctx.currentTime)` and schedule from there.
@@ -75,8 +85,8 @@ Style-level: misleading parameter names (a `setTargetAtTime` time-constant named
 
 Findings as a prioritized list. For each:
 
-- **Severity:** one of the tags above (`NAN INTO AUDIOPARAM` / `NODE LEAK` / `RAMP MISUSE` / `ENVELOPE MATH` / `CLOCK` / `DEAD NODE / PER-NOTE ALLOC` / `NIT`).
-- **Location:** `file:line` — for hard-rule violations (`NAN INTO AUDIOPARAM`, `NODE LEAK`) quote the offending line verbatim (smallest spanning snippet, ≤3 lines).
+- **Severity:** one of the tags above (`NAN INTO AUDIOPARAM` / `NODE LEAK` / `RAMP MISUSE` / `ENVELOPE MATH` / `FEEDBACK STABILITY` / `CLOCK` / `DEAD NODE / PER-NOTE ALLOC` / `NIT`).
+- **Location:** `file:line` — for hard-rule violations (`NAN INTO AUDIOPARAM`, `NODE LEAK`, `FEEDBACK STABILITY`) quote the offending line verbatim (smallest spanning snippet, ≤3 lines).
 - **What:** one sentence stating the hygiene rule being broken.
 - **Why it matters:** the concrete failure mode — silently dropped voice, CPU creep to crackle, click on attack, note that never sounds, GC stutter. Be specific.
 - **Suggested direction:** the fix in words (e.g. "add `panner` to the `safeDisconnect` list in this branch"). Not a code patch — the main thread implements.
