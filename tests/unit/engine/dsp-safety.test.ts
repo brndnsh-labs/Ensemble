@@ -74,6 +74,16 @@ describe('DSP & Signal Safety', () => {
                 type: 'lowpass',
             }));
             this.createConvolver = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
+            this.createDelay = vi.fn().mockImplementation(() => ({
+                connect: vi.fn(),
+                delayTime: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            }));
+            this.createOscillator = vi.fn().mockImplementation(() => ({
+                connect: vi.fn(),
+                frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                start: vi.fn(),
+                stop: vi.fn(),
+            }));
             this.createBuffer = vi.fn(() => ({
                 getChannelData: vi.fn(() => new Float32Array(1024)),
             }));

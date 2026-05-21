@@ -1,11 +1,10 @@
 /* eslint-disable */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
     calculateTimingOffset,
     clampFreq,
     compressSections,
-    createReverbImpulse,
     createSoftClipCurve,
     decompressSections,
     formatUnicodeSymbols,
@@ -20,37 +19,6 @@ import {
 
 describe('Utility Functions', () => {
     describe('DSP Utility Functions', () => {
-        let mockAudioCtx: any;
-
-        beforeEach(() => {
-            mockAudioCtx = {
-                sampleRate: 44100,
-                createBuffer: vi.fn((channels, length, sampleRate) => ({
-                    numberOfChannels: channels,
-                    length,
-                    sampleRate,
-                    _data: Array.from({ length: channels }, () => new Float32Array(length)),
-                    getChannelData(channel: number) {
-                        return this._data[channel];
-                    },
-                })),
-            };
-        });
-
-        it('should correctly generate a reverb impulse', () => {
-            const impulse = createReverbImpulse(mockAudioCtx, 1.0, 2.0);
-
-            expect(mockAudioCtx.createBuffer).toHaveBeenCalledWith(2, 44100, 44100);
-            expect(impulse.numberOfChannels).toBe(2);
-            expect(impulse.length).toBe(44100);
-            expect(impulse.sampleRate).toBe(44100);
-
-            // Check that the data is populated
-            const channelData = impulse.getChannelData(0);
-            expect(channelData[0]).not.toBeNaN();
-            expect(channelData[44099]).toBeCloseTo(0, 4); // Should decay towards 0
-        });
-
         it('should create and cache a soft clip curve', () => {
             const curve1 = createSoftClipCurve();
             expect(curve1).toBeInstanceOf(Float32Array);

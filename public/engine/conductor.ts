@@ -5,6 +5,14 @@ import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { generateProceduralFill } from './fills.js';
+import { REVERB_PRESETS } from './reverb.js';
+
+/**
+ * Genres that get the lush hall reverb preset; everything else gets the tight
+ * room. Slow, open, harmonically rich styles want a long tail — punchy,
+ * percussive styles want the groove to stay articulate.
+ */
+const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic', 'Minimal']);
 
 type Dispatch = (action: any, payload?: any) => void;
 
@@ -213,6 +221,11 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
 
         // Reverb Cleaning (Abbey Road)
         graph.master.reverbPreFilter.frequency.setTargetAtTime(600, time, ramp);
+
+        // Per-genre reverb space: a lush hall for slow, open genres; a tight
+        // room for punchy, percussive ones so the groove stays articulate.
+        const reverbPreset = HALL_GENRES.has(genre) ? REVERB_PRESETS.hall : REVERB_PRESETS.room;
+        graph.master.reverb.applyPreset(reverbPreset, time);
     }
 
     debounceSaveState();

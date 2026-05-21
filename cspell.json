@@ -277,7 +277,12 @@
         "hihats",
         "waveshaper",
         "preemption",
-        "AUDIOPARAM"
+        "AUDIOPARAM",
+        "Freeverb",
+        "Moorer",
+        "Schroeder",
+        "allpass",
+        "allpasses"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

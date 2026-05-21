@@ -645,58 +645,6 @@ export function safeDisconnect(nodes: AudioNode[]): void {
     });
 }
 
-/**
- * Creates an algorithmic reverb impulse response with pre-delay, early reflections,
- * and a true exponential diffuse tail. The 0–15ms gap before the first reflection
- * acts as a natural pre-delay, giving a sense of room distance.
- */
-export function createReverbImpulse(
-    audioCtx: AudioContext,
-    duration = 2.0,
-    decay = 2.0,
-): AudioBuffer {
-    const sampleRate = audioCtx.sampleRate;
-    const length = Math.ceil(sampleRate * duration);
-    const impulse = audioCtx.createBuffer(2, length, sampleRate);
-
-    // Sparse early reflections 15–75ms — give sense of room dimension.
-    const earlyTimes = [0.015, 0.023, 0.031, 0.043, 0.057, 0.074];
-    const earlyAmps = [0.58, 0.48, 0.4, 0.3, 0.2, 0.13];
-
-    // Diffuse tail begins after early reflections settle
-    const tailStart = Math.floor(sampleRate * 0.082);
-
-    for (let channel = 0; channel < 2; channel++) {
-        const data = impulse.getChannelData(channel);
-
-        // Early reflections with per-channel ±1ms jitter for stereo width
-        for (let r = 0; r < earlyTimes.length; r++) {
-            const jitter = (Math.random() - 0.5) * 0.002;
-            const idx = Math.floor(sampleRate * (earlyTimes[r] + jitter));
-            if (idx >= 0 && idx < length) {
-                const amp = earlyAmps[r] * (0.9 + Math.random() * 0.2);
-                data[idx] += amp;
-                if (idx + 1 < length) {
-                    data[idx + 1] += amp * 0.25;
-                }
-                if (idx + 2 < length) {
-                    data[idx + 2] += amp * 0.08;
-                }
-            }
-        }
-
-        // Diffuse tail: exponential decay normalized over the tail length
-        const tailLength = length - tailStart;
-        const rtDecay = 10 + (decay - 2) * 2;
-        for (let i = tailStart; i < length; i++) {
-            const t = (i - tailStart) / tailLength; // 0..1 over tail
-            data[i] = (Math.random() * 2 - 1) * Math.exp(-rtDecay * t) * 0.65;
-        }
-    }
-
-    return impulse;
-}
-
 const REGEX_SHARP = /#/g;
 const REGEX_FLAT1 = /([A-G])b/g;
 const REGEX_FLAT2 = /b(?=[0-9IVivm\-/])/g;

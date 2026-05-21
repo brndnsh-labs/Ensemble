@@ -1,9 +1,16 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import type { GlobalContext } from '../state/playback.js';
-import type { AudioGraph, EnsembleState, InstrumentBus, Mutable } from '../types.js';
-import { createReverbImpulse, createSoftClipCurve } from '../utils.js';
+import type {
+    AlgorithmicReverb,
+    AudioGraph,
+    EnsembleState,
+    InstrumentBus,
+    Mutable,
+} from '../types.js';
+import { createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
+import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
 import {
@@ -87,7 +94,7 @@ export function initAudio(
         let masterGain: GainNode | null = null;
         let saturator: WaveShaperNode | null = null;
         let masterLimiter: DynamicsCompressorNode | null = null;
-        let reverbNode: ConvolverNode | null = null;
+        let reverb: AlgorithmicReverb | null = null;
         let reverbPreFilter: BiquadFilterNode | null = null;
         const buses: Partial<Record<string, InstrumentBus>> = {};
 
@@ -143,9 +150,10 @@ export function initAudio(
         }
 
         if (playback.audio && masterGain) {
-            reverbNode = playback.audio.createConvolver();
-            reverbNode.buffer = createReverbImpulse(playback.audio, 1.5, 3.0);
-            reverbNode.connect(masterGain);
+            // Algorithmic reverb (Schroeder/Freeverb), replacing the old static
+            // white-noise convolver. Same input/output node contract.
+            reverb = createAlgorithmicReverb(playback.audio, REVERB_PRESETS.hall);
+            reverb.output.connect(masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---
             const reverbHPF = playback.audio.createBiquadFilter();
@@ -157,7 +165,7 @@ export function initAudio(
             reverbLPF.frequency.setValueAtTime(6000, playback.audio.currentTime);
 
             reverbHPF.connect(reverbLPF);
-            reverbLPF.connect(reverbNode);
+            reverbLPF.connect(reverb.input);
             reverbPreFilter = reverbHPF;
         }
 
@@ -303,8 +311,8 @@ export function initAudio(
             gainNode.connect(reverbGain);
             if (reverbPreFilter) {
                 reverbGain.connect(reverbPreFilter);
-            } else if (reverbNode) {
-                reverbGain.connect(reverbNode);
+            } else if (reverb) {
+                reverbGain.connect(reverb.input);
             }
 
             buses[m.name] = {
@@ -321,7 +329,7 @@ export function initAudio(
             masterGain &&
             saturator &&
             masterLimiter &&
-            reverbNode &&
+            reverb &&
             reverbPreFilter &&
             buses.chords &&
             buses.bass &&
@@ -334,7 +342,7 @@ export function initAudio(
                     gain: masterGain,
                     saturator,
                     limiter: masterLimiter,
-                    reverbNode,
+                    reverb,
                     reverbPreFilter,
                 },
                 chords: buses.chords,

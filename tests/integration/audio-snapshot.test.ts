@@ -130,6 +130,18 @@ describe('Audio Engine Snapshot Regression', () => {
                 buffer: null,
                 connect: () => {},
             }),
+            createDelay: () => {
+                const id = `delay_${audioLog.length}`;
+                return {
+                    connect: (dest) => audioLog.push(`${id}.connect(${dest.id || 'node'})`),
+                    delayTime: {
+                        value: 0,
+                        setValueAtTime: () => {},
+                        setTargetAtTime: () => {},
+                    },
+                    id,
+                };
+            },
             createPeriodicWave: () => ({}),
             destination: { id: 'destination' },
         };

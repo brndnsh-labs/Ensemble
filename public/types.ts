@@ -879,9 +879,40 @@ export interface InstrumentBus {
 }
 
 /**
+ * One preset for the algorithmic reverb: `size` scales the comb delay lengths,
+ * `rt60` is the -60 dB decay time in seconds, `damping` is the comb lowpass
+ * cutoff in Hz (a darker tail uses a lower cutoff).
+ */
+export interface ReverbPreset {
+    readonly size: number;
+    readonly rt60: number;
+    readonly damping: number;
+}
+
+/**
+ * The shared algorithmic (Schroeder/Freeverb) reverb. Exposes `input` and
+ * `output` `AudioNode`s — a drop-in replacement for the old convolver — plus
+ * real-time setters that morph the space. Built in `public/engine/reverb.ts`.
+ */
+export interface AlgorithmicReverb {
+    /** Node bus sends connect here (downstream of the pre-filter). */
+    readonly input: AudioNode;
+    /** Wet output — connects to the master gain. */
+    readonly output: AudioNode;
+    /** Set the -60 dB decay time in seconds, ramped from `when`. */
+    setDecay(rt60: number, when: number): void;
+    /** Scale the comb delay lengths (room size), ramped from `when`. */
+    setSize(scale: number, when: number): void;
+    /** Set the comb damping lowpass cutoff in Hz, ramped from `when`. */
+    setDamping(cutoffHz: number, when: number): void;
+    /** Apply size + decay + damping from a preset in one call. */
+    applyPreset(preset: ReverbPreset, when: number): void;
+}
+
+/**
  * The master output chain: every bus sums into `gain`, then runs
- * `gain → saturator → limiter → destination`. `reverbNode` is the shared
- * reverb return, fed via `reverbPreFilter`.
+ * `gain → saturator → limiter → destination`. `reverb` is the shared reverb
+ * return, fed via `reverbPreFilter`.
  */
 export interface MasterChain {
     /** Master volume gain node — every instrument bus sums here. */
@@ -890,8 +921,8 @@ export interface MasterChain {
     readonly saturator: WaveShaperNode;
     /** Master safety limiter. */
     readonly limiter: DynamicsCompressorNode;
-    /** The global reverb convolver. */
-    readonly reverbNode: ConvolverNode;
+    /** The shared algorithmic reverb (replaces the old static convolver). */
+    readonly reverb: AlgorithmicReverb;
     /** HPF/LPF pre-filter feeding the reverb (the node bus sends connect to). */
     readonly reverbPreFilter: BiquadFilterNode;
 }

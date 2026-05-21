@@ -77,7 +77,6 @@ vi.mock('../../../public/config.js', () => ({
 // Mock Utils
 vi.mock('../../../public/utils.js', () => ({
     safeDisconnect: vi.fn(),
-    createReverbImpulse: vi.fn(() => ({})),
     createSoftClipCurve: vi.fn(() => new Float32Array(1024)),
 }));
 
@@ -103,10 +102,13 @@ describe('Mix & Signal Integrity Audit', () => {
             ratio: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             attack: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             release: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-            frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-            Q: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            delayTime: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            Q: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             type: '',
             reduction: { value: 0 },
+            start: vi.fn(),
+            stop: vi.fn(),
         };
     }
 
@@ -127,6 +129,8 @@ describe('Mix & Signal Integrity Audit', () => {
             this.createWaveShaper = vi.fn().mockImplementation(createMockNode);
             this.createDynamicsCompressor = vi.fn().mockImplementation(createMockNode);
             this.createConvolver = vi.fn().mockImplementation(createMockNode);
+            this.createDelay = vi.fn().mockImplementation(createMockNode);
+            this.createOscillator = vi.fn().mockImplementation(createMockNode);
             this.createBiquadFilter = vi.fn().mockImplementation(createMockNode);
             this.createBuffer = vi.fn(() => ({
                 getChannelData: vi.fn(() => new Float32Array(1024)),

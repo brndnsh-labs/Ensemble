@@ -75,6 +75,16 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
                     reduction: { value: 0 },
                 }));
                 this.createConvolver = vi.fn(() => ({ connect: vi.fn(), buffer: null }));
+                this.createDelay = vi.fn(() => ({
+                    connect: vi.fn(),
+                    delayTime: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                }));
+                this.createOscillator = vi.fn(() => ({
+                    connect: vi.fn(),
+                    frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                    start: vi.fn(),
+                    stop: vi.fn(),
+                }));
                 this.createStereoPanner = vi.fn(() => ({
                     connect: vi.fn(),
                     pan: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },

@@ -241,7 +241,7 @@ describe('Conductor Logic', () => {
                         ratio: { setTargetAtTime: vi.fn() },
                         release: { setTargetAtTime: vi.fn() },
                     },
-                    reverbNode: {},
+                    reverb: { applyPreset: vi.fn() },
                     reverbPreFilter: { frequency: { setTargetAtTime: vi.fn() } },
                 },
                 chords: bus(),
