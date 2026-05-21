@@ -82,6 +82,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
+| `public/engine/hash-utils.ts` | Canonical deterministic hash helpers shared across engines. | `scrambleHash`, `stringHash33`, `stringHash31` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/soloist-pitch-engine.ts` | Advanced melodic pitch selection. | `selectPitchAndDevices` |
 | `public/engine/soloist-rhythm-engine.ts` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |

@@ -2,6 +2,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
+import { scrambleHash, stringHash31 } from './hash-utils.js';
 import {
     getBassSpaceFloor,
     getNearestVoiceLeadingCost,
@@ -321,11 +322,10 @@ function hashSectionId(sectionId: string | null | undefined): number {
     if (!sectionId) {
         return 0;
     }
-    let h = 0;
-    for (let i = 0; i < sectionId.length; i++) {
-        h = (h * 31 + sectionId.charCodeAt(i)) | 0;
-    }
-    return Math.abs(h);
+    // djb2 ×31-from-0 (stringHash31, canonical helper) folded to non-negative.
+    // why: kept on the ×31 variant — accompaniment cell-bank picks depend on
+    // this exact distribution; switching to the ×33 section hash would shift it.
+    return Math.abs(stringHash31(sectionId));
 }
 
 function averageMidi(midis: number[]): number {
@@ -1590,17 +1590,8 @@ export function getAccompanimentNotes(
     const compPhraseIndex = Math.floor(compBarIndex / COMP_PHRASE_BARS);
     const compBarInPhrase = compBarIndex % COMP_PHRASE_BARS;
     const compSectionIdHash = hashSectionId(chord.sectionId || '');
-    // mulberry32 — 32-bit scrambled hash. Inlined here (rather than imported)
-    // to mirror the local-copy convention bass-engine.ts and groove-engine.ts
-    // already use (`scrambleHash`); a cross-file refactor of the helper is
-    // tracked separately in the deterministic-phrasing epic.
-    const compScrambleHash = (seed: number): number => {
-        let t = (seed + 0x6d2b79f5) | 0;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-    };
-    const compTargetSeed = compScrambleHash(
+    // mulberry32 — canonical scrambleHash helper (hash-utils.ts).
+    const compTargetSeed = scrambleHash(
         (compSectionIdHash ^
             (compSectionOccurrence * 0x9e3779b1) ^
             (compPhraseIndex * 0x85ebca77)) |

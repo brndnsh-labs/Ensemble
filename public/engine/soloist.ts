@@ -28,9 +28,12 @@ type PhraseResponseSource = 'free' | 'form' | 'seed' | 'section' | 'recent';
 // but still drew from un-seeded Math.random(), so the same (barIndex,
 // sectionId) replayed a different jitter sequence on every engine run —
 // looped playback drifted and critique tests couldn't assert determinism.
-// Identical to scrambleHash in bass-engine.ts (S4) / harmonies.ts (S5) /
-// groove-engine.ts; copied locally to avoid a cross-file helper refactor in
-// this story. A bare LCG correlates on small integer seeds — mulberry32's
+// Byte-identical to the canonical `scrambleHash` in engine/hash-utils.ts
+// (Epic 11 S9). Kept as a local copy on purpose: migrating soloist's draw
+// sites is deferred to FOLLOWUPS §F (the soloist-picker scrambleHash
+// migration, its own opus story) — S9 did not touch the soloist to avoid
+// disturbing the seeded streams S10 had just stabilized.
+// A bare LCG correlates on small integer seeds — mulberry32's
 // avalanche keeps adjacent (barIndex, sectionId) seeds well-separated.
 const scrambleHash = (seed: number): number => {
     let t = (seed + 0x6d2b79f5) | 0;

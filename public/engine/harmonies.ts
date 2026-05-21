@@ -3,6 +3,7 @@ import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
+import { scrambleHash } from './hash-utils.js';
 import {
     isTensionChordQuality,
     shouldPreferGroundedPracticeVoicing,
@@ -13,20 +14,6 @@ import { getWorkerState } from './worker-orchestrator.js';
 /**
  * HARMONIES.JS (v3 - Behavioral Strategy Architecture)
  */
-
-// mulberry32 — 32-bit scrambled hash. Replaces raw Math.random() at per-step
-// decision sites so antiphonal response, reinforcement, and timing-jitter are
-// deterministic and reproducible across loops (epic-deterministic-phrasing S5).
-// DO NOT use a simple LCG on small integer seeds; mulberry32 scrambles small
-// linear inputs into well-distributed uint32 outputs.
-// why: identical to the scrambleHash in bass-engine.ts (S4); copied as a
-// local to avoid a cross-file refactor in this story.
-const scrambleHash = (seed: number): number => {
-    let t = (seed + 0x6d2b79f5) | 0;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-};
 
 interface TimeSignatureConfig {
     beats: number;

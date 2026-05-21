@@ -1,5 +1,6 @@
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
 /**
@@ -403,17 +404,6 @@ export function getBassNote(
     const beatsInChord = Math.round(chord.beats);
     const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
 
-    // --- Shared seeded RNG (used by both Imperfect Symmetry and withOctaveJump) ---
-    // mulberry32 — 32-bit scrambled hash. Hoisted up here so the result() wrapper
-    // (defined just below) can apply Imperfect-Symmetry post-processing without
-    // duplicating the hash function.
-    const scrambleHash = (seed: number): number => {
-        let t = (seed + 0x6d2b79f5) | 0;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-    };
-
     // --- Imperfect Symmetry: per-phrase octave displacement on repeat passes ---
     // why: epic-form-arrangement S2 — when a section repeats (Verse 2 vs Verse 1),
     // the bass would otherwise produce an identical line, making the band sound
@@ -442,12 +432,10 @@ export function getBassNote(
     const sectionOccurrence: number = context?.stepCoordination?.sectionOccurrence ?? 1;
     const isRepeatPass = sectionOccurrence >= 2;
     // Hash the sectionId (string) into a 32-bit int so different sections of the
-    // same occurrence-index get different phrase-target patterns. Cheap djb2.
+    // same occurrence-index get different phrase-target patterns. Cheap djb2
+    // (×33-from-5381) — canonical helper, see hash-utils.ts.
     const sectionIdStr: string = (chord as any)?.sectionId || '';
-    let sectionIdHash = 5381 | 0;
-    for (let i = 0; i < sectionIdStr.length; i++) {
-        sectionIdHash = (Math.imul(sectionIdHash, 33) + sectionIdStr.charCodeAt(i)) | 0;
-    }
+    const sectionIdHash = stringHash33(sectionIdStr);
     const PHRASE_BARS = 4; // why: standard 4-bar phrase in pop/rock/jazz.
     const phraseIndex = Math.floor(barIndexEarly / PHRASE_BARS);
     const barInPhrase = barIndexEarly % PHRASE_BARS;

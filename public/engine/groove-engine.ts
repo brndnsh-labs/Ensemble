@@ -21,6 +21,7 @@ import * as rock from './grooves/rock.js';
 import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG } from './grooves/utils.js';
+import { scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 
 const strategies: Record<string, any> = {
     Jazz: jazz,
@@ -52,18 +53,6 @@ function getStrategy(groove: any): any {
 
     return strategies[groove.genreFeel] || null;
 }
-
-// mulberry32 — 32-bit scrambled hash for deterministic velocity humanization.
-// why: bare Math.random() in humanizeVelocity makes drum velocities flake across
-// loops and critique-test runs (drums.md P2 #15 / epic-deterministic-phrasing S5).
-// Identical to scrambleHash in bass-engine.ts (S4) + harmonies.ts (S5); copied
-// locally to avoid cross-file refactor in this story.
-const scrambleHash = (seed: number): number => {
-    let t = (seed + 0x6d2b79f5) | 0;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-};
 
 function humanizeVelocity(vel: number, seed: number, amount = 0.05): number {
     return vel * (1.0 + (scrambleHash(seed) - 0.5) * amount);
@@ -442,20 +431,16 @@ export function applyGrooveOverrides(
         // candidates are the 13 remaining 16th positions per bar.
         const FOUNDATIONAL_STEPS_4_4 = new Set([0, 4, 12]);
         if (!FOUNDATIONAL_STEPS_4_4.has(loopStep)) {
-            // Hash sectionId string (djb2) for stable per-section variation.
+            // Hash sectionId string (djb2 ×33-from-5381) for stable per-section
+            // variation — canonical helper, see hash-utils.ts.
             const sectionIdStr: string = sectionIdFromTick || sectionId || '';
-            let sectionIdHash = 5381 | 0;
-            for (let i = 0; i < sectionIdStr.length; i++) {
-                sectionIdHash = (Math.imul(sectionIdHash, 33) + sectionIdStr.charCodeAt(i)) | 0;
-            }
+            const sectionIdHash = stringHash33(sectionIdStr);
             // why: also fold the instrument name so Snare and HiHat each get
             // their own target step within the bar — otherwise both lanes
-            // would permute on the same 16th, doubling the gesture.
-            let instNameHash = 0;
-            const instName: string = inst.name ?? '';
-            for (let c = 0; c < instName.length; c++) {
-                instNameHash = (instNameHash * 31 + instName.charCodeAt(c)) | 0;
-            }
+            // would permute on the same 16th, doubling the gesture. djb2
+            // ×31-from-0 variant (stringHash31) — kept distinct from the
+            // section hash so this lane's seeded distribution is unchanged.
+            const instNameHash = stringHash31(inst.name ?? '');
             // why: a bare djb-style polynomial hash of short instrument names
             // ("Snare" vs "HiHat") leaves the low bits poorly distributed, so
             // the XOR below can correlate adjacent lanes. Run it through the
@@ -584,11 +569,8 @@ export function applyGrooveOverrides(
         // jitter is independent but reproducible. Folding the full string is
         // required because charCodeAt(0) alone collides on real lane pairs:
         // Clave/Conga (C), HiHat/HighTom (H), Snare/Shaker (S) — see S5 review P1.
-        let nameHash = 0;
-        const name = inst.name ?? '';
-        for (let c = 0; c < name.length; c++) {
-            nameHash = (nameHash * 31 + name.charCodeAt(c)) | 0;
-        }
+        // djb2 ×31-from-0 (stringHash31) — preserves this site's prior output.
+        const nameHash = stringHash31(inst.name ?? '');
         const humanSeed = step * 41 + nameHash * 7;
         currentState.velocity = humanizeVelocity(currentState.velocity, humanSeed, jitterAmount);
     }
