@@ -29,10 +29,10 @@ Three kinds of item:
   **Listen for:** the accent should be a trashy *China* cymbal, not a Crash. **Also note the China's loudness relative to the Crash** — this is the input to decision **B4** below.
   Result: ☐ sounds right ☐ regression — file in FOLLOWUPS
 
-- [ ] **A4. Soloist engine determinism migration** *(Epic 12 S1)*
+- [x] **A4. Soloist engine determinism migration** *(Epic 12 S1)*
   Genre: any soloist-forward style. Play a few choruses, ideally looping.
   **Listen for:** the soloist migrated from un-seeded `Math.random()` to deterministic `scrambleHash` seeding. The line should sound exactly as musical as before — not more mechanical or repetitive (looped passages especially), and not more random. Critique tests confirm no statistical drift; this is the by-ear sanity check.
-  Result: ☐ sounds right ☐ regression — file in FOLLOWUPS
+  Result: ☑ sounds right — verified 2026-05-20.
 
 ---
 
