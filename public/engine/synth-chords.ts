@@ -94,7 +94,17 @@ interface PlayNoteOptions {
     numVoices?: number;
 }
 
-export function playNote(
+// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
+// instrument's `voice` setting; `*New` is a placeholder until Epic 2 fills it in.
+export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
+    (args[0].chords.voice === 'new' ? playNoteNew : playNoteCurrent)(...args);
+}
+
+function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
+    playNoteCurrent(...args);
+}
+
+function playNoteCurrent(
     state: EnsembleState,
     freq: number,
     time: number,

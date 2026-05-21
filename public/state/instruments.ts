@@ -35,6 +35,7 @@ export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
 
 export const chords = deepSignal<ChordState>({
     enabled: true,
+    voice: 'current',
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
@@ -49,6 +50,7 @@ export const chords = deepSignal<ChordState>({
 
 export const bass = deepSignal<BassState>({
     enabled: true,
+    voice: 'current',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
     lastFreq: null,
@@ -64,6 +66,7 @@ export const bass = deepSignal<BassState>({
 export const soloist = deepSignal<SoloistState>({
     // === Configuration (persisted) ===
     enabled: false,
+    voice: 'current',
     preset: 'trumpet',
     mode: 'monophonic',
     style: 'smart',
@@ -153,6 +156,7 @@ export const soloist = deepSignal<SoloistState>({
 
 export const harmony = deepSignal<HarmonyState>({
     enabled: false,
+    voice: 'current',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
     buffer: new Map(),
@@ -341,14 +345,17 @@ export function instrumentReducer(action: Action): boolean {
             c.instrument = 'Clean';
             c.octave = 65;
             c.density = 'standard';
+            c.voice = 'current';
 
             b.enabled = true;
             b.volume = 1.0;
             b.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
             b.octave = 38;
             b.style = 'smart';
+            b.voice = 'current';
 
             s.enabled = false;
+            s.voice = 'current';
             s.preset = 'trumpet';
             s.volume = 1.0;
             s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
@@ -434,6 +441,7 @@ export function instrumentReducer(action: Action): boolean {
             h.octave = 60;
             h.style = 'smart';
             h.complexity = 0.5;
+            h.voice = 'current';
             return true;
         }
         case ACTIONS.SET_STYLE:
@@ -463,6 +471,16 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_SOLOIST_PRESET:
             s.preset = action.payload;
             return true;
+        case ACTIONS.SET_INSTRUMENT_VOICE: {
+            // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap
+            // covers groove too, so this one case handles all five modules.
+            const target = instrumentStateMap[action.payload.module];
+            if (target) {
+                target.voice = action.payload.voice;
+                return true;
+            }
+            break;
+        }
         case ACTIONS.RESET_SESSION:
             (s.session as Mutable<typeof s.session>).sessionSteps = 0;
             return true;

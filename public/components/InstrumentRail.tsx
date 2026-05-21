@@ -110,10 +110,6 @@ function getStudioState(enabled: boolean, tradeMode: string | undefined, module:
     };
 }
 
-function hasStudioInstrumentControls(module: StudioInstrumentModule) {
-    return module !== 'bass';
-}
-
 interface StudioSurfaceProps {
     accent: string;
     anchorElement?: HTMLElement | null;
@@ -669,7 +665,7 @@ export function InstrumentRail({ orientation = 'vertical' }: InstrumentRailProps
 
                             delete rowElementsRef.current[instrument.module];
                         }}
-                        showSettings={hasStudioInstrumentControls(instrument.module)}
+                        showSettings={true}
                         triggerRef={(node) => {
                             if (node) {
                                 settingsTriggerRef.current[instrument.module] = node;

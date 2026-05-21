@@ -33,7 +33,17 @@ export function killSoloistNote(state: EnsembleState): void {
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
  */
-export function playSoloNote(
+// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
+// instrument's `voice` setting; `*New` is a placeholder until Epic 3 fills it in.
+export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): void {
+    (args[0].soloist.voice === 'new' ? playSoloNoteNew : playSoloNoteCurrent)(...args);
+}
+
+function playSoloNoteNew(...args: Parameters<typeof playSoloNoteCurrent>): void {
+    playSoloNoteCurrent(...args);
+}
+
+function playSoloNoteCurrent(
     state: EnsembleState,
     freq: number,
     time: number,

@@ -188,9 +188,19 @@ export interface PocketState {
     soloistGravity: number;
 }
 
+/**
+ * Which synthesis implementation an instrument uses. `current` is the
+ * original voice; `new` is the synth-audit reworked voice. The per-instrument
+ * settings toggle switches between them for A/B audition. Extended by
+ * synth-audit Epic 6 with `pack:<id>` values for sample packs.
+ */
+export type InstrumentVoice = 'current' | 'new';
+
 export interface GrooveState {
     /** Whether the drum engine is active. */
     readonly enabled: boolean;
+    /** Which synthesis voice this instrument uses (synth-audit A/B). */
+    readonly voice: InstrumentVoice;
     /** List of drum instruments. */
     readonly instruments: Instrument[];
     /** Volume level. */
@@ -264,6 +274,8 @@ export interface GrooveState {
 export interface ChordState {
     /** Whether the accompanist is active. */
     readonly enabled: boolean;
+    /** Which synthesis voice this instrument uses (synth-audit A/B). */
+    readonly voice: InstrumentVoice;
     /** The comping style ('smart', 'pad', etc). */
     readonly style: string;
     /** Output gain multiplier. */
@@ -289,6 +301,8 @@ export interface ChordState {
 export interface BassState {
     /** Whether the bass engine is active. */
     readonly enabled: boolean;
+    /** Which synthesis voice this instrument uses (synth-audit A/B). */
+    readonly voice: InstrumentVoice;
     /** Volume level. */
     readonly volume: number;
     /** Reverb level. */
@@ -732,6 +746,8 @@ export interface SoloistState {
 
     /** Whether the soloist is active. */
     readonly enabled: boolean;
+    /** Which synthesis voice this instrument uses (synth-audit A/B). */
+    readonly voice: InstrumentVoice;
     /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
     readonly preset: string;
     /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
@@ -779,6 +795,8 @@ export interface SoloistState {
 export interface HarmonyState {
     /** Whether the harmony engine is active. */
     readonly enabled: boolean;
+    /** Which synthesis voice this instrument uses (synth-audit A/B). */
+    readonly voice: InstrumentVoice;
     /** Volume level. */
     readonly volume: number;
     /** Reverb level. */
@@ -1064,6 +1082,11 @@ export interface ActionPayloadSetReverb {
     value: number;
 }
 
+export interface ActionPayloadSetInstrumentVoice {
+    module: 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+    voice: InstrumentVoice;
+}
+
 export interface ActionPayloadSetModalOpen {
     modal: keyof ModalsState;
     open: boolean;
@@ -1248,6 +1271,7 @@ export interface ActionPayloadMap {
     SET_SOLOIST_MODE: string;
     SET_SOLOIST_SEED: string;
     SET_SOLOIST_PRESET: string;
+    SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
     SET_SWING_SUB: string;
@@ -1326,6 +1350,7 @@ export const ACTIONS = {
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
     SET_SOLOIST_PRESET: 'SET_SOLOIST_PRESET',
+    SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 
     // --- Groove / Drums ---

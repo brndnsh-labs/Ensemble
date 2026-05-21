@@ -32,6 +32,7 @@ export function saveCurrentState(): void {
         mixerVersion: MIXER_SETTINGS_VERSION,
         chords: {
             enabled: chords.enabled,
+            voice: chords.voice,
             style: chords.style,
             instrument: (chords as any).instrument,
             octave: chords.octave,
@@ -41,6 +42,7 @@ export function saveCurrentState(): void {
         },
         bass: {
             enabled: bass.enabled,
+            voice: bass.voice,
             style: bass.style,
             octave: bass.octave,
             volume: bass.volume,
@@ -48,6 +50,7 @@ export function saveCurrentState(): void {
         },
         soloist: {
             enabled: soloist.enabled,
+            voice: soloist.voice,
             style: soloist.style,
             preset: soloist.preset,
             octave: soloist.octave,
@@ -57,6 +60,7 @@ export function saveCurrentState(): void {
         },
         harmony: {
             enabled: harmony.enabled,
+            voice: harmony.voice,
             style: harmony.style,
             octave: harmony.octave,
             volume: harmony.volume,
@@ -65,6 +69,7 @@ export function saveCurrentState(): void {
         },
         groove: {
             enabled: groove.enabled,
+            voice: groove.voice,
             volume: groove.volume,
             reverb: groove.reverb,
             swing: groove.swing,

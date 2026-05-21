@@ -35,7 +35,17 @@ export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05) {
     killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
-export function playHarmonyNote(
+// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
+// instrument's `voice` setting; `*New` is a placeholder until Epic 1 fills it in.
+export function playHarmonyNote(...args: Parameters<typeof playHarmonyNoteCurrent>): void {
+    (args[0].harmony.voice === 'new' ? playHarmonyNoteNew : playHarmonyNoteCurrent)(...args);
+}
+
+function playHarmonyNoteNew(...args: Parameters<typeof playHarmonyNoteCurrent>): void {
+    playHarmonyNoteCurrent(...args);
+}
+
+function playHarmonyNoteCurrent(
     state: EnsembleState,
     freq: number,
     time: number,

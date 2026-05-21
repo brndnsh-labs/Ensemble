@@ -23,7 +23,17 @@ const mixState = {
 /**
  * P-Bass Synthesis: Layered physical model
  */
-export function playBassNote(
+// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
+// instrument's `voice` setting; `*New` is a placeholder until Epic 5 fills it in.
+export function playBassNote(...args: Parameters<typeof playBassNoteCurrent>): void {
+    (args[0].bass.voice === 'new' ? playBassNoteNew : playBassNoteCurrent)(...args);
+}
+
+function playBassNoteNew(...args: Parameters<typeof playBassNoteCurrent>): void {
+    playBassNoteCurrent(...args);
+}
+
+function playBassNoteCurrent(
     state: EnsembleState,
     freq: number,
     time: number,

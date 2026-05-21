@@ -778,7 +778,17 @@ const mixState: DrumMixState = {
  * @param time - Start time in seconds.
  * @param velocity - Note velocity (0.0 - 1.0).
  */
-export function playDrumSound(
+// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
+// drum module's `voice` setting; `*New` is a placeholder until Epic 4 fills it in.
+export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
+    (args[0].groove.voice === 'new' ? playDrumSoundNew : playDrumSoundCurrent)(...args);
+}
+
+function playDrumSoundNew(...args: Parameters<typeof playDrumSoundCurrent>): void {
+    playDrumSoundCurrent(...args);
+}
+
+function playDrumSoundCurrent(
     state: EnsembleState,
     name: string,
     time: number,

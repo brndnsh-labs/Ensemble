@@ -30,10 +30,6 @@ function getModuleName(module: StudioInstrumentModule) {
             : module;
 }
 
-function hasInstrumentSpecificSettings(module: StudioInstrumentModule) {
-    return module !== 'bass';
-}
-
 function getInstrumentSpecificTitle(module: StudioInstrumentModule) {
     return module === 'groove'
         ? 'Feel & Actions'
@@ -212,12 +208,28 @@ interface InstrumentSpecificSettingsProps {
 export function InstrumentSpecificSettings({ module }: InstrumentSpecificSettingsProps) {
     const state = getInstrumentState(module);
 
-    if (!state || !hasInstrumentSpecificSettings(module)) {
+    if (!state) {
         return null;
     }
 
     return (
         <SettingGroup title={getInstrumentSpecificTitle(module)}>
+            {/* synth-audit Epic 0 S1 — A/B voice toggle, present for every instrument. */}
+            <SettingRow label="New Sound" id={`${getModuleName(module)}VoiceToggle`}>
+                <Toggle
+                    id={`${getModuleName(module)}VoiceToggle`}
+                    checked={state.voice === 'new'}
+                    ariaLabel={`${getModuleName(module)} new sound`}
+                    onChange={(val) => {
+                        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
+                            module,
+                            voice: val ? 'new' : 'current',
+                        });
+                        saveCurrentState();
+                    }}
+                />
+            </SettingRow>
+
             {module === 'chords' && (
                 <SettingRow label="Density" id="densitySelect">
                     <Select
@@ -333,11 +345,7 @@ export function InstrumentSettings({ module }: InstrumentSettingsProps) {
     return (
         <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
             <InstrumentSpecificSettings module={module} />
-            <InstrumentMixerSettings
-                module={module}
-                title="Mixer"
-                className={hasInstrumentSpecificSettings(module) ? 'divider-top' : ''}
-            />
+            <InstrumentMixerSettings module={module} title="Mixer" className="divider-top" />
         </div>
     );
 }
