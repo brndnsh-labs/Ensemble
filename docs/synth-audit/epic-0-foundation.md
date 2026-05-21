@@ -15,11 +15,19 @@ This epic is run **semi-manually** — `/cycle` and friends are coupled to the m
 
 ## Stories
 
-### S1. A/B audition harness
-There is no way to compare a new voice against the old one today. Build a per-instrument A/B switch: each `synth-*.ts` voice can run either its "current" or "new" implementation, toggled at runtime. Surface it as a temporary dev-only control (a small panel, gated behind a flag or `data-e2e-mode`-style guard so it never ships to end users). State for the toggle goes through `dispatch` like any other UI state.
+### S1. Per-instrument voice control (A/B audition harness)
+There is no way to compare a new voice against the old one today. Build a per-instrument voice switch: each `synth-*.ts` voice can run either its `current` or `new` implementation, selected at runtime.
 
-**Acceptance:** the owner can switch any one instrument between old/new synthesis mid-playback and hear the difference immediately, without a reload. Old voices remain bit-identical when the toggle is "current."
-**Effort:** ~5h. **Model:** opus (architecture — where the seam lives so per-voice swaps are clean). **Reviewer:** state-discipline-reviewer (new UI state). **Source:** owner request; `EPICS.md` Definition of Done.
+Surface it as a **visible control in each instrument's settings panel** — not a dev-only panel. This is deliberate: the same control is the precursor to the Epic 6 voice selector (synth vs. sample pack), so it is permanent UI, not scaffolding.
+
+Design constraints:
+- **State is a voice identifier, not a boolean.** Model the field as `voice: 'current' | 'new'`, through `dispatch` like any other UI state, persisted so it survives a reload. Epic 6 extends the same field with `'pack:<id>'` values — no migration, no boolean→enum rename later (CLAUDE.md "split labels from logic"). The settings UI can be a plain checkbox for now; the key underneath is the enum.
+- **`new` is the whole instrument's audited voice**, not per-story. Each later Epic-N story builds onto that instrument's `new` path; the user toggles the instrument as a unit. Mid-epic `new` is partially built — expected.
+- **Bass needs a settings entry point.** Bass has no settings panel today — add a settings button bringing it to parity with the other instruments. Folded in here as a sub-task, not a separate story.
+- `current` must remain bit-identical to today's output.
+
+**Acceptance:** every instrument (including bass) has a visible settings control to switch between `current` and `new` synthesis; the change takes effect mid-playback without a reload; the choice persists across reloads; `current` output is bit-identical to pre-epic. State uses a `voice` identifier, not a boolean.
+**Effort:** ~6h. **Model:** opus (architecture — where the synth seam lives so per-voice swaps are clean; bass settings panel). **Reviewer:** state-discipline-reviewer (new persisted UI state). **Source:** owner request; `EPICS.md` Definition of Done.
 
 ### S2. Build the `synth-graph-reviewer` agent
 Discovery already surfaced three audio-graph hygiene bugs (panner leak, overpromised NaN guards, unconnected node). Create a `synth-graph-reviewer` agent definition analogous to `state-discipline-reviewer`, seeded from `feedback_synth_audio_graph.md` and the §5 hygiene findings across all six reports. Its checklist: `0*NaN` / NaN into `AudioParam`s, node leaks (created but never `disconnect()`-ed), `exponentialRampToValueAtTime` misuse (ramp from/to 0, no anchor), decay/release math that can go negative or zero, UI-clock vs audio-clock scheduling.
@@ -59,6 +67,6 @@ The #1 cross-cutting "toy" tell is velocity driving loudness but never brightnes
 
 ## Notes
 
-- S1 and S2 are tooling and unblock everything — do them first, in either order.
+- S1 (the voice control) and S2 (the reviewer) unblock everything — do them first, in either order. S1 is permanent UI, not throwaway scaffolding — Epic 6 S1 extends its `voice` field.
 - S3 should land before S4/S5 (they extend the graph); S6/S7 are independent helpers and can fan out after S1.
 - After this epic, do a full listening pass before starting Epic 1 — confirm the foundation feels right.

@@ -15,6 +15,8 @@ This epic is **last** on purpose: packs are upside, not a crutch. The core synth
 ### S1. Instrument-source indirection registry
 Synthesis selection is hardcoded today (`scheduleChords` hardcodes `instrument || 'Piano'`; `INSTRUMENT_PRESETS` is a static export). Build an instrument registry: each voice resolves to either a synth function *or* a sample buffer, decided at resolution time. This is the seam that makes graceful synth-fallback clean when a pack isn't installed.
 
+This **extends the Epic 0 S1 `voice` field** rather than introducing a parallel mechanism — `voice` already ranges over `'current' | 'new'`; this story adds `'pack:<id>'` values and the registry that resolves any of them. The per-instrument settings control from S1 becomes the pack picker.
+
 **Acceptance:** every instrument routes through the registry; with no packs installed, output is bit-identical to pre-epic (synth path). `npm run typecheck` green.
 **Effort:** ~6h. **Model:** opus (architecture). **Reviewer:** synth-graph-reviewer + state-discipline-reviewer. **Source:** `shared.md` §6 blocker 1.
 
