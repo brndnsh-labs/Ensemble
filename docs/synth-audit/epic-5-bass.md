@@ -42,6 +42,8 @@ The comment at `synth-bass.ts:111` claims a guard the code doesn't deliver — `
 **Acceptance:** a NaN `bandIntensity` cannot reach a filter `AudioParam`. Comment matches behavior. `synth-graph-reviewer` clean.
 **Effort:** ~1h. **Model:** sonnet (concrete guard). **Reviewer:** synth-graph-reviewer. **Source:** `bass.md` §5.
 
+**Status:** Shipped 2026-05-22. Sanctioned exception to the "don't touch Current" rule (acceptance criterion explicitly targets a defensive-code bug inside `playBassNoteCurrent`; production audio is bit-identical because `bandIntensity` is always finite there). Sanitize at the source — `bandIntensity = Number.isFinite(playback.bandIntensity) ? playback.bandIntensity : 0` — so `growlBase`/`growlDepth` and the downstream `Math.max(0, …)` see a finite value and a NaN cannot reach `lp1.frequency.setValueAtTime`. The misleading "Guard against 0 * NaN" comment was replaced by one that honestly names the trap (`Math.max(0, NaN) === NaN`) and the sink. synth-graph-reviewer clean (0 P0/P1/P2). Owner confirmed Current sounds unchanged.
+
 ### S5. Per-note humanization
 The only per-note variation is a ±5% amplitude wobble. Wire the bass into the Epic 0 S6 humanization helper for subtle per-note timbre/timing/detune variation (tight profile — bass is a steady instrument).
 

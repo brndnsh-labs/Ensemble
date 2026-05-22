@@ -355,9 +355,14 @@ function playBassNoteCurrent(
         lp1.type = lp2.type = 'lowpass';
 
         const midi = 12 * Math.log2(freq / 440) + 69;
-        const growlBase = 200 + midi * 5 + playback.bandIntensity * 400;
-        const growlDepth = 1200 * (0.5 + playback.bandIntensity * 1.0);
-        // Guard against 0 * NaN = NaN when bandIntensity is undefined (e.g. tests)
+        // `playback.bandIntensity` is always finite in production but can be
+        // undefined in tests (and then `undefined * 400 === NaN`). The downstream
+        // `Math.max(0, …)` cannot sanitize NaN — `Math.max(0, NaN) === NaN` —
+        // so a NaN would reach `lp1.frequency.setValueAtTime` below. Sanitize
+        // at the source instead; the 0 fallback gives a sensible neutral cutoff.
+        const bandIntensity = Number.isFinite(playback.bandIntensity) ? playback.bandIntensity : 0;
+        const growlBase = 200 + midi * 5 + bandIntensity * 400;
+        const growlDepth = 1200 * (0.5 + bandIntensity * 1.0);
         const cutoff =
             muteAmount >= 1
                 ? 300
