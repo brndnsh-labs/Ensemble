@@ -263,6 +263,9 @@ function attachVibrato(
     voiceObj: SoloistVoice,
     osc1: OscillatorNode,
     osc2: OscillatorNode,
+    outputGain: GainNode,
+    vol: number,
+    filterFreq: AudioParam | null,
 ): void {
     if (isSoloistPianoMode(state.soloist.mode)) {
         return;
@@ -274,6 +277,9 @@ function attachVibrato(
         playTime,
         duration,
         style,
+        outputGain,
+        vol,
+        filterFreq,
         vibratoFlag,
     );
     vibrato.connect(vibGain);
@@ -378,8 +384,6 @@ function playTrumpet(
         isSoloistPianoMode(soloist.mode),
     );
 
-    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
-
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
     // a harder note opens the lowpass and lifts the bell formant, and the
     // whole-band intensity sets the brightness floor. Current voice keeps the
@@ -423,6 +427,24 @@ function playTrumpet(
     if (isNewVoice && duration > 0.5) {
         attachCutoffLfo(ctx, filter.frequency, sustainCutoff * 0.13, playTime, duration, voiceObj);
     }
+
+    // Coupled vibrato (epic-3-soloist S4) — attached after the filter exists
+    // so the LFO can also wobble the cutoff.
+    attachVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+        voiceObj,
+        osc1,
+        osc2,
+        outputGain,
+        vol,
+        filter.frequency,
+    );
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -490,8 +512,6 @@ function playSaxophone(
         isSoloistPianoMode(soloist.mode),
     );
 
-    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
-
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
     // digging in (per-note accent or whole-band intensity) pushes the sax
     // formants upward — a real embouchure/intensity behavior, reedier not just
@@ -529,6 +549,23 @@ function playSaxophone(
     if (isNewVoice && duration > 0.5) {
         attachCutoffLfo(ctx, f2.frequency, 200, playTime, duration, voiceObj);
     }
+
+    // Coupled vibrato (epic-3-soloist S4) — cutoff tap drives the bright formant.
+    attachVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+        voiceObj,
+        osc1,
+        osc2,
+        outputGain,
+        vol,
+        f2.frequency,
+    );
 
     osc1.connect(f1);
     osc2.connect(f1);
@@ -630,8 +667,6 @@ function playNeoJuno(
         isSoloistPianoMode(soloist.mode),
     );
 
-    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
-
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
     // a harder note (or higher band intensity) opens the lowpass; Current
     // voice keeps freq-only cutoffs.
@@ -654,6 +689,24 @@ function playNeoJuno(
     if (isNewVoice && duration > 0.5) {
         attachCutoffLfo(ctx, filter.frequency, freq * 0.3, playTime, duration, voiceObj);
     }
+
+    // Coupled vibrato (epic-3-soloist S4) — attached after the filter exists
+    // so the LFO can also wobble the cutoff.
+    attachVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+        voiceObj,
+        osc1,
+        osc2,
+        outputGain,
+        vol,
+        filter.frequency,
+    );
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -720,8 +773,6 @@ function playVowel(
         isSoloistPianoMode(soloist.mode),
     );
 
-    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
-
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
     // digging in (per-note accent or whole-band intensity) pushes the vowel
     // formant upward so hard notes open up. Current voice keeps the fixed
@@ -743,6 +794,24 @@ function playVowel(
     if (isNewVoice && duration > 0.5) {
         attachCutoffLfo(ctx, filter.frequency, 130, playTime, duration, voiceObj);
     }
+
+    // Coupled vibrato (epic-3-soloist S4) — attached after the filter exists
+    // so the LFO can also wobble the cutoff.
+    attachVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+        voiceObj,
+        osc1,
+        osc2,
+        outputGain,
+        vol,
+        filter.frequency,
+    );
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -802,8 +871,6 @@ function playShred(
         isSoloistPianoMode(soloist.mode),
     );
 
-    attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
-
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
     // a harder pick attack (or higher band intensity) opens the lowpass;
     // Current voice keeps the freq-only cutoff.
@@ -822,6 +889,24 @@ function playShred(
     if (isNewVoice && duration > 0.5) {
         attachCutoffLfo(ctx, filter.frequency, freq * 0.6, playTime, duration, voiceObj);
     }
+
+    // Coupled vibrato (epic-3-soloist S4) — attached after the filter exists
+    // so the LFO can also wobble the cutoff.
+    attachVibrato(
+        state,
+        ctx,
+        freq,
+        playTime,
+        duration,
+        style,
+        vibratoFlag,
+        voiceObj,
+        osc1,
+        osc2,
+        outputGain,
+        vol,
+        filter.frequency,
+    );
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -897,6 +982,9 @@ function createVibrato(
     time: number,
     duration: number,
     style: string,
+    outputGain: GainNode,
+    vol: number,
+    filterFreq: AudioParam | null,
     forceVibrato: boolean = false,
 ): VibratoNodes {
     const { soloist, playback } = state;
@@ -957,6 +1045,10 @@ function createVibrato(
         depthFactor *= 1.5;
     }
 
+    // epic-3-soloist S4 — widen the timid ~±14c pitch depth toward ±18c so the
+    // vibrato has presence; the coupled amp/cutoff taps below give it body.
+    depthFactor *= 1.3;
+
     vibrato.frequency.setValueAtTime(vibSpeed, time);
 
     const vibGain = ctx.createGain();
@@ -979,12 +1071,47 @@ function createVibrato(
     depthMod.connect(depthModGain);
     depthModGain.connect(vibGain.gain as any);
 
-    if ((duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode)) {
+    const vibRuns = (duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode);
+    if (vibRuns) {
         vibrato.start(time);
         vibrato.stop(time + duration + 0.2);
         depthMod.start(time + vibDelay);
         depthMod.stop(time + duration + 0.2);
     }
 
-    return { vibrato, vibGain, depthModNodes: [depthMod, depthModGain] };
+    // epic-3-soloist S4 — coupled vibrato: tap the same LFO into amplitude and
+    // filter cutoff so the wobble moves pitch, loudness, and timbre together
+    // (real vibrato is a 3-way correlated wobble, not a thin pitch waver).
+    // Both depths ramp in on the same delay/shape as the pitch depth, and both
+    // gains land in depthModNodes so the existing voiceObj cleanup covers them.
+    const couplingNodes: AudioNode[] = [];
+    if (vibRuns) {
+        const rampEnd = time + vibDelay + (isLongNote ? 0.35 : 0.18);
+
+        // Amplitude tremolo — small, correlated with the pitch rise.
+        const ampDepthGain = ctx.createGain();
+        ampDepthGain.gain.setValueAtTime(0, time);
+        ampDepthGain.gain.setValueAtTime(0, time + vibDelay);
+        ampDepthGain.gain.linearRampToValueAtTime(Math.max(0.0001, vol * 0.04), rampEnd);
+        vibrato.connect(ampDepthGain);
+        ampDepthGain.connect(outputGain.gain as any);
+        couplingNodes.push(ampDepthGain);
+
+        // Timbral wobble — correlated cutoff movement on the voice's filter.
+        if (filterFreq) {
+            const cutoffDepthGain = ctx.createGain();
+            cutoffDepthGain.gain.setValueAtTime(0, time);
+            cutoffDepthGain.gain.setValueAtTime(0, time + vibDelay);
+            cutoffDepthGain.gain.linearRampToValueAtTime(Math.max(1, freq * 0.05), rampEnd);
+            vibrato.connect(cutoffDepthGain);
+            cutoffDepthGain.connect(filterFreq);
+            couplingNodes.push(cutoffDepthGain);
+        }
+    }
+
+    return {
+        vibrato,
+        vibGain,
+        depthModNodes: [depthMod, depthModGain, ...couplingNodes],
+    };
 }
