@@ -48,3 +48,12 @@ The soloist is the **strongest pack candidate** of any voice — *and* the one w
 No threat. ~23.8 KB source, zero asset imports. The only buffer is the procedurally-generated shared noise buffer. Adding reverb (a small FDN) + LFO/humanization code adds ~3–8 KB. Spend freely on synthesis quality here.
 
 **Bottom line:** The soloist isn't broken — it's a competent two-osc subtractive lead. It reads as "toy" for three concrete reasons: (1) frozen sustains — no timbral movement once the attack settles; (2) velocity drives loudness only, never brightness; (3) zero per-note timbral variation. Fix those three plus add a shared reverb and the synth-lead presets reach "expensive." Realistic acoustic trumpet/sax remain future pack territory.
+
+## 7. Epic 3 resolution notes (2026-05-22)
+
+Epic 3 shipped all 7 stories — the §3 quick wins and deep rework (1)–(8). Two findings refined the discovery premises during the work:
+
+- **The dead legato branch's attack was *inverted*, not just dead (S1).** `isLegato` was hardcoded `false` at the scheduler, so the legato branch never ran — but its internal tuning was also wrong: legato set a *sharper* attack (5 ms) than non-legato (20 ms), the opposite of a slur. A dead branch's constants are unaudited guesses; waking it (§3 item 6) required fixing the attack sign, not just the wiring.
+- **velocity→cutoff coupling needed band-intensity coupling too (S2).** The §3-item-(1) coupling was correct, but the soloist's per-note velocity only picks up `intensity * 0.08` from the band-intensity knob — so the owner's natural test (sweep the intensity slider) showed almost no brightness change. The shipped `soloistBrightnessDrive` blends per-note velocity *and* band intensity.
+
+Hygiene note §5's "vibrato exponential-from-zero" (the bend ramp in `applyPitchEnvelope`) was **not** addressed by Epic 3 — still open if it ever matters.
