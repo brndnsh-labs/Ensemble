@@ -50,6 +50,8 @@ Three concrete items from `harmony.md` §5–§6: (a) remove the dead `tremoloGa
 **Acceptance:** `tremoloGain` gone; organ curve built once and cached; no uncaught `exponentialRamp` throw paths. `synth-graph-reviewer` clean.
 **Effort:** ~3h. **Model:** sonnet (concrete cleanup). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §5, §6.
 
+**Status:** Shipped 2026-05-21. Removed the dead `tremoloGain` node (allocated + tracked for cleanup but never connected), cached the organ WaveShaper saturation curve (`getOrganSaturationCurve` — was rebuilding a 44100-sample `Float32Array` per organ note), and guarded the slide and organ key-click `exponentialRampToValueAtTime` paths against zero anchors/targets (`freq > 0` / `finalVol > 0`). All sound-preserving. `synth-graph-reviewer` clean (P0: 0, P1: 0). Reviewer flagged a latent out-of-scope P1 — the "Bloom" filter ramps can throw at `freq === 0` since `clampFreq` floors at 0 — captured as a follow-up in `harmony.md` §5 for the S1 rebuild. typecheck/Biome/jscpd green, harmony synthesis + legato tests pass (21/21). Owner auditioned (no audible change confirmed) and approved.
+
 ## Notes
 
 - **Sequencing (synth-cycle triage, 2026-05-21):** Epic 1 is a *rebuild*, so S1–S4 are **not** independent — they all build one `playHarmonyNoteNew` body and must run **sequentially in order**: S1 stands the voice up, S2 adds the envelope, S3/S4 add the named formant presets. Each is independently auditable (the `new` voice gets progressively better). S5 (bus EQ — `engine.ts` mix-side, applies to `current` too) and S6 (hygiene on the current code) are genuinely independent — run them first as low-risk warmups, in any order. **Revised order: S6 → S5 → S1 → S2 → S3 → S4.**

@@ -10,6 +10,32 @@ import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 const HARMONY_VOICE_LIMIT_FADE = 0.02;
 
 /**
+ * The organ saturator's soft-clip curve is a pure function of a fixed drive
+ * constant (k = 2) — it does not vary per note. Building the 44100-sample
+ * Float32Array on every organ note (the old inline IIFE) was wasted work in
+ * the audio hot path; cache it once on first use. Mirrors `cachedShaperCurve`
+ * in synth-chords.ts — but unlike that one, no drive-keyed invalidation is
+ * needed: `k` is a compile-time constant, so the curve never changes.
+ * Sound-preserving — the curve values are byte-identical to the old IIFE.
+ */
+let cachedOrganCurve: Float32Array<ArrayBuffer> | null = null;
+
+function getOrganSaturationCurve(): Float32Array<ArrayBuffer> {
+    if (cachedOrganCurve) {
+        return cachedOrganCurve;
+    }
+    const n = 44100;
+    const curve = new Float32Array(n);
+    const k = 2; // soft-clip drive for the organ saturator
+    for (let i = 0; i < n; ++i) {
+        const x = (i * 2) / n - 1;
+        curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    cachedOrganCurve = curve;
+    return curve;
+}
+
+/**
  * Same-pitch retriggers are common in funk and horn writing. Crossfade them instead of
  * hard-choking the old voice so repeated hits can re-articulate without zipper-like clicks.
  */
@@ -226,7 +252,6 @@ function playHarmonyNoteCurrent(
     let lfo: OscillatorNode | null = null;
     let lfoGain: GainNode | null = null;
     let tremoloLfo: OscillatorNode | null = null;
-    let tremoloGain: GainNode | null = null;
     let fifthOsc: OscillatorNode | null = null;
     let click: OscillatorNode | null = null;
     let clickGain: GainNode | null = null;
@@ -243,16 +268,7 @@ function playHarmonyNoteCurrent(
                   ? 6.2
                   : 0.7 + ((intensityForLeslie - 0.4) / 0.2) * 5.5;
         saturator = playback.audio.createWaveShaper();
-        saturator.curve = (() => {
-            const n = 44100;
-            const curve = new Float32Array(n);
-            const k = 2;
-            for (let i = 0; i < n; ++i) {
-                const x = (i * 2) / n - 1;
-                curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
-            }
-            return curve;
-        })();
+        saturator.curve = getOrganSaturationCurve();
         voiceNodes.push(saturator);
 
         lfo = playback.audio.createOscillator();
@@ -269,17 +285,20 @@ function playHarmonyNoteCurrent(
         voiceNodes.push(lfo, lfoGain);
 
         tremoloLfo = playback.audio.createOscillator();
-        tremoloGain = playback.audio.createGain();
         tremoloLfo.type = 'sine';
         tremoloLfo.frequency.setValueAtTime(leslieSpeed, playTime);
+        // The Leslie tremolo is applied as an additive a-rate modulation on
+        // gain.gain via `tremAmp` (the gain envelope is the DC term, ±tremDepth
+        // is the swing). The old `tremoloGain` node held a `1 - tremDepth`
+        // offset but was never connected into the graph — pure dead allocation,
+        // removed. Sound is unchanged.
         const tremDepth = 0.2;
-        tremoloGain.gain.setValueAtTime(1.0 - tremDepth, playTime);
         const tremAmp = playback.audio.createGain();
         tremAmp.gain.setValueAtTime(tremDepth, playTime);
         tremoloLfo.connect(tremAmp);
         tremAmp.connect(gain.gain);
         tremoloLfo.start(playTime);
-        voiceNodes.push(tremoloLfo, tremoloGain, tremAmp);
+        voiceNodes.push(tremoloLfo, tremAmp);
     } else if (vibrato && (vibrato.rate || 0) > 0 && (vibrato.depth || 0) > 0) {
         lfo = playback.audio.createOscillator();
         lfoGain = playback.audio.createGain();
@@ -332,7 +351,11 @@ function playHarmonyNoteCurrent(
             voiceNodes.push(subGain);
         }
 
-        if (!retriggerProfile?.suppressClick) {
+        // why: the click ramp is `exponentialRampToValueAtTime`, which throws if
+        // it ramps *from* a zero anchor. The anchor here is `finalVol * 0.6`, so
+        // skip the click entirely when `finalVol` is 0 (a silent note has no
+        // audible key-click to render anyway).
+        if (!retriggerProfile?.suppressClick && finalVol > 0) {
             click = playback.audio.createOscillator();
             clickGain = playback.audio.createGain();
             click.type = 'square';
@@ -408,7 +431,12 @@ function playHarmonyNoteCurrent(
     }
 
     // Slides
-    if (slideInterval !== 0 && slideDuration > 0) {
+    // why: the slide ramps oscillator frequency with `exponentialRampToValueAtTime`,
+    // which throws on a zero/non-finite target or anchor. `freq` is finite-checked
+    // at entry but could still be 0; require `freq > 0` so both endpoints
+    // (`startFreq` and `freq`) are strictly positive. A non-positive freq falls
+    // through to the plain `setValueAtTime` path below (no exponential ramp).
+    if (slideInterval !== 0 && slideDuration > 0 && freq > 0) {
         const startFreq = freq * 2 ** (slideInterval / 12);
         osc1.frequency.setValueAtTime(startFreq, playTime);
         osc2.frequency.setValueAtTime(startFreq, playTime);

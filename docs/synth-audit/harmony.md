@@ -44,6 +44,7 @@ One monolithic `playHarmonyNote()` (38–569) does everything. Per-note graph:
 - **Release math can schedule in the past** (528): for pad styles `release = 0.5` while `duration` can be ~0.125s — start time `playTime - 0.375`. Legal but means short pad notes never reach `finalVol` before decay starts — a contributor to the weak pad sound.
 - **`tremoloGain` is created but never connected** (262–272) — allocated, given a value, pushed to `voiceNodes`, never wired into the graph. Dead node.
 - Scheduling clock correct; node cleanup correct but fragile (hangs off `osc1.onended`).
+- **Follow-up (found during S6, out of S6 scope):** the "Bloom" filter ramps (`filter.frequency.exponentialRampToValueAtTime` for stabs/plucks/disco/pad) target `clampFreq(freq * N)`, and `clampFreq` floors at **0**, not a positive value. If `freq === 0` reaches the voice (entry only checks `Number.isFinite`, not `> 0`), the target is 0 and the ramp throws. Latent P1 — fold into the S1 voice rebuild (the rebuilt voice should reject non-positive `freq` at entry), or fix `clampFreq` to floor at a small positive value.
 
 ## 6. Footprint
 
