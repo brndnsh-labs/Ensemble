@@ -51,7 +51,7 @@ function playBassNoteNew(
     muteAmount = 0,
     bendStartInterval = 0,
 ): void {
-    const { playback, bass } = state;
+    const { playback, bass, groove } = state;
     if (!playback.audio || !playback.audioGraph) {
         return;
     }
@@ -81,10 +81,11 @@ function playBassNoteNew(
 
         // The whole point of the New voice: velocity → timbre, not just level.
         // Convex curve (1.6) keeps soft notes round and dark; hard notes bloom.
+        // `timbre.brightness` (curve-shaped velocity, 0..1) drives the lowpass
+        // cutoff, the saturation pre-gain, and the impact transient below.
         const timbre = velocityTimbre(velocity, {
             curve: 1.6,
             cutoffRange: [0.4, 1.5],
-            driveRange: [0.1, 0.9],
         });
 
         const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - muteAmount * 0.85);
@@ -119,14 +120,23 @@ function playBassNoteNew(
         lp.frequency.setValueAtTime(Math.max(80, baseCutoff * timbre.cutoffMult), startTime);
         lp.Q.setValueAtTime(1.1, startTime);
 
+        // The sawtooth is the *grit* layer — and it deliberately bypasses the
+        // saturator below. Soft-clipping a sawtooth is what made the New voice
+        // buzzy/synthy ("sounds like a saw synth bass even at low intensity" —
+        // S2 listening gate); kept un-clipped and just low-passed it reads as
+        // string grit, not a synth lead. Its level is convex in velocity, so a
+        // soft pluck is almost pure sine body and only a hard note brings the
+        // grit forward.
         const sawGain = audio.createGain();
-        sawGain.gain.setValueAtTime(0.4, startTime);
+        sawGain.gain.setValueAtTime(0.15 + timbre.brightness * 0.3, startTime);
         saw.connect(lp);
         lp.connect(sawGain);
 
-        const mix = audio.createGain();
-        sub.connect(mix);
-        sawGain.connect(mix);
+        // `bodyMix` sums only the sine layers (fundamental + sub-octave below)
+        // — the round body that the saturator colors. The saw joins downstream,
+        // post-saturator.
+        const bodyMix = audio.createGain();
+        sub.connect(bodyMix);
 
         // --- Layer 0: sub-octave sine (the weight) ---
         // A real P-Bass DI carries deliberate energy an octave below the
@@ -154,16 +164,25 @@ function playBassNoteNew(
         subGain.gain.setValueAtTime(0.34, startTime);
         subOct.connect(subLp);
         subLp.connect(subGain);
-        subGain.connect(mix);
+        subGain.connect(bodyMix);
 
-        // --- Velocity-driven saturation: a hotter pre-gain into a fixed
-        // soft-clip means a harder note picks up more harmonics. ---
+        // --- Velocity-driven saturation (sine body only) --------------------
+        // A hotter pre-gain into the fixed soft-clip means a harder note picks
+        // up more harmonics — warm, even-order coloration of the round sine
+        // body (the saw grit bypasses this entirely, see above). The drive is
+        // *extra*-convex (brightness², on top
+        // of the curve-1.6 brightness) so soft and medium plucks sit near unity
+        // pre-gain — clean and round, like the `current` voice — and only a
+        // genuine hard dig-in (≳0.8 velocity) blooms toward the ~2.6× ceiling.
+        // Tuned down from a near-linear `1 + drive*2.5` after the S1 listening
+        // gate flagged the New voice as too aggressive on soft/medium notes.
+        const driveAmount = timbre.brightness * timbre.brightness;
         const driveGain = audio.createGain();
-        driveGain.gain.setValueAtTime(1 + timbre.drive * 2.5, startTime);
+        driveGain.gain.setValueAtTime(1 + driveAmount * 1.6, startTime);
         const shaper = audio.createWaveShaper();
         shaper.curve = createSoftClipCurve();
         shaper.oversample = '4x';
-        mix.connect(driveGain);
+        bodyMix.connect(driveGain);
         driveGain.connect(shaper);
 
         // --- Amp envelope: fast attack, a short decay to a sustain, release ---
@@ -177,7 +196,39 @@ function playBassNoteNew(
         amp.gain.setTargetAtTime(vol * 0.45, startTime + 0.04, 0.12);
         amp.gain.setTargetAtTime(0, startTime + releaseTime, 0.08);
         shaper.connect(amp);
+        // The grit layer joins the amp post-saturator — enveloped with the
+        // body but never soft-clipped.
+        sawGain.connect(amp);
         amp.connect(playback.audioGraph.bass.gain);
+
+        // --- Velocity-brightened finger-thud transient ----------------------
+        // A pluck transient the `current` voice has but the New voice lacked
+        // entirely. Both the bandpass center and its Q track velocity via the
+        // same curve-shaped `timbre.brightness`: a soft note gets a dull, low
+        // thud; a hard dig-in gets a sharp, present click. Volume is convex in
+        // velocity too, so soft notes stay understated. Routed straight to the
+        // bass bus (not through `amp`) to keep the click crisp and un-enveloped;
+        // `playPercussiveStrike` self-manages its own short-lived sub-graph.
+        const impactFreq = Math.max(
+            200,
+            Math.min(1600, freq * 1.6 * (0.7 + timbre.brightness * 0.9)),
+        );
+        const impactQ = 1.2 + timbre.brightness * 2.2;
+        playPercussiveStrike(
+            audio,
+            groove.audioBuffers.noise,
+            playback.audioGraph.bass.gain,
+            startTime,
+            {
+                volume: vol * (0.12 + timbre.brightness * 0.3),
+                filterType: 'bandpass',
+                freq: impactFreq,
+                Q: impactQ,
+                attack: 0.001,
+                decay: 0.018,
+                duration: 0.1,
+            },
+        );
 
         // Monophonic note-off — kill the previous note's amp.
         if (bass.lastBassGain && bass.lastBassGain !== amp) {
@@ -201,7 +252,7 @@ function playBassNoteNew(
                 subLp,
                 sawGain,
                 subGain,
-                mix,
+                bodyMix,
                 driveGain,
                 shaper,
                 amp,

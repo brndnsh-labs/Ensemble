@@ -26,6 +26,8 @@ The fundamental is just `sine`+`triangle` at pitch (`synth-bass.ts:74–94`) —
 **Acceptance:** A/B — hard and soft bass notes are timbrally distinct: loud notes growl and bite, soft notes are clean.
 **Effort:** ~3h. **Model:** opus (curves by ear). **Reviewer:** synth-graph-reviewer. **Source:** `bass.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. Re-tuned `playBassNoteNew`'s velocity-driven saturation (extra-convex `1 + brightness² * 1.6`, ceiling ~2.6× vs the old near-linear 3.25×) and added a velocity-brightened finger-thud transient via `playPercussiveStrike` (the `new` voice previously had none). A first listening gate rejected the result as still "saw synth bass even at low intensity" — the root cause was structural: the `new` voice routed the sawtooth through the soft-clip waveshaper, which sprays buzz harmonics at any velocity. Fixed by matching the `current` voice's architecture — the sawtooth grit layer now **bypasses the saturator** (only the sine body is soft-clipped), and `sawGain` is velocity-scaled (`0.15 + brightness*0.3`) so soft notes are near-pure sine. synth-graph-reviewer clean both passes (0 P0/P1/P2). Owner approved the reworked version — "way better."
+
 ### S3. Animated growl cutoff
 The growl layer's two lowpass filters are set with `setValueAtTime` only (`synth-bass.ts:117–118`) — cutoff frozen for the note's life. Add a `setTargetAtTime` downward sweep (start ~1.5× cutoff, settle over ~80–120 ms) so the pluck "settles" like a real string.
 
