@@ -785,7 +785,159 @@ export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>):
 }
 
 function playDrumSoundNew(...args: Parameters<typeof playDrumSoundCurrent>): void {
+    const [state, name, time, velocity] = args;
+    // The `new` drum voice diverges from `current` only where a synth-audit story
+    // has rebuilt a voice. Epic 4 S2 rebuilt the closed hihat; everything else still
+    // routes through the (frozen, bit-identical) `playDrumSoundCurrent`.
+    if (name === 'HiHat') {
+        playClosedHatNew(state, time, velocity);
+        return;
+    }
     playDrumSoundCurrent(...args);
+}
+
+/**
+ * `New`-voice closed hihat — synth-audit Epic 4 S2 ("un-choke the closed hat").
+ *
+ * The `current` closed hat is choked: three independent decay-shorteners stack on
+ * the gain envelope — `getCymbalVoiceConfig`'s velocity/intensity focus, the
+ * 0.92–1.10 `hatDecayMult`, and the `decayDelay` jitter — collapsing the gain
+ * time-constant to ~0.04 s. That guillotines the hat well before the `hihatMetal`
+ * buffer's own `partialDecay` (≈0.22 s natural ring) has finished, so the tail is
+ * cut off and the hit reads as clipped/toy-ish.
+ *
+ * This voice un-chokes it two ways: (1) a single, gentle velocity-driven decay
+ * term instead of three stacked shorteners — a real closed hat tightens a little
+ * when struck harder but is never guillotined; (2) a long gain time-constant
+ * (~0.11–0.16 s) so the gain envelope barely shapes the tail and the buffer's
+ * `partialDecay` does the choking, exactly as the discovery report prescribed.
+ *
+ * Per `epic-4-drums.md`, the `new` drum voice does NOT carry `playDrumSoundCurrent`'s
+ * un-seeded `Math.random()` `velJitter`: the scheduler's seeded `humanizeNote`
+ * (Epic 0 S6) already humanizes the incoming velocity, and dropping the second,
+ * un-seeded layer keeps the `new` voice reproducible.
+ */
+function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
+    const now = playback.audio.currentTime;
+    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
+    const playTime = Math.max(time, now + 0.002);
+    // Fail-fast on a malformed velocity rather than poisoning the gain envelope
+    // with NaN (which would throw at `setTargetAtTime` and drop the hit silently).
+    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    // why: no `velJitter` here — see the doc comment. The scheduler already
+    // applied seeded humanization to `velocity`.
+    const masterVol = hitVelocity * 1.3 * densityDuck;
+
+    const voiceConfig = getCymbalVoiceConfig(
+        'HiHat',
+        hitVelocity,
+        (playback as any).bandIntensity || 0.5,
+    );
+    if (!voiceConfig) {
+        return;
+    }
+
+    // HiHat is a right-panned instrument (see RIGHT_PANNED_INSTRUMENTS).
+    const panner = createSimplePanner(playback.audio, 0.35, playTime);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
+    }
+
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const vel = clamp01(Math.max(0.3, hitVelocity));
+
+    // --- The un-choke: ONE decay-shortener, not three -----------------------
+    // `decayTc` is the sole decay modulator. A long 0.16 s base means the gain
+    // envelope is nearly flat across the buffer's audible life, so the metallic
+    // buffer's `partialDecay` shapes the tail. The single velocity term tightens
+    // hard hits a touch (0.16 s soft → ~0.11 s hard) — physically real, never a
+    // guillotine. No `hatDecayMult`, no `decayDelay` jitter.
+    const decayTc = Math.max(0.085, 0.16 - Math.max(0, vel - 0.7) * 0.18);
+    const decayDelay = 0.012; // fixed short hold — lets the transient bloom
+
+    const hatArticulation = 0.985 + Math.random() * 0.035;
+    const vol =
+        masterVol *
+        voiceConfig.volumeScale *
+        getCymbalMixScale(state, 'HiHat') *
+        (0.95 + Math.random() * 0.03) *
+        rr();
+
+    // Choke the previous hat so successive closed hats don't pile up — this
+    // matters more than in `current` because this hat now rings longer.
+    if (groove.lastHatGain) {
+        rampGain(groove.lastHatGain.gain, 0, playTime, 0.008);
+    }
+
+    const source = playback.audio.createBufferSource();
+    source.buffer =
+        getCymbalBuffer(groove, 'HiHat') || ensureCymbalBuffer(playback.audio, groove, 'HiHat');
+    source.playbackRate.value =
+        voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
+
+    const bpFilter = playback.audio.createBiquadFilter();
+    bpFilter.type = 'bandpass';
+    bpFilter.frequency.setValueAtTime(
+        voiceConfig.bandpassFreq * (1.06 + Math.random() * 0.08),
+        playTime,
+    );
+    bpFilter.frequency.setTargetAtTime(
+        voiceConfig.bandpassFreq * (0.98 + Math.random() * 0.04),
+        playTime + 0.008,
+        0.02,
+    );
+    bpFilter.Q.value = voiceConfig.q * (0.92 + Math.random() * 0.22);
+
+    const hpFilter = playback.audio.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    hpFilter.frequency.setValueAtTime(
+        voiceConfig.highpassFreq * (1.03 + Math.random() * 0.09),
+        playTime,
+    );
+    hpFilter.frequency.setTargetAtTime(
+        voiceConfig.highpassFreq * 0.97 * (0.98 + Math.random() * 0.03),
+        playTime + 0.008,
+        0.025,
+    );
+
+    const gain = playback.audio.createGain();
+    gain.gain.setValueAtTime(0, playTime);
+    gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
+    gain.gain.setTargetAtTime(0, playTime + decayDelay, decayTc);
+    (groove as Mutable<typeof groove>).lastHatGain = gain; // @direct-mutation
+
+    source.connect(bpFilter);
+    bpFilter.connect(hpFilter);
+    hpFilter.connect(gain);
+    gain.connect(panner);
+
+    // Sizzle: thin 2–4 kHz presence layer under the bright buffer (as in `current`).
+    playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
+        volume: vol * 0.12,
+        filterType: 'bandpass',
+        freq: 3200 + Math.random() * 400,
+        Q: 1.2,
+        attack: 0.001,
+        decay: 0.04,
+        duration: 0.06,
+    });
+
+    source.start(playTime);
+    // why: stop at +0.45 s — long after the buffer's ≈0.22 s natural ring has
+    // died. The buffer *content* (not the gain envelope) is silent by then, so
+    // the stop produces no click regardless of the long gain time-constant.
+    source.stop(playTime + 0.45);
+
+    source.onended = () => {
+        if (groove.lastHatGain === gain) {
+            (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
+        }
+        safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
+    };
 }
 
 function playDrumSoundCurrent(

@@ -24,6 +24,7 @@ Three independent decay-shorteners stack on the closed hat: `getCymbalVoiceConfi
 
 **Acceptance:** A/B — the closed hat rings naturally instead of sounding choked/clipped, at all velocities.
 **Effort:** ~3h. **Model:** opus (decay by ear). **Reviewer:** synth-graph-reviewer. **Source:** `drums.md` §2; owner request.
+**Status:** Shipped 2026-05-22. Added `playClosedHatNew` — `playDrumSoundNew` routes the closed hihat to it, every other drum still delegates to the frozen `playDrumSoundCurrent`. The un-choke replaces the three stacked decay-shorteners with a single gentle velocity-driven decay term (~0.16s soft → ~0.11s hard) and a long gain time-constant, so the `hihatMetal` buffer's own `partialDecay` (≈0.22s natural ring) shapes the tail. The `new` voice drops `current`'s un-seeded `velJitter` per the epic note. `synth-graph-reviewer`: safe to land (0 P0, 0 P1, 2 P2 — a `velocity` finiteness guard added inline; the `voiceConfig.attack` finiteness note deferred as frozen-config scope). Owner approved by ear.
 
 ### S3. In-between hihat positions
 The dispatcher knows only `'HiHat'` and `'Open'` (`synth-drums.ts:984`). Add a continuous `0..1` openness parameter (or intermediate articulations) interpolating `decayBase`, `stopTime`, and bandpass/highpass cutoff between the closed and open profiles — plus a foot-pedal "chick" variant. The owner explicitly asked for this.
