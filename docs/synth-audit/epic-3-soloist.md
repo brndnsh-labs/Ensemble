@@ -62,6 +62,8 @@ osc2 detune is a fixed constant per preset; +12c on shred is nearly a quarter-to
 **Acceptance:** A/B — shred is tight, not chorused-sour; all presets have a subtle unison-settle on attack.
 **Effort:** ~3h. **Model:** opus (detune by ear). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. New helper `applyDetuneSettle(osc2, currentCents, newCents, playTime, isNew)` replaces each preset's static `osc2.detune.value` assignment. The Current voice keeps its fixed detune (bit-identical, including neo's explicit-zero). The New voice starts osc2 ~20c wider and `linearRampToValueAtTime`s inward to the final detune over 50 ms, so the unison locks in on the attack. Shred's New voice tightens its detune from a sour `+12c` near-quarter-tone to `+6c`. synth-graph-reviewer: clean (0 P0/P1/P2) — ramp finite and anchored, composes correctly with neo's detune LFO and the S4 vibrato (which taps `osc2.frequency`, a different param). Owner approved.
+
 ### S7. Articulation-aware ADSR release
 Release is always a fixed 85% of duration with no decay stage and no relationship to articulation. Add a real decay stage and tie release length to staccato/legato/duration.
 

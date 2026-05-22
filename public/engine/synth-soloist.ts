@@ -368,6 +368,31 @@ function soloistTimbreJitter(seed: number, scale: number): TimbreJitter {
 }
 
 /**
+ * Attack-time unison settle (epic-3-soloist S6). The Current voice keeps a
+ * fixed `currentCents` detune on osc2. The New voice starts osc2 ~20c wider
+ * and ramps inward to `newCents` over ~50 ms, so the two-oscillator unison
+ * "locks in" on the attack instead of sitting statically chorused. `newCents`
+ * also lets a preset tighten its detune for the New voice (shred: +12 → +6,
+ * where +12 is a sour near-quarter-tone). The ramp is scheduled automation on
+ * `osc2.detune`; any LFO connected to that param (neo) simply sums on top.
+ */
+function applyDetuneSettle(
+    osc2: OscillatorNode,
+    currentCents: number,
+    newCents: number,
+    playTime: number,
+    isNew: boolean,
+): void {
+    if (!isNew) {
+        osc2.detune.value = currentCents;
+        return;
+    }
+    const wide = newCents + (newCents >= 0 ? 20 : -20);
+    osc2.detune.setValueAtTime(wide, playTime);
+    osc2.detune.linearRampToValueAtTime(newCents, playTime + 0.05);
+}
+
+/**
  * Slow filter-cutoff LFO so a sustained note breathes instead of sitting
  * spectrally frozen (epic-3-soloist S3). The modulation depth ramps in after
  * a short delay — mirroring the vibrato delay — so the attack stays clean and
@@ -431,7 +456,7 @@ function playTrumpet(
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
-    osc2.detune.value = 5;
+    applyDetuneSettle(osc2, 5, 5, playTime, soloist.voice === 'new');
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -562,7 +587,7 @@ function playSaxophone(
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'triangle';
-    osc2.detune.value = -7;
+    applyDetuneSettle(osc2, -7, -7, playTime, soloist.voice === 'new');
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -706,6 +731,9 @@ function playNeoJuno(
     osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
+    // neo's static osc2 detune is 0 (its LFO supplies the movement); the New
+    // voice still gets the attack settle, summing on top of the LFO.
+    applyDetuneSettle(osc2, 0, 0, playTime, soloist.voice === 'new');
 
     const lfo1 = ctx.createOscillator();
     lfo1.frequency.value = 0.3;
@@ -829,7 +857,7 @@ function playVowel(
     osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'square';
-    osc2.detune.value = 4;
+    applyDetuneSettle(osc2, 4, 4, playTime, soloist.voice === 'new');
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -930,7 +958,8 @@ function playShred(
     osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
-    osc2.detune.value = 12;
+    // Shred New voice tightens +12c (a sour near-quarter-tone) to +6c.
+    applyDetuneSettle(osc2, 12, 6, playTime, soloist.voice === 'new');
 
     voiceObj.nodes.push(osc1, osc2);
 
