@@ -8,6 +8,7 @@ import {
     playResonantTone,
     rampGain,
     updateDensityDucking,
+    velocityTimbre,
 } from './synth-utils.js';
 
 type CymbalName = 'HiHat' | 'Open' | 'Ride' | 'Crash' | 'China';
@@ -919,9 +920,309 @@ function playDrumSoundNew(state: EnsembleState, name: string, time: number, velo
         case 'Ride':
             playRideNew(state, time, velocity);
             return;
-        default:
-            playDrumSoundCurrent(state, name, time, velocity);
     }
+    // Epic 4 S6 — hand-percussion `new` voices map velocity to timbre (filter
+    // cutoff + decay + noise-click), not just loudness. Conga/Bongo/Agogo are
+    // prefix-matched families, so they can't be exact `case`s above.
+    if (name === 'Clave') {
+        playClaveNew(state, time, velocity);
+        return;
+    }
+    if (name.startsWith('Conga') || name.startsWith('Bongo')) {
+        playCongaBongoNew(state, name, time, velocity);
+        return;
+    }
+    if (name.startsWith('Agogo') || name === 'Perc') {
+        playAgogoPercNew(state, name, time, velocity);
+        return;
+    }
+    if (name === 'Guiro') {
+        playGuiroNew(state, time, velocity);
+        return;
+    }
+    if (name === 'Shaker') {
+        playShakerNew(state, time, velocity);
+        return;
+    }
+    playDrumSoundCurrent(state, name, time, velocity);
+}
+
+/**
+ * Shared preamble for the Epic 4 S6 hand-percussion `new` voices: density
+ * ducking, the 2 ms scheduling guard, NaN-guarded velocity, the per-hit panner
+ * (wired to the drums bus) and its release callback. Returns `null` when there
+ * is no audio context. The `new` drum voice carries no un-seeded `velJitter`
+ * (epic note) — `masterVol` derives straight from the already-humanized
+ * incoming velocity.
+ */
+function setupNewPercHit(
+    state: EnsembleState,
+    time: number,
+    velocity: number,
+    panValue: number,
+): {
+    audio: AudioContext;
+    playTime: number;
+    hitVelocity: number;
+    masterVol: number;
+    panner: ReturnType<typeof createSimplePanner>;
+    releasePanner: () => void;
+} | null {
+    const { playback } = state;
+    if (!playback.audio) {
+        return null;
+    }
+    const now = playback.audio.currentTime;
+    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
+    const playTime = Math.max(time, now + 0.002);
+    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    const masterVol = hitVelocity * 1.3 * densityDuck;
+    const panner = createSimplePanner(playback.audio, panValue, playTime);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
+    }
+    return {
+        audio: playback.audio,
+        playTime,
+        hitVelocity,
+        masterVol,
+        panner,
+        releasePanner: () => safeDisconnect([panner]),
+    };
+}
+
+/**
+ * `New`-voice clave — Epic 4 S6. `current` plays a fixed 2450 Hz sine plus a
+ * fixed 5 kHz noise click, velocity scaling volume only. This voice maps
+ * velocity to timbre: a harder hit opens the noise-click highpass (brighter,
+ * sharper attack), lifts the click level, and lets the tone ring a touch
+ * longer — a soft clave is a dull rounded tap, a hard one cracks.
+ */
+function playClaveNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    if (!ctx) {
+        return;
+    }
+    const { audio, playTime, hitVelocity, masterVol, panner, releasePanner } = ctx;
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    // Convex curve: a soft clave stays dull, the crack only blooms when hit hard.
+    const t = velocityTimbre(hitVelocity, { curve: 1.7, cutoffRange: [0.72, 1.4] });
+    const vol = masterVol * 0.7 * rr();
+
+    playResonantTone(audio, panner, playTime, {
+        type: 'sine',
+        freqStart: 2450 * rr(0.01),
+        volume: vol,
+        attack: 0.0005,
+        // harder hit rings slightly longer (0.008 s → ~0.011 s)
+        decay: 0.008 * (1 + t.brightness * 0.4),
+        duration: 0.1,
+    });
+
+    // why: panner release rides the strike — tone and strike share `duration`
+    // (0.1 s), so whichever ends first, the other is already silent. If a
+    // future tweak makes the tone outlast the strike, move this to the tone.
+    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
+        // more click on hard hits — was a flat 0.4
+        volume: vol * (0.28 + t.brightness * 0.34),
+        filterType: 'highpass',
+        freq: 5000 * t.cutoffMult,
+        Q: 0.5,
+        attack: 0.0005,
+        decay: 0.003 * (1 + t.brightness * 0.5),
+        duration: 0.1,
+        onEnded: releasePanner,
+    });
+}
+
+/**
+ * `New`-voice conga / bongo — Epic 4 S6. `current` holds the skin-noise
+ * bandpass centre and the body-tone decay constant. Here a harder hit opens
+ * the skin bandpass (brighter slap), pushes more skin-noise through, and lets
+ * the drum body ring longer — the difference between a muted finger tap and an
+ * open-tone strike. Slap/Mute keep their existing character on top.
+ */
+function playCongaBongoNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
+    // Conga/Bongo are not right-panned — they spread randomly across ±0.25.
+    const ctx = setupNewPercHit(state, time, velocity, (Math.random() * 2 - 1) * 0.25);
+    if (!ctx) {
+        return;
+    }
+    const { audio, playTime, hitVelocity, masterVol, panner, releasePanner } = ctx;
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const t = velocityTimbre(hitVelocity, { curve: 1.5, cutoffRange: [0.66, 1.48] });
+
+    const isBongo = name.startsWith('Bongo');
+    const isHigh = name.includes('High');
+    const isSlap = name.includes('Slap');
+    const isMute = name.includes('Mute');
+    const baseFreq = isBongo ? (isHigh ? 420 : 280) : isHigh ? 210 : 155;
+    const vol = masterVol * (isSlap ? 0.85 : 0.7) * rr();
+    const decay = isMute ? 0.015 : isSlap ? 0.03 : 0.07;
+
+    playResonantTone(audio, panner, playTime, {
+        type: isSlap ? 'triangle' : 'sine',
+        freqStart: baseFreq * rr(0.01),
+        freqEnd: baseFreq * 0.95,
+        rampDuration: 0.05,
+        volume: vol,
+        attack: 0.002,
+        // harder hit lets the body ring longer (an open tone vs a choked tap)
+        decay: decay * (1 + t.brightness * 0.35),
+        duration: 0.3,
+    });
+
+    // why: panner release rides the strike — body tone and strike share
+    // `duration` (0.3 s), so its sibling is already silent when either ends.
+    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
+        // harder hit drives more skin-noise click
+        volume: (isSlap ? vol * 0.6 : vol * 0.25) * (1 + t.brightness * 0.6),
+        filterType: 'bandpass',
+        freq: (isSlap ? 2500 : 800) * t.cutoffMult,
+        Q: 1.0,
+        attack: 0.001,
+        decay: 0.015 * (1 + t.brightness * 0.4),
+        duration: 0.3,
+        onEnded: releasePanner,
+    });
+}
+
+/**
+ * `New`-voice agogo / perc bell — Epic 4 S6. The bell is tonal, so a filter
+ * cutoff is the wrong control — instead velocity drives the *upper partial*:
+ * a hard strike rings the bright 1.492× overtone forward and sustains a touch
+ * longer, a soft strike is a rounder, duller "ding".
+ */
+function playAgogoPercNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
+    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    if (!ctx) {
+        return;
+    }
+    const { audio, playTime, hitVelocity, masterVol, panner, releasePanner } = ctx;
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const t = velocityTimbre(hitVelocity, { curve: 1.6 });
+
+    const isHigh = name.includes('High') || name === 'Perc';
+    const vol = masterVol * 0.35 * rr();
+    const freq = isHigh ? 1150 : 780;
+    // harder hit sustains the bell a little longer
+    const bellDecay = 0.12 * (1 + t.brightness * 0.28);
+
+    playResonantTone(audio, panner, playTime, {
+        type: 'sine',
+        freqStart: freq * rr(0.005),
+        volume: vol,
+        attack: 0.001,
+        decay: bellDecay,
+        duration: 0.5,
+    });
+
+    playResonantTone(audio, panner, playTime, {
+        type: 'triangle',
+        freqStart: freq * 1.492 * rr(0.005),
+        // the brightness control: hard hit pushes the upper partial forward
+        // (~0.34 → ~0.68 of the fundamental), soft hit keeps the bell rounded
+        volume: vol * (0.34 + t.brightness * 0.34),
+        attack: 0.001,
+        decay: bellDecay,
+        duration: 0.5,
+    });
+
+    // why: all three bell tones share `duration` (0.5 s), so releasing the
+    // panner on any one is safe — its siblings are already silent.
+    playResonantTone(audio, panner, playTime, {
+        type: 'sine',
+        freqStart: freq,
+        volume: vol * 0.5,
+        attack: 0.002,
+        decay: 0.04,
+        duration: 0.5,
+        onEnded: releasePanner,
+    });
+}
+
+/**
+ * `New`-voice guiro — Epic 4 S6. `current` scrapes looped noise through a
+ * fixed 2.5 kHz bandpass. Here velocity opens the bandpass (a hard scrape is
+ * raspier and brighter) and drives the scrape-pulse level.
+ */
+function playGuiroNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    if (!ctx) {
+        return;
+    }
+    const { audio, playTime, hitVelocity, masterVol, panner, releasePanner } = ctx;
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const t = velocityTimbre(hitVelocity, { curve: 1.4, cutoffRange: [0.72, 1.4] });
+    const vol = masterVol * 0.5 * rr();
+
+    // why: Guiro builds its node chain by hand, so unlike the helper-based
+    // sibling voices it does NOT get `playPercussiveStrike`'s buffer null-guard
+    // for free. A missing noise buffer would make `noise.start()` throw, which
+    // aborts the voice mid-build and orphans the already-connected panner on
+    // the live drums bus. Guard the buffer and free the panner explicitly.
+    const noiseBuffer = state.groove.audioBuffers.noise;
+    if (!noiseBuffer) {
+        releasePanner();
+        return;
+    }
+
+    try {
+        const noise = audio.createBufferSource();
+        noise.buffer = noiseBuffer;
+        noise.loop = true;
+        const filter = audio.createBiquadFilter();
+        filter.type = 'bandpass';
+        // harder scrape is brighter and raspier
+        filter.frequency.setValueAtTime(2500 * t.cutoffMult, playTime);
+        filter.Q.value = 1.0;
+        const gain = audio.createGain();
+        gain.gain.setValueAtTime(0, playTime);
+
+        // the four scrape pulses — a harder scrape also pushes each pulse louder
+        const pulseLevel = vol * (0.78 + t.brightness * 0.42);
+        for (let i = 0; i < 4; i++) {
+            const pulseTime = playTime + i * 0.035;
+            gain.gain.setTargetAtTime(pulseLevel * (0.6 + i * 0.1), pulseTime, 0.005);
+            gain.gain.setTargetAtTime(0, pulseTime + 0.015, 0.01);
+        }
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(panner);
+        noise.start(playTime);
+        noise.stop(playTime + 0.2);
+        noise.onended = () => safeDisconnect([noise, filter, gain, panner]);
+    } catch {
+        // Any audio-graph error mid-build still frees the panner.
+        releasePanner();
+    }
+}
+
+/**
+ * `New`-voice shaker — Epic 4 S6. `current` is a fixed 6 kHz highpass strike.
+ * Velocity opens the highpass (a hard shake is brighter, more present) and
+ * lengthens the decay slightly so a hard shake sustains its "sh" tail.
+ */
+function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    if (!ctx) {
+        return;
+    }
+    const { audio, playTime, hitVelocity, masterVol, panner, releasePanner } = ctx;
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const t = velocityTimbre(hitVelocity, { curve: 1.5, cutoffRange: [0.72, 1.34] });
+    const vol = masterVol * 0.45 * rr();
+
+    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
+        volume: vol,
+        filterType: 'highpass',
+        freq: 6000 * t.cutoffMult,
+        attack: 0.01,
+        // harder shake sustains its tail a touch longer (0.05 s → ~0.07 s)
+        decay: 0.05 * (1 + t.brightness * 0.4),
+        duration: 0.2,
+        onEnded: releasePanner,
+    });
 }
 
 /**
