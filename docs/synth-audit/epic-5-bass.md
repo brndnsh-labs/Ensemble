@@ -18,6 +18,8 @@ The fundamental is just `sine`+`triangle` at pitch (`synth-bass.ts:74–94`) —
 **Acceptance:** A/B — the bass has weight and low-end body, especially on small speakers, without boom.
 **Effort:** ~3h. **Model:** opus (level/filter by ear). **Reviewer:** synth-graph-reviewer. **Source:** `bass.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. Added a dedicated sub-octave sine to `playBassNoteNew` — a second `sine` an octave below the fundamental, low-passed to ~140 Hz (Q 0.7), fixed gain 0.34, summed into the bass mix; it rides the bend ramp with the other oscillators and is floored above 10 Hz. synth-graph-reviewer clean (0 P0/P1/P2). Owner confirmed the added low-end weight reads correctly. Listening gate also surfaced that the `new` voice overall sounds louder/more aggressive than `current` — that is the velocity-driven saturation (`driveGain = 1 + drive*2.5`, up to 3.25× pre-gain into the soft-clip), and is S2's explicit mandate; owner wants S2 to preserve `current`'s rounder/smoother character on soft/medium notes and only let genuinely hard notes bite.
+
 ### S2. Velocity-driven saturation + transient brightness
 `bodyMix.gain` into the waveshaper is a fixed 0.8 (`synth-bass.ts:90`), and the impact transient (`vol*0.4`, 132) scales only in volume. Make `bodyMix.gain` scale with velocity (hard notes clip/growl harder) and push `impactFreq`/`impactQ` up with velocity (digs-in get a sharper click) — via the Epic 0 S7 helper.
 

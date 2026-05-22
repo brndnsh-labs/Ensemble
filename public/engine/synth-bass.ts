@@ -128,6 +128,34 @@ function playBassNoteNew(
         sub.connect(mix);
         sawGain.connect(mix);
 
+        // --- Layer 0: sub-octave sine (the weight) ---
+        // A real P-Bass DI carries deliberate energy an octave below the
+        // fundamental — that is what reads as "body" and weight on small
+        // speakers, where the fundamental itself is barely reproduced. A
+        // dedicated octave-down sine, low-passed to ~140 Hz so it stays pure
+        // sub and never muds the midrange. Fixed level (0.34): the sub is a
+        // constant low-end floor, not a velocity-reactive layer — the saw and
+        // saturator already carry the dynamic timbre. Floored above 10 Hz so a
+        // very low note can't drop the sub below the oscillator's useful range.
+        const subOct = audio.createOscillator();
+        subOct.type = 'sine';
+        subOct.frequency.setValueAtTime(Math.max(10, startFreq / 2), startTime);
+        if (bend !== 0) {
+            subOct.frequency.exponentialRampToValueAtTime(
+                Math.max(10, freq / 2),
+                startTime + bendRamp,
+            );
+        }
+        const subLp = audio.createBiquadFilter();
+        subLp.type = 'lowpass';
+        subLp.frequency.setValueAtTime(140, startTime);
+        subLp.Q.setValueAtTime(0.7, startTime);
+        const subGain = audio.createGain();
+        subGain.gain.setValueAtTime(0.34, startTime);
+        subOct.connect(subLp);
+        subLp.connect(subGain);
+        subGain.connect(mix);
+
         // --- Velocity-driven saturation: a hotter pre-gain into a fixed
         // soft-clip means a harder note picks up more harmonics. ---
         const driveGain = audio.createGain();
@@ -159,10 +187,25 @@ function playBassNoteNew(
 
         sub.start(startTime);
         saw.start(startTime);
+        subOct.start(startTime);
         const stopTime = startTime + releaseTime + 1.0;
         sub.stop(stopTime);
         saw.stop(stopTime);
-        sub.onended = () => safeDisconnect([sub, saw, lp, sawGain, mix, driveGain, shaper, amp]);
+        subOct.stop(stopTime);
+        sub.onended = () =>
+            safeDisconnect([
+                sub,
+                saw,
+                subOct,
+                lp,
+                subLp,
+                sawGain,
+                subGain,
+                mix,
+                driveGain,
+                shaper,
+                amp,
+            ]);
     } catch (e) {
         console.error('playBassNoteNew error:', e, { freq, time, duration });
     }
