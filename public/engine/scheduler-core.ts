@@ -39,6 +39,7 @@ import {
     updateSustain,
 } from './engine.js';
 import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
+import { stringHash31 } from './hash-utils.js';
 import {
     dispatchMidiAutomation,
     dispatchMidiBass,
@@ -58,7 +59,7 @@ import {
 } from './platform-orchestrator.js';
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
-import { killActiveVoices } from './synth-utils.js';
+import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed, killActiveVoices } from './synth-utils.js';
 import { generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
@@ -615,9 +616,23 @@ function scheduleDrums(
         queueVisualizerFillEvent(playback, finalTime, false);
     }
 
+    // Seeded per-note humanization (synth-audit Epic 0 S6): each drum piece
+    // gets its own independent micro-timing + velocity wobble, replacing the
+    // shared per-tick `Math.random()` jitter that moved the whole kit in
+    // lockstep. Seeded on (step, piece) so looped playback reproduces exactly.
+    // `humanize` is normally a 0–100 slider value; guard the divide so a
+    // malformed dispatch can't fan a NaN into every drum's playTime/velocity.
+    const humanizeScale = Number.isFinite(groove.humanize) ? groove.humanize / 100 : 0;
+
     tickResult.drumHits.forEach((hit: any) => {
-        const playTime = finalTime + hit.instTimeOffset;
-        playDrumSound(state, hit.soundName, playTime, hit.velocity * conductorVel);
+        const h = humanizeNote(
+            humanizeSeed(absoluteStep, 'drums', stringHash31(hit.soundName)),
+            HUMANIZE_PROFILES.drums,
+            humanizeScale,
+        );
+        const playTime = finalTime + hit.instTimeOffset + h.timeOffset;
+        const velocity = hit.velocity * conductorVel * h.velocityMult;
+        playDrumSound(state, hit.soundName, playTime, velocity);
 
         if (vizState.enabled) {
             const midiNum = DRUM_VIS_PITCHES[hit.soundName] || 36;
@@ -625,12 +640,12 @@ function scheduleDrums(
                 track: 'drums',
                 midi: midiNum,
                 time: playTime,
-                velocity: hit.velocity * conductorVel,
+                velocity,
                 duration: 0.1,
             });
         }
 
-        dispatchMidiDrum(state, hit.soundName, playTime, hit.velocity * conductorVel);
+        dispatchMidiDrum(state, hit.soundName, playTime, velocity);
     });
 }
 
@@ -1135,6 +1150,10 @@ export function scheduleGlobalEvent(
     dispatchMidiAutomation(state, stepInfo, swungTime);
 
     const drumStep = step % (groove.measures * spm);
+    // Legacy shared per-tick timing jitter. Drums no longer use this — S6 gave
+    // them independent seeded humanization (`humanizeNote`). Bass, chords,
+    // harmonies and the soloist still ride this shared `t` until Epics 5/2/1/3
+    // migrate each to `humanizeNote`; remove this line once they have.
     const t = swungTime + (Math.random() - 0.5) * (groove.humanize / 100) * 0.025;
 
     if (playback.metronome && stepInfo.isBeatStart && playback.audio) {
@@ -1191,7 +1210,10 @@ export function scheduleGlobalEvent(
             state,
             {
                 step: drumStep,
-                time: t,
+                // Drums take the un-jittered base time: S6 humanizes each drum
+                // piece independently inside `scheduleDrums`, so they no longer
+                // ride the shared per-tick `t` jitter (that would double up).
+                time: swungTime,
                 isDownbeat: stepInfo.isMeasureStart,
                 isBeatStart: stepInfo.isBeatStart,
                 isBackbeat: stepInfo.isBackbeat,

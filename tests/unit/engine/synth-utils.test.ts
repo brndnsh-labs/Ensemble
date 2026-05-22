@@ -2,6 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     createSimplePanner,
+    HUMANIZE_PROFILES,
+    humanizeNote,
+    humanizeSeed,
     killActiveVoices,
     rampGain,
     updateDensityDucking,
@@ -146,6 +149,53 @@ describe('Synthesis Utilities', () => {
 
             const result = createSimplePanner(mockCtx, 0.5, 10.0);
             expect(result).toBe(mockGain);
+        });
+    });
+
+    describe('humanizeNote (Epic 0 S6)', () => {
+        const drums = HUMANIZE_PROFILES.drums;
+
+        it('is deterministic — same seed reproduces the same offsets', () => {
+            const seed = humanizeSeed(12, 'drums', 7);
+            const a = humanizeNote(seed, drums);
+            const b = humanizeNote(seed, drums);
+            expect(a).toEqual(b);
+        });
+
+        it('draws independently per instrument and per voice', () => {
+            // Same step, different instrument → different timing.
+            const drumHit = humanizeNote(humanizeSeed(4, 'drums', 0), drums);
+            const bassHit = humanizeNote(humanizeSeed(4, 'bass', 0), drums);
+            expect(drumHit.timeOffset).not.toBe(bassHit.timeOffset);
+
+            // Same instrument, different voice → different timing.
+            const voiceA = humanizeNote(humanizeSeed(4, 'drums', 0), drums);
+            const voiceB = humanizeNote(humanizeSeed(4, 'drums', 1), drums);
+            expect(voiceA.timeOffset).not.toBe(voiceB.timeOffset);
+        });
+
+        it('keeps timing/velocity/detune independent within one note', () => {
+            // The three draws come off distinct XOR constants — they must not
+            // collapse onto the same underlying random value.
+            const n = humanizeNote(humanizeSeed(9, 'soloist', 2), HUMANIZE_PROFILES.soloist);
+            const timeFrac = n.timeOffset / HUMANIZE_PROFILES.soloist.timeSpread;
+            const velFrac = (n.velocityMult - 1) / HUMANIZE_PROFILES.soloist.velSpread;
+            expect(timeFrac).not.toBeCloseTo(velFrac, 5);
+        });
+
+        it('is a no-op at scale 0 (humanize knob off)', () => {
+            const n = humanizeNote(humanizeSeed(3, 'drums', 0), drums, 0);
+            expect(n.timeOffset).toBeCloseTo(0, 10); // may be -0
+            expect(n.velocityMult).toBe(1);
+            expect(n.detuneCents).toBeCloseTo(0, 10); // may be -0
+        });
+
+        it('stays within the profile spread (± at full strength)', () => {
+            for (let step = 0; step < 200; step++) {
+                const n = humanizeNote(humanizeSeed(step, 'drums', step % 5), drums, 1);
+                expect(Math.abs(n.timeOffset)).toBeLessThanOrEqual(drums.timeSpread);
+                expect(Math.abs(n.velocityMult - 1)).toBeLessThanOrEqual(drums.velSpread);
+            }
         });
     });
 });

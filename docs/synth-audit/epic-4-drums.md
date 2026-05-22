@@ -63,4 +63,5 @@ Every noise layer (kick skin, snare wires, hat sizzle, toms, shaker, guiro, brus
 ## Notes
 
 - S1 and S5 are mechanical — fan out early. S2 + S3 are the owner's explicit hihat ask — prioritize. S8 is a shared-helper change that S6 may want to consume.
+- **Carried over from Epic 0 S6:** the scheduler now applies seeded `humanizeNote` velocity/timing per drum hit, but `playDrumSoundCurrent` still has its own un-seeded `Math.random()` `velJitter` (`synth-drums.ts`). `current` is frozen and bit-identical, so it stays — but whichever story builds `playDrumSoundNew` must **not** carry the `velJitter` line over: S6's seeded humanization replaces it, and dropping it makes the `new` drum voice fully reproducible.
 - The one defensible drum pack is acoustic cymbals (Epic 6) — but synthesized cymbals with S4 are good; no pack dependency here.
