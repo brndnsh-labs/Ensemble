@@ -632,6 +632,91 @@ function getVariedCymbalBuffer(
     return pool[index];
 }
 
+// synth-audit Epic 4 S7 — voice-specific colored noise.
+// Every noise layer reads one shared flat 2 s white-noise buffer, started from
+// sample 0 every hit — spectrally flat AND static, two "synthy" tells at once.
+// `createColoredNoiseBuffer` pre-renders a longer (4 s) buffer with a per-voice
+// spectral tilt; the `new` voices read a random per-hit offset into it (via
+// `playPercussiveStrike`'s `bufferOffset`), so a noise layer is both textured
+// and varied hit-to-hit. Runtime-generated — no bundle-size change.
+type ColoredNoiseTilt = 'bright' | 'warm' | 'raspy';
+
+// Length of every colored-noise buffer, and the range `noiseOffset` draws from
+// — one symbol so the two can never drift apart.
+const NOISE_BUFFER_SECONDS = 4;
+
+/**
+ * Render a 4 s mono noise buffer with a spectral tilt:
+ * - `bright` — a one-pole differentiator (+slope): airy, fine hiss for hat
+ *   sizzle / clave click / shaker.
+ * - `warm` — a one-pole lowpass (−slope): rounder, body-ish noise for conga skin.
+ * - `raspy` — a gentle highpass: gritty mid texture for the guiro scrape.
+ *
+ * The result is RMS-normalized to match flat white noise (RMS ≈ 0.577), so
+ * swapping a voice's buffer changes its *timbre* without changing its level —
+ * the A/B stays an honest timbre comparison. A final `tanh` tames stray peaks
+ * the normalization can lift past unity.
+ */
+function createColoredNoiseBuffer(audioCtx: AudioContext, tilt: ColoredNoiseTilt): AudioBuffer {
+    const length = Math.max(1, Math.floor(audioCtx.sampleRate * NOISE_BUFFER_SECONDS));
+    const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    let lp = 0;
+    let prev = 0;
+    let sumSq = 0;
+    for (let i = 0; i < length; i++) {
+        const white = Math.random() * 2 - 1;
+        let v: number;
+        if (tilt === 'warm') {
+            // one-pole lowpass — most energy ends up in `lp`
+            lp = lp * 0.86 + white * 0.14;
+            v = lp;
+        } else if (tilt === 'bright') {
+            // differentiator (white − previous white) — emphasizes the top
+            v = white - prev;
+        } else {
+            // raspy — gentle highpass: white minus a slow-following lowpass
+            lp = lp * 0.62 + white * 0.38;
+            v = white - lp;
+        }
+        prev = white;
+        data[i] = v;
+        sumSq += v * v;
+    }
+
+    // Normalize to white-noise RMS so the colored buffer is a like-for-like
+    // timbre swap, not a level change.
+    const rms = Math.sqrt(sumSq / length);
+    const norm = rms > 1e-6 ? 0.5774 / rms : 1;
+    for (let i = 0; i < length; i++) {
+        data[i] = Math.tanh(data[i] * norm);
+    }
+    return buffer;
+}
+
+/**
+ * Lazily create and cache one colored-noise buffer per tilt, under a derived
+ * `groove.audioBuffers` key. One 4 s buffer per tilt for the page lifetime —
+ * three tilts, negligible RAM, no reset path needed.
+ */
+function getColoredNoiseBuffer(
+    audioCtx: AudioContext,
+    groove: GrooveState,
+    tilt: ColoredNoiseTilt,
+): AudioBuffer {
+    const key = `noise#${tilt}`;
+    if (!groove.audioBuffers[key]) {
+        groove.audioBuffers[key] = createColoredNoiseBuffer(audioCtx, tilt);
+    }
+    return groove.audioBuffers[key];
+}
+
+/** A fresh random read position into a colored-noise buffer. */
+function noiseOffset(): number {
+    return Math.random() * NOISE_BUFFER_SECONDS;
+}
+
 function getBandLayerCount(state: EnsembleState): number {
     let layers = 0;
     if ((state as any).bass?.enabled) {
@@ -1022,17 +1107,25 @@ function playClaveNew(state: EnsembleState, time: number, velocity = 1.0): void 
     // why: panner release rides the strike — tone and strike share `duration`
     // (0.1 s), so whichever ends first, the other is already silent. If a
     // future tweak makes the tone outlast the strike, move this to the tone.
-    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
-        // more click on hard hits — was a flat 0.4
-        volume: vol * (0.28 + t.brightness * 0.34),
-        filterType: 'highpass',
-        freq: 5000 * t.cutoffMult,
-        Q: 0.5,
-        attack: 0.0005,
-        decay: 0.003 * (1 + t.brightness * 0.5),
-        duration: 0.1,
-        onEnded: releasePanner,
-    });
+    // S7 — `bright` colored noise, random per-hit offset for a sharp varied click.
+    playPercussiveStrike(
+        audio,
+        getColoredNoiseBuffer(audio, state.groove, 'bright'),
+        panner,
+        playTime,
+        {
+            // more click on hard hits — was a flat 0.4
+            volume: vol * (0.28 + t.brightness * 0.34),
+            filterType: 'highpass',
+            freq: 5000 * t.cutoffMult,
+            Q: 0.5,
+            attack: 0.0005,
+            decay: 0.003 * (1 + t.brightness * 0.5),
+            duration: 0.1,
+            onEnded: releasePanner,
+            bufferOffset: noiseOffset(),
+        },
+    );
 }
 
 /**
@@ -1074,17 +1167,25 @@ function playCongaBongoNew(state: EnsembleState, name: string, time: number, vel
 
     // why: panner release rides the strike — body tone and strike share
     // `duration` (0.3 s), so its sibling is already silent when either ends.
-    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
-        // harder hit drives more skin-noise click
-        volume: (isSlap ? vol * 0.6 : vol * 0.25) * (1 + t.brightness * 0.6),
-        filterType: 'bandpass',
-        freq: (isSlap ? 2500 : 800) * t.cutoffMult,
-        Q: 1.0,
-        attack: 0.001,
-        decay: 0.015 * (1 + t.brightness * 0.4),
-        duration: 0.3,
-        onEnded: releasePanner,
-    });
+    // S7 — `warm` colored noise: a rounder, body-ish skin layer, varied per hit.
+    playPercussiveStrike(
+        audio,
+        getColoredNoiseBuffer(audio, state.groove, 'warm'),
+        panner,
+        playTime,
+        {
+            // harder hit drives more skin-noise click
+            volume: (isSlap ? vol * 0.6 : vol * 0.25) * (1 + t.brightness * 0.6),
+            filterType: 'bandpass',
+            freq: (isSlap ? 2500 : 800) * t.cutoffMult,
+            Q: 1.0,
+            attack: 0.001,
+            decay: 0.015 * (1 + t.brightness * 0.4),
+            duration: 0.3,
+            onEnded: releasePanner,
+            bufferOffset: noiseOffset(),
+        },
+    );
 }
 
 /**
@@ -1161,7 +1262,8 @@ function playGuiroNew(state: EnsembleState, time: number, velocity = 1.0): void 
     // for free. A missing noise buffer would make `noise.start()` throw, which
     // aborts the voice mid-build and orphans the already-connected panner on
     // the live drums bus. Guard the buffer and free the panner explicitly.
-    const noiseBuffer = state.groove.audioBuffers.noise;
+    // S7 — `raspy` colored noise (gritty mid texture) instead of flat white.
+    const noiseBuffer = getColoredNoiseBuffer(audio, state.groove, 'raspy');
     if (!noiseBuffer) {
         releasePanner();
         return;
@@ -1189,7 +1291,9 @@ function playGuiroNew(state: EnsembleState, time: number, velocity = 1.0): void 
         noise.connect(filter);
         filter.connect(gain);
         gain.connect(panner);
-        noise.start(playTime);
+        // a random per-hit read position into the 4 s buffer — each scrape is
+        // a different slice of grit (the source already loops).
+        noise.start(playTime, noiseOffset());
         noise.stop(playTime + 0.2);
         noise.onended = () => safeDisconnect([noise, filter, gain, panner]);
     } catch {
@@ -1213,16 +1317,25 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
     const t = velocityTimbre(hitVelocity, { curve: 1.5, cutoffRange: [0.72, 1.34] });
     const vol = masterVol * 0.45 * rr();
 
-    playPercussiveStrike(audio, state.groove.audioBuffers.noise, panner, playTime, {
-        volume: vol,
-        filterType: 'highpass',
-        freq: 6000 * t.cutoffMult,
-        attack: 0.01,
-        // harder shake sustains its tail a touch longer (0.05 s → ~0.07 s)
-        decay: 0.05 * (1 + t.brightness * 0.4),
-        duration: 0.2,
-        onEnded: releasePanner,
-    });
+    // S7 — `bright` colored noise read at a random per-hit offset: a fine,
+    // airy, granular "sh" that varies shake-to-shake, not a flat static slice.
+    playPercussiveStrike(
+        audio,
+        getColoredNoiseBuffer(audio, state.groove, 'bright'),
+        panner,
+        playTime,
+        {
+            volume: vol,
+            filterType: 'highpass',
+            freq: 6000 * t.cutoffMult,
+            attack: 0.01,
+            // harder shake sustains its tail a touch longer (0.05 s → ~0.07 s)
+            decay: 0.05 * (1 + t.brightness * 0.4),
+            duration: 0.2,
+            onEnded: releasePanner,
+            bufferOffset: noiseOffset(),
+        },
+    );
 }
 
 /**
@@ -1345,16 +1458,25 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     hpFilter.connect(gain);
     gain.connect(panner);
 
-    // Sizzle: thin 2–4 kHz presence layer under the bright buffer (as in `current`).
-    playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
-        volume: vol * 0.12,
-        filterType: 'bandpass',
-        freq: 3200 + Math.random() * 400,
-        Q: 1.2,
-        attack: 0.001,
-        decay: 0.04,
-        duration: 0.06,
-    });
+    // Sizzle: thin 2–4 kHz presence layer under the bright buffer. S7 — a
+    // `bright` colored-noise buffer read at a random per-hit offset, so the
+    // sizzle is fine/airy and varies hit-to-hit instead of a flat static slice.
+    playPercussiveStrike(
+        playback.audio,
+        getColoredNoiseBuffer(playback.audio, groove, 'bright'),
+        panner,
+        playTime,
+        {
+            volume: vol * 0.12,
+            filterType: 'bandpass',
+            freq: 3200 + Math.random() * 400,
+            Q: 1.2,
+            attack: 0.001,
+            decay: 0.04,
+            duration: 0.06,
+            bufferOffset: noiseOffset(),
+        },
+    );
 
     source.start(playTime);
     // why: stop at +0.45 s — long after the buffer's ≈0.22 s natural ring has

@@ -122,6 +122,15 @@ interface PercussiveStrikeOptions {
      * so the caller's cleanup is guaranteed to run exactly once.
      */
     onEnded?: () => void;
+    /**
+     * Optional read position (seconds) into `buffer`. When > 0 the source plays from
+     * that offset with `loop` enabled, so a caller can draw a different slice of a
+     * long colored-noise buffer per hit (synth-audit Epic 4 S7) and kill the "every
+     * hit is the identical noise slice" tell. Default `0` — identical to the
+     * pre-S7 `source.start(time)` behavior, so the frozen `current` voices that
+     * never pass it are bit-unchanged.
+     */
+    bufferOffset?: number;
 }
 
 export function playPercussiveStrike(
@@ -138,6 +147,7 @@ export function playPercussiveStrike(
         decay = 0.01,
         duration = 0.1,
         onEnded,
+        bufferOffset = 0,
     }: PercussiveStrikeOptions = {},
 ): void {
     if (!audio || !buffer || !destination) {
@@ -163,7 +173,14 @@ export function playPercussiveStrike(
         filter.connect(gain);
         gain.connect(destination);
 
-        source.start(time);
+        // A finite, positive offset reads a per-hit slice of a long colored-noise
+        // buffer (S7); `loop` lets the short strike wrap rather than run dry near
+        // the buffer end. Offset 0 (every `current` caller) → plain `start(time)`.
+        const offset = Number.isFinite(bufferOffset) && bufferOffset > 0 ? bufferOffset : 0;
+        if (offset > 0) {
+            source.loop = true;
+        }
+        source.start(time, offset);
         source.stop(time + duration);
 
         source.onended = () => {
