@@ -38,6 +38,7 @@ Every HiHat hit replays one cached buffer — fast hat patterns are near-xerox c
 
 **Acceptance:** A/B — fast hat/ride patterns sound stick-to-stick varied, not looped. No bundle-size change.
 **Effort:** ~3h. **Model:** opus (variation by ear). **Reviewer:** synth-graph-reviewer. **Source:** `drums.md` §2, §3, §6.
+**Status:** Shipped 2026-05-22. New `getVariedCymbalBuffer` helper maintains a runtime pool of 4 independently-synthesized `createMetallicBuffer` outputs per cymbal (different random phases/detunes/weights each) under a derived `audioBuffers` key; the pool lazy-fills one buffer per hit then serves a no-immediate-repeat uniform random pick. The three `new`-voice hi-hats (`playClosedHatNew`/`playOpenHatNew`/`playPedalChickNew`) draw from it; `playDrumSoundCurrent`'s single-buffer path is untouched. All buffers runtime-generated — no bundle change. `synth-graph-reviewer`: safe to land (0 P0, 1 P1, 2 P2 — all patched inline: pool-ceiling/no-reset comment, unbiased picker draw). Owner approved by ear.
 
 ### S5. Ride ping on every hit
 The ride "ping" fires only above `velocity > 0.92` (`synth-drums.ts:1067`); below that the ride is pure wash with no stick definition. Drop the gate — scale ping volume continuously from velocity.

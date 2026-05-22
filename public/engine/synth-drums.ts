@@ -549,6 +549,88 @@ function ensureCymbalBuffer(
     return groove.audioBuffers[profile.key];
 }
 
+// synth-audit Epic 4 S4 — per-hit cymbal variation.
+// `current` caches one metallic buffer per cymbal, so fast hat patterns replay a
+// byte-identical sample — a clear "looped" tell. The `new` hat voices instead
+// draw from a small runtime-generated pool: `createMetallicBuffer` already
+// randomizes partial phases, per-partial detune/weight and the noise/transient
+// layers on every call, so N independent generations are N genuinely different
+// cymbals. Pool size 4 is the sweet spot from `drums.md` §6 — enough that a
+// fast 16th hat run never repeats a sample within earshot. All buffers are
+// synthesized at runtime, so the bundle is unchanged.
+//
+// Resident-RAM ceiling: `CYMBAL_POOL_SIZE × (distinct cymbal keys reaching
+// `getVariedCymbalBuffer`)`. Today that key set is fixed at 2 (`hihatMetal`,
+// `openHatMetal`), so 8 metallic buffers — negligible. NOTE for future stories:
+// `groove.audioBuffers` is created once (`state/groove.ts`) and has no reset or
+// prune path, so a `#pool` entry lives for the page lifetime. If a future story
+// derives `profile.key` dynamically (per groove / velocity / articulation), the
+// key set multiplies and this becomes unbounded — add pruning there.
+//
+// The no-immediate-repeat guarantee in `getVariedCymbalBuffer` requires
+// `CYMBAL_POOL_SIZE >= 2`; do not drop it to 1.
+const CYMBAL_POOL_SIZE = 4;
+
+// Per-cymbal cursor for the last buffer handed out, so the picker can avoid an
+// immediate repeat — a non-repeating random walk over the pool reads as more
+// varied than a fixed round-robin cycle (which is itself just a period-4 loop).
+const cymbalPoolLastIndex: Record<string, number> = {};
+
+/**
+ * Variation-pool buffer fetch for the `new` hi-hat voices (Epic 4 S4).
+ *
+ * Lazily grows a pool of `CYMBAL_POOL_SIZE` independently-synthesized metallic
+ * buffers under a derived `audioBuffers` key. While the pool is still filling,
+ * each call generates and returns a fresh buffer — this spreads the synthesis
+ * cost across the first few hits (one `createMetallicBuffer` per hit, the same
+ * per-hit cost `current` already pays on its first hat hit) and means even
+ * hits 1–4 are already distinct. Once the pool is full it returns a random
+ * member, never the one used immediately before, so a fast hat pattern has no
+ * audible loop period.
+ *
+ * `current` is untouched: `playDrumSoundCurrent` keeps using the single-buffer
+ * `getCymbalBuffer`/`ensureCymbalBuffer` path.
+ */
+function getVariedCymbalBuffer(
+    audioCtx: AudioContext,
+    groove: GrooveState,
+    name: CymbalName,
+): AudioBuffer {
+    const profile = CYMBAL_BUFFER_PROFILES[name];
+    if (!profile) {
+        return groove.audioBuffers.noise;
+    }
+    const poolKey = `${profile.key}#pool`;
+    let pool: AudioBuffer[] = groove.audioBuffers[poolKey];
+    if (!pool) {
+        pool = [];
+        groove.audioBuffers[poolKey] = pool;
+    }
+    // Still filling — synthesize one more distinct buffer and use it now.
+    if (pool.length < CYMBAL_POOL_SIZE) {
+        const fresh = createMetallicBuffer(audioCtx, profile);
+        pool.push(fresh);
+        return fresh;
+    }
+    // Full pool — pick a random buffer, but never repeat the previous one.
+    const last = cymbalPoolLastIndex[profile.key] ?? -1;
+    let index: number;
+    if (last < 0) {
+        // First pick after the pool filled — no previous buffer to avoid.
+        index = Math.floor(Math.random() * pool.length);
+    } else {
+        // Draw uniformly from the `pool.length - 1` non-`last` slots and shift
+        // past `last`: this keeps every non-`last` member equally likely (a
+        // plain "redraw collisions to last+1" would double one neighbor's odds).
+        index = Math.floor(Math.random() * (pool.length - 1));
+        if (index >= last) {
+            index++;
+        }
+    }
+    cymbalPoolLastIndex[profile.key] = index;
+    return pool[index];
+}
+
 function getBandLayerCount(state: EnsembleState): number {
     let layers = 0;
     if ((state as any).bass?.enabled) {
@@ -917,8 +999,9 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     }
 
     const source = playback.audio.createBufferSource();
-    source.buffer =
-        getCymbalBuffer(groove, 'HiHat') || ensureCymbalBuffer(playback.audio, groove, 'HiHat');
+    // Epic 4 S4 — draw from the variation pool so successive closed hats are
+    // not byte-identical replays of one cached buffer.
+    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'HiHat');
     source.playbackRate.value =
         voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
 
@@ -1064,8 +1147,8 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, open
     }
 
     const source = playback.audio.createBufferSource();
-    source.buffer =
-        getCymbalBuffer(groove, 'Open') || ensureCymbalBuffer(playback.audio, groove, 'Open');
+    // Epic 4 S4 — variation pool: fast open/half/quarter runs vary stick-to-stick.
+    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'Open');
     source.playbackRate.value =
         voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
 
@@ -1153,8 +1236,8 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
     }
 
     const source = playback.audio.createBufferSource();
-    source.buffer =
-        getCymbalBuffer(groove, 'HiHat') || ensureCymbalBuffer(playback.audio, groove, 'HiHat');
+    // Epic 4 S4 — variation pool shared with the closed hat (same HiHat family).
+    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'HiHat');
     source.playbackRate.value =
         voiceConfig.playbackRate * (0.95 + Math.random() * 0.03) * rr(voiceConfig.playbackVariance);
 
