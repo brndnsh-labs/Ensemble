@@ -298,6 +298,46 @@ function soloistBrightnessDrive(state: EnsembleState, vol: number): number {
     return Math.min(1, brightness * 0.5 + intensity * 0.6);
 }
 
+/**
+ * Slow filter-cutoff LFO so a sustained note breathes instead of sitting
+ * spectrally frozen (epic-3-soloist S3). The modulation depth ramps in after
+ * a short delay — mirroring the vibrato delay — so the attack stays clean and
+ * only the held tail moves. The caller gates on note length and the New voice.
+ */
+function attachCutoffLfo(
+    ctx: AudioContext,
+    filterFreq: AudioParam,
+    depthHz: number,
+    playTime: number,
+    duration: number,
+    voiceObj: SoloistVoice,
+): void {
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    // 0.15–0.4 Hz — slow enough to read as "breathing", not tremolo. Slight
+    // per-note spread so stacked/repeated notes don't phase-lock.
+    lfo.frequency.value = 0.15 + Math.random() * 0.25;
+
+    // The LFO sums additively onto the filter's scheduled cutoff automation
+    // (Web Audio param summing). Depth held at 0 through the attack, then
+    // ramped in over ~0.5 s so only the sustained tail breathes.
+    const lfoGain = ctx.createGain();
+    const delay = 0.3;
+    lfoGain.gain.setValueAtTime(0, playTime);
+    lfoGain.gain.setValueAtTime(0, playTime + delay);
+    lfoGain.gain.linearRampToValueAtTime(depthHz, playTime + delay + 0.5);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(filterFreq);
+    voiceObj.nodes.push(lfo, lfoGain);
+
+    // duration + 0.2 matches every preset's osc1 stop time, so the LFO is
+    // never disconnected (via osc1.onended → safeDisconnect) while still
+    // running — a mid-output disconnect would step the cutoff and click.
+    lfo.start(playTime);
+    lfo.stop(playTime + duration + 0.2);
+}
+
 function playTrumpet(
     state: EnsembleState,
     ctx: AudioContext,
@@ -378,6 +418,11 @@ function playTrumpet(
     smoother.gain.setValueAtTime(freq > 1000 ? -4 : -2, playTime);
 
     voiceObj.nodes.push(filter, bellFilter, smoother);
+
+    // Sustained-note breathing (epic-3-soloist S3) — New voice, long notes only.
+    if (isNewVoice && duration > 0.5) {
+        attachCutoffLfo(ctx, filter.frequency, sustainCutoff * 0.13, playTime, duration, voiceObj);
+    }
 
     osc1.connect(filter);
     osc2.connect(filter);
@@ -478,6 +523,12 @@ function playSaxophone(
     breathGain.connect(masterGainNode.gain);
 
     voiceObj.nodes.push(f1, f2, breathLfo, breathGain, masterGainNode);
+
+    // Sustained-note breathing (epic-3-soloist S3) — modulate the brighter
+    // formant only, so the tail shimmers without the vowel drifting.
+    if (isNewVoice && duration > 0.5) {
+        attachCutoffLfo(ctx, f2.frequency, 200, playTime, duration, voiceObj);
+    }
 
     osc1.connect(f1);
     osc2.connect(f1);
@@ -599,6 +650,11 @@ function playNeoJuno(
 
     voiceObj.nodes.push(filter);
 
+    // Sustained-note breathing (epic-3-soloist S3) — New voice, long notes only.
+    if (isNewVoice && duration > 0.5) {
+        attachCutoffLfo(ctx, filter.frequency, freq * 0.3, playTime, duration, voiceObj);
+    }
+
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(outputGain);
@@ -683,6 +739,11 @@ function playVowel(
 
     voiceObj.nodes.push(filter);
 
+    // Sustained-note breathing (epic-3-soloist S3) — slow vowel-formant drift.
+    if (isNewVoice && duration > 0.5) {
+        attachCutoffLfo(ctx, filter.frequency, 130, playTime, duration, voiceObj);
+    }
+
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(outputGain);
@@ -757,6 +818,11 @@ function playShred(
 
     voiceObj.nodes.push(filter);
 
+    // Sustained-note breathing (epic-3-soloist S3) — New voice, long notes only.
+    if (isNewVoice && duration > 0.5) {
+        attachCutoffLfo(ctx, filter.frequency, freq * 0.6, playTime, duration, voiceObj);
+    }
+
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(outputGain);
@@ -771,7 +837,11 @@ function playShred(
     osc1.start(playTime);
     osc2.start(playTime);
 
-    const stopTime = playTime + duration + 0.1;
+    // duration + 0.2 (was + 0.1): matches the other four presets and the
+    // attachCutoffLfo stop time, so the cutoff LFO is never disconnected while
+    // still running (epic-3-soloist S3). The gain envelope has fully released
+    // well before this, so the later hard-stop is inaudible.
+    const stopTime = playTime + duration + 0.2;
     osc1.stop(stopTime);
     osc2.stop(stopTime);
 

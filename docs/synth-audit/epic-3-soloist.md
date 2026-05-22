@@ -38,6 +38,8 @@ Held notes are spectrally frozen. Add a slow (0.15–0.4 Hz) cutoff LFO, depth-r
 **Acceptance:** A/B — a 2-second held note evolves in brightness instead of sitting dead.
 **Effort:** ~3h. **Model:** opus (movement by ear). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. A shared `attachCutoffLfo` helper adds a slow sine LFO (0.15–0.4 Hz, per-note random spread) summed additively onto each preset's filter cutoff, with depth held at 0 through the attack then ramped in over ~0.5 s — mirroring the vibrato delay — so only the sustained tail breathes. Lowpass presets (trumpet/neo/shred) wobble cutoff ±~12%, sax modulates its bright formant only, vowel gets a slow formant drift. Gated on `voice === 'new'` and `duration > 0.5 s`. synth-graph-reviewer caught a P1 — shred's `osc1` hard-stop (`+0.1 s`) lagged the LFO stop (`+0.2 s`), disconnecting the LFO mid-output for a cutoff-step click; fixed by aligning shred's `stopTime` to `+0.2 s` (matches the other four presets, gain envelope already released). Owner approved.
+
 ### S4. Coupled vibrato
 Vibrato modulates pitch only. Route the vibrato LFO (scaled) into output gain and filter cutoff as well — real vibrato is a 3-way correlated wobble. Consider widening the timid ~±15c pitch depth.
 
