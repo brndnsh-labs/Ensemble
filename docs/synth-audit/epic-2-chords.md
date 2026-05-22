@@ -30,6 +30,8 @@ The hammer strike (`synth-chords.ts:152–169`) is too quiet and too diffuse. Ra
 **Acceptance:** A/B — chords have a defined attack that cuts through a full-band mix. The single highest-leverage fix for burial.
 **Effort:** ~4h. **Model:** opus (transient design by ear). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. `playNoteNew` now layers a defined two-part transient on top of the legacy diffuse blip before delegating the body: a boosted noise "chiff" (`playPercussiveStrike` at `finalVol*0.45`, ~3× the old level) and a fast-decaying pitched click (`playResonantTone`, ~45 ms triangle at the note pitch). Both track velocity/polyphony and fire at the strum-shifted onset. synth-graph-reviewer: clean (no findings) — guard ordering, no NaN path, no node leak (both helpers self-disconnect), `playNoteCurrent` bit-identical. The one P2 (NaN-velocity not range-checked) is pre-existing and already covered by S7. typecheck/Biome/jscpd/vitest green. Owner approved by ear.
+
 ### S3. Velocity → brightness
 Velocity currently moves only filter cutoff and gain, not wave content. Crossfade two periodic waves (mellow + bright) by velocity, or scale upper-partial weights — using the Epic 0 S7 velocity→timbre helper.
 

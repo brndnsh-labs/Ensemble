@@ -6,6 +6,7 @@ import {
     humanizeNote,
     humanizeSeed,
     playPercussiveStrike,
+    playResonantTone,
     rampGain,
 } from './synth-utils.js';
 
@@ -122,14 +123,66 @@ const CHORD_STRUM_JITTER = 0.15; // humanize scale — keeps jitter well under o
 
 function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     const [state, freq, time, duration, opts = {}] = args;
-    const index = opts.index ?? 0;
-    if (index <= 0) {
+    const { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = opts;
+    const { playback, groove } = state;
+
+    // Bail to the delegate's own guard if the context is unusable — never
+    // schedule a transient for a note `playNoteCurrent` will reject.
+    if (!playback.audio || !Number.isFinite(freq)) {
         playNoteCurrent(state, freq, time, duration, { ...opts, index: 0 });
         return;
     }
-    const seed = humanizeSeed(index, 'chords', Math.round(freq));
-    const { timeOffset } = humanizeNote(seed, HUMANIZE_PROFILES.chords, CHORD_STRUM_JITTER);
-    const strum = index * CHORD_STRUM_STEP + timeOffset;
+
+    // Strum offset (Epic 2 S1) — 0 for the lowest note (index 0), ascending
+    // thereafter. The transient below fires at the strum-shifted start so it
+    // lands exactly on each note's onset, including the index-0 anchor.
+    let strum = 0;
+    if (index > 0) {
+        const seed = humanizeSeed(index, 'chords', Math.round(freq));
+        const { timeOffset } = humanizeNote(seed, HUMANIZE_PROFILES.chords, CHORD_STRUM_JITTER);
+        strum = index * CHORD_STRUM_STEP + timeOffset;
+    }
+    const startTime = Math.max(time + strum, playback.audio.currentTime);
+
+    // synth-audit Epic 2 S2 — real attack transient. `playNoteCurrent`'s only
+    // onset cue is a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
+    // the ear to latch onto, a primary cause of chord burial. The `new` voice
+    // layers a defined two-part transient on top of (not replacing) that blip:
+    //   1. a boosted noise "chiff" — the hammer strike, ~3x the legacy level;
+    //   2. a fast-decaying pitched click at the note frequency, so the onset
+    //      has a pitched edge that cuts a full-band mix.
+    // Both track velocity + polyphony via `finalVol` (recomputed to match
+    // `playNoteCurrent`'s `vol / sqrt(numVoices)`). Levels are first guesses,
+    // tuned at the listening gate.
+    const resolvedInstrument =
+        instrument === 'Piano' || instrument === 'Warm' ? instrument : 'Piano';
+    if (resolvedInstrument === 'Piano' && !muted && playback.audioGraph) {
+        const finalVol = vol / Math.sqrt(Math.max(1, numVoices));
+        const dest = playback.audioGraph.chords.gain;
+        // Hammer "chiff" — bandpass noise, a touch brighter than the legacy
+        // strike's 800-4000 Hz band so it reads as an edge, not a thud.
+        playPercussiveStrike(playback.audio, groove.audioBuffers.noise, dest, startTime, {
+            volume: finalVol * 0.45,
+            filterType: 'bandpass',
+            freq: Math.max(900, Math.min(5000, 1200 + (freq / 440) * 700 + finalVol * 600)),
+            Q: 1.2,
+            attack: 0.0008,
+            decay: 0.008,
+            duration: 0.08,
+        });
+        // Pitched click — a ~45 ms triangle blip at the note pitch. The fast
+        // 6 ms decay keeps it a transient tick, not an audible doubled tone.
+        playResonantTone(playback.audio, dest, startTime, {
+            type: 'triangle',
+            freqStart: freq,
+            freqEnd: freq,
+            volume: finalVol * 0.3,
+            attack: 0.001,
+            decay: 0.006,
+            duration: 0.045,
+        });
+    }
+
     playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
 }
 
