@@ -8,6 +8,7 @@ import {
     killActiveVoices,
     rampGain,
     updateDensityDucking,
+    velocityTimbre,
 } from '../../../public/engine/synth-utils.js';
 
 describe('Synthesis Utilities', () => {
@@ -196,6 +197,39 @@ describe('Synthesis Utilities', () => {
                 expect(Math.abs(n.timeOffset)).toBeLessThanOrEqual(drums.timeSpread);
                 expect(Math.abs(n.velocityMult - 1)).toBeLessThanOrEqual(drums.velSpread);
             }
+        });
+    });
+
+    describe('velocityTimbre (Epic 0 S7)', () => {
+        it('maps a harder note to a brighter, more driven timbre', () => {
+            const soft = velocityTimbre(0.2);
+            const hard = velocityTimbre(0.9);
+            expect(hard.brightness).toBeGreaterThan(soft.brightness);
+            expect(hard.cutoffMult).toBeGreaterThan(soft.cutoffMult);
+            expect(hard.drive).toBeGreaterThan(soft.drive);
+        });
+
+        it('clamps velocity to 0..1 at both ends', () => {
+            expect(velocityTimbre(-5)).toEqual(velocityTimbre(0));
+            expect(velocityTimbre(99)).toEqual(velocityTimbre(1));
+        });
+
+        it('maps the endpoints onto the configured ranges', () => {
+            const opts = { cutoffRange: [0.3, 1.8] as const, driveRange: [0.1, 0.7] as const };
+            const lo = velocityTimbre(0, opts);
+            const hi = velocityTimbre(1, opts);
+            expect(lo.cutoffMult).toBeCloseTo(0.3);
+            expect(lo.drive).toBeCloseTo(0.1);
+            expect(hi.cutoffMult).toBeCloseTo(1.8);
+            expect(hi.drive).toBeCloseTo(0.7);
+        });
+
+        it('respects the curve: convex (>1) stays darker at mid-velocity than linear', () => {
+            const linear = velocityTimbre(0.5, { curve: 1 });
+            const convex = velocityTimbre(0.5, { curve: 2 });
+            expect(convex.brightness).toBeLessThan(linear.brightness);
+            expect(linear.brightness).toBeCloseTo(0.5);
+            expect(convex.brightness).toBeCloseTo(0.25);
         });
     });
 });

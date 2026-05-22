@@ -34,7 +34,7 @@ This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — 
 4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
 5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
 
-**Current position:** Epic 0 — S1 (voice A/B harness), S2 (`synth-graph-reviewer`), S3 (typed audio-graph), S4 (algorithmic reverb — shipped as Schroeder/Freeverb after the FDN proved unstable under Web Audio), S5 (chord mix de-burial), S6 (shared seeded humanization layer) shipped 2026-05-21. **Next: Epic 0 S7** (shared velocity→timbre helper) — the last foundation story.
+**Current position:** Epic 0 is **complete** — all 7 foundation stories shipped 2026-05-21 (A/B harness, `synth-graph-reviewer`, typed audio-graph, algorithmic reverb, chord de-burial, shared humanization, velocity→timbre helper). Per the epic's own note, do a full listening pass before starting Epic 1. **Next: Epic 1** (Harmony Voice Rebuild) — the per-instrument epics now fan out; owner's listening triage put harmony first.
 
 ## The five cross-cutting themes
 
@@ -52,7 +52,7 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 6 | A/B harness, `synth-graph-reviewer`, typed audio graph, algorithmic reverb, chord de-burial, shared humanization + velocity→timbre helpers. **Do first.** Semi-manual. S1–S6 shipped 2026-05-21. |
+| 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 7 | ✅ Complete. A/B harness, `synth-graph-reviewer`, typed audio graph, algorithmic reverb, chord de-burial, shared humanization + velocity→timbre helpers. Semi-manual. All 7 shipped 2026-05-21. |
 | 1 | [Harmony Voice Rebuild](epic-1-harmony.md) | 6 | 0 | "Most toy-ish." Generic soloist skeleton + style switch — needs a real rebuild into named formant voices. Organ branch is good; leave it. |
 | 2 | [Chords → Electric Piano](epic-2-chords.md) | 7 | 0 | Buried by 3 mechanisms. Per-partial additive + inharmonicity + real transient → convincing electric piano. |
 | 3 | [Soloist Expressiveness](epic-3-soloist.md) | 7 | 0 | Highest-risk (most exposed). Frozen sustains, velocity→loudness-only, zero per-note variation. Wakes the dead legato path. |
@@ -60,7 +60,7 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 | 5 | [Bass Finishing](epic-5-bass.md) | 5 | 0 | Synthy-but-good — finishing, not a rebuild. Sub layer, velocity-driven saturation, animated growl cutoff. |
 | 6 | [Pack Infrastructure & First Pack](epic-6-packs.md) | 6 | 0 | Sample-pack system + first pack. Needs instrument-source indirection + non-persisted entitlement. Last. |
 
-**Total: 6 / 46 stories shipped.**
+**Total: 7 / 46 stories shipped.**
 
 ## The honest pack list
 

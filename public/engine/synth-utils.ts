@@ -308,3 +308,70 @@ export function humanizeNote(seed: number, profile: HumanizeProfile, scale = 1):
         detuneCents: (rDetune - 0.5) * 2 * profile.detuneSpread * scale,
     };
 }
+
+// --- Shared velocity → timbre mapping (synth-audit Epic 0 S7) ---------------
+//
+// The #1 cross-cutting "toy" tell: velocity drives loudness but never
+// brightness. A real instrument hit harder gets *brighter* — more open, more
+// harmonics — not just louder. `velocityTimbre` is the shared mapping every
+// voice uses to turn a note's velocity into timbre controls: a filter-cutoff
+// multiplier and a saturation-drive amount, shaped by a tunable curve.
+//
+// S7 lands the helper + one worked example (the `new` bass voice). Epics 2–5
+// apply it per voice.
+
+/** Tuning for `velocityTimbre`. All fields optional — the defaults are sane. */
+export interface VelocityTimbreOptions {
+    /**
+     * Exponent applied to the 0..1 velocity before mapping. `1` is linear;
+     * `<1` is concave (soft notes already open up — a quick, forgiving feel);
+     * `>1` is convex (soft notes stay dark, the timbre only blooms on hard
+     * hits — how most acoustic instruments behave). Default `1.5`.
+     */
+    readonly curve?: number;
+    /**
+     * `[atSoft, atHard]` filter-cutoff multiplier — the factor to apply to a
+     * voice's base cutoff at velocity 0 vs velocity 1. Default `[0.5, 1.5]`.
+     */
+    readonly cutoffRange?: readonly [number, number];
+    /**
+     * `[atSoft, atHard]` saturation drive, 0..1 — how hard to push a voice's
+     * waveshaper / pre-gain. Default `[0, 1]`.
+     */
+    readonly driveRange?: readonly [number, number];
+}
+
+/** The timbre controls derived from one note's velocity. */
+export interface VelocityTimbre {
+    /** The curve-shaped velocity, 0..1 — a general-purpose brightness scalar. */
+    readonly brightness: number;
+    /** Multiply a lowpass/voice cutoff by this — harder hit, brighter. */
+    readonly cutoffMult: number;
+    /** Saturation drive, 0..1 — harder hit, more harmonics. */
+    readonly drive: number;
+}
+
+/**
+ * Map a note's velocity to timbre controls. `velocity` is clamped to 0..1,
+ * shaped through `options.curve`, then mapped linearly into the cutoff and
+ * drive ranges. Pure and deterministic — no allocation beyond the small
+ * returned object, safe to call per note.
+ */
+export function velocityTimbre(
+    velocity: number,
+    options: VelocityTimbreOptions = {},
+): VelocityTimbre {
+    // Defensive coercion: this is a shared helper Epics 2–5 all call, so a
+    // non-finite velocity/curve must not propagate NaN into a filter cutoff.
+    const rawCurve = options.curve ?? 1.5;
+    const curve = Number.isFinite(rawCurve) && rawCurve > 0 ? rawCurve : 1.5;
+    const [cutLo, cutHi] = options.cutoffRange ?? [0.5, 1.5];
+    const [driveLo, driveHi] = options.driveRange ?? [0, 1];
+    const v = Number.isFinite(velocity) ? Math.min(1, Math.max(0, velocity)) : 0;
+    const brightness = curve === 1 ? v : v ** curve;
+    return {
+        brightness,
+        cutoffMult: cutLo + brightness * (cutHi - cutLo),
+        drive: driveLo + brightness * (driveHi - driveLo),
+    };
+}

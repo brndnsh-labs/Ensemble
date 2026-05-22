@@ -1,6 +1,11 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
-import { playPercussiveStrike, rampGain, updateDensityDucking } from './synth-utils.js';
+import {
+    playPercussiveStrike,
+    rampGain,
+    updateDensityDucking,
+    velocityTimbre,
+} from './synth-utils.js';
 
 export function killBassNote(state: EnsembleState): void {
     const { playback, bass } = state;
@@ -29,8 +34,138 @@ export function playBassNote(...args: Parameters<typeof playBassNoteCurrent>): v
     (args[0].bass.voice === 'new' ? playBassNoteNew : playBassNoteCurrent)(...args);
 }
 
-function playBassNoteNew(...args: Parameters<typeof playBassNoteCurrent>): void {
-    playBassNoteCurrent(...args);
+// synth-audit Epic 0 S7 — worked example for the shared `velocityTimbre`
+// helper. A compact two-layer bass (clean sine sub + sawtooth harmonic layer)
+// whose *tone*, not just its loudness, tracks how hard the note is played:
+// `velocityTimbre` opens the lowpass and pushes the saturator on hard notes
+// and closes both down on soft ones. The Current voice scales loudness with
+// velocity but barely the timbre — toggle "New Sound" on bass and play a soft
+// then a hard note to hear the difference. Epic 5 ("Bass Finishing") builds
+// this `new` path out further (sub layer, growl animation, etc.).
+function playBassNoteNew(
+    state: EnsembleState,
+    freq: number,
+    time: number,
+    duration: number,
+    velocity = 1.0,
+    muteAmount = 0,
+    bendStartInterval = 0,
+): void {
+    const { playback, bass } = state;
+    if (!playback.audio || !playback.audioGraph) {
+        return;
+    }
+    // Every input is caller-supplied — guard them all. A non-finite
+    // `bendStartInterval` would otherwise poison `startFreq` and the pitch
+    // ramp anchor, silently dropping the voice.
+    if (
+        !Number.isFinite(freq) ||
+        !Number.isFinite(time) ||
+        !Number.isFinite(duration) ||
+        !Number.isFinite(velocity) ||
+        !Number.isFinite(muteAmount) ||
+        !Number.isFinite(bendStartInterval)
+    ) {
+        return;
+    }
+    if (freq < 10 || freq > 24000) {
+        return;
+    }
+    try {
+        const audio = playback.audio;
+        const now = audio.currentTime;
+        const startTime = Math.max(time, now);
+        // Clamp the bend to a sane musical range so the pitch ramp can't start
+        // from a near-zero frequency (invalid exponential-ramp anchor).
+        const bend = Math.max(-24, Math.min(24, bendStartInterval));
+
+        // The whole point of the New voice: velocity → timbre, not just level.
+        // Convex curve (1.6) keeps soft notes round and dark; hard notes bloom.
+        const timbre = velocityTimbre(velocity, {
+            curve: 1.6,
+            cutoffRange: [0.4, 1.5],
+            driveRange: [0.1, 0.9],
+        });
+
+        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - muteAmount * 0.85);
+        if (vol < 0.005) {
+            return;
+        }
+
+        const startFreq = bend !== 0 ? freq * 2 ** (bend / 12) : freq;
+        const bendRamp = Math.min(0.1, duration * 0.5);
+
+        // --- Layer 1: clean sine sub (the weight) ---
+        const sub = audio.createOscillator();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(startFreq, startTime);
+
+        // --- Layer 2: sawtooth harmonics through the velocity-brightened LP ---
+        const saw = audio.createOscillator();
+        saw.type = 'sawtooth';
+        saw.frequency.setValueAtTime(startFreq, startTime);
+
+        if (bend !== 0) {
+            sub.frequency.exponentialRampToValueAtTime(freq, startTime + bendRamp);
+            saw.frequency.exponentialRampToValueAtTime(freq, startTime + bendRamp);
+        }
+
+        // Base (fully-open) cutoff tracks pitch; `cutoffMult` scales it down on
+        // soft notes, a palm-mute (`muteAmount`) rolls it down further.
+        const midi = 12 * Math.log2(freq / 440) + 69;
+        const baseCutoff = (450 + midi * 18) * (1 - muteAmount * 0.5);
+        const lp = audio.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(Math.max(80, baseCutoff * timbre.cutoffMult), startTime);
+        lp.Q.setValueAtTime(1.1, startTime);
+
+        const sawGain = audio.createGain();
+        sawGain.gain.setValueAtTime(0.4, startTime);
+        saw.connect(lp);
+        lp.connect(sawGain);
+
+        const mix = audio.createGain();
+        sub.connect(mix);
+        sawGain.connect(mix);
+
+        // --- Velocity-driven saturation: a hotter pre-gain into a fixed
+        // soft-clip means a harder note picks up more harmonics. ---
+        const driveGain = audio.createGain();
+        driveGain.gain.setValueAtTime(1 + timbre.drive * 2.5, startTime);
+        const shaper = audio.createWaveShaper();
+        shaper.curve = createSoftClipCurve();
+        shaper.oversample = '4x';
+        mix.connect(driveGain);
+        driveGain.connect(shaper);
+
+        // --- Amp envelope: fast attack, a short decay to a sustain, release ---
+        // `releaseTime` is floored above the 0.04 decay anchor so the three
+        // envelope events always stay in schedule order (a short or fully
+        // muted note would otherwise schedule the release before the decay).
+        const amp = audio.createGain();
+        amp.gain.setValueAtTime(0, startTime);
+        amp.gain.setTargetAtTime(vol, startTime, 0.006);
+        const releaseTime = Math.max(0.06, duration * (1 - muteAmount) + 0.02 * muteAmount);
+        amp.gain.setTargetAtTime(vol * 0.45, startTime + 0.04, 0.12);
+        amp.gain.setTargetAtTime(0, startTime + releaseTime, 0.08);
+        shaper.connect(amp);
+        amp.connect(playback.audioGraph.bass.gain);
+
+        // Monophonic note-off — kill the previous note's amp.
+        if (bass.lastBassGain && bass.lastBassGain !== amp) {
+            rampGain(bass.lastBassGain.gain, 0, startTime, 0.005);
+        }
+        (bass as Mutable<typeof bass>).lastBassGain = amp; // @direct-mutation
+
+        sub.start(startTime);
+        saw.start(startTime);
+        const stopTime = startTime + releaseTime + 1.0;
+        sub.stop(stopTime);
+        saw.stop(stopTime);
+        sub.onended = () => safeDisconnect([sub, saw, lp, sawGain, mix, driveGain, shaper, amp]);
+    } catch (e) {
+        console.error('playBassNoteNew error:', e, { freq, time, duration });
+    }
 }
 
 function playBassNoteCurrent(
