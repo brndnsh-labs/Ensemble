@@ -1,5 +1,6 @@
 import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
+import { scrambleHash } from './hash-utils.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
@@ -53,6 +54,7 @@ function playSoloNoteCurrent(
     style: string = 'scalar',
     isLegato: boolean = false,
     vibrato: boolean = false,
+    noteSeed: number = 0,
 ): void {
     const { playback, soloist } = state;
     if (!Number.isFinite(freq)) {
@@ -100,6 +102,13 @@ function playSoloNoteCurrent(
     const prevFreq = soloist.audio.lastRenderedFreq || freq;
     (soloist.audio as Mutable<typeof soloist.audio>).lastRenderedFreq = freq; // @direct-mutation
 
+    // Per-note timbral humanization (epic-3-soloist S5) — New voice only; the
+    // neutral object keeps the Current voice bit-identical.
+    const timbre =
+        soloist.voice === 'new'
+            ? soloistTimbreJitter(noteSeed, (state.groove?.humanize ?? 0) / 100)
+            : NO_TIMBRE_JITTER;
+
     switch (preset) {
         case 'neo':
             playNeoJuno(
@@ -116,6 +125,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
         case 'vowel':
@@ -133,6 +143,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
         case 'trumpet':
@@ -150,6 +161,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
         case 'saxophone':
@@ -167,6 +179,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
         case 'shred':
@@ -184,6 +197,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
         default:
@@ -201,6 +215,7 @@ function playSoloNoteCurrent(
                 isLegato,
                 prevFreq,
                 vibrato,
+                timbre,
             );
             break;
     }
@@ -304,6 +319,54 @@ function soloistBrightnessDrive(state: EnsembleState, vol: number): number {
     return Math.min(1, brightness * 0.5 + intensity * 0.6);
 }
 
+/** Per-note timbral humanization offsets (epic-3-soloist S5). */
+interface TimbreJitter {
+    /** Filter-cutoff multiplier, centered on 1.0. */
+    readonly cutoffJit: number;
+    /** Detune offset in cents, centered on 0. */
+    readonly detuneCents: number;
+    /** Attack-time multiplier, centered on 1.0. */
+    readonly attackJit: number;
+    /** Bell/formant frequency multiplier, centered on 1.0. */
+    readonly bellJit: number;
+}
+
+/** Neutral jitter — the Current voice and humanize=0 both use this no-op. */
+const NO_TIMBRE_JITTER: TimbreJitter = {
+    cutoffJit: 1,
+    detuneCents: 0,
+    attackJit: 1,
+    bellJit: 1,
+};
+
+/**
+ * Seeded per-note timbral humanization (epic-3-soloist S5) — so successive
+ * same-pitch notes are not byte-identical and the "machine playing the same
+ * note" tell is gone. Four independent `scrambleHash` draws off one seed
+ * (XORed with distinct constants so the dimensions don't move in lockstep)
+ * jitter cutoff ±8%, detune ±3c, attack ±20%, and bell/formant freq ±5%.
+ * `scale` is the `groove.humanize / 100` knob; at 0 the result is neutral.
+ * Deterministic — the same seed always yields the same offsets, so looped
+ * playback and critique tests reproduce exactly.
+ */
+function soloistTimbreJitter(seed: number, scale: number): TimbreJitter {
+    if (!(scale > 0)) {
+        return NO_TIMBRE_JITTER;
+    }
+    const s = Math.min(1, scale);
+    // scrambleHash returns 0..1; (h - 0.5) centers each draw on 0.
+    const jCut = scrambleHash(seed ^ 0x2545f491) - 0.5;
+    const jDet = scrambleHash(seed ^ 0x7f4a7c15) - 0.5;
+    const jAtk = scrambleHash(seed ^ 0xb55a4f09) - 0.5;
+    const jBell = scrambleHash(seed ^ 0x1b873593) - 0.5;
+    return {
+        cutoffJit: 1 + jCut * 2 * 0.08 * s,
+        detuneCents: jDet * 2 * 3 * s,
+        attackJit: 1 + jAtk * 2 * 0.2 * s,
+        bellJit: 1 + jBell * 2 * 0.05 * s,
+    };
+}
+
 /**
  * Slow filter-cutoff LFO so a sustained note breathes instead of sitting
  * spectrally frozen (epic-3-soloist S3). The modulation depth ramps in after
@@ -358,11 +421,13 @@ function playTrumpet(
     isLegato: boolean,
     prevFreq: number,
     vibratoFlag: boolean,
+    timbre: TimbreJitter,
 ): void {
     const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
+    osc1.detune.value = timbre.detuneCents;
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
@@ -390,7 +455,8 @@ function playTrumpet(
     // freq-only cutoffs.
     const isNewVoice = soloist.voice === 'new';
     const drive = soloistBrightnessDrive(state, vol);
-    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+    // × timbre.cutoffJit folds in the S5 per-note ±8% cutoff humanization.
+    const cutoffMult = (isNewVoice ? 0.75 + drive * 0.6 : 1) * timbre.cutoffJit;
     const bellMult = isNewVoice ? 0.85 + drive * 0.35 : 1;
 
     const filter = ctx.createBiquadFilter();
@@ -408,7 +474,7 @@ function playTrumpet(
 
     const bellFilter = ctx.createBiquadFilter();
     bellFilter.type = 'peaking';
-    bellFilter.frequency.value = 1200;
+    bellFilter.frequency.value = 1200 * timbre.bellJit;
     bellFilter.Q.value = 1.5;
 
     // Register-aware bell gain: Reduce boost in high register to prevent nasality
@@ -455,7 +521,7 @@ function playTrumpet(
     // Legato attack swells in gently (epic-3-soloist S1) so a connected note
     // blends under the previous note's release tail instead of re-articulating
     // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
-    const attack = isLegato ? 0.032 : 0.02;
+    const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
@@ -486,11 +552,13 @@ function playSaxophone(
     isLegato: boolean,
     prevFreq: number,
     vibratoFlag: boolean,
+    timbre: TimbreJitter,
 ): void {
     const { soloist } = state;
 
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
+    osc1.detune.value = timbre.detuneCents;
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'triangle';
@@ -519,7 +587,8 @@ function playSaxophone(
     // lowpass presets: too much shift would change the vowel, not brightness.
     const isNewVoice = soloist.voice === 'new';
     const drive = soloistBrightnessDrive(state, vol);
-    const formantMult = isNewVoice ? 0.92 + drive * 0.28 : 1;
+    // × timbre.cutoffJit folds in the S5 per-note ±8% formant humanization.
+    const formantMult = (isNewVoice ? 0.92 + drive * 0.28 : 1) * timbre.cutoffJit;
 
     const f1 = ctx.createBiquadFilter();
     f1.type = 'bandpass';
@@ -577,7 +646,7 @@ function playSaxophone(
     masterGainNode.connect(outputGain);
 
     // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
-    const attack = isLegato ? 0.055 : 0.04;
+    const attack = (isLegato ? 0.055 : 0.04) * timbre.attackJit;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
@@ -629,10 +698,12 @@ function playNeoJuno(
     isLegato: boolean,
     prevFreq: number,
     vibratoFlag: boolean,
+    timbre: TimbreJitter,
 ): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
+    osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
 
@@ -672,7 +743,8 @@ function playNeoJuno(
     // voice keeps freq-only cutoffs.
     const isNewVoice = soloist.voice === 'new';
     const drive = soloistBrightnessDrive(state, vol);
-    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+    // × timbre.cutoffJit folds in the S5 per-note ±8% cutoff humanization.
+    const cutoffMult = (isNewVoice ? 0.75 + drive * 0.6 : 1) * timbre.cutoffJit;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -715,7 +787,7 @@ function playNeoJuno(
     // Legato attack swells in gently (epic-3-soloist S1) so a connected note
     // blends under the previous note's release tail instead of re-articulating
     // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
-    const attack = isLegato ? 0.032 : 0.02;
+    const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
@@ -749,10 +821,12 @@ function playVowel(
     isLegato: boolean,
     prevFreq: number,
     vibratoFlag: boolean,
+    timbre: TimbreJitter,
 ): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
+    osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'square';
     osc2.detune.value = 4;
@@ -779,7 +853,8 @@ function playVowel(
     // sweep. Tight range — a large shift changes the vowel.
     const isNewVoice = soloist.voice === 'new';
     const drive = soloistBrightnessDrive(state, vol);
-    const formantMult = isNewVoice ? 0.92 + drive * 0.28 : 1;
+    // × timbre.cutoffJit folds in the S5 per-note ±8% formant humanization.
+    const formantMult = (isNewVoice ? 0.92 + drive * 0.28 : 1) * timbre.cutoffJit;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
@@ -818,7 +893,7 @@ function playVowel(
     filter.connect(outputGain);
 
     // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
-    const attack = isLegato ? 0.035 : 0.02;
+    const attack = (isLegato ? 0.035 : 0.02) * timbre.attackJit;
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
@@ -847,10 +922,12 @@ function playShred(
     isLegato: boolean,
     prevFreq: number,
     vibratoFlag: boolean,
+    timbre: TimbreJitter,
 ): void {
     const { soloist } = state;
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
+    osc1.detune.value = timbre.detuneCents;
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
     osc2.detune.value = 12;
@@ -876,7 +953,8 @@ function playShred(
     // Current voice keeps the freq-only cutoff.
     const isNewVoice = soloist.voice === 'new';
     const drive = soloistBrightnessDrive(state, vol);
-    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+    // × timbre.cutoffJit folds in the S5 per-note ±8% cutoff humanization.
+    const cutoffMult = (isNewVoice ? 0.75 + drive * 0.6 : 1) * timbre.cutoffJit;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -914,7 +992,7 @@ function playShred(
 
     // Legato attack stays tight but loses the hard 5 ms transient
     // (epic-3-soloist S1) — shred is aggressive, so the swell is subtler.
-    const attack = isLegato ? 0.016 : 0.005;
+    const attack = (isLegato ? 0.016 : 0.005) * timbre.attackJit;
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 1.3, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);

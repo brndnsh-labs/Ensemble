@@ -7,6 +7,11 @@ import {
 } from './engine/engine.js';
 import { stateMap } from './state.js';
 
+// Monotonic counter so each manually-triggered solo note gets a distinct
+// humanization seed (epic-3-soloist S5) — otherwise every manual note would
+// share noteSeed 0 and be byte-identical, the exact "machine" tell S5 fixes.
+let manualSoloSeq = 0;
+
 export function triggerSoloNote(
     freq: number,
     time: number,
@@ -18,7 +23,18 @@ export function triggerSoloNote(
     vibrato = false,
 ): void {
     initAudio(stateMap);
-    playSoloNote(stateMap, freq, time, duration, vol, bend, style, isLegato, vibrato);
+    playSoloNote(
+        stateMap,
+        freq,
+        time,
+        duration,
+        vol,
+        bend,
+        style,
+        isLegato,
+        vibrato,
+        manualSoloSeq++,
+    );
 }
 
 export function stopSoloist(): void {

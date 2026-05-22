@@ -54,6 +54,8 @@ Successive same-pitch notes are byte-identical. Jitter cutoff ±8%, detune ±3c,
 **Acceptance:** A/B — repeated notes vary subtly; the "machine playing the same note" tell is gone. Deterministic under a fixed session seed.
 **Effort:** ~3h. **Model:** opus (variation range by ear). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. New helper `soloistTimbreJitter(seed, scale)` draws four independent `scrambleHash` values off one seed (distinct XOR constants) — jittering cutoff ±8%, detune ±3c, attack ±20%, bell freq ±5%, scaled by the `groove.humanize` knob. A `noteSeed` (defaulted last param) is threaded scheduler → `playSoloNote` → `playSoloNoteCurrent`, seeded `humanizeSeed(step, 'soloist', voiceIndex)`; `playSoloNoteCurrent` builds the `timbre` object (neutral `NO_TIMBRE_JITTER` for the Current voice — bit-identical) and passes it to all 5 presets. Deterministic — looped phrases reproduce exactly. synth-graph-reviewer: clean (0 P0/P1); one P2 fixed — the manual-trigger path (`performance-controller.ts`) bypassed the jitter via the defaulted seed, now seeded by a monotonic per-call counter. Owner approved.
+
 ### S6. Attack-time detune settle + tighten shred
 osc2 detune is a fixed constant per preset; +12c on shred is nearly a quarter-tone and sounds sour. Tighten shred to ~+6c (or add a third osc for fatness), and ramp osc2 detune from a wide value (~±20c) to its final over 40–60 ms so unisons "lock in" on the attack.
 

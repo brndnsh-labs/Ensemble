@@ -472,7 +472,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
 
     if (soloistNote) {
         const results = Array.isArray(soloistNote) ? soloistNote : [soloistNote];
-        results.forEach((res: any) => {
+        results.forEach((res: any, voiceIndex: number) => {
             const freq = res.freq || getFrequency(res.midi);
             const duration = (res.durationSteps || 4) * 0.25 * (60.0 / playback.bpm);
 
@@ -486,6 +486,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
                 soloist.style,
                 false,
                 res.vibrato,
+                humanizeSeed(pickupStep, 'soloist', voiceIndex),
             );
             dispatchMidiCountInSoloist(state, res, time);
             if (vizState.enabled) {
@@ -774,7 +775,7 @@ function scheduleSoloist(
         }
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
 
-        notesToPlay.forEach((noteEntry: any) => {
+        notesToPlay.forEach((noteEntry: any, voiceIndex: number) => {
             if (noteEntry?.freq) {
                 const {
                     freq,
@@ -828,6 +829,10 @@ function scheduleSoloist(
                     style,
                     isLegato,
                     vibrato,
+                    // Per-note timbral humanization seed (epic-3-soloist S5) —
+                    // (step, voiceIndex) so successive same-pitch notes differ
+                    // yet stay deterministic for looped playback / tests.
+                    humanizeSeed(step, 'soloist', voiceIndex),
                 );
 
                 // Soloist is monophonic UNLESS double stops are enabled
