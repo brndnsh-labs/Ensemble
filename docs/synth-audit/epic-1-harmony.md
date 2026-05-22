@@ -44,6 +44,8 @@ The harmony bus EQ (`engine.ts:257–271`) is a single peaking filter at 1200 Hz
 **Acceptance:** A/B — harmony has presence and air without competing with the chord comp.
 **Effort:** ~3h. **Model:** opus (mix judgment). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §2.
 
+**Status:** Shipped 2026-05-22. Replaced the inaudible +1 dB no-op peaking filter (1200 Hz) on the harmony bus with two voiced filters: a low-mid scoop (peaking 500 Hz, Q 1.0, −3 dB) to clear the band the chord comp owns, and an air high-shelf (+3 dB from 7.5 kHz) to give harmony its own presence slot above the chords' 2.5 kHz lift. `synth-graph-reviewer` clean (P0: 0, P1: 0) — finite constants, fully connected series chain, correct peaking-Q usage. typecheck/Biome/jscpd green, 954 harmony-related tests pass. Owner auditioned in-mix and approved.
+
 ### S6. Hygiene cleanup
 Three concrete items from `harmony.md` §5–§6: (a) remove the dead `tremoloGain` — allocated at `synth-harmonies.ts:262–272`, never connected; (b) cache the organ WaveShaper curve — `synth-harmonies.ts:236–245` rebuilds a 44100-sample `Float32Array` on *every organ note*; the chords file already has the cached pattern (`cachedShaperCurve`) to copy; (c) guard the `slideInterval` exponential ramp (401–412) and the organ click ramp (330–331) against zero/NaN start or target values.
 

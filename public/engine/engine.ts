@@ -295,17 +295,38 @@ export function initAudio(
                 busEQ.connect(presence);
                 presence.connect(masterGain);
             } else if (m.name === 'harmonies') {
-                const warmth = playback.audio.createBiquadFilter();
-                warmth.type = 'peaking';
-                warmth.frequency.setValueAtTime(1200, playback.audio.currentTime);
-                warmth.gain.setValueAtTime(1, playback.audio.currentTime);
+                // Harmony bus character (synth-audit Epic 1 S5): the old
+                // bus was a single +1 dB peaking filter at 1.2 kHz — an
+                // inaudible no-op, the thinnest bus in the mixer. Harmony
+                // is a *sweetener* layer that should float above the chord
+                // comp, so the bus now does two things:
+                //
+                // 1. Low-mid scoop — peaking 500 Hz, Q 1.0, -3 dB. The
+                //    chord bus owns the low-mids (its lowshelf sits at
+                //    350 Hz); scooping harmony here keeps it from
+                //    competing with the comp and muddying that band.
+                const scoop = playback.audio.createBiquadFilter();
+                scoop.type = 'peaking';
+                scoop.frequency.setValueAtTime(500, playback.audio.currentTime);
+                scoop.Q.setValueAtTime(1.0, playback.audio.currentTime);
+                scoop.gain.setValueAtTime(-3, playback.audio.currentTime);
+
+                // 2. Air high-shelf — +3 dB from 7.5 kHz up. Sits well
+                //    above the chord bus's 2.5 kHz presence lift, so the
+                //    harmony gets its own presence/air slot rather than
+                //    fighting the chords for the same band.
+                const air = playback.audio.createBiquadFilter();
+                air.type = 'highshelf';
+                air.frequency.setValueAtTime(7500, playback.audio.currentTime);
+                air.gain.setValueAtTime(3, playback.audio.currentTime);
 
                 const panner = playback.audio.createStereoPanner();
                 panner.pan.setValueAtTime(0.2, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
-                busEQ.connect(warmth);
-                warmth.connect(panner);
+                busEQ.connect(scoop);
+                scoop.connect(air);
+                air.connect(panner);
                 panner.connect(masterGain);
 
                 busPanner = panner;
