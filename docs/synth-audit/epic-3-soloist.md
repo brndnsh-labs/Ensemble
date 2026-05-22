@@ -70,6 +70,8 @@ Release is always a fixed 85% of duration with no decay stage and no relationshi
 **Acceptance:** A/B — staccato notes are crisp, sustained notes have a natural tail; release feels played, not clamped.
 **Effort:** ~4h. **Model:** opus (envelope by ear). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. Two new helpers — `soloistRelease(playTime, duration, isLegato)` derives articulation-aware release timing (legato → late + gentle; staccato `duration < 0.22` → early + crisp; else scales with duration), and `applySoloistEnvelope` schedules a real ADSR on `outputGain.gain`: attack → decay to a `peak*0.82` sustain → that release. Each of the 5 presets branches `if (isNewVoice)` to the new envelope, keeping its exact prior envelope verbatim in the `else` (Current bit-identical). synth-graph-reviewer: clean event ordering across all articulation branches; one P1 fixed — the `playSoloNoteCurrent` entry guard now also checks `vol`/`duration` (not just `freq`) before they reach `setTargetAtTime`. Owner approved.
+
 ## Notes
 
 - The soloist's shared algorithmic reverb need is satisfied by Epic 0 S4 (FDN) — confirm the soloist bus has a sensible send during this epic.

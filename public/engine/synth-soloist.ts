@@ -57,7 +57,10 @@ function playSoloNoteCurrent(
     noteSeed: number = 0,
 ): void {
     const { playback, soloist } = state;
-    if (!Number.isFinite(freq)) {
+    // Guard every value that feeds an AudioParam: freq → oscillators, vol →
+    // the envelope peak, duration → the release/decay timing. A non-finite
+    // here would throw inside setTargetAtTime (epic-3-soloist S7).
+    if (!Number.isFinite(freq) || !Number.isFinite(vol) || !Number.isFinite(duration)) {
         return;
     }
 
@@ -367,6 +370,61 @@ function soloistTimbreJitter(seed: number, scale: number): TimbreJitter {
     };
 }
 
+/** A note's release timing — when the release stage starts and its shape. */
+interface SoloistRelease {
+    /** Absolute time the release `setTargetAtTime` is scheduled. */
+    readonly start: number;
+    /** `setTargetAtTime` time-constant — smaller is a crisper cutoff. */
+    readonly constant: number;
+}
+
+/**
+ * Articulation-aware release timing (epic-3-soloist S7). The old envelope
+ * always released at a fixed `duration * 0.8–0.9` with a fixed constant,
+ * regardless of how the note was played. This ties the release to
+ * articulation:
+ *  - legato → late start + gentle constant, so the note sustains into the next;
+ *  - staccato (short, non-legato) → early start + quick constant: a crisp cutoff;
+ *  - otherwise → scales with duration so a longer note gets a fuller tail.
+ */
+function soloistRelease(playTime: number, duration: number, isLegato: boolean): SoloistRelease {
+    if (isLegato) {
+        return { start: playTime + duration * 0.92, constant: 0.12 };
+    }
+    if (duration < 0.22) {
+        return { start: playTime + duration * 0.55, constant: 0.035 };
+    }
+    // Longer notes get a slightly longer tail, capped so it never drags.
+    const tail = Math.min(0.18, 0.07 + duration * 0.05);
+    return { start: playTime + duration * 0.85, constant: tail };
+}
+
+/**
+ * The New soloist voice's amplitude envelope (epic-3-soloist S7) — a real
+ * ADSR: attack to `peak`, a decay stage down to a sustain level, then the
+ * articulation-aware release from `soloistRelease`. The Current voice keeps
+ * its own per-preset envelope (no decay, fixed release) untouched.
+ */
+function applySoloistEnvelope(
+    outputGain: GainNode,
+    peak: number,
+    playTime: number,
+    duration: number,
+    attack: number,
+    isLegato: boolean,
+): void {
+    const gain = outputGain.gain;
+    const rel = soloistRelease(playTime, duration, isLegato);
+    // The decay must land before the release re-aims the param — an
+    // out-of-order setTargetAtTime would swell the note back up. Clamp it
+    // between playTime and just before the release.
+    const decayStart = Math.max(playTime, Math.min(playTime + attack * 4, rel.start - 0.01));
+    gain.setValueAtTime(0, playTime);
+    gain.setTargetAtTime(peak, playTime, attack);
+    gain.setTargetAtTime(peak * 0.82, decayStart, 0.06);
+    gain.setTargetAtTime(0, rel.start, rel.constant);
+}
+
 /**
  * Attack-time unison settle (epic-3-soloist S6). The Current voice keeps a
  * fixed `currentCents` detune on osc2. The New voice starts osc2 ~20c wider
@@ -548,10 +606,15 @@ function playTrumpet(
     // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
     const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
-    outputGain.gain.setTargetAtTime(vol * 0.9, playTime + 0.1, 0.05);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+    if (isNewVoice) {
+        // ADSR with articulation-aware release (epic-3-soloist S7).
+        applySoloistEnvelope(outputGain, vol * 1.2, playTime, duration, attack, isLegato);
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
+        outputGain.gain.setTargetAtTime(vol * 0.9, playTime + 0.1, 0.05);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+    }
 
     osc1.start(playTime);
     osc2.start(playTime);
@@ -673,9 +736,14 @@ function playSaxophone(
     // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
     const attack = (isLegato ? 0.055 : 0.04) * timbre.attackJit;
 
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+    if (isNewVoice) {
+        // ADSR with articulation-aware release (epic-3-soloist S7).
+        applySoloistEnvelope(outputGain, vol * 2.9, playTime, duration, attack, isLegato);
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
+    }
 
     const noiseBuffer = state.groove?.audioBuffers?.noise;
     if (noiseBuffer) {
@@ -817,9 +885,14 @@ function playNeoJuno(
     // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
     const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    if (isNewVoice) {
+        // ADSR with articulation-aware release (epic-3-soloist S7).
+        applySoloistEnvelope(outputGain, vol * 1.1, playTime, duration, attack, isLegato);
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    }
 
     osc1.start(playTime);
     osc2.start(playTime);
@@ -922,9 +995,14 @@ function playVowel(
 
     // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
     const attack = (isLegato ? 0.035 : 0.02) * timbre.attackJit;
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    if (isNewVoice) {
+        // ADSR with articulation-aware release (epic-3-soloist S7).
+        applySoloistEnvelope(outputGain, vol * 2.5, playTime, duration, attack, isLegato);
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
+    }
 
     osc1.start(playTime);
     osc2.start(playTime);
@@ -1022,9 +1100,14 @@ function playShred(
     // Legato attack stays tight but loses the hard 5 ms transient
     // (epic-3-soloist S1) — shred is aggressive, so the swell is subtler.
     const attack = (isLegato ? 0.016 : 0.005) * timbre.attackJit;
-    outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.3, playTime, attack);
-    outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);
+    if (isNewVoice) {
+        // ADSR with articulation-aware release (epic-3-soloist S7).
+        applySoloistEnvelope(outputGain, vol * 1.3, playTime, duration, attack, isLegato);
+    } else {
+        outputGain.gain.setValueAtTime(0, playTime);
+        outputGain.gain.setTargetAtTime(vol * 1.3, playTime, attack);
+        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);
+    }
 
     osc1.start(playTime);
     osc2.start(playTime);
