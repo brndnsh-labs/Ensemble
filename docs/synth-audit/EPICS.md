@@ -34,7 +34,7 @@ This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — 
 4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
 5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
 
-**Current position:** Epic 0 complete (7/7, 2026-05-21). Epic 1 (Harmony Voice Rebuild) in progress — **S6 hygiene cleanup shipped 2026-05-21, S5 bus character EQ shipped 2026-05-22** (2/6). Run order S6 → S5 → S1 → S2 → S3 → S4 (see the epic file's sequencing note). **Next: Epic 1 S1** (stand up `playHarmonyNoteNew` — the voice rebuild begins); resume with `/synth-cycle`.
+**Current position:** Epic 0 complete (7/7, 2026-05-21). Epic 1 (Harmony Voice Rebuild) in progress — **S6 + S5 + S1 shipped** (3/6, S1 stood up the real `playHarmonyNoteNew` voice 2026-05-22). Run order S6 → S5 → S1 → S2 → S3 → S4 (see the epic file's sequencing note). **Next: Epic 1 S2** (real ADSR envelope on the new voice); resume with `/synth-cycle`.
 
 ## The five cross-cutting themes
 
@@ -53,14 +53,14 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
 | 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 7 | ✅ Complete. A/B harness, `synth-graph-reviewer`, typed audio graph, algorithmic reverb, chord de-burial, shared humanization + velocity→timbre helpers. Semi-manual. All 7 shipped 2026-05-21. |
-| 1 | [Harmony Voice Rebuild](epic-1-harmony.md) | 6 | 2 | "Most toy-ish." Generic soloist skeleton + style switch — needs a real rebuild into named formant voices. Organ branch is good; leave it. S6 hygiene + S5 bus EQ shipped. |
+| 1 | [Harmony Voice Rebuild](epic-1-harmony.md) | 6 | 3 | "Most toy-ish." Generic soloist skeleton + style switch — needs a real rebuild into named formant voices. Organ branch is good; leave it. S6 hygiene + S5 bus EQ + S1 voice standup shipped. |
 | 2 | [Chords → Electric Piano](epic-2-chords.md) | 7 | 0 | Buried by 3 mechanisms. Per-partial additive + inharmonicity + real transient → convincing electric piano. |
 | 3 | [Soloist Expressiveness](epic-3-soloist.md) | 7 | 0 | Highest-risk (most exposed). Frozen sustains, velocity→loudness-only, zero per-note variation. Wakes the dead legato path. |
 | 4 | [Drums Polish](epic-4-drums.md) | 8 | 0 | Strongest voice already. Un-choke the hat, in-between positions, velocity→timbre on percussion. Includes one real bug: the panner leak. |
 | 5 | [Bass Finishing](epic-5-bass.md) | 5 | 0 | Synthy-but-good — finishing, not a rebuild. Sub layer, velocity-driven saturation, animated growl cutoff. |
 | 6 | [Pack Infrastructure & First Pack](epic-6-packs.md) | 6 | 0 | Sample-pack system + first pack. Needs instrument-source indirection + non-persisted entitlement. Last. |
 
-**Total: 9 / 46 stories shipped.**
+**Total: 10 / 46 stories shipped.**
 
 ## The honest pack list
 
