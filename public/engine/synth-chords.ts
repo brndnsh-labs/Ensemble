@@ -297,6 +297,14 @@ function playAdditiveBody(
     const MAX_PARTIAL_HZ = 16000;
     const TAU_BASE = 2.8; // s — the fundamental's decay time-constant
     const TAU_K = 0.6; // upper partials decay faster: τ_n = TAU_BASE/(1+K·(n-1))
+    // synth-audit Epic 2 S5 — inharmonicity. A perfectly harmonic partial
+    // series (n·f0) is exactly what reads as "organ-ish synth". Real piano
+    // strings are stiff: every partial rings slightly sharp of its harmonic
+    // via f_n = n·f0·√(1+B·n²), and the stretch grows toward the treble — so
+    // `B` is pitch-dependent. Coefficients tuned by ear at the listening gate.
+    const B_BASE = 0.0003;
+    const B_FREQ_REF = 800;
+    const inharmonicB = B_BASE * (1 + freq / B_FREQ_REF);
     const partialNs: number[] = [];
     let weightSum = 0;
     for (let n = 1; n <= MAX_PARTIALS; n++) {
@@ -316,8 +324,10 @@ function playAdditiveBody(
         const osc = audio.createOscillator();
         const pg = audio.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(n * freq, startTime);
-        // ±2 cents of per-note humanization — not inharmonicity (that is S5).
+        // Inharmonic stretch (S5): partial n sits sharp of n·f0 by √(1+B·n²).
+        const stretch = Math.sqrt(1 + inharmonicB * n * n);
+        osc.frequency.setValueAtTime(n * freq * stretch, startTime);
+        // ±2 cents of per-note humanization, independent of the stretch.
         osc.detune.setValueAtTime(Math.random() * 4 - 2, startTime);
         const tau = TAU_BASE / (1 + TAU_K * (n - 1));
         pg.gain.setValueAtTime(0, startTime);

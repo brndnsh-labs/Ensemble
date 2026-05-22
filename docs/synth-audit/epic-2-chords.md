@@ -54,6 +54,8 @@ On top of S4's per-partial model, detune partial *n* from *n·f0* by a stretch f
 **Acceptance:** A/B — the voice reads as a real piano/electric piano rather than an organ-ish synth. Depends on S4.
 **Effort:** ~3h. **Model:** opus (tuning by ear). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. `playAdditiveBody` now stretches each partial sharp of its harmonic via `f_n = n·f0·√(1+B·n²)`, with `B` pitch-dependent (`B = B_BASE·(1+freq/B_FREQ_REF)`, B_BASE=0.0003, B_FREQ_REF=800) so inharmonicity rises toward the treble like a real stiff string. The ±2 ¢ per-note humanization composes on top, untouched. synth-graph-reviewer: clean (no findings) — stretched frequency provably finite/non-negative, ~5500 Hz of headroom under the sample-rate limit worst-case, no nodes added, `playNoteCurrent` bit-identical. typecheck/Biome/jscpd/vitest green. Owner approved by ear.
+
 ### S6. Soften polyphony compensation
 `1/sqrt(numVoices)` makes a 4-note chord play each voice at 0.5× — a full chord ends up quieter than a single note, working against de-burial. Switch to a gentler curve (`1/numVoices^0.3`) or a cap.
 
