@@ -831,6 +831,15 @@ function playDrumSoundCurrent(
     if (playback.audioGraph) {
         panner.connect(playback.audioGraph.drums.gain);
     }
+    // why: this per-hit panner must be disconnected once the hit fully decays, or it
+    // leaks one StereoPannerNode per drum hit — dozens/second at tempo (synth-audit
+    // Epic 4 S1). The cymbal/guiro/brush branches already free it via their own
+    // buffer-source `onended`; the helper-only branches below hand `onEnded` to their
+    // longest-lived (or tied-longest) `playResonantTone`/`playPercussiveStrike` call.
+    // When tied, sibling layers stop at the same instant and are already silent, so
+    // freeing the panner microseconds early is inaudible and leaks nothing (each
+    // sibling still disconnects its own chain via its own `onended`).
+    const releasePanner = () => safeDisconnect([panner]);
 
     // Round-robin variation (±1.5%)
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
@@ -878,7 +887,7 @@ function playDrumSoundCurrent(
             duration: 0.24,
         });
 
-        // 4. The "Shell": Deep resonance
+        // 4. The "Shell": Deep resonance — longest-lived Kick layer, so it owns panner release.
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
             freqStart: voiceConfig.shellFreq * rr(0.01),
@@ -887,6 +896,7 @@ function playDrumSoundCurrent(
             attack: 0.003,
             decay: voiceConfig.shellDecay,
             duration: voiceConfig.shellDuration,
+            onEnded: releasePanner,
         });
 
         // 5. Click: 2–4kHz presence peak that cuts through on small speakers/earbuds
@@ -941,6 +951,7 @@ function playDrumSoundCurrent(
                 attack: 0.002,
                 decay: 0.02,
                 duration: 0.5,
+                onEnded: releasePanner,
             });
 
             return;
@@ -982,6 +993,7 @@ function playDrumSoundCurrent(
             });
         }
 
+        // wires are the longest-lived Snare layer (wiresDuration ~0.16-0.46s) — own panner release.
         playPercussiveStrike(playback.audio, groove.audioBuffers.noise, panner, playTime, {
             volume: vol * voiceConfig.wiresVolume,
             filterType: 'bandpass',
@@ -990,6 +1002,7 @@ function playDrumSoundCurrent(
             attack: 0.0008,
             decay: voiceConfig.wiresDecay,
             duration: voiceConfig.wiresDuration,
+            onEnded: releasePanner,
         });
     } else if (name === 'HiHat' || name === 'Open' || name === 'Ride') {
         const isRide = name === 'Ride';
@@ -1204,6 +1217,7 @@ function playDrumSoundCurrent(
             attack: 0.0005,
             decay: 0.003,
             duration: 0.1,
+            onEnded: releasePanner,
         });
     } else if (name.startsWith('Conga') || name.startsWith('Bongo')) {
         const isBongo = name.startsWith('Bongo');
@@ -1234,6 +1248,7 @@ function playDrumSoundCurrent(
             attack: 0.001,
             decay: 0.015,
             duration: 0.3,
+            onEnded: releasePanner,
         });
     } else if (name.startsWith('Agogo') || name === 'Perc') {
         const isHigh = name.includes('High') || name === 'Perc';
@@ -1265,6 +1280,7 @@ function playDrumSoundCurrent(
             attack: 0.002,
             decay: 0.04,
             duration: 0.5,
+            onEnded: releasePanner,
         });
     } else if (name === 'Guiro') {
         const vol = masterVol * 0.5 * rr();
@@ -1298,6 +1314,7 @@ function playDrumSoundCurrent(
             attack: 0.01,
             decay: 0.05,
             duration: 0.2,
+            onEnded: releasePanner,
         });
     } else if (name.includes('Tom')) {
         const voiceConfig = getTomVoiceConfig(name, velocity);
@@ -1338,7 +1355,7 @@ function playDrumSoundCurrent(
             duration: voiceConfig.bodyDuration,
         });
 
-        // 4. Shell Resonance
+        // 4. Shell Resonance — longest-lived Tom layer (shellDuration ~1-1.75s), owns panner release.
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
             freqStart: voiceConfig.shellFreq * rr(0.01),
@@ -1346,6 +1363,7 @@ function playDrumSoundCurrent(
             attack: voiceConfig.shellAttack,
             decay: voiceConfig.shellDecay * rr(),
             duration: voiceConfig.shellDuration,
+            onEnded: releasePanner,
         });
     } else if (name.startsWith('Cowbell')) {
         // why: disco "Octave Cowbells" (drums.md P0 #3) need a real voice, not a fallback —
@@ -1380,6 +1398,7 @@ function playDrumSoundCurrent(
             attack: 0.001,
             decay: 0.04,
             duration: 0.18,
+            onEnded: releasePanner,
         });
 
         // 3. Bandpass strike click — short noise burst centered at 3.2kHz delivers the
@@ -1461,6 +1480,10 @@ function playDrumSoundCurrent(
                 duration: 0.12,
             });
         }
+    } else {
+        // No branch matched (unknown `name` — already surfaced by maybeWarnUnknownSound).
+        // Nothing feeds the panner, so free it immediately rather than leaking it.
+        releasePanner();
     }
 }
 

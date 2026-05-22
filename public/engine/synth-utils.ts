@@ -114,6 +114,14 @@ interface PercussiveStrikeOptions {
     attack?: number;
     decay?: number;
     duration?: number;
+    /**
+     * Optional cleanup callback fired once the strike has fully finished — after the
+     * helper disconnects its own `[source, filter, gain]` chain. Lets a caller free a
+     * node it owns (e.g. a per-hit `StereoPannerNode`) without the helper needing to
+     * know about it. Fires even when the helper bails early (null buffer) or throws,
+     * so the caller's cleanup is guaranteed to run exactly once.
+     */
+    onEnded?: () => void;
 }
 
 export function playPercussiveStrike(
@@ -129,9 +137,11 @@ export function playPercussiveStrike(
         attack = 0.001,
         decay = 0.01,
         duration = 0.1,
+        onEnded,
     }: PercussiveStrikeOptions = {},
 ): void {
     if (!audio || !buffer || !destination) {
+        onEnded?.();
         return;
     }
 
@@ -156,9 +166,13 @@ export function playPercussiveStrike(
         source.start(time);
         source.stop(time + duration);
 
-        source.onended = () => safeDisconnect([source, filter, gain]);
+        source.onended = () => {
+            safeDisconnect([source, filter, gain]);
+            onEnded?.();
+        };
     } catch {
         /* ignore audio errors */
+        onEnded?.();
     }
 }
 
@@ -172,6 +186,12 @@ interface ResonantToneOptions {
     decay?: number;
     duration?: number;
     detune?: number;
+    /**
+     * Optional cleanup callback fired once the tone has fully finished — after the
+     * helper disconnects its own `[osc, gain]` chain. See `PercussiveStrikeOptions.onEnded`.
+     * Fires even when the helper bails early or throws, so it runs exactly once.
+     */
+    onEnded?: () => void;
 }
 
 export function playResonantTone(
@@ -188,9 +208,11 @@ export function playResonantTone(
         decay = 0.05,
         duration = 0.5,
         detune = 0,
+        onEnded,
     }: ResonantToneOptions = {},
 ): void {
     if (!audio || !destination) {
+        onEnded?.();
         return;
     }
 
@@ -217,9 +239,13 @@ export function playResonantTone(
         osc.start(time);
         osc.stop(time + duration);
 
-        osc.onended = () => safeDisconnect([osc, gain]);
+        osc.onended = () => {
+            safeDisconnect([osc, gain]);
+            onEnded?.();
+        };
     } catch {
         /* ignore audio errors */
+        onEnded?.();
     }
 }
 
