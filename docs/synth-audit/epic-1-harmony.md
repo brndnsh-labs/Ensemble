@@ -12,14 +12,16 @@ This is the one epic that is a **rebuild, not a polish**. The **organ branch is 
 
 ## Stories
 
-### S1. Decouple `style` from the `genreFeel` override
-`synth-harmonies.ts:288–303` checks `groove.genreFeel` (Rock/Metal, Neo-Soul/Acoustic) *before* the `style` switch, so a chosen style silently never reaches its branch. Remove the preemption: `genreFeel` may *bias* defaults but must not override an explicit `style`.
+### S1. Stand up `playHarmonyNoteNew` — `style` decoupled from `genreFeel`
+**This is the first voice-rebuild story** — where `playHarmonyNoteNew` stops being a placeholder that delegates to `*Current` and becomes a real (if still basic) harmony voice that S2–S4 then build onto. The bug to design out from the start: `synth-harmonies.ts:288–303` (cited from the *current* voice for reference — this is not an in-place edit target) checks `groove.genreFeel` (Rock/Metal, Neo-Soul/Acoustic) *before* the `style` switch, so a chosen style silently never reaches its branch. The new voice must structure this correctly: `genreFeel` may *bias* defaults but must never override an explicit `style`. Carry the good organ branch into the new voice unchanged. Named formant voices come in S3/S4; S1 only makes `New` a structurally-correct voice.
 
-**Acceptance:** every `style` branch is reachable under every `genreFeel`. A/B confirms previously-hijacked styles now sound as intended.
-**Effort:** ~2h. **Model:** sonnet (control-flow fix, concrete). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §2.
+> Note (synth-cycle triage): this cannot land in `playHarmonyNoteCurrent` — making hijacked styles reachable *changes* `current`'s sound, which breaks the bit-identical `current` freeze. All of it lands in `playHarmonyNoteNew`.
+
+**Acceptance:** `playHarmonyNoteNew` is a real voice (no longer delegating to `*Current`); every `style` branch is reachable under every `genreFeel`; A/B confirms previously-hijacked styles now sound as intended.
+**Effort:** ~4h. **Model:** opus (voice-skeleton standup + control structure). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §2.
 
 ### S2. Real ADSR envelope
-The envelope (`synth-harmonies.ts:526–528`) is AR — linear attack to `finalVol`, then `setTargetAtTime(0)` release. No decay, no sustain stage. Add a decay-to-sustain stage so pads swell-and-settle. Also fix the past-scheduled release for short pad notes (§5) so they reach `finalVol` before decay begins.
+Layered onto the `playHarmonyNoteNew` voice S1 stood up. The current envelope (`synth-harmonies.ts:526–528`, cited for reference) is AR — linear attack to `finalVol`, then `setTargetAtTime(0)` release. No decay, no sustain stage. Give the new voice a decay-to-sustain stage so pads swell-and-settle. Also avoid the past-scheduled release for short pad notes (§5) so they reach `finalVol` before decay begins.
 
 **Acceptance:** A/B — pad/string styles have an audible swell-settle shape instead of a flat held tone. Short pad notes are no longer shape-distorted.
 **Effort:** ~3h. **Model:** opus (envelope shape by ear). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §2, §5.
@@ -50,5 +52,7 @@ Three concrete items from `harmony.md` §5–§6: (a) remove the dead `tremoloGa
 
 ## Notes
 
-- S1 and S6 are mechanical and can be done first/in parallel. S2 → S3/S4 (the rebuilt voices want the real envelope). S5 is independent.
-- Do **not** touch the organ branch — it is the one good voice here.
+- **Sequencing (synth-cycle triage, 2026-05-21):** Epic 1 is a *rebuild*, so S1–S4 are **not** independent — they all build one `playHarmonyNoteNew` body and must run **sequentially in order**: S1 stands the voice up, S2 adds the envelope, S3/S4 add the named formant presets. Each is independently auditable (the `new` voice gets progressively better). S5 (bus EQ — `engine.ts` mix-side, applies to `current` too) and S6 (hygiene on the current code) are genuinely independent — run them first as low-risk warmups, in any order. **Revised order: S6 → S5 → S1 → S2 → S3 → S4.**
+- The epic's original note called S1 "mechanical" — it is not, under the bit-identical `current` freeze: a control-flow patch to `playHarmonyNoteCurrent` would change `current`'s sound. S1 is a voice-rebuild story (opus), re-scoped accordingly above.
+- S2 → S3/S4 (the rebuilt formant voices want the real envelope).
+- Do **not** touch the organ branch's *sound* — it is the one good voice here. S1 carries it into `playHarmonyNoteNew` unchanged; S6(b) caching the organ WaveShaper curve is a transparent, sound-preserving perf fix and is allowed.
