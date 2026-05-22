@@ -172,7 +172,13 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     // It no longer delegates to `playNoteCurrent`: a per-partial additive
     // body (S4) replaces the legacy single-oscillator body, and the attack
     // transient (S2) + bright layer (S3) sit on top.
-    const finalVol = vol / Math.sqrt(Math.max(1, numVoices));
+    // synth-audit Epic 2 S6 — soften polyphony compensation. The legacy
+    // `1/√numVoices` curve drops a 4-note chord to 0.5× per voice, so a full
+    // voicing ends up quieter than a single note — working against de-burial.
+    // The gentler `numVoices^-0.3` lifts a 4-note chord to 0.66× per voice
+    // (6-note → 0.58×): still some attenuation to guard against clipping on
+    // dense chords, but a full chord no longer sits below a sparse one.
+    const finalVol = vol / Math.max(1, numVoices) ** 0.3;
 
     // synth-audit Epic 2 S2 — real attack transient. `playNoteCurrent`'s only
     // onset cue is a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
@@ -244,8 +250,15 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     }
 
     // synth-audit Epic 2 S4 — per-partial additive body (replaces the legacy
-    // delegated single-oscillator-through-one-LPF body).
-    playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+    // delegated single-oscillator-through-one-LPF body). Guarded: the
+    // scheduler iterates a chord's notes with `forEach`, so an un-caught
+    // throw here would abort every later note in the chord, not just this
+    // one. `playNoteCurrent` has the equivalent guard around its own body.
+    try {
+        playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+    } catch (err) {
+        console.error('playNote (new) additive-body error:', err);
+    }
 }
 
 // synth-audit Epic 2 S4 — per-partial additive body. The legacy body is one
@@ -306,17 +319,25 @@ function playAdditiveBody(
     const B_FREQ_REF = 800;
     const inharmonicB = B_BASE * (1 + freq / B_FREQ_REF);
     const partialNs: number[] = [];
-    let weightSum = 0;
+    let sumInvSq = 0; // Σ(1/n²) over surviving partials — drives RMS normalization
     for (let n = 1; n <= MAX_PARTIALS; n++) {
         if (n * freq > MAX_PARTIAL_HZ) {
             break;
         }
         partialNs.push(n);
-        weightSum += 1 / n; // ~1/n harmonic rolloff
+        sumInvSq += 1 / (n * n); // amplitudes follow a 1/n roll-off
     }
-    // Normalize so the partials sum to ~unity at onset regardless of how many
-    // survived the ceiling — keeps the body level matched to `finalVol`.
-    const norm = weightSum > 0 ? 1 / weightSum : 1;
+    // Normalize the bank by RMS, not by peak-amplitude sum. The partials are
+    // mutually independent sines (uncorrelated phases), so "make the
+    // amplitudes sum to 1" peak normalization under-delivers loudness by the
+    // bank's crest factor
+    // (~7 dB) — which left the additive body far quieter than the legacy
+    // voice and effectively inaudible on exposed, low-intensity material such
+    // as a reggae skank. Target a fixed bank RMS instead: with amp_n = norm/n,
+    // RMS = norm·√(0.5·Σ(1/n²)), so norm = BANK_RMS / √(0.5·Σ(1/n²)). This is
+    // partial-count-independent, so high notes (fewer partials) stay matched.
+    const BANK_RMS = 0.72; // ≈ the legacy body's loudness
+    const norm = sumInvSq > 0 ? BANK_RMS / Math.sqrt(0.5 * sumInvSq) : 1;
 
     const oscs: OscillatorNode[] = [];
     const gains: GainNode[] = [];
@@ -346,6 +367,16 @@ function playAdditiveBody(
         // the mix chain dangling without a source to drive `onended`.
         safeDisconnect([bodyGain, hpf, panner]);
         return;
+    }
+
+    // Start every partial *before* any stop is scheduled — calling `stop()`
+    // on a never-started oscillator throws InvalidStateError, which would
+    // abort the note (and, un-caught, the whole chord). The fundamental
+    // (n=1) always exists and is stopped no later than any other partial, so
+    // tearing the graph down off its `onended` fires `safeDisconnect` once.
+    oscs[0].onended = () => safeDisconnect([...oscs, ...gains, bodyGain, hpf, panner]);
+    for (const o of oscs) {
+        o.start(startTime);
     }
 
     // Release / panic stop — mirrors the legacy voice's `stopNote` semantics
@@ -381,15 +412,6 @@ function playAdditiveBody(
         for (const o of oscs) {
             o.stop(stopAt);
         }
-    }
-
-    // The fundamental (n=1) always exists and is stopped no later than any
-    // other partial — in the no-pedal path every osc shares one `stopAt`; in
-    // the pedal path `stopBody` stops every osc at the same `t`. Tearing the
-    // graph down off its `onended` therefore fires `safeDisconnect` once.
-    oscs[0].onended = () => safeDisconnect([...oscs, ...gains, bodyGain, hpf, panner]);
-    for (const o of oscs) {
-        o.start(startTime);
     }
 }
 

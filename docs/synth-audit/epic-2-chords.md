@@ -62,6 +62,8 @@ On top of S4's per-partial model, detune partial *n* from *n·f0* by a stretch f
 **Acceptance:** A/B — full voicings are not quieter than sparse ones; no clipping on dense chords.
 **Effort:** ~2h. **Model:** sonnet (concrete curve change). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2.
 
+**Status:** Shipped 2026-05-22. `playNoteNew`'s `finalVol` now uses `vol / numVoices^0.3` instead of `vol / √numVoices`, so a full voicing is no longer quieter than a sparse one (4-note chord 0.50×→0.66× per voice). The listening gate surfaced **two latent bugs in the S4 additive body**, both fixed in the same change: (1) the partial bank was peak-normalized, under-delivering RMS loudness by ~7 dB — switched to RMS normalization (`norm = BANK_RMS/√(0.5·Σ(1/n²))`); (2) **a P0** — `playAdditiveBody` called `osc.stop()` before `osc.start()`, throwing `InvalidStateError`, which silenced the body and (un-caught) aborted the scheduler's per-note `forEach` so only the first chord note sounded ("one note at a time", every genre). Fixed by reordering start-before-stop and adding a try/catch guard around `playAdditiveBody` in `playNoteNew`. synth-graph-reviewer: clean (P0:0, P1:0) — fix verified on all five lifecycle points, `playNoteCurrent` bit-identical. typecheck/Biome/jscpd/vitest green. Owner approved by ear across genres.
+
 ### S7. NaN guards on `vol` / `duration` / `bandIntensity`
 `vol` (from `n.velocity`) and `duration` reach `AudioParam`s and `osc.stop()` unguarded; a NaN silently poisons gain/cutoff/shaper or drops the note. Add `Number.isFinite` guards with sane fallbacks (fail-fast per the worker-payload convention).
 

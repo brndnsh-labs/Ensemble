@@ -34,7 +34,7 @@ This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — 
 4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
 5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
 
-**Current position:** Epic 0 complete (7/7, 2026-05-21). **Epic 1 (Harmony Voice Rebuild) complete (6/6, 2026-05-22)** — `playHarmonyNoteNew` rebuilt into a real voice: decoupled style/genreFeel, ADSR, named Horn Section + String Pad formant voices, bus character EQ, hygiene cleanup. Organ branch carried over untouched. **Epic 2 (Chords → Electric Piano) in progress (5/7, 2026-05-22)** — S1 strum-stagger; S2 two-part attack transient; S3 velocity-scaled bright-wave layer; S4 9-partial additive body with per-partial decay; S5 pitch-dependent inharmonic partial stretch. **Next: Epic 2 S6 (Soften polyphony compensation)**; resume with `/synth-cycle`.
+**Current position:** Epic 0 complete (7/7, 2026-05-21). **Epic 1 (Harmony Voice Rebuild) complete (6/6, 2026-05-22)** — `playHarmonyNoteNew` rebuilt into a real voice: decoupled style/genreFeel, ADSR, named Horn Section + String Pad formant voices, bus character EQ, hygiene cleanup. Organ branch carried over untouched. **Epic 2 (Chords → Electric Piano) in progress (6/7, 2026-05-22)** — S1 strum-stagger; S2 two-part attack transient; S3 velocity-scaled bright-wave layer; S4 9-partial additive body with per-partial decay; S5 pitch-dependent inharmonic stretch; S6 softened polyphony compensation + fixed an S4 stop-before-start P0 (additive body never started → "one note at a time"). **Next: Epic 2 S7 (NaN guards)** — last Epic 2 story; resume with `/synth-cycle`.
 
 ## The five cross-cutting themes
 
@@ -54,13 +54,13 @@ Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructur
 | :- | :- | :-: | :-: | :- |
 | 0 | [Audio Foundation & A/B Harness](epic-0-foundation.md) | 7 | 7 | ✅ Complete. A/B harness, `synth-graph-reviewer`, typed audio graph, algorithmic reverb, chord de-burial, shared humanization + velocity→timbre helpers. Semi-manual. All 7 shipped 2026-05-21. |
 | 1 | [Harmony Voice Rebuild](epic-1-harmony.md) | 6 | 6 | ✅ Complete. Generic soloist skeleton + style switch rebuilt into named formant voices (Horn Section, String Pad), real ADSR, bus EQ, hygiene. Organ branch left intact. All 6 shipped 2026-05-22. |
-| 2 | [Chords → Electric Piano](epic-2-chords.md) | 7 | 5 | Buried by 3 mechanisms. Per-partial additive + inharmonicity + real transient → convincing electric piano. S1–S5 shipped 2026-05-22. |
+| 2 | [Chords → Electric Piano](epic-2-chords.md) | 7 | 6 | Buried by 3 mechanisms. Per-partial additive + inharmonicity + real transient → convincing electric piano. S1–S6 shipped 2026-05-22 (S6 also fixed an S4 stop-before-start P0). |
 | 3 | [Soloist Expressiveness](epic-3-soloist.md) | 7 | 0 | Highest-risk (most exposed). Frozen sustains, velocity→loudness-only, zero per-note variation. Wakes the dead legato path. |
 | 4 | [Drums Polish](epic-4-drums.md) | 8 | 0 | Strongest voice already. Un-choke the hat, in-between positions, velocity→timbre on percussion. Includes one real bug: the panner leak. |
 | 5 | [Bass Finishing](epic-5-bass.md) | 5 | 0 | Synthy-but-good — finishing, not a rebuild. Sub layer, velocity-driven saturation, animated growl cutoff. |
 | 6 | [Pack Infrastructure & First Pack](epic-6-packs.md) | 6 | 0 | Sample-pack system + first pack. Needs instrument-source indirection + non-persisted entitlement. Last. |
 
-**Total: 18 / 46 stories shipped.**
+**Total: 19 / 46 stories shipped.**
 
 ## The honest pack list
 
