@@ -46,6 +46,8 @@ Replace the single periodic-wave oscillator with ~6–10 individually-enveloped 
 **Acceptance:** A/B — sustained chords have natural spectral decay (upper partials die first); the "buzzy stable" sustain is gone. Holds up at full polyphony without CPU strain.
 **Effort:** ~6h. **Model:** opus (DSP design). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. The `new` Piano voice no longer delegates its body to `playNoteCurrent` — `playNoteNew` now calls a new `playAdditiveBody` helper that builds the body from up to 9 harmonic sine partials (n·f0, capped below 16 kHz), each individually enveloped with a decay time-constant that shortens up the series (`τ_n = TAU_BASE/(1+TAU_K·(n−1))`), so the spectrum darkens naturally as the note rings. Partial amplitudes follow a 1/n roll-off, normalized so the bank sums to ~unity. Sustain-pedal semantics (`heldNotes` registration, 64-note cap, `stopBody`) mirror the legacy voice; the legacy LPF sweep + waveshaper are dropped. `Warm` stays on the delegated legacy voice. synth-graph-reviewer: safe to land (P0:0); two P1s confirmed as legacy *parity* (held-note-never-stopped leak, identical in `playNoteCurrent`) — not regressions; one comment tightened. `playNoteCurrent` bit-identical. typecheck/Biome/jscpd/vitest green; owner approved by ear incl. full-polyphony CPU check.
+
 ### S5. Inharmonicity
 On top of S4's per-partial model, detune partial *n* from *n·f0* by a stretch factor (`f_n = n·f0·sqrt(1+B·n²)`, B small, pitch-dependent). This is the difference between "rich synth" and "piano."
 
@@ -68,3 +70,4 @@ On top of S4's per-partial model, detune partial *n* from *n·f0* by a stretch f
 
 - S1, S6, S7 are mechanical — fan out early. S4 → S5 (inharmonicity needs the per-partial model). S2, S3 are independent voice work.
 - Target the synthesized voice at a great **electric piano** + a serviceable acoustic. The true acoustic grand is Epic 6.
+- *Carry-over (S4 review, 2026-05-22):* both the legacy `playNoteCurrent` and the new `playAdditiveBody` leave a sustained note's oscillators running with no scheduled `.stop()` until pedal-up / 64-note eviction / panic — a held note that is never released and never evicted leaks its nodes. Pre-existing, shared by both voices, not an S4 regression. Worth a shared-layer follow-up (a hard ceiling on held-note lifetime) if it ever bites.

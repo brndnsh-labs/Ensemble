@@ -159,20 +159,31 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     }
     const startTime = Math.max(time + strum, playback.audio.currentTime);
 
+    // Epic 2 targets the electric-piano voice — for any other instrument
+    // (i.e. Warm) the `new` voice keeps the legacy delegated body untouched.
+    const resolvedInstrument =
+        instrument === 'Piano' || instrument === 'Warm' ? instrument : 'Piano';
+    if (resolvedInstrument !== 'Piano') {
+        playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
+        return;
+    }
+
+    // --- The `new` Piano voice ---------------------------------------------
+    // It no longer delegates to `playNoteCurrent`: a per-partial additive
+    // body (S4) replaces the legacy single-oscillator body, and the attack
+    // transient (S2) + bright layer (S3) sit on top.
+    const finalVol = vol / Math.sqrt(Math.max(1, numVoices));
+
     // synth-audit Epic 2 S2 — real attack transient. `playNoteCurrent`'s only
     // onset cue is a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
     // the ear to latch onto, a primary cause of chord burial. The `new` voice
-    // layers a defined two-part transient on top of (not replacing) that blip:
+    // gives the onset a defined two-part transient:
     //   1. a boosted noise "chiff" — the hammer strike, ~3x the legacy level;
     //   2. a fast-decaying pitched click at the note frequency, so the onset
     //      has a pitched edge that cuts a full-band mix.
-    // Both track velocity + polyphony via `finalVol` (recomputed to match
-    // `playNoteCurrent`'s `vol / sqrt(numVoices)`). Levels are first guesses,
-    // tuned at the listening gate.
-    const resolvedInstrument =
-        instrument === 'Piano' || instrument === 'Warm' ? instrument : 'Piano';
-    if (resolvedInstrument === 'Piano' && !muted && playback.audioGraph) {
-        const finalVol = vol / Math.sqrt(Math.max(1, numVoices));
+    // Both track velocity + polyphony via `finalVol`. Levels are first
+    // guesses, tuned at the listening gate.
+    if (!muted && playback.audioGraph) {
         const dest = playback.audioGraph.chords.gain;
         // Hammer "chiff" — bandpass noise, a touch brighter than the legacy
         // strike's 800-4000 Hz band so it reads as an edge, not a thud.
@@ -232,7 +243,144 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
         }
     }
 
-    playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
+    // synth-audit Epic 2 S4 — per-partial additive body (replaces the legacy
+    // delegated single-oscillator-through-one-LPF body).
+    playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+}
+
+// synth-audit Epic 2 S4 — per-partial additive body. The legacy body is one
+// static periodic-wave oscillator dragged through a single lowpass sweep —
+// every partial decays in lockstep, so a held chord freezes into a "buzzy
+// stable" sustain. This rebuilds the body as N harmonic sine partials, each
+// individually enveloped: upper partials are given progressively shorter
+// decay time-constants, so the spectrum darkens naturally as the note rings
+// (upper partials die first) instead of a uniform LPF faking it. Harmonic
+// only — systematic inharmonic stretch is S5.
+function playAdditiveBody(
+    state: EnsembleState,
+    freq: number,
+    startTime: number,
+    duration: number,
+    finalVol: number,
+    muted: boolean,
+): void {
+    const { playback } = state;
+    if (!playback.audio || !playback.audioGraph) {
+        return;
+    }
+    const audio = playback.audio;
+    const preset = INSTRUMENT_PRESETS.Piano;
+
+    if (!playback.heldNotes) {
+        (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
+    }
+
+    // Master body level — velocity gain + the note's release envelope.
+    const bodyGain = audio.createGain();
+    bodyGain.gain.setValueAtTime(0, startTime);
+    bodyGain.gain.setTargetAtTime(finalVol * (preset.gainMult || 1.0), startTime, preset.attack);
+
+    // Mix chain: a highpass to keep dense voicings out of the mud, then a
+    // gentle pan. The legacy per-note LPF sweep is deliberately gone — the
+    // per-partial decay below is the real spectral evolution.
+    const hpf = audio.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.setValueAtTime(150, startTime);
+    const panner = createSimplePanner(audio, -0.2, startTime);
+    bodyGain.connect(hpf);
+    hpf.connect(panner);
+    panner.connect(playback.audioGraph.chords.gain);
+
+    // Which partials survive: harmonic n·f0, capped below 16 kHz so high
+    // notes naturally trim their bank (also keeps the voice budget down).
+    const MAX_PARTIALS = 9;
+    const MAX_PARTIAL_HZ = 16000;
+    const TAU_BASE = 2.8; // s — the fundamental's decay time-constant
+    const TAU_K = 0.6; // upper partials decay faster: τ_n = TAU_BASE/(1+K·(n-1))
+    const partialNs: number[] = [];
+    let weightSum = 0;
+    for (let n = 1; n <= MAX_PARTIALS; n++) {
+        if (n * freq > MAX_PARTIAL_HZ) {
+            break;
+        }
+        partialNs.push(n);
+        weightSum += 1 / n; // ~1/n harmonic rolloff
+    }
+    // Normalize so the partials sum to ~unity at onset regardless of how many
+    // survived the ceiling — keeps the body level matched to `finalVol`.
+    const norm = weightSum > 0 ? 1 / weightSum : 1;
+
+    const oscs: OscillatorNode[] = [];
+    const gains: GainNode[] = [];
+    for (const n of partialNs) {
+        const osc = audio.createOscillator();
+        const pg = audio.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(n * freq, startTime);
+        // ±2 cents of per-note humanization — not inharmonicity (that is S5).
+        osc.detune.setValueAtTime(Math.random() * 4 - 2, startTime);
+        const tau = TAU_BASE / (1 + TAU_K * (n - 1));
+        pg.gain.setValueAtTime(0, startTime);
+        pg.gain.setTargetAtTime(norm / n, startTime, preset.attack);
+        // Decay starts once the attack has settled (~12 ms): upper partials,
+        // with the shortest τ, fall away first.
+        pg.gain.setTargetAtTime(0, startTime + 0.012, tau);
+        osc.connect(pg);
+        pg.connect(bodyGain);
+        oscs.push(osc);
+        gains.push(pg);
+    }
+
+    if (oscs.length === 0) {
+        // Defensive — unreachable for any real chord pitch, but never leave
+        // the mix chain dangling without a source to drive `onended`.
+        safeDisconnect([bodyGain, hpf, panner]);
+        return;
+    }
+
+    // Release / panic stop — mirrors the legacy voice's `stopNote` semantics
+    // so `heldNotes` eviction and `killAllPianoNotes` keep working.
+    const stopBody = (t: number, isPanic = false): void => {
+        const damping = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
+        rampGain(bodyGain.gain, 0, t, damping);
+        for (const o of oscs) {
+            try {
+                o.stop(t + 0.5);
+            } catch {
+                /* already stopped */
+            }
+        }
+    };
+
+    if (playback.sustainActive && !muted) {
+        // Pedal down: the note rings on the per-partial decay, bounded only
+        // by pedal-up or the 64-note cap — exactly the legacy behavior.
+        const noteRef = { stop: stopBody };
+        playback.heldNotes.add(noteRef);
+        if (playback.heldNotes.size > 64) {
+            const firstNote = playback.heldNotes.values().next().value;
+            firstNote.stop(audio.currentTime);
+            playback.heldNotes.delete(firstNote);
+        }
+    } else {
+        // No pedal: the damper falls at note-end — release, then stop the
+        // oscillators with enough tail for the release ramp to reach silence.
+        const effectiveDuration = muted ? 0.015 : duration;
+        rampGain(bodyGain.gain, 0, startTime + effectiveDuration, 0.03);
+        const stopAt = startTime + effectiveDuration + 0.6;
+        for (const o of oscs) {
+            o.stop(stopAt);
+        }
+    }
+
+    // The fundamental (n=1) always exists and is stopped no later than any
+    // other partial — in the no-pedal path every osc shares one `stopAt`; in
+    // the pedal path `stopBody` stops every osc at the same `t`. Tearing the
+    // graph down off its `onended` therefore fires `safeDisconnect` once.
+    oscs[0].onended = () => safeDisconnect([...oscs, ...gains, bodyGain, hpf, panner]);
+    for (const o of oscs) {
+        o.start(startTime);
+    }
 }
 
 function playNoteCurrent(
