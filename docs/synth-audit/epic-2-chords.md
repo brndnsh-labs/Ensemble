@@ -38,6 +38,8 @@ Velocity currently moves only filter cutoff and gain, not wave content. Crossfad
 **Acceptance:** A/B — soft and hard chord hits are timbrally distinct, not just louder/quieter.
 **Effort:** ~3h. **Model:** opus (curve by ear). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. `playNoteNew` now layers a velocity-scaled "bright" oscillator on top of the delegated body: a cached fundamental-light `brightWave` PeriodicWave (energy in partials 3–7), gated by `velocityTimbre`'s convex `brightness` scalar — soft chords stay on the mellow body alone, hard hits bloom upper-harmonic shimmer in. Fast attack + 0.18 s decay-bloom, self-disconnecting. synth-graph-reviewer found one P1 (the bright osc could be hard-stopped while still audible on staccato chords → click, because the stop was coupled to note `duration`); fixed by decoupling the stop to a fixed 1.0 s tail (~5.4 decay time-constants, inaudible residual). `playNoteCurrent` bit-identical. typecheck/Biome/jscpd/vitest green. Owner approved by ear.
+
 ### S4. Per-partial additive voice
 Replace the single periodic-wave oscillator with ~6–10 individually-enveloped sine partials, upper partials given shorter decay time-constants so the spectrum evolves naturally instead of one uniform LPF sweep faking it. This is *the* technique that makes synthetic piano stop sounding synthetic. Mind the voice budget (partials × polyphony).
 

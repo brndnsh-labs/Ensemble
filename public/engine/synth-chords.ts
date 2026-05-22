@@ -8,6 +8,7 @@ import {
     playPercussiveStrike,
     playResonantTone,
     rampGain,
+    velocityTimbre,
 } from './synth-utils.js';
 
 interface ChordInstrumentPreset {
@@ -56,7 +57,21 @@ function createPianoWave(audioCtx: AudioContext): PeriodicWave {
     return audioCtx.createPeriodicWave(real, imag);
 }
 
+// synth-audit Epic 2 S3 — the velocity "bright" wave. Energy is concentrated
+// in partials 3-7 with a deliberately light fundamental, so layering it adds
+// upper-harmonic shimmer (an EP-leaning tine bite) without doubling the body's
+// low end. The `new` voice crossfades this in by velocity: soft chords stay on
+// the mellow `pianoWave` body alone, hard hits bloom this layer in on top.
+function createBrightWave(audioCtx: AudioContext): PeriodicWave {
+    const real = new Float32Array([
+        0, 0.15, 0.25, 0.4, 0.5, 0.45, 0.35, 0.28, 0.2, 0.14, 0.09, 0.05,
+    ]);
+    const imag = new Float32Array(real.length).fill(0);
+    return audioCtx.createPeriodicWave(real, imag);
+}
+
 let pianoWave: PeriodicWave | null = null;
+let brightWave: PeriodicWave | null = null;
 let cachedShaperCurve: Float32Array<ArrayBuffer> | null = null;
 let cachedShaperDrive = -1;
 
@@ -181,6 +196,40 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
             decay: 0.006,
             duration: 0.045,
         });
+
+        // synth-audit Epic 2 S3 — velocity → brightness. `playNoteCurrent`
+        // moves only cutoff + gain with velocity; its wave content never
+        // changes, so soft and hard hits are timbrally identical. This layer
+        // crossfades a fundamental-light "bright" wave in by velocity — the
+        // convex `velocityTimbre` curve keeps soft chords on the mellow body
+        // alone and blooms upper-harmonic shimmer in only on harder hits.
+        const { brightness } = velocityTimbre(vol, { curve: 1.6 });
+        if (brightness > 0.01) {
+            if (!brightWave) {
+                brightWave = createBrightWave(playback.audio);
+            }
+            const brightOsc = playback.audio.createOscillator();
+            const brightGain = playback.audio.createGain();
+            brightOsc.setPeriodicWave(brightWave);
+            brightOsc.frequency.setValueAtTime(freq, startTime);
+            // Upper partials die first: a fast attack then an immediate decay
+            // (time-constant 0.18 s) makes this an attack-brightness bloom,
+            // not a sustained ring — which also sidesteps sustain-pedal
+            // coordination, since the layer is gone long before pedal-up.
+            brightGain.gain.setValueAtTime(0, startTime);
+            brightGain.gain.setTargetAtTime(finalVol * brightness * 0.45, startTime, 0.004);
+            rampGain(brightGain.gain, 0, startTime + 0.03, 0.18);
+            brightOsc.connect(brightGain);
+            brightGain.connect(dest);
+            brightOsc.start(startTime);
+            // Stop is decoupled from note `duration`: the `setTargetAtTime`
+            // decay only approaches 0, so the osc must run long enough that
+            // it is inaudible (~5 time-constants ≈ 0.9 s) before the hard
+            // `stop()` cut, otherwise short/staccato chords click. A fixed
+            // 1.0 s tail gives ~5.4 τ — residual well under 0.5% of peak.
+            brightOsc.stop(startTime + 1.0);
+            brightOsc.onended = () => safeDisconnect([brightOsc, brightGain]);
+        }
     }
 
     playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
