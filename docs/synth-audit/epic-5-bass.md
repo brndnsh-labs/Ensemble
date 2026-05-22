@@ -34,6 +34,8 @@ The growl layer's two lowpass filters are set with `setValueAtTime` only (`synth
 **Acceptance:** A/B — bass notes have a pluck-settle motion instead of a static timbre.
 **Effort:** ~2h. **Model:** opus (sweep by ear). **Reviewer:** synth-graph-reviewer. **Source:** `bass.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. Added a pluck-settle sweep to the `playBassNoteNew` saw-layer lowpass — it opens at `lpTarget * (1.3 + brightness * 0.4)` (clamped ≤18000) via `setValueAtTime` and sweeps down to the velocity-scaled target over ~100 ms via `setTargetAtTime(…, 0.035)`. Each note now has a brief brightness bloom at the attack that mellows like real pluck-energy decay, replacing the previously frozen filter cutoff. synth-graph-reviewer clean (0 P0/P1/P2). Owner approved.
+
 ### S4. NaN guard on `bandIntensity`
 The comment at `synth-bass.ts:111` claims a guard the code doesn't deliver — `Math.max(0, NaN) === NaN`, so a NaN `bandIntensity` reaches `lp1.frequency.setValueAtTime`. Add a real `Number.isFinite` fallback and fix the misleading comment.
 

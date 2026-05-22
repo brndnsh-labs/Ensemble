@@ -115,9 +115,19 @@ function playBassNoteNew(
         // soft notes, a palm-mute (`muteAmount`) rolls it down further.
         const midi = 12 * Math.log2(freq / 440) + 69;
         const baseCutoff = (450 + midi * 18) * (1 - muteAmount * 0.5);
+        // Pluck-settle motion: a real plucked string is brightest at the
+        // attack and mellows as the pluck energy decays. The saw lowpass opens
+        // ~1.3–1.7× above its velocity-scaled target (a harder pluck swings
+        // wider) and then sweeps down to the target over ~100 ms. Without this
+        // the filter is frozen for the note's whole life — the "static timbre"
+        // S3 fixes. `lpTarget` is the settled cutoff; the start is clamped well
+        // below the audible ceiling for safety.
+        const lpTarget = Math.max(80, baseCutoff * timbre.cutoffMult);
+        const lpStart = Math.min(18000, lpTarget * (1.3 + timbre.brightness * 0.4));
         const lp = audio.createBiquadFilter();
         lp.type = 'lowpass';
-        lp.frequency.setValueAtTime(Math.max(80, baseCutoff * timbre.cutoffMult), startTime);
+        lp.frequency.setValueAtTime(lpStart, startTime);
+        lp.frequency.setTargetAtTime(lpTarget, startTime, 0.035);
         lp.Q.setValueAtTime(1.1, startTime);
 
         // The sawtooth is the *grit* layer — and it deliberately bypasses the
