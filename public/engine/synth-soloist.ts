@@ -7,7 +7,7 @@ import {
     isSoloistMonophonicMode,
     isSoloistPianoMode,
 } from './soloist-mode-policy.js';
-import { createSimplePanner, killActiveVoices } from './synth-utils.js';
+import { createSimplePanner, killActiveVoices, velocityTimbre } from './synth-utils.js';
 
 export type { SoloistVoice } from '../types.js';
 
@@ -282,6 +282,22 @@ function attachVibrato(
     voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
 }
 
+/**
+ * Combined brightness drive for the New soloist voice (epic-3-soloist S2):
+ * blends per-note accent velocity (curved via `velocityTimbre`) with the
+ * whole-band intensity, so the soloist gets brighter both when an individual
+ * note is hit harder and when the band as a whole lifts. Returns 0..1.
+ */
+function soloistBrightnessDrive(state: EnsembleState, vol: number): number {
+    const { brightness } = velocityTimbre(vol, { curve: 1.6 });
+    const intensity = Number.isFinite(state.playback.bandIntensity)
+        ? state.playback.bandIntensity
+        : 0.5;
+    // Intensity is weighted slightly heavier so the band-energy knob is
+    // audible on its own; per-note velocity then modulates within that floor.
+    return Math.min(1, brightness * 0.5 + intensity * 0.6);
+}
+
 function playTrumpet(
     state: EnsembleState,
     ctx: AudioContext,
@@ -324,13 +340,22 @@ function playTrumpet(
 
     attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
+    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
+    // a harder note opens the lowpass and lifts the bell formant, and the
+    // whole-band intensity sets the brightness floor. Current voice keeps the
+    // freq-only cutoffs.
+    const isNewVoice = soloist.voice === 'new';
+    const drive = soloistBrightnessDrive(state, vol);
+    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+    const bellMult = isNewVoice ? 0.85 + drive * 0.35 : 1;
+
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
 
     // Non-linear cutoff ceiling: Cap the filter to prevent "ice-pick" high frequencies
-    const baseCutoff = clampFreq(freq * 1.2);
-    const maxCutoff = Math.min(clampFreq(freq * 4.0), 5500 + freq * 1.5);
-    const sustainCutoff = Math.min(clampFreq(freq * 2.5), 4500 + freq * 1.2);
+    const baseCutoff = clampFreq(freq * 1.2 * cutoffMult);
+    const maxCutoff = Math.min(clampFreq(freq * 4.0 * cutoffMult), 5500 + freq * 1.5);
+    const sustainCutoff = Math.min(clampFreq(freq * 2.5 * cutoffMult), 4500 + freq * 1.2);
 
     filter.frequency.setValueAtTime(baseCutoff, playTime);
     filter.frequency.exponentialRampToValueAtTime(maxCutoff, playTime + 0.08);
@@ -344,7 +369,7 @@ function playTrumpet(
 
     // Register-aware bell gain: Reduce boost in high register to prevent nasality
     const bellBoost = freq > 800 ? Math.max(1.5, 4 - (freq - 800) * 0.005) : 4;
-    bellFilter.gain.value = bellBoost;
+    bellFilter.gain.value = bellBoost * bellMult;
 
     // High-shelf smoothing: Roll off extreme high-end "fizz"
     const smoother = ctx.createBiquadFilter();
@@ -422,14 +447,23 @@ function playSaxophone(
 
     attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
+    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
+    // digging in (per-note accent or whole-band intensity) pushes the sax
+    // formants upward — a real embouchure/intensity behavior, reedier not just
+    // louder. Current voice keeps fixed formants. Tighter range than the
+    // lowpass presets: too much shift would change the vowel, not brightness.
+    const isNewVoice = soloist.voice === 'new';
+    const drive = soloistBrightnessDrive(state, vol);
+    const formantMult = isNewVoice ? 0.92 + drive * 0.28 : 1;
+
     const f1 = ctx.createBiquadFilter();
     f1.type = 'bandpass';
-    f1.frequency.value = 900;
+    f1.frequency.value = 900 * formantMult;
     f1.Q.value = 3.0;
 
     const f2 = ctx.createBiquadFilter();
     f2.type = 'bandpass';
-    f2.frequency.value = 2400;
+    f2.frequency.value = 2400 * formantMult;
     f2.Q.value = 4.0;
 
     const breathLfo = ctx.createOscillator();
@@ -547,10 +581,20 @@ function playNeoJuno(
 
     attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
+    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
+    // a harder note (or higher band intensity) opens the lowpass; Current
+    // voice keeps freq-only cutoffs.
+    const isNewVoice = soloist.voice === 'new';
+    const drive = soloistBrightnessDrive(state, vol);
+    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(clampFreq(freq * 3), playTime);
-    filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + duration);
+    filter.frequency.setValueAtTime(clampFreq(freq * 3 * cutoffMult), playTime);
+    filter.frequency.exponentialRampToValueAtTime(
+        clampFreq(freq * 1.5 * cutoffMult),
+        playTime + duration,
+    );
     filter.Q.value = 1.0;
 
     voiceObj.nodes.push(filter);
@@ -622,11 +666,19 @@ function playVowel(
 
     attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
+    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
+    // digging in (per-note accent or whole-band intensity) pushes the vowel
+    // formant upward so hard notes open up. Current voice keeps the fixed
+    // sweep. Tight range — a large shift changes the vowel.
+    const isNewVoice = soloist.voice === 'new';
+    const drive = soloistBrightnessDrive(state, vol);
+    const formantMult = isNewVoice ? 0.92 + drive * 0.28 : 1;
+
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(800, playTime);
-    filter.frequency.exponentialRampToValueAtTime(1200, playTime + 0.1);
-    filter.frequency.exponentialRampToValueAtTime(800, playTime + duration);
+    filter.frequency.setValueAtTime(800 * formantMult, playTime);
+    filter.frequency.exponentialRampToValueAtTime(1200 * formantMult, playTime + 0.1);
+    filter.frequency.exponentialRampToValueAtTime(800 * formantMult, playTime + duration);
     filter.Q.value = 5.0;
 
     voiceObj.nodes.push(filter);
@@ -691,9 +743,16 @@ function playShred(
 
     attachVibrato(state, ctx, freq, playTime, duration, style, vibratoFlag, voiceObj, osc1, osc2);
 
+    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
+    // a harder pick attack (or higher band intensity) opens the lowpass;
+    // Current voice keeps the freq-only cutoff.
+    const isNewVoice = soloist.voice === 'new';
+    const drive = soloistBrightnessDrive(state, vol);
+    const cutoffMult = isNewVoice ? 0.75 + drive * 0.6 : 1;
+
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
+    filter.frequency.setValueAtTime(clampFreq(freq * 6 * cutoffMult), playTime);
     filter.Q.value = 2.0;
 
     voiceObj.nodes.push(filter);
@@ -773,7 +832,7 @@ function createVibrato(
     const { soloist, playback } = state;
     const config: StyleConfig =
         (STYLE_CONFIG as Record<string, StyleConfig>)[style] || STYLE_CONFIG.scalar;
-    const intensity = playback.bandIntensity || 0.5;
+    const intensity = Number.isFinite(playback.bandIntensity) ? playback.bandIntensity : 0.5;
     const vibrato = ctx.createOscillator();
 
     const bps = (playback.bpm || 120) / 60;

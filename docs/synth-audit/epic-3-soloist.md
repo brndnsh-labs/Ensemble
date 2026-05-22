@@ -30,6 +30,8 @@ Filter cutoffs derive purely from `freq`, never `vel`. Make every preset's filte
 **Acceptance:** A/B — hard and soft solo notes are timbrally distinct (brighter when dug in), not just louder.
 **Effort:** ~3h. **Model:** opus (curve by ear). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3.
 
+**Status:** Shipped 2026-05-22. All 5 soloist presets now couple filter brightness to a `soloistBrightnessDrive` that blends per-note accent velocity (via the Epic 0 S7 `velocityTimbre` helper, convex curve 1.6) with whole-band intensity (`drive = brightness*0.5 + bandIntensity*0.6`, clamped). Lowpass presets (trumpet/neo/shred) open the cutoff ±~30%; formant presets (sax/vowel) shift formants modestly; trumpet also lifts its bell formant. Gated on `soloist.voice === 'new'` — this is the first story to make the soloist "New Sound" toggle audible (it was a no-op delegate before). First listening gate found the band-intensity knob barely moved brightness (note velocity only picks up `intensity*0.08`); owner chose to also couple to band intensity directly — hence the blend. synth-graph-reviewer: clean both passes (1 P2 NaN-hardening nit fixed — both `bandIntensity` readers now `Number.isFinite`-guarded). Owner approved.
+
 ### S3. Filter-cutoff LFO on sustain
 Held notes are spectrally frozen. Add a slow (0.15–0.4 Hz) cutoff LFO, depth-ramped in like the existing vibrato delay, so sustained notes breathe.
 
