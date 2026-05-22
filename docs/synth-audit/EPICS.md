@@ -34,7 +34,7 @@ This track is **not** driven by `/cycle`, `/next`, `/implement`, or `/done` — 
 4. **Listening gate** — the owner A/B-auditions the change through the per-instrument "New Sound" toggle before it ships. No story is done until heard.
 5. Add a **Status:** line to the story, bump the tally in this file, commit (one commit per story).
 
-**Current position:** Epic 0 is **complete** — all 7 foundation stories shipped 2026-05-21 (A/B harness, `synth-graph-reviewer`, typed audio-graph, algorithmic reverb, chord de-burial, shared humanization, velocity→timbre helper). Per the epic's own note, do a full listening pass before starting Epic 1. **Next: Epic 1** (Harmony Voice Rebuild) — the per-instrument epics now fan out; owner's listening triage put harmony first.
+**Current position:** Epic 0 is **complete** — all 7 foundation stories shipped 2026-05-21 (A/B harness, `synth-graph-reviewer`, typed audio-graph, algorithmic reverb, chord de-burial, shared humanization, velocity→timbre helper). The post-epic full listening pass was done and signed off by the owner 2026-05-21. **Next: Epic 1** (Harmony Voice Rebuild) — run order S6 → S5 → S1 → S2 → S3 → S4 (see the epic file's sequencing note); start with `/synth-cycle`.
 
 ## The five cross-cutting themes
 
