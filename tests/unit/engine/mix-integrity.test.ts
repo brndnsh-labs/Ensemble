@@ -150,12 +150,13 @@ describe('Mix & Signal Integrity Audit', () => {
         document.body.appendChild(masterVolInput);
     });
 
-    it('should correctly assemble the master chain (Gain -> Saturator -> Limiter -> Dest)', () => {
+    it('should correctly assemble the master chain (Gain -> Glue -> Saturator -> Limiter -> Dest)', () => {
         initAudio(getState());
 
         // Verify Master Chain Connections
         const { master } = playback.audioGraph;
-        expect(master.gain.connect).toHaveBeenCalledWith(master.saturator);
+        expect(master.gain.connect).toHaveBeenCalledWith(master.glue);
+        expect(master.glue.connect).toHaveBeenCalledWith(master.saturator);
         expect(master.saturator.connect).toHaveBeenCalledWith(master.limiter);
         expect(master.limiter.connect).toHaveBeenCalledWith(playback.audio.destination);
     });

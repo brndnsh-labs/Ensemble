@@ -911,12 +911,14 @@ export interface AlgorithmicReverb {
 
 /**
  * The master output chain: every bus sums into `gain`, then runs
- * `gain → saturator → limiter → destination`. `reverb` is the shared reverb
- * return, fed via `reverbPreFilter`.
+ * `gain → glue → saturator → limiter → destination`. `reverb` is the shared
+ * reverb return, fed via `reverbPreFilter`.
  */
 export interface MasterChain {
     /** Master volume gain node — every instrument bus sums here. */
     readonly gain: GainNode;
+    /** Gentle "glue" bus compressor — evens out full-band peaks before the brick-wall limiter. */
+    readonly glue: DynamicsCompressorNode;
     /** Master soft-clipper / saturator. */
     readonly saturator: WaveShaperNode;
     /** Master safety limiter. */

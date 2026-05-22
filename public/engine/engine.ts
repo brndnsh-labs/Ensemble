@@ -92,6 +92,7 @@ export function initAudio(
         // single typed `AudioGraph` object and assigned to `playback.audioGraph`
         // once every node exists (see assembly block after the module loop).
         let masterGain: GainNode | null = null;
+        let glueCompressor: DynamicsCompressorNode | null = null;
         let saturator: WaveShaperNode | null = null;
         let masterLimiter: DynamicsCompressorNode | null = null;
         let reverb: AlgorithmicReverb | null = null;
@@ -131,6 +132,20 @@ export function initAudio(
         }
 
         if (playback.audio) {
+            // Glue bus compressor (synth-audit Epic 0 S5): a gentle, slow-ish
+            // compressor ahead of the brick-wall limiter. When the whole band
+            // peaks together it evens the sum out musically, so the limiter
+            // doesn't yank everything down — which is what was burying the
+            // chord bed. Soft knee + 2:1 ratio + 25 ms attack lets transients
+            // through; the threshold is high enough that quiet passages pass
+            // untouched.
+            glueCompressor = playback.audio.createDynamicsCompressor();
+            glueCompressor.threshold.setValueAtTime(-18, playback.audio.currentTime);
+            glueCompressor.knee.setValueAtTime(6, playback.audio.currentTime);
+            glueCompressor.ratio.setValueAtTime(2, playback.audio.currentTime);
+            glueCompressor.attack.setValueAtTime(0.025, playback.audio.currentTime);
+            glueCompressor.release.setValueAtTime(0.25, playback.audio.currentTime);
+
             saturator = playback.audio.createWaveShaper();
             saturator.curve = createSoftClipCurve();
             saturator.oversample = '4x';
@@ -143,8 +158,15 @@ export function initAudio(
             masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
         }
 
-        if (masterGain && saturator && masterLimiter && playback.audio?.destination) {
-            masterGain.connect(saturator);
+        if (
+            masterGain &&
+            glueCompressor &&
+            saturator &&
+            masterLimiter &&
+            playback.audio?.destination
+        ) {
+            masterGain.connect(glueCompressor);
+            glueCompressor.connect(saturator);
             saturator.connect(masterLimiter);
             masterLimiter.connect(playback.audio.destination);
         }
@@ -212,19 +234,24 @@ export function initAudio(
                 lowShelf.frequency.setValueAtTime(350, playback.audio.currentTime);
                 lowShelf.gain.setValueAtTime(-2, playback.audio.currentTime);
 
-                const notch = playback.audio.createBiquadFilter();
-                notch.type = 'peaking';
-                notch.frequency.setValueAtTime(2500, playback.audio.currentTime);
-                notch.Q.setValueAtTime(0.7, playback.audio.currentTime);
-                notch.gain.setValueAtTime(-2, playback.audio.currentTime);
+                // Presence band (synth-audit Epic 0 S5): this used to be a
+                // -2 dB *cut* at 2.5 kHz, which scooped out exactly the band
+                // the ear uses to localize an instrument — a third mechanism
+                // burying the chords. Inverted to a gentle, broad (Q 0.7)
+                // +2 dB lift so the chord bed reads through the mix.
+                const presence = playback.audio.createBiquadFilter();
+                presence.type = 'peaking';
+                presence.frequency.setValueAtTime(2500, playback.audio.currentTime);
+                presence.Q.setValueAtTime(0.7, playback.audio.currentTime);
+                presence.gain.setValueAtTime(2, playback.audio.currentTime);
 
                 const panner = playback.audio.createStereoPanner();
                 panner.pan.setValueAtTime(-0.2, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
                 busEQ.connect(lowShelf);
-                lowShelf.connect(notch);
-                notch.connect(panner);
+                lowShelf.connect(presence);
+                presence.connect(panner);
                 panner.connect(masterGain);
 
                 busPanner = panner;
@@ -327,6 +354,7 @@ export function initAudio(
         // Assemble the typed graph once every node exists.
         if (
             masterGain &&
+            glueCompressor &&
             saturator &&
             masterLimiter &&
             reverb &&
@@ -340,6 +368,7 @@ export function initAudio(
             const audioGraph: AudioGraph = {
                 master: {
                     gain: masterGain,
+                    glue: glueCompressor,
                     saturator,
                     limiter: masterLimiter,
                     reverb,

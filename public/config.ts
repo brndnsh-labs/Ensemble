@@ -104,7 +104,7 @@ export const TIME_SIGNATURES = {
 
 export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,
-    chords: 0.13, // Keeps chords slightly more forward while preserving the shared headroom budget
+    chords: 0.16, // De-buried (synth-audit Epic 0 S5): chords are the harmonic bed and were sitting under bass/soloist; raised ~+1.8 dB so they read through loud full-band passages
     bass: 0.1575, // Preserves the previous 45% default bass balance at unity UI volume
     soloist: 0.15, // Keeps melodic lead presence slightly under the prior default mix
     harmonies: 0.1, // Holds harmony behind the chord bed while leaving drums a bit more room
