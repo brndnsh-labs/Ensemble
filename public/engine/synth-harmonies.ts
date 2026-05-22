@@ -77,7 +77,7 @@ function extendLegatoHarmonyVoice(
     if (!existing?.gain || !playback.audio) {
         return false;
     }
-    const releaseTail = style === 'stabs' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
+    const releaseTail = style === 'horns' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
     try {
         existing.gain.gain.cancelScheduledValues(playTime);
     } catch {
@@ -177,7 +177,13 @@ function stealHarmonyPitchVoice(
     if (!existing) {
         return null;
     }
-    const profile = getHarmonyRetriggerProfile(style);
+    // Key bridge: the shared `getHarmonyRetriggerProfile` predates the
+    // engine's `HARMONY_STYLES` rename — its fast-retrigger list is keyed on
+    // the legacy `'stabs'`. Map the real `'horns'` style onto it here so the
+    // horn section gets the intended snappy retrigger (20 ms fade, 0.012
+    // attack floor). The shared helper is left untouched because
+    // `playHarmonyNoteCurrent` consumes it too and must stay bit-identical.
+    const profile = getHarmonyRetriggerProfile(style === 'horns' ? 'stabs' : style);
     killHarmonyVoice(existing, playTime, profile.fadeTime);
     const idx = harmony.activeVoices.indexOf(existing);
     if (idx !== -1) {
@@ -208,31 +214,31 @@ type HarmonyTimbre = {
  * every feel.
  */
 function resolveHarmonyTimbre(style: string, feel: string): HarmonyTimbre {
-    // Base timbre per style — carried from the Current voice's style branches.
+    // Base timbre per style. The keys here are the engine's real harmony-style
+    // vocabulary (`HARMONY_STYLES`): horns, strings, organ, plucks, counter.
+    // (Organ is handled in its own branch upstream and never reaches here.)
     let timbre: HarmonyTimbre;
     switch (style) {
         case 'plucks':
             timbre = { osc1: 'sawtooth', osc2: 'square', osc2Detune: 5, sub: 'sine' };
             break;
-        case 'disco':
-            timbre = { osc1: 'triangle', osc2: 'sawtooth', osc2Detune: 4, sub: 'sine' };
-            break;
         case 'counter':
             timbre = { osc1: 'sawtooth', osc2: 'triangle', osc2Detune: 4, sub: 'sine' };
             break;
-        case 'stabs':
+        case 'horns':
             // Sawtooth core (synth-audit Epic 1 S3 "Horn Section"): a saw pair
             // gives the rich harmonic spectrum the brass formants carve.
             timbre = { osc1: 'sawtooth', osc2: 'sawtooth', osc2Detune: 12, sub: 'triangle' };
             break;
         default:
+            // 'strings' and any future style — a soft saw/triangle pad blend.
             timbre = { osc1: 'triangle', osc2: 'sawtooth', osc2Detune: 8, sub: 'sine' };
     }
     // genreFeel bias — a lean, not a replacement. Rock/Metal want brightness
     // and width (a saw pair, wider detune); Neo-Soul/Acoustic want a softer,
     // tighter blend (a triangle pair, narrower detune). The style's detune
     // *character* is preserved by widening/narrowing rather than overwriting:
-    // a 'stabs' style stays the widest style under any feel.
+    // the 'horns' style stays the widest style under any feel.
     if (feel === 'Rock' || feel === 'Metal') {
         timbre.osc1 = 'sawtooth';
         timbre.osc2 = 'sawtooth';
@@ -284,7 +290,7 @@ function playHarmonyNoteNew(
     time: number,
     duration: number,
     vol = 0.4,
-    style = 'stabs',
+    style = 'horns',
     midi: number | null = null,
     slideInterval = 0,
     slideDuration = 0,
@@ -489,10 +495,10 @@ function playHarmonyNoteNew(
             sub.connect(filter);
         }
 
-        if (style === 'stabs') {
+        if (style === 'horns') {
             // --- "Horn Section" voice (synth-audit Epic 1 S3) ---
             // A real brass-section character layered onto the sawtooth core +
-            // stabs bloom. Three parts, all summed at the voice `gain`:
+            // horns bloom. Three parts, all summed at the voice `gain`:
             //   1. Body path  — filter → bell → gain.
             //   2. Formants   — raw osc → two bandpass filters → gain (brass
             //      "honk"). Fed pre-filter so the lowpass bloom can't gut the
@@ -604,7 +610,7 @@ function playHarmonyNoteNew(
     const intensity = playback.bandIntensity;
     const brightnessMult = 1.0 + intensity * 2.0;
 
-    if (style === 'stabs') {
+    if (style === 'horns') {
         const qVal = feel === 'Rock' || feel === 'Metal' ? 5 + intensity * 5 : 3 + intensity * 2;
         const startFreq = Math.min(freq * 8 * brightnessMult, 12000);
         filter.frequency.setValueAtTime(clampFreq(startFreq), playTime);
@@ -617,10 +623,6 @@ function playHarmonyNoteNew(
         filter.frequency.setValueAtTime(clampFreq(freq * 8), playTime);
         filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 1.5), playTime + 0.1);
         filter.Q.setValueAtTime(5 + intensity * 5, playTime);
-    } else if (style === 'disco') {
-        filter.frequency.setValueAtTime(clampFreq(freq * 6), playTime);
-        filter.frequency.exponentialRampToValueAtTime(clampFreq(freq * 2), playTime + 0.12);
-        filter.Q.setValueAtTime(2 + intensity * 3, playTime);
     } else if (style === 'counter') {
         filter.frequency.setValueAtTime(clampFreq(freq * 1.5), playTime);
         filter.frequency.linearRampToValueAtTime(
@@ -629,8 +631,8 @@ function playHarmonyNoteNew(
         );
         filter.Q.setValueAtTime(1.0, playTime);
     } else {
-        // Default branch — also the organ bloom (organ is not stabs/plucks/
-        // disco/counter). A gentle swell-and-settle around the cutoff.
+        // Default branch — 'strings' and the organ bloom. A gentle
+        // swell-and-settle around the cutoff.
         const cutoff =
             feel === 'Neo-Soul' ? freq * 1.5 * brightnessMult : freq * 3 * brightnessMult;
         filter.frequency.setValueAtTime(clampFreq(cutoff), playTime);
@@ -647,22 +649,22 @@ function playHarmonyNoteNew(
     // release, no decay or sustain stage — so every held note was a flat
     // plateau. A real decay-to-sustain stage gives pad/string styles a swell
     // (the slow attack rising) that then settles (decay down to a slightly
-    // lower sustain) instead of sitting frozen. Fast styles (stabs/plucks/
+    // lower sustain) instead of sitting frozen. Fast styles (horns/plucks/
     // organ) get decay 0 / sustain at the peak, so their envelope collapses
     // back to plain AR — their character is unchanged.
-    const isFastAttack = style === 'stabs' || style === 'plucks' || isOrgan;
+    const isFastAttack = style === 'horns' || style === 'plucks' || isOrgan;
     const baseAttack = isFastAttack ? 0.01 : 0.2;
     const attackFloor = retriggerProfile?.attackFloor || 0.005;
     let attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
-    let release = style === 'stabs' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
+    let release = style === 'horns' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
     // Pad styles settle ~20% below the attack peak over a 0.35 s decay. The
-    // 'stabs' horn section (S3) gets a fast 60 ms decay to ~92% — a gentle
-    // "tiny swell": the stab pops to the peak then settles slightly,
-    // brass-like, rather than sitting flat. The settle is kept shallow so
-    // stabs in rapid succession stay even in level. Plucks/organ hold at the
-    // peak (decay 0 — AR).
-    const decay = style === 'stabs' ? 0.06 : isFastAttack ? 0 : 0.35;
-    const sustainLevel = finalVol * (style === 'stabs' ? 0.92 : isFastAttack ? 1.0 : 0.8);
+    // 'horns' section (S3) gets a fast 60 ms decay to ~92% — a gentle "tiny
+    // swell": the stab pops to the peak then settles slightly, brass-like,
+    // rather than sitting flat. The settle is kept shallow so stabs in rapid
+    // succession stay even in level. Plucks/organ hold at the peak (decay
+    // 0 — AR).
+    const decay = style === 'horns' ? 0.06 : isFastAttack ? 0 : 0.35;
+    const sustainLevel = finalVol * (style === 'horns' ? 0.92 : isFastAttack ? 1.0 : 0.8);
 
     // isBloom — a harmonic-bloom hit on a soloist anchor. A swell-in attack
     // completes the gesture. MAX of a 20% bump and a +5 ms additive bump so
@@ -686,7 +688,7 @@ function playHarmonyNoteNew(
         playTime,
     );
     osc2.detune.setValueAtTime(
-        (style === 'stabs' ? 12 : 8) * detuneMult +
+        (style === 'horns' ? 12 : 8) * detuneMult +
             (Math.random() - 0.5) * 4 +
             (Math.random() - 0.5) * 2 * bloomDetune,
         playTime,
