@@ -22,6 +22,8 @@ Plus a dead-code find: the legato/portamento path is fully built but `isLegato` 
 **Acceptance:** A/B — connected solo phrases glide between notes; separated notes still re-attack cleanly.
 **Effort:** ~3h. **Model:** opus (adjacency rule + by-ear glide). **Reviewer:** synth-graph-reviewer. **Source:** `soloist.md` §2, §3; owner request.
 
+**Status:** Shipped 2026-05-22. `isLegato` is now driven by rhythmic adjacency in `scheduleSoloist` (gap to the previous note's grid-slot end under half a 16th-step → legato), replacing the hardcoded `false`. First listening gate revealed the dead legato branch had legato attacking *harder* (5 ms) than normal notes — re-articulating every note — so a follow-up pass flipped the legato attack to a gentle swell across all 5 presets and lengthened the portamento glide (60→85 ms non-guitar). synth-graph-reviewer: clean on both passes (one deferred P2 noted below re: `lastNoteEnd` reset coverage). Owner approved.
+
 ### S2. Velocity → cutoff coupling
 Filter cutoffs derive purely from `freq`, never `vel`. Make every preset's filter cutoff (and bell/formant gains) a function of velocity via the Epic 0 S7 helper. Discovery's single highest-ROI change.
 
@@ -63,3 +65,4 @@ Release is always a fixed 85% of duration with no decay stage and no relationshi
 - The soloist's shared algorithmic reverb need is satisfied by Epic 0 S4 (FDN) — confirm the soloist bus has a sensible send during this epic.
 - S1 is the owner-requested dead-code revival — a satisfying early win. S2/S3/S4/S5 are independent and can fan out. S6, S7 touch the per-preset envelopes.
 - Acoustic-realism trumpet/sax remain Epic 6 pack territory — this epic makes the *synth-lead* presets genuinely expensive; don't chase photoreal brass in pure synthesis.
+- S1 P2 (deferred): `soloist.audio.lastNoteEnd` is reset to 0 only on the transport-reset action (`instruments.ts:436`). A stop/restart that does not run that reset can leave a stale future audio-clock time, so the first note after restart may be spuriously legato-flagged. Bounded benign — `applyPitchEnvelope`'s `Math.abs(freq - prevFreq) < freq * 0.5` magnitude gate caps the worst case at one brief, in-range glide. Revisit only if the restart glide is audible.

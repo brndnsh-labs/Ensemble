@@ -801,6 +801,23 @@ function scheduleSoloist(
                 const vel = baseVel * polyphonyComp;
                 const finalTime = playTime + offsetS;
 
+                // Legato detection (epic-3-soloist S1): a note that begins
+                // where the previous one ended is a connected phrase note —
+                // drive the dead legato/portamento path from rhythmic
+                // adjacency. lastNoteEnd holds the previous soloist note's
+                // finalTime+duration; a gap under half a 16th-step (slack for
+                // timing-offset jitter) counts as contiguous, while a real
+                // rest is at least a full step of silence. Excluded:
+                // double stops (a single lastRenderedFreq can't glide a
+                // chord) and notes with an explicit bend-in (the bend is an
+                // intentional articulation that legato would otherwise
+                // swallow — applyPitchEnvelope checks legato before bend).
+                const gridSlack = 0.25 * (60.0 / playback.bpm) * 0.5;
+                const isLegato =
+                    !noteEntry.isDoubleStop &&
+                    !bendStartInterval &&
+                    finalTime - soloist.audio.lastNoteEnd < gridSlack;
+
                 playSoloNote(
                     state,
                     freq,
@@ -809,7 +826,7 @@ function scheduleSoloist(
                     vel,
                     bendStartInterval || 0,
                     style,
-                    false,
+                    isLegato,
                     vibrato,
                 );
 

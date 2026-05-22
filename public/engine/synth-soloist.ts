@@ -69,7 +69,7 @@ function playSoloNoteCurrent(
 
     if (playback.debugSoloist) {
         console.log(
-            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}, vibrato=${vibrato}`,
+            `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, preset=${preset}, vibrato=${vibrato}, legato=${isLegato}`,
         );
     }
 
@@ -360,7 +360,10 @@ function playTrumpet(
     bellFilter.connect(smoother);
     smoother.connect(outputGain);
 
-    const attack = isLegato ? 0.005 : 0.02;
+    // Legato attack swells in gently (epic-3-soloist S1) so a connected note
+    // blends under the previous note's release tail instead of re-articulating
+    // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
+    const attack = isLegato ? 0.032 : 0.02;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
@@ -451,7 +454,8 @@ function playSaxophone(
     f2.connect(masterGainNode);
     masterGainNode.connect(outputGain);
 
-    const attack = isLegato ? 0.008 : 0.04;
+    // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
+    const attack = isLegato ? 0.055 : 0.04;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 2.9, playTime, attack);
@@ -555,7 +559,10 @@ function playNeoJuno(
     osc2.connect(filter);
     filter.connect(outputGain);
 
-    const attack = isLegato ? 0.005 : 0.02;
+    // Legato attack swells in gently (epic-3-soloist S1) so a connected note
+    // blends under the previous note's release tail instead of re-articulating
+    // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
+    const attack = isLegato ? 0.032 : 0.02;
 
     outputGain.gain.setValueAtTime(0, playTime);
     outputGain.gain.setTargetAtTime(vol * 1.1, playTime, attack);
@@ -628,8 +635,10 @@ function playVowel(
     osc2.connect(filter);
     filter.connect(outputGain);
 
+    // Legato attack swells in gently (epic-3-soloist S1) — see playTrumpet.
+    const attack = isLegato ? 0.035 : 0.02;
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, 0.02);
+    outputGain.gain.setTargetAtTime(vol * 2.5, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.8, 0.1);
 
     osc1.start(playTime);
@@ -693,8 +702,11 @@ function playShred(
     osc2.connect(filter);
     filter.connect(outputGain);
 
+    // Legato attack stays tight but loses the hard 5 ms transient
+    // (epic-3-soloist S1) — shred is aggressive, so the swell is subtler.
+    const attack = isLegato ? 0.016 : 0.005;
     outputGain.gain.setValueAtTime(0, playTime);
-    outputGain.gain.setTargetAtTime(vol * 1.3, playTime, 0.005);
+    outputGain.gain.setTargetAtTime(vol * 1.3, playTime, attack);
     outputGain.gain.setTargetAtTime(0, playTime + duration * 0.9, 0.05);
 
     osc1.start(playTime);
@@ -730,7 +742,9 @@ function applyPitchEnvelope(
     const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
 
     if (isLegato && Math.abs(freq - prevFreq) < freq * 0.5) {
-        const glideTime = isSoloistGuitarMode(soloist.mode) ? 0.03 : 0.06;
+        // Portamento glide — long enough to read as a slur, not a fast bend
+        // (epic-3-soloist S1). Guitar mode stays quicker (hammer-on feel).
+        const glideTime = isSoloistGuitarMode(soloist.mode) ? 0.04 : 0.085;
         osc1.frequency.setValueAtTime(prevFreq, playTime);
         osc2.frequency.setValueAtTime(prevFreq, playTime);
         osc1.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
