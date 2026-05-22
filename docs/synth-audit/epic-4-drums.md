@@ -45,6 +45,7 @@ The ride "ping" fires only above `velocity > 0.92` (`synth-drums.ts:1067`); belo
 
 **Acceptance:** A/B — every ride hit has stick definition; soft rides are no longer indistinct wash.
 **Effort:** ~2h. **Model:** sonnet (concrete gate removal + scaling). **Reviewer:** synth-graph-reviewer. **Source:** `drums.md` §2, §3.
+**Status:** Shipped 2026-05-22. New `playRideNew` — a ride-only `new` voice (the ride is rendered inside the frozen `playDrumSoundCurrent`, so the gate could not be edited in place). The `velocity > 0.92` ping gate is gone: the stick "ping" fires on every hit, volume scaled continuously with `pingScale = 1.0 + (1 - velNorm) * 0.7` — the scale *rises* as the hit softens, since a light ride tap is physically mostly stick attack, which is what gives quiet rides definition. Also draws from the Epic 4 S4 variation pool (first `new` ride voice — honors S4's "ride patterns" clause); drops the un-seeded `velJitter` per the epic note. `synth-graph-reviewer`: its one P1 (panner-leak on the `!voiceConfig` return) was a line-number misread — verified false against source (`voiceConfig` guard precedes `createSimplePanner`); effective verdict clean. Owner approved by ear.
 
 ### S6. Velocity → timbre on hand percussion
 Clave, conga, bongo, agogo, perc, shaker, guiro take velocity only as a volume scalar — frequencies, cutoffs, decay times are constant. Map velocity to filter cutoff and decay (harder = brighter + slightly longer, more noise-click) via the Epic 0 S7 helper.

@@ -916,6 +916,9 @@ function playDrumSoundNew(state: EnsembleState, name: string, time: number, velo
         case 'HiHatPedal':
             playPedalChickNew(state, time, velocity);
             return;
+        case 'Ride':
+            playRideNew(state, time, velocity);
+            return;
         default:
             playDrumSoundCurrent(state, name, time, velocity);
     }
@@ -1278,6 +1281,123 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
     source.onended = () => {
         if (groove.lastHatGain === gain) {
             (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
+        }
+        safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
+    };
+}
+
+/**
+ * `New`-voice ride cymbal — synth-audit Epic 4 S5 ("ride ping on every hit").
+ *
+ * The `current` ride fires its stick "ping" (the triangle-osc attack transient)
+ * only above `velocity > 0.92` — every softer ride hit is pure metallic wash
+ * with no stick definition, so a quiet ride pattern reads as indistinct hiss.
+ *
+ * This voice drops the velocity gate: the ping fires on EVERY hit, with its
+ * volume scaled continuously from velocity. The scale curve *rises* as the hit
+ * gets softer (`pingScale` 1.0 hard → 1.7 soft) on purpose — a light ride tap
+ * is physically predominantly the stick attack, with the bow wash blooming
+ * only when struck harder, so boosting the ping on soft hits is what gives a
+ * quiet ride its definition rather than just making it uniformly louder.
+ *
+ * Otherwise this is the `current` ride: same `rideMetal` buffer (now drawn from
+ * the Epic 4 S4 variation pool — the first `new` ride voice can finally honor
+ * S4's "fast ride patterns" clause), same bandpass/highpass chain, same gain
+ * envelope and `lastRideGain` choke. Per the epic note the `new` drum voice
+ * carries no un-seeded `velJitter` — the scheduler's seeded `humanizeNote`
+ * already humanized `velocity`.
+ *
+ * NOTE: `pingScale`'s curve constants are by-ear starting points; expect to
+ * retune them at the listening gate.
+ */
+function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
+    const now = playback.audio.currentTime;
+    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
+    const playTime = Math.max(time, now + 0.002);
+    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    // why: no `velJitter` — see the doc comment; the scheduler already applied
+    // seeded humanization to `velocity`.
+    const masterVol = hitVelocity * 1.3 * densityDuck;
+
+    const voiceConfig = getCymbalVoiceConfig(
+        'Ride',
+        hitVelocity,
+        (playback as any).bandIntensity || 0.5,
+    );
+    if (!voiceConfig) {
+        return;
+    }
+
+    // Ride is right-panned (see RIGHT_PANNED_INSTRUMENTS).
+    const panner = createSimplePanner(playback.audio, 0.35, playTime);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
+    }
+
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const vol = masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Ride') * rr();
+
+    // Choke any prior ride tail so successive rides don't pile up.
+    if (groove.lastRideGain) {
+        rampGain(groove.lastRideGain.gain, 0, playTime, 0.05);
+    }
+
+    const source = playback.audio.createBufferSource();
+    // Epic 4 S4 variation pool — fast ride patterns vary stick-to-stick.
+    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'Ride');
+    source.playbackRate.value = voiceConfig.playbackRate * rr(voiceConfig.playbackVariance);
+
+    const bpFilter = playback.audio.createBiquadFilter();
+    bpFilter.type = 'bandpass';
+    bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * 1.14, playTime);
+    bpFilter.frequency.setTargetAtTime(voiceConfig.bandpassFreq * 0.96, playTime + 0.008, 0.08);
+    bpFilter.Q.value = voiceConfig.q;
+
+    const hpFilter = playback.audio.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * 1.1, playTime);
+    hpFilter.frequency.setTargetAtTime(voiceConfig.highpassFreq * 0.95, playTime + 0.008, 0.1);
+
+    const gain = playback.audio.createGain();
+    gain.gain.setValueAtTime(0, playTime);
+    gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
+    gain.gain.setTargetAtTime(0, playTime + voiceConfig.decayDelay, voiceConfig.decayTime);
+    (groove as Mutable<typeof groove>).lastRideGain = gain; // @direct-mutation
+
+    source.connect(bpFilter);
+    bpFilter.connect(hpFilter);
+    hpFilter.connect(gain);
+    gain.connect(panner);
+
+    // --- The un-gated ping --------------------------------------------------
+    // Every ride hit gets a stick "ping" — no `velocity > 0.92` gate. `pingScale`
+    // rises as the hit softens so a quiet ride keeps stick definition instead of
+    // collapsing to pure wash (see the doc comment).
+    if (voiceConfig.pingFreq && voiceConfig.pingVolume) {
+        const velNorm = clamp01((hitVelocity - 0.3) / 0.7);
+        const pingScale = 1.0 + (1 - velNorm) * 0.7;
+        playResonantTone(playback.audio, panner, playTime, {
+            type: 'triangle',
+            freqStart: voiceConfig.pingFreq * rr(0.02),
+            freqEnd: voiceConfig.pingFreq * 0.84,
+            rampDuration: 0.01,
+            volume: vol * voiceConfig.pingVolume * pingScale,
+            attack: 0.0008,
+            decay: 0.01,
+            duration: 0.08,
+        });
+    }
+
+    source.start(playTime);
+    source.stop(playTime + voiceConfig.stopTime);
+
+    source.onended = () => {
+        if (groove.lastRideGain === gain) {
+            (groove as Mutable<typeof groove>).lastRideGain = null; // @direct-mutation
         }
         safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
     };
