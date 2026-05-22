@@ -106,7 +106,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
             if (shouldPlay) {
                 if (openAccent) {
-                    soundName = 'Open';
+                    // Epic 4 S3: the funk "bark" is a quick open-then-choke,
+                    // not a full wash — a half-open hat the following closed
+                    // 16th snaps shut. The bigger section-turnaround barks
+                    // below stay full-open.
+                    soundName = 'HiHatHalf';
                     velocity = openSection ? 0.96 : 1.0;
                     instTimeOffset -= barkUsesA ? 0.001 : 0.002;
                 } else if (phraseLift) {
@@ -130,7 +134,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
             if (phraseRelease && intensity > 0.82) {
                 shouldPlay = true;
-                soundName = 'Open';
+                // Epic 4 S3: a controlled half-open bark (see openAccent above).
+                soundName = 'HiHatHalf';
                 velocity = 0.94;
                 instTimeOffset -= 0.0015;
             }

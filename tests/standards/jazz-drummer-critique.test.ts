@@ -104,8 +104,11 @@ describe('Jazz Drummer Critique', () => {
                     }
                 }
 
-                // --- CRITIQUE: Foot Chick (HiHat on 2 and 4) ---
-                if ((s === 4 || s === 12) && stepData.instruments.HiHat) {
+                // --- CRITIQUE: Foot Chick (pedal hi-hat on 2 and 4) ---
+                // why: synth-audit Epic 4 S3 gave the foot chick its own
+                // `HiHatPedal` articulation — the bedrock 2-and-4 pedal close
+                // is now a real pedal voice, not a stick-closed `HiHat`.
+                if ((s === 4 || s === 12) && stepData.instruments.HiHatPedal) {
                     footChickHits++;
                 }
 

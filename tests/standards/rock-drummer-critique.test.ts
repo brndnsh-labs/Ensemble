@@ -81,6 +81,18 @@ describe('Rock Drummer Critique', () => {
         return history;
     };
 
+    // Hi-hat family: closed + the Epic 4 S3 in-between articulations
+    // (quarter/half-open) + the foot-pedal chick + full open + ride. A
+    // timekeeping-hat lookup must see all of them or it silently drops the
+    // new articulations and under-counts the pulse.
+    const hatFamilyHit = (instruments) =>
+        instruments.HiHat ||
+        instruments.HiHatQuarter ||
+        instruments.HiHatHalf ||
+        instruments.HiHatPedal ||
+        instruments.Open ||
+        instruments.Ride;
+
     it('should pass an authenticity critique for a 128-bar Rock performance', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
@@ -123,10 +135,7 @@ describe('Rock Drummer Critique', () => {
                 }
 
                 // --- CRITIQUE: Eighth Note Pulse (Hats/Ride) ---
-                const hat =
-                    stepData.instruments.HiHat ||
-                    stepData.instruments.Open ||
-                    stepData.instruments.Ride;
+                const hat = hatFamilyHit(stepData.instruments);
                 if (hat) {
                     if (isEighth) {
                         eighthNoteHats++;
@@ -185,11 +194,16 @@ describe('Rock Drummer Critique', () => {
         const lowIntensityPerf = simulatePerformance(32, { playback: { bandIntensity: 0.3 } });
         const highIntensityPerf = simulatePerformance(32, { playback: { bandIntensity: 0.9 } });
 
+        // Count the intensity-gated opens: the full open AND the half-open
+        // (both fire only as a high-intensity phrase accent). The quarter-open
+        // lift articulation is deliberately excluded — it is an always-on
+        // offbeat detail, not part of the "open up when intensity rises"
+        // behavior this test measures.
         const countOpenHats = (perf) => {
             let count = 0;
             perf.forEach((bar) =>
                 bar.forEach((step) => {
-                    if (step.instruments.Open) {
+                    if (step.instruments.Open || step.instruments.HiHatHalf) {
                         count++;
                     }
                 }),
@@ -214,12 +228,14 @@ describe('Rock Drummer Critique', () => {
 
         performance.forEach((bar) =>
             bar.forEach((step) => {
-                const hat =
-                    step.instruments.HiHat || step.instruments.Open || step.instruments.Ride;
+                const hat = hatFamilyHit(step.instruments);
                 if (!hat) {
                     return;
                 }
                 timekeepingHits++;
+                // Only a *full* open is a "wash" — the half/quarter-open
+                // articulations are controlled accents, not a continuous
+                // open hat, so they are deliberately not counted here.
                 if (hat.sound === 'Open') {
                     openHits++;
                 }

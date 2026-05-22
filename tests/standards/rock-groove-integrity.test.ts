@@ -116,7 +116,7 @@ describe('Rock Groove Integrity', () => {
             expect(downbeatHat.velocity).toBeGreaterThan(upbeatHat.velocity);
         });
 
-        it('should route phrase-end open hats through the open lane instead of doubling articulations', () => {
+        it('should route a phrase-end open as a half-open hat without doubling articulations', () => {
             const highIntensityState = {
                 ...mockState,
                 playback: { ...mockState.playback, bandIntensity: 0.9 },
@@ -133,10 +133,14 @@ describe('Rock Groove Integrity', () => {
                 createParams(phraseEndStep, 'Open', 0),
             );
 
-            expect(closedLane.shouldPlay).toBe(false);
-            expect(openLane.shouldPlay).toBe(true);
-            expect(openLane.soundName).toBe('Open');
-            expect(openLane.instTimeOffset).toBeLessThan(0);
+            // Epic 4 S3: a phrase-ending hat is a controlled half-open, not a
+            // full Open wash (the bigger lift/anthem opens stay 'Open'). A
+            // half-open is not 'Open', so it owns the closed (HiHat) lane —
+            // the Open lane stays silent and the articulation never doubles.
+            expect(closedLane.shouldPlay).toBe(true);
+            expect(closedLane.soundName).toBe('HiHatHalf');
+            expect(openLane.shouldPlay).toBe(false);
+            expect(closedLane.instTimeOffset).toBeLessThan(0);
         });
     });
 });

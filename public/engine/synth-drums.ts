@@ -174,6 +174,11 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     'Sidestick',
     'HiHat',
     'Open',
+    // Hi-hat articulations rendered by the `new` voice (Epic 4 S3); the
+    // `current` voice degrades them via HAT_ARTICULATION_FALLBACK.
+    'HiHatQuarter',
+    'HiHatHalf',
+    'HiHatPedal',
     'Ride',
     'Crash',
     'China',
@@ -780,20 +785,58 @@ const mixState: DrumMixState = {
  */
 // synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
 // drum module's `voice` setting; `*New` is a placeholder until Epic 4 fills it in.
-export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
-    (args[0].groove.voice === 'new' ? playDrumSoundNew : playDrumSoundCurrent)(...args);
-}
+/**
+ * Hi-hat articulations introduced by the `new` voice (synth-audit Epic 4 S3)
+ * that `playDrumSoundCurrent` has no branch for. The `current` voice degrades
+ * each to its nearest classic voice so it never goes silent — quarter-open and
+ * the foot-pedal chick read closest to a closed hat, half-open to a full open
+ * hat. The `new` voice renders them properly (see `playDrumSoundNew`). Existing
+ * names are absent from this map, so `current` stays bit-identical for them.
+ */
+const HAT_ARTICULATION_FALLBACK: Record<string, string> = {
+    HiHatQuarter: 'HiHat',
+    HiHatHalf: 'Open',
+    HiHatPedal: 'HiHat',
+};
 
-function playDrumSoundNew(...args: Parameters<typeof playDrumSoundCurrent>): void {
+export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
     const [state, name, time, velocity] = args;
-    // The `new` drum voice diverges from `current` only where a synth-audit story
-    // has rebuilt a voice. Epic 4 S2 rebuilt the closed hihat; everything else still
-    // routes through the (frozen, bit-identical) `playDrumSoundCurrent`.
-    if (name === 'HiHat') {
-        playClosedHatNew(state, time, velocity);
+    if (state.groove.voice === 'new') {
+        playDrumSoundNew(state, name, time, velocity);
         return;
     }
-    playDrumSoundCurrent(...args);
+    // `current` voice: collapse any `new`-only hat articulation to a classic
+    // voice it knows. A no-op for every existing soundName.
+    const currentName = HAT_ARTICULATION_FALLBACK[name] ?? name;
+    playDrumSoundCurrent(state, currentName, time, velocity);
+}
+
+function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
+    // The `new` drum voice diverges from `current` only where a synth-audit story
+    // has rebuilt a voice. Epic 4 S2/S3 rebuilt the whole hi-hat family into a
+    // closed↔open continuum plus a foot-pedal chick; everything else still routes
+    // through the (frozen, bit-identical) `playDrumSoundCurrent`.
+    switch (name) {
+        case 'HiHat':
+            playClosedHatNew(state, time, velocity);
+            return;
+        case 'HiHatQuarter':
+            // ~⅓ open — the openHatMetal buffer cut fairly short.
+            playOpenHatNew(state, time, velocity, 0.32);
+            return;
+        case 'HiHatHalf':
+            // ~⅗ open — a clearly sustaining but not fully-open hat.
+            playOpenHatNew(state, time, velocity, 0.6);
+            return;
+        case 'Open':
+            playOpenHatNew(state, time, velocity, 1.0);
+            return;
+        case 'HiHatPedal':
+            playPedalChickNew(state, time, velocity);
+            return;
+        default:
+            playDrumSoundCurrent(state, name, time, velocity);
+    }
 }
 
 /**
@@ -931,6 +974,223 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     // died. The buffer *content* (not the gain envelope) is silent by then, so
     // the stop produces no click regardless of the long gain time-constant.
     source.stop(playTime + 0.45);
+
+    source.onended = () => {
+        if (groove.lastHatGain === gain) {
+            (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
+        }
+        safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
+    };
+}
+
+/**
+ * `New`-voice open / in-between hi-hat — synth-audit Epic 4 S3.
+ *
+ * Renders the closed↔open continuum *above* the closed endpoint: `openness`
+ * (0–1) covers the quarter-open (~0.32) and half-open (~0.6) hats and the
+ * fully-open hat (1.0) on one voice. Every non-closed position sounds the
+ * `openHatMetal` buffer (which rings ≈1 s naturally); `openness` drives how
+ * hard the gain envelope chokes that ring — a quarter-open hat is the
+ * `openHatMetal` buffer cut short, a fully-open hat lets it ring. `openness`
+ * also opens the
+ * band/highpass (more-open = brighter, airier) and lengthens the stop time.
+ *
+ * The decay curve is steep (`openness²`) on purpose: a linear map bunches the
+ * quarter/half hats together near the long-decay end and they stop reading as
+ * distinct articulations. Like the closed hat this carries no `velJitter` —
+ * the scheduler's seeded `humanizeNote` already humanized `velocity`.
+ *
+ * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
+ * to retune them at the listening gate.
+ */
+function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, openness = 1.0): void {
+    const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
+    const now = playback.audio.currentTime;
+    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
+    const playTime = Math.max(time, now + 0.002);
+    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    const open = clamp01(Number.isFinite(openness) ? openness : 1.0);
+    const masterVol = hitVelocity * 1.3 * densityDuck;
+
+    const voiceConfig = getCymbalVoiceConfig(
+        'Open',
+        hitVelocity,
+        (playback as any).bandIntensity || 0.5,
+    );
+    if (!voiceConfig) {
+        return;
+    }
+
+    // HiHat family is right-panned (see RIGHT_PANNED_INSTRUMENTS).
+    const panner = createSimplePanner(playback.audio, 0.35, playTime);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
+    }
+
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+    const vel = clamp01(Math.max(0.3, hitVelocity));
+
+    // --- The continuum ------------------------------------------------------
+    // `open` is the sole openness control. `decayTc` (the gain `setTargetAtTime`
+    // time-constant) chokes the long-ringing `openHatMetal` buffer short for a
+    // quarter-open hat and lets it ring for a full-open one; the `open²` curve
+    // keeps quarter/half distinct. A harder hit reads a touch tighter, as a
+    // real hat does. `brightness` opens the filters as the hat opens.
+    const decayTc = (0.045 + open * open * 0.5) * (1 - Math.max(0, vel - 0.7) * 0.18);
+    const decayDelay = 0.014; // fixed short hold — no jitter
+    // why: source must outlive the audible ring. For low `open` the gain
+    // envelope has cleared >10 time-constants by then; the full-open stop
+    // (3.2 s) lands past the openHatMetal buffer's own 3.0 s duration, where
+    // the source already outputs pure zero — no click at either extreme.
+    const stopTime = 0.4 + open * 2.8;
+    const brightness = 0.82 + open * 0.18;
+
+    const hatArticulation = 0.985 + Math.random() * 0.04;
+    const vol =
+        masterVol *
+        voiceConfig.volumeScale *
+        getCymbalMixScale(state, 'Open') *
+        // a fully-open hat is the loudest of the family; quarter-open sits back
+        (0.86 + open * 0.16) *
+        rr();
+
+    // Choke the previous hat — an open hat ringing into a following closed or
+    // pedal hat must duck out cleanly (the foot-close gesture).
+    if (groove.lastHatGain) {
+        rampGain(groove.lastHatGain.gain, 0, playTime, 0.012);
+    }
+
+    const source = playback.audio.createBufferSource();
+    source.buffer =
+        getCymbalBuffer(groove, 'Open') || ensureCymbalBuffer(playback.audio, groove, 'Open');
+    source.playbackRate.value =
+        voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
+
+    const bpFilter = playback.audio.createBiquadFilter();
+    bpFilter.type = 'bandpass';
+    bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * brightness * 1.08, playTime);
+    bpFilter.frequency.setTargetAtTime(
+        voiceConfig.bandpassFreq * brightness,
+        playTime + 0.01,
+        0.05,
+    );
+    bpFilter.Q.value = voiceConfig.q * (0.9 + Math.random() * 0.2);
+
+    const hpFilter = playback.audio.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * (0.9 + open * 0.1), playTime);
+
+    const gain = playback.audio.createGain();
+    gain.gain.setValueAtTime(0, playTime);
+    gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
+    gain.gain.setTargetAtTime(0, playTime + decayDelay, decayTc);
+    (groove as Mutable<typeof groove>).lastHatGain = gain; // @direct-mutation
+
+    source.connect(bpFilter);
+    bpFilter.connect(hpFilter);
+    hpFilter.connect(gain);
+    gain.connect(panner);
+
+    source.start(playTime);
+    // stop past the audible ring — see the `stopTime` derivation above.
+    source.stop(playTime + stopTime);
+
+    source.onended = () => {
+        if (groove.lastHatGain === gain) {
+            (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
+        }
+        safeDisconnect([source, bpFilter, hpFilter, gain, panner]);
+    };
+}
+
+/**
+ * `New`-voice foot-pedal "chick" — synth-audit Epic 4 S3.
+ *
+ * A closed hi-hat sounded by the foot pedal rather than the stick: the two
+ * cymbals snap together. Versus a stick-closed hat it is darker (little stick
+ * attack or top sizzle), softer, and shorter — a "chk" rather than a "tick".
+ * Idiomatically it lands on the off-beats (the jazz 2-and-4 pedal). It sounds
+ * the same `hihatMetal` buffer as the closed hat, but with a slightly slower
+ * attack (the cymbals *meet*, they are not struck), a darker bandpass, a fast
+ * decay, and no sizzle layer.
+ */
+function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): void {
+    const { playback, groove } = state;
+    if (!playback.audio) {
+        return;
+    }
+    const now = playback.audio.currentTime;
+    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
+    const playTime = Math.max(time, now + 0.002);
+    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    const masterVol = hitVelocity * 1.3 * densityDuck;
+
+    const voiceConfig = getCymbalVoiceConfig(
+        'HiHat',
+        hitVelocity,
+        (playback as any).bandIntensity || 0.5,
+    );
+    if (!voiceConfig) {
+        return;
+    }
+
+    const panner = createSimplePanner(playback.audio, 0.35, playTime);
+    if (playback.audioGraph) {
+        panner.connect(playback.audioGraph.drums.gain);
+    }
+
+    const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
+
+    // A pedal chick is quieter and darker than a struck closed hat.
+    const vol =
+        masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'HiHat') * 0.55 * rr();
+
+    if (groove.lastHatGain) {
+        rampGain(groove.lastHatGain.gain, 0, playTime, 0.006);
+    }
+
+    const source = playback.audio.createBufferSource();
+    source.buffer =
+        getCymbalBuffer(groove, 'HiHat') || ensureCymbalBuffer(playback.audio, groove, 'HiHat');
+    source.playbackRate.value =
+        voiceConfig.playbackRate * (0.95 + Math.random() * 0.03) * rr(voiceConfig.playbackVariance);
+
+    const bpFilter = playback.audio.createBiquadFilter();
+    bpFilter.type = 'bandpass';
+    // why: dark and rounded — the pedal close has little top sizzle. A lower
+    // centre (0.6×) pulls the metallic edge down, and a low Q (0.85×, below the
+    // stick hat's) widens the band so it reads as a soft "chk" rather than the
+    // peaky, resonant "tss" scratch a tight high-Q band gives on this buffer.
+    bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * 0.6, playTime);
+    bpFilter.Q.value = voiceConfig.q * 0.85;
+
+    const hpFilter = playback.audio.createBiquadFilter();
+    hpFilter.type = 'highpass';
+    // lower highpass than the stick hat — keep more warm low-mid body
+    hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * 0.62, playTime);
+
+    const gain = playback.audio.createGain();
+    gain.gain.setValueAtTime(0, playTime);
+    // why: soft attack — the cymbals *meet*, they are not struck. Slow enough
+    // (7 ms) to round off the buffer's 8 ms transient burst, which is what
+    // otherwise reads as a scratchy onset.
+    gain.gain.setTargetAtTime(vol, playTime, 0.007);
+    // fast decay — a chick is short
+    gain.gain.setTargetAtTime(0, playTime + 0.01, 0.035);
+    (groove as Mutable<typeof groove>).lastHatGain = gain; // @direct-mutation
+
+    source.connect(bpFilter);
+    bpFilter.connect(hpFilter);
+    hpFilter.connect(gain);
+    gain.connect(panner);
+
+    source.start(playTime);
+    // why: stop at +0.2 s — both the hihatMetal buffer content and the fast
+    // gain envelope are silent well before then, so the stop produces no click.
+    source.stop(playTime + 0.2);
 
     source.onended = () => {
         if (groove.lastHatGain === gain) {

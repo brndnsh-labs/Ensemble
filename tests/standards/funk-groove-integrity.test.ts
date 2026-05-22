@@ -167,7 +167,7 @@ describe('Funk Groove Integrity', () => {
             mockMath.mockRestore();
         });
 
-        it('should route phrase-release barks to the open lane without doubling the 16th stream', () => {
+        it('should route phrase-release barks as a half-open hat without doubling the 16th stream', () => {
             getState.mockReturnValue(mockState);
             mockState.groove.sectionSeedMap['1'] = 0.8;
 
@@ -175,9 +175,13 @@ describe('Funk Groove Integrity', () => {
             const closedLane = applyGrooveOverrides(getState(), createParams(releaseStep, 'HiHat'));
             const openLane = applyGrooveOverrides(getState(), createParams(releaseStep, 'Open'));
 
-            expect(closedLane.shouldPlay).toBe(false);
-            expect(openLane.shouldPlay).toBe(true);
-            expect(openLane.soundName).toBe('Open');
+            // Epic 4 S3: the funk "bark" is a half-open hat (a quick
+            // open-then-choke), not a full Open wash. A half-open is not
+            // 'Open', so it owns the closed (HiHat) lane — the Open lane stays
+            // silent, so the 16th stream is still single, never doubled.
+            expect(closedLane.shouldPlay).toBe(true);
+            expect(closedLane.soundName).toBe('HiHatHalf');
+            expect(openLane.shouldPlay).toBe(false);
         });
     });
 });

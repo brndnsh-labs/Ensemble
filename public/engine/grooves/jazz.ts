@@ -4,6 +4,7 @@ import {
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
+    getPhraseSeed,
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
@@ -50,6 +51,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isBackbeat,
         isOffbeat,
         beatIndex,
+        barIndex,
         drumComplexity,
         sectionSeed,
         isTurnaround,
@@ -123,9 +125,22 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         shouldPlay = false;
         if (isBackbeat) {
             shouldPlay = true;
-            velocity = 1.0;
-            // Humanize the foot chick: slightly ahead of the beat for driving energy
-            instTimeOffset -= 0.005 + Math.random() * 0.005;
+            // why: a foot "chick" is a soft timekeeping undercurrent, not an
+            // accent — the ride leads, the pedal supports. Held at ~0.6 so it
+            // sits under the ride rather than punching through (the old 1.0
+            // was a stick-hat velocity, too loud for a foot articulation).
+            velocity = 0.6;
+            // The foot "chick" — the hi-hat closed by the pedal on 2 & 4, the
+            // backbone of swing time. Epic 4 S3 gives it a real pedal-chick
+            // voice; before, this step emitted a plain stick-closed hat
+            // despite being a foot articulation.
+            soundName = 'HiHatPedal';
+            // Humanize the foot chick: slightly ahead of the beat for driving
+            // energy. Seeded on (barIndex, beatIndex) — deterministic phrasing
+            // so looped playback and critique tests reproduce exactly, rather
+            // than a raw Math.random() jitter.
+            const chickSeed = getPhraseSeed(sectionSeed, barIndex, 1, beatIndex);
+            instTimeOffset -= 0.005 + chickSeed * 0.005;
         }
     } else if (context.inst.name === 'Kick') {
         shouldPlay = false;

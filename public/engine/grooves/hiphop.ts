@@ -227,7 +227,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // non-burst beats.
         if ((boomBapOpen || trapOpen) && !trapRollHere) {
             shouldPlay = true;
-            soundName = 'Open';
+            // Epic 4 S3: boom-bap's open hat is a tight, controlled half-open —
+            // the vintage "ts-tss" release. Trap's open hat stays a fuller open
+            // accent. (boomBapOpen is motif 0; trapOpen is motif >= 1 — exclusive.)
+            soundName = boomBapOpen ? 'HiHatHalf' : 'Open';
             velocity = activeMotif >= 2 ? 1.02 : 0.94;
             instTimeOffset += activeMotif === 0 ? 0.002 : 0.001;
         }

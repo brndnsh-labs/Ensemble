@@ -108,7 +108,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
             if (shouldPlay) {
                 if (openAccent) {
-                    soundName = 'Open';
+                    // Epic 4 S3: a phrase-ending hat is a *controlled* half-open
+                    // into the downbeat — punchier and tighter than a full wash.
+                    // The bigger lift/anthem opens stay full-open.
+                    soundName = liftOpen || anthemOpen ? 'Open' : 'HiHatHalf';
                     velocity = beatIndex === 3 ? 0.92 : 0.86;
                     instTimeOffset -= 0.0015 + intensity * 0.001;
                 } else if (rideSection) {
@@ -138,6 +141,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     if (isOffbeat && beatIndex === liftBeat) {
                         velocity += 0.08;
                         instTimeOffset -= 0.002 + intensity * 0.001;
+                        // Epic 4 S3: the accented "lift" offbeat hat breathes
+                        // slightly open — the loose-rock drive between a tight
+                        // hat and a full bark.
+                        soundName = 'HiHatQuarter';
                     } else if (isOffbeat && beatIndex === 3) {
                         velocity += 0.05;
                         instTimeOffset -= 0.003 + intensity * 0.0015;

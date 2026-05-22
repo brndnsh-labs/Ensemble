@@ -4,6 +4,12 @@ export const DRUM_MAP: Record<string, number> = {
     Snare: 38,
     HiHat: 42,
     Open: 46,
+    // why: Epic 4 S3 hi-hat articulations. GM 44 is Pedal Hi-Hat (a dedicated
+    // note); GM has no in-between, so quarter-open round-trips as Closed (42)
+    // and half-open as Open (46) — the nearest GM voices.
+    HiHatQuarter: 42,
+    HiHatHalf: 46,
+    HiHatPedal: 44,
     Crash: 49,
     Ride: 51,
     Rim: 37,

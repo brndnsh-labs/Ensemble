@@ -82,9 +82,12 @@ describe('Funk Drummer Critique', () => {
                     } else if (
                         result.shouldPlay &&
                         instName === 'HiHat' &&
-                        result.soundName === 'Open'
+                        (result.soundName === 'Open' || result.soundName?.startsWith('HiHat'))
                     ) {
-                        // Special case for HiHat overrides that switch to Open
+                        // HiHat-lane articulation overrides: a switch to a full
+                        // Open, or to an Epic 4 S3 in-between hat
+                        // (HiHatHalf/Quarter — the funk "bark" — or HiHatPedal).
+                        // All fold into the HiHat timekeeping slot.
                         stepData.instruments.HiHat = {
                             velocity: result.velocity,
                             sound: result.soundName,
