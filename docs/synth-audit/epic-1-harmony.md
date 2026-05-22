@@ -44,6 +44,8 @@ Build a named string-pad preset: a multi-detuned sawtooth ensemble (4–6 layers
 **Acceptance:** A/B — sustained harmony reads as a string ensemble with width and movement, not a static duo. Note: a true sampled string ensemble remains the one future pack candidate (Epic 6) — this story makes the *synth* pad as good as synthesis allows.
 **Effort:** ~6h. **Model:** opus (voice design). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §3, §4.
 
+**Status:** Shipped 2026-05-22. The `style === 'strings'` path in `playHarmonyNoteNew` is now a real string-ensemble pad: a 5-layer sawtooth ensemble (saw core + 3 extra detuned layers, ~38 cents wide), per-layer attack offsets so the ensemble blooms in, a slow chorus LFO (0.22 Hz, ±6 cents) sweeping every layer's detune, a body-resonance peak (~250 Hz), and a slow gentle lowpass that drifts open across the note. Keeps the S2 pad ADSR. `synth-graph-reviewer` fully clean (P0/P1/P2: 0). typecheck/Biome/jscpd green, 954 harmony tests pass. Owner auditioned and approved. **Epic 1 complete (6/6).**
+
 ### S5. Harmony bus character EQ
 The harmony bus EQ (`engine.ts:257–271`) is a single peaking filter at 1200 Hz with +1 dB gain — inaudible. Give the bus real character like the bass/chord buses: an air high-shelf and a low-mid scoop, voiced so harmony sits as a sweetener layer above the chords.
 

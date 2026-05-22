@@ -230,8 +230,14 @@ function resolveHarmonyTimbre(style: string, feel: string): HarmonyTimbre {
             // gives the rich harmonic spectrum the brass formants carve.
             timbre = { osc1: 'sawtooth', osc2: 'sawtooth', osc2Detune: 12, sub: 'triangle' };
             break;
+        case 'strings':
+            // String ensemble (synth-audit Epic 1 S4): an all-sawtooth core —
+            // every layer the same waveform so the detuned ensemble blends as
+            // one section. The extra layers are added in the routing branch.
+            timbre = { osc1: 'sawtooth', osc2: 'sawtooth', osc2Detune: 8, sub: 'sawtooth' };
+            break;
         default:
-            // 'strings' and any future style — a soft saw/triangle pad blend.
+            // Any future style — a soft saw/triangle pad blend.
             timbre = { osc1: 'triangle', osc2: 'sawtooth', osc2Detune: 8, sub: 'sine' };
     }
     // genreFeel bias — a lean, not a replacement. Rock/Metal want brightness
@@ -371,6 +377,10 @@ function playHarmonyNoteNew(
     let lfoGain: GainNode | null = null;
     let tremoloLfo: OscillatorNode | null = null;
     let fifthOsc: OscillatorNode | null = null;
+    // String-ensemble nodes (S4) — populated by the 'strings' routing branch,
+    // stopped centrally in the universal stop block below.
+    let chorusLfo: OscillatorNode | null = null;
+    const stringLayers: OscillatorNode[] = [];
 
     // --- Organ voice: carried over from the Current voice unchanged ---
     if (isOrgan) {
@@ -579,6 +589,63 @@ function playHarmonyNoteNew(
                 breath.stop(playTime + duration + 0.5);
                 voiceNodes.push(breath, breathHP, breathGain);
             }
+        } else if (style === 'strings') {
+            // --- "String Pad" ensemble voice (synth-audit Epic 1 S4) ---
+            // The canonical pure-synth "expensive pad": a detuned sawtooth
+            // ensemble with width and slow movement, not a static two-osc duo.
+            //   - osc1/osc2 (the saw core) plus 3 extra saw layers = 5 voices,
+            //     spread across ~38 cents of static detune for ensemble width.
+            //   - Each extra layer starts a few ms late so the ensemble blooms
+            //     in rather than hitting as one block (per-layer attack offset).
+            //   - One slow chorus LFO sweeps every layer's detune a few cents
+            //     for the continuous movement that separates a real ensemble
+            //     from a frozen chord.
+            //   - A body-resonance peak adds string-body warmth.
+
+            // Slow ensemble chorus LFO — created first so the extra layers can
+            // tap it as they are built.
+            chorusLfo = playback.audio.createOscillator();
+            chorusLfo.type = 'sine';
+            chorusLfo.frequency.setValueAtTime(0.22, playTime);
+            const chorusGain = playback.audio.createGain();
+            chorusGain.gain.setValueAtTime(6, playTime); // ±6 cents of sweep
+            chorusLfo.connect(chorusGain);
+            chorusLfo.start(playTime);
+            voiceNodes.push(chorusLfo, chorusGain);
+
+            // 3 extra sawtooth layers. Static detune spread (cents) + a small
+            // seeded-free random jitter so no two notes are an identical stack.
+            // Combined with osc1 (~0) and osc2 (~+8) this lands 5 layers across
+            // roughly [-18 .. +20] cents.
+            const layerDetune = [-18, -9, 19];
+            const layerStart = [0.013, 0.027, 0.043]; // per-layer attack offset
+            for (let i = 0; i < 3; i++) {
+                const layer = playback.audio.createOscillator();
+                layer.type = 'sawtooth';
+                layer.frequency.setValueAtTime(freq, playTime);
+                layer.detune.setValueAtTime(layerDetune[i] + (Math.random() - 0.5) * 6, playTime);
+                chorusGain.connect(layer.detune);
+                layer.connect(filter);
+                layer.start(playTime + layerStart[i]);
+                stringLayers.push(layer);
+                voiceNodes.push(layer);
+            }
+            // Sweep the core layers too.
+            chorusGain.connect(osc1.detune);
+            chorusGain.connect(osc2.detune);
+            if (sub) {
+                chorusGain.connect(sub.detune);
+            }
+
+            // Body-resonance peak — a low warm formant for string body.
+            const bodyPeak = playback.audio.createBiquadFilter();
+            bodyPeak.type = 'peaking';
+            bodyPeak.frequency.setValueAtTime(250, playTime);
+            bodyPeak.Q.setValueAtTime(1.2, playTime);
+            bodyPeak.gain.setValueAtTime(3.5, playTime);
+            filter.connect(bodyPeak);
+            bodyPeak.connect(gain);
+            voiceNodes.push(bodyPeak);
         } else {
             filter.connect(gain);
         }
@@ -630,8 +697,19 @@ function playHarmonyNoteNew(
             playTime + duration * 0.6,
         );
         filter.Q.setValueAtTime(1.0, playTime);
+    } else if (style === 'strings') {
+        // String pad (S4): a slow, gentle lowpass that drifts *open* across
+        // the note — the pad brightens almost imperceptibly as it sustains,
+        // string-like, rather than a snappy attack bloom. Low Q so it stays
+        // a soft tone shaper, not a resonant sweep.
+        filter.frequency.setValueAtTime(clampFreq(freq * 2.0), playTime);
+        filter.frequency.linearRampToValueAtTime(
+            clampFreq(freq * 4.5 * (0.6 + intensity * 0.4)),
+            playTime + duration * 0.85,
+        );
+        filter.Q.setValueAtTime(0.7, playTime);
     } else {
-        // Default branch — 'strings' and the organ bloom. A gentle
+        // Default branch — any remaining style and the organ bloom. A gentle
         // swell-and-settle around the cutoff.
         const cutoff =
             feel === 'Neo-Soul' ? freq * 1.5 * brightnessMult : freq * 3 * brightnessMult;
@@ -743,6 +821,13 @@ function playHarmonyNoteNew(
     }
     if (tremoloLfo) {
         tremoloLfo.stop(stopTime);
+    }
+    // String-ensemble extra layers + chorus LFO (S4).
+    for (const layer of stringLayers) {
+        layer.stop(stopTime);
+    }
+    if (chorusLfo) {
+        chorusLfo.stop(stopTime);
     }
 
     osc1.onended = () => safeDisconnect(voiceNodes);
