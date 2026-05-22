@@ -509,12 +509,23 @@ function playHarmonyNoteNew(
         filter.Q.setValueAtTime(1 + intensity, playTime);
     }
 
-    // --- Envelope (AR — S2 replaces this with a real ADSR) ---
+    // --- Envelope (ADSR — synth-audit Epic 1 S2) ---
+    // The S1 voice carried the inherited AR shape — attack straight into the
+    // release, no decay or sustain stage — so every held note was a flat
+    // plateau. A real decay-to-sustain stage gives pad/string styles a swell
+    // (the slow attack rising) that then settles (decay down to a slightly
+    // lower sustain) instead of sitting frozen. Fast styles (stabs/plucks/
+    // organ) get decay 0 / sustain at the peak, so their envelope collapses
+    // back to plain AR — their character is unchanged.
     const isFastAttack = style === 'stabs' || style === 'plucks' || isOrgan;
     const baseAttack = isFastAttack ? 0.01 : 0.2;
     const attackFloor = retriggerProfile?.attackFloor || 0.005;
     let attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
     let release = style === 'stabs' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
+    // Pad styles settle ~20% below the attack peak over a 0.35 s decay; fast
+    // styles hold at the peak (decay 0 — the ADSR collapses back to AR).
+    const decay = isFastAttack ? 0 : 0.35;
+    const sustainLevel = finalVol * (isFastAttack ? 1.0 : 0.8);
 
     // isBloom — a harmonic-bloom hit on a soloist anchor. A swell-in attack
     // completes the gesture. MAX of a 20% bump and a +5 ms additive bump so
@@ -544,14 +555,21 @@ function playHarmonyNoteNew(
         playTime,
     );
 
+    const attackEnd = playTime + attack;
+    const decayEnd = attackEnd + decay;
+    // why: anchor the release start to the END of the decay, not just
+    // `playTime + duration - release`. For a short pad note the latter lands
+    // before the attack/decay finish — the §5 distortion where the note never
+    // reaches its peak. The max() guarantees attack→decay always complete; a
+    // long note still sustains at `sustainLevel` in the gap between `decayEnd`
+    // and the release.
+    const releaseStart = Math.max(decayEnd, playTime + duration - release);
     gain.gain.setValueAtTime(0, playTime);
-    gain.gain.linearRampToValueAtTime(finalVol, playTime + attack);
-    // why: for pad styles (release 0.5) emitted at a short duration (~0.125 s)
-    // the release start `playTime + duration - release` lands before playTime.
-    // Web Audio allows this — the decay simply runs from the past — and it is
-    // the existing behavior for plain pads. S2 replaces this AR shape with a
-    // real ADSR and fixes the short-pad-note distortion properly.
-    gain.gain.setTargetAtTime(0, playTime + duration - release, release);
+    gain.gain.linearRampToValueAtTime(finalVol, attackEnd);
+    if (decay > 0) {
+        gain.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
+    }
+    gain.gain.setTargetAtTime(0, releaseStart, release);
 
     gain.connect(panner);
     if (playback.audioGraph) {
@@ -568,7 +586,14 @@ function playHarmonyNoteNew(
         sub.start(playTime);
     }
 
-    const stopTime = playTime + duration + 0.5;
+    // why: a pad's release tail is a `setTargetAtTime` exponential — it needs
+    // room to decay below audibility before the oscillators hard-stop, or the
+    // `osc.stop()` clips it into a click. Give pads 4 release time constants
+    // past the release start (~1.8% of peak remaining). Fast styles keep the
+    // original tail — their releases are already short.
+    const stopTime = isFastAttack
+        ? playTime + duration + 0.5
+        : Math.max(playTime + duration + 0.5, releaseStart + release * 4);
     osc1.stop(stopTime);
     osc2.stop(stopTime);
     if (sub) {

@@ -28,6 +28,8 @@ Layered onto the `playHarmonyNoteNew` voice S1 stood up. The current envelope (`
 **Acceptance:** A/B — pad/string styles have an audible swell-settle shape instead of a flat held tone. Short pad notes are no longer shape-distorted.
 **Effort:** ~3h. **Model:** opus (envelope shape by ear). **Reviewer:** synth-graph-reviewer. **Source:** `harmony.md` §2, §5.
 
+**Status:** Shipped 2026-05-22. Replaced the inherited AR envelope in `playHarmonyNoteNew` with a real ADSR: pad styles (counter/disco/default) get a 0.35 s decay settling ~20% below the attack peak to a sustain stage — a swell-and-settle shape; fast styles (stabs/plucks/organ) get decay 0 / sustain at peak, collapsing back to AR (character unchanged). Fixed the §5 short-pad-note distortion by anchoring the release start to `max(decayEnd, playTime + duration - release)` so attack→decay always complete before release. Pad oscillators now stop 4 release time-constants past the release start so the tail fades below audibility instead of clipping into a click. `synth-graph-reviewer` fully clean (P0/P1/P2: 0). typecheck/Biome/jscpd green, 954 harmony tests pass. Owner auditioned the swell-settle shape and approved.
+
 ### S3. "Horn Section" formant voice
 Build a named horn-section preset following the soloist/`INSTRUMENT_PRESETS` pattern: sawtooth core, bandpass formants (~1.2k/2.5k), a brass bell peak, fast attack with a tiny swell, optional shared noise-breath layer (the sax technique at `synth-soloist.ts:448–466` is directly reusable).
 
