@@ -116,6 +116,50 @@ function extendLegatoHarmonyVoice(
 }
 
 /**
+ * Click-free voice kill for the rebuilt harmony voice (synth-audit Epic 1 S3
+ * rapid-stab fix).
+ *
+ * The shared `killActiveVoices` fades a stolen voice's gain with
+ * `setTargetAtTime` — an exponential that never actually reaches 0 — then
+ * hard-stops the voice's oscillators ~3.5 time-constants later, when the gain
+ * is still at ~3% of its level. For a loud, breathy horn stab stolen
+ * mid-sustain that residual is an audible click (worst on the breath noise
+ * layer, which has no benign zero-crossings). This kill uses
+ * `linearRampToValueAtTime`, which reaches *exactly* 0 at `time + fadeTime`,
+ * and stops the nodes only after that — so every node hard-stops into genuine
+ * silence. Local to the rebuilt voice; the shared helper is left untouched so
+ * the other instruments are unaffected.
+ */
+function killHarmonyVoice(
+    voice: { gain?: GainNode; nodes?: AudioNode[] },
+    time: number,
+    fadeTime: number,
+): void {
+    const g = voice.gain?.gain;
+    if (g) {
+        try {
+            g.cancelScheduledValues(time);
+            // Anchor at the current value so the ramp is a true `fadeTime`
+            // fade, not a slow ramp down from some stale earlier event.
+            g.setValueAtTime(g.value, time);
+            g.linearRampToValueAtTime(0, time + fadeTime);
+        } catch {
+            /* some test mocks don't implement the full AudioParam API */
+        }
+    }
+    if (voice.nodes) {
+        for (const node of voice.nodes as Array<AudioNode & { stop?: (t: number) => void }>) {
+            try {
+                // Stop only after the linear fade has reached 0.
+                node.stop?.(time + fadeTime + 0.02);
+            } catch {
+                /* ignore: node may already be stopped */
+            }
+        }
+    }
+}
+
+/**
  * Pitch-aware voice stealing for the rebuilt harmony voice (synth-audit
  * Epic 1 S1). A non-legato hit at a MIDI that is already sounding crossfades
  * the prior voice out (per the style's retrigger profile) instead of hard-
@@ -134,7 +178,7 @@ function stealHarmonyPitchVoice(
         return null;
     }
     const profile = getHarmonyRetriggerProfile(style);
-    killActiveVoices([existing], playTime, profile.fadeTime);
+    killHarmonyVoice(existing, playTime, profile.fadeTime);
     const idx = harmony.activeVoices.indexOf(existing);
     if (idx !== -1) {
         harmony.activeVoices.splice(idx, 1); // @worker-mutation
@@ -177,7 +221,9 @@ function resolveHarmonyTimbre(style: string, feel: string): HarmonyTimbre {
             timbre = { osc1: 'sawtooth', osc2: 'triangle', osc2Detune: 4, sub: 'sine' };
             break;
         case 'stabs':
-            timbre = { osc1: 'sawtooth', osc2: 'triangle', osc2Detune: 12, sub: 'triangle' };
+            // Sawtooth core (synth-audit Epic 1 S3 "Horn Section"): a saw pair
+            // gives the rich harmonic spectrum the brass formants carve.
+            timbre = { osc1: 'sawtooth', osc2: 'sawtooth', osc2Detune: 12, sub: 'triangle' };
             break;
         default:
             timbre = { osc1: 'triangle', osc2: 'sawtooth', osc2Detune: 8, sub: 'sine' };
@@ -288,7 +334,7 @@ function playHarmonyNoteNew(
     if (harmony.activeVoices.length >= 3) {
         const oldest = harmony.activeVoices.shift();
         if (oldest) {
-            killActiveVoices([oldest], playTime, HARMONY_VOICE_LIMIT_FADE);
+            killHarmonyVoice(oldest, playTime, HARMONY_VOICE_LIMIT_FADE);
         }
     }
 
@@ -442,7 +488,94 @@ function playHarmonyNoteNew(
         if (sub) {
             sub.connect(filter);
         }
-        filter.connect(gain);
+
+        if (style === 'stabs') {
+            // --- "Horn Section" voice (synth-audit Epic 1 S3) ---
+            // A real brass-section character layered onto the sawtooth core +
+            // stabs bloom. Three parts, all summed at the voice `gain`:
+            //   1. Body path  — filter → bell → gain.
+            //   2. Formants   — raw osc → two bandpass filters → gain (brass
+            //      "honk"). Fed pre-filter so the lowpass bloom can't gut the
+            //      resonances during the sustain.
+            //   3. Breath     — a shared noise layer for the air of real
+            //      players (the sax technique, reused).
+            // Distinct from the soloist's single trumpet — that is one bell at
+            // 1.2 kHz in a serial chain; this is a wider, formant-stacked
+            // *section*.
+
+            // Brass bell — a broad projection peak on the body path. Placed
+            // above the trumpet's 1.2 kHz bell, and register-aware (less boost
+            // up high) so high voicings don't turn nasal.
+            const bellGain = freq > 500 ? Math.max(3, 6 - (freq - 500) * 0.008) : 6;
+            const bell = playback.audio.createBiquadFilter();
+            bell.type = 'peaking';
+            bell.frequency.setValueAtTime(1900, playTime);
+            bell.Q.setValueAtTime(0.8, playTime);
+            bell.gain.setValueAtTime(bellGain, playTime);
+            filter.connect(bell);
+            bell.connect(gain);
+            voiceNodes.push(bell);
+
+            // Two bandpass formants — the resonant brass honk. Fixed
+            // frequencies (a formant is a body resonance, not pitch-tracked);
+            // Q slightly broader than the soloist sax so it reads as a section
+            // rather than one reedy instrument. Mixed in below the body level.
+            const formantGain = playback.audio.createGain();
+            formantGain.gain.setValueAtTime(0.4, playTime);
+            const f1 = playback.audio.createBiquadFilter();
+            f1.type = 'bandpass';
+            f1.frequency.setValueAtTime(1200, playTime);
+            f1.Q.setValueAtTime(2.5, playTime);
+            const f2 = playback.audio.createBiquadFilter();
+            f2.type = 'bandpass';
+            f2.frequency.setValueAtTime(2500, playTime);
+            f2.Q.setValueAtTime(3.0, playTime);
+            osc1.connect(f1);
+            osc2.connect(f1);
+            osc1.connect(f2);
+            osc2.connect(f2);
+            f1.connect(formantGain);
+            f2.connect(formantGain);
+            formantGain.connect(gain);
+            voiceNodes.push(formantGain, f1, f2);
+
+            // Noise-breath layer — the air of real players. Reuses the shared
+            // noise buffer (the sax technique at synth-soloist.ts). Skipped
+            // when the buffer is absent or the note is silent.
+            const noiseBuffer = groove.audioBuffers?.noise;
+            if (noiseBuffer && finalVol > 0) {
+                const breath = playback.audio.createBufferSource();
+                breath.buffer = noiseBuffer;
+                breath.loop = true;
+                const breathHP = playback.audio.createBiquadFilter();
+                breathHP.type = 'highpass';
+                breathHP.frequency.setValueAtTime(2000, playTime);
+                const breathGain = playback.audio.createGain();
+                // Breath as a front-loaded attack "chiff" (S3 rapid-stab fix):
+                // a real horn section's breathiness lives at the stab attack,
+                // not as a sustained airy bed. A short swell-in + fast decay,
+                // decoupled from note duration, keeps each chiff time-localized
+                // to its attack — so rapid/chord stabs become a row of crisp
+                // articulations instead of overlapping into a fluctuating
+                // noise wash. The level is scaled by 1/sqrt(voices): broadband
+                // noise sums by power, so 1/sqrt keeps the total section air
+                // roughly flat no matter how many notes stack in a chord stab.
+                // (The constant base is not ×finalVol — the breath is enveloped
+                // a second time by the voice `gain`.)
+                const breathLevel = 0.07 / Math.sqrt(1 + harmony.activeVoices.length);
+                breathGain.gain.setValueAtTime(0, playTime);
+                breathGain.gain.setTargetAtTime(breathLevel, playTime, 0.008);
+                breathGain.gain.setTargetAtTime(0, playTime + 0.04, 0.05);
+                breath.connect(breathHP);
+                breathHP.connect(breathGain);
+                breathGain.connect(gain);
+                breath.start(playTime);
+                breath.stop(playTime + duration + 0.5);
+                voiceNodes.push(breath, breathHP, breathGain);
+            }
+        } else {
+            filter.connect(gain);
+        }
     }
 
     // --- Universal frequency block (slides apply to osc1/osc2/sub) ---
@@ -522,10 +655,14 @@ function playHarmonyNoteNew(
     const attackFloor = retriggerProfile?.attackFloor || 0.005;
     let attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
     let release = style === 'stabs' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
-    // Pad styles settle ~20% below the attack peak over a 0.35 s decay; fast
-    // styles hold at the peak (decay 0 — the ADSR collapses back to AR).
-    const decay = isFastAttack ? 0 : 0.35;
-    const sustainLevel = finalVol * (isFastAttack ? 1.0 : 0.8);
+    // Pad styles settle ~20% below the attack peak over a 0.35 s decay. The
+    // 'stabs' horn section (S3) gets a fast 60 ms decay to ~92% — a gentle
+    // "tiny swell": the stab pops to the peak then settles slightly,
+    // brass-like, rather than sitting flat. The settle is kept shallow so
+    // stabs in rapid succession stay even in level. Plucks/organ hold at the
+    // peak (decay 0 — AR).
+    const decay = style === 'stabs' ? 0.06 : isFastAttack ? 0 : 0.35;
+    const sustainLevel = finalVol * (style === 'stabs' ? 0.92 : isFastAttack ? 1.0 : 0.8);
 
     // isBloom — a harmonic-bloom hit on a soloist anchor. A swell-in attack
     // completes the gesture. MAX of a 20% bump and a +5 ms additive bump so
