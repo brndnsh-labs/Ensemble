@@ -106,7 +106,29 @@ export function duckGain(
     }
 }
 
-interface PercussiveStrikeOptions {
+/**
+ * Optional two-stage decay (synth-audit Epic 4 S8). With only `decay`, a voice
+ * does one flat exponential to silence. Supply BOTH `holdTime` and `bodyDecay`
+ * and the envelope hands off: the fast `decay` shapes the initial transient,
+ * then `holdTime` seconds after the attack a second `setTargetAtTime` with the
+ * slower `bodyDecay` time-constant takes over the tail — a transient + body,
+ * like a real struck drum, instead of a single curve. Both targets are 0, so
+ * the stage-1→stage-2 handoff is continuous (no click); it only changes slope.
+ * A voice that passes neither is bit-identical to the pre-S8 single-stage
+ * envelope.
+ *
+ * `setTargetAtTime` is an exponential approach — it never reaches 0 — so a
+ * caller that opts in MUST set `duration` long enough that the `bodyDecay` tail
+ * has decayed below the click floor before the node's hard `stop()`; ~5
+ * time-constants past `holdTime` is the rule of thumb. Otherwise the stop cuts
+ * an audible residual and ticks.
+ */
+interface TwoStageDecayOptions {
+    holdTime?: number;
+    bodyDecay?: number;
+}
+
+interface PercussiveStrikeOptions extends TwoStageDecayOptions {
     volume?: number;
     filterType?: BiquadFilterType;
     freq?: number;
@@ -133,6 +155,33 @@ interface PercussiveStrikeOptions {
     bufferOffset?: number;
 }
 
+/**
+ * Schedule the optional S8 body tail on an already-running decay envelope.
+ * `decayStart` is the moment the first-stage decay began (`time + attack`).
+ * A no-op unless BOTH `holdTime` and `bodyDecay` are finite and positive — so
+ * a single-stage caller is bit-unchanged. The second `setTargetAtTime` also
+ * targets 0, picking up from whatever value the transient decay has reached at
+ * `decayStart + holdTime`, so the handoff only changes slope (no discontinuity).
+ */
+function applyBodyTail(
+    param: AudioParam,
+    decayStart: number,
+    holdTime?: number,
+    bodyDecay?: number,
+): void {
+    if (
+        holdTime === undefined ||
+        bodyDecay === undefined ||
+        !Number.isFinite(holdTime) ||
+        !Number.isFinite(bodyDecay) ||
+        holdTime <= 0 ||
+        bodyDecay <= 0
+    ) {
+        return;
+    }
+    param.setTargetAtTime(0, decayStart + holdTime, bodyDecay);
+}
+
 export function playPercussiveStrike(
     audio: AudioContext,
     buffer: AudioBuffer | null,
@@ -148,6 +197,8 @@ export function playPercussiveStrike(
         duration = 0.1,
         onEnded,
         bufferOffset = 0,
+        holdTime,
+        bodyDecay,
     }: PercussiveStrikeOptions = {},
 ): void {
     if (!audio || !buffer || !destination) {
@@ -168,6 +219,7 @@ export function playPercussiveStrike(
         gain.gain.setValueAtTime(0, time);
         gain.gain.setTargetAtTime(volume, time, attack);
         gain.gain.setTargetAtTime(0, time + attack, decay);
+        applyBodyTail(gain.gain, time + attack, holdTime, bodyDecay);
 
         source.connect(filter);
         filter.connect(gain);
@@ -193,7 +245,7 @@ export function playPercussiveStrike(
     }
 }
 
-interface ResonantToneOptions {
+interface ResonantToneOptions extends TwoStageDecayOptions {
     type?: OscillatorType;
     freqStart?: number;
     freqEnd?: number;
@@ -226,6 +278,8 @@ export function playResonantTone(
         duration = 0.5,
         detune = 0,
         onEnded,
+        holdTime,
+        bodyDecay,
     }: ResonantToneOptions = {},
 ): void {
     if (!audio || !destination) {
@@ -249,6 +303,7 @@ export function playResonantTone(
         gain.gain.setValueAtTime(0, time);
         gain.gain.setTargetAtTime(volume, time, attack);
         gain.gain.setTargetAtTime(0, time + attack, decay);
+        applyBodyTail(gain.gain, time + attack, holdTime, bodyDecay);
 
         osc.connect(gain);
         gain.connect(destination);

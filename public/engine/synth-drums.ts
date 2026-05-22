@@ -1152,6 +1152,11 @@ function playCongaBongoNew(state: EnsembleState, name: string, time: number, vel
     const baseFreq = isBongo ? (isHigh ? 420 : 280) : isHigh ? 210 : 155;
     const vol = masterVol * (isSlap ? 0.85 : 0.7) * rr();
     const decay = isMute ? 0.015 : isSlap ? 0.03 : 0.07;
+    // S8 — an *open* conga/bongo tone is a sharp finger-attack transient handing
+    // off to a resonant drum body. `decay` shapes the transient; `bodyDecay`
+    // (only for the open tone) carries the long ring. Mute/slap stay choked —
+    // no body tail — which is what those articulations are: a stopped head.
+    const isOpenTone = !isMute && !isSlap;
 
     playResonantTone(audio, panner, playTime, {
         type: isSlap ? 'triangle' : 'sine',
@@ -1162,11 +1167,18 @@ function playCongaBongoNew(state: EnsembleState, name: string, time: number, vel
         attack: 0.002,
         // harder hit lets the body ring longer (an open tone vs a choked tap)
         decay: decay * (1 + t.brightness * 0.35),
-        duration: 0.3,
+        holdTime: isOpenTone ? 0.03 : undefined,
+        bodyDecay: isOpenTone ? 0.18 : undefined,
+        // why: 1.0 s gives the 0.18 s body tail ~5 time-constants past the
+        // hold — it decays below the click floor before the node hard-stops,
+        // so the stop is inaudible. Mute/slap are choked, 0.3 s is plenty.
+        duration: isOpenTone ? 1.0 : 0.3,
+        // why: panner release rides the body tone — with the S8 body tail it is
+        // the longest-lived layer (open 0.7 s, mute/slap 0.3 s), always ≥ the
+        // 0.3 s skin strike, so the strike is silent whenever the panner frees.
+        onEnded: releasePanner,
     });
 
-    // why: panner release rides the strike — body tone and strike share
-    // `duration` (0.3 s), so its sibling is already silent when either ends.
     // S7 — `warm` colored noise: a rounder, body-ish skin layer, varied per hit.
     playPercussiveStrike(
         audio,
@@ -1182,7 +1194,6 @@ function playCongaBongoNew(state: EnsembleState, name: string, time: number, vel
             attack: 0.001,
             decay: 0.015 * (1 + t.brightness * 0.4),
             duration: 0.3,
-            onEnded: releasePanner,
             bufferOffset: noiseOffset(),
         },
     );
@@ -1319,6 +1330,9 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
 
     // S7 — `bright` colored noise read at a random per-hit offset: a fine,
     // airy, granular "sh" that varies shake-to-shake, not a flat static slice.
+    // S8 — two-stage decay: the fast `decay` is the bead-impact transient, then
+    // `bodyDecay` carries the longer "sh" wash. `bodyDecay` (not `decay`) now
+    // carries the S6 velocity→sustain intent — a harder shake washes longer.
     playPercussiveStrike(
         audio,
         getColoredNoiseBuffer(audio, state.groove, 'bright'),
@@ -1329,9 +1343,12 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
             filterType: 'highpass',
             freq: 6000 * t.cutoffMult,
             attack: 0.01,
-            // harder shake sustains its tail a touch longer (0.05 s → ~0.07 s)
-            decay: 0.05 * (1 + t.brightness * 0.4),
-            duration: 0.2,
+            decay: 0.016,
+            holdTime: 0.022,
+            bodyDecay: 0.07 * (1 + t.brightness * 0.5),
+            // why: 0.6 s clears the worst-case body tail (~0.105 s bodyDecay at
+            // full velocity) by ~5 time-constants, so the stop is inaudible.
+            duration: 0.6,
             onEnded: releasePanner,
             bufferOffset: noiseOffset(),
         },
