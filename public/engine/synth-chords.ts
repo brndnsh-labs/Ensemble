@@ -1,6 +1,13 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
-import { createSimplePanner, playPercussiveStrike, rampGain } from './synth-utils.js';
+import {
+    createSimplePanner,
+    HUMANIZE_PROFILES,
+    humanizeNote,
+    humanizeSeed,
+    playPercussiveStrike,
+    rampGain,
+} from './synth-utils.js';
 
 interface ChordInstrumentPreset {
     attack: number;
@@ -100,8 +107,30 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
     (args[0].chords.voice === 'new' ? playNoteNew : playNoteCurrent)(...args);
 }
 
+// synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received
+// the dead `index: 0` from the scheduler, so every chord note started
+// perfectly simultaneously. The `new` voice gets a real ascending pitch rank
+// and turns it into a low→high roll: a base ~4 ms-per-voice spread plus a
+// small deterministic timing jitter so the roll isn't mechanically linear.
+// The offset is applied to `time` here and the delegated call gets `index: 0`
+// so `playNoteCurrent`'s legacy `Math.random()` stagger stays off (no double
+// strum). The lowest note (index 0) is anchored exactly on the beat.
+// `freq` is assumed finite here — `playNoteCurrent` is the guarding layer,
+// and the scheduler's `.filter(n => n.freq)` keeps non-finite notes out.
+const CHORD_STRUM_STEP = 0.004; // seconds of roll per chord-voice index
+const CHORD_STRUM_JITTER = 0.15; // humanize scale — keeps jitter well under one step
+
 function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
-    playNoteCurrent(...args);
+    const [state, freq, time, duration, opts = {}] = args;
+    const index = opts.index ?? 0;
+    if (index <= 0) {
+        playNoteCurrent(state, freq, time, duration, { ...opts, index: 0 });
+        return;
+    }
+    const seed = humanizeSeed(index, 'chords', Math.round(freq));
+    const { timeOffset } = humanizeNote(seed, HUMANIZE_PROFILES.chords, CHORD_STRUM_JITTER);
+    const strum = index * CHORD_STRUM_STEP + timeOffset;
+    playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
 }
 
 function playNoteCurrent(

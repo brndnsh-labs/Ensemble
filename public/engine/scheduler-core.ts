@@ -913,6 +913,19 @@ function scheduleChords(
             }
         }
 
+        // synth-audit Epic 2 S1 — strum index. The `new` chords voice rolls
+        // the chord low→high; rank each non-muted note by ascending pitch and
+        // pass that rank as `index`. The `current` voice keeps `index: 0`
+        // (mechanically simultaneous, bit-identical) so the A/B stays honest.
+        const strumRank = new Map<unknown, number>();
+        if (chords.voice === 'new') {
+            notes
+                .filter((n: any) => !n.muted && n.freq)
+                .slice()
+                .sort((a: any, b: any) => a.freq - b.freq)
+                .forEach((n: any, rank: number) => strumRank.set(n, rank));
+        }
+
         notes.forEach((n: any) => {
             const {
                 freq,
@@ -943,7 +956,7 @@ function scheduleChords(
                 const { name, octave } = midiToNote(midiNum);
                 playNote(state, freq, playTime, duration, {
                     vol: velocity,
-                    index: 0,
+                    index: strumRank.get(n) ?? 0,
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
                 });

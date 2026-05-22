@@ -22,6 +22,8 @@ The realism ceiling: the "piano" is one static 10-partial wave with a single sha
 **Acceptance:** A/B — chords have a subtle human strum/roll spread, not a mechanical block.
 **Effort:** ~2h. **Model:** sonnet (concrete wire-up). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §2.
 
+**Status:** Shipped 2026-05-22. `scheduleChords` now ranks a step's non-muted notes by ascending pitch and passes that rank as `index` — but only for the `new` voice, so `current` keeps `index: 0` and stays bit-identical. `playNoteNew` turns the rank into a low→high roll (~4 ms/voice base spread + small deterministic `humanizeNote` jitter at scale 0.15), applies it to `time`, and delegates with `index: 0` so the legacy `Math.random()` stagger never double-strums. synth-graph-reviewer: clean (P0:0, P1:0, P2:3, all observations) — confirmed `playNoteCurrent` bit-identical, no node leaks, no NaN to AudioParam; folded in the reviewer's one clarity-comment suggestion. typecheck/Biome/jscpd/vitest green. Owner approved by ear.
+
 ### S2. Real attack transient
 The hammer strike (`synth-chords.ts:152–169`) is too quiet and too diffuse. Raise it toward 0.4–0.6×, and add a short pitched click component (a fast-decaying blip at the note frequency, or a resonant ping in the 2–4 kHz band) so the onset has an edge.
 
