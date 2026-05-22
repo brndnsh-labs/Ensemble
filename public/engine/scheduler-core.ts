@@ -696,9 +696,17 @@ function scheduleBass(
     step: number,
     time: number,
 ): void {
-    const { bass, playback, vizState } = state;
+    const { bass, playback, vizState, groove } = state;
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
+
+    // Seeded per-note humanization (synth-audit Epic 5 S5): replaces the
+    // shared per-tick `t` jitter for the bass voice. Tight `bass` profile —
+    // bass is a steady instrument, so the spreads are small (±14 ms timing,
+    // ±10% velocity, ±3¢ detune). Seeded on `(step, 'bass')` so looped
+    // playback and critique tests reproduce exactly. Guard the divide so a
+    // malformed dispatch can't fan a NaN into the bass timing/velocity/pitch.
+    const humanizeScale = Number.isFinite(groove.humanize) ? groove.humanize / 100 : 0;
 
     if (notes && notes.length > 0) {
         notes.forEach((noteEntry: any) => {
@@ -706,13 +714,25 @@ function scheduleBass(
                 const { freq, durationSteps, velocity, timingOffset, muted, bendStartInterval } =
                     noteEntry;
                 const { chord } = chordData as any;
-                const adjustedTime = time + (timingOffset || 0);
+                const h = humanizeNote(
+                    humanizeSeed(step, 'bass', 0),
+                    HUMANIZE_PROFILES.bass,
+                    humanizeScale,
+                );
+                const adjustedTime = time + (timingOffset || 0) + h.timeOffset;
+                // Apply detune by nudging the frequency itself — `playBassNote`
+                // takes no detune param, and ±3¢ is far below any perceptual
+                // pitch-class boundary so this can't accidentally bend the note.
+                const detunedFreq = Number.isFinite(freq)
+                    ? freq * 2 ** (h.detuneCents / 1200)
+                    : freq;
                 (bass as Mutable<typeof bass>).lastPlayedFreq = freq; // @direct-mutation
                 const midiNum = getMidi(freq || 0) || 0;
                 const { name, octave } = midiToNote(midiNum);
                 const spb = 60.0 / playback.bpm;
                 const duration = (durationSteps || 4) * 0.25 * spb;
-                const finalVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
+                const finalVel =
+                    (velocity || 1.0) * (playback.conductorVelocity || 1.0) * h.velocityMult;
                 if (vizState.enabled) {
                     const fLen = chord.freqs.length;
                     const chordNotes = new Array(fLen);
@@ -732,7 +752,7 @@ function scheduleBass(
                 }
                 playBassNote(
                     state,
-                    freq || 0,
+                    detunedFreq || 0,
                     adjustedTime,
                     duration,
                     finalVel,
@@ -1298,7 +1318,11 @@ export function scheduleGlobalEvent(
         }
         scheduleChordVisuals(state, chordData, t);
         if (bass.enabled) {
-            scheduleBass(state, chordData, step, t);
+            // S5: bass migrated to per-note `humanizeNote` inside `scheduleBass`,
+            // so it takes the un-jittered `swungTime` (riding the shared `t`
+            // would double up). Chords/harmonies/soloist still ride `t` until
+            // their respective humanize stories migrate them.
+            scheduleBass(state, chordData, step, swungTime);
         }
         if (soloist.enabled) {
             scheduleSoloist(state, chordData, step, soloistTime);

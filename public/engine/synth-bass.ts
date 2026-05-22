@@ -25,6 +25,15 @@ const mixState = {
     lastTick: 0,
 };
 
+// Bass styles whose genre identity calls for sub-bass content (a sine an
+// octave below the played note). Everything else gets a bass-guitar-register
+// voice — a P-Bass / J-Bass lives at 41–200 Hz and adding an octave-down sine
+// drops the perceived foundation below where a real bass guitar even goes
+// (S5 listening gate, 2026-05-22). The two members here are the styles whose
+// UI labels literally promise sub character — `'Hip Hop (808/Sub)'` and
+// `'Dub (Reggae)'` (see `public/data/instrument-styles.ts`).
+const SUB_BASS_STYLES = new Set<string>(['hiphop', 'dub']);
+
 /**
  * P-Bass Synthesis: Layered physical model
  */
@@ -148,15 +157,26 @@ function playBassNoteNew(
         const bodyMix = audio.createGain();
         sub.connect(bodyMix);
 
-        // --- Layer 0: sub-octave sine (the weight) ---
-        // A real P-Bass DI carries deliberate energy an octave below the
-        // fundamental — that is what reads as "body" and weight on small
-        // speakers, where the fundamental itself is barely reproduced. A
-        // dedicated octave-down sine, low-passed to ~140 Hz so it stays pure
-        // sub and never muds the midrange. Fixed level (0.34): the sub is a
-        // constant low-end floor, not a velocity-reactive layer — the saw and
-        // saturator already carry the dynamic timbre. Floored above 10 Hz so a
-        // very low note can't drop the sub below the oscillator's useful range.
+        // --- Layer 0: sub-octave sine (the weight, sub-bass genres only) ---
+        // A dedicated octave-down sine, low-passed to ~140 Hz so it stays pure
+        // sub and never muds the midrange. Floored above 10 Hz so a very low
+        // note can't drop the sub below the oscillator's useful range.
+        //
+        // **Gated by `bass.style`**: only sub-bass genres (hip-hop, dub — see
+        // `SUB_BASS_STYLES`) get this layer. For bass-guitar-register styles
+        // (rock/funk/jazz/etc.) adding an octave-down sine shifts the perceived
+        // foundation *below* where a real bass guitar lives (open low E is
+        // 41 Hz; sub-oct of typical bass notes is 20–55 Hz, well into sub-bass
+        // synth territory). S1 originally always-on; S5 listening gate flagged
+        // that as "way too low for most genres" — confirmed by owner.
+        //
+        // **Level is also freq-dependent within sub-bass styles**: the
+        // sub-oct only sounds *like* a sub-bass when its frequency lands below
+        // the kick's body band (~48–65 Hz, per `getKickVoiceConfig`'s
+        // `shellFreq` / `knockEndFreq`). Full strength on low notes (≤85 Hz,
+        // sub-oct ≤42 Hz, true sub-bass); fade linearly to silent across
+        // 85–160 Hz; muted above (where the octave-down would compete with
+        // the kick's body or just be in-band bass-doubling).
         const subOct = audio.createOscillator();
         subOct.type = 'sine';
         subOct.frequency.setValueAtTime(Math.max(10, startFreq / 2), startTime);
@@ -170,8 +190,10 @@ function playBassNoteNew(
         subLp.type = 'lowpass';
         subLp.frequency.setValueAtTime(140, startTime);
         subLp.Q.setValueAtTime(0.7, startTime);
+        const wantsSubBass = SUB_BASS_STYLES.has(bass.style);
+        const subBlend = !wantsSubBass ? 0 : freq <= 85 ? 1 : freq >= 160 ? 0 : (160 - freq) / 75;
         const subGain = audio.createGain();
-        subGain.gain.setValueAtTime(0.34, startTime);
+        subGain.gain.setValueAtTime(0.34 * subBlend, startTime);
         subOct.connect(subLp);
         subLp.connect(subGain);
         subGain.connect(bodyMix);
