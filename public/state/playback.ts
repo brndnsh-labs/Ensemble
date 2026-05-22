@@ -113,6 +113,16 @@ export function playbackReducer(action: Action): boolean {
             }
             break;
         case ACTIONS.SET_BAND_INTENSITY:
+            // synth-audit Epic 2 S7 — fail-fast NaN guard. A non-finite
+            // payload would clamp to NaN (`Math.max(0, Math.min(1, NaN))`),
+            // poisoning every consumer's velocity/cutoff math downstream.
+            // Catch + log, keep the previous value rather than swallow it.
+            if (!Number.isFinite(action.payload)) {
+                console.warn(
+                    `SET_BAND_INTENSITY: non-finite payload (${action.payload}) — ignored`,
+                );
+                return false;
+            }
             p.bandIntensity = Math.max(0, Math.min(1, action.payload));
             return true;
         case ACTIONS.SET_COMPLEXITY:

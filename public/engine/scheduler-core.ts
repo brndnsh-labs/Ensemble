@@ -951,16 +951,35 @@ function scheduleChords(
             }
 
             if (!muted && freq) {
-                const duration = (durationSteps || 1) * 0.25 * spb;
+                // synth-audit Epic 2 S7 — fail-fast NaN guards. `velocity`
+                // comes straight from the worker note and `duration` from
+                // `durationSteps`; a non-finite value silently poisons a gain
+                // or cutoff AudioParam, or makes `osc.stop(NaN)` throw and the
+                // note never schedule. Catch + log here, before the voice
+                // dispatch, so the bad payload is visible rather than swallowed.
+                let safeVelocity = velocity;
+                if (!Number.isFinite(safeVelocity)) {
+                    console.warn(
+                        `scheduleChords: non-finite velocity (${velocity}) — 0.5 fallback`,
+                    );
+                    safeVelocity = 0.5;
+                }
+                let duration = (durationSteps || 1) * 0.25 * spb;
+                if (!Number.isFinite(duration)) {
+                    console.warn(
+                        `scheduleChords: non-finite duration (durationSteps=${durationSteps}) — one-step fallback`,
+                    );
+                    duration = 0.25 * spb;
+                }
                 const midiNum = getMidi(freq) || 0;
                 const { name, octave } = midiToNote(midiNum);
                 playNote(state, freq, playTime, duration, {
-                    vol: velocity,
+                    vol: safeVelocity,
                     index: strumRank.get(n) ?? 0,
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
                 });
-                dispatchMidiChordNote(state, freq, velocity, playTime, duration);
+                dispatchMidiChordNote(state, freq, safeVelocity, playTime, duration);
                 if (vizState.enabled) {
                     queueVisualizerNoteEvent(playback, {
                         track: 'chords',
@@ -969,7 +988,7 @@ function scheduleChords(
                         midi: midiNum,
                         time: playTime,
                         duration,
-                        velocity,
+                        velocity: safeVelocity,
                         ccEvents,
                     });
                 }

@@ -70,6 +70,8 @@ On top of S4's per-partial model, detune partial *n* from *n·f0* by a stretch f
 **Acceptance:** a NaN velocity or duration is caught and logged, not silently swallowed. `synth-graph-reviewer` clean.
 **Effort:** ~2h. **Model:** sonnet (concrete guards). **Reviewer:** synth-graph-reviewer. **Source:** `chords.md` §5.
 
+**Status:** Shipped 2026-05-22. Fail-fast `Number.isFinite` guards added at the boundary: `scheduleChords` guards `velocity` (→0.5) and `duration` (→one step) before the voice dispatch, so a non-finite worker-note payload is logged rather than silently poisoning a gain/cutoff AudioParam or throwing `osc.stop(NaN)`; the `SET_BAND_INTENSITY` reducer rejects a non-finite payload (logs + keeps the previous value) instead of clamping it to NaN. synth-graph-reviewer: safe to land (P0:0, P1:0) — both AudioParam-poisoning classes fully closed, `playNoteCurrent` bit-identical for valid inputs; one NIT (visualizer event still passed raw velocity) patched. state-discipline-reviewer: fully clean. typecheck/Biome/jscpd/vitest green. Owner confirmed no regression.
+
 ## Notes
 
 - S1, S6, S7 are mechanical — fan out early. S4 → S5 (inharmonicity needs the per-partial model). S2, S3 are independent voice work.
