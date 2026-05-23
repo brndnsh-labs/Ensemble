@@ -184,19 +184,96 @@ Main app still **35.70 KB brotli over budget** (was 36.16). Worker headroom **4.
 
 **Risk.** Higher than S1–S4: synth voices are constructed on demand but the modules are imported eagerly because `engine.ts` `initAudio()` wires the graph at boot. A naive `import()` split will break sync with the audio graph; this needs design before implementation.
 
-**Status.** Plan-first. Don't implement until after S0–S4 land and the design is reviewed.
+**Status.** Deferred 2026-05-23. Risk-vs-reward not favorable today; revisit if/when something forces the issue.
+
+### S6 — Knip Tier A sweep (mechanical dead-export removal)
+
+**Goal.** Delete unused exported leaf symbols whose function/constant bodies have no remaining caller anywhere — both the export and the implementation come out.
+
+**Context.** Commit `7aacbedd` repaired the knip configuration; `npm run knip` now reports 44 unused exports (was 0 under the stale config). Tier A is the ~20 entries that are isolated, named, and not part of a known dispatch convention. Tier B is the `state.ts` barrel re-exports (S7). Tier C is two orphaned components (S8).
+
+**Actions.**
+1. Run `npm run knip` and capture the current report as the baseline list.
+2. For each Tier A symbol, grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for both the symbol name AND any string literal that names it (some are dispatched by name).
+3. For each symbol confirmed dead: remove the export, remove the implementation, remove any now-orphaned helpers/types it referenced. Lookup-table constants (`GENRE_STYLE_MAPPING`, `SOLOIST_REGISTER_PROFILES`) need particular care — if the *table* is dead, anything it was the sole consumer of can come out next pass.
+4. Special case: `drop-mechanic.ts` has 4 unused exports out of a small surface — re-read the file to see if the whole module is dead, not just the exports.
+5. Verify: `npm run typecheck`, `npx vitest run --reporter=dot`, `npm run build:size`.
+6. `bundle-hygiene-reviewer` on the diff.
+
+**Tier A list (from `npm run knip` after commit `7aacbedd`):**
+
+| file:line | symbol | notes |
+| --- | --- | --- |
+| `public/arranger-controller.ts:8` | `transformRelativeProgression`, `validateProgression` | dead barrel re-export; originals live in `chords-engine.ts` and are used directly elsewhere |
+| `public/engine/engine.ts:28,35` | `INSTRUMENT_PRESETS`, `playChordScratch` | tagged `Engine` — old namespace export remnants |
+| `public/engine/midi-utils.ts:9` | `writeVarInt` | |
+| `public/engine/midi-worker-logic.ts:23,24` | `MIDI_EXTENSION_PATTERN`, `PPQ` | |
+| `public/engine/chords-engine.ts:571` | `getRootlessVoicing` | |
+| `public/engine/accompaniment.ts:101` | `ALTERED_DOMINANT_QUALITIES` | sibling to `ALTERED_HOOK_QUALITIES`; the hook one survived, this one didn't |
+| `public/engine/drop-mechanic.ts:63,81,87,100` | `DROP_ENERGY_DELTA_THRESHOLD`, `DROP_INFERRED_MIN_FORM_PROGRESS`, `isDropFriendlyGenre`, `isDropSectionLabel` | 4 of the file's exports — check whole-file viability |
+| `public/engine/soloist-config.ts:541,644` | `GENRE_STYLE_MAPPING`, `SOLOIST_REGISTER_PROFILES` | big lookup tables — biggest single KB potential in this tier |
+| `public/engine/soloist-devices.ts:54` | `getChordMask` | |
+| `public/engine/voicing-policy.ts:23,38` | `TENSION_CHORD_QUALITIES`, `isBassSpaceFeel` | |
+| `public/engine/worker-utils.ts:20,39,40` | `WORKER_MANAGED_KEYS`, `lastChordIndex`, `lastSectionIndex` | |
+| `public/form-analysis.ts:61` | `JAM_CYCLE_DEFAULT` | |
+| `public/lead-sheet-model.ts:1` | `LEAD_SHEET_MEASURES_PER_ROW` | |
+| `public/utils.ts:22` | `hashString` | check carefully — name suggests something dispatch tables might string-reference |
+| `public/visualizer-events.ts:168,275,288` | `queueVisualizerEvent`, `createVisualizerStepEvent`, `createVisualizerFillEvent` | three of the file's exports — check what's actually live on the visualizer message channel |
+
+**Acceptance.** Knip's unused-export count drops by the number of Tier A items actually removed. `npm run typecheck`, `npm test`, `npm run test:e2e` all green. Reviewer clean. KB-delta reported per chunk (expectation: small but non-zero — these are leaf functions and constants that no longer reach the bundle once unexported).
+
+### S7 — State barrel re-export hygiene
+
+**Goal.** Drop the 13 unused re-exports from `public/state.ts` (slice values + reducers re-exported for an external consumer that never materialized).
+
+**Actions.**
+1. Confirm each of these is actually unused outside `state.ts` (knip reports them but the symbols are also *called* inside `state.ts` via the local binding, so deletion is delete-the-export-keyword, not delete-the-symbol):
+   - Slice values: `bass`, `chords`, `conductor`, `groove`, `harmony`, `midi`, `soloist`, `vizState`
+   - Reducers: `arrangerReducer`, `conductorReducer`, `grooveReducer`, `instrumentReducer`, `midiReducer`, `playbackReducer`, `vizReducer`
+2. Remove the export block.
+3. Verify nothing imports from `state.ts` that just broke.
+
+**Acceptance.** ~15 lines smaller. No KB delta (these were internal to a single chunk on each side of the worker boundary, so the minifier was already handling them — this is pure source clarity). Reviewer clean.
+
+### S8 — Orphaned components: decide WIP vs delete
+
+**Goal.** Resolve the two component-level dead exports knip flagged.
+
+**Candidates.**
+- `public/components/InstrumentSettings.tsx:75` — `InstrumentMixerSettings`
+- `public/components/SoloistControls.tsx:36` — `SoloistSeedControl`
+
+**Actions.**
+1. Open each file; read the surrounding component to understand what it was intended for.
+2. Check git blame / log for the introducing commit to see if it was WIP that got left, or finished work that got disconnected.
+3. Cross-check `docs/VISION.md` "Open work" for any planned feature that would consume them.
+4. Decide per component: **delete** (no consumer in sight, no roadmap home) or **wire up** (clearly intended for a feature still in flight; file a followup with the wiring requirement).
+5. If delete: remove the function and any now-orphaned helpers/styles unique to it.
+
+**Acceptance.** Knip unused-export count drops by however many were deleted. Reviewer clean. KB-delta proportional to what was actually removed (component bodies are usually a few KB each).
 
 ## Followups / parking lot
+
+### Bundle-shape candidates from the 2026-05-23 main-thread import trace
+
+These came out of tracing why ~80 KB of main-bundle raw is worker-only engine code. They are tracked here for future stories, not yet promoted:
+
+- **Inline `ALTERED_HOOK_QUALITIES`** into `soloist-pitch-engine.ts` (or move to a shared `harmonic-constants.ts`). One 4-element `Set` is the only thing pulling all 45.7 KB of `accompaniment.ts` into `soloist-pitch-engine`'s consumer tree. ~1 KB brotli alone; enabler for the bigger soloist cuts.
+- **Split `generateSessionSeed` out of `soloist-seeder.ts`** into a tiny module. `public/state-effects.ts:10` is the only main-thread caller; the rest of the 46 KB file is worker-internal. Est. 7–9 KB brotli off main.
+- **Extract a `getDrumNotesForStep()` standalone helper.** Today `scheduleDrums` calls `generateNotesForStep({includeDrums: true, ...false})`; the runtime gate works but the bundle still pulls every instrument's engine in. Est. 5–8 KB brotli after the previous two land.
+- **Delegate the soloist pickup note to the worker.** `scheduler-core.ts:463` calls `getSoloistNote` once at playback start; that one call drags `soloist.ts` + `soloist-pitch-engine.ts` + `soloist-rhythm-engine.ts` (~92 KB raw / ~18 KB brotli) into main. Biggest potential single cut but the pickup note is audible — design before code. Speculative, sits alongside S5.
+
+### Long-term / non-bundle
 
 - Deploy pipeline source-map stripping (verify it's already happening).
 - `accompaniment.ts` (2940 LoC) and `synth-drums.ts` (2583 LoC) structural splits — pure refactor, no bundle delta, but improves long-term maintainability. Separate track, not bundle audit.
 - `types.ts` (1442 LoC) — split into per-domain type files. Mostly readability, small bundle benefit.
-- `knip` returned nothing under default config; likely too permissive — investigate config and rerun.
 
 ## How to use this doc
 
-- **Tomorrow morning:** start at S0. Each story is one commit. Run `bundle-hygiene-reviewer` before each commit.
-- **During the work:** update the baseline table after S0 with real brotli numbers; update KB-delta in each story's commit message.
+- Each story is one commit. Run `bundle-hygiene-reviewer` before each commit.
+- Goal is **lean and efficient, smaller is better when behavior is unchanged** — not chasing the `.size-limit.json` budgets (those are arbitrary historical baselines, useful only as a regression tripwire).
+- During the work: update the "Post-S<N> baseline" table with real brotli numbers after each story; cite the KB-delta in the commit message.
 - **When all stories ship:** archive this doc under `docs/archive/BUNDLE_AUDIT.md` (mirror the musical-audit archive pattern), and lift the most reusable rules into a `docs/guides/bundle-hygiene.md` if any are general enough.
 
 ## Recurring hygiene (after this audit ships)
