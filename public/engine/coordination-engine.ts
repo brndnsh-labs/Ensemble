@@ -352,6 +352,30 @@ export function createCoordinationContext(
     };
 }
 
+/**
+ * The full coordination context shape produced by `createCoordinationContext` and
+ * mutated by `updateCoordinationContext`. Exporting the type lets consumer files
+ * annotate parameters without resorting to `any`.
+ *
+ * Fields are listed in writer order (creation-time → drum preamble → soloist
+ * producer → bass producer → chord producer). See the inline comments inside
+ * `createCoordinationContext` for detailed writer / readable-after semantics.
+ *
+ * The five S1 lookahead/drop fields are explicitly called out because
+ * `drop-mechanic.ts` and the Epic 11 S2 rock-push consume them through
+ * `(coordination as any)` casts — having the real type here documents the
+ * shape and gives future callers a migration target.
+ *   - `upcomingSectionLabel`      — raw label of the next section ("Drop", "Chorus", …)
+ *   - `upcomingSectionEnergyDelta`— getSectionEnergy(next) − getSectionEnergy(current)
+ *   - `barsUntilSectionChange`    — 0 = last bar before change, −1 = not resolvable
+ *   - `dropMuteActive`            — true every step of the 1-bar pre-drop cut window
+ *   - `dropCrashPending`          — true only on the downbeat of the mute bar
+ *
+ * Source: docs/audit/FOLLOWUPS.md §G "CoordinationContext interface" NIT;
+ *         docs/audit/epic-deferred-followups.md S1(a)/(b).
+ */
+export type CoordinationContext = ReturnType<typeof createCoordinationContext>;
+
 export function updateCoordinationContext(context: any, module: string, result: any): void {
     if (!result) {
         return;
