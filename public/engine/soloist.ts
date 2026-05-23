@@ -1435,7 +1435,47 @@ export function getSoloistNote(
     if (stepInForm === coordination.sectionStart || (step < 0 && step === -stepsPerMeasure)) {
         const pools: any = INFLUENCE_POOLS;
         const pool = pools[activeStyle] || [];
-        if (pool.length > 0) {
+        // why: Epic 12 S3 — sticky-retain a user-pinned profile across
+        // section boundaries. Pinning bypasses the 80% rotation gate
+        // entirely (100% retain by construction) instead of biasing the
+        // same weight-based picker — this is a binary decision, not a
+        // continuous bias, so a final-stage multiplier dance isn't needed.
+        const pinned = soloist.pinnedProfile ?? null;
+        const pinnedIsInPool = pinned !== null && pool.includes(pinned);
+        const isNoPool = pool.length === 0;
+
+        if (pinnedIsInPool) {
+            // In-pool pin → sticky-retain on every boundary, including the
+            // first of the session (phraseCount === 0).
+            if (soloist.session.currentPhrase.context.profile !== pinned) {
+                soloist.session.currentPhrase.context.profile = pinned; // @worker-mutation
+                logDebug(`Pinned influence (sticky-retain): ${pinned}`);
+            }
+        } else if (pinned !== null && isNoPool) {
+            // No INFLUENCE_POOLS entry for this style (Reggae, Country,
+            // Bossa, Acoustic, Ska, Metal, Minimal, hip-hop, disco). The
+            // pre-S3 behavior was a complete no-op, which silently dropped
+            // user pins on those styles. Honor the pin instead — downstream
+            // Greats logic may no-op on the (style, profile) pair, but the
+            // user's intent is preserved and the field is observable.
+            if (soloist.session.currentPhrase.context.profile !== pinned) {
+                soloist.session.currentPhrase.context.profile = pinned; // @worker-mutation
+                logDebug(`Pinned influence (no-pool retain on '${activeStyle}'): ${pinned}`);
+            }
+        } else if (!isNoPool) {
+            // Auto-rotation path. Reached when (a) no pin, or (b) pin is
+            // set but off-pool — e.g. user pinned 'evans' on the blues
+            // pool {srv, monk, armstrong, miles}. In case (b) we fall back
+            // to auto-rotation rather than write through a profile string
+            // the downstream Greats logic for THIS style isn't prepared
+            // for. The debug warn fires per-boundary (gated by the debug
+            // flag); not worth tracking a once-warned set just for log
+            // hygiene.
+            if (pinned !== null) {
+                logDebug(
+                    `Pinned profile '${pinned}' not in pool for style '${activeStyle}' — falling back to auto-rotation.`,
+                );
+            }
             // High intensity sections might shift influence more frequently (probabilistically)
             // why: discriminators 40/41 — section-boundary influence rotation.
             // 40 gates whether to shift, 41 picks the pool index. Keyed on

@@ -10,7 +10,7 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | :- | :- | :-: | :- |
 | S1 | Soloist engine `scrambleHash` migration | opus | Shipped 2026-05-20 |
 | S2 | `evansIntervals` chord-quality awareness | opus | Ready |
-| S3 | Profile-rotation sticky-retain | opus | Ready |
+| S3 | Profile-rotation sticky-retain | opus | Shipped 2026-05-23 |
 | S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Ready |
 | S5 | Bass walking idiom | opus | Ready |
 | S6 | Per-genre tuning sweep | sonnet | Blocked → `LISTEN_TESTS.md` Part B |
@@ -19,7 +19,7 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**1 / 10 shipped.** S2–S5 are cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**3 / 10 shipped.** S4–S5 are cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
@@ -51,7 +51,7 @@ Migrate every draw to a `scrambleHash` source keyed on `(barIndex, sectionId, st
 
 **Acceptance:** a user-selected soloist profile persists across section boundaries at >90%; auto/un-pinned profiles still rotate; a test asserts the retain rate. State writes for any new "is-pinned" signal flow through dispatch.
 **Effort:** ~2-3h. **Model:** opus (product + taste call). **Reviewer:** music-theory-reviewer + state-discipline-reviewer. **Source:** FOLLOWUPS §E (mis-bucketed product bug).
-**Status:** Ready.
+**Status:** Shipped 2026-05-23 — added `pinnedProfile: string | null` to the soloist slice (default `null`; flows through `applySoloistPayload` via the `config`-kind route; included in `getSyncState()` snapshot + generic `SET_PARAM`/`UPDATE_SB` delta paths). Engine rotation gate at `soloist.ts:~1444` rewritten with three branches: in-pool pin → sticky-retain (100%); no-pool pin (Reggae/Country/Bossa/Acoustic/Ska/Metal/Minimal/etc. — styles without an `INFLUENCE_POOLS` entry) → honor pin since there's no auto-rotation to fall back to (post-review P1 patch — initial S3 implementation silently dropped pins on those styles); off-pool pin (pool exists, pin not in it) → fall back to auto-rotation since downstream Greats logic in `soloist-pitch-engine.ts` is keyed on `(style, profile)` and silently no-ops on unknowns. Unpinned (null) path is byte-identical to pre-S3. New `tests/standards/soloist-profile-pin.test.ts` with 4 assertions (pinned-evans on jazz ≥95% — observed 100%; auto-rotation diversity ≥2 distinct + no profile >90%; off-pool fallback evans <30%; no-pool retain ≥95%). All 1981 tests green; both state-discipline + worker-contract reviewers clean (0/0/0/0); music-theory reviewer P1 patched in same diff, 4 P2s (test-comment narrative + every-boundary warn comment patched inline; sister-test isolation foot-gun + 100%-Evans saturation distribution filed in FOLLOWUPS §F; pre-existing comment typo skipped). No UI work — the field is shaped for a future `pinnedProfile` picker that dispatches `SET_PARAM { module: 'soloist', param: 'pinnedProfile', value }`.
 
 ### S4. Micro-nit & test-rigor cleanup sweep
 

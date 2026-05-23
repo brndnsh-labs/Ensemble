@@ -79,6 +79,10 @@ export const soloist = deepSignal<SoloistState>({
     doubleStopProb: 1.0,
     tradeMode: 'manual',
     motifTracking: false,
+    // why: Epic 12 S3 — user-pinned Greats profile. `null` keeps the
+    // historical 80%-section-boundary auto-rotation; non-null sticky-retains
+    // the chosen profile across boundaries (see soloist.ts rotation site).
+    pinnedProfile: null,
 
     // === Engine runtime ===
     session: {
@@ -201,6 +205,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
     motifTracking: { kind: 'config', key: 'motifTracking' },
+    pinnedProfile: { kind: 'config', key: 'pinnedProfile' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
@@ -364,6 +369,9 @@ export function instrumentReducer(action: Action): boolean {
             s.tradeMode = 'manual';
             s.motifTracking = false;
             s.phrasingIntensity = 0.5;
+            // why: Epic 12 S3 — keep historical auto-rotation as the post-
+            // reset default; a user re-pins via UPDATE_SB after reset.
+            s.pinnedProfile = null;
             // Reset engine runtime to a fresh session.
             const session = s.session as Mutable<typeof s.session>;
             const phr = session.phrasing as Mutable<typeof session.phrasing>;

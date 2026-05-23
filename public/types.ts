@@ -775,6 +775,17 @@ export interface SoloistState {
     readonly tradeMode: string;
     /** Whether tracking motifs is enabled. */
     readonly motifTracking: boolean;
+    /**
+     * User-pinned Greats profile (e.g. 'evans', 'bird'). When non-null and
+     * present in the active genre's `INFLUENCE_POOLS` pool, the soloist
+     * sticky-retains this profile across section boundaries instead of
+     * re-rolling at the default 80% rotation gate (see soloist.ts §
+     * "Structural Influence Rotation"). When null (default), section
+     * boundaries auto-rotate as before. When set but off-pool for the
+     * current genre, falls back to auto-rotation and warns once.
+     * Epic 12 S3.
+     */
+    readonly pinnedProfile: string | null;
 
     // === Engine runtime (per-playback, transient) ===
     readonly session: SoloistSession;
@@ -1244,6 +1255,7 @@ export type ActionPayloadUpdateSB = Partial<{
     doubleStopProb: number;
     tradeMode: string;
     motifTracking: boolean;
+    pinnedProfile: string | null;
     sessionSeed: SoloistSessionSeed | null;
     sessionSteps: number;
     phraseCount: number;
