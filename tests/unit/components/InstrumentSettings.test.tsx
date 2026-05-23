@@ -47,7 +47,10 @@ vi.mock('../../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 
-import { InstrumentSettings } from '../../../public/components/InstrumentSettings.jsx';
+import {
+    InstrumentMixerStrip,
+    InstrumentSpecificSettings,
+} from '../../../public/components/InstrumentSettings.jsx';
 
 describe('InstrumentSettings Component', () => {
     let container;
@@ -77,7 +80,7 @@ describe('InstrumentSettings Component', () => {
         });
 
         act(() => {
-            render(<InstrumentSettings module="harmony" />, container);
+            render(<InstrumentMixerStrip module="harmony" />, container);
         });
 
         const volumeSlider = container.querySelector('#harmonyVolume');
@@ -121,7 +124,7 @@ describe('InstrumentSettings Component', () => {
         });
 
         act(() => {
-            render(<InstrumentSettings module="groove" />, container);
+            render(<InstrumentSpecificSettings module="groove" />, container);
         });
 
         const swingSlider = container.querySelector('#swingSlider');
@@ -165,7 +168,7 @@ describe('InstrumentSettings Component', () => {
         });
 
         act(() => {
-            render(<InstrumentSettings module="groove" />, container);
+            render(<InstrumentSpecificSettings module="groove" />, container);
         });
 
         const creativityToggle = container.querySelector('#creativityCheck');

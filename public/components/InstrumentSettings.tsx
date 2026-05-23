@@ -66,61 +66,6 @@ function updateInstrumentAudio(
     }
 }
 
-interface InstrumentMixerSettingsProps {
-    module: StudioInstrumentModule;
-    title?: string;
-    className?: string;
-}
-
-function InstrumentMixerSettings({
-    module,
-    title = 'Mixer',
-    className = '',
-}: InstrumentMixerSettingsProps) {
-    const state = getInstrumentState(module);
-
-    if (!state) {
-        return null;
-    }
-
-    const moduleName = getModuleName(module);
-
-    return (
-        <SettingGroup title={title} className={className}>
-            <SettingRow
-                label="Volume"
-                id={`${moduleName}Volume`}
-                valueDisplay={`${Math.round(state.volume * 100)}%`}
-            >
-                <Slider
-                    id={`${moduleName}Volume`}
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={state.volume}
-                    onInput={(val) => updateInstrumentAudio(module, 'volume', val)}
-                    ariaValueText={`${Math.round(state.volume * 100)}%`}
-                />
-            </SettingRow>
-            <SettingRow
-                label="Reverb"
-                id={`${moduleName}Reverb`}
-                valueDisplay={`${Math.round(state.reverb * 100)}%`}
-            >
-                <Slider
-                    id={`${moduleName}Reverb`}
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={state.reverb}
-                    onInput={(val) => updateInstrumentAudio(module, 'reverb', val)}
-                    ariaValueText={`${Math.round(state.reverb * 100)}%`}
-                />
-            </SettingRow>
-        </SettingGroup>
-    );
-}
-
 interface InstrumentMixerStripProps {
     module: StudioInstrumentModule;
     accent?: string;
@@ -317,19 +262,6 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
 
             {module === 'groove' && <GrooveControls state={state} />}
         </SettingGroup>
-    );
-}
-
-interface InstrumentSettingsProps {
-    module: StudioInstrumentModule;
-}
-
-export function InstrumentSettings({ module }: InstrumentSettingsProps) {
-    return (
-        <div class={`grid-2-col instrument-settings instrument-settings--${module}`}>
-            <InstrumentSpecificSettings module={module} />
-            <InstrumentMixerSettings module={module} title="Mixer" className="divider-top" />
-        </div>
     );
 }
 
