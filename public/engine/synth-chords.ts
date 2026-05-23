@@ -49,6 +49,23 @@ export const INSTRUMENT_PRESETS: Record<string, ChordInstrumentPreset> = {
         resonance: 1.2,
         gainMult: 1.25,
     },
+    // Mix-pass 2026-05-23 — power-metal accompaniment previously used `Warm`,
+    // an electric-piano voice (tine: true, resonance: 2.2) that droned when
+    // retriggered every 8th note: the high-Q lowpass peak never settled
+    // between chugs and tails stacked into a sustained metallic ring. The
+    // PowerMetal preset is a dry, palm-mute-leaning amp tone — single saw
+    // fundamental, no tine, low resonance so the filter sweep moves but
+    // doesn't ring, and a short decay so each chug clears before the next.
+    PowerMetal: {
+        attack: 0.005,
+        decay: 0.35,
+        filterBase: 350,
+        filterDepth: 1400,
+        resonance: 0.7,
+        tine: false,
+        fundamental: 'sawtooth',
+        gainMult: 0.9,
+    },
 };
 
 function createPianoWave(audioCtx: AudioContext): PeriodicWave {
@@ -160,9 +177,13 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     const startTime = Math.max(time + strum, playback.audio.currentTime);
 
     // Epic 2 targets the electric-piano voice — for any other instrument
-    // (i.e. Warm) the `new` voice keeps the legacy delegated body untouched.
+    // (Warm, PowerMetal) the `new` voice keeps the legacy delegated body
+    // untouched so the preset's own oscillator/filter/decay parameters drive
+    // the sound.
     const resolvedInstrument =
-        instrument === 'Piano' || instrument === 'Warm' ? instrument : 'Piano';
+        instrument === 'Piano' || instrument === 'Warm' || instrument === 'PowerMetal'
+            ? instrument
+            : 'Piano';
     if (resolvedInstrument !== 'Piano') {
         playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
         return;
@@ -441,7 +462,7 @@ function playNoteCurrent(
     }
 
     try {
-        if (instrument !== 'Piano' && instrument !== 'Warm') {
+        if (instrument !== 'Piano' && instrument !== 'Warm' && instrument !== 'PowerMetal') {
             instrument = 'Piano';
         }
 

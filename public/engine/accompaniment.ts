@@ -2096,7 +2096,9 @@ export function getAccompanimentNotes(
                     durationSteps: dur,
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.002, // Tight unison
-                    instrument: 'Warm',
+                    // Mix-pass 2026-05-23 — was 'Warm', an EP voice whose high
+                    // resonance + 8th-note retriggering produced a droning ring.
+                    instrument: 'PowerMetal',
                     dry: false,
                 });
             });
