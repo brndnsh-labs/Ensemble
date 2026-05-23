@@ -25,10 +25,6 @@ export function isSoloistGuitarMode(mode: string | null | undefined): boolean {
     return resolveSoloistMode(mode) === 'guitar';
 }
 
-export function isSoloistPianoMode(_mode: string | null | undefined): boolean {
-    return false;
-}
-
 export function allowsSoloistPolyphony(mode: string | null | undefined): boolean {
     return !isSoloistMonophonicMode(mode);
 }

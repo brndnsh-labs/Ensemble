@@ -6,7 +6,6 @@ import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
     isSoloistMonophonicMode,
-    isSoloistPianoMode,
 } from './soloist-mode-policy.js';
 import { createSimplePanner, killActiveVoices, velocityTimbre } from './synth-utils.js';
 
@@ -80,11 +79,6 @@ function playSoloNoteCurrent(
 
     // Voice Management
     manageVoices(playTime, soloist.audio, soloist.mode);
-
-    const isPiano = isSoloistPianoMode(soloist.mode);
-    if (isPiano) {
-        isLegato = false;
-    }
 
     const gain = ctx.createGain();
     gain.gain.value = 0;
@@ -269,7 +263,7 @@ function manageVoices(playTime: number, audio: SoloistState['audio'], mode: stri
 // Wire the shared LFO vibrato into a voice's two oscillators. Byte-identical
 // across every preset voice (playTrumpet, playSaxophone, playNeoJuno,
 // playVowel, playShred), so it lives here instead of being copy-pasted five
-// times. Piano mode has no vibrato — bail before building the LFO graph.
+// times.
 function attachVibrato(
     state: EnsembleState,
     ctx: AudioContext,
@@ -285,9 +279,6 @@ function attachVibrato(
     vol: number,
     filterFreq: AudioParam | null,
 ): void {
-    if (isSoloistPianoMode(state.soloist.mode)) {
-        return;
-    }
     const { vibrato, vibGain, depthModNodes } = createVibrato(
         state,
         ctx,
@@ -529,7 +520,6 @@ function playTrumpet(
         style,
         isLegato,
         prevFreq,
-        isSoloistPianoMode(soloist.mode),
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
@@ -665,7 +655,6 @@ function playSaxophone(
         style,
         isLegato,
         prevFreq,
-        isSoloistPianoMode(soloist.mode),
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
@@ -831,7 +820,6 @@ function playNeoJuno(
         style,
         isLegato,
         prevFreq,
-        isSoloistPianoMode(soloist.mode),
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
@@ -945,7 +933,6 @@ function playVowel(
         style,
         isLegato,
         prevFreq,
-        isSoloistPianoMode(soloist.mode),
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice,
@@ -1052,7 +1039,6 @@ function playShred(
         style,
         isLegato,
         prevFreq,
-        isSoloistPianoMode(soloist.mode),
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
@@ -1134,15 +1120,8 @@ function applyPitchEnvelope(
     _style: string,
     isLegato: boolean,
     prevFreq: number,
-    isPiano: boolean = false,
 ): void {
     const { soloist } = state;
-    if (isPiano) {
-        osc1.frequency.setValueAtTime(freq, playTime);
-        osc2.frequency.setValueAtTime(freq, playTime);
-        return;
-    }
-
     const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
 
     if (isLegato && Math.abs(freq - prevFreq) < freq * 0.5) {
@@ -1261,7 +1240,7 @@ function createVibrato(
     depthMod.connect(depthModGain);
     depthModGain.connect(vibGain.gain as any);
 
-    const vibRuns = (duration > 0.15 || forceVibrato) && !isSoloistPianoMode(soloist.mode);
+    const vibRuns = duration > 0.15 || forceVibrato;
     if (vibRuns) {
         vibrato.start(time);
         vibrato.stop(time + duration + 0.2);

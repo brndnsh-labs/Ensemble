@@ -81,7 +81,6 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         playback,
         soloist,
         isPolyphonic,
-        isPiano,
         dynamicCenter,
         scaleMask,
         responseSignature,
@@ -267,7 +266,7 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
                 bendStartInterval: 1,
             },
         ];
-    } else if (deviceType === 'countryBend' && isPolyphonic && !isPiano) {
+    } else if (deviceType === 'countryBend' && isPolyphonic) {
         const rootMidi = targetChord.rootMidi;
         const topNote =
             selectedMidi + ([3, 4, 7].includes((selectedMidi - rootMidi + 12) % 12) ? 0 : 2);

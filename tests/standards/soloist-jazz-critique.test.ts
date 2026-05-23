@@ -715,7 +715,6 @@ describe('Soloist Jazz Critique', () => {
                     // soloist.session.phrasing.isResting (soloist-devices.ts:670)
                     soloist: { session: { phrasing: { isResting: false } } },
                     isPolyphonic: false,
-                    isPiano: false,
                     dynamicCenter: 70,
                     responseSource: 'section',
                     responseMode: 'paraphrase',

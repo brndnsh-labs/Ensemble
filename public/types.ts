@@ -750,7 +750,7 @@ export interface SoloistState {
     readonly voice: InstrumentVoice;
     /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
     readonly preset: string;
-    /** The soloist mode ('monophonic' or 'guitar'; legacy piano normalizes to monophonic). */
+    /** The soloist mode ('monophonic' or 'guitar'; unknown values normalize to monophonic). */
     readonly mode: string;
     /** Optional playing style (e.g. 'jazz', 'blues', 'smart'). */
     readonly style?: string;

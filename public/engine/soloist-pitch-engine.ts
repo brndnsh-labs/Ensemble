@@ -1438,7 +1438,6 @@ export function selectPitchAndDevices(
         playback,
         soloist: soloistState,
         isPolyphonic,
-        isPiano: false,
         dynamicCenter: 72,
         scaleMask,
         seedNote,

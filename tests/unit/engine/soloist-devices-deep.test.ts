@@ -25,7 +25,6 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             playback: { bpm: 120 },
             soloist: makeSoloistMock({ mode: 'monophonic', isResting: false }),
             isPolyphonic: true,
-            isPiano: false,
             dynamicCenter: 60,
             scaleMask: 0b101010110101, // Major scale-ish
         };
