@@ -303,19 +303,19 @@ const PRESETS_RAW = [
         sections: [
             {
                 label: 'A',
-                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vi7 | vi7',
+                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7+ | vi7 | vi7',
             },
             {
                 label: 'A',
-                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7alt | vi7 | vi7',
+                value: 'ii7 | V7 | Imaj7 | IVmaj7 | viiø7 | III7+ | vi7 | vi7',
             },
             {
                 label: 'B',
-                value: 'viiø7 | III7alt | vi7 | vi7 | ii7 | V7 | Imaj7 | IVmaj7',
+                value: 'viiø7 | III7+ | vi7 | vi7 | ii7 | V7 | Imaj7 | IVmaj7',
             },
             {
                 label: 'C',
-                value: 'viiø7 | III7alt | vi7 | vi7 | viiø7 | III7alt | vi7 | vi7',
+                value: 'viiø7 | III7+ | vi7 | vi7 | viiø7 | III7+ | vi7 | vi7',
             },
         ],
         category: 'Jazz',
@@ -326,7 +326,7 @@ const PRESETS_RAW = [
         },
         provenance: {
             variant: 'Common-practice concert-major relative-minor chart',
-            notes: 'Keeps the turnaround as vii half-diminished -> III7alt so the relative-minor pull stays explicit instead of being flattened into a generic dominant.',
+            notes: 'Keeps the turnaround as vii half-diminished -> III7+ so the relative-minor pull stays explicit instead of being flattened into a generic dominant.',
         },
     },
     {
