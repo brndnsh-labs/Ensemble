@@ -226,6 +226,133 @@ describe('Soloist Chorus Evolution — RHYTHM side (S6)', () => {
     });
 
     // -------------------------------------------------------------------------
+    // 2b. Active coordination boosts — multiplier still fires on non-forced steps
+    // -------------------------------------------------------------------------
+    // This case exercises the "wash-out scenario" the Epic 9 S5.a final-stage
+    // placement was designed to prevent (FOLLOWUPS §B, epic-followup-drain S4).
+    //
+    // Setup:
+    //   - `stepCoordination.kickHit` + `snareHit` active at startStep → the first
+    //     step in the phrase gets +0.2 + 0.2 additive boost at the `step===startStep`
+    //     guard, pushing that step's attackProb near/above 1.0.
+    //   - `sessionSeed` with notes at specific steps → those steps get +0.4 boost,
+    //     pushing them past 1.0 (forced hits regardless of loop count).
+    //
+    // Expectation:
+    //   - With the CURRENT final-stage placement (`if (attackProb < 1.0) *= 1.3`),
+    //     forced/boosted steps are skipped by the gate (correct — no loop escalation
+    //     on an already-forced anchor). Non-forced steps still get the escalation.
+    //     Net result: Loop 2 > Loop 0 (escalation concentrates on boundary steps).
+    //
+    //   - With the OLD densityScale placement, the loop multiplier was baked into
+    //     `attackProb`'s base factor BEFORE additive boosts. The loop factor
+    //     applied even to seed-step base values, but since those steps would fire
+    //     regardless (boosted above 1.0 by the +0.4 seed), the multiplier's effect
+    //     was partially "spent" on forced notes. The realistic net delta from the old
+    //     approach would have been smaller — sometimes invisible — when many steps
+    //     were already forced. The new placement concentrates the escalation only on
+    //     genuinely boundary-case steps where it matters most.
+    //
+    // This case seeds with 4 notes across 64 steps so that ~6% of steps are forced
+    // (seed notes) and ~94% are genuinely boundary-case. The aggregate Loop 2 >
+    // Loop 0 attack count must be maintained even under active kick/snare boosts.
+    it('final-stage multiplier survives active coordination boosts on non-forced steps', () => {
+        // A sessionSeed with 4 notes spread across a 64-step phrase at evenly
+        // spaced positions — forces 4 attacks regardless of loop count.
+        const sessionSeedWithNotes = {
+            notes: [
+                { step: 0, midi: 60, isAnchor: true },
+                { step: 16, midi: 62, isAnchor: false },
+                { step: 32, midi: 64, isAnchor: true },
+                { step: 48, midi: 65, isAnchor: false },
+            ],
+            loopLengthSteps: 64,
+        };
+
+        function buildSoloistStateWithSeed() {
+            return makeSoloistMock({
+                mode: 'monophonic',
+                style: 'scalar',
+                phraseContext: null,
+                sessionSeed: sessionSeedWithNotes,
+                rhythmicEntropy: 0,
+                transitionState: 'playing',
+                isResting: false,
+            });
+        }
+
+        // Coordination with active kick+snare at startStep and the full stepCoordination
+        // bag to exercise the boost paths.
+        function makeActiveCoordination(activeSteps: number) {
+            return {
+                sectionStart: 0,
+                sectionEnd: activeSteps + 64,
+                stepCoordination: {
+                    kickHit: true, // why: +0.2 additive to attackProb at step===startStep
+                    snareHit: true, // why: +0.2 additive at step===startStep (cumulative +0.4)
+                },
+                bypassRhythm: false,
+            };
+        }
+
+        function generateAtLoopWithBoosts(loopCount: number, seed = 0xc0ffee) {
+            const prng = makeMulberry32(seed);
+            return generateRhythmPlan(
+                0,
+                64,
+                'scalar',
+                0.6,
+                16,
+                4,
+                makeActiveCoordination(64),
+                256,
+                buildSoloistStateWithSeed(),
+                null,
+                loopCount,
+                prng,
+            );
+        }
+
+        // Aggregate over multiple seeds (same pattern as the density test above)
+        // to isolate the systematic mean from per-seed jitter.
+        const seeds = [0xc0ffee, 0xdeadbe, 0x12345, 0xabcdef, 0x111111, 0xfeedf, 0x10101];
+        let total0 = 0;
+        let total2 = 0;
+        for (const seed of seeds) {
+            total0 += generateAtLoopWithBoosts(0, seed).length;
+            total2 += generateAtLoopWithBoosts(2, seed).length;
+        }
+        const delta = total2 - total0;
+        const pctDelta = total0 > 0 ? (delta / total0) * 100 : 0;
+
+        console.log('\n--- SOLOIST CHORUS EVOLUTION (RHYTHM) — ACTIVE BOOSTS ---');
+        console.log(`[Seeds]                      ${seeds.length}`);
+        console.log(`[Active coordination boosts] kickHit=true, snareHit=true at startStep`);
+        console.log(`[Session seed notes]         4 forced anchors across 64 steps`);
+        console.log(`[Loop 0 total attacks]       ${total0}  (forced seed + unforced base)`);
+        console.log(`[Loop 2 total attacks]       ${total2}  (forced seed + escalated unforced)`);
+        console.log(
+            `[Delta]                      +${delta} (${pctDelta.toFixed(1)}% — escalation on non-forced steps only)`,
+        );
+        console.log('----------------------------------------------------------\n');
+
+        // why: the loop-count multiplier fires ONLY on non-forced (< 1.0) steps.
+        // With 4 forced seed steps (4 of 64), the remaining ~60 steps are genuine
+        // boundary cases. The +30% escalation on those non-forced steps should
+        // produce a positive delta aggregated over 7 seeds, just as in test 1.
+        // A zero or negative delta would indicate the `< 1.0` gate is incorrectly
+        // being gated OUT by the coordination boosts on steps it shouldn't touch —
+        // i.e., the boosts are washing out the multiplier on non-forced steps.
+        expect(total2).toBeGreaterThan(total0);
+        // why: 4 forced seed steps are identical between loops; escalation acts on
+        // ~60 remaining steps. The realized aggregate delta should be in the same
+        // order of magnitude as test 1 (5+ attacks). A smaller threshold (3+)
+        // reflects that forced steps are identical across loops so the denominator
+        // (total0) is slightly higher, compressing the relative delta.
+        expect(delta).toBeGreaterThanOrEqual(3);
+    });
+
+    // -------------------------------------------------------------------------
     // 3. Loop 0 is unchanged — strict Head adherence per CLAUDE.md
     // -------------------------------------------------------------------------
     it('Loop 0 path is bias-free: same RNG produces same plan as no-loop call', () => {
