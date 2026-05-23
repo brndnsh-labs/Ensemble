@@ -372,8 +372,16 @@ async function renderSceneReports({ scenes, seeds }) {
                             },
                             soloist: {
                                 ...liveState.soloist,
-                                buffer: new Map(),
-                                activeVoices: [],
+                                audio: {
+                                    ...(liveState.soloist.audio || {}),
+                                    activeVoices: [],
+                                    buffer: new Map(),
+                                    lastFreq: null,
+                                    lastMidiPlayed: null,
+                                    lastRenderedFreq: null,
+                                    lastPlayedFreq: null,
+                                    lastNoteEnd: 0,
+                                },
                                 motifBuffer: [...(liveState.soloist.motifBuffer || [])],
                                 pitchHistory: [...(liveState.soloist.pitchHistory || [])],
                                 deviceBuffer: [
@@ -382,8 +390,6 @@ async function renderSceneReports({ scenes, seeds }) {
                                 phraseContext: {
                                     ...(liveState.soloist.session.currentPhrase.context || {}),
                                 },
-                                lastFreq: null,
-                                lastPlayedFreq: null,
                             },
                             harmony: {
                                 ...liveState.harmony,
@@ -448,8 +454,9 @@ async function renderSceneReports({ scenes, seeds }) {
                         state.harmony.enabled = Boolean(
                             stem.enabled.harmony && (scene.includeHarmony ?? true),
                         );
-                        // The rendered audit still targets backing-band stems for stable comparisons.
-                        state.soloist.enabled = false;
+                        state.soloist.enabled = Boolean(
+                            stem.enabled.soloist && (scene.includeSoloist ?? true),
+                        );
                         state.groove.enabled = Boolean(
                             stem.enabled.drums && (scene.includeDrums ?? true),
                         );
@@ -492,7 +499,7 @@ async function renderSceneReports({ scenes, seeds }) {
                             const result = generateNotesForStep(state, step, cursors, {
                                 includeBass: state.bass.enabled,
                                 includeChords: state.chords.enabled,
-                                includeSoloist: false,
+                                includeSoloist: state.soloist.enabled,
                                 includeHarmony: state.harmony.enabled,
                                 includeDrums: false,
                             });
@@ -504,6 +511,8 @@ async function renderSceneReports({ scenes, seeds }) {
                                     storeNote(state.chords.buffer, step, note);
                                 } else if (note.module === 'harmony') {
                                     storeNote(state.harmony.buffer, step, note);
+                                } else if (note.module === 'soloist') {
+                                    storeNote(state.soloist.audio.buffer, step, note);
                                 }
                             }
                         }
@@ -512,7 +521,11 @@ async function renderSceneReports({ scenes, seeds }) {
                     function collectScheduleBuffer(state, modules) {
                         const combined = new Map();
                         for (const moduleName of modules) {
-                            const source = state[moduleName]?.buffer;
+                            const moduleState = state[moduleName];
+                            const source =
+                                moduleName === 'soloist'
+                                    ? moduleState?.audio?.buffer
+                                    : moduleState?.buffer;
                             if (!(source instanceof Map)) {
                                 continue;
                             }

@@ -84,32 +84,44 @@ export const MIX_REPORT_STEMS = [
     {
         id: 'full',
         label: 'Full Mix',
-        enabled: { drums: true, bass: true, chords: true, harmony: true },
+        enabled: { drums: true, bass: true, chords: true, harmony: true, soloist: false },
         schedule: { modules: ['bass', 'chords', 'harmony'], voiceLimit: 8 },
+    },
+    {
+        id: 'full+solo',
+        label: 'Full Mix + Soloist',
+        enabled: { drums: true, bass: true, chords: true, harmony: true, soloist: true },
+        schedule: { modules: ['bass', 'chords', 'harmony', 'soloist'], voiceLimit: 9 },
     },
     {
         id: 'drums',
         label: 'Drums',
-        enabled: { drums: true, bass: false, chords: false, harmony: false },
+        enabled: { drums: true, bass: false, chords: false, harmony: false, soloist: false },
         schedule: null,
     },
     {
         id: 'bass',
         label: 'Bass',
-        enabled: { drums: false, bass: true, chords: false, harmony: false },
+        enabled: { drums: false, bass: true, chords: false, harmony: false, soloist: false },
         schedule: { modules: ['bass'], voiceLimit: 1 },
     },
     {
         id: 'chords',
         label: 'Chords',
-        enabled: { drums: false, bass: false, chords: true, harmony: false },
+        enabled: { drums: false, bass: false, chords: true, harmony: false, soloist: false },
         schedule: { modules: ['chords'], voiceLimit: 5 },
     },
     {
         id: 'harmony',
         label: 'Harmony',
-        enabled: { drums: false, bass: false, chords: false, harmony: true },
+        enabled: { drums: false, bass: false, chords: false, harmony: true, soloist: false },
         schedule: { modules: ['harmony'], voiceLimit: 3 },
+    },
+    {
+        id: 'soloist',
+        label: 'Soloist',
+        enabled: { drums: false, bass: false, chords: false, harmony: false, soloist: true },
+        schedule: { modules: ['soloist'], voiceLimit: 1 },
     },
 ];
 
@@ -367,10 +379,12 @@ export function parseEnsembleAuditInput(text, options = {}) {
 
 export function summarizeRenderedFindings(stems) {
     const full = stems.full;
+    const fullWithSolo = stems['full+solo'];
     const drums = stems.drums;
     const bass = stems.bass;
     const chords = stems.chords;
     const harmony = stems.harmony;
+    const soloist = stems.soloist;
     const notes = [];
 
     if (drums && full) {
@@ -397,6 +411,17 @@ export function summarizeRenderedFindings(stems) {
 
     if (harmony?.rmsDb > -80 && harmony.probes?.air > (chords?.probes?.air || 0) * 0.9) {
         notes.push('harmony contributes meaningful top-end air');
+    }
+
+    const fullReference = fullWithSolo || full;
+    if (soloist && fullReference) {
+        if (soloist.rmsDb < fullReference.rmsDb - 8) {
+            notes.push('soloist gets buried behind the bed');
+        } else if (soloist.rmsDb > fullReference.rmsDb - 2) {
+            notes.push('soloist sits very forward — almost solo');
+        } else {
+            notes.push('soloist sits forward of the bed at a lead level');
+        }
     }
 
     if ((harmony?.schedule?.voiceLimitPressureCount || 0) > 0) {
