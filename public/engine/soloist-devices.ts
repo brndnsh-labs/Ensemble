@@ -51,7 +51,7 @@ export const DEVICE_SPAN_STEPS: Record<string, number> = {
 /**
  * Computes a bitmask of intervals present in the current chord.
  */
-export function getChordMask(currentChord: any): number {
+function getChordMask(currentChord: any): number {
     let mask = 0;
     if (currentChord?.intervals) {
         for (let i = 0; i < currentChord.intervals.length; i++) {

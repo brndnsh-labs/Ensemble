@@ -5,7 +5,7 @@ import {
     validateProgression,
 } from './engine/chords-engine.js';
 
-export { mutateProgression, transformRelativeProgression, validateProgression };
+export { mutateProgression };
 
 import { analyzeFormUI } from './engine/conductor.js';
 import { restoreGains } from './engine/engine.js';

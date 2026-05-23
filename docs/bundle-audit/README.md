@@ -222,6 +222,17 @@ Main app still **35.70 KB brotli over budget** (was 36.16). Worker headroom **4.
 
 **Acceptance.** Knip's unused-export count drops by the number of Tier A items actually removed. `npm run typecheck`, `npm test`, `npm run test:e2e` all green. Reviewer clean. KB-delta reported per chunk (expectation: small but non-zero — these are leaf functions and constants that no longer reach the bundle once unexported).
 
+**Status:** Shipped 2026-05-23. Removed `export` from every Tier A symbol — all 16 lines from the table plus one cascade (`INSTRUMENT_PRESETS` in `synth-chords.ts` became fully internal once `engine.ts` dropped its re-export). 27 dropped `export` keywords across 16 files. No symbol body deleted: every Tier A entry is still *used* intra-file, so this is a pure export-surface contraction. Knip **44 → 17** (delta = Tier A count); the 17 remaining are S7 barrel re-exports (15) + S8 orphan components (2). Main app brotli **115.70 → 115.89 KB (+0.19, noise)**, worker **60.74 → 60.62 KB (−0.12, noise)** — Rollup was already inlining the internal usages, so the win is source clarity, not bytes. Reviewer flagged 1 P1 (AI_MAP advertised `isDropFriendlyGenre` as a public symbol on `drop-mechanic.ts`; trimmed to `shouldFireDropMute` only). 1975/1975 vitest green; typecheck clean.
+
+### Post-S6 baseline (2026-05-23)
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S4 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | —         | **115.89 KB**       | 80 KB    | +0.19 KB (noise)    |
+| `logic-worker.<rev>.js`          | —         | **60.62 KB**        | 65 KB    | −0.12 KB (noise)    |
+| `index.<rev>.css`                | —         | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+
 ### S7 — State barrel re-export hygiene
 
 **Goal.** Drop the 13 unused re-exports from `public/state.ts` (slice values + reducers re-exported for an external consumer that never materialized).

@@ -165,7 +165,7 @@ function assertValidTrack(track: VisualizerTrackId | string): VisualizerTrackId 
     return track as VisualizerTrackId;
 }
 
-export function queueVisualizerEvent<T extends VisualizerQueuedEvent>(
+function queueVisualizerEvent<T extends VisualizerQueuedEvent>(
     playback: { drawQueue: VisualizerQueuedEvent[] },
     event: T,
 ): T {
@@ -272,7 +272,7 @@ export function queueVisualizerChordEvent(
     return queueVisualizerEvent(playback, createVisualizerChordEvent(payload));
 }
 
-export function createVisualizerStepEvent(time: number, step: number): VisualizerStepEvent {
+function createVisualizerStepEvent(time: number, step: number): VisualizerStepEvent {
     assertValidTime(time, 'step');
     return { type: 'step', time, step };
 }
@@ -285,7 +285,7 @@ export function queueVisualizerStepEvent(
     return queueVisualizerEvent(playback, createVisualizerStepEvent(time, step));
 }
 
-export function createVisualizerFillEvent(time: number, active: boolean): VisualizerFillEvent {
+function createVisualizerFillEvent(time: number, active: boolean): VisualizerFillEvent {
     assertValidTime(time, 'fill');
     return { type: 'fill', time, active };
 }

@@ -98,7 +98,7 @@ const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 
 // 7b13, and 7#11. Gating on '7alt' alone (the original code) left charts that spell
 // G7b9 or G7#9 falling through to the generic inversion path with no awareness of
 // their resolution-critical altered tones. Source: chords.md P1 #7.
-export const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11']);
+const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11']);
 
 // why: hook/breath subset of altered dominants. Excludes 7#11 (lydian dominant) because
 // its scale source — root, 3, #11, 5, 6, b7 — does NOT contain b9, #9, or b13. Hook

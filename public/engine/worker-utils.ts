@@ -17,7 +17,7 @@ export interface ChordAtStep {
  * `recursiveSafeSync` descends into a nested object, it looks up the
  * protected list under `${moduleName}.${key}` (e.g. `soloist.session.phrasing`).
  */
-export const WORKER_MANAGED_KEYS: Record<string, string[]> = {
+const WORKER_MANAGED_KEYS: Record<string, string[]> = {
     'soloist.session.phrasing': [
         'state',
         'isResting',
@@ -36,8 +36,8 @@ export const WORKER_MANAGED_KEYS: Record<string, string[]> = {
 };
 
 // --- LOGIC CURSORS ---
-export let lastChordIndex = 0;
-export let lastSectionIndex = 0;
+let lastChordIndex = 0;
+let lastSectionIndex = 0;
 
 export function resetCursors(): void {
     lastChordIndex = 0;

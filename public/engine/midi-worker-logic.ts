@@ -20,8 +20,8 @@ import { resetSoloistState } from './soloist.js';
 import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep } from './worker-utils.js';
 
-export const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
-export const PPQ = 480;
+const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
+const PPQ = 480;
 
 export interface ExportOptions {
     includedTracks?: string[];

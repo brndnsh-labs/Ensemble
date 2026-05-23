@@ -13,26 +13,18 @@ import { audioWatchdog } from './audio-recovery.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
-import {
-    INSTRUMENT_PRESETS,
-    killAllPianoNotes,
-    playChordScratch,
-    playNote,
-    updateSustain,
-} from './synth-chords.js';
+import { killAllPianoNotes, playNote, updateSustain } from './synth-chords.js';
 import { killDrumNote, playDrumSound } from './synth-drums.js';
 import { killHarmonyNote, playHarmonyNote } from './synth-harmonies.js';
 import { killSoloistNote, playSoloNote } from './synth-soloist.js';
 
 export {
-    INSTRUMENT_PRESETS,
     killAllPianoNotes,
     killBassNote,
     killDrumNote,
     killHarmonyNote,
     killSoloistNote,
     playBassNote,
-    playChordScratch,
     playDrumSound,
     playHarmonyNote,
     playNote,

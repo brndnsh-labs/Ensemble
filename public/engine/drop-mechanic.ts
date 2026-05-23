@@ -60,7 +60,7 @@ const DROP_FRIENDLY_GENRES: readonly string[] = [
  * gesture ambient instead of a signpost. A drop cut must stay a rare structural
  * event — only the hard, multi-step lifts qualify.
  */
-export const DROP_ENERGY_DELTA_THRESHOLD = 0.3;
+const DROP_ENERGY_DELTA_THRESHOLD = 0.3;
 
 /**
  * Fraction of the unrolled form a playback must have passed before an
@@ -78,13 +78,13 @@ export const DROP_ENERGY_DELTA_THRESHOLD = 0.3;
  *
  * Authored Drop/Breakdown sections are explicit intent and fire at any position.
  */
-export const DROP_INFERRED_MIN_FORM_PROGRESS = 0.6;
+const DROP_INFERRED_MIN_FORM_PROGRESS = 0.6;
 
 /**
  * True iff the genre is one for which the drop/breakdown cut should fire.
  * `genreFeel` is the canonical genre string on `groove.genreFeel`.
  */
-export function isDropFriendlyGenre(genreFeel: string | undefined | null): boolean {
+function isDropFriendlyGenre(genreFeel: string | undefined | null): boolean {
     if (!genreFeel) {
         return false;
     }
@@ -97,7 +97,7 @@ export function isDropFriendlyGenre(genreFeel: string | undefined | null): boole
  * case-insensitive — mirrors `isIntroSectionLabel` / `isOutroSectionLabel` in
  * `arrangement-layering.ts`.
  */
-export function isDropSectionLabel(label: string | undefined | null): boolean {
+function isDropSectionLabel(label: string | undefined | null): boolean {
     if (!label) {
         return false;
     }

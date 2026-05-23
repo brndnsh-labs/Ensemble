@@ -562,13 +562,9 @@ function resolveChordRoot(
     return { rootMidi, rootPart, romanMatch, nnsMatch, noteMatch, rootRomanBase };
 }
 
-/**
- * Generates pro-level rootless jazz voicings.
- * Omits root and often the 5th to focus on 3rd, 7th, and extensions.
- */
-import { getIntervals, getRootlessVoicing } from './chords-styles.js';
+import { getIntervals } from './chords-styles.js';
 
-export { getIntervals, getRootlessVoicing };
+export { getIntervals };
 
 /**
  * Formats chord names with appropriate suffixes based on quality and extensions.

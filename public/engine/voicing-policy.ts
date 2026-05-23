@@ -20,7 +20,7 @@ const PRACTICE_GROUNDING_QUALITIES = new Set([
     'augmaj7',
 ]);
 
-export const TENSION_CHORD_QUALITIES = new Set([
+const TENSION_CHORD_QUALITIES = new Set([
     'halfdim',
     'm7b5',
     'half-diminished',
@@ -35,7 +35,7 @@ export const TENSION_CHORD_QUALITIES = new Set([
     'augmaj7',
 ]);
 
-export function isBassSpaceFeel(feel: string | undefined | null): boolean {
+function isBassSpaceFeel(feel: string | undefined | null): boolean {
     return BASS_SPACE_FEELS.has(feel || '');
 }
 

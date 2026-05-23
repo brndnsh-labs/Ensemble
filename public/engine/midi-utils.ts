@@ -6,7 +6,7 @@ export interface MidiEvent {
 /**
  * Binary MIDI writing utilities.
  */
-export function writeVarInt(value: number): number[] {
+function writeVarInt(value: number): number[] {
     const buffer: number[] = [];
     if (value === 0) {
         return [0];

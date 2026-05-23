@@ -538,7 +538,7 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
     {} as Record<string, StyleConfig>,
 );
 
-export const GENRE_STYLE_MAPPING: Record<string, string> = {
+const GENRE_STYLE_MAPPING: Record<string, string> = {
     Rock: 'rock',
     Jazz: 'jazz',
     Funk: 'funk',
@@ -641,7 +641,7 @@ const DEFAULT_REGISTER_PROFILE: RegisterProfile = {
     liveLoopLift: 2,
 };
 
-export const SOLOIST_REGISTER_PROFILES: Record<string, Partial<RegisterProfile>> = {
+const SOLOIST_REGISTER_PROFILES: Record<string, Partial<RegisterProfile>> = {
     scalar: {},
     acoustic: {
         seedFloor: 60,

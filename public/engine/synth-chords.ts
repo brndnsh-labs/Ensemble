@@ -26,7 +26,7 @@ interface ChordInstrumentPreset {
     reverbMult?: number;
 }
 
-export const INSTRUMENT_PRESETS: Record<string, ChordInstrumentPreset> = {
+const INSTRUMENT_PRESETS: Record<string, ChordInstrumentPreset> = {
     Warm: {
         attack: 0.03,
         decay: 0.6,

@@ -58,7 +58,7 @@ export const JAM_CYCLE_LENGTHS: Record<string, number> = {
 // why 13: shares no common factor with the usual 4- and 8-bar section counts,
 // so the swell does not phase-lock to the form (a multiple like 12 would
 // re-crest on the same form-repeat every cycle).
-export const JAM_CYCLE_DEFAULT = 13;
+const JAM_CYCLE_DEFAULT = 13;
 
 /**
  * Timer-less open-jam macro-arc.
