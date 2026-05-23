@@ -17,6 +17,8 @@ The synth track gates on the owner's ear — no machine can stand in for that, s
 - This skill can chain `--until-blocked`.
 - The exceptions are stories tagged **speculative** in the doc (e.g. S5 — lazy-load synthesis on first `togglePlay()`) — those need a design decision before code, and chaining halts on them.
 
+**Budgets are baselines, not targets.** The numbers in `.size-limit.json` are arbitrary historical baselines — useful as a regression tripwire ("this chunk used to fit; what just changed?") but not a finish line. The operative goal is **smaller is better when behavior is unchanged**, not "must hit budget." Don't promote risky structural changes (e.g. S5) just to close a budget gap.
+
 ## Why this is mostly inline (no implementer agent)
 
 Bundle stories are surgical by nature: "delete this function and unwind 11 call sites", "convert this import to `import()`", "remove this orphaned state field". The orchestrator can do all of it on the main thread, faster than spawning + briefing a subagent. The one agent in the loop is the reviewer (`bundle-hygiene-reviewer`), which polices the diff for the failure modes specific to this kind of work.
@@ -36,6 +38,8 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
    - **Uncommitted bundle changes** → either mid-flight (pre-review or pre-commit) or a previous story left orphaned. Investigate before starting fresh.
 
    **Shipped-but-unmarked check.** The pickup rule below ("lowest S-number with no `**Status:**` line") can mis-fire if a story was shipped in a prior session but the README never got its Status line. Before declaring a pickup, spend 5 seconds: `git log --oneline -S "<core symbol from the story>" -- public/` — if that turns up a prior commit, the story is already shipped. Backfill the missing Status line (and `Post-S<N>` baseline table if absent) as a separate `docs(bundle-audit)` commit before starting the new story's work. Keeps KB-delta attribution clean and avoids smuggling housekeeping into a refactor commit.
+
+   **Discovery tools (when no drafted story applies — e.g. drafting a new one or sanity-checking the board):** `npm run knip` lists unused exports (configured as of commit `7aacbedd`; Tier A/B/C triage shape lives in the doc), and `dist/stats.html` shows per-module byte contribution by chunk. `public/engine/grooves/*.ts` is intentionally on knip's ignore list because `import * as <genre>` namespace dispatch defeats its static analysis — re-including it just produces noise, not signal.
 
 2. **Resolve the invocation:**
    - explicit `S<N>` → that story.
@@ -132,13 +136,14 @@ Halt — do not implement until the design is agreed.
 | build:size | brotli for target chunk did not *grow* | target chunk grew (a "shrink" story that grows the bundle is broken) |
 | reviewer | findings are P1/P2, all mechanically fixable | any P0, or P1 that needs a design call |
 | patch | tests + typecheck still green after the fix | tests still failing, fix is ambiguous |
-| commit | hook passes (cspell/Biome auto-fixes OK to retry inline) | non-trivial hook failure |
+| commit | hook passes (cspell/Biome auto-fixes OK to retry inline; knip output is informational and does not block) | non-trivial hook failure |
 
 **Premise break is always a halt** — not in the table because it can fire from any step (orient surfaces a stale Status, pre-flight grep finds the "dead" code is reachable, implement discovers the cited file/line is wrong). Whenever the story's stated premise breaks, stop, update the doc with a `**Status:** Not applicable, <date>. <reason + lesson>` line, surface the finding, and ask for direction. Never silently rewrite the story to match what you found. Applies equally inside `--until-blocked` chains.
 
 ## Edge cases
 
 - **`bundle-hygiene-reviewer` not invocable** (e.g. the session that *created* it, or a fresh fork): fall back to inline review using the contract in `.claude/agents/bundle-hygiene-reviewer.md` as a checklist, and note the substitution in the commit body.
+- **Knip output during pre-commit:** the pre-commit hook runs `npm run knip || true` (mirrors cspell's pattern) — findings flowing past during commit are informational, not a failure. Stand-alone `npm run knip` and `npm run validate` still exit truthfully; check those when you want the gate.
 - **Knip / depcheck flags a removal we made:** that's expected — those tools' output is the *symptom*; the cleanup is the cure. Read the relevant config to confirm we're not deleting something a tool was hiding.
 - **A story's Actions list turns out to be wrong** (e.g. the doc says "delete X" but X is reachable from a path the doc missed): stop. Update the doc, surface the premise break, ask for direction. Do not "fix" the doc silently while implementing — premise breaks deserve a conversation. (See [[feedback_audit_doc_premise_breaks]] in memory — same failure mode as the musical audit.)
 - **KB delta is *negative* — bytes grew:** never commit a bundle-cycle story that grew the target chunk. Either the technique was wrong, scope-crept, or accidentally introduced a side effect. Stop and investigate.
