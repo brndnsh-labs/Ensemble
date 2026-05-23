@@ -121,8 +121,8 @@ describe('Engine Bus Management', () => {
         it('should restore gains to state levels', () => {
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalled();
-            // mult for chords is MIXER_GAIN_MULTIPLIERS.chords (0.15), vol is 1.0 -> 0.15
-            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.15, 10.0, 0.04);
+            // mult for chords is MIXER_GAIN_MULTIPLIERS.chords (0.135), vol is 1.0 -> 0.135
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.135, 10.0, 0.04);
         });
 
         it('should mute if module is disabled', () => {
