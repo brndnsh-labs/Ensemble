@@ -339,11 +339,27 @@ export function applyGrooveOverrides(
     const firstIterBoundary = arrangerState.totalSteps || seedTimelineStartStep + stepsPerBar;
     const firstIterationSuppression = step < firstIterBoundary ? 0.3 : 1.0;
 
+    // why: Epic 12 S4 — migrate the three entropy-phase Math.random() draws to
+    // scrambleHash seeded on (barIndex, sectionId, loopStep) so drum-strategy
+    // probability and velocity decisions are deterministic across loops and
+    // critique tests. Each draw gets a distinct discriminator (1/3/5) so
+    // co-located draws don't collide. sectionId hashed with stringHash33 —
+    // matching the Imperfect Symmetry block at line ~437. Source: FOLLOWUPS §C.
+    const _entropySectionIdStr = sectionIdFromTick || sectionId || '';
+    const _entropySectionHash = stringHash33(_entropySectionIdStr);
+    // Shared base seed: barIndex * large-prime XOR sectionHash XOR loopStep * small-prime.
+    // Discriminators are odd primes (1/3/5) so adjacent draws produce unrelated values.
+    const _entropyBaseSeed = (_entropySectionHash ^ (barIndex * 0x9e3779b1) ^ (loopStep * 131)) | 0;
+
     if (
         groove.creativity &&
         entropyGateActive &&
         !currentState.shouldPlay &&
-        Math.random() <
+        // why: draw 1 (discriminator 1) — the entropy gate itself. scrambleHash gives
+        // a well-distributed float per (barIndex, sectionId, loopStep) tuple so the
+        // gate fires at the correct average rate without introducing LCG sawtooth
+        // artifacts (see feedback_seeded_prng_mulberry32 project memory).
+        scrambleHash((_entropyBaseSeed + 1) | 0) <
             playback.bandIntensity *
                 config.entropyMultiplier *
                 firstIterationSuppression *
@@ -365,7 +381,11 @@ export function applyGrooveOverrides(
 
         if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
             currentState.shouldPlay = true;
-            currentState.velocity = 0.1 + Math.random() * 0.15;
+            // why: draw 2 (discriminator 3) — ghost snare velocity in [0.1, 0.25).
+            // Must be distinct from draw 1 to avoid correlation; discriminator 3
+            // separates the gate decision from the velocity assignment. Range matches
+            // prior Math.random(): 0.1 + r*0.15 ∈ [0.10, 0.25).
+            currentState.velocity = 0.1 + scrambleHash((_entropyBaseSeed + 3) | 0) * 0.15;
             // why: gate kept at 0.4 (NOT swept with the per-genre S8 backbeat gates).
             // This fires entropy-phase syncopation hits across ALL genres including ones
             // whose per-genre Snare gates were deliberately preserved (Jazz brushwork,
@@ -383,7 +403,11 @@ export function applyGrooveOverrides(
             currentState.soundName !== 'Open'
         ) {
             currentState.shouldPlay = true;
-            currentState.velocity = 0.2 + Math.random() * 0.2;
+            // why: draw 3 (discriminator 5) — entropy hihat velocity in [0.2, 0.4).
+            // Discriminator 5 separates this from draws 1 and 2. Range matches prior
+            // Math.random(): 0.2 + r*0.2 ∈ [0.20, 0.40). Kept in a separate branch
+            // from draw 2 (Snare) so a single step can't trigger both velocity paths.
+            currentState.velocity = 0.2 + scrambleHash((_entropyBaseSeed + 5) | 0) * 0.2;
             currentState.soundName = 'HiHat';
         }
     }
