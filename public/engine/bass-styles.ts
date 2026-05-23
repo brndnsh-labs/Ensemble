@@ -824,7 +824,13 @@ export function getBassNoteStyle(
 
         // 2. The "And" (8th notes) - Aggressive Pops
         if (stepInBeat === Math.floor(ts.stepsPerBeat / 2)) {
-            // Higher octave pop probability than before
+            // why: slap-bass "pop" (right-hand index-finger snap on an upper string) is
+            // the defining punctuation of the funk idiom on the upbeat 8th (the "and").
+            // Base prob 0.6 + intensity*0.4 → 60-100%: at low intensity the pop fires
+            // most of the time (keeps the groove snappy even at moderate dynamics); at
+            // full intensity it fires on virtually every "and" (Bootsy/Larry Graham territory).
+            // Upper-octave (+12) is idiomatic — the pop string rings an octave above the
+            // slapped root, giving the signature bright snap. Source: bass.md P2 #17.
             const popProb = 0.6 + intensity * 0.4;
             if (Math.random() < popProb) {
                 const note = baseRoot + 12;
@@ -843,6 +849,12 @@ export function getBassNoteStyle(
             if (
                 stepInBeat === 3 &&
                 playback.complexity > 0.7 &&
+                // why: 16th-note pop on the "a" (last 16th of each beat) is a high-complexity
+                // ornament — Marcus Miller territory. Prob 0.3 + intensity*0.3 → 30-60%: a
+                // full-groove pop on every "a" would overwhelm the pocket; this keeps it as
+                // a surprise accent rather than a structural note. Only fires when complexity
+                // is high (>0.7) so it's absent on straightforward grooves.
+                // Source: bass.md P2 #17.
                 Math.random() < 0.3 + intensity * 0.3 &&
                 !isSoloistBusyLocal
             ) {
@@ -852,6 +864,14 @@ export function getBassNoteStyle(
             }
 
             // Dead-note/Ghost chucks to maintain engine
+            // why: the "chuck" (muted dead note) is the rhythmic engine of slap bass —
+            // it fills 16th-note subdivisions that don't slap/pop without adding harmonic
+            // content, keeping the groove locked and percussive. Prob (0.2 or 0.1 busy) +
+            // intensity*0.4 → 20-60% (or 10-50% when soloist is busy): high enough to
+            // produce a groove engine that feels "locked" at medium/high intensity, low
+            // enough to leave space at low intensity. Reduced to 0.1 base when the
+            // soloist is busy — yield some 16th space so the two don't clutter.
+            // Source: bass.md P2 #17.
             const chuckProb = (isSoloistBusyLocal ? 0.1 : 0.2) + intensity * 0.4;
             if (Math.random() < chuckProb && !isSoloistBusyLocal) {
                 // Usually repeat root or previous note as a ghost
@@ -862,6 +882,14 @@ export function getBassNoteStyle(
             if (
                 playback.complexity > 0.7 &&
                 intensity > 0.6 &&
+                // why: hammer-on (left hand pulls-off/hammers onto a neighboring scale tone
+                // without the right hand striking) adds melodic flair on a 16th subdivision.
+                // Fixed 30% rate keeps it as an occasional color, not a structural element —
+                // a "funky smell of garlic in the groove" rather than a melody statement.
+                // Only fires at high complexity + intensity so minimal/medium grooves stay
+                // clean. Target note is M2 (Dorian) or b2 (approach) above root depending
+                // on scale content — both idiomatic hammer-on destinations.
+                // Source: bass.md P2 #17.
                 Math.random() < 0.3 &&
                 !isSoloistBusyLocal
             ) {
