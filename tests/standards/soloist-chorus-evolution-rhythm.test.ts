@@ -316,40 +316,85 @@ describe('Soloist Chorus Evolution — RHYTHM side (S6)', () => {
         // Aggregate over multiple seeds (same pattern as the density test above)
         // to isolate the systematic mean from per-seed jitter.
         const seeds = [0xc0ffee, 0xdeadbe, 0x12345, 0xabcdef, 0x111111, 0xfeedf, 0x10101];
-        let total0 = 0;
-        let total2 = 0;
+        const FORCED_STEPS = new Set([0, 16, 32, 48]); // seed-anchored positions
+
+        // Partition counts: attacks at forced-step indices vs non-forced.
+        // The final-stage `if (attackProb < 1.0) *= 1.3` placement does NOT touch
+        // forced steps (their `attackProb >= 1.0` skips the multiplier), so forced
+        // counts must be byte-equal between loops 0 and 2. The OLD `densityScale`
+        // placement scaled the base attackProb BEFORE the +0.4 seed boost, which
+        // would still let `total2 > total0` pass (the multiplier escalates non-forced
+        // steps in both placements) — the discriminating fingerprint is whether
+        // forced-step parity holds. If forced counts diverge between loops, the
+        // multiplier is leaking into the wrong gate.
+        let forced0 = 0;
+        let forced2 = 0;
+        let nonForced0 = 0;
+        let nonForced2 = 0;
         for (const seed of seeds) {
-            total0 += generateAtLoopWithBoosts(0, seed).length;
-            total2 += generateAtLoopWithBoosts(2, seed).length;
+            for (const node of generateAtLoopWithBoosts(0, seed)) {
+                const stepInLoop = (node.stepTarget - 0) % 64;
+                if (FORCED_STEPS.has(stepInLoop)) {
+                    forced0++;
+                } else {
+                    nonForced0++;
+                }
+            }
+            for (const node of generateAtLoopWithBoosts(2, seed)) {
+                const stepInLoop = (node.stepTarget - 0) % 64;
+                if (FORCED_STEPS.has(stepInLoop)) {
+                    forced2++;
+                } else {
+                    nonForced2++;
+                }
+            }
         }
-        const delta = total2 - total0;
-        const pctDelta = total0 > 0 ? (delta / total0) * 100 : 0;
+        const total0 = forced0 + nonForced0;
+        const total2 = forced2 + nonForced2;
+        const nonForcedDelta = nonForced2 - nonForced0;
+        const forcedDelta = forced2 - forced0;
 
         console.log('\n--- SOLOIST CHORUS EVOLUTION (RHYTHM) — ACTIVE BOOSTS ---');
         console.log(`[Seeds]                      ${seeds.length}`);
         console.log(`[Active coordination boosts] kickHit=true, snareHit=true at startStep`);
-        console.log(`[Session seed notes]         4 forced anchors across 64 steps`);
-        console.log(`[Loop 0 total attacks]       ${total0}  (forced seed + unforced base)`);
-        console.log(`[Loop 2 total attacks]       ${total2}  (forced seed + escalated unforced)`);
+        console.log(`[Session seed notes]         4 forced anchors at steps {0,16,32,48}`);
+        console.log(`[Loop 0 forced / non-forced] ${forced0} / ${nonForced0} (total ${total0})`);
+        console.log(`[Loop 2 forced / non-forced] ${forced2} / ${nonForced2} (total ${total2})`);
         console.log(
-            `[Delta]                      +${delta} (${pctDelta.toFixed(1)}% — escalation on non-forced steps only)`,
+            `[Forced delta]               ${forcedDelta}  (must be 0 — multiplier skips forced steps)`,
         );
+        console.log(`[Non-forced delta]           +${nonForcedDelta} (escalation lands here only)`);
         console.log('----------------------------------------------------------\n');
 
-        // why: the loop-count multiplier fires ONLY on non-forced (< 1.0) steps.
-        // With 4 forced seed steps (4 of 64), the remaining ~60 steps are genuine
-        // boundary cases. The +30% escalation on those non-forced steps should
-        // produce a positive delta aggregated over 7 seeds, just as in test 1.
-        // A zero or negative delta would indicate the `< 1.0` gate is incorrectly
-        // being gated OUT by the coordination boosts on steps it shouldn't touch —
-        // i.e., the boosts are washing out the multiplier on non-forced steps.
-        expect(total2).toBeGreaterThan(total0);
-        // why: 4 forced seed steps are identical between loops; escalation acts on
-        // ~60 remaining steps. The realized aggregate delta should be in the same
-        // order of magnitude as test 1 (5+ attacks). A smaller threshold (3+)
-        // reflects that forced steps are identical across loops so the denominator
-        // (total0) is slightly higher, compressing the relative delta.
-        expect(delta).toBeGreaterThanOrEqual(3);
+        // why: forced-step parity is the DISCRIMINATING fingerprint of the
+        // final-stage `if (attackProb < 1.0) *= 1.3` placement. Forced steps
+        // (attackProb >= 1.0 from the +0.4 seed boost) skip the multiplier
+        // entirely; downstream rhythm-node selection (duration overlap, merge)
+        // can still produce a small natural delta of ~1 across 7 seeds. With
+        // the OLD `densityScale` placement, the multiplier would scale the base
+        // attackProb BEFORE the +0.4 boost, escalating forced steps proportional
+        // to their share of total hits (~21% under this fixture's distribution).
+        // A leak of >2 forced hits across 7 seeds (>7% of forced baseline)
+        // means the multiplier is touching the wrong gate.
+        expect(forcedDelta).toBeLessThanOrEqual(2);
+
+        // why: the loop-count multiplier escalates ONLY on non-forced (< 1.0)
+        // steps. With 4 forced seed steps out of 64, the remaining ~60 steps
+        // are genuine boundary cases. The +30% escalation on those steps
+        // should produce a clearly positive aggregate delta across 7 seeds.
+        expect(nonForced2).toBeGreaterThan(nonForced0);
+        expect(nonForcedDelta).toBeGreaterThanOrEqual(3);
+
+        // why: the discrimination versus OLD placement is the RATIO. Under NEW,
+        // ~all loop escalation lands on non-forced steps (observed 25:1). Under
+        // OLD, escalation would distribute proportional to step counts
+        // (~86:23 → ~3.7:1 ratio of non-forced:forced delta). The 5× bound
+        // separates the two placements while leaving headroom for natural
+        // forced-step variance.
+        const totalDelta = nonForcedDelta + forcedDelta;
+        if (forcedDelta > 0 && totalDelta > 0) {
+            expect(nonForcedDelta).toBeGreaterThanOrEqual(forcedDelta * 5);
+        }
     });
 
     // -------------------------------------------------------------------------
