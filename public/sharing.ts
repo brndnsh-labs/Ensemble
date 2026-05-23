@@ -16,7 +16,7 @@ export interface ShareOptions {
  * Compresses the full band/mixer state into a Base64 string.
  */
 function compressBandSettings(options: ShareOptions = {}): string {
-    const { soloist, bass, chords, harmony, groove } = getState();
+    const { arranger, soloist, bass, chords, harmony, groove } = getState();
 
     const band = {
         mv: MIXER_SETTINGS_VERSION,
@@ -28,7 +28,7 @@ function compressBandSettings(options: ShareOptions = {}): string {
             v: parseFloat(soloist.volume.toFixed(2)),
             r: parseFloat(soloist.reverb.toFixed(2)),
             m: soloist.mode,
-            sd: soloist.seed || '',
+            sd: arranger.seed || '',
         },
         b: {
             e: (options.includeBass !== undefined ? options.includeBass : bass.enabled) ? 1 : 0,

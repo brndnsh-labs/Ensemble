@@ -93,6 +93,45 @@ test.describe('ChartSurface @ui', () => {
         });
     });
 
+    test.describe('Song seed control', () => {
+        test('topbar exposes a song seed chip that opens a popover with input + reroll', async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width: 1366, height: 900 });
+            const trigger = page.locator('#songSeedBtn');
+            await expect(trigger).toBeVisible();
+            await expect(
+                trigger.locator('.workspace-toolbar-trigger-label', { hasText: 'Seed' }),
+            ).toBeVisible();
+
+            await trigger.click();
+            const panel = page.locator('#songSeedPanel');
+            await expect(panel).toBeVisible();
+
+            const input = panel.locator('#songSeedInput');
+            await expect(input).toBeVisible();
+            await input.fill('ABC123');
+            await expect(input).toHaveValue('ABC123');
+            await expect(trigger.locator('.workspace-toolbar-trigger-value')).toHaveText('ABC123');
+
+            await panel.getByRole('button', { name: 'Generate Random Seed' }).click();
+            const rolled = await input.inputValue();
+            expect(rolled).toMatch(/^[0-9A-F]{6}$/);
+            expect(rolled).not.toBe('ABC123');
+        });
+
+        test('song seed chip is visible in the mobile topbar @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 390, height: 844 });
+            const shape = page.locator('.chart-surface__zone--shape');
+            const trigger = shape.locator('#songSeedBtn');
+            await expect(trigger).toBeVisible();
+
+            await trigger.tap();
+            await expect(page.locator('#songSeedPanel')).toBeVisible();
+            await expect(page.locator('#songSeedInput')).toBeVisible();
+        });
+    });
+
     test.describe('Library modal', () => {
         test('opens via Library button and closes on backdrop click', async ({ page }) => {
             await page.setViewportSize({ width: 1366, height: 900 });

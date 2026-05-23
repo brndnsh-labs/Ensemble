@@ -109,17 +109,13 @@ test.describe('Instrument settings — desktop @ui', () => {
         await expectWithinViewport(page, surface);
     });
 
-    test('Soloist settings popover exposes preset, complexity, and trading controls', async ({
-        page,
-    }) => {
+    test('Soloist settings popover exposes complexity and trading controls', async ({ page }) => {
         const surface = await openInstrumentSettings(page, 'Soloist');
 
         await expect(surface.locator('#soloistComplexity')).toBeVisible();
-        await expect(surface.locator('#soloistPresetSelect')).toBeVisible();
         const soloistCard = surface.locator('.workspace-studio-surface-card--soloist');
         await expect(soloistCard).toBeVisible();
         await expect(soloistCard.getByText('Trading')).toBeVisible();
-        await expect(soloistCard.locator('#arrangerSoloistSeed')).toBeVisible();
 
         // Body container should be the scroll area when content exceeds height.
         const body = surface.locator('.workspace-studio-surface-body');
@@ -193,9 +189,11 @@ test.describe('Instrument settings — mobile @mobile', () => {
         expect(box.x).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
 
-        // Seed control sits at the bottom of the surface; must be reachable via scroll.
-        const seed = surface.locator('#arrangerSoloistSeed');
-        await seed.scrollIntoViewIfNeeded();
-        await expect(seed).toBeVisible();
+        // Trading controls sit at the bottom of the soloist surface; must be reachable via scroll.
+        const trading = surface
+            .locator('.workspace-studio-surface-card--soloist')
+            .getByText('Trading');
+        await trading.scrollIntoViewIfNeeded();
+        await expect(trading).toBeVisible();
     });
 });

@@ -25,13 +25,13 @@ export function handleEffects(
             const { playback, arranger, soloist, groove } = stateMap;
             if (playback.isPlaying) {
                 // --- Soloist Seeder ---
-                let currentSoloistSeed = soloist.seed;
-                if (!currentSoloistSeed) {
-                    currentSoloistSeed = Math.floor(Math.random() * 0xffffff)
+                let currentSongSeed = arranger.seed;
+                if (!currentSongSeed) {
+                    currentSongSeed = Math.floor(Math.random() * 0xffffff)
                         .toString(16)
                         .padStart(6, '0')
                         .toUpperCase();
-                    dispatch(ACTIONS.SET_SOLOIST_SEED, currentSoloistSeed);
+                    dispatch(ACTIONS.SET_SONG_SEED, currentSongSeed);
                 }
 
                 const soloGenerated = generateSessionSeed(
@@ -39,13 +39,13 @@ export function handleEffects(
                     arranger,
                     soloist.style || 'smart',
                     playback.bandIntensity,
-                    currentSoloistSeed,
+                    currentSongSeed,
                 );
                 dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
 
                 // --- Drum Seeder ---
                 if (groove.enabled) {
-                    const currentDrumSeed = soloist.seed || currentSoloistSeed;
+                    const currentDrumSeed = currentSongSeed;
                     const drumOrchGenerated = generateDrumOrchestration(
                         stateMap,
                         arranger,
@@ -102,7 +102,7 @@ export function handleEffects(
                     stateMap.arranger,
                     stateMap.soloist.style || 'smart',
                     stateMap.playback.bandIntensity,
-                    stateMap.soloist.seed,
+                    stateMap.arranger.seed,
                 );
                 dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
 
@@ -112,14 +112,14 @@ export function handleEffects(
                         stateMap.arranger,
                         stateMap.groove.genreFeel || 'Rock',
                         stateMap.playback.bandIntensity,
-                        stateMap.soloist.seed,
+                        stateMap.arranger.seed,
                     );
                     const drumFillsGenerated = generateDrumFills(
                         stateMap,
                         stateMap.arranger,
                         stateMap.groove.genreFeel || 'Rock',
                         stateMap.playback.bandIntensity,
-                        stateMap.soloist.seed,
+                        stateMap.arranger.seed,
                     );
                     const drumAccentsGenerated = generateSoloistAccents(
                         stateMap,
@@ -127,7 +127,7 @@ export function handleEffects(
                         soloGenerated,
                         stateMap.groove.genreFeel || 'Rock',
                         stateMap.playback.bandIntensity,
-                        stateMap.soloist.seed,
+                        stateMap.arranger.seed,
                     );
                     dispatch(ACTIONS.UPDATE_GB, {
                         orchestrationMap: drumOrchGenerated,

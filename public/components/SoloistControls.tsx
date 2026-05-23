@@ -28,54 +28,6 @@ export function SoloistControls() {
                     ]}
                 />
             </div>
-            <SoloistSeedControl />
-        </div>
-    );
-}
-
-function SoloistSeedControl() {
-    const { seed } = useEnsembleState((s) => ({
-        seed: s.soloist.seed,
-    }));
-
-    const updateSeed = (val: string) => {
-        dispatch(ACTIONS.SET_SOLOIST_SEED, val);
-        saveCurrentState();
-    };
-
-    const rollSeed = () => {
-        const newSeed = Math.floor(Math.random() * 0xffffff)
-            .toString(16)
-            .padStart(6, '0')
-            .toUpperCase();
-        dispatch(ACTIONS.SET_SOLOIST_SEED, newSeed);
-        saveCurrentState();
-    };
-
-    return (
-        <div class="workspace-seed-control">
-            <label class="workspace-seed-label" htmlFor="arrangerSoloistSeed">
-                Soloist seed
-            </label>
-            <div class="workspace-seed-row">
-                <input
-                    id="arrangerSoloistSeed"
-                    type="text"
-                    value={seed || ''}
-                    placeholder="Random"
-                    class="seed-input"
-                    aria-label="Soloist seed"
-                    onInput={(e) => updateSeed((e.target as HTMLInputElement).value)}
-                />
-                <button
-                    class="icon-btn"
-                    title="Generate Random Seed"
-                    aria-label="Generate Random Seed"
-                    onClick={rollSeed}
-                >
-                    🎲
-                </button>
-            </div>
         </div>
     );
 }

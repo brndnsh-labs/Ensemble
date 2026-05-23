@@ -22,6 +22,7 @@ export const arranger = deepSignal<ArrangerState>({
     lastChordPreset: 'Pop (Standard)',
     mutatedSectionId: null,
     isDirty: false,
+    seed: '',
 });
 
 export function arrangerReducer(action: Action): boolean {
@@ -50,6 +51,7 @@ export function arrangerReducer(action: Action): boolean {
             a.isDirty = false;
             a.history = [];
             a.grouping = null;
+            a.seed = '';
             return true;
         case ACTIONS.SET_NOTATION:
             a.notation = action.payload;
@@ -72,6 +74,9 @@ export function arrangerReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_ARRANGEMENT:
             a.sections = action.payload;
+            return true;
+        case ACTIONS.SET_SONG_SEED:
+            a.seed = action.payload;
             return true;
     }
     return false;

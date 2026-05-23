@@ -7,6 +7,7 @@ import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
 import { MobileActionBar } from './MobileActionBar.jsx';
+import { SongSeedControl } from './SongSeedControl.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
 
@@ -55,6 +56,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                 <div class="chart-surface__zone chart-surface__zone--shape">
                     <TimeSignatureControl />
                     <KeySignatureMenuControl />
+                    <SongSeedControl />
                 </div>
                 <div class="chart-surface__zone chart-surface__zone--output">
                     {isSharedUrl && (

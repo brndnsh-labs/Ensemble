@@ -509,8 +509,14 @@ h2 {
     flex: 1 1 7rem;
 }
 
-.workspace-arranger-toolbar-trigger--key {
+.workspace-arranger-toolbar-trigger--key,
+.workspace-arranger-toolbar-trigger--seed {
     justify-content: space-between;
     min-width: 0;
     padding-inline: 0.65rem;
+}
+
+.workspace-arranger-toolbar-trigger--seed .workspace-toolbar-trigger-value {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
 }

@@ -69,6 +69,7 @@ export function getSyncState() {
             grouping: arranger.grouping,
             sections: arranger.sections,
             measureMap: arranger.measureMap,
+            seed: arranger.seed,
         },
         chords: {
             style: chords.style,
@@ -94,7 +95,6 @@ export function getSyncState() {
             enabled: soloist.enabled,
             volume: soloist.volume,
             mode: soloist.mode,
-            seed: soloist.seed,
             phrasingIntensity: soloist.phrasingIntensity,
             tradeMode: soloist.tradeMode,
             hookRetentionProb: soloist.hookRetentionProb,

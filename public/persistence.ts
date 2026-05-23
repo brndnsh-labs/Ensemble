@@ -16,6 +16,7 @@ export function saveCurrentState(): void {
         isMinor: arranger.isMinor,
         notation: arranger.notation,
         lastChordPreset: arranger.lastChordPreset,
+        seed: arranger.seed,
         theme: playback.theme,
         bpm: playback.bpm,
         metronome: playback.metronome,

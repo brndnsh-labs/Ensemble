@@ -79,7 +79,6 @@ export const soloist = deepSignal<SoloistState>({
     doubleStopProb: 1.0,
     tradeMode: 'manual',
     motifTracking: false,
-    seed: '',
 
     // === Engine runtime ===
     session: {
@@ -202,7 +201,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
     motifTracking: { kind: 'config', key: 'motifTracking' },
-    seed: { kind: 'config', key: 'seed' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
@@ -365,7 +363,6 @@ export function instrumentReducer(action: Action): boolean {
             s.complexity = 0.5;
             s.tradeMode = 'manual';
             s.motifTracking = false;
-            s.seed = '';
             s.phrasingIntensity = 0.5;
             // Reset engine runtime to a fresh session.
             const session = s.session as Mutable<typeof s.session>;
@@ -464,9 +461,6 @@ export function instrumentReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
             s.mode = resolveSoloistMode(action.payload);
-            return true;
-        case ACTIONS.SET_SOLOIST_SEED:
-            s.seed = action.payload;
             return true;
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap

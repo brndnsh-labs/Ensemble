@@ -271,6 +271,8 @@ export function syncWorker(action?: string, payload?: any): void {
                 timeSignature: arranger.timeSignature,
             };
             break;
+        // No `case 'SET_SONG_SEED'`: arranger.seed is main-thread-only.
+        // See docs/guides/WORKER_CONTRACT.md §8 (Main-Thread-Only Synced Fields).
     }
 
     if (Object.keys(data).length > 0) {

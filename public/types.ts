@@ -149,6 +149,8 @@ export interface ArrangerState {
     readonly isDirty: boolean;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
     readonly grouping: number[] | null;
+    /** 6-char hex PRNG seed driving soloist + drum generation for this song. */
+    readonly seed: string;
 }
 
 export interface ConductorState {
@@ -773,8 +775,6 @@ export interface SoloistState {
     readonly tradeMode: string;
     /** Whether tracking motifs is enabled. */
     readonly motifTracking: boolean;
-    /** Thematic seed for deterministic generation. */
-    readonly seed: string;
 
     // === Engine runtime (per-playback, transient) ===
     readonly session: SoloistSession;
@@ -1244,7 +1244,6 @@ export type ActionPayloadUpdateSB = Partial<{
     doubleStopProb: number;
     tradeMode: string;
     motifTracking: boolean;
-    seed: string;
     sessionSeed: SoloistSessionSeed | null;
     sessionSteps: number;
     phraseCount: number;
@@ -1309,7 +1308,7 @@ export interface ActionPayloadMap {
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
-    SET_SOLOIST_SEED: string;
+    SET_SONG_SEED: string;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
@@ -1387,7 +1386,7 @@ export const ACTIONS = {
     SET_VOLUME: 'SET_VOLUME',
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
-    SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
+    SET_SONG_SEED: 'SET_SONG_SEED',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 

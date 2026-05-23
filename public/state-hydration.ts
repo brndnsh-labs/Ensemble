@@ -139,6 +139,10 @@ export function hydrateState(): void {
             isMinor: savedState.isMinor || false,
             notation: validatedNotation,
             lastChordPreset: savedState.lastChordPreset || 'Pop (Standard)',
+            seed:
+                (typeof savedState.seed === 'string' && savedState.seed) ||
+                (typeof savedState.soloist?.seed === 'string' && savedState.soloist.seed) ||
+                '',
         });
 
         Object.assign(playback, {
@@ -215,7 +219,6 @@ export function hydrateState(): void {
                           ? 'guitar'
                           : 'monophonic',
                 ),
-                seed: savedState.soloist.seed || '',
             });
         }
         if (savedState.harmony) {
@@ -431,8 +434,10 @@ export function loadFromUrl(): void {
                         ? clamp(band.s.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist)
                         : INSTRUMENT_REVERB_DEFAULTS.soloist,
                     mode: resolveSoloistMode(band.s.m || soloist.mode),
-                    seed: typeof band.s.sd === 'string' ? band.s.sd : '',
                 });
+                if (typeof band.s.sd === 'string') {
+                    Object.assign(arranger, { seed: band.s.sd });
+                }
             }
             if (band.b) {
                 Object.assign(bass, {
