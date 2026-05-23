@@ -43,7 +43,7 @@ Migrate every draw to a `scrambleHash` source keyed on `(barIndex, sectionId, st
 
 **Acceptance:** Evans (and other Greats) extension picks are quality-legal — no b5 avoid-note on min7; extended `soloist` critique coverage asserts the per-quality split; the `isEvansCadence` decision is implemented or explicitly documented.
 **Effort:** ~4h. **Model:** opus (harmonic-theory taste). **Reviewer:** music-theory-reviewer. **Listen-test:** Evans-style min7 passages should lose the sour b5 color. **Source:** FOLLOWUPS §E (mis-bucketed correctness bug) + §F.
-**Status:** Ready.
+**Status:** Shipped 2026-05-23 — `ChordQualityClass` + `classifyChordQuality()` + per-quality `EVANS_INTERVALS_BY_QUALITY` / `MILES_INTERVALS_BY_QUALITY` tables replace the flat sets. Dm7 interval-6 (b5 avoid) drops from 6.5% → 2.2% (30/30 reliability loop); Cmaj7 interval-6 (lydian #11) preserved as negative control. `isEvansCadence` decision documented inline: skip-only is sufficient — the cumulative `isCallResponse ×8.0` × phrase-end role-aware `×4.0` (=×32) root/5th cadence pull already dominates; adding an Evans-specific boost would caricature. New critique test in `jazz-soloist-authenticity.test.ts`. Reviewer P1s patched inline: `'diminished'` / `'augmented'` added to `classifyChordQuality`; halfdim suppression rationale rewritten to the actual locrian-vocabulary reason. P2s filed in FOLLOWUPS §F (missing per-quality test controls; case-sensitive classifier; m6-bucket interval-9 ear-call; `slashIntervals` chord-quality blindness; bucket-by-quality vs by-active-scale architectural note). All 1977 vitest tests green. Two reviewer P0/P1/P2-tier listen-test items added to FOLLOWUPS for next listening session.
 
 ### S3. Profile-rotation sticky-retain
 

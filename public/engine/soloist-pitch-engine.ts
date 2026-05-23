@@ -73,9 +73,130 @@ const CANDIDATE_WEIGHTS = new Float32Array(128);
 const srvIntervals = new Set([0, 3, 5, 6, 7, 10]);
 const gilmourIntervals = new Set([0, 7]);
 const slashIntervals = new Set([4, 9]);
-const milesIntervals = new Set([2, 5, 9]);
-const evansIntervals = new Set([2, 5, 6, 9]);
 const alteredHookIntervals = new Set([1, 3, 6, 8]);
+
+// Coarse chord-quality bucket used to gate per-quality legal-extension sets.
+// why: the Greats interval sets (`evansIntervals` historically, plus the
+// per-quality variants below) are *legal upper-structure colors* — they are
+// chord-quality-dependent. The bug fixed in Epic 12 S2: the flat
+// `evansIntervals = {2, 5, 6, 9}` set treated interval 6 as a universal Evans
+// color, but `6` is the b5 *avoid note* on minor 7th chords (Db over Dm7).
+// Per-quality buckets let each profile express its real harmonic vocabulary
+// instead of leaking a tritone into ~25% of Evans extensions on min7
+// passages (the audit report's "sour b5 color" in Evans-style min7 lines).
+//
+// Buckets are coarse on purpose — we only need to distinguish the qualities
+// whose legal extension vocabularies actually diverge in this code. An
+// undefined/empty quality string falls back to 'maj'; a non-empty but
+// unrecognized quality falls through to 'dom' (the dominant bucket is the
+// most numerically-named family and the most likely match for an unknown
+// numeric suffix like '15'). The two fallbacks currently share the same
+// Evans/Miles extension sets, so behavior is identical today — split the
+// comments if that ever changes.
+type ChordQualityClass =
+    | 'maj' // major triad, maj7/maj9/maj11/maj13/maj7#11, 6, add9
+    | 'min' // m7/m9/m11/m13 and plain minor triad — m7's 6 is b5 (avoid)
+    | 'min6' // m6 chord — dorian context, 6 = M6 is the chord tone itself
+    | 'dom' // 7, 9, 11, 13 — full dominant extension vocabulary legal
+    | 'alt' // 7alt, 7b9, 7#9, 7b13 — altered scale; route via alteredHookIntervals
+    | 'halfdim' // halfdim / m7b5 — locrian; 6 = b5 is a chord tone, not an extension
+    | 'dim' // dim, dim7 — symmetric, no traditional upper-structure
+    | 'sus' // sus2, sus4 — no 3rd, looser palette
+    | 'aug'; // aug, augmaj7 — whole-tone / lydian-aug, no perfect 5
+
+function classifyChordQuality(quality: string | undefined): ChordQualityClass {
+    if (!quality) {
+        return 'maj';
+    }
+    if (quality === '7alt' || quality === '7b9' || quality === '7#9' || quality === '7b13') {
+        return 'alt';
+    }
+    if (quality === 'halfdim') {
+        return 'halfdim';
+    }
+    if (quality === 'dim' || quality === 'dim7' || quality === 'diminished') {
+        return 'dim';
+    }
+    if (quality === 'sus2' || quality === 'sus4') {
+        return 'sus';
+    }
+    if (quality === 'aug' || quality === 'augmaj7' || quality === 'augmented') {
+        return 'aug';
+    }
+    if (quality === 'm6') {
+        return 'min6';
+    }
+    // Minor family: 'minor', 'm', 'm7', 'm9', 'm11', 'm13'. Mirrors the
+    // theory-scales.ts isMinorQuality predicate: starts with 'm' but NOT 'maj'.
+    if (quality.startsWith('m') && !quality.startsWith('maj')) {
+        return 'min';
+    }
+    if (quality.startsWith('maj') || quality === 'major' || quality === '6' || quality === 'add9') {
+        return 'maj';
+    }
+    // Numeric dominant: '7', '9', '11', '13', '7#11'. Default for unrecognized
+    // numeric-suffix qualities (treat like a dominant extension chord).
+    return 'dom';
+}
+
+// --- Per-quality Greats interval sets ---
+//
+// Each profile keeps its musical character (Evans = upper extensions,
+// Miles = modal extensions) but the *specific* intervals rewarded vary
+// by chord quality. Sources: standard jazz pedagogy on chord/scale
+// relationships + transcription evidence cited in audit FOLLOWUPS §E.
+
+// Evans: 9 (interval 2), 11 (interval 5), #11/13 (interval 6/9 depending on chord).
+//   maj-family: 9, 11 (suspended color), #11 (lydian color), 13 — all legal.
+//     why interval 6 included: over maj7 the #11 is the canonical lydian color
+//     Evans is famous for (Cmaj7 over F, the "So What" voicing's brother).
+//   min-family (m7/m9/m11/m13): 9 (legal), 11 (legal), 13 (dorian — favored
+//     by Evans on m7 per soloist-config style routing), but NOT 6 (the b5
+//     avoid note — the Db over Dm7 collision the audit flagged).
+//   min6: 9, 11 — 13 is the chord root's M6 (chord tone), no extension reward
+//     needed; 6 (b5) still wrong.
+//   dom7: 9, 11 (as sus 4 color), 13, #11 — full upper-structure palette.
+//   alt: empty — altered dominants route through `alteredHookIntervals`
+//     elsewhere; mixing the diatonic Evans set in would pull toward unaltered
+//     9/13 against the chord's stated b9/#9/b13/#11 tensions.
+//   halfdim: empty — locrian doesn't admit natural 9 (b9 over m7b5) or
+//     natural 13 (b13). The only in-scale Evans extension is the 11
+//     (interval 5), and rewarding it alone is noise relative to the chord-
+//     tone pull on the four locrian guide tones; intentionally suppress.
+//   dim: empty — symmetric diminished is built from the chord tones plus
+//     diminished-scale neighbors; there's no traditional upper-structure
+//     vocabulary to reward.
+//   sus/aug: empty — non-tertian; let the picker's diatonic logic drive.
+const EVANS_INTERVALS_BY_QUALITY: Record<ChordQualityClass, ReadonlySet<number>> = {
+    maj: new Set([2, 5, 6, 9]),
+    min: new Set([2, 5, 9]), // why: drop 6 — b5 avoid note on m7 (Epic 12 S2 fix)
+    min6: new Set([2, 5]), // why: drop 6 (avoid) and 9 (chord tone overlap on m6)
+    dom: new Set([2, 5, 6, 9]),
+    alt: new Set<number>(), // why: alteredHookIntervals handles this surface
+    halfdim: new Set<number>(),
+    dim: new Set<number>(),
+    sus: new Set<number>(),
+    aug: new Set<number>(),
+};
+
+// Miles: 9 (interval 2), 11 (interval 5), 13 (interval 9). All three are
+// legal on the modal vocabulary Miles actually used (Kind of Blue dorian
+// vamps, So What, etc.). The flat set was already quality-safe — no
+// interval 6 — but we lift it into the same per-quality shape so the
+// engine has one consistent surface for "profile extension lookup", and
+// so future audit findings on Miles (or new profiles) have a clean place
+// to land per-quality nuance.
+const MILES_INTERVALS_BY_QUALITY: Record<ChordQualityClass, ReadonlySet<number>> = {
+    maj: new Set([2, 5, 9]),
+    min: new Set([2, 5, 9]),
+    min6: new Set([2, 5]), // why: 9 = M6 = chord tone on m6, no extension lift needed
+    dom: new Set([2, 5, 9]),
+    alt: new Set<number>(), // why: alteredHookIntervals owns the altered surface
+    halfdim: new Set<number>(),
+    dim: new Set<number>(),
+    sus: new Set([2, 5, 9]),
+    aug: new Set<number>(),
+};
 
 // Base rarity penalty for chromatic neighbors of chord tones. Scaled by
 // per-style config.chromaticism so high-chromaticism profiles (bird 0.9,
@@ -525,6 +646,13 @@ export function selectPitchAndDevices(
     //   G7b13 falling through; broadening to 7#11 over-reaches. Source: Epic 9 S3
     //   P1 finding (FOLLOWUPS §C).
     const isAlteredHookQuality = ALTERED_HOOK_QUALITIES.has(targetChord.quality ?? '');
+    // Coarse quality bucket for the per-quality Greats interval lookup tables
+    // (EVANS_INTERVALS_BY_QUALITY, MILES_INTERVALS_BY_QUALITY). Hoisted once
+    // per call so the picker's hot inner loop just does a Set.has() — see the
+    // ChordQualityClass type for what each bucket represents.
+    const chordQualityClass = classifyChordQuality(targetChord.quality);
+    const evansLegalIntervals = EVANS_INTERVALS_BY_QUALITY[chordQualityClass];
+    const milesLegalIntervals = MILES_INTERVALS_BY_QUALITY[chordQualityClass];
     const responseConfig = config.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
     const responseSignature = soloistState.session.currentPhrase.context?.responseSignature || null;
@@ -799,8 +927,15 @@ export function selectPitchAndDevices(
                     }
                     break;
                 case 'miles':
-                    // Miles: Modal, targets extensions (9, 11, 13)
-                    if (milesIntervals.has(interval)) {
+                    // Miles: Modal, targets extensions (9, 11, 13). Per-quality
+                    // lookup (Epic 12 S2): the flat {2,5,9} set was already
+                    // quality-safe (no interval 6, the avoid-note offender), so
+                    // most buckets are unchanged. The lift to per-quality form
+                    // matches Evans's surface so the engine has one consistent
+                    // "profile extension lookup" shape, and m6/alt/halfdim/dim/
+                    // aug now correctly contribute zero (extension idea doesn't
+                    // apply on chord tones / fully-tensioned chord families).
+                    if (milesLegalIntervals.has(interval)) {
                         weight *= 1.3;
                     }
                     break;
@@ -835,16 +970,37 @@ export function selectPitchAndDevices(
                     // +300 strong-beat) interact with the picker. Selected
                     // +60/×3.5 to stay in the musically defensible band.
                     //
+                    // why per-quality (Epic 12 S2): the prior flat
+                    // `evansIntervals = {2, 5, 6, 9}` set treated interval 6
+                    // as a universal color, but 6 is the b5 *avoid note* on
+                    // min7 (Db over Dm7). Per-quality lookup drops 6 on the
+                    // 'min' bucket while keeping it on 'maj' (lydian #11) and
+                    // 'dom' (13/#11). alt/halfdim/dim/sus/aug buckets are
+                    // empty by design — see EVANS_INTERVALS_BY_QUALITY table.
+                    //
                     // At phrase-end with role === 'response', skip the extension
-                    // boost entirely so the V→I cadence (handled by the
-                    // phrase-end ×4.0 root/5th pull below) can actually land
-                    // home — audit P1 #4's original ask. Without this, the
-                    // extension boost on the 9 swamps the cadence pull and
-                    // Evans response phrases never resolve home.
+                    // boost entirely so the V→I cadence can actually land home
+                    // — audit P1 #4's original ask. Without this, the extension
+                    // boost on the 9 swamps the cadence pull and Evans response
+                    // phrases never resolve home.
+                    //
+                    // why `isEvansCadence` is skip-only (Epic 12 S2 follow-up,
+                    // FOLLOWUPS §F): the audit asked whether the cadence guard
+                    // should ALSO boost root/5th rather than just skip the
+                    // extension boost. Existing engine code already covers
+                    // this: the phrase-end role-aware block ~50 lines below
+                    // multiplies root/5th by ×4.0 on response phrases
+                    // regardless of profile, and the isCallResponse block adds
+                    // ×8.0 on resolution tones. Stacking another Evans-specific
+                    // root/5th boost on top would over-tune toward a
+                    // caricatured "Evans always lands on root" reading — the
+                    // soloist-evans-cadence-critique.test.ts already measures a
+                    // 43.9% phrase-end home rate post-fix, which transcription
+                    // evidence puts in the right band. Skip-only is enough.
                     const phraseRole = soloistState.session.currentPhrase.context?.role;
                     const isEvansCadence =
                         rhythmNode?.isPhraseEnd === true && phraseRole === 'response';
-                    if (evansIntervals.has(interval) && !isEvansCadence) {
+                    if (evansLegalIntervals.has(interval) && !isEvansCadence) {
                         weight += 60;
                         weight *= 3.5;
                     }
