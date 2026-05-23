@@ -1,6 +1,6 @@
 [
     {
-        "path": "dist/main.*.js",
+        "path": "dist/index.*.js",
         "limit": "80 KB",
         "name": "Main Application (Bundled)"
     },
@@ -10,7 +10,7 @@
         "name": "Logic Worker (Bundled)"
     },
     {
-        "path": "dist/styles.*.css",
+        "path": "dist/index.*.css",
         "limit": "65 KB",
         "name": "Global CSS"
     }

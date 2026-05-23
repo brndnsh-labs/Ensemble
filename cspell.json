@@ -284,7 +284,8 @@
         "Moorer",
         "Schroeder",
         "allpass",
-        "allpasses"
+        "allpasses",
+        "treemap"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

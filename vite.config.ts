@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import preact from '@preact/preset-vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -83,6 +84,13 @@ export default defineConfig({
     plugins: [
         preact(),
         copyStaticAssets(),
+        visualizer({
+            filename: 'dist/stats.html',
+            template: 'treemap',
+            gzipSize: true,
+            brotliSize: true,
+            emitFile: false,
+        }) as Plugin,
         VitePWA({
             strategies: 'injectManifest',
             srcDir: '.',
