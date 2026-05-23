@@ -26,7 +26,8 @@ async function openLibrary(page: Page): Promise<void> {
 
 async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
     const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
-    await modal.getByRole('button', { name: presetName, exact: true }).click();
+    // Chips are always visible in the chip wall. Click the first matching chip by aria-label.
+    await modal.locator(`.preset-library-chip-name[aria-label="${presetName}"]`).first().click();
 }
 
 test.describe('Arranger & Chord Visualizer @visual', () => {
@@ -90,74 +91,75 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(modal).toBeVisible();
         await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
         await expect(modal.getByTestId('preset-library-search')).toBeVisible();
-        await expect(modal.getByTestId('preset-library-favorites-only')).toBeVisible();
-        await expect(modal.locator('.preset-library-card-grid').first()).toBeVisible();
-        await expect(modal.getByRole('button', { name: 'Jazz', exact: true })).toBeVisible();
+        await expect(modal.getByTestId('preset-library-result-summary')).toBeVisible();
+        // Chip wall is the default view — Jazz row and a colored chip should be visible.
+        await expect(
+            modal.locator('[data-testid="preset-library-chip-row"][data-row-label="Jazz"]'),
+        ).toBeVisible();
+        await expect(
+            modal.locator('.preset-library-chip[data-genre="Jazz"]').first(),
+        ).toBeVisible();
 
-        await modal.locator('.preset-library-card-button').first().click();
+        // Click the first Jazz chip to load it.
+        await modal
+            .locator(
+                '[data-testid="preset-library-chip-row"][data-row-label="Jazz"] .preset-library-chip-name',
+            )
+            .first()
+            .click();
         await expect(modal).toBeHidden();
     });
 
-    test('Progression library supports search, genre filters, favorites, and recents', async ({
-        page,
-    }) => {
+    test('Progression library supports search, pinning, and recents', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await openLibrary(page);
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
         const search = modal.getByTestId('preset-library-search');
 
+        // Search hides non-matching chips and collapses empty rows.
         await search.fill('autumn');
         await expect(
-            modal.getByRole('button', { name: 'Autumn Leaves', exact: true }),
+            modal.locator('.preset-library-chip-name[aria-label="Autumn Leaves"]').first(),
         ).toBeVisible();
         await expect(
-            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
+            modal.locator('.preset-library-chip-name[aria-label="Pop (Standard)"]'),
+        ).toHaveCount(0);
+        await expect(
+            modal.locator('[data-testid="preset-library-chip-row"][data-row-label="Pop/Rock"]'),
         ).toHaveCount(0);
 
+        // Clear restores the full chip wall.
         await modal.getByTestId('preset-library-clear').click();
-        await modal.getByRole('button', { name: 'Jazz', exact: true }).click();
         await expect(
-            modal.getByRole('button', { name: 'Autumn Leaves', exact: true }),
+            modal.locator('.preset-library-chip-name[aria-label="Pop (Standard)"]'),
         ).toBeVisible();
-        await expect(
-            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
-        ).toHaveCount(0);
 
-        await modal.getByTestId('preset-library-clear').click();
+        // Pinning a preset surfaces it in the always-visible Pinned row.
         await modal.getByRole('button', { name: 'Add Pop (Standard) to favorites' }).click();
-        await expect(modal).toContainText('Pinned favorites');
-        await expect(modal.locator('.preset-library-section').first()).toContainText(
-            'Pop (Standard)',
+        const pinnedRow = modal.locator(
+            '[data-testid="preset-library-chip-row"][data-row-label="Pinned"]',
         );
+        await expect(pinnedRow).toBeVisible();
+        await expect(pinnedRow).toContainText('Pop (Standard)');
 
-        await modal.getByTestId('preset-library-favorites-only').click();
-        await expect(
-            modal.getByRole('button', { name: 'Pop (Standard)', exact: true }),
-        ).toBeVisible();
-        await expect(modal.getByRole('button', { name: 'Autumn Leaves', exact: true })).toHaveCount(
-            0,
-        );
-
-        await modal.getByTestId('preset-library-favorites-only').click();
+        // Loading a preset adds it to the Recent row on next open.
         await choosePresetFromLibrary(page, 'Pop (Ballad)');
         await expect(modal).toBeHidden();
 
         await openLibrary(page);
-        await expect(
-            page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]'),
-        ).toContainText('Recent picks');
-        await expect(
-            page
-                .locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]')
-                .getByRole('button', { name: 'Pop (Ballad)', exact: true })
-                .first(),
-        ).toBeVisible();
+        const reopened = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const recentRow = reopened.locator(
+            '[data-testid="preset-library-chip-row"][data-row-label="Recent"]',
+        );
+        await expect(recentRow).toBeVisible();
+        await expect(recentRow).toContainText('Pop (Ballad)');
     });
 
     test('Progression library keeps sticky controls layered above scrolling results', async ({
         page,
     }) => {
-        await page.setViewportSize({ width: 1280, height: 900 });
+        // Use a short viewport so the chip wall definitely overflows.
+        await page.setViewportSize({ width: 1280, height: 600 });
         await openLibrary(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
@@ -165,7 +167,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const body = page.locator('.workspace-library-body');
 
         await body.evaluate((element) => {
-            element.scrollTop = 650;
+            element.scrollTop = 400;
         });
 
         const toolbarOwnsProbe = await toolbar.evaluate((element) => {
@@ -175,28 +177,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         });
 
         expect(toolbarOwnsProbe).toBe(true);
-    });
-
-    test('Progression library keeps card widths stable when search narrows results', async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 1280, height: 900 });
-        await openLibrary(page);
-
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
-        const firstCard = modal.locator('.preset-library-card').first();
-        const search = modal.getByTestId('preset-library-search');
-
-        const beforeWidth = await firstCard.evaluate(
-            (element) => element.getBoundingClientRect().width,
-        );
-        await search.fill('autumn');
-        const afterWidth = await firstCard.evaluate(
-            (element) => element.getBoundingClientRect().width,
-        );
-
-        expect(afterWidth).toBeLessThanOrEqual(beforeWidth + 32);
-        expect(afterWidth).toBeLessThanOrEqual(320);
     });
 
     test('Autumn Leaves stays readable without adding scroll at desktop size', async ({ page }) => {

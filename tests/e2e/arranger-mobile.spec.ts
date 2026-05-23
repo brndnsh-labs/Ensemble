@@ -101,7 +101,6 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await openLibraryFromArranger(page);
 
         const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
-        const chips = modal.locator('.preset-library-filter-chips');
 
         await expect(modal).toBeVisible();
 
@@ -116,16 +115,11 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         expect(modalBox.width).toBeGreaterThanOrEqual(viewport.width - 4);
         expect(modalBox.height).toBeGreaterThanOrEqual(viewport.height - 4);
 
-        const chipMetrics = await chips.evaluate((element) => ({
-            clientWidth: element.clientWidth,
-            scrollWidth: element.scrollWidth,
-            clientHeight: element.clientHeight,
-            scrollHeight: element.scrollHeight,
-        }));
-
-        expect(chipMetrics.scrollWidth).toBeGreaterThan(chipMetrics.clientWidth);
-        expect(chipMetrics.scrollHeight).toBeLessThanOrEqual(chipMetrics.clientHeight + 4);
-        await expect(modal.locator('.preset-library-section-header p').first()).toBeHidden();
+        // Chip rows stack with their genre label as a top-aligned anchor on mobile.
+        const firstRow = modal.locator('[data-testid="preset-library-chip-row"]').first();
+        await expect(firstRow).toBeVisible();
+        await expect(firstRow.locator('.preset-library-chip-row-label')).toBeVisible();
+        await expect(firstRow.locator('.preset-library-chip').first()).toBeVisible();
     });
 
     // Removed: "Tall mobile view stretches fit charts vertically without centering them"

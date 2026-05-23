@@ -14,7 +14,6 @@ import { decompressSections, generateId, transposeKeyName } from '../utils.js';
 const USER_PRESETS_STORAGE_KEY = 'ensemble_userPresets';
 const FAVORITES_STORAGE_KEY = 'ensemble_presetLibraryFavorites';
 const RECENTS_STORAGE_KEY = 'ensemble_presetLibraryRecents';
-const ALL_GENRES_LABEL = 'All';
 const RECENT_PRESET_LIMIT = 6;
 
 type PresetSource = 'built-in' | 'user';
@@ -51,21 +50,8 @@ interface LibraryEntry {
     source: PresetSource;
     preset: LibraryPreset;
     category: string;
-    styleLabel: string;
-    preview: string;
     searchableText: string;
-    isMinor: boolean;
     isFavorite: boolean;
-    isRecent: boolean;
-}
-
-function formatBadgeLabel(value: string): string {
-    return value
-        .split(/[-_]/g)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
 }
 
 function formatPresetCount(count: number): string {
@@ -160,25 +146,6 @@ function getPresetCategory(preset: LibraryPreset, source: PresetSource): string 
     return preset.category || (source === 'user' ? 'Custom' : 'Library');
 }
 
-function getPresetPreview(preset: LibraryPreset, sections: PresetSection[]): string {
-    if (preset.provenance?.variant) {
-        return preset.provenance.variant;
-    }
-
-    if (preset.provenance?.notes) {
-        return preset.provenance.notes;
-    }
-
-    const firstSection = sections[0];
-    if (firstSection?.value) {
-        return firstSection.label
-            ? `${firstSection.label}: ${firstSection.value}`
-            : firstSection.value;
-    }
-
-    return 'Saved progression';
-}
-
 function getPresetSearchText(
     preset: LibraryPreset,
     source: PresetSource,
@@ -206,28 +173,14 @@ function getPresetSearchText(
         .toLowerCase();
 }
 
-function matchesEntry(
-    entry: LibraryEntry,
-    searchTokens: string[],
-    activeGenre: string,
-    favoritesOnly: boolean,
-): boolean {
-    if (favoritesOnly && !entry.isFavorite) {
-        return false;
-    }
-
-    if (activeGenre !== ALL_GENRES_LABEL && entry.category !== activeGenre) {
-        return false;
-    }
-
+function entryMatchesSearch(entry: LibraryEntry, searchTokens: string[]): boolean {
     if (searchTokens.length === 0) {
         return true;
     }
-
     return searchTokens.every((token) => entry.searchableText.includes(token));
 }
 
-interface PresetCardProps {
+interface PresetChipProps {
     entry: LibraryEntry;
     isActive: boolean;
     onSelect: (entry: LibraryEntry) => void;
@@ -235,58 +188,113 @@ interface PresetCardProps {
     onDelete: ((entry: LibraryEntry) => void) | undefined;
 }
 
-function PresetCard({ entry, isActive, onSelect, onToggleFavorite, onDelete }: PresetCardProps) {
+function PresetChip({ entry, isActive, onSelect, onToggleFavorite, onDelete }: PresetChipProps) {
     return (
-        <article
-            class={`preset-library-card${isActive ? ' active' : ''}`}
-            data-category={entry.category}
-            data-source={entry.source}
+        <div
+            class={`preset-library-chip${isActive ? ' active' : ''}`}
+            data-genre={entry.category}
+            data-testid="preset-library-chip"
         >
-            <div class="preset-library-card-actions">
-                <button
-                    type="button"
-                    class={`preset-library-pin-btn${entry.isFavorite ? ' active' : ''}`}
-                    aria-label={`${
-                        entry.isFavorite ? 'Remove' : 'Add'
-                    } ${entry.name} ${entry.isFavorite ? 'from' : 'to'} favorites`}
-                    aria-pressed={entry.isFavorite}
-                    onClick={() => onToggleFavorite(entry.id)}
-                >
-                    {entry.isFavorite ? 'Pinned' : 'Pin'}
-                </button>
-                {entry.source === 'user' && onDelete && (
-                    <button
-                        type="button"
-                        class="preset-library-delete-btn"
-                        aria-label={`Delete preset ${entry.name}`}
-                        onClick={() => onDelete(entry)}
-                    >
-                        Delete
-                    </button>
-                )}
-            </div>
             <button
                 type="button"
-                class="preset-library-card-button"
+                class="preset-library-chip-name"
                 aria-label={entry.name}
+                aria-current={isActive ? 'true' : undefined}
                 onClick={() => onSelect(entry)}
             >
-                <div class="preset-library-card-header">
-                    <span class="preset-library-card-title">{entry.name}</span>
-                    {entry.isRecent && <span class="preset-library-badge">Recent</span>}
-                </div>
-                <div class="preset-library-card-badges">
-                    <span class="preset-library-badge">{entry.category}</span>
-                    {entry.styleLabel && (
-                        <span class="preset-library-badge">{entry.styleLabel}</span>
-                    )}
-                    <span class="preset-library-badge">{entry.isMinor ? 'Minor' : 'Major'}</span>
-                    {entry.source === 'user' && <span class="preset-library-badge">User</span>}
-                </div>
-                <p class="preset-library-card-preview">{entry.preview}</p>
+                {entry.name}
             </button>
-        </article>
+            <button
+                type="button"
+                class={`preset-library-chip-pin${entry.isFavorite ? ' active' : ''}`}
+                aria-label={`${entry.isFavorite ? 'Remove' : 'Add'} ${entry.name} ${
+                    entry.isFavorite ? 'from' : 'to'
+                } favorites`}
+                aria-pressed={entry.isFavorite}
+                title={entry.isFavorite ? 'Unpin' : 'Pin to favorites'}
+                onClick={() => onToggleFavorite(entry.id)}
+            >
+                {entry.isFavorite ? '★' : '☆'}
+            </button>
+            {entry.source === 'user' && onDelete && (
+                <button
+                    type="button"
+                    class="preset-library-chip-delete"
+                    aria-label={`Delete preset ${entry.name}`}
+                    title="Delete preset"
+                    onClick={() => onDelete(entry)}
+                >
+                    ×
+                </button>
+            )}
+        </div>
     );
+}
+
+interface ChipRowProps {
+    label: string;
+    entries: LibraryEntry[];
+    matchedIds: Set<string> | null;
+    activeName: string | null;
+    onSelect: (entry: LibraryEntry) => void;
+    onToggleFavorite: (entryId: string) => void;
+    onDelete: (entry: LibraryEntry) => void;
+}
+
+function ChipRow({
+    label,
+    entries,
+    matchedIds,
+    activeName,
+    onSelect,
+    onToggleFavorite,
+    onDelete,
+}: ChipRowProps) {
+    const visibleEntries = matchedIds
+        ? entries.filter((entry) => matchedIds.has(entry.id))
+        : entries;
+
+    if (visibleEntries.length === 0) {
+        return null;
+    }
+
+    return (
+        <div
+            class="preset-library-chip-row"
+            data-row-label={label}
+            data-testid="preset-library-chip-row"
+        >
+            <div class="preset-library-chip-row-label">{label}</div>
+            <div class="preset-library-chip-row-chips">
+                {visibleEntries.map((entry) => (
+                    <PresetChip
+                        key={`${label}-${entry.id}`}
+                        entry={entry}
+                        isActive={activeName === entry.name}
+                        onSelect={onSelect}
+                        onToggleFavorite={onToggleFavorite}
+                        onDelete={entry.source === 'user' ? onDelete : undefined}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Wraps a state mutation in document.startViewTransition when available so the
+ * resulting layout shift (pinned row appearing, chips reordering) eases in
+ * rather than jumping. Falls back to a plain invocation in older browsers.
+ */
+function withViewTransition(update: () => void): void {
+    const doc = document as Document & {
+        startViewTransition?: (callback: () => void) => unknown;
+    };
+    if (typeof doc.startViewTransition === 'function') {
+        doc.startViewTransition(update);
+    } else {
+        update();
+    }
 }
 
 interface PresetLibraryProps {
@@ -300,8 +308,6 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
     const applyPresetSettings = useEnsembleState((state) => state.playback.applyPresetSettings);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeGenre, setActiveGenre] = useState(ALL_GENRES_LABEL);
-    const [favoritesOnly, setFavoritesOnly] = useState(false);
     const [userPresets, setUserPresets] = useState<LibraryPreset[]>([]);
     const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
     const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -323,7 +329,6 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
     }, []);
 
     const favoriteIdSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
-    const recentIdSet = useMemo(() => new Set(recentIds), [recentIds]);
 
     const builtInEntries = useMemo(
         () =>
@@ -336,17 +341,11 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
                     source: 'built-in',
                     preset,
                     category: getPresetCategory(preset, 'built-in'),
-                    styleLabel: preset.settings?.style
-                        ? formatBadgeLabel(preset.settings.style)
-                        : '',
-                    preview: getPresetPreview(preset, sections),
                     searchableText: getPresetSearchText(preset, 'built-in', sections),
-                    isMinor: Boolean(preset.isMinor),
                     isFavorite: favoriteIdSet.has(presetId),
-                    isRecent: recentIdSet.has(presetId),
                 };
             }),
-        [favoriteIdSet, recentIdSet],
+        [favoriteIdSet],
     );
 
     const userEntries = useMemo(() => {
@@ -363,15 +362,11 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
                 source: 'user',
                 preset,
                 category: getPresetCategory(preset, 'user'),
-                styleLabel: preset.settings?.style ? formatBadgeLabel(preset.settings.style) : '',
-                preview: getPresetPreview(preset, sections),
                 searchableText: getPresetSearchText(preset, 'user', sections),
-                isMinor: Boolean(preset.isMinor),
                 isFavorite: favoriteIdSet.has(presetId),
-                isRecent: recentIdSet.has(presetId),
             };
         });
-    }, [favoriteIdSet, recentIdSet, userPresets]);
+    }, [favoriteIdSet, userPresets]);
 
     const allEntries = useMemo(
         () => [...builtInEntries, ...userEntries],
@@ -382,41 +377,43 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
         [allEntries],
     );
 
-    const genres = useMemo(() => {
-        const nextGenres: string[] = [];
-        for (const entry of allEntries) {
-            if (entry.category === 'Custom' || nextGenres.includes(entry.category)) {
-                continue;
+    const groupedBuiltInEntries = useMemo(() => {
+        const buckets = new Map<string, LibraryEntry[]>();
+        for (const entry of builtInEntries) {
+            const list = buckets.get(entry.category);
+            if (list) {
+                list.push(entry);
+            } else {
+                buckets.set(entry.category, [entry]);
             }
-            nextGenres.push(entry.category);
         }
-        return nextGenres;
-    }, [allEntries]);
+        for (const list of buckets.values()) {
+            list.sort((left, right) => left.name.localeCompare(right.name));
+        }
+        return Array.from(buckets.entries()).sort(([leftLabel], [rightLabel]) =>
+            leftLabel.localeCompare(rightLabel),
+        );
+    }, [builtInEntries]);
 
     const searchTokens = useMemo(
         () => searchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean),
         [searchQuery],
     );
-
-    const filteredBuiltInEntries = useMemo(
-        () =>
-            builtInEntries.filter((entry) =>
-                matchesEntry(entry, searchTokens, activeGenre, favoritesOnly),
-            ),
-        [activeGenre, builtInEntries, favoritesOnly, searchTokens],
-    );
-    const filteredUserEntries = useMemo(
-        () =>
-            userEntries.filter((entry) =>
-                matchesEntry(entry, searchTokens, activeGenre, favoritesOnly),
-            ),
-        [activeGenre, favoritesOnly, searchTokens, userEntries],
-    );
-
-    const filteredEntryCount = filteredBuiltInEntries.length + filteredUserEntries.length;
-    const hasActiveFilters =
-        searchTokens.length > 0 || activeGenre !== ALL_GENRES_LABEL || favoritesOnly;
+    const hasActiveSearch = searchTokens.length > 0;
     const activeName = isDirty ? null : lastChordPreset;
+
+    const matchedIds = useMemo(() => {
+        if (!hasActiveSearch) {
+            return null;
+        }
+        const matches = new Set<string>();
+        for (const entry of allEntries) {
+            if (entryMatchesSearch(entry, searchTokens)) {
+                matches.add(entry.id);
+            }
+        }
+        return matches;
+    }, [allEntries, hasActiveSearch, searchTokens]);
 
     const pinnedEntries: LibraryEntry[] = [];
     for (const entryId of favoriteIds) {
@@ -433,6 +430,8 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
             recentEntries.push(entry);
         }
     }
+
+    const filteredEntryCount = matchedIds ? matchedIds.size : allEntries.length;
 
     const getPresetSections = (preset: LibraryPreset): Section[] => {
         const rawSections = getRawPresetSections(preset);
@@ -459,15 +458,17 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
             ? favoriteIds.filter((id) => id !== entryId)
             : [entryId, ...favoriteIds.filter((id) => id !== entryId)];
 
-        if (
-            persistStoredStringArray(
-                FAVORITES_STORAGE_KEY,
-                nextFavoriteIds,
-                'Failed to update favorites.',
-            )
-        ) {
-            setFavoriteIds(nextFavoriteIds);
-        }
+        withViewTransition(() => {
+            if (
+                persistStoredStringArray(
+                    FAVORITES_STORAGE_KEY,
+                    nextFavoriteIds,
+                    'Failed to update favorites.',
+                )
+            ) {
+                setFavoriteIds(nextFavoriteIds);
+            }
+        });
     };
 
     const recordRecentPreset = (entryId: string) => {
@@ -476,6 +477,9 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
             RECENT_PRESET_LIMIT,
         );
 
+        // Not wrapped in withViewTransition: this fires alongside the modal-close
+        // animation, and a concurrent root-level view transition holds the
+        // closing modal alive long enough for it to flicker back in.
         if (
             persistStoredStringArray(
                 RECENTS_STORAGE_KEY,
@@ -554,7 +558,7 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
         }
     };
 
-    const resultSummary = hasActiveFilters
+    const resultSummary = hasActiveSearch
         ? `Showing ${formatPresetCount(filteredEntryCount)} of ${formatPresetCount(allEntries.length)}`
         : `${formatPresetCount(allEntries.length)} ready to browse`;
 
@@ -571,176 +575,79 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
                         type="search"
                         placeholder="Search presets, genres, styles, or chords"
                         value={searchQuery}
+                        autoFocus
                         data-testid="preset-library-search"
                         onInput={(event) =>
                             setSearchQuery((event.currentTarget as HTMLInputElement).value)
                         }
                     />
-                    {(searchQuery || hasActiveFilters) && (
+                    {hasActiveSearch && (
                         <button
                             type="button"
                             class="secondary-btn preset-library-clear-btn"
                             data-testid="preset-library-clear"
-                            onClick={() => {
-                                setSearchQuery('');
-                                setActiveGenre(ALL_GENRES_LABEL);
-                                setFavoritesOnly(false);
-                            }}
+                            onClick={() => setSearchQuery('')}
                         >
                             Clear
                         </button>
                     )}
                 </div>
-
-                <div class="preset-library-toolbar-meta">
-                    <p
-                        class="preset-library-summary"
-                        data-testid="preset-library-result-summary"
-                        aria-live="polite"
-                    >
-                        {resultSummary}
-                    </p>
-                    <button
-                        type="button"
-                        class={`button-group-btn preset-library-favorites-toggle${
-                            favoritesOnly ? ' active' : ''
-                        }`}
-                        data-testid="preset-library-favorites-only"
-                        aria-pressed={favoritesOnly}
-                        onClick={() => setFavoritesOnly((currentValue) => !currentValue)}
-                    >
-                        Favorites only
-                    </button>
-                </div>
-
-                <div class="preset-library-filter-group">
-                    <span class="preset-library-filter-label">Genre</span>
-                    <div
-                        class="button-group preset-library-filter-chips"
-                        role="group"
-                        aria-label="Genre filters"
-                    >
-                        <button
-                            type="button"
-                            class={`button-group-btn${activeGenre === ALL_GENRES_LABEL ? ' active' : ''}`}
-                            aria-pressed={activeGenre === ALL_GENRES_LABEL}
-                            onClick={() => setActiveGenre(ALL_GENRES_LABEL)}
-                        >
-                            {ALL_GENRES_LABEL}
-                        </button>
-                        {genres.map((genre) => (
-                            <button
-                                type="button"
-                                key={genre}
-                                class={`button-group-btn${activeGenre === genre ? ' active' : ''}`}
-                                aria-pressed={activeGenre === genre}
-                                onClick={() => setActiveGenre(genre)}
-                            >
-                                {genre}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <p
+                    class="preset-library-summary"
+                    data-testid="preset-library-result-summary"
+                    aria-live="polite"
+                >
+                    {resultSummary}
+                </p>
             </div>
 
             <div class="preset-library-results" data-testid="preset-library-results">
-                {!hasActiveFilters && pinnedEntries.length > 0 && (
-                    <div class="preset-library-section">
-                        <div class="preset-library-section-header">
-                            <h4>Pinned favorites</h4>
-                            <p>Keep the progressions you reach for most right at the top.</p>
-                        </div>
-                        <div class="preset-library-card-grid">
-                            {pinnedEntries.map((entry) => (
-                                <PresetCard
-                                    key={`pinned-${entry.id}`}
-                                    entry={entry}
-                                    isActive={activeName === entry.name}
-                                    onSelect={handleSelect}
-                                    onToggleFavorite={toggleFavorite}
-                                    onDelete={entry.source === 'user' ? handleDelete : undefined}
-                                />
-                            ))}
-                        </div>
-                    </div>
+                <ChipRow
+                    label="Pinned"
+                    entries={pinnedEntries}
+                    matchedIds={matchedIds}
+                    activeName={activeName}
+                    onSelect={handleSelect}
+                    onToggleFavorite={toggleFavorite}
+                    onDelete={handleDelete}
+                />
+                <ChipRow
+                    label="Recent"
+                    entries={recentEntries}
+                    matchedIds={matchedIds}
+                    activeName={activeName}
+                    onSelect={handleSelect}
+                    onToggleFavorite={toggleFavorite}
+                    onDelete={handleDelete}
+                />
+                {userEntries.length > 0 && (
+                    <ChipRow
+                        label="Yours"
+                        entries={userEntries}
+                        matchedIds={matchedIds}
+                        activeName={activeName}
+                        onSelect={handleSelect}
+                        onToggleFavorite={toggleFavorite}
+                        onDelete={handleDelete}
+                    />
                 )}
+                {groupedBuiltInEntries.map(([label, entries]) => (
+                    <ChipRow
+                        key={label}
+                        label={label}
+                        entries={entries}
+                        matchedIds={matchedIds}
+                        activeName={activeName}
+                        onSelect={handleSelect}
+                        onToggleFavorite={toggleFavorite}
+                        onDelete={handleDelete}
+                    />
+                ))}
 
-                {!hasActiveFilters && recentEntries.length > 0 && (
-                    <div class="preset-library-section">
-                        <div class="preset-library-section-header">
-                            <h4>Recent picks</h4>
-                            <p>Jump back into the last progressions you loaded.</p>
-                        </div>
-                        <div class="preset-library-card-grid">
-                            {recentEntries.map((entry) => (
-                                <PresetCard
-                                    key={`recent-${entry.id}`}
-                                    entry={entry}
-                                    isActive={activeName === entry.name}
-                                    onSelect={handleSelect}
-                                    onToggleFavorite={toggleFavorite}
-                                    onDelete={entry.source === 'user' ? handleDelete : undefined}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {filteredBuiltInEntries.length > 0 && (
-                    <div class="preset-library-section">
-                        <div class="preset-library-section-header">
-                            <h4>Library</h4>
-                            <p>
-                                Browse the built-in progressions by style, genre, and harmonic
-                                character.
-                            </p>
-                        </div>
-                        <div class="preset-library-card-grid">
-                            {filteredBuiltInEntries.map((entry) => (
-                                <PresetCard
-                                    key={entry.id}
-                                    entry={entry}
-                                    isActive={activeName === entry.name}
-                                    onSelect={handleSelect}
-                                    onToggleFavorite={toggleFavorite}
-                                    onDelete={undefined}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {filteredUserEntries.length > 0 && (
-                    <div class="preset-library-section">
-                        <div class="preset-library-section-header">
-                            <h4>Your presets</h4>
-                            <p>
-                                Saved charts stay searchable and can be pinned alongside the
-                                built-ins.
-                            </p>
-                        </div>
-                        <div class="preset-library-card-grid">
-                            {filteredUserEntries.map((entry) => (
-                                <PresetCard
-                                    key={entry.id}
-                                    entry={entry}
-                                    isActive={activeName === entry.name}
-                                    onSelect={handleSelect}
-                                    onToggleFavorite={toggleFavorite}
-                                    onDelete={handleDelete}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {filteredEntryCount === 0 && (
+                {hasActiveSearch && filteredEntryCount === 0 && (
                     <div class="preset-library-empty-state">
                         <h4>No presets match that search</h4>
-                        <p>
-                            Try a broader genre, clear the favorites toggle, or search by style or
-                            chord symbols.
-                        </p>
+                        <p>Try a broader query, or clear to browse the full library.</p>
                     </div>
                 )}
             </div>

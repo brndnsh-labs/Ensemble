@@ -88,12 +88,12 @@ test.describe('UI polish consistency @ui', () => {
         ).toBe(true);
         expect(
             selectors.some((selector) =>
-                selector.includes('.preset-library-card-button:focus-visible'),
+                selector.includes('.preset-library-chip-name:focus-visible'),
             ),
         ).toBe(true);
         expect(
             selectors.some((selector) =>
-                selector.includes('.preset-library-pin-btn:focus-visible'),
+                selector.includes('.preset-library-chip-pin:focus-visible'),
             ),
         ).toBe(true);
         expect(selectors).toContain('.seed-input:focus-visible');

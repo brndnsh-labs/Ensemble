@@ -74,11 +74,21 @@ describe('PresetLibrary', () => {
     let storageData;
 
     /**
+     * Returns the names of all rendered chips.
      * @returns {string[]}
      */
-    const getRenderedTitles = () =>
-        Array.from(container.querySelectorAll('.preset-library-card-title')).map(
-            (title) => title.textContent || '',
+    const getRenderedChipNames = () =>
+        Array.from(container.querySelectorAll('.preset-library-chip-name')).map(
+            (name) => name.textContent || '',
+        );
+
+    /**
+     * Returns the names of chip rows currently rendered (used to assert search collapse).
+     * @returns {string[]}
+     */
+    const getRenderedRowLabels = () =>
+        Array.from(container.querySelectorAll('[data-testid="preset-library-chip-row"]')).map(
+            (row) => row.getAttribute('data-row-label') || '',
         );
 
     beforeEach(() => {
@@ -118,10 +128,10 @@ describe('PresetLibrary', () => {
             await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
-        const activeCardTitle = container.querySelector(
-            '.preset-library-card.active .preset-library-card-title',
+        const activeChipName = container.querySelector(
+            '.preset-library-chip.active .preset-library-chip-name',
         );
-        expect(activeCardTitle?.textContent).toBe('Pop (Standard)');
+        expect(activeChipName?.textContent).toBe('Pop (Standard)');
         expect(
             container.querySelector('[data-testid="preset-library-result-summary"]')?.textContent,
         ).toContain('2 presets ready to browse');
@@ -135,14 +145,38 @@ describe('PresetLibrary', () => {
             await new Promise((resolve) => setTimeout(resolve, 0));
         });
 
-        expect(container.querySelector('.preset-library-card.active')).toBeNull();
+        expect(container.querySelector('.preset-library-chip.active')).toBeNull();
     });
 
-    it('filters presets by search text and genre', async () => {
+    it('color-codes chips by their genre category', async () => {
         await act(async () => {
             render(<PresetLibrary />, container);
             await new Promise((resolve) => setTimeout(resolve, 0));
         });
+
+        const popChip = container.querySelector('.preset-library-chip[data-genre="Pop/Rock"]');
+        const jazzChip = container.querySelector('.preset-library-chip[data-genre="Jazz"]');
+        expect(popChip).not.toBeNull();
+        expect(jazzChip).not.toBeNull();
+        expect(popChip?.querySelector('.preset-library-chip-name')?.textContent).toBe(
+            'Pop (Standard)',
+        );
+        expect(jazzChip?.querySelector('.preset-library-chip-name')?.textContent).toBe(
+            'Autumn Leaves',
+        );
+    });
+
+    it('hides non-matching chips on search and collapses empty rows', async () => {
+        await act(async () => {
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        // No search: every chip is rendered; both genre rows are present.
+        expect(getRenderedChipNames()).toEqual(
+            expect.arrayContaining(['Pop (Standard)', 'Autumn Leaves']),
+        );
+        expect(getRenderedRowLabels()).toEqual(expect.arrayContaining(['Pop/Rock', 'Jazz']));
 
         const searchInput = /** @type {HTMLInputElement|null} */ (
             container.querySelector('[data-testid="preset-library-search"]')
@@ -154,29 +188,15 @@ describe('PresetLibrary', () => {
             searchInput.dispatchEvent(new Event('input', { bubbles: true }));
         });
 
-        expect(getRenderedTitles()).toEqual(['Autumn Leaves']);
-
-        const clearButton = /** @type {HTMLButtonElement|null} */ (
-            container.querySelector('[data-testid="preset-library-clear"]')
-        );
-        await act(async () => {
-            clearButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        const jazzButton = Array.from(
-            container.querySelectorAll('.preset-library-filter-chips button'),
-        ).find((button) => button.textContent === 'Jazz');
-        await act(async () => {
-            jazzButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        expect(getRenderedTitles()).toEqual(['Autumn Leaves']);
+        // Non-matching chips removed; the Pop/Rock row collapses entirely.
+        expect(getRenderedChipNames()).toEqual(['Autumn Leaves']);
+        expect(getRenderedRowLabels()).toEqual(['Jazz']);
         expect(
             container.querySelector('[data-testid="preset-library-result-summary"]')?.textContent,
         ).toContain('Showing 1 preset of 2 presets');
     });
 
-    it('supports favorites-only filtering', async () => {
+    it('surfaces pinned presets in a dedicated row at the top', async () => {
         await act(async () => {
             render(<PresetLibrary />, container);
             await new Promise((resolve) => setTimeout(resolve, 0));
@@ -195,14 +215,14 @@ describe('PresetLibrary', () => {
             JSON.stringify(['built-in:Autumn Leaves']),
         );
 
-        const favoritesOnlyButton = /** @type {HTMLButtonElement|null} */ (
-            container.querySelector('[data-testid="preset-library-favorites-only"]')
+        const rows = container.querySelectorAll('[data-testid="preset-library-chip-row"]');
+        const pinnedRow = Array.from(rows).find(
+            (row) => row.getAttribute('data-row-label') === 'Pinned',
         );
-        await act(async () => {
-            favoritesOnlyButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        expect(getRenderedTitles()).toEqual(['Autumn Leaves']);
+        expect(pinnedRow).toBeDefined();
+        expect(pinnedRow?.querySelector('.preset-library-chip-name')?.textContent).toBe(
+            'Autumn Leaves',
+        );
     });
 
     it('loads a preset, records it in recents, and notifies the caller', async () => {
@@ -215,7 +235,7 @@ describe('PresetLibrary', () => {
         });
 
         const autumnLeavesButton = /** @type {HTMLButtonElement|null} */ (
-            container.querySelector('.preset-library-card-button[aria-label="Autumn Leaves"]')
+            container.querySelector('.preset-library-chip-name[aria-label="Autumn Leaves"]')
         );
 
         await act(async () => {

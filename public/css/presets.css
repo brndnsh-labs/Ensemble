@@ -4,7 +4,7 @@
     isolation: isolate;
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: var(--space-3);
 }
 
 .preset-library-toolbar {
@@ -13,39 +13,14 @@
     z-index: 18;
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: 0.9rem;
+    gap: var(--space-2);
+    padding: 0.75rem 0.9rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--panel-color), var(--bg-color) 12%);
     box-shadow:
         0 14px 28px rgba(0, 0, 0, 0.16),
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.preset-library-toolbar::after {
-    content: "";
-    position: absolute;
-    left: 0.75rem;
-    right: 0.75rem;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.08) 20%,
-        rgba(255, 255, 255, 0.22) 50%,
-        rgba(255, 255, 255, 0.08) 80%,
-        transparent 100%
-    );
-    pointer-events: none;
-}
-
-.preset-library-results {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-    padding-top: 0.2rem;
 }
 
 .preset-library-search-row {
@@ -57,7 +32,7 @@
 .preset-library-search-input {
     flex: 1;
     min-width: 0;
-    padding: 0.75rem 0.875rem;
+    padding: 0.6rem 0.8rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: var(--input-bg);
@@ -80,216 +55,168 @@
     padding-inline: 0.9rem;
 }
 
-.preset-library-toolbar-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-}
-
 .preset-library-summary {
     margin: 0;
     color: var(--text-secondary);
     font-size: var(--font-sm);
 }
 
-.preset-library-favorites-toggle {
+.preset-library-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: 0.1rem;
+}
+
+/* Chip rows: small left-aligned label + wrapping chips */
+.preset-library-chip-row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.preset-library-chip-row-label {
+    padding-top: 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
-.preset-library-filter-group {
+.preset-library-chip-row-chips {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-}
-
-.preset-library-filter-label {
-    font-size: var(--font-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.preset-library-filter-chips {
     flex-wrap: wrap;
+    gap: 0.4rem;
 }
 
-.preset-library-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-}
-
-.preset-library-section-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.preset-library-section-header h4 {
-    margin: 0;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.preset-library-section-header p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: var(--font-sm);
-    line-height: 1.45;
-}
-
-.preset-library-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 17.5rem));
-    justify-content: start;
-    align-items: stretch;
-    gap: var(--space-3);
-}
-
-.preset-library-card {
-    --preset-accent: var(--accent-color);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 11.25rem;
-    padding: var(--space-3);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--preset-accent);
-    border-radius: var(--radius-lg);
-    background: linear-gradient(180deg, var(--input-bg), var(--card-bg-hover));
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14);
-    transition:
-        transform var(--anim-fast) var(--anim-ease),
-        border-color var(--anim-fast) var(--anim-ease),
-        box-shadow var(--anim-fast) var(--anim-ease),
-        background-color var(--anim-fast) var(--anim-ease);
-    animation: fade-in-up var(--anim-normal) var(--anim-ease) both;
-}
-
-.preset-library-card:hover,
-.preset-library-card:focus-within {
-    transform: translateY(-2px);
-    border-color: var(--preset-accent);
-    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.18);
-    background: var(--card-bg-hover);
-}
-
-.preset-library-card.active {
-    border-color: var(--preset-accent);
-    box-shadow:
-        0 0 0 1px var(--preset-accent),
-        0 18px 32px rgba(0, 0, 0, 0.2);
-}
-
-.preset-library-card-actions {
-    display: flex;
+/* Chip itself: pill with name + pin (always visible) + optional delete */
+.preset-library-chip {
+    --chip-accent: var(--text-muted);
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-}
-
-.preset-library-pin-btn,
-.preset-library-delete-btn {
-    min-width: 0;
-    padding: 0.35rem 0.7rem;
-    border: 1px solid var(--border-color);
+    gap: 0.15rem;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--chip-accent) 35%, transparent);
     border-radius: 999px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--font-xs);
-    transition:
-        background-color var(--anim-fast) var(--anim-ease),
-        border-color var(--anim-fast) var(--anim-ease),
-        color var(--anim-fast) var(--anim-ease);
-}
-
-.preset-library-pin-btn:hover,
-.preset-library-delete-btn:hover {
-    border-color: var(--preset-accent);
+    background: color-mix(in srgb, var(--chip-accent) 10%, transparent);
     color: var(--text-primary);
+    overflow: hidden;
+    transition:
+        opacity 200ms var(--anim-ease),
+        transform 120ms var(--anim-ease),
+        background-color 160ms var(--anim-ease),
+        border-color 160ms var(--anim-ease);
 }
 
-.preset-library-pin-btn.active {
-    border-color: var(--preset-accent);
-    background: var(--preset-accent);
-    color: white;
+.preset-library-chip:hover {
+    background: color-mix(in srgb, var(--chip-accent) 22%, transparent);
+    border-color: color-mix(in srgb, var(--chip-accent) 70%, transparent);
+    transform: translateY(-1px);
 }
 
-.preset-library-pin-btn:focus-visible,
-.preset-library-delete-btn:focus-visible,
-.preset-library-card-button:focus-visible {
+.preset-library-chip.active {
+    background: var(--chip-accent);
+    border-color: var(--chip-accent);
+    color: #000;
+}
+
+.preset-library-chip.active .preset-library-chip-name,
+.preset-library-chip.active .preset-library-chip-pin,
+.preset-library-chip.active .preset-library-chip-delete {
+    color: #000;
+}
+
+.preset-library-chip-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0.35rem 0.5rem 0.35rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 16rem;
+}
+
+.preset-library-chip-name:focus-visible {
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
 }
 
-.preset-library-card-button {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 7rem;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    color: var(--text-color);
-    text-align: left;
-}
-
-.preset-library-card-header {
-    display: flex;
+.preset-library-chip-pin,
+.preset-library-chip-delete {
+    display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
-    justify-content: space-between;
-    width: 100%;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin-right: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--text-muted) 90%, transparent);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 999px;
+    transition:
+        background-color 120ms var(--anim-ease),
+        color 120ms var(--anim-ease);
 }
 
-.preset-library-card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    line-height: 1.3;
+.preset-library-chip-pin:hover,
+.preset-library-chip-delete:hover {
+    background: rgba(255, 255, 255, 0.12);
     color: var(--text-primary);
 }
 
-.preset-library-card-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
+.preset-library-chip-pin.active {
+    color: var(--chip-accent);
 }
 
-.preset-library-badge {
-    padding: 0.2rem 0.5rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text-secondary);
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+.preset-library-chip-pin:focus-visible,
+.preset-library-chip-delete:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 1px;
 }
 
-.preset-library-card-preview {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: var(--font-sm);
-    line-height: 1.45;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+/* Genre color tokens — bring back the old color-by-category mapping */
+.preset-library-chip[data-genre="Pop/Rock"] {
+    --chip-accent: var(--blue);
 }
-
-.preset-library-card[data-source="user"] .preset-library-card-preview {
-    color: var(--text-color);
+.preset-library-chip[data-genre="Electronic"],
+.preset-library-chip[data-genre="Experimental"] {
+    --chip-accent: var(--violet);
+}
+.preset-library-chip[data-genre="Soul/R&B"],
+.preset-library-chip[data-genre="Soul/Funk"] {
+    --chip-accent: var(--magenta);
+}
+.preset-library-chip[data-genre="Blues"] {
+    --chip-accent: var(--cyan);
+}
+.preset-library-chip[data-genre="World/Latin"],
+.preset-library-chip[data-genre="Custom"] {
+    --chip-accent: var(--orange);
+}
+.preset-library-chip[data-genre="Jazz"] {
+    --chip-accent: var(--green);
+}
+.preset-library-chip[data-genre="Classical/Trad"],
+.preset-library-chip[data-genre="Rock/Metal"] {
+    --chip-accent: var(--red);
+}
+.preset-library-chip[data-genre="Theory"],
+.preset-library-chip[data-genre="Country/Folk"] {
+    --chip-accent: var(--yellow);
 }
 
 .preset-library-empty-state {
@@ -312,51 +239,9 @@
     line-height: 1.5;
 }
 
-.preset-library-card[data-category="Pop/Rock"] {
-    --preset-accent: var(--blue);
-}
-
-.preset-library-card[data-category="Electronic"],
-.preset-library-card[data-category="Experimental"] {
-    --preset-accent: var(--violet);
-}
-
-.preset-library-card[data-category="Soul/R&B"],
-.preset-library-card[data-category="Soul/Funk"] {
-    --preset-accent: var(--magenta);
-}
-
-.preset-library-card[data-category="Blues"] {
-    --preset-accent: var(--cyan);
-}
-
-.preset-library-card[data-category="World/Latin"],
-.preset-library-card[data-category="Custom"] {
-    --preset-accent: var(--orange);
-}
-
-.preset-library-card[data-category="Jazz"] {
-    --preset-accent: var(--green);
-}
-
-.preset-library-card[data-category="Classical/Trad"],
-.preset-library-card[data-category="Rock/Metal"] {
-    --preset-accent: var(--red);
-}
-
-.preset-library-card[data-category="Theory"],
-.preset-library-card[data-category="Country/Folk"] {
-    --preset-accent: var(--yellow);
-}
-
 @media (max-width: 720px) {
     .preset-library-toolbar {
-        gap: var(--space-2);
-        padding: 0.8rem;
-    }
-
-    .preset-library-search-row {
-        flex-wrap: wrap;
+        padding: 0.7rem 0.75rem;
     }
 
     .preset-library-search-input {
@@ -364,113 +249,96 @@
         font-size: 1rem;
     }
 
-    .preset-library-clear-btn {
-        width: auto;
-        padding-inline: 0.75rem;
-    }
-
-    .preset-library-toolbar-meta {
-        align-items: stretch;
-        gap: var(--space-1);
-    }
-
     .preset-library-summary {
-        font-size: 0.8rem;
-        line-height: 1.35;
+        font-size: 0.78rem;
     }
 
-    .preset-library-favorites-toggle {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .preset-library-filter-group {
-        gap: var(--space-1);
-    }
-
-    .preset-library-filter-label {
-        font-size: 0.7rem;
-    }
-
-    .preset-library-filter-chips {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        gap: 0.35rem;
-        padding-bottom: 0.15rem;
-        scrollbar-width: none;
-    }
-
-    .preset-library-filter-chips::-webkit-scrollbar {
-        display: none;
-    }
-
-    .preset-library-filter-chips .button-group-btn {
-        flex: 0 0 auto;
-        white-space: nowrap;
-    }
-
-    .preset-library-results {
-        gap: var(--space-3);
-    }
-
-    .preset-library-section {
-        gap: var(--space-2);
-    }
-
-    .preset-library-section-header h4 {
-        font-size: 0.76rem;
-    }
-
-    .preset-library-section-header p {
-        display: none;
-    }
-
-    .preset-library-card-grid {
+    .preset-library-chip-row {
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2);
+        gap: 0.3rem;
     }
 
-    .preset-library-card {
-        min-height: 0;
-        padding: 0.75rem;
-        gap: 0.4rem;
-        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.12);
+    .preset-library-chip-row-label {
+        padding-top: 0;
+        font-size: 0.68rem;
     }
 
-    .preset-library-card-button {
-        min-height: 0;
-        gap: 0.35rem;
+    .preset-library-chip-name {
+        font-size: 0.88rem;
+        padding: 0.45rem 0.5rem 0.45rem 0.8rem;
+        max-width: 14rem;
     }
 
-    .preset-library-card-title {
-        font-size: 0.9rem;
+    .preset-library-chip-pin,
+    .preset-library-chip-delete {
+        width: 1.9rem;
+        height: 1.9rem;
+        font-size: 1rem;
+    }
+}
+
+/* --- Library modal layout: pin the header, scroll only the body. --- */
+.workspace-library-modal {
+    overflow: hidden;
+    padding: 0;
+    /* Lock to a consistent height so the sheet doesn't resize while the user
+       searches and chips collapse out. min() so it fits short viewports. */
+    height: min(85vh, 700px);
+    max-height: min(85vh, 700px);
+}
+
+.workspace-library-header {
+    flex-shrink: 0;
+    padding: 1.25rem 1.5rem 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--panel-color);
+}
+
+.workspace-library-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* No padding-top — the sticky toolbar sits flush so scrolled chips can't
+       leak through the gap above it. Bottom + side padding stay. */
+    padding: 0 1.5rem 1.5rem;
+}
+
+.workspace-library-body .preset-library-toolbar {
+    /* Toolbar stretches into the body's side padding so its sticky background
+       fully covers the scroll viewport edge-to-edge. */
+    margin: 0 -1.5rem 0.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    border-radius: 0;
+}
+
+@media (max-width: 720px) {
+    .workspace-library-header {
+        padding: 1rem 1rem 0.7rem;
     }
 
-    .preset-library-card-badges {
-        gap: 0.15rem;
+    .workspace-library-body {
+        padding: 0 1rem 1.25rem;
     }
 
-    .preset-library-badge {
-        padding: 0.16rem 0.4rem;
-        font-size: 0.62rem;
+    .workspace-library-body .preset-library-toolbar {
+        margin: 0 -1rem 0.4rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
     }
+}
 
-    .preset-library-card-preview {
-        font-size: 0.8rem;
-        -webkit-line-clamp: 2;
-    }
-
-    .preset-library-card-actions {
-        gap: 0.35rem;
-    }
-
-    .preset-library-pin-btn,
-    .preset-library-delete-btn {
-        padding: 0.3rem 0.6rem;
-    }
-
-    .preset-library-empty-state {
-        padding: 0.85rem;
+/* --- View transition tuning. ---
+   Pinning a chip dispatches into document.startViewTransition so the
+   Pinned row appearing at the top eases in rather than jumping the genre
+   rows down. Keep the crossfade quick so it reads as polish, not animation. */
+@media not (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation-duration: 220ms;
+        animation-timing-function: var(--anim-ease);
     }
 }
