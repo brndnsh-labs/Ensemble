@@ -67,10 +67,23 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
     });
 
     it('should generate extra hits (Entropy) when creativity is enabled', () => {
-        const step = 7; // Syncopated step (not blocked for Rock)
-
+        // why: Epic 12 S4 — after the Math.random()→scrambleHash migration the entropy
+        // gate is deterministic per (barIndex, sectionId, loopStep). Repeating the SAME
+        // step 200× now always gives the same hash → always fires or never fires, making
+        // the old "repeat 200× and check > 0" approach a tautology.
+        //
+        // New approach: sweep across 200 DIFFERENT syncopated steps across many bars.
+        // Each unique (barIndex, loopStep) pair produces a different scrambleHash value,
+        // giving a spread of gate-fire decisions. Rock entropyMultiplier=0.05, intensity=1.0
+        // → threshold 0.05. scrambleHash is well-distributed, so ~5% of the 200 distinct
+        // steps should fire. Expect at least 1 hit out of 200 (very conservative lower
+        // bound that guards against the branch being dead without relying on exact counts).
         let generatedHits = 0;
-        for (let i = 0; i < 200; i++) {
+        // Syncopated steps in 4/4: loopStep % 2 === 1 (i.e. odd positions 1,3,5,7,9,11,13,15)
+        // blocked steps for Rock: [3,5,11,13] (adjacent to backbeat) and [1,9] (e-of-beat)
+        // non-blocked syncopated step: 7 or 15 → use loopStep=7 (step = bar*16 + 7)
+        for (let bar = 0; bar < 200; bar++) {
+            const step = bar * 16 + 7; // always loopStep=7 (syncopated, non-blocked in Rock)
             const params = createParams(step, 'Snare', true, 1.0);
             const result = applyGrooveOverrides(getState(), params);
             if (result.shouldPlay) {
@@ -78,8 +91,9 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
             }
         }
 
-        // Probability is bandIntensity * 0.15 = 0.15.
-        // In 200 runs, we expect ~30 hits.
+        // With entropyMultiplier=0.05 at intensity=1.0, ~5% of steps should fire.
+        // Over 200 distinct bars, expect ~10 hits. Lower bound 1 gives wide
+        // stochastic headroom while still guarding against the branch being dead.
         expect(generatedHits).toBeGreaterThan(0);
     });
 
