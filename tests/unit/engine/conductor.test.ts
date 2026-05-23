@@ -16,6 +16,8 @@ const { makeSoloistMock } = await vi.hoisted(
 
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = (await importOriginal()) as any;
+    const { bass, chords, harmony, soloist } = await import('../../../public/state/instruments.js');
+    const { groove } = await import('../../../public/state/groove.js');
 
     // Create distinct mock objects so we can control them
     const mockPlayback = { ...actual.playback };
@@ -27,11 +29,11 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         loopCount: 0,
         formIteration: 0,
     };
-    const mockGroove = { ...actual.groove };
-    const mockSoloist = makeSoloistMock({ ...actual.soloist });
-    const mockHarmony = { ...actual.harmony, enabled: false, buffer: new Map() };
-    const mockChords = { ...actual.chords };
-    const mockBass = { ...actual.bass };
+    const mockGroove = { ...groove };
+    const mockSoloist = makeSoloistMock({ ...soloist });
+    const mockHarmony = { ...harmony, enabled: false, buffer: new Map() };
+    const mockChords = { ...chords };
+    const mockBass = { ...bass };
 
     const mockStateMap = {
         playback: mockPlayback,

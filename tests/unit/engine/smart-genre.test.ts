@@ -7,18 +7,24 @@ import { ACTIONS } from '../../../public/types.js';
 // Mock dependencies that are dynamically imported to prevent floating promises
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
+    const { playbackReducer } = await import('../../../public/state/playback.js');
+    const { arrangerReducer } = await import('../../../public/state/arranger.js');
+    const { instrumentReducer } = await import('../../../public/state/instruments.js');
+    const { grooveReducer } = await import('../../../public/state/groove.js');
+    const { midiReducer } = await import('../../../public/state/midi.js');
+    const { vizReducer } = await import('../../../public/state/visualizer.js');
     return {
         ...actual,
         // Wrap dispatch to avoid handleEffects during tests
         dispatch: vi.fn((action, payload) => {
             // Only perform state updates, skip handleEffects side-effects
             const a = { type: action, payload };
-            actual.playbackReducer(a);
-            actual.arrangerReducer(a);
-            actual.instrumentReducer(a);
-            actual.grooveReducer(a, actual.playback);
-            actual.midiReducer(a);
-            actual.vizReducer(a);
+            playbackReducer(a);
+            arrangerReducer(a);
+            instrumentReducer(a);
+            grooveReducer(a, actual.playback);
+            midiReducer(a);
+            vizReducer(a);
         }),
     };
 });

@@ -246,6 +246,17 @@ Main app still **35.70 KB brotli over budget** (was 36.16). Worker headroom **4.
 
 **Acceptance.** ~15 lines smaller. No KB delta (these were internal to a single chunk on each side of the worker boundary, so the minifier was already handling them — this is pure source clarity). Reviewer clean.
 
+**Status:** Shipped 2026-05-23. Collapsed the 17-symbol `export {…}` block in `public/state.ts` to the two survivors (`arranger`, `playback`); knip's 15 flagged re-exports came out. Premise gap caught during the cycle: five tests consumed the dead re-exports through `vi.mock('public/state.js', async (importOriginal) => { ...actual.<X> })` — knip can't see dynamic-mock consumption, so it had labelled them dead while they were really live test-only consumers. Redirected each `actual.<slice|reducer>` reference to a direct import of the canonical slice module inside the mock factory (`tests/unit/engine/{jazz-blues-intensity,conductor,time-signature-transitions,smart-genre}.test.ts` + `tests/unit/utils/persistence.test.ts`); ESM single-instance-per-resolved-path guarantees the test mocks still see the same deepSignal singletons as production. Main app brotli **115.89 → 115.97 KB (+0.08, noise)**, worker **60.62 → 60.64 KB (+0.02, noise)** — source-clarity win, as the story predicted. Knip unused-export count **17 → 2** (only S8 orphans remain). `bundle-hygiene-reviewer` clean (0 P0/P1/P2). 1975/1975 vitest green; typecheck clean.
+
+### Post-S7 baseline (2026-05-23)
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S6 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | —         | **115.97 KB**       | 80 KB    | +0.08 KB (noise)    |
+| `logic-worker.<rev>.js`          | —         | **60.64 KB**        | 65 KB    | +0.02 KB (noise)    |
+| `index.<rev>.css`                | —         | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+
 ### S8 — Orphaned components: decide WIP vs delete
 
 **Goal.** Resolve the two component-level dead exports knip flagged.

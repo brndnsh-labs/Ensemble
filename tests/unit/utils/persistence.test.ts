@@ -14,6 +14,10 @@ const { makeSoloistMock } = await vi.hoisted(
 // Mock storage
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
+    const { bass, chords, harmony, soloist } = await import('../../../public/state/instruments.js');
+    const { groove } = await import('../../../public/state/groove.js');
+    const { midi } = await import('../../../public/state/midi.js');
+    const { vizState } = await import('../../../public/state/visualizer.js');
     const mockStorage = {
         save: vi.fn(),
         get: vi.fn(),
@@ -23,16 +27,16 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         playback: { ...actual.playback },
         arranger: { ...actual.arranger, sections: [], key: 'C', timeSignature: '4/4' },
         groove: {
-            ...actual.groove,
+            ...groove,
             enabled: true,
             instruments: [{ name: 'Kick', steps: new Array(16).fill(0) }],
         },
-        chords: { ...actual.chords, enabled: true },
-        bass: { ...actual.bass, enabled: true },
-        soloist: makeSoloistMock({ ...actual.soloist, enabled: true }),
-        harmony: { ...actual.harmony, enabled: false },
-        vizState: { ...actual.vizState },
-        midi: { ...actual.midi },
+        chords: { ...chords, enabled: true },
+        bass: { ...bass, enabled: true },
+        soloist: makeSoloistMock({ ...soloist, enabled: true }),
+        harmony: { ...harmony, enabled: false },
+        vizState: { ...vizState },
+        midi: { ...midi },
         storage: mockStorage,
         dispatch: vi.fn(),
     };

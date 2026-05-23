@@ -156,26 +156,7 @@ export function getSyncState() {
     };
 }
 
-// Export individual state slices for dynamic imports
-export {
-    arranger,
-    arrangerReducer,
-    bass,
-    chords,
-    conductor,
-    conductorReducer,
-    groove,
-    grooveReducer,
-    harmony,
-    instrumentReducer,
-    midi,
-    midiReducer,
-    playback,
-    playbackReducer,
-    soloist,
-    vizReducer,
-    vizState,
-};
+export { arranger, playback };
 
 // Persistence Helpers
 export const storage = {
