@@ -283,9 +283,11 @@ describe('Hip Hop Bassist Critique', () => {
         // returns false on every step → zero slides, period.
         expect(heldSlides.length).toBe(0);
         // why: alternating chart with intensity 0.75 + ~55% boundary slide rate
-        // across 31 boundaries should produce many slides. Lower-bound at 5 for
-        // safe stochastic headroom; upper-bound implicit at 31.
-        expect(altSlides.length).toBeGreaterThan(5);
+        // across 31 boundaries should produce many slides. 20-run sample: 11-22
+        // observed (mean ~17). Floor tightened from > 5 to > 10 — 1 unit below
+        // the empirical minimum (11) — to guard against the slide branch being
+        // silently disabled while keeping enough headroom to pass reliably.
+        expect(altSlides.length).toBeGreaterThan(10);
         // Strictly more is the comparative assertion the acceptance criterion
         // requires.
         expect(altSlides.length).toBeGreaterThan(heldSlides.length);
