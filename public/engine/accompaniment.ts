@@ -2535,7 +2535,15 @@ export function getAccompanimentNotes(
     // a deterministic gate from (barIndex, intBeat) so loop comparisons stay
     // coherent. ~65% thin rate on eligible non-downbeat hits is a "noticeable
     // breath" without going completely silent.
-    const PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk']);
+    // why: Bossa joins Jazz/Blues/Funk after the partido-alto bank (Epic 9 S5.c)
+    // shipped. The partido-alto cells encode soloist-busy thinning via the sparse
+    // cell [0, 10, 14] (the vibe path drops the latest hit on `sparse` vibe too).
+    // But those paths only apply when the soloist is CURRENTLY busy; they don't
+    // give a "breath" AFTER the soloist's phrase ends. The thin gate here fills
+    // that gap: when the soloist has just rested (soloistResting=true, ≥3 phrase
+    // notes), Bossa's partido-alto hits are thinned 65% to leave post-phrase
+    // space. Evaluated 2026-05-23 (Epic 12 S4, FOLLOWUPS §D).
+    const PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk', 'Bossa Nova']);
     if (
         isHit &&
         measureStep !== 0 &&
