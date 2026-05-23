@@ -340,16 +340,25 @@ export function applyGrooveOverrides(
     const firstIterationSuppression = step < firstIterBoundary ? 0.3 : 1.0;
 
     // why: Epic 12 S4 — migrate the three entropy-phase Math.random() draws to
-    // scrambleHash seeded on (barIndex, sectionId, loopStep) so drum-strategy
-    // probability and velocity decisions are deterministic across loops and
-    // critique tests. Each draw gets a distinct discriminator (1/3/5) so
-    // co-located draws don't collide. sectionId hashed with stringHash33 —
-    // matching the Imperfect Symmetry block at line ~437. Source: FOLLOWUPS §C.
+    // scrambleHash seeded on (barIndex, sectionId, loopStep, inst.name) so
+    // drum-strategy probability and velocity decisions are deterministic across
+    // loops and critique tests. Each draw gets a distinct discriminator (1/3/5)
+    // so co-located draws don't collide. sectionId hashed with stringHash33 —
+    // matching the Imperfect Symmetry block at line ~437; inst.name hashed with
+    // stringHash31 (the existing convention at lines 467/597) so the gate
+    // decision is INDEPENDENT per lane — without the inst-name fold, Snare and
+    // HiHat would see the same hash quantile at the same (barIndex, loopStep)
+    // and their entropy decisions would lockstep. Musically minor (Snare/HiHat
+    // eligibility conditions are mutually exclusive at any given step), but
+    // restoring lane independence preserves the prior per-call statistical
+    // shape. Source: FOLLOWUPS §C.
     const _entropySectionIdStr = sectionIdFromTick || sectionId || '';
     const _entropySectionHash = stringHash33(_entropySectionIdStr);
-    // Shared base seed: barIndex * large-prime XOR sectionHash XOR loopStep * small-prime.
+    const _entropyInstHash = stringHash31(inst.name ?? '');
+    // Shared base seed: barIndex * large-prime XOR sectionHash XOR loopStep * small-prime XOR instHash.
     // Discriminators are odd primes (1/3/5) so adjacent draws produce unrelated values.
-    const _entropyBaseSeed = (_entropySectionHash ^ (barIndex * 0x9e3779b1) ^ (loopStep * 131)) | 0;
+    const _entropyBaseSeed =
+        (_entropySectionHash ^ (barIndex * 0x9e3779b1) ^ (loopStep * 131) ^ _entropyInstHash) | 0;
 
     if (
         groove.creativity &&

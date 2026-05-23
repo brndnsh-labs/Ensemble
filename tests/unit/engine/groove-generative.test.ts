@@ -97,6 +97,39 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         expect(generatedHits).toBeGreaterThan(0);
     });
 
+    it('should produce well-distributed ghost-snare velocity samples (draw 2)', () => {
+        // why: Epic 12 S4 patch — the entropy-gate test above only exercises
+        // draw 1 (gate fire/no-fire). This test independently asserts draws 2
+        // (ghost-snare velocity) lands in the documented range [0.10, 0.25)
+        // AND spans a non-trivial portion of that range — guards against a
+        // regression that makes scrambleHash((_entropyBaseSeed + 3) | 0)
+        // return a constant or correlate with draw 1.
+        const velocities: number[] = [];
+        for (let bar = 0; bar < 400; bar++) {
+            const step = bar * 16 + 7; // loopStep=7 (non-blocked syncopated)
+            const params = createParams(step, 'Snare', true, 1.0);
+            const result = applyGrooveOverrides(getState(), params);
+            if (result.shouldPlay && typeof result.velocity === 'number') {
+                velocities.push(result.velocity);
+            }
+        }
+
+        // Need a meaningful sample to assert distribution.
+        expect(velocities.length).toBeGreaterThan(5);
+
+        const min = Math.min(...velocities);
+        const max = Math.max(...velocities);
+        // why: ghost-snare base assignment is 0.10 + scrambleHash * 0.15
+        // (∈ [0.10, 0.25)). Downstream velocity scaling can lift the upper
+        // bound modestly, so the assertion bands the OUTPUT velocity to a
+        // ghost-quiet range and guards against the draw collapsing to a
+        // constant. A draw returning the same value 5+ times across 400
+        // bars would shrink the spread below 0.04.
+        expect(min).toBeGreaterThanOrEqual(0.09);
+        expect(max).toBeLessThan(0.35);
+        expect(max - min).toBeGreaterThan(0.04);
+    });
+
     it('should respect genre boundaries even in creativity mode', () => {
         const step = 0; // Downbeat
 
