@@ -26,11 +26,6 @@ export interface MotivicResponse {
     spaceBias: number;
 }
 
-export interface ContourSkeletonStep {
-    interval: number;
-    durationSteps: number;
-}
-
 export interface StyleConfig {
     genreGravityOffset: number;
     restBase: number;
@@ -66,7 +61,6 @@ export interface StyleConfig {
     chromaticism: number;
     seedTriplets: SeedTriplets;
     motivicResponse: MotivicResponse;
-    contourSkeletons: ContourSkeletonStep[][];
 }
 
 const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
@@ -116,50 +110,6 @@ const DEFAULT_STYLE_CONFIG: StyleConfig = {
     chromaticism: 0.1,
     seedTriplets: DEFAULT_SEED_TRIPLETS,
     motivicResponse: DEFAULT_MOTIVIC_RESPONSE,
-    contourSkeletons: [
-        [
-            {
-                interval: 1,
-                durationSteps: 2,
-            },
-            {
-                interval: 2,
-                durationSteps: 2,
-            },
-            {
-                interval: 0,
-                durationSteps: 4,
-            },
-        ],
-        [
-            {
-                interval: 2,
-                durationSteps: 4,
-            },
-            {
-                interval: -1,
-                durationSteps: 2,
-            },
-            {
-                interval: 1,
-                durationSteps: 2,
-            },
-        ],
-        [
-            {
-                interval: -1,
-                durationSteps: 2,
-            },
-            {
-                interval: -2,
-                durationSteps: 2,
-            },
-            {
-                interval: 0,
-                durationSteps: 4,
-            },
-        ],
-    ],
 };
 
 const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
@@ -205,36 +155,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             maxResponseNotes: 7,
             spaceBias: 0.14,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     shred: {
         restBase: 0.05,
@@ -251,62 +171,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.4,
         chromaticism: 0.5,
-        contourSkeletons: [
-            [
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 1,
-                },
-            ],
-            [
-                {
-                    interval: -1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: -2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 6,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 7,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     blues: {
         restBase: 0.09,
@@ -353,50 +217,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             cadenceBias: 0.48,
             timingStrength: 1.0,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 3,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -3,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 5,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 6,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 7,
-                    durationSteps: 5,
-                },
-            ],
-        ],
     },
     neo: {
         genreGravityOffset: 0.015,
@@ -431,50 +251,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             maxResponseNotes: 6,
             spaceBias: 0.36,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 2,
-                    durationSteps: 3,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 6,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     funk: {
         genreGravityOffset: -0.005,
@@ -492,50 +268,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.9,
         chromaticism: 0.3,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 3,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-                {
-                    interval: -2,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-            ],
-        ],
     },
     hiphop: {
         genreGravityOffset: 0.015,
@@ -552,46 +284,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.7,
         chromaticism: 0.2,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 6,
-                },
-            ],
-        ],
     },
     minimal: {
         restBase: 0.3,
@@ -607,34 +299,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.4,
         rhythmicDensity: 0.3,
         syncopationLikelihood: 0.3,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 8,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: -1,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-        ],
     },
     jazz: {
         restBase: 0.08,
@@ -684,40 +348,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             cadenceBias: 0.28,
             timingStrength: 0.78,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-            ],
-        ],
     },
     bird: {
         restBase: 0.05,
@@ -763,62 +393,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             cadenceBias: 0.24,
             timingStrength: 0.82,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 5,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 7,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 1,
-                },
-            ],
-            [
-                {
-                    interval: -2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     disco: {
         minNotesPerPhrase: 3,
@@ -830,50 +404,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.6,
         chromaticism: 0.2,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     bossa: {
         restBase: 0.12,
@@ -904,50 +434,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             maxResponseNotes: 5,
             spaceBias: 0.42,
         },
-        contourSkeletons: [
-            [
-                {
-                    interval: 2,
-                    durationSteps: 3,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 3,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     country: {
         restBase: 0.08,
@@ -970,50 +456,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.7,
         syncopationLikelihood: 0.4,
         chromaticism: 0.3,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: -2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-        ],
     },
     metal: {
         timingJitter: 2,
@@ -1030,58 +472,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.9,
         syncopationLikelihood: 0.3,
         chromaticism: 0.6,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 1,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: -2,
-                    durationSteps: 4,
-                },
-            ],
-        ],
     },
     reggae: {
         restBase: 0.12,
@@ -1095,50 +485,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         stationaryProb: 0.25,
         syncopationLikelihood: 0.9,
         chromaticism: 0.2,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 3,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 1,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-            ],
-        ],
     },
     acoustic: {
         restBase: 0.15,
@@ -1152,42 +498,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.4,
         chromaticism: 0.2,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 4,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: -1,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 6,
-                },
-            ],
-        ],
     },
     ska: {
         genreGravityOffset: -0.005,
@@ -1205,54 +515,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.8,
         chromaticism: 0.4,
-        contourSkeletons: [
-            [
-                {
-                    interval: 0,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-            ],
-            [
-                {
-                    interval: 4,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 0,
-                    durationSteps: 4,
-                },
-            ],
-            [
-                {
-                    interval: 2,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 3,
-                    durationSteps: 2,
-                },
-                {
-                    interval: 4,
-                    durationSteps: 4,
-                },
-            ],
-        ],
     },
 };
 

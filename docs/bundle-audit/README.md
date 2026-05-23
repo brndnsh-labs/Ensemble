@@ -165,6 +165,19 @@ Main app is now **36.16 KB brotli over budget** (was 43.21). Worker headroom unc
 
 **Acceptance.** Critique tests + e2e pass. `logic-worker.*.js` brotli ≤57 KB. `bundle-hygiene-reviewer` clean.
 
+**Status:** Shipped 2026-05-23. Removed the `contourSkeletons` field from `StyleConfig` and dropped its `ContourSkeletonStep` interface — the field was defined and populated for the default style plus 16 style overrides (17 nested-array blocks, ~732 source lines) but never read anywhere in `public/` or `tests/`. Grep-confirmed: no consumer in `soloist-pitch-engine.ts`, `soloist-rhythm-engine.ts`, `soloist.ts`, `soloist-devices.ts`, `coordination-engine.ts`, or any test. The unrelated `phraseContext.skeleton` (a live `SkeletonNode[]` on the phrase pipeline) is a separate concept. Worker brotli **60.99 → 60.74 KB (−0.25 KB)**, main app **116.16 → 115.70 KB (−0.46 KB)** — `soloist-config.ts` is imported on both sides via `soloist-pitch-engine.ts` so the win splits across chunks. The ≤57 KB worker target was not met; the user noted in-flight that the specific number was arbitrary and "shrink without behavior change" is the operative DoD. Source-clarity win: nested-numeric data compresses to ~1 byte/source-line under brotli, so 732 lines → ~0.7 KB combined is expected, not a red flag. The bigger worker-shrink targets (preact/signals dependency ~14 KB, sharing the same `soloist-config` style entries between threads) are structural and not in S4 scope. `bundle-hygiene-reviewer` clean (0 P0/P1/P2). 1975/1975 vitest green; typecheck clean.
+
+### Post-S4 baseline (2026-05-23)
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S3 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | 434.55 KB | **115.70 KB**       | 80 KB    | −0.46 KB            |
+| `logic-worker.<rev>.js`          | 216.23 KB | **60.74 KB**        | 65 KB    | −0.25 KB            |
+| `index.<rev>.css`                | 102.14 KB | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+
+Main app still **35.70 KB brotli over budget** (was 36.16). Worker headroom **4.26 KB** (was 4.01).
+
 ### S5 (speculative) — Lazy-load synthesis on first `togglePlay()`
 
 **Goal.** Defer `synth-*.ts` modules out of the boot path; they're only needed once playback starts.
