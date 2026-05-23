@@ -147,6 +147,13 @@ interface DrumMixState {
     lastTick: number;
 }
 
+// Ensemble pan map (verified 2026-05-23 mix-pass — see playDrumSound below
+// for the full drum dispatch):
+//   center        — Kick, Bass, Soloist (anchors)
+//   slight left   — Snare/Sidestick/Brush (-0.1), Chords (-0.2 at bus)
+//   slight right  — Harmony (+0.2 at bus)
+//   right (+0.35) — HiHat / Open / Crash / Ride / China / shaker family
+//   spread ±0.25  — Toms / Conga / Bongo (per-hit randomized)
 const RIGHT_PANNED_INSTRUMENTS = new Set([
     'HiHat',
     'Open',
