@@ -33,7 +33,7 @@ export function SoloistControls() {
     );
 }
 
-export function SoloistSeedControl() {
+function SoloistSeedControl() {
     const { seed } = useEnsembleState((s) => ({
         seed: s.soloist.seed,
     }));

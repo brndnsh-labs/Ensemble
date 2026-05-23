@@ -72,7 +72,7 @@ interface InstrumentMixerSettingsProps {
     className?: string;
 }
 
-export function InstrumentMixerSettings({
+function InstrumentMixerSettings({
     module,
     title = 'Mixer',
     className = '',

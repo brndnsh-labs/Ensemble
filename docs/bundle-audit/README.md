@@ -274,7 +274,23 @@ Main app still **35.70 KB brotli over budget** (was 36.16). Worker headroom **4.
 
 **Acceptance.** Knip unused-export count drops by however many were deleted. Reviewer clean. KB-delta proportional to what was actually removed (component bodies are usually a few KB each).
 
+**Status:** Shipped 2026-05-23. Premise softening: both knip-flagged symbols are *not* orphans — they're internal sub-components rendered by the externally-exported wrappers in their own files (`InstrumentMixerSettings` at `InstrumentSettings.tsx:75` is rendered by `InstrumentSettings` at line 331; `SoloistSeedControl` at `SoloistControls.tsx:36` is rendered by `SoloistControls` at line 31). Grep across `public/`, `tests/`, `scripts/`, `.github/` confirmed no external importer for either symbol. Fix was the same shape as S6/S7: drop the `export` keyword. Knip unused-export count **2 → 0** — audit-wide knip target now hit. Main app brotli **115.97 → 115.85 KB (−0.12, noise)**, worker **60.64 → 60.69 KB (+0.05, noise)** — Rollup was already DCE-treating these as internal, so this is a pure source-clarity win, as predicted. `bundle-hygiene-reviewer` clean (0 P0/P1/P2). 1975/1975 vitest green; typecheck clean. **Adjacent observation (out of scope, parking lot):** the `InstrumentSettings` wrapper itself is only consumed by `tests/unit/components/InstrumentSettings.test.tsx` — production renders `<InstrumentSpecificSettings />` + `<InstrumentMixerStrip />` directly via `InstrumentRail.tsx`. Test-only-production-dead is a separate cleanup question.
+
+### Post-S8 baseline (2026-05-23)
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S7 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | —         | **115.85 KB**       | 80 KB    | −0.12 KB (noise)    |
+| `logic-worker.<rev>.js`          | —         | **60.69 KB**        | 65 KB    | +0.05 KB (noise)    |
+| `index.<rev>.css`                | —         | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+
 ## Followups / parking lot
+
+### Test-only-production-dead (from S8)
+
+`public/components/InstrumentSettings.tsx` exports `InstrumentSettings` (the grid-2-col wrapper); the only consumer is `tests/unit/components/InstrumentSettings.test.tsx`. Production renders the wrapper's two children directly via `InstrumentRail.tsx`. Either rewrite the test to exercise the children (and delete the wrapper) or accept the wrapper as a tested-but-not-shipped utility. Not bundle-audit scope — knip can't see it (test files keep it live), and the wrapper isn't on a hot path.
+
 
 ### Bundle-shape candidates from the 2026-05-23 main-thread import trace
 
