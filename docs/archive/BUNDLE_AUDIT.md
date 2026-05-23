@@ -1,4 +1,24 @@
-# Bundle Audit
+# Bundle Audit (Archived Snapshot)
+
+Snapshot of the **2026-05-22 → 2026-05-23 bundle-audit cycle**. Chapter closed at 8/9 stories shipped (S2 not-applicable, S5 deferred speculative) — knip unused-export count went from 44 → 0 and main-app brotli from 123.9 KB → 115.85 KB (−8.05 KB), most of which came from the S3 lazy-load split.
+
+Reusable rules from the cycle (budgets-as-baselines, statically-DCEd dead-code expectations, the pre-flight grep tripwire for "orphaned" musical content, knip blind spots, defense-in-depth hygiene) extracted to **`docs/guides/bundle-hygiene.md`** — that's the live reference for ongoing bundle work.
+
+The per-story workflow lives in the **`/bundle-cycle`** skill (`.claude/skills/bundle-cycle/SKILL.md`) and the **`bundle-hygiene-reviewer`** subagent (`.claude/agents/bundle-hygiene-reviewer.md`); both remain active for one-off bundle work even though the audit chapter is closed.
+
+## Cycle summary
+
+- **Trigger:** 2026-05-22 audit — bundle budgets in `.size-limit.json` were silently broken (paths mismatched Vite's emitted filenames) and source LOC in `public/` had crept up post-musical-audit and mid-synth-audit. Goal: re-establish measurable budgets, remove provably dead code, set up CI-enforceable hygiene.
+- **Stories shipped:** 8/9 (S0 instrumentation, S1 piano-mode unwind, S3 lazy-load split, S4 contourSkeletons drop, S6 Tier A export sweep, S7 state.ts barrel hygiene, S8 sub-component exports). S2 (orphaned percussion) marked Not Applicable on premise break; S5 (lazy-load synthesis) deferred speculative.
+- **Reviewer discipline:** every story reviewed on the uncommitted diff by `bundle-hygiene-reviewer` before commit. The reviewer was created at the start of the cycle and used for the remainder.
+- **Premise-break rate:** 2/9 stories (S2 N/A, S8 softening). Pattern matched musical-audit experience — audit docs name what to fix but not why the recipe will work; pre-flight grep catches the gap before code goes in.
+- **KB delta (cumulative, Post-S0 → Post-S8 brotli):** main app −8.05 KB (−6.5%), worker −0.26 KB (noise), CSS unchanged. Almost the entire main-app delta came from S3's lazy-load split for `LibraryModal` + `VisualizerOverlay`.
+- **Knip:** repaired in `7aacbedd` (config was stale and reported zero unused exports against a real list of 44). Final state: 0 unused exports.
+- **Source-clarity wins:** S1, S4, S6, S7, S8 all produced ~0 KB brotli deltas — these were statically-provable dead code that Rollup was already DCE'ing. The win in those stories is source clarity and future-proofing, not bytes. The S0 baseline-doc explicitly framed this expectation, and every story called it out.
+
+## Below this line: original audit doc, frozen at archive time.
+
+---
 
 Planning doc for the bundle-size + dead-code cleanup pass. Lives in the same family as `docs/audit/` (musical) and `docs/synth-audit/` (synth) — same flow (story → implement → review → done) but a different concern: **shipping bytes and code hygiene, not musical correctness.**
 

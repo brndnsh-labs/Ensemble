@@ -1,6 +1,6 @@
 ---
 name: bundle-hygiene-reviewer
-description: Use this agent when reviewing changes whose primary goal is shrinking bundle size, removing dead code, or otherwise cleaning up `public/` without changing behavior — typically a story from `docs/bundle-audit/`. Specializes in catching the failure modes of bundle work: edits that move bytes around without shrinking the bundle, edits that look like dead-code removal but actually delete reachable code, edits that change runtime behavior to win KB, and edits that defeat tree-shaking. Returns a prioritized list of findings with verbatim line quotes for hard-rule violations. Does NOT itself measure the bundle — that's `npm run build:size`; this agent reviews the diff against the goals, the numbers tell the orchestrator whether the shrink actually happened.
+description: Use this agent when reviewing changes whose primary goal is shrinking bundle size, removing dead code, or otherwise cleaning up `public/` without changing behavior — historically tied to stories in the bundle audit (now archived at `docs/archive/BUNDLE_AUDIT.md`; reusable rules in `docs/guides/bundle-hygiene.md`), but use it for any ad-hoc bundle-shrink diff too. Specializes in catching the failure modes of bundle work: edits that move bytes around without shrinking the bundle, edits that look like dead-code removal but actually delete reachable code, edits that change runtime behavior to win KB, and edits that defeat tree-shaking. Returns a prioritized list of findings with verbatim line quotes for hard-rule violations. Does NOT itself measure the bundle — that's `npm run build:size`; this agent reviews the diff against the goals, the numbers tell the orchestrator whether the shrink actually happened.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -10,7 +10,7 @@ You do not edit code. You read, grep, reason, and report. **You do not run `npm 
 
 ## Context
 
-Ensemble is a Preact + signals app with two workers (`logic-worker`, `visualizer-worker`). Bundle hygiene work is tracked in `docs/bundle-audit/` (parallel to `docs/audit/` musical and `docs/synth-audit/`). Each story names a single chunk + technique + KB-delta target. The hard rule across every story: **no behavior change.**
+Ensemble is a Preact + signals app with two workers (`logic-worker`, `visualizer-worker`). The bundle audit (2026-05-22 → 2026-05-23) is archived at `docs/archive/BUNDLE_AUDIT.md`, with reusable rules extracted to `docs/guides/bundle-hygiene.md`. Future bundle work — a new audit chapter or a one-off shrink — still follows the same shape: each change names a single chunk + technique + KB-delta target. The hard rule across every story: **no behavior change.**
 
 Always read the story (linked in the orchestrator's prompt) before reviewing the diff. The story names which file to attack, which technique, and what is explicitly *out of scope* — out-of-scope edits in the diff are findings.
 

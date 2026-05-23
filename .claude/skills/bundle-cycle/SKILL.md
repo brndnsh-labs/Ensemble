@@ -1,13 +1,15 @@
 ---
 name: bundle-cycle
-description: Run one bundle-audit story end-to-end, from picking it off `docs/bundle-audit/README.md` through to a committed shrink (or a verified no-op). Composes the bundle-audit per-story flow — pick next story → grep-for-survivors → implement → typecheck + Vitest → bundle-hygiene-reviewer → patch → measure KB delta → commit. Plan-first — presents the plan before any agent fires. This is the bundle-audit (`docs/bundle-audit/`) counterpart to `/cycle` (musical) and `/synth-cycle` (synth). Most bundle stories are surgical (delete this function, simplify these branches), so the orchestrator implements inline — there is no dedicated implementer agent. The Definition of Done is **measurable** (KB delta from `npm run build:size`) + **behavior-preserving** (full test suite passes), so this skill can chain `--until-blocked` like `/cycle`. Usage `/bundle-cycle` for the next unshipped story, `/bundle-cycle S<N>` for a specific story (e.g. `/bundle-cycle S2`), `/bundle-cycle --until-blocked` to keep going until a P0 finding, a speculative-tagged story, or user interrupt.
+description: Run one bundle-audit story end-to-end, from picking it off `docs/archive/BUNDLE_AUDIT.md` through to a committed shrink (or a verified no-op). Composes the bundle-audit per-story flow — pick next story → grep-for-survivors → implement → typecheck + Vitest → bundle-hygiene-reviewer → patch → measure KB delta → commit. Plan-first — presents the plan before any agent fires. This is the bundle-audit (`docs/archive/BUNDLE_AUDIT.md`) counterpart to `/cycle` (musical) and `/synth-cycle` (synth). Most bundle stories are surgical (delete this function, simplify these branches), so the orchestrator implements inline — there is no dedicated implementer agent. The Definition of Done is **measurable** (KB delta from `npm run build:size`) + **behavior-preserving** (full test suite passes), so this skill can chain `--until-blocked` like `/cycle`. Usage `/bundle-cycle` for the next unshipped story, `/bundle-cycle S<N>` for a specific story (e.g. `/bundle-cycle S2`), `/bundle-cycle --until-blocked` to keep going until a P0 finding, a speculative-tagged story, or user interrupt.
 ---
 
 # /bundle-cycle — one bundle-audit story to a committed shrink
 
+> **Audit chapter status (2026-05-23):** the bundle audit is **closed** — all stories shipped or resolved (`docs/archive/BUNDLE_AUDIT.md`). This skill is preserved for **future ad-hoc bundle work** (suspicious chunk growth, opportunistic shrinks, a new audit chapter). The cadence below still applies; you just won't find a live story board to pick from. The reusable rules from the closed cycle live in `docs/guides/bundle-hygiene.md` — read that first when reaching for this skill.
+
 Goal: collapse the bundle-audit per-story rhythm into one invocation. Plan-first — present the plan before doing any work.
 
-**This skill drives the bundle-audit track only** (`docs/bundle-audit/`). It is the deliberate counterpart to `/cycle` (musical-audit, `docs/audit/`) and `/synth-cycle` (synth-audit, `docs/synth-audit/`). The three tracks share no infrastructure — different board, different reviewer, different Definition of Done. Never let this skill pick a musical or synth story.
+**This skill drives bundle-shrink work** — the deliberate counterpart to `/cycle` (musical-audit, `docs/audit/`) and `/synth-cycle` (synth-audit, `docs/synth-audit/`). The three tracks share no infrastructure — different reviewer, different Definition of Done. Never let this skill pick a musical or synth story.
 
 ## Why this is not `/synth-cycle`
 
@@ -33,7 +35,7 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
 
 ## Workflow
 
-1. **Orient.** Read `docs/bundle-audit/README.md` — specifically the "Story sequence" section and the latest `Post-S<N> baseline` table. Run `git status` / `git diff --stat`. Determine the state:
+1. **Orient.** Read `docs/archive/BUNDLE_AUDIT.md` — specifically the "Story sequence" section and the latest `Post-S<N> baseline` table. Run `git status` / `git diff --stat`. Determine the state:
    - **Clean tree** → no story in flight; this is a fresh pickup.
    - **Uncommitted bundle changes** → either mid-flight (pre-review or pre-commit) or a previous story left orphaned. Investigate before starting fresh.
 
@@ -46,7 +48,7 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
    - `--until-blocked` → set chain flag; pick next story.
    - bare `/bundle-cycle` → pick the next unshipped story by lowest S-number with no `**Status:**` marker.
 
-3. **Load the story.** Open `docs/bundle-audit/README.md`, read the chosen story's **Goal**, **Actions**, and **Acceptance** sections. The actions list is canonical — the diff must match it.
+3. **Load the story.** Open `docs/archive/BUNDLE_AUDIT.md`, read the chosen story's **Goal**, **Actions**, and **Acceptance** sections. The actions list is canonical — the diff must match it.
 
 4. **Present the plan and stop for confirmation:**
 
@@ -100,7 +102,7 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
 10. **Patch P0/P1 inline.** P0 = block (reachable code deleted, behavior change, load-bearing test deletion). P1 = mechanical fix (stale fixture field, doc drift, dead barrel re-export). P2 = defer to a followup note in the README unless trivially in-scope.
 
 11. **Finalize:**
-    - Add a `**Status:** Shipped <date>. <2–4 sentence summary of what landed, KB delta, reviewer verdict.>` line under the story in `docs/bundle-audit/README.md`.
+    - Add a `**Status:** Shipped <date>. <2–4 sentence summary of what landed, KB delta, reviewer verdict.>` line under the story in `docs/archive/BUNDLE_AUDIT.md`.
     - Update the "Post-S<N> baseline" snapshot in the doc with the new brotli numbers.
     - If the story removed any `public/**` file, deregister it from `AI_MAP.md` (the pre-commit docs-lint hook blocks otherwise).
     - Commit — one commit per story, Conventional Commit (`chore(bundle-audit): S<N> — <summary>` or `refactor(<area>): S<N> — <summary>` depending on the file scope). KB delta in the body. Never `git add -A` blindly (review the staged set), never `--no-verify`, never auto-push, never amend.
@@ -111,7 +113,7 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
 
 ## Speculative-tagged stories
 
-A story marked **speculative** in `docs/bundle-audit/README.md` (e.g. S5 — lazy-load synthesis on first `togglePlay()`) needs a design decision before implementation. When this skill encounters one:
+A story marked **speculative** in `docs/archive/BUNDLE_AUDIT.md` (e.g. S5 — lazy-load synthesis on first `togglePlay()`) needs a design decision before implementation. When this skill encounters one:
 
 ```
 ## Speculative story — needs you
@@ -148,10 +150,10 @@ Halt — do not implement until the design is agreed.
 - **A story's Actions list turns out to be wrong** (e.g. the doc says "delete X" but X is reachable from a path the doc missed): stop. Update the doc, surface the premise break, ask for direction. Do not "fix" the doc silently while implementing — premise breaks deserve a conversation. (See [[feedback_audit_doc_premise_breaks]] in memory — same failure mode as the musical audit.)
 - **KB delta is *negative* — bytes grew:** never commit a bundle-cycle story that grew the target chunk. Either the technique was wrong, scope-crept, or accidentally introduced a side effect. Stop and investigate.
 - **A speculative story is the *only* remaining one:** present it (per "Speculative-tagged stories" above) — don't auto-implement.
-- **The audit is complete** (all stories `**Status:** Shipped`): say so and offer to archive `docs/bundle-audit/README.md` → `docs/archive/BUNDLE_AUDIT.md`, with any reusable rules lifted to `docs/guides/bundle-hygiene.md`.
+- **The audit is complete** (all stories `**Status:** Shipped`): say so and offer to archive `docs/archive/BUNDLE_AUDIT.md` → `docs/archive/BUNDLE_AUDIT.md`, with any reusable rules lifted to `docs/guides/bundle-hygiene.md`.
 
 ## Chain references
 
 - Self-contained — the bundle track has no `/implement` `/review` `/patch` `/done` skills of its own. This skill performs all four steps inline.
-- `/pmlite` and `/next` are musical-audit tools — they will not see bundle-audit progress. Read `docs/bundle-audit/README.md` directly to check the board.
+- `/pmlite` and `/next` are musical-audit tools — they will not see bundle-audit progress. Read `docs/archive/BUNDLE_AUDIT.md` directly to check the board.
 - The reviewer agent (`bundle-hygiene-reviewer`) is project-local at `.claude/agents/bundle-hygiene-reviewer.md`. It is loaded once per session — an agent created mid-session won't be available until restart.
