@@ -2535,15 +2535,17 @@ export function getAccompanimentNotes(
     // a deterministic gate from (barIndex, intBeat) so loop comparisons stay
     // coherent. ~65% thin rate on eligible non-downbeat hits is a "noticeable
     // breath" without going completely silent.
-    // why: Bossa joins Jazz/Blues/Funk after the partido-alto bank (Epic 9 S5.c)
-    // shipped. The partido-alto cells encode soloist-busy thinning via the sparse
-    // cell [0, 10, 14] (the vibe path drops the latest hit on `sparse` vibe too).
-    // But those paths only apply when the soloist is CURRENTLY busy; they don't
-    // give a "breath" AFTER the soloist's phrase ends. The thin gate here fills
-    // that gap: when the soloist has just rested (soloistResting=true, ≥3 phrase
-    // notes), Bossa's partido-alto hits are thinned 65% to leave post-phrase
-    // space. Evaluated 2026-05-23 (Epic 12 S4, FOLLOWUPS §D).
-    const PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk', 'Bossa Nova']);
+    // why: Bossa Nova evaluated 2026-05-23 (Epic 12 S4, FOLLOWUPS §D) and
+    // INTENTIONALLY excluded. The partido-alto bank (Epic 9 S5.c) already
+    // encodes soloist-busy thinning via the sparse cell [0, 10, 14] plus the
+    // `sparse`-vibe drop. Stacking a post-phrase 65% thin on top compounds
+    // with those sparse paths and produces holes that contradict Bossa's
+    // continuous-comp identity. The genre's tradition is a steady partido-alto
+    // ostinato; "breath" comes from the cells themselves, not from a separate
+    // phrase-end gate. If a future listening session wants a post-phrase
+    // Bossa rest, it should narrow the cell selection (e.g. force `compFloor`
+    // for one beat) rather than re-add Bossa here.
+    const PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk']);
     if (
         isHit &&
         measureStep !== 0 &&
