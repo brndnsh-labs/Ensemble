@@ -63,6 +63,6 @@
     "dependencies": {
         "@preact/signals": "^2.9.0",
         "deepsignal": "^1.6.0",
-        "preact": "^10.29.1"
+        "preact": "^10.29.2"
     }
 }
