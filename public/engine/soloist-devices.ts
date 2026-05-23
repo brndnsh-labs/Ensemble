@@ -104,6 +104,18 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
     // approach around the chord stab. selectedMidi itself has already been
     // biased away from unison PCs by the picker (final-stage 0.05× at
     // soloist-pitch-engine.ts:1154); this floor closes the device-system gap.
+    //
+    // KNOWN STRUCTURAL LIMIT — 23.1pp mean absolute unison-drop ceiling:
+    // Only `run` and `enclosure` devices are covered here. The other devices
+    // (`bebopScale`, `bluesLick`, `chickenPick`, `quartal`, `birdFlurry`)
+    // walk chord tones by genre-defining design (Parker bebop vocabulary, blues
+    // scale, etc.) — applying an accompPcSet veto to those would dismantle the
+    // idiom vocabulary, not improve coordination. As a result the realized
+    // mean absolute unison-rate drop tops out at ~23.1pp rather than the
+    // audit-doc target of 30pp. This is a DESIGN LIMIT, not a defect. To push
+    // past 23.1pp the lever is biasing device SELECTION away from chord-tone-
+    // walker devices when the comper is dense, not widening this floor.
+    // Source: docs/audit/FOLLOWUPS.md §B "accompanimentMidis device-floor scope".
     const accompPcSet =
         accompanimentMidis && accompanimentMidis.length > 0
             ? new Set<number>(
