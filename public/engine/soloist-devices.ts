@@ -589,8 +589,28 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
                     return candidate;
                 }
             }
-            // Fallback: full whole-tone step in stepDir. Keeps the line moving
-            // even if the scale set is degenerate.
+            // Fallback: whole-tone step in stepDir. Fires only when NO pitch class
+            // within 4 semitones is in `bebopPcSet` — a condition that arises on
+            // genuinely degenerate scales. Analysis of the two main degenerate cases:
+            //
+            // 1. Whole-tone scale (0,2,4,6,8,10): all scale degrees are 2 semitones
+            //    apart, so the loop always finds a match at `semi=2` BEFORE reaching
+            //    the fallback — the fallback never fires for whole-tone scales.
+            //
+            // 2. Diminished scale (0,2,3,5,6,8,9,11): 8 PCs, so the maximum gap
+            //    between consecutive scale tones is 2 semitones — again, the loop
+            //    finds a hit at semi≤2 before the fallback is needed.
+            //
+            // In practice the fallback is a last-resort guard for truly pathological
+            // input (e.g. a scale with < 3 notes, or a bebopPcSet that was somehow
+            // built empty). Returning `from + stepDir * 2` (a whole-tone step) is
+            // acceptable in those cases: it keeps the line moving without stopping the
+            // engine, and a 2-semitone step is at worst a small chromatic inflection
+            // rather than a large leap. Making the fallback scale-aware would require
+            // a broader scale search here, which has no practical benefit because the
+            // actual degenerate-scale cases never reach it.
+            //
+            // Source: docs/audit/epic-followup-drain.md S4 (§E NIT).
             return from + stepDir * 2;
         };
 
