@@ -31,9 +31,11 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
 
 ## Workflow
 
-1. **Orient.** Read `docs/bundle-audit/README.md` — specifically the "Story sequence" section and the "Post-S0 baseline" table. Run `git status` / `git diff --stat`. Determine the state:
+1. **Orient.** Read `docs/bundle-audit/README.md` — specifically the "Story sequence" section and the latest `Post-S<N> baseline` table. Run `git status` / `git diff --stat`. Determine the state:
    - **Clean tree** → no story in flight; this is a fresh pickup.
    - **Uncommitted bundle changes** → either mid-flight (pre-review or pre-commit) or a previous story left orphaned. Investigate before starting fresh.
+
+   **Shipped-but-unmarked check.** The pickup rule below ("lowest S-number with no `**Status:**` line") can mis-fire if a story was shipped in a prior session but the README never got its Status line. Before declaring a pickup, spend 5 seconds: `git log --oneline -S "<core symbol from the story>" -- public/` — if that turns up a prior commit, the story is already shipped. Backfill the missing Status line (and `Post-S<N>` baseline table if absent) as a separate `docs(bundle-audit)` commit before starting the new story's work. Keeps KB-delta attribution clean and avoids smuggling housekeeping into a refactor commit.
 
 2. **Resolve the invocation:**
    - explicit `S<N>` → that story.
@@ -65,6 +67,13 @@ If a story genuinely needs broader implementation (S5-class lazy-loading with au
    ```
 
 5. **On confirmation, run pre-flight grep.** Before any deletion, grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every symbol the story will remove. Surviving callers in *runtime* code are P0 — stop. Surviving callers in tests that exercise the deleted feature are a P1 — decide whether to delete those tests (only if they prove the *deleted* code path) or update them to point at the replacement.
+
+   **Project-specific tripwire for musical-content deletions.** A story that proposes deleting a state field, instrument lane, drum voice, percussion entry, or anything keyed by a musical name (`"Clave"`, `"Shaker"`, `"Bossa Nova"`, etc.) has three non-obvious *runtime* producers that aren't UI code. Always grep these three before declaring something orphaned:
+   - `public/engine/grooves/*.ts` — genre engines that write to lane step arrays (Latin lanes are populated here, not by user clicks)
+   - `public/engine/fills.ts` — every drum fill pattern arrays lane names; Toms, Conga, and the like are all driven here
+   - `tests/standards/*-critique.test.ts` — critique tests exercise these paths and would flake silently if the production code disappeared
+
+   If any of these three reference the symbol you're about to delete, it's almost certainly **not** dead — the "no UI trigger path" angle is misleading. Surface as a premise break (see step 11). The S2 ("orphaned percussion sweep") premise break on 2026-05-23 is the canonical example.
 
 6. **Implement on main thread.** Make the surgical edits per the Actions list. Do not refactor adjacent code "while you're here" — that's scope creep, the reviewer will flag it, and it muddies KB-delta attribution.
 
@@ -124,6 +133,8 @@ Halt — do not implement until the design is agreed.
 | reviewer | findings are P1/P2, all mechanically fixable | any P0, or P1 that needs a design call |
 | patch | tests + typecheck still green after the fix | tests still failing, fix is ambiguous |
 | commit | hook passes (cspell/Biome auto-fixes OK to retry inline) | non-trivial hook failure |
+
+**Premise break is always a halt** — not in the table because it can fire from any step (orient surfaces a stale Status, pre-flight grep finds the "dead" code is reachable, implement discovers the cited file/line is wrong). Whenever the story's stated premise breaks, stop, update the doc with a `**Status:** Not applicable, <date>. <reason + lesson>` line, surface the finding, and ask for direction. Never silently rewrite the story to match what you found. Applies equally inside `--until-blocked` chains.
 
 ## Edge cases
 
