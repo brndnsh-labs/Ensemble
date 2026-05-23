@@ -104,11 +104,11 @@ export const TIME_SIGNATURES = {
 
 export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,
-    chords: 0.16, // De-buried (synth-audit Epic 0 S5): chords are the harmonic bed and were sitting under bass/soloist; raised ~+1.8 dB so they read through loud full-band passages
+    chords: 0.15, // Mix-pass 2026-05-23: chords -0.6 dB; modest trim — much of the "chords loud" perception turned out to be the chord/soloist ratio, which the soloist +2.5 dB lift already addresses
     bass: 0.1575, // Preserves the previous 45% default bass balance at unity UI volume
-    soloist: 0.15, // Keeps melodic lead presence slightly under the prior default mix
+    soloist: 0.2, // Mix-pass 2026-05-23: soloist +2.5 dB; baseline mix-report put trumpet 5-7 dB under full mix — buried for a lead. Lifts toward -3 to -4 dB lead seat.
     harmonies: 0.1, // Holds harmony behind the chord bed while leaving drums a bit more room
-    drums: 0.26, // Keeps the rhythmic anchor near the earlier default loudness
+    drums: 0.38, // Mix-pass 2026-05-23: drums +3.3 dB; rhythmic anchor was 7-9 dB under full mix in non-jazz scenes, making the beat hard to track. Iter 2 (+1.5 dB on top of iter 1) brings rock/blues/funk into the -4 to -5 dB target window; jazz stays naturally quieter (brushes/ride)
 };
 
 export const SMART_BASS_STYLE_MAP = {
