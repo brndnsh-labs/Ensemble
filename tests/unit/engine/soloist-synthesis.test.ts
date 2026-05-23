@@ -49,6 +49,7 @@ vi.mock('../../../public/state.js', () => {
                     exponentialRampToValueAtTime: vi.fn(),
                 },
                 Q: { value: 0, setValueAtTime: vi.fn() },
+                gain: { value: 0, setValueAtTime: vi.fn() },
                 connect: vi.fn(),
             })),
             createStereoPanner: vi.fn(() => ({
@@ -103,7 +104,7 @@ describe('Soloist Synthesis', () => {
         vi.clearAllMocks();
         soloist.audio.activeVoices = [];
         soloist.mode = 'monophonic';
-        soloist.preset = 'saxophone';
+        soloist.preset = 'trumpet';
         playback.audio.currentTime = 10;
     });
 
@@ -143,9 +144,9 @@ describe('Soloist Synthesis', () => {
         soloist.mode = 'guitar';
         playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
 
-        // Sax preset oscillator order: osc1, osc2, breathLfo, vibrato, depthMod —
-        // vibrato is the 4th oscillator (index 3).
-        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
+        // Trumpet oscillator order: osc1, osc2, vibrato, depthMod —
+        // vibrato is the 3rd oscillator (index 2).
+        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // Base 120 BPM speed is 6.0. Blues nudge is -0.5. Guitar nudge is +0.4. Total 5.9
@@ -158,7 +159,7 @@ describe('Soloist Synthesis', () => {
         soloist.mode = 'monophonic';
         playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
 
-        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
+        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // 6.0 (base) - 0.5 (blues) - 0.5 (monophonic) = 5.0
@@ -173,19 +174,20 @@ describe('Soloist Synthesis', () => {
         const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
         expect(oscs.length).toBeGreaterThanOrEqual(4); // vibrato remains active via monophonic fallback
 
-        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
+        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
         expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
-    it('should use mixed sawtooth and triangle oscillators for rich tone', () => {
+    it('should use dual sawtooth oscillators for trumpet tone', () => {
         playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         const osc1 = playback.audio.createOscillator.mock.results[0].value;
         const osc2 = playback.audio.createOscillator.mock.results[1].value;
 
+        // Trumpet: both oscillators are sawtooth (one detuned via applyDetuneSettle).
         expect(osc1.type).toBe('sawtooth');
-        expect(osc2.type).toBe('triangle');
+        expect(osc2.type).toBe('sawtooth');
     });
 
     it('should handle rapid note triggers (shredding) without exceeding voice limit', () => {
@@ -204,22 +206,6 @@ describe('Soloist Synthesis', () => {
             ),
         );
         expect(voiceSteals.length).toBeGreaterThan(1);
-    });
-
-    it('should apply aggressive shred envelopes in guitar mode', () => {
-        soloist.mode = 'guitar';
-        soloist.preset = 'shred';
-        const freq = 440;
-        const playTime = 10;
-        playSoloNote(getState(), freq, playTime, 1.0, 0.8);
-
-        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
-        const gainNode = playback.audio.createGain.mock.results[0].value;
-
-        expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(freq * 6, playTime);
-        expect(filter.Q.value).toBe(2.0);
-        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0.8 * 1.3, playTime, 0.005);
-        expect(gainNode.gain.setTargetAtTime).toHaveBeenCalledWith(0, playTime + 0.9, 0.05);
     });
 
     describe('Vibrato Engine Extensivenss', () => {

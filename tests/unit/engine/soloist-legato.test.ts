@@ -38,12 +38,14 @@ vi.mock('../../../public/state.js', () => {
             onended: null,
         }),
         createBiquadFilter: () => ({
+            type: '',
             frequency: {
                 value: 1000,
                 setValueAtTime: vi.fn(),
                 exponentialRampToValueAtTime: vi.fn(),
             },
             Q: { value: 1 },
+            gain: { value: 0, setValueAtTime: vi.fn() },
             connect: vi.fn(),
             disconnect: vi.fn(),
         }),
@@ -123,20 +125,21 @@ describe('Soloist Legato Articulation', () => {
         expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.04);
     });
 
-    it('should use a gentler attack for legato notes (neo preset)', () => {
-        soloist.preset = 'neo';
+    it('should use a gentler attack for legato notes (trumpet)', () => {
+        soloist.preset = 'trumpet';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', true);
 
         const voice = soloist.audio.activeVoices[0];
         const gain = voice.gain;
 
-        // Legato attack swells in gently (epic-3-soloist S1) — 0.032 for neo, slower
-        // than the staccato 0.02, so a connected note blends under the prior release.
+        // Legato attack swells in gently (epic-3-soloist S1) — 0.032 for trumpet,
+        // slower than the staccato 0.02, so a connected note blends under the
+        // prior release.
         expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(expect.any(Number), 100, 0.032);
     });
 
-    it('should use normal attack (0.02s) for non-legato Neo preset', () => {
-        soloist.preset = 'neo';
+    it('should use normal attack (0.02s) for non-legato trumpet', () => {
+        soloist.preset = 'trumpet';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
 
         const voice = soloist.audio.activeVoices[0];

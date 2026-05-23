@@ -468,9 +468,6 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_SOLOIST_SEED:
             s.seed = action.payload;
             return true;
-        case ACTIONS.SET_SOLOIST_PRESET:
-            s.preset = action.payload;
-            return true;
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap
             // covers groove too, so this one case handles all five modules.

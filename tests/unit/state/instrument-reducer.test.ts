@@ -52,11 +52,9 @@ describe('Instrument Reducer', () => {
         expect(harmony.reverb).toBe(0.2);
     });
 
-    it('should set soloist mode and preset', () => {
+    it('should set soloist mode', () => {
         instrumentReducer({ type: ACTIONS.SET_SOLOIST_MODE, payload: 'guitar' });
         expect(soloist.mode).toBe('guitar');
-        instrumentReducer({ type: ACTIONS.SET_SOLOIST_PRESET, payload: 'neo' });
-        expect(soloist.preset).toBe('neo');
     });
 
     it('should handle session resets', () => {

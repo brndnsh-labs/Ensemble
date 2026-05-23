@@ -29,7 +29,10 @@ const clamp = (val: any, min: number, max: number, defaultVal: number): number =
     return Math.min(Math.max(min, num), max);
 };
 
-const SUPPORTED_SOLOIST_PRESETS = new Set(['neo', 'vowel', 'trumpet', 'saxophone', 'shred']);
+// Mix-pass consolidation (2026-05-23) — soloist is now a single trumpet voice;
+// legacy presets (neo / vowel / saxophone / shred) coerce to trumpet here so
+// older saved sessions and share URLs keep loading without throwing.
+const SUPPORTED_SOLOIST_PRESETS = new Set(['trumpet']);
 
 function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;

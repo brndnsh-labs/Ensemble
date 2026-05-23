@@ -748,7 +748,8 @@ export interface SoloistState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
-    /** The synth sound profile ('neo', 'vowel', 'trumpet', 'saxophone'). */
+    /** The synth sound profile. Consolidated to 'trumpet' (2026-05-23 mix-pass);
+     *  field retained as a string for save/share compat with legacy values. */
     readonly preset: string;
     /** The soloist mode ('monophonic' or 'guitar'; unknown values normalize to monophonic). */
     readonly mode: string;
@@ -1309,7 +1310,6 @@ export interface ActionPayloadMap {
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
     SET_SOLOIST_SEED: string;
-    SET_SOLOIST_PRESET: string;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
@@ -1388,7 +1388,6 @@ export const ACTIONS = {
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SOLOIST_SEED: 'SET_SOLOIST_SEED',
-    SET_SOLOIST_PRESET: 'SET_SOLOIST_PRESET',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 
