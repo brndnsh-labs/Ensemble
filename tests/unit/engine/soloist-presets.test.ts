@@ -121,7 +121,7 @@ describe('Soloist Presets', () => {
 
     it('should play Neo-Juno (Dual Saw + 2 LFOs)', () => {
         soloist.preset = 'neo';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         // 2 Oscs + 2 LFOs + 1 Vibrato + 1 DepthMod = 6 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(6);
@@ -130,7 +130,7 @@ describe('Soloist Presets', () => {
 
     it('should play Vowel Lead (Parallel Filters + LFO)', () => {
         soloist.preset = 'vowel';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
@@ -143,7 +143,7 @@ describe('Soloist Presets', () => {
 
     it('should play Trumpet preset (Saw + Peaking Filter)', () => {
         soloist.preset = 'trumpet';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
@@ -154,7 +154,7 @@ describe('Soloist Presets', () => {
 
     it('should play Saxophone preset (Saw/Tri + Breath LFO)', () => {
         soloist.preset = 'saxophone';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         // 2 Oscs + 1 Breath LFO + 1 Vibrato + 1 DepthMod = 5 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(5);
@@ -165,7 +165,7 @@ describe('Soloist Presets', () => {
 
     it('should play Shred preset (High-gain Saw + Noise)', () => {
         soloist.preset = 'shred';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         // 2 Oscs + 1 Vibrato + 1 DepthMod = 4 oscillators
         expect(playback.audio.createOscillator).toHaveBeenCalledTimes(4);
@@ -176,7 +176,7 @@ describe('Soloist Presets', () => {
 
     it('should kill active voices properly', () => {
         soloist.preset = 'neo';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         const voice = soloist.audio.activeVoices[0];
         const gainNode = voice.gain;
@@ -196,12 +196,12 @@ describe('Soloist Presets', () => {
 
     it('should manage voice stealing with complex nodes', () => {
         soloist.preset = 'neo';
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         const firstVoice = soloist.audio.activeVoices[0];
 
         // Play another note immediately (stealing the first)
-        playSoloNote(getState(), 880, 10.1, 1.0);
+        playSoloNote(getState(), 880, 10.1, 1.0, 1.0);
 
         expect(firstVoice.gain.gain.setTargetAtTime).toHaveBeenCalled();
         // Check that oscillators are stopped

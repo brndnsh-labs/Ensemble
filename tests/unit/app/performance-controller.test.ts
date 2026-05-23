@@ -58,6 +58,7 @@ describe('Performance Controller', () => {
                 style,
                 isLegato,
                 vibrato,
+                expect.any(Number),
             );
         });
 
@@ -80,6 +81,7 @@ describe('Performance Controller', () => {
                 'scalar',
                 false,
                 false,
+                expect.any(Number),
             );
         });
     });

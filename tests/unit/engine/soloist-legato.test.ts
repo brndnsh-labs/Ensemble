@@ -105,11 +105,11 @@ describe('Soloist Legato Articulation', () => {
         // Should start at prevFreq (440)
         expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(440, 100.5);
 
-        // Monophonic mode should use 60ms glide
-        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.06);
+        // Monophonic mode now uses an 85ms portamento glide (epic-3-soloist S1).
+        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.085);
     });
 
-    it('should use 30ms glide for guitar mode', () => {
+    it('should use 40ms glide for guitar mode', () => {
         soloist.mode = 'guitar';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', false);
         playSoloNote(getState(), 554, 100.5, 0.5, 0.5, 0, 'scalar', true);
@@ -119,18 +119,20 @@ describe('Soloist Legato Articulation', () => {
         const voice = soloist.audio.activeVoices[1];
         const osc = voice.nodes.find((n) => n.frequency?.setValueAtTime);
 
-        // Guitar mode should use 30ms glide
-        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.03);
+        // Guitar mode keeps a quicker hammer-on glide of 40ms (epic-3-soloist S1).
+        expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.04);
     });
 
-    it('should use fast attack (0.005s) for legato notes', () => {
+    it('should use a gentler attack for legato notes (neo preset)', () => {
+        soloist.preset = 'neo';
         playSoloNote(getState(), 440, 100, 0.5, 0.5, 0, 'scalar', true);
 
         const voice = soloist.audio.activeVoices[0];
         const gain = voice.gain;
 
-        // Expect setTargetAtTime with timeConstant 0.005
-        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(expect.any(Number), 100, 0.005);
+        // Legato attack swells in gently (epic-3-soloist S1) — 0.032 for neo, slower
+        // than the staccato 0.02, so a connected note blends under the prior release.
+        expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(expect.any(Number), 100, 0.032);
     });
 
     it('should use normal attack (0.02s) for non-legato Neo preset', () => {

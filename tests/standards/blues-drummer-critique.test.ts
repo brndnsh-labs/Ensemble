@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
@@ -12,8 +12,25 @@ vi.mock('../../public/state.js', () => ({
 }));
 
 describe('Blues Drummer Critique', () => {
+    // Seed Math.random with mulberry32 so the engine's unseeded RNG draws
+    // (groove-engine velocity nudges, blues backbeat-kick gate, etc.) land in
+    // a stable distribution across runs. Without this the >30/64 backbeat-kick
+    // threshold below sits close enough to the natural ~38 mean to flake.
+    let originalRandom;
     beforeEach(() => {
         vi.restoreAllMocks();
+        originalRandom = Math.random;
+        let seed = 0x9e3779b9;
+        Math.random = () => {
+            seed |= 0;
+            seed = (seed + 0x6d2b79f5) | 0;
+            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    });
+    afterEach(() => {
+        Math.random = originalRandom;
     });
 
     const simulatePerformance = (numBars, stateOverrides = {}) => {

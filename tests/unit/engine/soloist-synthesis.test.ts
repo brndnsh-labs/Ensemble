@@ -108,8 +108,8 @@ describe('Soloist Synthesis', () => {
     });
 
     it('should enforce monophonic voice stealing by default', () => {
-        playSoloNote(getState(), 440, 10, 1.0);
-        playSoloNote(getState(), 880, 11, 1.0); // New note should kill previous
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
+        playSoloNote(getState(), 880, 11, 1.0, 1.0); // New note should kill previous
 
         // The first note's gain should have been told to ramp to 0
         const _firstVoiceGain = soloist.audio.activeVoices[0].gain.gain;
@@ -121,8 +121,8 @@ describe('Soloist Synthesis', () => {
 
     it('should allow two voices when mode is guitar', () => {
         soloist.mode = 'guitar';
-        playSoloNote(getState(), 440, 10, 1.0);
-        playSoloNote(getState(), 554, 10, 1.0); // Same time, double stop
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
+        playSoloNote(getState(), 554, 10, 1.0, 1.0); // Same time, double stop
 
         expect(soloist.audio.activeVoices.length).toBe(2);
     });
@@ -143,8 +143,9 @@ describe('Soloist Synthesis', () => {
         soloist.mode = 'guitar';
         playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
 
-        // Vibrato is the 3rd oscillator created (osc1, osc2, vibrato)
-        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
+        // Sax preset oscillator order: osc1, osc2, breathLfo, vibrato, depthMod —
+        // vibrato is the 4th oscillator (index 3).
+        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // Base 120 BPM speed is 6.0. Blues nudge is -0.5. Guitar nudge is +0.4. Total 5.9
@@ -157,7 +158,7 @@ describe('Soloist Synthesis', () => {
         soloist.mode = 'monophonic';
         playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
 
-        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
+        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
         // 6.0 (base) - 0.5 (blues) - 0.5 (monophonic) = 5.0
@@ -172,13 +173,13 @@ describe('Soloist Synthesis', () => {
         const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
         expect(oscs.length).toBeGreaterThanOrEqual(4); // vibrato remains active via monophonic fallback
 
-        const vibratoOsc = playback.audio.createOscillator.mock.results[2].value;
+        const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
         expect(vibSpeed).toBeCloseTo(5.0, 0);
     });
 
     it('should use mixed sawtooth and triangle oscillators for rich tone', () => {
-        playSoloNote(getState(), 440, 10, 1.0);
+        playSoloNote(getState(), 440, 10, 1.0, 1.0);
 
         const osc1 = playback.audio.createOscillator.mock.results[0].value;
         const osc2 = playback.audio.createOscillator.mock.results[1].value;
@@ -191,7 +192,7 @@ describe('Soloist Synthesis', () => {
         soloist.mode = 'monophonic';
         // Trigger 10 notes very rapidly
         for (let i = 0; i < 10; i++) {
-            playSoloNote(getState(), 440 + i * 10, 10 + i * 0.05, 0.1);
+            playSoloNote(getState(), 440 + i * 10, 10 + i * 0.05, 0.1, 1.0);
         }
 
         // Only 1 voice should be active at the end since they are all new gestures
