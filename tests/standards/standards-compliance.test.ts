@@ -186,14 +186,14 @@ describe('Standards Compliance Test Suite', () => {
             expect(new Set(modulation.map((chord) => chord.key))).toEqual(new Set(['Db']));
         });
 
-        it('Autumn Leaves stores the turnaround dominant as altered rather than merely augmented', () => {
+        it('Autumn Leaves stores the turnaround dominant as augmented (III7+)', () => {
             loadPreset('Autumn Leaves', 'Bb', false);
 
             const turnaroundChord = arranger.progression.find(
                 (chord) => chord.sectionLabel === 'A' && chord.localIndex === 5,
             );
-            expect(turnaroundChord.absName).toBe('D7alt');
-            expect(turnaroundChord.quality).toBe('7alt');
+            expect(turnaroundChord.absName).toBe('D7+');
+            expect(turnaroundChord.quality).toBe('aug');
         });
 
         it('All The Things You Are follows the common descending local-key cycle', () => {

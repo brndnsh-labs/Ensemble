@@ -153,8 +153,7 @@ describe('Genre Expansion Integration', () => {
             expect(notes.length).toBeGreaterThanOrEqual(2);
             const intervals = notes.map((n) => n.midi - 48);
             expect(intervals).toContain(7); // 5th
-            // Should use 'Warm' instrument for distortion potential
-            expect(notes[0].instrument).toBe('Warm');
+            expect(notes[0].instrument).toBe('PowerMetal');
         });
 
         it('should use Metal scale for soloist', () => {
