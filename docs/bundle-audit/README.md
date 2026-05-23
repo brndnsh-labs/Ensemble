@@ -24,8 +24,6 @@ Main app + CSS budgets were not being enforced because `.size-limit.json` paths 
 
 ### Post-S0 baseline (2026-05-22, after instrumentation)
 
-This is the number every subsequent story's KB-delta is measured against.
-
 | chunk                            | raw       | gzip     | brotli (size-limit) | budget   | status   |
 | -------------------------------- | --------- | -------- | ------------------- | -------- | -------- |
 | `index.<rev>.js` (main app)      | 475.82 KB | 148.24 KB | **123.9 KB**       | 80 KB    | ❌ +43.9 |
@@ -33,6 +31,18 @@ This is the number every subsequent story's KB-delta is measured against.
 | `index.<rev>.css`                | 102.14 KB | 17.62 KB | **15.13 KB**        | 65 KB    | ✅ 23%   |
 | `visualizer-worker.<rev>.js`     | 14.38 KB  | —        | —                   | —        | —        |
 | 6 dynamic chunks (combined)      | 67.59 KB  | 18.88 KB | —                   | —        | —        |
+
+### Post-S1 baseline (2026-05-23, commit `1cd46551`)
+
+This is the number every subsequent story's KB-delta is measured against. Note that between Post-S0 and Post-S1 several non-bundle-audit commits landed (soloist trumpet consolidation, mix tuning, PowerMetal preset, dep update), so the delta below is *not* purely S1.
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S0 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | 470.86 KB | **123.21 KB**       | 80 KB    | −0.69 KB            |
+| `logic-worker.<rev>.js`          | 221.02 KB | **61.00 KB**        | 65 KB    | +0.05 KB (noise)    |
+| `index.<rev>.css`                | 102.14 KB | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+| 6 dynamic chunks (combined)      | 67.61 KB  | —                   | —        | +0.02 KB (noise)    |
 
 **The real story:** main app is the priority (44 KB brotli over budget), not the worker. CSS is well within budget. The worker still needs the 8 KB headroom target from S4 but it's not the urgent fix.
 
@@ -101,6 +111,8 @@ Each story has a single chunk-and-technique focus. Don't combine — KB-delta at
 
 **Acceptance.** `npm run typecheck`, `npm test`, `npm run test:e2e` all green. KB-delta reported for `index.*.js` and `logic-worker.*.js` brotli. `bundle-hygiene-reviewer` clean.
 
+**Status:** Shipped 2026-05-22 (commit `253f1b6c`). Dropped `isSoloistPianoMode` from `soloist-mode-policy.ts` and unwound every consumer — `synth-soloist.ts` (5 dead-arg callsites at `applyPitchEnvelope`, vibrato early-return, `vibRuns` clause), `soloist-devices.ts` (countryBend simplification), `soloist-pitch-engine.ts` (dead `isPiano:false` arg), `types.ts` JSDoc, and two stale test fixtures. As predicted, statically-provable dead code was already DCE'd by the minifier — KB delta against Post-S0 is in noise (see Post-S1 baseline table). Source-clarity win.
+
 ### S2 — Orphaned percussion sweep
 
 **Goal.** Remove state + engine code for percussion lanes that have no trigger path.
@@ -111,6 +123,8 @@ Each story has a single chunk-and-technique focus. Don't combine — KB-delta at
 3. Check `manual-metadata.ts` and `MANUAL.md` for stale references.
 
 **Acceptance.** Same as S1, plus a visible drop in `logic-worker.*.js` brotli (these lanes ship to the worker).
+
+**Status:** Not applicable, 2026-05-23. Premise break: the lanes are *not* orphaned. Verified runtime producers — `grooves/latin.ts` (active for Bossa Nova / Samba / Latin/Salsa / Afro-Cuban 6/8 via `groove-engine.ts:36-51`), `grooves/acoustic.ts`, `grooves/disco.ts`, and `fills.ts` (every drum fill pattern uses Toms; Conga also referenced at `fills.ts:282,289`). Critique tests (`bossa-drummer-critique`, `latin-drummer-critique`, `tom-vocabulary-critique`, `latin-groove-integrity`) exercise them, multiple presets in `drum-presets.ts` write them, and Bossa is exposed in the genre menu (`instrument-styles.ts:32`). The `project_orphaned_latin_content` memory note was about the *manual step-sequencer UI* (no button to toggle the Shaker lane by hand) — not the runtime. Removing them would be a P0 deletion of reachable musical code. **Lesson:** before any future "X is unused" story, grep for the canonical lane/symbol name across `public/engine/grooves/`, `public/engine/fills.ts`, and `tests/standards/` — those are the three non-obvious producers in this codebase.
 
 ### S3 — Main-bundle code-splitting (one feature)
 
