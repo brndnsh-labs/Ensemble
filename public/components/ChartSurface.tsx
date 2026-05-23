@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'preact/compat';
 import { useCallback, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -5,11 +6,16 @@ import { useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
-import { LibraryModal } from './LibraryModal.jsx';
 import { MobileActionBar } from './MobileActionBar.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
-import { VisualizerOverlay } from './VisualizerOverlay.jsx';
+
+const LibraryModal = lazy(() =>
+    import('./LibraryModal.jsx').then((m) => ({ default: m.LibraryModal })),
+);
+const VisualizerOverlay = lazy(() =>
+    import('./VisualizerOverlay.jsx').then((m) => ({ default: m.VisualizerOverlay })),
+);
 
 const NARROW_MQ = '(max-width: 1023px)';
 const MOBILE_MQ = '(max-width: 640px)';
@@ -20,7 +26,12 @@ interface ChartSurfaceProps {
 
 export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
     const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [libraryEverOpened, setLibraryEverOpened] = useState(false);
     const [isVizOpen, setIsVizOpen] = useState(false);
+    const openLibrary = useCallback(() => {
+        setLibraryEverOpened(true);
+        setIsLibraryOpen(true);
+    }, []);
     const [isSharedUrl, setIsSharedUrl] = useState(() => {
         if (typeof window === 'undefined') {
             return false;
@@ -60,11 +71,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                     )}
                     {!isMobile && (
                         <>
-                            <button
-                                type="button"
-                                class="header-btn"
-                                onClick={() => setIsLibraryOpen(true)}
-                            >
+                            <button type="button" class="header-btn" onClick={openLibrary}>
                                 Library
                             </button>
                             <button
@@ -106,7 +113,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                             type="button"
                                             class="workspace-toolbar-panel__action"
                                             onClick={() => {
-                                                setIsLibraryOpen(true);
+                                                openLibrary();
                                                 closePopover();
                                             }}
                                         >
@@ -170,8 +177,16 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
             {isMobile && (
                 <MobileActionBar isVizOpen={isVizOpen} onOpenViz={() => setIsVizOpen(true)} />
             )}
-            <LibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} />
-            {isVizOpen && <VisualizerOverlay getVisualTime={getVisualTime} onClose={closeViz} />}
+            {libraryEverOpened && (
+                <Suspense fallback={null}>
+                    <LibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} />
+                </Suspense>
+            )}
+            {isVizOpen && (
+                <Suspense fallback={null}>
+                    <VisualizerOverlay getVisualTime={getVisualTime} onClose={closeViz} />
+                </Suspense>
+            )}
         </div>
     );
 }

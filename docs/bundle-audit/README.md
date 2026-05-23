@@ -139,6 +139,20 @@ Each story has a single chunk-and-technique focus. Don't combine — KB-delta at
 
 **Acceptance.** App boot is unaffected (no flash, no missing controls); feature works on first invocation; a new chunk shows in `dist/` and the main bundle shrinks by at least 5 KB brotli.
 
+**Status:** Shipped 2026-05-23. Converted `LibraryModal` and `VisualizerOverlay` to `lazy()` imports in `ChartSurface.tsx` with `<Suspense fallback={null}>` boundaries. `LibraryModal` uses a `libraryEverOpened` latch so the chunk only loads on first user click, while preserving its internal 180ms exit-animation lifecycle (which would have broken under a naive `{isOpen && ...}` gate). `VisualizerOverlay` keeps its existing `{isVizOpen && ...}` gate, now inside Suspense. Main-app brotli **123.21 → 116.16 KB (−7.05 KB)**, raw **470.86 → 439.34 KB (−31.5 KB)**; two new dynamic chunks in `dist/`. `bundle-hygiene-reviewer` clean (0 P0/P1/P2). All other modals (Settings/Editor/GenerateSong/Share/Manual) were already lazy in `Modals.tsx`.
+
+### Post-S3 baseline (2026-05-23)
+
+| chunk                            | raw       | brotli (size-limit) | budget   | Δ vs Post-S1 brotli |
+| -------------------------------- | --------- | ------------------- | -------- | ------------------- |
+| `index.<rev>.js` (main app)      | 439.34 KB | **116.16 KB**       | 80 KB    | **−7.05 KB**        |
+| `logic-worker.<rev>.js`          | 221.02 KB | **60.99 KB**        | 65 KB    | −0.01 KB (noise)    |
+| `index.<rev>.css`                | 102.14 KB | **15.13 KB**        | 65 KB    | 0                    |
+| `visualizer-worker.<rev>.js`     | 14.38 KB  | —                   | —        | 0                    |
+| 8 dynamic chunks (combined)      | 99.91 KB  | —                   | —        | +32.3 KB raw (the split)         |
+
+Main app is now **36.16 KB brotli over budget** (was 43.21). Worker headroom unchanged — S4 still needed.
+
 ### S4 — Logic-worker headroom (8 KB target)
 
 **Goal.** Pull the worker from 61/65 KB brotli down to ≤57 KB.
