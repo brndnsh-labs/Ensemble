@@ -11,7 +11,7 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S1 | Soloist engine `scrambleHash` migration | opus | Shipped 2026-05-20 |
 | S2 | `evansIntervals` chord-quality awareness | opus | Ready |
 | S3 | Profile-rotation sticky-retain | opus | Shipped 2026-05-23 |
-| S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Ready |
+| S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Shipped 2026-05-23 |
 | S5 | Bass walking idiom | opus | Ready |
 | S6 | Per-genre tuning sweep | sonnet | Blocked → `LISTEN_TESTS.md` Part B |
 | S7 | Final-bar polish | opus | Blocked → `LISTEN_TESTS.md` C1 |
@@ -19,7 +19,7 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**3 / 10 shipped.** S4–S5 are cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**4 / 10 shipped.** S5 is cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
@@ -69,7 +69,7 @@ Commit-per-item, Epic 11 S5 mould. Every remaining mechanical follow-up — NITs
 
 **Acceptance:** all items shipped, committed per-item; no behavior change beyond the `Math.random()`→`scrambleHash` migration and the Bossa gate (if added); `npm test` green.
 **Effort:** ~6h. **Model:** sonnet (mechanical). **Reviewer:** music-theory-reviewer (the PRNG migration + Bossa gate touch musical behavior). **Source:** FOLLOWUPS §B/§C/§D/§E/§G.
-**Status:** Ready.
+**Status:** Shipped 2026-05-23 — 9 sub-items committed per-item + 4 reviewer-driven patches. `CoordinationContext` interface declared (forward-ref export). `accompanimentMidis` 23.1pp ceiling documented as structural limit. Funk pop/chuck/hammer probabilities documented. `findNextBebopMidi` whole-tone fallback documented as acceptable. Hip-hop slide-rate floor tightened `> 5` → `> 8` (patched from `> 10` after reviewer P2 — sat at min-1 of observed). `bass-chord-change-approach-critique` cushion documented as honest (engine churn since FOLLOWUPS entry grew the gap from ~1pp to 14-24pp). Soloist rhythm 2b extended with discriminating forced-vs-non-forced partition assertions (rewritten from `total2 > total0` after reviewer P2 — original didn't distinguish OLD vs NEW multiplier placement). Bossa phrase-end breath EVAL = no (initially added to `PHRASE_END_THIN_GENRES` but reverted after reviewer P0 — test/production divergence via genre-key drift, and partido-alto already encodes soloist-busy thinning natively). 3 `groove-engine.ts` `Math.random()` draws migrated to `scrambleHash` with per-draw discriminators + inst-name fold for lane independence (patched after reviewer P2). New velocity-distribution unit test guards draws 2/3 against constant-return regression. All 1983 tests green; standards suite 629/629; music-theory-reviewer P0 + 4 P2s all patched inline. Two pre-existing concerns surfaced by review filed in FOLLOWUPS §B (accompaniment.ts Bossa genre-key audit; bass-styles.ts funk slap-bass Math.random determinism).
 
 ### S5. Bass walking idiom
 
