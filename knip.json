@@ -1,15 +1,18 @@
 {
-    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "$schema": "https://unpkg.com/knip@6/schema.json",
     "entry": [
-        "public/sw.ts",
         "public/logic-worker.ts",
-        "public/ui-types.ts",
-        "public/ui-root.tsx",
         "public/visualizer-worker.ts",
-        "scripts/*.ts",
-        "tests/scripts/*.ts"
+        "public/sw.ts",
+        "scripts/**/*.ts",
+        "tests/**/*.{test,spec}.{ts,tsx}",
+        "tests/bench/**/*.ts",
+        "tests/scripts/**/*.ts"
     ],
-    "project": ["public/**/*.{ts,tsx}", "scripts/*.ts", "tests/**/*.{ts,tsx}"],
-    "ignoreExportsUsedInFile": true,
+    "project": ["public/**/*.{ts,tsx}", "scripts/**/*.ts", "tests/**/*.{ts,tsx}"],
+    "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+    },
     "ignore": ["public/engine/grooves/*.ts"]
 }
