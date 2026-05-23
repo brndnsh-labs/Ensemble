@@ -488,7 +488,16 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         );
 
         // Jazz/Blues get 0.95 override at intensity > 0.75; Rock gets 0.5× reduction.
-        // Jazz rate should be meaningfully higher. Delta of >10pp guards against fluke.
+        // Jazz rate should be meaningfully higher.
+        //
+        // Reliability note (Epic 12 S4 — FOLLOWUPS §G): at the time of the Epic 11 S6
+        // implementation (2026-05-20) the observed gap was ~1pp (jazz 27.5% vs rock
+        // 28.4%), making this assertion sign-fragile against Math.random() stream shifts.
+        // After the Epic 12 S1-S3 scrambleHash migrations stabilized the soloist engine's
+        // Math.random consumption, the 256-bar observed gap moved to 14-24pp (30-run
+        // sample, 2026-05-23). The 10pp cushion is now statistically honest — a regression
+        // that swapped Jazz/Blues privilege for Rock would need to close a 14-24pp gap,
+        // not 1pp. Passes 30/30 in isolation.
         expect(jazzRate).toBeGreaterThan(rockRate + 0.1);
     });
 
