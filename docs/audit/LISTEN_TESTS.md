@@ -36,43 +36,25 @@ Three kinds of item:
 
 ---
 
-## Part B — Decisions (each unblocks Epic 12 / S6)
+## Part B — Decisions (each unblocks Epic 12 / S6) — **COMPLETE 2026-05-24**
 
-- [ ] **B1. Imperfect Symmetry intensity floor**
-  Currently gated at `intensity ≥ 0.4` (`conductor.ts` / Epic 2 S2), which suppresses the gesture during quiet ballad-style Verse 2 — where subtle variation is arguably most musical.
-  Genre: any; play a low-intensity (~0.25–0.35) verse-style passage and judge whether the cloned-measure variation is missed.
-  **Options:** keep `0.4` · lower to `0.25` · keep `0.4` but add a gentler upward bias at low intensity.
-  **Decision:** _______________________
+- [x] **B1. Imperfect Symmetry intensity floor**
+  **Decision:** lower to 0.25 (shipped Epic 12 S6 commit `118c5018` 2026-05-24). Gate at `bass-engine.ts:451` now lets the octave-displacement gesture diverge on quiet ballad-style verses — the window where mechanical-loop feel is most exposed.
 
-- [ ] **B2. S8 energy-ramp inversion aggressiveness**
-  `conductor.ts:229` ships `0.5 down / 1.5 up`; the up-ramp can leap +0.25 in a single measure. Audit S8 explicitly said "pick after a listen-test of both directions."
-  Genre: any; listen across a section energy rise and a fall — does the up-ramp feel like a lurch?
-  **Options:** keep `0.5 / 1.5` · gentler `0.75 / 1.25` · neutral `1.0 / 1.0`.
-  **Decision:** _______________________
+- [x] **B2. S8 energy-ramp inversion aggressiveness**
+  **Decision:** soften to 0.75 / 1.25 (shipped Epic 12 S6 commit `9423fbbb` 2026-05-24). `conductor.ts:251` ramp multipliers preserve the asymmetric "settle in, build up" feel but cap the per-measure rise to ≈+0.0625 from the prior +0.25 lurch.
 
-- [ ] **B3. S8 Ska-Punk genre intensity floor**
-  Ska-Punk is high-energy by genre identity but has no `GENRE_INTENSITY_FLOORS` entry, so the backbeat upbeat-crack can drop out at low intensity.
-  Genre: Ska-Punk; play a low-intensity passage and judge whether the upbeat crack should always be present.
-  **Options:** add a floor ~`0.4` (analogous to Disco `0.45`) · pick a different floor value · leave it without a floor.
-  **Decision:** _______________________
+- [x] **B3. S8 Ska-Punk genre intensity floor**
+  **Decision:** add floor at 0.4 (shipped Epic 12 S6 commit `a349b777` 2026-05-24). `'Ska-Punk': 0.4` added to `GENRE_INTENSITY_FLOORS`, one notch below Disco's 0.45.
 
-- [ ] **B4. China cymbal `volumeScale`**
-  China runtime profile ships `volumeScale: 0.85` — picked as defensive headroom against a since-fixed triple-stack. A real China/Trash typically peaks *above* the Crash.
-  Genre: Metal; A/B the China accent against a Crash at the same hit (see **A3**).
-  **Options:** `0.90` · `0.95` · `1.0`.
-  **Decision:** _______________________
+- [x] **B4. China cymbal `volumeScale`**
+  **Decision:** raise to 1.0 (shipped Epic 12 S6 commit `7f875c9d` 2026-05-24). China now sits ≈+0.92 dB over Crash (which is at 0.9), matching idiomatic metal trash-cymbal mixes. Closes the volume question on [A3](#part-a--verification-of-shipped-engine-work) as well.
 
-- [ ] **B5. Funk motif-2 `+2` displacement frequency**
-  `grooves/funk.ts:184` puts 25% of motif-2 phrases on a full `+2` displacement (both backbeats shifted for a sustained 2-bar phrase). Canonically `+2` is a 1-bar fill setup, not a sustained groove.
-  Genre: Funk; play several 2-bar phrases and judge whether the sustained `+2` feel is too frequent.
-  **Options:** keep `0/1/2` at `25%/35%/40%`-ish current split · re-weight to `50%/35%/15%` (normal-heavy) · restructure `+2` as a 1-bar gesture that returns to normal next bar.
-  **Decision:** _______________________
+- [x] **B5. Funk motif-2 `+2` displacement frequency**
+  **Decision:** restructure `+2` as a 1-bar gesture (shipped Epic 12 S6 commit `c183362e` 2026-05-24). `grooves/funk.ts:189` now collapses `+2` back to spine backbeat on bar 2 of the 2-bar phrase via `effectiveDisplacement`, matching the canonical antecedent-consequent shape. `+0` and `+1` keep their 2-bar sustained scope.
 
-- [ ] **B6. Final-bar HiHat suppression**
-  Epic 2 S4 suppresses the HiHat on the final bar; in 8th-note-hat genres this can read as an abrupt drop-out.
-  Genre: an 8th-note-hat genre (Disco, Funk, Rock); listen to the last bar before a loop/section end.
-  **Options:** keep universal suppression · per-genre gate (suppress only where it sounds natural — list which genres).
-  **Decision:** _______________________
+- [x] **B6. Final-bar HiHat suppression**
+  **Decision:** per-genre gate via `HAT_SPINE_GENRES` (shipped Epic 12 S6 commits `0ef382a9` + `313e96d1` 2026-05-24). HiHat suppression preserved on sparse-hat genres (Jazz / Bossa / Acoustic / Country / Blues / Reggae / Latin / Minimal); kept on the spine in Disco / Funk / Rock / Metal / Shred / Ska-Punk / Hip Hop / Neo-Soul. The patch commit added Hip Hop and Neo-Soul after a music-theory-reviewer P1 + P2 and renamed `HAT_DENSE_GENRES` → `HAT_SPINE_GENRES` since Ska-Punk's skank is offbeat-only, not dense.
 
 ---
 

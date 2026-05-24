@@ -9,17 +9,17 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | Story | Title | Model | State |
 | :- | :- | :-: | :- |
 | S1 | Soloist engine `scrambleHash` migration | opus | Shipped 2026-05-20 |
-| S2 | `evansIntervals` chord-quality awareness | opus | Ready |
+| S2 | `evansIntervals` chord-quality awareness | opus | Shipped 2026-05-23 |
 | S3 | Profile-rotation sticky-retain | opus | Shipped 2026-05-23 |
 | S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Shipped 2026-05-23 |
 | S5 | Bass walking idiom | opus | Shipped 2026-05-23 |
-| S6 | Per-genre tuning sweep | sonnet | Blocked → `LISTEN_TESTS.md` Part B |
+| S6 | Per-genre tuning sweep | sonnet | Shipped 2026-05-24 |
 | S7 | Final-bar polish | opus | Blocked → `LISTEN_TESTS.md` C1 |
 | S8 | Per-genre arrangement design | opus | Blocked → `LISTEN_TESTS.md` C2/C3 |
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**5 / 10 shipped.** S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**6 / 10 shipped.** S7–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
@@ -90,7 +90,7 @@ Implements the six value/direction decisions recorded in `LISTEN_TESTS.md` Part 
 
 **Acceptance:** each `LISTEN_TESTS.md` Part B decision is implemented as recorded; critique tests updated where a gated rate changes.
 **Effort:** ~4h. **Model:** sonnet (mechanical once decided). **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
-**Status:** Blocked — needs `LISTEN_TESTS.md` Part B decisions B1–B6.
+**Status:** Shipped 2026-05-24 — all six B-items committed per-item. B1 (`118c5018`): bass Imperfect Symmetry floor 0.4 → 0.25 at `bass-engine.ts:451`. B2 (`9423fbbb`): conductor ramp 0.5/1.5 → 0.75/1.25 at `conductor.ts:251`. B3 (`a349b777`): `'Ska-Punk': 0.4` added to `GENRE_INTENSITY_FLOORS`. B4 (`7f875c9d`): China `volumeScale` 0.85 → 1.0 at `synth-drums.ts:464`. B5 (`c183362e`): funk motif-2 `+2` restructured as 1-bar gesture via `effectiveDisplacement` collapse on bar 2. B6 (`0ef382a9` + reviewer-patch `313e96d1`): `HAT_SPINE_GENRES = {Disco, Funk, Rock, Metal, Shred, Ska-Punk, Hip Hop, Neo-Soul}` gates the Epic 2 S4 final-bar HiHat suppression — sparse-hat genres still suppress, spine-hat genres keep the ticker. Music-theory-reviewer 0 P0 / 1 P1 (Hip Hop missing) / 4 P2; P1 + naming P2 (`HAT_DENSE_GENRES` → `HAT_SPINE_GENRES`) + Neo-Soul P2 patched inline. 634/634 standards green. Listen-test passed 2026-05-24 (no playback issues on owner's initial testing).
 
 ### S7. Final-bar polish
 
