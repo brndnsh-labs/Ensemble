@@ -342,6 +342,22 @@ const PRESET_OVERRIDES = {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0,
         ],
+        // Aux-percussion: idiomatic funk wash. Shaker runs 16ths with the
+        // accent on the upbeats (positions 1,3,5… in each beat) and ghosts on
+        // the downbeats — the classic wrist-snap pattern that interlocks with
+        // the hi-hat's downbeat-accented 16ths instead of doubling them
+        // (Chic-era under-the-hat sizzle, the engine's main 5 kHz air-band
+        // producer). Conga adds a sparse "ah/e" syncopation with a slight
+        // bar-2 variation. Velocities (1 → 0.9, 2 → 1.25 in groove-engine.ts)
+        // are tuned to sit *under* the kit.
+        Shaker: [
+            1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1,
+            2, 1, 2,
+        ],
+        Conga: [
+            0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1, 1, 0,
+            0, 2, 0,
+        ],
         '3/4': {
             Kick: [2, 0, 0, 1, 0, 0, 2, 0, 0, 0, 1, 0, 2, 0, 0, 1, 0, 0, 2, 0, 1, 0, 2, 0],
             Snare: [0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0],
