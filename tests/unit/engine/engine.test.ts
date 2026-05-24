@@ -99,6 +99,8 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
                 this.createBuffer = vi.fn(() => ({
                     getChannelData: vi.fn(() => new Float32Array(1024)),
                 }));
+                this.createChannelMerger = vi.fn(() => ({ connect: vi.fn() }));
+                this.createChannelSplitter = vi.fn(() => ({ connect: vi.fn() }));
                 this.resume = vi.fn().mockResolvedValue();
             }
         };

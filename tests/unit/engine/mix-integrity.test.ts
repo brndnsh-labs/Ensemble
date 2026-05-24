@@ -132,6 +132,8 @@ describe('Mix & Signal Integrity Audit', () => {
             this.createDelay = vi.fn().mockImplementation(createMockNode);
             this.createOscillator = vi.fn().mockImplementation(createMockNode);
             this.createBiquadFilter = vi.fn().mockImplementation(createMockNode);
+            this.createChannelMerger = vi.fn().mockImplementation(createMockNode);
+            this.createChannelSplitter = vi.fn().mockImplementation(createMockNode);
             this.createBuffer = vi.fn(() => ({
                 getChannelData: vi.fn(() => new Float32Array(1024)),
             }));

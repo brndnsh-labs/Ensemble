@@ -87,6 +87,8 @@ describe('DSP & Signal Safety', () => {
             this.createBuffer = vi.fn(() => ({
                 getChannelData: vi.fn(() => new Float32Array(1024)),
             }));
+            this.createChannelMerger = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
+            this.createChannelSplitter = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
             this.destination = {};
         });
 

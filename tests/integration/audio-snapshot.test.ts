@@ -143,6 +143,8 @@ describe('Audio Engine Snapshot Regression', () => {
                 };
             },
             createPeriodicWave: () => ({}),
+            createChannelMerger: () => ({ connect: () => {} }),
+            createChannelSplitter: () => ({ connect: () => {} }),
             destination: { id: 'destination' },
         };
 
