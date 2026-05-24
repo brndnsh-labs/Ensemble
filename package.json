@@ -27,6 +27,7 @@
         "drums:report": "tsx scripts/evaluate-groove.ts",
         "ensemble:report": "tsx scripts/evaluate-ensemble.ts",
         "mix:report": "tsx scripts/mix-report.ts",
+        "mix:diff": "tsx scripts/mix-diff.ts",
         "size": "size-limit",
         "build:size": "npm run build && size-limit",
         "validate": "npm run typecheck && npm run knip && npm run jscpd && npm run format && npm test",
