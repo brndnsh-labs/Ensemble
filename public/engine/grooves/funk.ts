@@ -187,16 +187,29 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // backbeat — the displacement reads as a deliberate gesture, not
             // a permanent setting.
             const displacement = snarePhraseSeed < 0.4 ? 0 : snarePhraseSeed < 0.75 ? 1 : 2;
+            // why (Epic 12 S6 B5): asymmetric phrase scope. +0 (normal) and +1
+            // (laid-back e of backbeat) are canonically *sustained* groove choices
+            // — a drummer who picks them commits for the phrase. +2 (full offbeat
+            // shift) is canonically a 1-bar fill setup, not a sustained 2-bar
+            // groove. Restrict +2 to bar 1 of the 2-bar phrase; on bar 2 it
+            // collapses back to the spine backbeat so the gesture reads as a
+            // setup-and-return, not a sustained displacement.
+            const barInPhrase = barIndex % 2; // 0 = bar 1, 1 = bar 2 of the 2-bar phrase
+            const effectiveDisplacement =
+                displacement === 2 && barInPhrase === 1 ? 0 : displacement;
             const onBackbeatTuple = beatIndex === 1 || beatIndex === 3;
             const isDisplacedHit =
                 onBackbeatTuple &&
-                ((displacement === 0 && isBackbeat) ||
-                    (displacement === 1 && isEOfBeat) ||
-                    (displacement === 2 && isOffbeat && !isPulse));
+                ((effectiveDisplacement === 0 && isBackbeat) ||
+                    (effectiveDisplacement === 1 && isEOfBeat) ||
+                    (effectiveDisplacement === 2 && isOffbeat && !isPulse));
             if (isDisplacedHit) {
                 shouldPlay = true;
                 // why: full-displacement (+2) hits a touch harder — that's the
                 // most overt gesture and drummers play it with more commitment.
+                // Uses original `displacement` (not effective) so the velocity
+                // intent applies on bar 1 of a +2 phrase; bar 2 falls back to the
+                // spine backbeat (effectiveDisplacement === 0) at 1.15 anyway.
                 velocity = displacement === 2 ? 1.18 : 1.15;
             }
         } else {
