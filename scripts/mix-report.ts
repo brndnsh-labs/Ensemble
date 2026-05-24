@@ -151,6 +151,13 @@ function formatMetric(value, digits = 3) {
     return value.toFixed(digits);
 }
 
+function formatLoopArc(loopRmsDb) {
+    if (!Array.isArray(loopRmsDb) || loopRmsDb.length === 0) {
+        return '-';
+    }
+    return loopRmsDb.map((v) => (Number.isFinite(v) ? v.toFixed(1) : '-inf')).join('|');
+}
+
 async function readStdin() {
     if (process.stdin.isTTY) {
         throw new Error('Expected piped JSON when using --focus-from=-');
@@ -264,6 +271,8 @@ function printHumanMixReport(report) {
                         metrics.stereo?.sideRatio == null
                             ? '-'
                             : Number(metrics.stereo.sideRatio).toFixed(3),
+                    arc: metrics.arc || '-',
+                    loopDb: formatLoopArc(metrics.loopRmsDb),
                 })),
             );
 
@@ -274,7 +283,8 @@ function printHumanMixReport(report) {
     }
 }
 
-async function renderSceneReports({ scenes, seeds, writeWav }) {
+async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
+    const loopCount = Math.max(1, Math.floor(loops || 1));
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
     const writtenWavPaths = [];
@@ -320,7 +330,7 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
             );
 
             const sceneRuns = await page.evaluate(
-                async ({ scenes, stems, seeds, writeWav }) => {
+                async ({ scenes, stems, seeds, writeWav, loops }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     const {
                         getState,
@@ -633,6 +643,67 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                         return peak;
                     }
 
+                    function computePerLoopRmsDb(
+                        monoSamples,
+                        sampleRate,
+                        leadInSeconds,
+                        loopSeconds,
+                        loopCount,
+                    ) {
+                        if (loopCount <= 1 || loopSeconds <= 0) {
+                            return null;
+                        }
+                        const out = [];
+                        const samplesPerLoop = Math.floor(loopSeconds * sampleRate);
+                        const startOffset = Math.floor(leadInSeconds * sampleRate);
+                        for (let i = 0; i < loopCount; i++) {
+                            const start = startOffset + i * samplesPerLoop;
+                            const end = Math.min(monoSamples.length, start + samplesPerLoop);
+                            if (end <= start) {
+                                out.push(-Infinity);
+                                continue;
+                            }
+                            let sumSquares = 0;
+                            for (let j = start; j < end; j++) {
+                                sumSquares += monoSamples[j] * monoSamples[j];
+                            }
+                            const rms = Math.sqrt(sumSquares / (end - start));
+                            out.push(rms > 0 ? 20 * Math.log10(rms) : -Infinity);
+                        }
+                        return out;
+                    }
+
+                    function classifyArc(loopRmsDb) {
+                        if (!loopRmsDb || loopRmsDb.length < 2) {
+                            return null;
+                        }
+                        const finite = loopRmsDb.filter((v) => Number.isFinite(v));
+                        if (finite.length < 2) {
+                            return null;
+                        }
+                        const max = Math.max(...finite);
+                        const min = Math.min(...finite);
+                        if (max - min < 1.5) {
+                            return 'flat';
+                        }
+                        const peakIndex = loopRmsDb.indexOf(max);
+                        const troughIndex = loopRmsDb.indexOf(min);
+                        const last = loopRmsDb.length - 1;
+                        if (peakIndex === 0 && loopRmsDb[last] <= loopRmsDb[0] - 1.5) {
+                            return 'front-loaded';
+                        }
+                        if (peakIndex === last && loopRmsDb[0] <= loopRmsDb[last] - 1.5) {
+                            return 'building';
+                        }
+                        if (peakIndex > 0 && peakIndex < last) {
+                            return 'arc';
+                        }
+                        if (troughIndex > 0 && troughIndex < last) {
+                            return 'dip';
+                        }
+                        return 'irregular';
+                    }
+
                     function computeRms(samples) {
                         let sumSquares = 0;
                         for (let i = 0; i < samples.length; i++) {
@@ -857,8 +928,10 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                         const state = createSceneState(scene, stem);
                         const sixteenth = 60 / state.playback.bpm / 4;
                         const renderLeadIn = 0.25;
-                        const renderSeconds =
-                            renderLeadIn + state.arranger.totalSteps * sixteenth + 2;
+                        const stepsPerLoop = state.arranger.totalSteps;
+                        const loopCount = Math.max(1, loops || 1);
+                        const totalRenderSteps = stepsPerLoop * loopCount;
+                        const renderSeconds = renderLeadIn + totalRenderSteps * sixteenth + 2;
                         const offlineCtx = new OfflineAudioContext(
                             2,
                             Math.ceil(renderSeconds * sampleRate),
@@ -869,6 +942,12 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
 
                         try {
                             initAudio(state, { audioContext: offlineCtx, enableWatchdog: false });
+
+                            // Schedule analysis runs once per stem from the
+                            // first-loop note buffer; the absolute schedule
+                            // density is comparable across stems/scenes that
+                            // way. Per-loop *audio* arcs come from slicing the
+                            // rendered output below.
                             fillBuffers(state);
                             const schedule = stem.schedule
                                 ? analyzeNoteSchedule(
@@ -879,17 +958,40 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                                   )
                                 : null;
 
-                            for (let step = 0; step < state.arranger.totalSteps; step++) {
-                                const time = renderLeadIn + step * sixteenth;
-                                state.playback.nextNoteTime = time;
-                                state.playback.unswungNextNoteTime = time;
-                                scheduleGlobalEvent(state, step, time);
+                            for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
+                                // Drive the soloist's chorus-evolution machinery
+                                // (Loop 0 head → Loop 1 themed → Loop 2+ exploratory)
+                                // by bumping currentLoopCount the way scheduler-core
+                                // does at each `step % totalSteps === 0` boundary.
+                                state.playback.currentLoopCount = loopIndex;
+                                if (loopIndex > 0) {
+                                    // Re-fill so chorus-evolution biases (ornamentation
+                                    // rate, fatigue decay, common-tone reward) actually
+                                    // express in the generated notes for this loop.
+                                    fillBuffers(state);
+                                }
+                                for (let step = 0; step < stepsPerLoop; step++) {
+                                    const absoluteStep = loopIndex * stepsPerLoop + step;
+                                    const time = renderLeadIn + absoluteStep * sixteenth;
+                                    state.playback.nextNoteTime = time;
+                                    state.playback.unswungNextNoteTime = time;
+                                    scheduleGlobalEvent(state, step, time);
+                                }
                             }
 
                             const rendered = await offlineCtx.startRendering();
                             const mono = toMono(rendered);
                             const peak = computePeak(mono);
                             const rms = computeRms(mono);
+
+                            const loopRmsDb = computePerLoopRmsDb(
+                                mono,
+                                sampleRate,
+                                renderLeadIn,
+                                stepsPerLoop * sixteenth,
+                                loopCount,
+                            );
+                            const arc = classifyArc(loopRmsDb);
 
                             if (writeWav) {
                                 const channels = [];
@@ -913,6 +1015,8 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                                 probes: computeSpectralProbes(mono, sampleRate),
                                 transients: computeTransientMetrics(mono, sampleRate),
                                 stereo: computeStereoMetrics(rendered),
+                                loopRmsDb,
+                                arc,
                                 schedule,
                             };
                         } finally {
@@ -950,7 +1054,13 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
 
                     return sceneReports;
                 },
-                { scenes, stems: MIX_REPORT_STEMS, seeds, writeWav: Boolean(writeWav) },
+                {
+                    scenes,
+                    stems: MIX_REPORT_STEMS,
+                    seeds,
+                    writeWav: Boolean(writeWav),
+                    loops: loopCount,
+                },
             );
 
             return { sceneRuns, writtenWavPaths };
@@ -989,6 +1099,7 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         scenes,
         seeds,
         writeWav: cliOptions.writeWav,
+        loops: cliOptions.loops,
     });
     const report = buildRenderedMixReport({
         sceneRuns,

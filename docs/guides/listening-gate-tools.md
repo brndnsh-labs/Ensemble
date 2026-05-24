@@ -26,6 +26,15 @@ mono) and `sideRatio` (fraction of energy in the side channel, 0 = mono, ~0.5
 = maximally wide). Useful for catching mixes that have shrunk to the center
 without anyone noticing.
 
+Pass `--loops=N` (default 1) to render each scene through N choruses. The
+offline render bumps `playback.currentLoopCount` on each loop boundary so
+the soloist's chorus-evolution machinery (Loop 0 head → Loop 1 themed →
+Loop 2+ exploratory) actually expresses. Each stem then reports per-loop
+RMS in dB (`loopDb` column) and an `arc` classification: `flat` (under
+1.5 dB swing), `front-loaded`, `building`, `arc`, `dip`, `irregular`. The
+old default render of a single loop was silently testing only the
+"Loop 0" head behavior — this surfaces the rest of the architecture.
+
 ## `npm run --silent mix:diff -- before.json after.json`
 
 Compares two `mix:report --json` outputs and surfaces stems whose

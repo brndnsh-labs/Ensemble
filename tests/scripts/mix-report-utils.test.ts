@@ -60,6 +60,13 @@ describe('mix report utilities', () => {
 
         const defaults = resolveMixReportCliOptions([]);
         expect(defaults.writeWav).toBeNull();
+        expect(defaults.loops).toBe(1);
+
+        const looped = resolveMixReportCliOptions(['--loops=4']);
+        expect(looped.loops).toBe(4);
+
+        const negative = resolveMixReportCliOptions(['--loops=-2']);
+        expect(negative.loops).toBe(1);
 
         const selected = selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES, ['jazz-ride']);
         expect(selected).toHaveLength(1);

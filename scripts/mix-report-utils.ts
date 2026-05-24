@@ -297,6 +297,12 @@ export function resolveMixReportCliOptions(argv = []) {
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
         writeWav: readStringOption(options, 'write-wav', '') || null,
+        // Render each scene through N loops of its progression so the
+        // soloist's chorus-evolution architecture (Loop 0 head → Loop 1
+        // themed → Loop 2+ exploratory) actually expresses. The per-loop
+        // RMS arc gets reported per stem so front-loaded / arc-shaped /
+        // flat intensity trajectories surface as hard numbers.
+        loops: Math.max(1, Math.floor(readNumberOption(options, 'loops', 1))),
     };
 }
 
