@@ -401,6 +401,42 @@ describe('mix report utilities', () => {
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
         });
 
+        it('flags when only the bed (full) is mono even if full+solo passes', () => {
+            // Realistic post-S1 case: soloist bus pans +0.25 so adding the
+            // soloist lifts the +solo stem above the floor while the bed
+            // stem (drums + bass + chords + harmony only) stays narrow.
+            // Owner asked for both numbers in the finding line.
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    stereo: { correlation: 0.98, sideRatio: 0.015 },
+                }),
+                'full+solo': createStemMetrics({
+                    stereo: { correlation: 0.9, sideRatio: 0.04 },
+                }),
+            });
+            const finding = findings.find((n) => n.includes('functionally mono'));
+            expect(finding).toBeDefined();
+            // Surfaces the failing bed stem with its number
+            expect(finding).toContain('full 1.5%');
+            // Does not name the +solo stem (it passed)
+            expect(finding).not.toContain('full+solo');
+        });
+
+        it('flags both stems when both fall below the floor', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    stereo: { correlation: 0.99, sideRatio: 0.009 },
+                }),
+                'full+solo': createStemMetrics({
+                    stereo: { correlation: 0.97, sideRatio: 0.018 },
+                }),
+            });
+            const finding = findings.find((n) => n.includes('functionally mono'));
+            expect(finding).toBeDefined();
+            expect(finding).toContain('full 0.9%');
+            expect(finding).toContain('full+solo 1.8%');
+        });
+
         it('flags an over-panned mix above the side-energy ceiling', () => {
             // Bill Evans-era hard-pan territory: 45% side. The default ceiling
             // is 30%; the S1 engine cap is 20%. The "over-panned" finding

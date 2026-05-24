@@ -528,22 +528,40 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         );
     }
 
-    // Stereo image: gate on side energy ratio, not correlation. Get Lucky
-    // at correlation 0.94 sounds genuinely stereo (3% side); Bill Evans at
-    // correlation 0.095 / 45% side is also great. The discriminator is the
-    // side ratio. Correlation stays in the finding line for diagnostic value.
-    if (full?.stereo?.sideRatio != null && full.stereo.sideRatio < sideRatioMin) {
-        const corrPart =
-            full.stereo.correlation != null
-                ? `; L/R correlation ${full.stereo.correlation.toFixed(3)}`
-                : '';
+    // Stereo image: gate on side energy ratio across both `full` (bed only)
+    // and `full+solo` (bed + soloist). The bed-only stem catches mono drum
+    // + chord beds that get masked once a panned soloist enters; the +solo
+    // stem catches over-panning once the soloist's StereoPanner contributes.
+    // Side ratio is the discriminator, not correlation — Get Lucky at corr
+    // 0.94 sounds genuinely stereo (3% side); Bill Evans at corr 0.095 /
+    // 45% side is also great.
+    const sideCandidates = [
+        {
+            label: 'full',
+            sideRatio: full?.stereo?.sideRatio,
+            correlation: full?.stereo?.correlation,
+        },
+        {
+            label: 'full+solo',
+            sideRatio: fullWithSolo?.stereo?.sideRatio,
+            correlation: fullWithSolo?.stereo?.correlation,
+        },
+    ].filter((row) => row.sideRatio != null);
+    const tooNarrow = sideCandidates.filter((row) => row.sideRatio < sideRatioMin);
+    const tooWide = sideCandidates.filter((row) => row.sideRatio > sideRatioMax);
+    if (tooNarrow.length > 0) {
+        const parts = tooNarrow.map((row) => {
+            const corrPart = row.correlation != null ? `, corr ${row.correlation.toFixed(3)}` : '';
+            return `${row.label} ${(row.sideRatio * 100).toFixed(1)}%${corrPart}`;
+        });
         notes.push(
-            `full mix is functionally mono — side energy ${(full.stereo.sideRatio * 100).toFixed(1)}% (target ≥ ${(sideRatioMin * 100).toFixed(1)}%)${corrPart}`,
+            `mix is functionally mono — side energy ${parts.join('; ')} (target ≥ ${(sideRatioMin * 100).toFixed(1)}%)`,
         );
     }
-    if (full?.stereo?.sideRatio != null && full.stereo.sideRatio > sideRatioMax) {
+    if (tooWide.length > 0) {
+        const parts = tooWide.map((row) => `${row.label} ${(row.sideRatio * 100).toFixed(1)}%`);
         notes.push(
-            `full mix is over-panned — side energy ${(full.stereo.sideRatio * 100).toFixed(1)}% (target ≤ ${(sideRatioMax * 100).toFixed(1)}%)`,
+            `mix is over-panned — side energy ${parts.join('; ')} (target ≤ ${(sideRatioMax * 100).toFixed(1)}%)`,
         );
     }
 
