@@ -42,6 +42,24 @@ const strategies: Record<string, any> = {
     Shred: shred,
 };
 
+// why (Epic 12 S6 B6): genres whose closed-hat is a constant 8th/16th-note
+// ticker driving the pocket. The Epic 2 S4 final-bar resolution gesture (Crash
+// + sustained cymbal) suppresses the HiHat universally so the swell rings out
+// cleanly — but in these genres the hat ISN'T a separate "would the cymbal
+// clutter the swell" decision, it's part of the spine. Suppressing it reads as
+// an abrupt drop-out at the moment the band is supposed to land hardest.
+//
+// Membership rule: hat (or upbeat-crack ride/snare driving the offbeat) plays
+// on every 8th or finer through the bar at typical intensity. Disco's 4-on-the-
+// floor + 8th-hat, Funk's 16th ghosting, Rock's driving 8ths, Metal/Shred's
+// 8th-note rides, Ska-Punk's offbeat-hat upbeat-crack.
+//
+// For sparser-hat genres (Jazz/Bossa/Acoustic/Country/Blues/Reggae/Neo-Soul/
+// Latin/Minimal/Hip Hop) the original universal suppression remains correct —
+// the hat wasn't a constant ticker to begin with, so silencing it on the final
+// bar reads as the intended "let the swell breathe" gesture.
+const HAT_DENSE_GENRES = new Set(['Disco', 'Funk', 'Rock', 'Metal', 'Shred', 'Ska-Punk']);
+
 function getStrategy(groove: any): any {
     const isLatinStyle =
         groove.genreFeel === 'Bossa Nova' ||
@@ -568,18 +586,24 @@ export function applyGrooveOverrides(
                 // dominant gesture.
                 currentState.shouldPlay = true;
                 currentState.velocity = 1.15;
-            } else if (inst.name === 'HiHat') {
+            } else if (inst.name === 'HiHat' && !HAT_DENSE_GENRES.has(groove.genreFeel)) {
                 // why: suppress the closed-hat on beat 1 — the Open Crash is
                 // what we want ringing through the bar. Closed hat overlay
-                // would clutter the swell.
+                // would clutter the swell. Gated per-genre (Epic 12 S6 B6):
+                // in 8th-note-hat genres (HAT_DENSE_GENRES) the hat is part of
+                // the spine, so silencing it reads as an abrupt drop-out
+                // rather than a swell-breathing decision.
                 currentState.shouldPlay = false;
             }
         } else {
-            // After beat 1: silence the cymbal lanes so the swell rings out.
-            // why: HiHat ticking past beat 1 would chop the Crash's tail.
-            // Open keeps the Crash routing if it was set above, but we don't
-            // re-trigger it — only the beat-1 fire is allowed.
-            if (inst.name === 'HiHat' || inst.name === 'Open') {
+            // After beat 1: silence Open (the Crash's tail rings on its own)
+            // and the HiHat in sparse-hat genres. In HAT_DENSE_GENRES we let
+            // the hat ticker continue through the final bar (Epic 12 S6 B6) —
+            // chopping it for a swell that doesn't fit the genre would read
+            // as the band dropping out, not as a cadence gesture.
+            if (inst.name === 'Open') {
+                currentState.shouldPlay = false;
+            } else if (inst.name === 'HiHat' && !HAT_DENSE_GENRES.has(groove.genreFeel)) {
                 currentState.shouldPlay = false;
             }
             // Snare/Kick: let the strategy/entropy decide as usual — a real

@@ -647,8 +647,14 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
         expect(result.velocity).toBeGreaterThanOrEqual(1.0);
     });
 
-    it('suppresses HiHat on the final bar so the swell rings out', () => {
+    it('suppresses HiHat on the final bar in sparse-hat genres (e.g. Jazz)', () => {
+        // why (Epic 12 S6 B6): final-bar HiHat suppression is now per-genre.
+        // Sparse-hat genres (Jazz, Bossa, Acoustic, Country, Blues, Reggae,
+        // Neo-Soul, Latin, Minimal, Hip Hop) keep the universal suppression so
+        // the Open Crash swell rings cleanly through the bar.
         const state = makeDrumsMockState();
+        state.groove.genreFeel = 'Jazz';
+        state.groove.lastDrumPreset = 'Jazz';
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
@@ -663,6 +669,36 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
         const subParams = buildDrumParams(finalDownbeat + 4, 'HiHat', 1, state, true);
         result = applyGrooveOverrides(state, subParams);
         expect(result.shouldPlay).toBe(false);
+    });
+
+    it('keeps the HiHat ticker through the final bar in hat-dense genres (e.g. Funk)', () => {
+        // why (Epic 12 S6 B6): in 8th-note-hat genres (HAT_DENSE_GENRES — Disco,
+        // Funk, Rock, Metal, Shred, Ska-Punk) the hat IS the spine. Silencing
+        // it on the final bar would read as an abrupt drop-out rather than a
+        // swell-breathing decision. The final-bar gate must NOT force-suppress
+        // the HiHat in these genres — whatever the strategy decided plays.
+        const state = makeDrumsMockState(); // default genre is Funk
+        getState.mockReturnValue(state);
+
+        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
+        // Downbeat HiHat in Funk: the gate must not unconditionally suppress.
+        // (Whether the strategy actually fires is a separate decision; the
+        // assertion here is that the final-bar override no longer flips it to
+        // false outright.) We assert this by confirming the strategy's own
+        // shouldPlay value survives — if the gate had suppressed it, we'd see
+        // false here regardless of what the strategy decided.
+        const dbParams = buildDrumParams(finalDownbeat, 'HiHat', 1, state, true);
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        const dbResult = applyGrooveOverrides(state, dbParams);
+
+        // Compare against a non-final-bar identical step: if the only delta
+        // between the two results is the final-bar gate firing, then the gate
+        // is correctly NOT suppressing the hat in Funk. (Both should have the
+        // same shouldPlay value.)
+        const dbParamsNonFinal = buildDrumParams(finalDownbeat, 'HiHat', 1, state, false);
+        const dbResultNonFinal = applyGrooveOverrides(state, dbParamsNonFinal);
+
+        expect(dbResult.shouldPlay).toBe(dbResultNonFinal.shouldPlay);
     });
 
     it('Crash does NOT fire on a non-final downbeat (baseline preserved)', () => {
