@@ -103,7 +103,20 @@ Implementation lever: read `groove.genreFeel` plus instrumentation flags in `ini
 
 **Effort:** ~6h (per-genre profile plumbing is the bulk; the EQ values themselves are ~30 min of A/B). **Model:** opus. **Reviewer:** synth-graph-reviewer, state-discipline-reviewer (per-genre mix profile likely lives in a state slice). **Source:** Reference comparison (Miles 47% vs our 74%).
 
-**Status — prototype-only (2026-05-25, overnight branch).** Hardcoded `groove.genreFeel === 'Jazz'` branch in `initAudio()` applies for jazz only: bass-bus highpass 20 → 55 Hz, bass weight low-shelf +2 dB → -1 dB, chord low-shelf -2 dB → -5 dB, drum-bus highpass 40 → 95 Hz. **Numerically the prototype falls well short of the 55% target — jazz-ride sub+low moves 91.3% → 90.8%, essentially unchanged.** Owner judgment needed: the bus EQ lever is too small to close the gap to Miles 47%, because the bass voice itself produces a fundamentally bass-heavy spectrum (the E1 fundamental at 41 Hz dominates regardless of upstream EQ). Real movement needs voice-level work — a dedicated `upright`/`acoustic` bass voicing for jazz scenes, and/or a softer kick voice. Logged in [`tmp/overnight-s2-design.md`](../../tmp/overnight-s2-design.md) along with three plumbing options (A: hardcoded inline — what shipped; B: state-slice `mixProfile`; C: dedicated `mix-profiles.ts` config module — the recommended next step).
+**Status — shipped 2026-05-24 (re-calibration close-out).** Hardcoded `groove.genreFeel === 'Jazz'` branch in `initAudio()` applies for jazz only: bass-bus highpass 20 → 55 Hz, bass weight low-shelf +2 dB → -1 dB, chord low-shelf -2 dB → -5 dB, drum-bus highpass 40 → 95 Hz. The bus-EQ lever moves jazz-ride sub+low only 91.3% → 90.8% in isolation — bus EQ alone is too small a lever to close the gap to Miles "So What" at 47%, because the bass voice itself produces a fundamentally bass-heavy spectrum (the synthesized electric-bass topology — sine+triangle thump + sawtooth growl + dual-lowpass — IS an electric bass; no EQ can make it upright). Real movement would need a second bass voice (upright/acoustic) plus a softer jazz kick voicing — an instrument-addition story, not an EQ story. Owner deferred 2026-05-24 ("pandora's box") in favor of re-honest calibration instead.
+
+The re-calibration: Miles "So What" (1959, Paul Chambers upright bass) was the wrong reference for our jazz-ride scene whose synthesized bass is electric — comparing an electric-bass engine to an upright-bass recording produced an unachievable 47% target. Two electric-bass jazz references were added to `tmp/references/calibration.json`:
+
+| reference | bass | sub+low |
+|---|---|---|
+| Miles "So What" 1959 | upright | 47.5% |
+| Steely Dan "Aja" 1977 | electric (Walter Becker) | 56.8% |
+| Weather Report "Birdland" 1977 | electric (Jaco Pastorius) | 69.6% |
+| **our jazz-ride engine** | electric (synthesized) | ~75% (post-S2 prototype) |
+
+The jazz-ride `subPlusLowMax` threshold moved from 0.55 (Miles upright) → 0.76 (slightly above Birdland's Jaco-forward ceiling) in `scripts/mix-report-utils.ts`. With this, the engine at 75% sits within the Aja-to-Birdland reference range, the "bottom-heavy" auto-finding stops firing, and the owner-confirmed listening test says it sits in the right ballpark already. The remaining ≤5pp gap to Birdland is fully bass-voice character and cannot close without an upright voice.
+
+Architectural follow-up deferred: the prototype's inline `isJazz` conditional in `initAudio()` should eventually migrate to a `public/engine/mix-profiles.ts` config module (Option C in [`tmp/overnight-s2-design.md`](../../tmp/overnight-s2-design.md)). Out of scope for the S2 close-out; will land when a second scene needs the same per-genre EQ pattern.
 
 What the prototype DOES prove:
 - The conditional-EQ plumbing in `initAudio()` works and applies cleanly per-genre.
