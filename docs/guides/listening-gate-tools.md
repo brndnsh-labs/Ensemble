@@ -21,6 +21,11 @@ npm run mix:report -- --write-wav=tmp/mix-render --scene=jazz-ride --seeds=ALPHA
 
 Output dir is gitignored under `tmp/`.
 
+The per-stem table includes `corr` (Pearson L/R correlation, 1.0 = perfectly
+mono) and `sideRatio` (fraction of energy in the side channel, 0 = mono, ~0.5
+= maximally wide). Useful for catching mixes that have shrunk to the center
+without anyone noticing.
+
 ## `npm run --silent mix:diff -- before.json after.json`
 
 Compares two `mix:report --json` outputs and surfaces stems whose

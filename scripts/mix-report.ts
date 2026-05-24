@@ -256,6 +256,14 @@ function printHumanMixReport(report) {
                     presence: Number(metrics.probes?.presence || 0).toFixed(3),
                     air: Number(metrics.probes?.air || 0).toFixed(3),
                     centroidHz: Math.round(metrics.probes?.centroid || 0),
+                    corr:
+                        metrics.stereo?.correlation == null
+                            ? '-'
+                            : Number(metrics.stereo.correlation).toFixed(3),
+                    sideRatio:
+                        metrics.stereo?.sideRatio == null
+                            ? '-'
+                            : Number(metrics.stereo.sideRatio).toFixed(3),
                 })),
             );
 
@@ -579,6 +587,41 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                         return mono;
                     }
 
+                    function computeStereoMetrics(audioBuffer) {
+                        // Mono renders have no stereo image — return null so
+                        // downstream code can distinguish "wasn't stereo" from
+                        // "stereo but center-summed."
+                        if ((audioBuffer.numberOfChannels || 1) < 2) {
+                            return { correlation: null, sideRatio: null };
+                        }
+                        const left = audioBuffer.getChannelData(0);
+                        const right = audioBuffer.getChannelData(1);
+                        const length = Math.min(left.length, right.length);
+
+                        let sumLR = 0;
+                        let sumLL = 0;
+                        let sumRR = 0;
+                        let midEnergy = 0;
+                        let sideEnergy = 0;
+                        for (let i = 0; i < length; i++) {
+                            const l = left[i];
+                            const r = right[i];
+                            sumLR += l * r;
+                            sumLL += l * l;
+                            sumRR += r * r;
+                            const mid = (l + r) * 0.5;
+                            const side = (l - r) * 0.5;
+                            midEnergy += mid * mid;
+                            sideEnergy += side * side;
+                        }
+
+                        const denom = Math.sqrt(sumLL * sumRR);
+                        const correlation = denom > 1e-12 ? sumLR / denom : 1;
+                        const totalEnergy = midEnergy + sideEnergy;
+                        const sideRatio = totalEnergy > 1e-12 ? sideEnergy / totalEnergy : 0;
+                        return { correlation, sideRatio };
+                    }
+
                     function computePeak(samples) {
                         let peak = 0;
                         for (let i = 0; i < samples.length; i++) {
@@ -869,6 +912,7 @@ async function renderSceneReports({ scenes, seeds, writeWav }) {
                                 crestDb: toDb(peak) - toDb(rms),
                                 probes: computeSpectralProbes(mono, sampleRate),
                                 transients: computeTransientMetrics(mono, sampleRate),
+                                stereo: computeStereoMetrics(rendered),
                                 schedule,
                             };
                         } finally {
