@@ -257,11 +257,21 @@ export function initAudio(
             let busPanner: StereoPannerNode | null = null;
             let busSidechain: GainNode | null = null;
 
+            // Epic 7 S2 prototype: jazz-ride sits at 91% sub+low vs Miles
+            // "So What" reference 47%. A soft bass low-shelf + extra chord
+            // low-mid pull-back recovers headroom in the lows for a small
+            // sextet feel. Hardcoded conditional for the prototype only —
+            // the long-term plumbing (per-scene mix profile) lives in
+            // `tmp/overnight-s2-design.md`.
+            const isJazz = groove.genreFeel === 'Jazz';
+
             if (m.name === 'chords') {
                 const lowShelf = playback.audio.createBiquadFilter();
                 lowShelf.type = 'lowshelf';
                 lowShelf.frequency.setValueAtTime(350, playback.audio.currentTime);
-                lowShelf.gain.setValueAtTime(-2, playback.audio.currentTime);
+                // Jazz: extra -3 dB on top of the standard -2 dB so the chord
+                // bus doesn't fight the sextet's natural low-mid space.
+                lowShelf.gain.setValueAtTime(isJazz ? -5 : -2, playback.audio.currentTime);
 
                 // Presence band (synth-audit Epic 0 S5): this used to be a
                 // -2 dB *cut* at 2.5 kHz, which scooped out exactly the band
@@ -290,10 +300,19 @@ export function initAudio(
                 const sidechain = playback.audio.createGain();
                 sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
 
+                // Epic 7 S2 prototype: jazz uses an upright/double-bass voicing
+                // that doesn't carry the same sub-bass weight as a finger or
+                // pick electric. Push the bus highpass up from 20 → 55 Hz and
+                // flatten the +2 dB low-shelf to -1 dB so the bass sits in
+                // the upper-bass register where a jazz bass actually lives.
+                if (isJazz) {
+                    busEQ.frequency.setValueAtTime(55, playback.audio.currentTime);
+                }
+
                 const weight = playback.audio.createBiquadFilter();
                 weight.type = 'lowshelf';
                 weight.frequency.setValueAtTime(100, playback.audio.currentTime);
-                weight.gain.setValueAtTime(2, playback.audio.currentTime);
+                weight.gain.setValueAtTime(isJazz ? -1 : 2, playback.audio.currentTime);
 
                 const scoop = playback.audio.createBiquadFilter();
                 scoop.type = 'peaking';
@@ -383,7 +402,12 @@ export function initAudio(
             } else if (m.name === 'drums') {
                 const drumsHP = playback.audio.createBiquadFilter();
                 drumsHP.type = 'highpass';
-                drumsHP.frequency.setValueAtTime(40, playback.audio.currentTime);
+                // Epic 7 S2 prototype: jazz scenes use a softer kick voicing —
+                // pull the drum-bus highpass from 40 → 95 Hz to roll off the
+                // kick's sub-bass content. Combined with the bass-bus changes
+                // above, brings jazz-ride sub+low closer to the Miles
+                // reference (47%). Non-jazz scenes keep 40 Hz.
+                drumsHP.frequency.setValueAtTime(isJazz ? 95 : 40, playback.audio.currentTime);
 
                 const drumsAir = playback.audio.createBiquadFilter();
                 drumsAir.type = 'peaking';

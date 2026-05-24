@@ -92,6 +92,18 @@ Implementation lever: read `groove.genreFeel` plus instrumentation flags in `ini
 
 **Effort:** ~6h (per-genre profile plumbing is the bulk; the EQ values themselves are ~30 min of A/B). **Model:** opus. **Reviewer:** synth-graph-reviewer, state-discipline-reviewer (per-genre mix profile likely lives in a state slice). **Source:** Reference comparison (Miles 47% vs our 74%).
 
+**Status — prototype-only (2026-05-25, overnight branch).** Hardcoded `groove.genreFeel === 'Jazz'` branch in `initAudio()` applies for jazz only: bass-bus highpass 20 → 55 Hz, bass weight low-shelf +2 dB → -1 dB, chord low-shelf -2 dB → -5 dB, drum-bus highpass 40 → 95 Hz. **Numerically the prototype falls well short of the 55% target — jazz-ride sub+low moves 91.3% → 90.8%, essentially unchanged.** Owner judgment needed: the bus EQ lever is too small to close the gap to Miles 47%, because the bass voice itself produces a fundamentally bass-heavy spectrum (the E1 fundamental at 41 Hz dominates regardless of upstream EQ). Real movement needs voice-level work — a dedicated `upright`/`acoustic` bass voicing for jazz scenes, and/or a softer kick voice. Logged in [`tmp/overnight-s2-design.md`](../../tmp/overnight-s2-design.md) along with three plumbing options (A: hardcoded inline — what shipped; B: state-slice `mixProfile`; C: dedicated `mix-profiles.ts` config module — the recommended next step).
+
+What the prototype DOES prove:
+- The conditional-EQ plumbing in `initAudio()` works and applies cleanly per-genre.
+- Non-jazz scenes are not regressed (rock 94.8% → 94.6%, blues 80.9% → 80.6%, funk 97.6% → 97.0% — all within the ±3% no-regression bound).
+- The drum HPF lever does close 20pp of the drum-stem sub share (jazz drums sub 0.625 → 0.402) but the bass-stem share is the dominant contributor and bus EQ can't shift it that far without sounding gutted.
+
+Recommended sequencing if Epic 7 continues here:
+1. **S2a (architectural):** adopt Option C from the design memo — extract `MIX_PROFILES` into `public/engine/mix-profiles.ts`, replace the hardcoded conditional with a profile lookup. Cheap (~30 min). Unblocks scaling to more scenes.
+2. **S2b (voice work):** add a dedicated jazz bass voicing (upright-style) + softer jazz kick voicing. This is the real lever for hitting Miles. Likely ~1 day, needs synth-graph-reviewer + listening gate.
+3. **S2c (re-calibration):** revisit the 55% target with the post-S2b numbers; possibly relax to 60–65% if the post-voice numbers are still high.
+
 ### S3. High-register / air content
 Air (>5 kHz) is the one finding where even non-jazz references beat us by some measures: Chic and STP at 1.7%, ours at 1.3%, Miles at 4.5%. **But the 8-reference expansion exposed a measurement problem worth checking before the engine work.** Daft Punk "Get Lucky" — a track with audibly aggressive hi-hat / shaker content and pristine modern production — registers only 0.5% air at our 7.2 kHz Goertzel probe. *Lower than our engine at 1.3%.* That can't be right; the probe is missing where the energy actually lives.
 
