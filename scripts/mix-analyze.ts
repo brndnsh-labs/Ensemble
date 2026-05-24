@@ -220,7 +220,7 @@ function printHumanReport(analyses: FileAnalysis[]): void {
 
     console.log('');
     console.log(
-        `Findings (genre-agnostic thresholds: sub+low > ${DEFAULT_FINDING_THRESHOLDS.subPlusLowMax * 100}%, air < ${DEFAULT_FINDING_THRESHOLDS.airMin * 100}%, corr > ${DEFAULT_FINDING_THRESHOLDS.stereoCorrelationMax}):`,
+        `Findings (genre-agnostic thresholds: sub+low > ${DEFAULT_FINDING_THRESHOLDS.subPlusLowMax * 100}%, air < ${DEFAULT_FINDING_THRESHOLDS.airMin * 100}%, side < ${DEFAULT_FINDING_THRESHOLDS.sideRatioMin * 100}%):`,
     );
     for (const a of analyses) {
         const lowShare = a.probes.sub + a.probes.low;
@@ -231,11 +231,24 @@ function printHumanReport(analyses: FileAnalysis[]): void {
         if (a.probes.air < DEFAULT_FINDING_THRESHOLDS.airMin) {
             notes.push(`thin air band (${(a.probes.air * 100).toFixed(1)}%)`);
         }
+        // Stereo gate switched from correlation to side ratio in Epic 7 S1.
+        // See memory note `stereo-side-ratio-over-correlation` and
+        // summarizeRenderedFindings in mix-report-utils.ts for the reasoning.
         if (
-            a.stereo.correlation !== null &&
-            a.stereo.correlation > DEFAULT_FINDING_THRESHOLDS.stereoCorrelationMax
+            a.stereo.sideRatio !== null &&
+            a.stereo.sideRatio < DEFAULT_FINDING_THRESHOLDS.sideRatioMin
         ) {
-            notes.push(`functionally mono (corr ${a.stereo.correlation.toFixed(3)})`);
+            const corrPart =
+                a.stereo.correlation !== null ? `, corr ${a.stereo.correlation.toFixed(3)}` : '';
+            notes.push(
+                `functionally mono (side ${(a.stereo.sideRatio * 100).toFixed(1)}%${corrPart})`,
+            );
+        }
+        if (
+            a.stereo.sideRatio !== null &&
+            a.stereo.sideRatio > DEFAULT_FINDING_THRESHOLDS.sideRatioMax
+        ) {
+            notes.push(`over-panned (side ${(a.stereo.sideRatio * 100).toFixed(1)}%)`);
         }
         if (a.arc === 'flat') {
             notes.push('flat per-loop arc');

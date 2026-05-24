@@ -21,7 +21,20 @@ const DEFAULT_SEED = 'MIX_AUDIT';
 export const DEFAULT_FINDING_THRESHOLDS = {
     subPlusLowMax: 0.85,
     airMin: 0.01,
+    // Kept for diagnostic display in the finding line; the gate now uses
+    // sideRatioMin. Get Lucky at correlation 0.94 sounds genuinely stereo
+    // because side energy is 3% — correlation alone misses real stereo
+    // content (see memory: stereo-side-ratio-over-correlation, 2026-05-24).
     stereoCorrelationMax: 0.92,
+    // Side energy gate: fire "functionally mono" when sideRatio < this.
+    // 0.02 is genre-agnostic floor — no pro reference renders below it.
+    // Per-scene findingThresholds tighten this toward 0.03 (Get Lucky
+    // baseline) for the engine's calibrated scenes.
+    sideRatioMin: 0.02,
+    // Side energy ceiling: fire "over-panned" when sideRatio > this.
+    // 0.30 catches hard-panned 1961-era mixes (Bill Evans 0.45); the
+    // S1 engine target ceiling is 0.20.
+    sideRatioMax: 0.3,
 };
 
 export const DEFAULT_MIX_REPORT_SCENES = [
@@ -45,6 +58,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
             subPlusLowMax: 0.8,
             airMin: 0.015,
             stereoCorrelationMax: 0.85,
+            sideRatioMin: 0.03,
+            sideRatioMax: 0.2,
         },
     },
     {
@@ -67,6 +82,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
             subPlusLowMax: 0.85,
             airMin: 0.025,
             stereoCorrelationMax: 0.85,
+            sideRatioMin: 0.03,
+            sideRatioMax: 0.2,
         },
     },
     {
@@ -89,6 +106,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
             subPlusLowMax: 0.55,
             airMin: 0.035,
             stereoCorrelationMax: 0.7,
+            sideRatioMin: 0.03,
+            sideRatioMax: 0.2,
         },
     },
     {
@@ -111,6 +130,8 @@ export const DEFAULT_MIX_REPORT_SCENES = [
             subPlusLowMax: 0.8,
             airMin: 0.015,
             stereoCorrelationMax: 0.85,
+            sideRatioMin: 0.03,
+            sideRatioMax: 0.2,
         },
     },
 ];
@@ -422,8 +443,8 @@ export function parseEnsembleAuditInput(text, options = {}) {
 export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_THRESHOLDS) {
     const subPlusLowMax = thresholds?.subPlusLowMax ?? DEFAULT_FINDING_THRESHOLDS.subPlusLowMax;
     const airMin = thresholds?.airMin ?? DEFAULT_FINDING_THRESHOLDS.airMin;
-    const stereoCorrelationMax =
-        thresholds?.stereoCorrelationMax ?? DEFAULT_FINDING_THRESHOLDS.stereoCorrelationMax;
+    const sideRatioMin = thresholds?.sideRatioMin ?? DEFAULT_FINDING_THRESHOLDS.sideRatioMin;
+    const sideRatioMax = thresholds?.sideRatioMax ?? DEFAULT_FINDING_THRESHOLDS.sideRatioMax;
     const full = stems.full;
     const fullWithSolo = stems['full+solo'];
     const drums = stems.drums;
@@ -507,9 +528,22 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         );
     }
 
-    if (full?.stereo?.correlation != null && full.stereo.correlation > stereoCorrelationMax) {
+    // Stereo image: gate on side energy ratio, not correlation. Get Lucky
+    // at correlation 0.94 sounds genuinely stereo (3% side); Bill Evans at
+    // correlation 0.095 / 45% side is also great. The discriminator is the
+    // side ratio. Correlation stays in the finding line for diagnostic value.
+    if (full?.stereo?.sideRatio != null && full.stereo.sideRatio < sideRatioMin) {
+        const corrPart =
+            full.stereo.correlation != null
+                ? `; L/R correlation ${full.stereo.correlation.toFixed(3)}`
+                : '';
         notes.push(
-            `full mix is functionally mono — L/R correlation ${full.stereo.correlation.toFixed(3)}, side energy ${((full.stereo.sideRatio || 0) * 100).toFixed(1)}%`,
+            `full mix is functionally mono — side energy ${(full.stereo.sideRatio * 100).toFixed(1)}% (target ≥ ${(sideRatioMin * 100).toFixed(1)}%)${corrPart}`,
+        );
+    }
+    if (full?.stereo?.sideRatio != null && full.stereo.sideRatio > sideRatioMax) {
+        notes.push(
+            `full mix is over-panned — side energy ${(full.stereo.sideRatio * 100).toFixed(1)}% (target ≤ ${(sideRatioMax * 100).toFixed(1)}%)`,
         );
     }
 

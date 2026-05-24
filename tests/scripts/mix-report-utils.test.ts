@@ -247,10 +247,12 @@ describe('mix report utilities', () => {
 
     describe('architectural-bias findings', () => {
         // Default thresholds are genre-agnostic (subPlusLow > 85%, air < 1%,
-        // corr > 0.92) — see DEFAULT_FINDING_THRESHOLDS in mix-report-utils.ts.
+        // sideRatio < 2%) — see DEFAULT_FINDING_THRESHOLDS in mix-report-utils.ts.
         // Calibrated 2026-05-24 so they don't false-positive on pro reference
         // mixes (Miles, Chic, STP, BB King). Tighter genre-specific thresholds
-        // live on each scene in DEFAULT_MIX_REPORT_SCENES.
+        // live on each scene in DEFAULT_MIX_REPORT_SCENES. The stereo gate
+        // switched from correlation to side ratio in Epic 7 S1 — see memory
+        // note `stereo-side-ratio-over-correlation`.
 
         it('flags bottom-heavy mixes by sub+low share', () => {
             const findings = summarizeRenderedFindings({
@@ -360,7 +362,9 @@ describe('mix report utilities', () => {
             expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(true);
         });
 
-        it('flags a functionally mono mix by L/R correlation', () => {
+        it('flags a functionally mono mix by side energy ratio', () => {
+            // Pre-S1 engine baseline: correlation 0.985 / side 0.8% — fires
+            // under the 2% genre-agnostic floor.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
                     stereo: { correlation: 0.985, sideRatio: 0.008 },
@@ -369,28 +373,45 @@ describe('mix report utilities', () => {
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
         });
 
-        it('does not flag a pro mix as mono under the default threshold', () => {
-            // Calibrated against Chic "I Want Your Love": correlation 0.834 —
-            // the narrowest of the four reference mixes, still passes the
-            // default 0.92 threshold.
+        it('does not flag a high-correlation pro mix with real side content', () => {
+            // Daft Punk "Get Lucky": correlation 0.940 (would have failed the
+            // old correlation gate) but side energy 3% sounds genuinely stereo
+            // — the case the memory note flags as why side ratio is the right
+            // discriminator, not correlation.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
-                    stereo: { correlation: 0.834, sideRatio: 0.083 },
+                    stereo: { correlation: 0.94, sideRatio: 0.03 },
                 }),
             });
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(false);
         });
 
-        it('flags functional-mono under a scene-specific (jazz) threshold', () => {
+        it('flags functional-mono under a tighter scene-specific floor', () => {
+            // Side ratio 12% would pass the default 2% floor, but a stricter
+            // scene threshold (e.g. a jazz scene calibrated toward Miles at
+            // 21% side) still flags it.
             const findings = summarizeRenderedFindings(
                 {
                     full: createStemMetrics({
                         stereo: { correlation: 0.75, sideRatio: 0.12 },
                     }),
                 },
-                { stereoCorrelationMax: 0.7 },
+                { sideRatioMin: 0.15 },
             );
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
+        });
+
+        it('flags an over-panned mix above the side-energy ceiling', () => {
+            // Bill Evans-era hard-pan territory: 45% side. The default ceiling
+            // is 30%; the S1 engine cap is 20%. The "over-panned" finding
+            // gives a counterweight to the mono finding so tuning won't
+            // accidentally chase Bill Evans 1961 width.
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    stereo: { correlation: 0.1, sideRatio: 0.45 },
+                }),
+            });
+            expect(findings.some((n) => n.includes('over-panned'))).toBe(true);
         });
 
         it('flags a front-loaded arc when the full mix is classified that way', () => {

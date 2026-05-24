@@ -147,13 +147,15 @@ interface DrumMixState {
     lastTick: number;
 }
 
-// Ensemble pan map (verified 2026-05-23 mix-pass — see playDrumSound below
+// Ensemble pan map (Epic 7 S1 widening 2026-05-25 — see playDrumSound below
 // for the full drum dispatch):
-//   center        — Kick, Bass, Soloist (anchors)
-//   slight left   — Snare/Sidestick/Brush (-0.1), Chords (-0.2 at bus)
-//   slight right  — Harmony (+0.2 at bus)
-//   right (+0.35) — HiHat / Open / Crash / Ride / China / shaker family
-//   spread ±0.25  — Toms / Conga / Bongo (per-hit randomized)
+//   center 0     — Kick (anchored; jitter attempt removed — see playDrumSound)
+//   center +0.25 — Soloist (bus offset; per-note ±0.05 jitter on top)
+//   left   -0.2  — Snare/Sidestick/Brush
+//   left   -0.3  — Chords (at bus)
+//   right  +0.3  — Harmony (at bus)
+//   right  +0.35 — HiHat / Open / Crash / Ride / China / shaker family
+//   spread ±0.25 — Toms / Conga / Bongo (per-hit randomized)
 const RIGHT_PANNED_INSTRUMENTS = new Set([
     'HiHat',
     'Open',
@@ -1882,13 +1884,22 @@ function playDrumSoundCurrent(
         panValue = 0.35;
     } else if (name === 'Snare' || name === 'Sidestick' || name === 'Brush') {
         // why: Brush is the low-intensity jazz substitute for the snare/sidestick
-        // and occupies the same physical drum, so it shares their slight-left
-        // placement. Without this it would fall through to center (0) and the
-        // Brush->Sidestick swap at the intensity boundary would jump the pan.
-        panValue = -0.1;
+        // and occupies the same physical drum, so it shares their left placement.
+        // Without this it would fall through to center (0) and the Brush->Sidestick
+        // swap at the intensity boundary would jump the pan. Widened from -0.1 to
+        // -0.2 in Epic 7 S1 to better balance the +0.35 hi-hat mass on the right.
+        panValue = -0.2;
     } else if (name.includes('Tom') || name.includes('Conga') || name.includes('Bongo')) {
         panValue = (Math.random() * 2 - 1) * 0.25;
     }
+    // why (Epic 7 S1, tried-and-reverted): kicked around a ±0.10 per-hit
+    // Math.random() jitter on the kick to give the drums stem some side
+    // energy. It worked numerically but consumed an extra random draw per
+    // kick, shifting all the downstream Math.random consumers (hi-hat
+    // velocity jitter) out of step — which halved the hi-hat's air-band
+    // content. PRNG stream coupling, captured in repo memory. Kick stays
+    // at 0; a deterministic per-kick offset (hash of step index) would get
+    // the side energy without the stream coupling — follow-up story.
     const panner = createSimplePanner(playback.audio, panValue, playTime);
     if (playback.audioGraph) {
         panner.connect(playback.audioGraph.drums.gain);

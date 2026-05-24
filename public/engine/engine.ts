@@ -167,7 +167,44 @@ export function initAudio(
             // Algorithmic reverb (Schroeder/Freeverb), replacing the old static
             // white-noise convolver. Same input/output node contract.
             reverb = createAlgorithmicReverb(playback.audio, REVERB_PRESETS.hall);
-            reverb.output.connect(masterGain);
+
+            // Epic 7 S1: pseudo-stereo widener on the reverb wet only. The
+            // reverb internal chain is mono (single comb/allpass network), so
+            // by default the wet sums to L=R and contributes 0% side energy.
+            // Splitting into a direct path (pan -0.5) plus a 12 ms-delayed
+            // path (pan +0.5) gives the wet a real stereo image via the Haas
+            // precedence effect: source localization is unchanged (dry sources
+            // still define where each instrument sits) but the ambient bed
+            // develops genuine stereo width. Each path is attenuated 0.5 so
+            // the total reverb amplitude matches the original single-path
+            // setup; without this the two ±0.5 pan paths sum to ~2.4 dB
+            // louder reverb and a noticeably warmer top end. Mono-sum is
+            // safe: H(f) = 0.5 + 0.5·e^{-j2π·f·0.012} has full nulls at odd
+            // multiples of 41.7 Hz (41.7, 125, 208, 292, 375, 458, 542 Hz);
+            // every one falls under the 600 Hz reverbHPF and contributes no
+            // audible cancellation. Above 600 Hz the wet picks up a
+            // 12 ms-period comb-filter coloring when collapsed to mono,
+            // which is the accepted Haas trade for the side-energy gain.
+            const widenerGain = 0.5;
+            const reverbDirectGain = playback.audio.createGain();
+            reverbDirectGain.gain.setValueAtTime(widenerGain, playback.audio.currentTime);
+            const reverbDirectPan = playback.audio.createStereoPanner();
+            reverbDirectPan.pan.setValueAtTime(-0.5, playback.audio.currentTime);
+
+            const reverbHaasDelay = playback.audio.createDelay(0.05);
+            reverbHaasDelay.delayTime.setValueAtTime(0.012, playback.audio.currentTime);
+            const reverbDelayedGain = playback.audio.createGain();
+            reverbDelayedGain.gain.setValueAtTime(widenerGain, playback.audio.currentTime);
+            const reverbDelayedPan = playback.audio.createStereoPanner();
+            reverbDelayedPan.pan.setValueAtTime(0.5, playback.audio.currentTime);
+
+            reverb.output.connect(reverbDirectGain);
+            reverbDirectGain.connect(reverbDirectPan);
+            reverbDirectPan.connect(masterGain);
+            reverb.output.connect(reverbHaasDelay);
+            reverbHaasDelay.connect(reverbDelayedGain);
+            reverbDelayedGain.connect(reverbDelayedPan);
+            reverbDelayedPan.connect(masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---
             const reverbHPF = playback.audio.createBiquadFilter();
@@ -237,8 +274,10 @@ export function initAudio(
                 presence.Q.setValueAtTime(0.7, playback.audio.currentTime);
                 presence.gain.setValueAtTime(2, playback.audio.currentTime);
 
+                // Epic 7 S1 widened from -0.2 to -0.3: the chord bus needs
+                // to carry more side energy because bass is mono by design.
                 const panner = playback.audio.createStereoPanner();
-                panner.pan.setValueAtTime(-0.2, playback.audio.currentTime);
+                panner.pan.setValueAtTime(-0.3, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
                 busEQ.connect(lowShelf);
@@ -283,9 +322,25 @@ export function initAudio(
                 presence.gain.setValueAtTime(2, playback.audio.currentTime);
                 presence.Q.setValueAtTime(1.0, playback.audio.currentTime);
 
+                // Epic 7 S1: place the lead opposite the chord bus (-0.3) so
+                // the soloist owns its own slot. Per-note jitter in
+                // synth-soloist.ts (±0.05) cascades through this bus panner,
+                // which gives the lead an audible drift around +0.25 (not a
+                // strict sum — each cascaded StereoPannerNode re-positions
+                // its own input rather than adding). Pan at +0.25 contributes
+                // ~4% side energy from a single source; the goal is full-mix
+                // sideRatio ≥ 0.03 across all scenes, and bass is mono by
+                // design (low frequencies don't localize), so the other buses
+                // carry the side budget.
+                const panner = playback.audio.createStereoPanner();
+                panner.pan.setValueAtTime(0.25, playback.audio.currentTime);
+
                 gainNode.connect(busEQ);
                 busEQ.connect(presence);
-                presence.connect(masterGain);
+                presence.connect(panner);
+                panner.connect(masterGain);
+
+                busPanner = panner;
             } else if (m.name === 'harmonies') {
                 // Harmony bus character (synth-audit Epic 1 S5): the old
                 // bus was a single +1 dB peaking filter at 1.2 kHz — an
@@ -312,8 +367,11 @@ export function initAudio(
                 air.frequency.setValueAtTime(7500, playback.audio.currentTime);
                 air.gain.setValueAtTime(3, playback.audio.currentTime);
 
+                // Epic 7 S1 widened from +0.2 to +0.3: harmony stays opposite
+                // the chord bus (-0.3) and gives the upper-mid air content
+                // a dedicated right-side slot.
                 const panner = playback.audio.createStereoPanner();
-                panner.pan.setValueAtTime(0.2, playback.audio.currentTime);
+                panner.pan.setValueAtTime(0.3, playback.audio.currentTime);
 
                 gainNode.connect(busEQ);
                 busEQ.connect(scoop);

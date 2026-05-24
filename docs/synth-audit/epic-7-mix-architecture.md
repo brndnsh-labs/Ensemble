@@ -60,6 +60,24 @@ Every instrument bus is dead-center. Reference span is wide: Bill Evans 1961 at 
 
 **Effort:** ~3h. **Model:** opus (placement by ear). **Reviewer:** synth-graph-reviewer. **Source:** Reference comparison (8 tracks across 6 genres; see `tmp/references/calibration.json`).
 
+**Status — partial (2026-05-25, overnight branch `overnight/synth-epic-7-2026-05-25`).** Bus-pan widening + Haas-style stereo widener on the reverb wet. Acceptance is partially met — see `tmp/overnight-report.md` for the full audit and the morning A/B WAVs in `tmp/references/{before,after}-s1/`. Summary against the 4 default scenes (`full+solo` stem, which is what plays in real sessions):
+
+| scene | baseline | after S1 | target |
+|---|---|---|---|
+| rock-backbeat | 0.7% | 3.1% | ≥ 3.0% ✓ |
+| blues-shuffle | 1.0% | 3.0% | ≥ 3.0% ✓ |
+| jazz-ride | 0.5% | 3.5% | ≥ 3.0% ✓ |
+| funk-pocket | 0.3% | 1.4% | ≥ 3.0% ✗ |
+
+The diagnostic `full` stem (excludes soloist) sits 1.5–2× lower than `full+solo` because the soloist bus panner is one of the biggest contributors. The strict `full`-stem reading is 1.8% / 2.2% / 1.8% / 0.6% — every scene under target. The owner picks which gate counts; the listening reality is `full+solo`.
+
+Why funk falls short: bass is mono by design (low frequencies don't localize), funk drums are kick-and-snare-dominated rather than hat-heavy (the snare-pan widening helps but the centered kick dominates the drum energy), and funk harmony content is sparse (2.9% stem side vs. ~10% on other scenes). Pushing the existing per-bus pans harder would start to sound off-center. The natural next lever — switch the algorithmic reverb to a true stereo (L/R-independent comb network) implementation — is logged as an S1 follow-up; it would close the funk gap without changing source positions.
+
+Changes shipped on this branch:
+- `public/engine/engine.ts` — soloist bus gains a `StereoPannerNode` at +0.25; chord bus pan -0.2 → -0.3; harmony bus pan +0.2 → +0.3; Haas-style stereo widener on the reverb wet (12 ms delay on one path, both paths attenuated 0.5 so the overall reverb amplitude matches the original single-path setup — preserves spectral character).
+- `public/engine/synth-drums.ts` — snare/sidestick/brush per-hit pan widened -0.1 → -0.2 (constant; no new PRNG draws).
+- `scripts/mix-report-utils.ts`, `scripts/mix-analyze.ts`, `tests/scripts/mix-report-utils.test.ts` — "functionally mono" finding switched from L/R correlation to side energy ratio; per-scene `sideRatioMin`/`sideRatioMax` thresholds plumbed; tests updated.
+
 ### S2. EQ rebalance for jazz-ride
 Jazz reference (Miles "So What", small sextet with horns) sits at 47% sub+low and centroid 753 Hz. Our jazz-ride render is 74% sub+low and centroid 410 Hz — the spectral fingerprint of a kit-and-electric-bass mix, not a small jazz combo with horns. The fix is per-scene EQ, not a global one: when the scene's `genreFeel` is Jazz, the bass bus low-shelf at 100 Hz should soften, and the chord bus low-mid (~350 Hz) should pull back. Other genres' EQ should remain untouched — they already match their references.
 
