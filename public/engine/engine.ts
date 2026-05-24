@@ -168,43 +168,16 @@ export function initAudio(
             // white-noise convolver. Same input/output node contract.
             reverb = createAlgorithmicReverb(playback.audio, REVERB_PRESETS.hall);
 
-            // Epic 7 S1: pseudo-stereo widener on the reverb wet only. The
-            // reverb internal chain is mono (single comb/allpass network), so
-            // by default the wet sums to L=R and contributes 0% side energy.
-            // Splitting into a direct path (pan -0.5) plus a 12 ms-delayed
-            // path (pan +0.5) gives the wet a real stereo image via the Haas
-            // precedence effect: source localization is unchanged (dry sources
-            // still define where each instrument sits) but the ambient bed
-            // develops genuine stereo width. Each path is attenuated 0.5 so
-            // the total reverb amplitude matches the original single-path
-            // setup; without this the two ±0.5 pan paths sum to ~2.4 dB
-            // louder reverb and a noticeably warmer top end. Mono-sum is
-            // safe: H(f) = 0.5 + 0.5·e^{-j2π·f·0.012} has full nulls at odd
-            // multiples of 41.7 Hz (41.7, 125, 208, 292, 375, 458, 542 Hz);
-            // every one falls under the 600 Hz reverbHPF and contributes no
-            // audible cancellation. Above 600 Hz the wet picks up a
-            // 12 ms-period comb-filter coloring when collapsed to mono,
-            // which is the accepted Haas trade for the side-energy gain.
-            const widenerGain = 0.5;
-            const reverbDirectGain = playback.audio.createGain();
-            reverbDirectGain.gain.setValueAtTime(widenerGain, playback.audio.currentTime);
-            const reverbDirectPan = playback.audio.createStereoPanner();
-            reverbDirectPan.pan.setValueAtTime(-0.5, playback.audio.currentTime);
-
-            const reverbHaasDelay = playback.audio.createDelay(0.05);
-            reverbHaasDelay.delayTime.setValueAtTime(0.012, playback.audio.currentTime);
-            const reverbDelayedGain = playback.audio.createGain();
-            reverbDelayedGain.gain.setValueAtTime(widenerGain, playback.audio.currentTime);
-            const reverbDelayedPan = playback.audio.createStereoPanner();
-            reverbDelayedPan.pan.setValueAtTime(0.5, playback.audio.currentTime);
-
-            reverb.output.connect(reverbDirectGain);
-            reverbDirectGain.connect(reverbDirectPan);
-            reverbDirectPan.connect(masterGain);
-            reverb.output.connect(reverbHaasDelay);
-            reverbHaasDelay.connect(reverbDelayedGain);
-            reverbDelayedGain.connect(reverbDelayedPan);
-            reverbDelayedPan.connect(masterGain);
+            // Epic 7 S1 follow-up: reverb is now natively stereo (independent
+            // L/R comb networks with offset tunings inside `reverb.ts`), so
+            // the wet picks up genuinely uncorrelated side energy at the
+            // source. The earlier Haas widener (a 12 ms-delayed copy panned
+            // ±0.5) only nudged the side ratio from ~0% to 1.4% on funk
+            // because the two paths still correlated ~1 with each other.
+            // True-stereo comb banks drive the L/R correlation down at every
+            // frequency the combs resonate at — moving funk full+solo from
+            // 1.4% to the ≥ 3.0% target without changing any source position.
+            reverb.output.connect(masterGain);
 
             // --- Pro Mix: Abbey Road Reverb Filters ---
             const reverbHPF = playback.audio.createBiquadFilter();

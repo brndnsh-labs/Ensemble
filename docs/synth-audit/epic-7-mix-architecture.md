@@ -78,6 +78,17 @@ Changes shipped on this branch:
 - `public/engine/synth-drums.ts` — snare/sidestick/brush per-hit pan widened -0.1 → -0.2 (constant; no new PRNG draws).
 - `scripts/mix-report-utils.ts`, `scripts/mix-analyze.ts`, `tests/scripts/mix-report-utils.test.ts` — "functionally mono" finding switched from L/R correlation to side energy ratio; per-scene `sideRatioMin`/`sideRatioMax` thresholds plumbed; tests updated.
 
+**Status — shipped 2026-05-24 (S1 follow-up: true-stereo reverb).** Rebuilt the algorithmic reverb in `public/engine/reverb.ts` as two parallel comb banks (L and R) with canonical Freeverb `+23`-sample offset tunings, merged through a `ChannelMergerNode(2)` into a stereo `output`. Replaced the Haas widener in `engine.ts` with a direct `reverb.output → masterGain` connection. The L and R networks share only the mono input fan-out and the output merger — no cross-channel feedback, preserving the top-docstring stability rule. `synth-graph-reviewer` returned 0 P0/P1/P2 findings ("safe to land"; topology clean, all 16 combs ramped by the setters, no orphan refs to deleted widener nodes). Owner approved through the listening gate (stereo depth in the ambient bed; mono compatibility preserved; no source-position drift). Final numbers below — `full+solo` (the listening-reality stem) clears the ≥ 3% target with comfortable headroom on every scene; the strict `full` (bed-only) stem improves on every scene but still under-target because most bed energy is centered kick/snare/bass with low reverb sends.
+
+| scene | baseline | after S1 partial | after S1 follow-up (this) | `full+solo` target | `full` (strict bed) |
+|---|---|---|---|---|---|
+| rock-backbeat | 0.7% | 3.1% | **6.46%** ✓ | ≥ 3.0% ✓ | 2.34% (was 1.8%) ✗ |
+| blues-shuffle | 1.0% | 3.0% | **7.78%** ✓ | ≥ 3.0% ✓ | 2.56% (was 1.8%) ✗ |
+| jazz-ride | 0.5% | 3.5% | **10.17%** ✓ | ≥ 3.0% ✓ | 1.67% (was 0.6%) ✗ |
+| funk-pocket | 0.3% | 1.4% | **5.52%** ✓ | ≥ 3.0% ✓ | 0.82% (was 0.8%) ✗ |
+
+The auto-finding `mix is functionally mono` still fires on all four scenes because the gate uses `min(full, full+solo)`. But the text now reports only the bed-only number, not both — and the `full+solo` reading is now everywhere above target. Closing the bed-only gate further is a separate design call (would require bed-source panning, which S1 deliberately avoided to preserve source localization).
+
 ### S2. EQ rebalance for jazz-ride
 Jazz reference (Miles "So What", small sextet with horns) sits at 47% sub+low and centroid 753 Hz. Our jazz-ride render is 74% sub+low and centroid 410 Hz — the spectral fingerprint of a kit-and-electric-bass mix, not a small jazz combo with horns. The fix is per-scene EQ, not a global one: when the scene's `genreFeel` is Jazz, the bass bus low-shelf at 100 Hz should soften, and the chord bus low-mid (~350 Hz) should pull back. Other genres' EQ should remain untouched — they already match their references.
 

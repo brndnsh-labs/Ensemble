@@ -28,11 +28,22 @@ import type { AlgorithmicReverb, ReverbPreset } from '../types.js';
  * Comb-filter delay lengths, in samples at the 44.1 kHz design rate. The
  * canonical Freeverb tuning — mutually prime-ish so the combs do not reinforce
  * into an audible flutter. Converted to seconds (rate-independent) at build.
+ *
+ * The L bank uses the original tuning. The R bank offsets each delay by
+ * `STEREO_SPREAD` samples (canonical Freeverb spread = 23 samples) so the L
+ * and R comb resonances land on slightly different frequencies. With two
+ * mono-equivalent inputs feeding two independently-tuned banks the resulting
+ * L and R outputs are genuinely uncorrelated — the wet picks up real
+ * side-energy without a Haas-style time-shift trick (which still cross-
+ * correlates ~1 with the source and only marginally moves the side ratio).
  */
-const COMB_TUNING_44K: readonly number[] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
+const STEREO_SPREAD = 23;
+const COMB_TUNING_44K_L: readonly number[] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
+const COMB_TUNING_44K_R: readonly number[] = COMB_TUNING_44K_L.map((n) => n + STEREO_SPREAD);
 
-/** Allpass diffuser delay lengths (44.1 kHz design rate). */
-const ALLPASS_TUNING_44K: readonly number[] = [556, 441, 341, 225];
+/** Allpass diffuser delay lengths (44.1 kHz design rate), offset per channel. */
+const ALLPASS_TUNING_44K_L: readonly number[] = [556, 441, 341, 225];
+const ALLPASS_TUNING_44K_R: readonly number[] = ALLPASS_TUNING_44K_L.map((n) => n + STEREO_SPREAD);
 
 /** The sample rate the tuning constants above were chosen for. */
 const DESIGN_RATE = 44100;
@@ -122,62 +133,87 @@ export function createAlgorithmicReverb(
     let size = preset.size;
     let rt60 = preset.rt60;
 
-    // --- Parallel comb bank ---------------------------------------------
-    // Every comb is fed from `input` and taps into `combSum`. Its feedback
-    // loop touches only itself — never another comb — which is what keeps the
-    // graph stable under Web Audio.
-    const combSum = ctx.createGain();
-    const combs: Comb[] = [];
-    for (const tuning of COMB_TUNING_44K) {
-        const baseDelay = tuning / DESIGN_RATE;
+    // --- Parallel comb banks (L and R, independently tuned) -------------
+    // Every comb is fed from `input` and taps into the channel's combSum.
+    // Its feedback loop touches only itself — never another comb, never the
+    // other channel — which is what keeps the graph stable under Web Audio
+    // (cross-coupled delay cycles self-oscillate even with provably sub-unity
+    // gain on Chromium; see the top docstring).
+    const buildCombBank = (tunings: readonly number[], combSum: GainNode): Comb[] => {
+        const bank: Comb[] = [];
+        for (const tuning of tunings) {
+            const baseDelay = tuning / DESIGN_RATE;
 
-        const delay = ctx.createDelay(0.2);
-        delay.delayTime.value = snap(baseDelay * size);
+            const delay = ctx.createDelay(0.2);
+            delay.delayTime.value = snap(baseDelay * size);
 
-        const damp = ctx.createBiquadFilter();
-        damp.type = 'lowpass';
-        damp.frequency.value = preset.damping;
-        damp.Q.value = DAMPING_Q_DB;
+            const damp = ctx.createBiquadFilter();
+            damp.type = 'lowpass';
+            damp.frequency.value = preset.damping;
+            damp.Q.value = DAMPING_Q_DB;
 
-        const feedback = ctx.createGain();
-        feedback.gain.value = combFeedbackFor(baseDelay * size, rt60);
+            const feedback = ctx.createGain();
+            feedback.gain.value = combFeedbackFor(baseDelay * size, rt60);
 
-        input.connect(delay);
-        delay.connect(combSum); // wet tap
-        delay.connect(damp);
-        damp.connect(feedback);
-        feedback.connect(delay); // self-loop
+            input.connect(delay);
+            delay.connect(combSum); // wet tap
+            delay.connect(damp);
+            damp.connect(feedback);
+            feedback.connect(delay); // self-loop
 
-        combs.push({ delay, damp, feedback, baseDelay });
-    }
+            bank.push({ delay, damp, feedback, baseDelay });
+        }
+        return bank;
+    };
 
-    // --- Series allpass diffusers ---------------------------------------
+    const combSumL = ctx.createGain();
+    const combSumR = ctx.createGain();
+    const combsL = buildCombBank(COMB_TUNING_44K_L, combSumL);
+    const combsR = buildCombBank(COMB_TUNING_44K_R, combSumR);
+    const combs: Comb[] = [...combsL, ...combsR];
+
+    // --- Series allpass diffusers (per channel) -------------------------
     // Freeverb's allpass: `out = delayed - in`, `delayIn = in + fb·delayed`.
     // Each is a single self-looping delay; they run in series after the combs.
-    let chain: AudioNode = combSum;
-    for (const tuning of ALLPASS_TUNING_44K) {
-        const apIn = ctx.createGain();
-        const sum = ctx.createGain();
-        const delay = ctx.createDelay(0.1);
-        delay.delayTime.value = snap(tuning / DESIGN_RATE);
-        const fb = ctx.createGain();
-        fb.gain.value = ALLPASS_FEEDBACK;
-        const invIn = ctx.createGain();
-        invIn.gain.value = -1;
-        const apOut = ctx.createGain();
+    // L and R chains are fully independent — no cross-channel coupling.
+    const buildAllpassChain = (tunings: readonly number[], start: AudioNode): AudioNode => {
+        let chain: AudioNode = start;
+        for (const tuning of tunings) {
+            const apIn = ctx.createGain();
+            const sum = ctx.createGain();
+            const delay = ctx.createDelay(0.1);
+            delay.delayTime.value = snap(tuning / DESIGN_RATE);
+            const fb = ctx.createGain();
+            fb.gain.value = ALLPASS_FEEDBACK;
+            const invIn = ctx.createGain();
+            invIn.gain.value = -1;
+            const apOut = ctx.createGain();
 
-        chain.connect(apIn);
-        apIn.connect(sum);
-        sum.connect(delay);
-        delay.connect(fb);
-        fb.connect(sum); // self-loop
-        delay.connect(apOut); // delayed term
-        apIn.connect(invIn);
-        invIn.connect(apOut); // minus the input term
+            chain.connect(apIn);
+            apIn.connect(sum);
+            sum.connect(delay);
+            delay.connect(fb);
+            fb.connect(sum); // self-loop
+            delay.connect(apOut); // delayed term
+            apIn.connect(invIn);
+            invIn.connect(apOut); // minus the input term
 
-        chain = apOut;
-    }
-    chain.connect(output);
+            chain = apOut;
+        }
+        return chain;
+    };
+
+    const chainL = buildAllpassChain(ALLPASS_TUNING_44K_L, combSumL);
+    const chainR = buildAllpassChain(ALLPASS_TUNING_44K_R, combSumR);
+
+    // Merge the two mono chains into a 2-channel stereo `output`. The merger
+    // takes one mono input per channel; the L bank becomes the left output
+    // sample and the R bank becomes the right — so the wet is natively
+    // stereo with uncorrelated content, not a Haas-style delayed copy.
+    const stereoMerger = ctx.createChannelMerger(2);
+    chainL.connect(stereoMerger, 0, 0);
+    chainR.connect(stereoMerger, 0, 1);
+    stereoMerger.connect(output);
 
     const rampParam = (param: AudioParam, value: number, when: number) => {
         // Guard both arguments — a NaN value or time write to an AudioParam
