@@ -459,9 +459,12 @@ const CYMBAL_RUNTIME_PROFILES: Record<CymbalName, CymbalRuntimeProfile> = {
         // boom that Crash has. q 0.55 (vs Crash 0.45) is nasal and bright. decayBase 0.95s
         // and stopTime 2.4s — China is a fast, bark-like accent cymbal; the "trash" is in
         // the attack, not the sustain (matches reference trash chinas at ~2-3s ring-out).
-        // volumeScale 0.85 trims slightly under Crash (0.9) to avoid clipping
-        // when it stacks with the steady-state Open/Ride pulse on metal section downbeats.
-        volumeScale: 0.85,
+        // volumeScale 1.0 (Epic 12 S6 B4 — raised from 0.85, the original defensive
+        // headroom against the since-fixed Epic 7 S6 triple-stack). Real Chinas peak
+        // ABOVE Crash level; par-with-Crash (Crash is 0.9) is the floor of musical
+        // accuracy — at 1.0 the China sits ≈+1 dB louder than Crash, matching reference
+        // metal trash-cymbal mixes where the China is the louder accent.
+        volumeScale: 1.0,
         playbackRate: 1.0,
         playbackVariance: 0.022,
         bandpassBase: 4200,
