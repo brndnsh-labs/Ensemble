@@ -672,7 +672,7 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
     });
 
     it('keeps the HiHat ticker through the final bar in hat-dense genres (e.g. Funk)', () => {
-        // why (Epic 12 S6 B6): in 8th-note-hat genres (HAT_DENSE_GENRES — Disco,
+        // why (Epic 12 S6 B6): in 8th-note-hat genres (HAT_SPINE_GENRES — Disco,
         // Funk, Rock, Metal, Shred, Ska-Punk) the hat IS the spine. Silencing
         // it on the final bar would read as an abrupt drop-out rather than a
         // swell-breathing decision. The final-bar gate must NOT force-suppress
