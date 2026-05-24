@@ -1220,8 +1220,9 @@ export function getBassNote(
             // branch doesn't fire this preserves the right shape.)
             // Final-stage weight *= multiplier (not additive) so it dominates over the
             // hand-position / center-proximity ranking already embedded in each weight.
-            // why: bass.md P2 #15 / epic-deterministic-phrasing S3 — generic fallback
-            //   had no target awareness; uniform bias was also musically wrong shape.
+            // why: bass.md P1 #10 (target-awareness) — generic fallback had no pull
+            //   toward the next chord's root; this multiplier is the fix. P2 #15
+            //   (deterministic phrasing) is addressed by the seedBit pick below.
             // Uses the outer `barIndex` declared near withOctaveJump (S4); same value.
             // why: isChordChangeApproach uses bassMidi ?? rootMidi, catching slash-chord
             //   changes (e.g. C → C/E) that this inline `rootMidi !== rootMidi` check
@@ -1231,14 +1232,27 @@ export function getBassNote(
                 // why: 7-semitone (perfect-fifth) approach window. A candidate within
                 //   a fifth of the target gets meaningful lift; beyond a fifth, the
                 //   note is too distant to feel like an approach and the lift falls
-                //   off to zero. /12 was too gentle — a fifth-away candidate kept
-                //   ~0.42 proximity, washing out the bias against hand-position score.
+                //   off to zero.
+                // why: APPROACH_STRENGTH = 8. The candidate weights coming out of
+                //   clampAndNormalize stack hand-position (×1.5–3) × style-priority
+                //   (×5) × root/5th stability (×1.5), so a top candidate routinely
+                //   sits at ~15–20× over a peripheral scale tone. A bare
+                //   `1 + proximity * beatScale` multiplier (max 1.33× at beat 2,
+                //   2× at beat 4) gets washed out — verified by the Epic-12 S5
+                //   discriminating test that the multiplier had no measurable
+                //   effect on the picked-note distribution at beat 2. ×8 lifts
+                //   beat 2 to max 3.67×, beat 3 to 6.33×, beat 4 to 9× — enough
+                //   to push a target-adjacent candidate (5th-of-current that's
+                //   one step from next-root) past the original root in the
+                //   top-2 ranking while still preserving the beat-asymmetric
+                //   pedagogy beat 4 > beat 3 > beat 2.
                 const APPROACH_WINDOW = 7;
+                const APPROACH_STRENGTH = 8;
                 const beatScale = intBeat / 3;
                 for (const c of candidates) {
                     const dist = Math.abs(c.midi - nextTarget);
                     const proximity = Math.max(0, 1 - dist / APPROACH_WINDOW);
-                    c.weight *= 1 + proximity * beatScale;
+                    c.weight *= 1 + proximity * beatScale * APPROACH_STRENGTH;
                 }
                 // Re-sort after target-distance bias applied.
                 candidates.sort((a, b) => b.weight - a.weight);

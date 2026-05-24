@@ -1091,7 +1091,14 @@ export function getBassNoteStyle(
         if (patternIndex === 1) {
             targetInterval = 7; // 5th
         } else if (patternIndex === 2) {
-            targetInterval = 9; // 6th
+            // why: bass.md P1 #9 — the walking-ska "6th" beat was hard-coded to
+            // 9 (M6), which is wrong over minor (b3 + M6 → Dorian implication,
+            // not Aeolian) and half-dim (b5 + M6 clash). Pick scale-aware sixth:
+            // prefer M6 if it's in the chord's diatonic scale (major, Dorian,
+            // Mixolydian, Lydian etc.), fall back to m6 (natural minor, Locrian,
+            // Phrygian), and finally fall back to the 5th if neither sixth is
+            // available (degenerate-scale safety; the 5 is always idiomatic).
+            targetInterval = scale.includes(9) ? 9 : scale.includes(8) ? 8 : 7;
         } else if (patternIndex === 3) {
             targetInterval = 12; // Octave
         }

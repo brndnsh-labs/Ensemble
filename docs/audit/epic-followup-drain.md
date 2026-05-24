@@ -12,14 +12,14 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S2 | `evansIntervals` chord-quality awareness | opus | Ready |
 | S3 | Profile-rotation sticky-retain | opus | Shipped 2026-05-23 |
 | S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Shipped 2026-05-23 |
-| S5 | Bass walking idiom | opus | Ready |
+| S5 | Bass walking idiom | opus | Shipped 2026-05-23 |
 | S6 | Per-genre tuning sweep | sonnet | Blocked → `LISTEN_TESTS.md` Part B |
 | S7 | Final-bar polish | opus | Blocked → `LISTEN_TESTS.md` C1 |
 | S8 | Per-genre arrangement design | opus | Blocked → `LISTEN_TESTS.md` C2/C3 |
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**4 / 10 shipped.** S5 is cycle-able immediately. S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**5 / 10 shipped.** S6–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
@@ -80,7 +80,7 @@ Two bass-walking idiom-correctness items. Verify-by-ear after, but no pre-decisi
 
 **Acceptance:** walking-ska no longer plays a M6 over a minor chord; the generic walking line measurably approaches the next chord's root/3rd; extended bass critique coverage.
 **Effort:** ~3h. **Model:** opus (idiom-correctness). **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
-**Status:** Ready.
+**Status:** Shipped 2026-05-23 — sub-item 1: `bass-styles.ts:1101` scale-aware sixth picker (`scale.includes(9) ? 9 : scale.includes(8) ? 8 : 7`) — eliminates Dorian implication over minor + b5/M6 clash over half-dim. Sub-item 2: triaged inline — `bass-engine.ts:1191-1265` already implemented target-distance multiplier under Epic 3 S3 (mis-attributed in WHY comment to P2 #15; corrected to P1 #10 inline). Reviewer P0 caught that the initial critique test was tautological (passed even with multiplier neutralized — confounded by prevMidi bleed from chromatic-approach branch); rewrote with direct `getBassNote` calls + controlled prevMidi + bias-on vs. bias-off control via `nextChord` parameter; PC-distance metric (engine register-normalizes the target). Reviewer P2: original 1.33× max multiplier at beat 2 was washed out by stacked `clampAndNormalize` weights (~15-20×); raised to `APPROACH_STRENGTH = 8` → beat 2 max 3.67×, beat 3 max 6.33×, beat 4 max 9× — discriminating-test gap 0 → 0.57 PC semitones. NIT (tier-3 fallback test) deferred — would need invasive `getScaleForChord` mocking for a degenerate path. 4-test critique file new at `tests/standards/bass-walking-idiom-critique.test.ts`; 633/633 standards + 863/863 unit-engine green; 10/10 reliability on new test.
 
 ### S6. Per-genre tuning sweep
 
