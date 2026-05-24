@@ -148,11 +148,29 @@ This is the deepest story — it touches `coordination-engine.ts` and probably n
 
 **Effort:** ~3–5 days including a design discussion and a `music-theory-reviewer` pass. **Model:** opus (design + implementation). **Reviewer:** synth-graph-reviewer (engine), state-discipline-reviewer (any new conductor state), music-theory-reviewer (musical correctness). **Source:** Per-loop arc finding in `summarizeRenderedFindings`.
 
+### S5. Wire orphaned aux-percussion UI (S3b path-a, extracted)
+
+Extracted from S3b 2026-05-25 after S3a closed and the 5 kHz re-measurement made path (a) clearly the right shape (see `tmp/overnight-s3a-probe.md`). The funk engine sits 11× below Chic at the 5 kHz air probe — the largest gap in the engine — and the cause is known: `groove.ts` state already contains shaker / conga / clave / cowbell lanes (see `project_orphaned_latin_content.md`), but no UI surface fires them on any drum preset, so the funk pocket plays kick / snare / hat only. Closing that UI gap closes the air gap AND the orphaned-percussion debt in one move.
+
+Two surfaces to wire:
+- **Per-preset default activation.** Funk-pocket / blues-shuffle / latin presets should fire their existing aux-percussion lanes by default. Jazz-ride probably wants a brush-shaker or none.
+- **User control surface.** The lanes need a discoverable UI knob — likely on the instrument rail / drum panel — so users can toggle them per-track or per-preset. Not a hidden flag.
+
+**Acceptance:**
+- `mix:report --scene=funk-pocket`: `air5k ≥ Chic equivalent (~2%)` on the drum stem or full+solo stem (gap closes from 11× to ≤ 1.5×).
+- `mix:report --scene={blues-shuffle,jazz-ride,rock-backbeat}`: no regression on existing findings; aux-percussion either fires (with audible result in the report) or stays off by design with a note in the drum preset config.
+- UI: aux-percussion lanes can be toggled on/off from the instrument-rail drum panel; the funk preset visibly shows the active lanes.
+- `state-discipline-reviewer` pass on any new state field (e.g. a `percussion.activeLanes` array on the groove slice) — writes go through `dispatch(ACTIONS.X)`.
+- Listening: funk-pocket render has audible shaker / conga content that sits behind the kit, not on top of it.
+
+**Effort:** ~2 days. The lanes and their note-generation are already in place; the work is UI surface + preset-default wiring + persistence in saved sessions / share URLs. **Model:** sonnet (UI work, lanes already exist). **Reviewer:** state-discipline-reviewer (new state writes), synth-graph-reviewer (any new percussion voice routing), music-theory-reviewer (per-genre lane choices on the defaults — e.g. is conga the right default for funk vs cowbell). **Source:** Reference comparison (funk reference Chic 2.2% vs engine 0.2% at 5 kHz probe) + `project_orphaned_latin_content.md`.
+
 ## Notes
 
 - **S1 is the recommended first pickup.** Universal, low-risk, high-confidence; doesn't depend on the per-scene mix-profile plumbing that S2 needs.
 - **S2 needs a design decision** before implementation: per-genre mix profiles can live in `engine.ts initAudio()` (read at audio-context construction) or in a state slice read each tick. Initial leaning: at `initAudio()` since per-genre EQ doesn't need to change every step.
-- **S3 has a product gap risk.** Enabling orphaned percussion adds UI surface and may need its own micro-epic for the trigger paths if they don't exist on any presets at all. Scope-check before committing.
+- **S3 split 2026-05-25.** S3a (probe re-location) shipped. S3b path-a extracted into S5 (orphaned aux-percussion UI). S3b path-b (a wash voice) is parked — the per-genre patterns are too different for a single wash voice to satisfy.
 - **S4 may grow.** A real intensity arc may want to feed back into the form-arranger work (`docs/audit/epic-form-arrangement.md`) so the arc lines up with section boundaries. Cross-track coordination needed.
-- All four stories should preserve the `synth-audit` rule that `play<X>Current` is bit-identical — none of these change per-voice synthesis; they change bus routing, EQ, conductor state, and trigger logic.
+- **S5 is the recommended next pickup after the overnight branch lands.** It's the highest-impact remaining gap (funk air 11× below reference), it touches UI which the other stories don't, and it closes the `project_orphaned_latin_content` debt as a side effect.
+- All stories should preserve the `synth-audit` rule that `play<X>Current` is bit-identical — none of these change per-voice synthesis; they change bus routing, EQ, conductor state, and trigger logic.
 - After every story, re-run `npm run mix:analyze` against the reference set in `tmp/references/` to verify the changes still cluster with the references rather than drifting away.
