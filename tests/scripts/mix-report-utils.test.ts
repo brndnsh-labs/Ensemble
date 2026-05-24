@@ -7,6 +7,7 @@ import {
     parseEnsembleAuditInput,
     resolveMixReportCliOptions,
     selectMixReportScenes,
+    summarizeRenderedFindings,
 } from '../../scripts/mix-report-utils.js';
 
 function createStemMetrics(overrides = {}) {
@@ -242,5 +243,124 @@ describe('mix report utilities', () => {
         expect(lines.some((line) => line.kind === 'scene')).toBe(true);
         expect(lines.some((line) => line.kind === 'seed')).toBe(true);
         expect(lines.some((line) => line.kind === 'stem')).toBe(true);
+    });
+
+    describe('architectural-bias findings', () => {
+        it('flags bottom-heavy mixes by sub+low share', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    probes: {
+                        sub: 0.45,
+                        low: 0.25,
+                        lowMid: 0.1,
+                        mid: 0.1,
+                        presence: 0.05,
+                        air: 0.05,
+                    },
+                }),
+            });
+            expect(findings.some((n) => n.includes('bottom-heavy'))).toBe(true);
+        });
+
+        it('does not flag a balanced mix as bottom-heavy', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    probes: {
+                        sub: 0.15,
+                        low: 0.15,
+                        lowMid: 0.2,
+                        mid: 0.2,
+                        presence: 0.15,
+                        air: 0.15,
+                    },
+                }),
+            });
+            expect(findings.some((n) => n.includes('bottom-heavy'))).toBe(false);
+        });
+
+        it('flags missing air across all stems', () => {
+            const lowAir = (a) =>
+                createStemMetrics({
+                    probes: { sub: 0.3, low: 0.3, lowMid: 0.2, mid: 0.15, presence: 0.04, air: a },
+                });
+            const findings = summarizeRenderedFindings({
+                full: lowAir(0.01),
+                drums: lowAir(0.02),
+                bass: lowAir(0.0),
+                chords: lowAir(0.03),
+                harmony: lowAir(0.04),
+                soloist: lowAir(0.01),
+            });
+            expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(true);
+        });
+
+        it('does not flag missing air when at least one stem carries it', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    probes: {
+                        sub: 0.2,
+                        low: 0.2,
+                        lowMid: 0.2,
+                        mid: 0.15,
+                        presence: 0.1,
+                        air: 0.15,
+                    },
+                }),
+                harmony: createStemMetrics({
+                    probes: {
+                        sub: 0.05,
+                        low: 0.05,
+                        lowMid: 0.1,
+                        mid: 0.1,
+                        presence: 0.2,
+                        air: 0.5,
+                    },
+                }),
+            });
+            expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(false);
+        });
+
+        it('flags a functionally mono mix by L/R correlation', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    stereo: { correlation: 0.985, sideRatio: 0.008 },
+                }),
+            });
+            expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
+        });
+
+        it('does not flag a wide mix as mono', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    stereo: { correlation: 0.6, sideRatio: 0.25 },
+                }),
+            });
+            expect(findings.some((n) => n.includes('functionally mono'))).toBe(false);
+        });
+
+        it('flags a front-loaded arc when the full mix is classified that way', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'front-loaded',
+                    loopRmsDb: [-18, -24, -25],
+                }),
+            });
+            expect(findings.some((n) => n.includes('front-loaded'))).toBe(true);
+        });
+
+        it('flags flat dynamics only when multiple loops were rendered', () => {
+            const singleLoop = summarizeRenderedFindings({
+                full: createStemMetrics({ arc: null, loopRmsDb: null }),
+            });
+            expect(singleLoop.some((n) => n.includes('flat across loops'))).toBe(false);
+
+            const multiLoop = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'flat',
+                    loopRmsDb: [-22, -22.5, -22.4],
+                }),
+            });
+            expect(multiLoop.some((n) => n.includes('flat across loops'))).toBe(true);
+        });
     });
 });

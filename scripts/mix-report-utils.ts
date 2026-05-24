@@ -447,6 +447,42 @@ export function summarizeRenderedFindings(stems) {
         notes.push('harmony stem shows sharp waveform edges worth auditing');
     }
 
+    // Architectural-bias findings (post-2026-05-23 audio-judge listening pass).
+    // These triangulated across two independent multimodal listens; the
+    // thresholds are starting points and may be tuned by ear over time.
+    if (full?.probes) {
+        const subPlusLow = (full.probes.sub || 0) + (full.probes.low || 0);
+        if (subPlusLow > 0.55) {
+            notes.push(
+                `full mix is bottom-heavy — ${Math.round(subPlusLow * 100)}% of energy in sub+low bands`,
+            );
+        }
+    }
+
+    const allStems = [full, fullWithSolo, drums, bass, chords, harmony, soloist].filter(Boolean);
+    const maxAir = allStems.reduce((max, s) => Math.max(max, s.probes?.air || 0), 0);
+    if (allStems.length > 0 && maxAir < 0.05) {
+        notes.push(
+            `no stem owns the air band above 5 kHz (max air ratio across stems: ${maxAir.toFixed(3)})`,
+        );
+    }
+
+    if (full?.stereo?.correlation != null && full.stereo.correlation > 0.95) {
+        notes.push(
+            `full mix is functionally mono — L/R correlation ${full.stereo.correlation.toFixed(3)}, side energy ${((full.stereo.sideRatio || 0) * 100).toFixed(1)}%`,
+        );
+    }
+
+    if (full?.arc === 'front-loaded') {
+        notes.push(
+            'full mix intensity is front-loaded across loops — energy in loop 0 then collapses',
+        );
+    } else if (full?.arc === 'flat' && Array.isArray(full.loopRmsDb) && full.loopRmsDb.length > 1) {
+        // Only flag flatness as a finding when we actually rendered multiple
+        // loops — single-loop renders are always "flat" by definition.
+        notes.push('full mix dynamics are flat across loops — no intensity arc');
+    }
+
     return notes;
 }
 
