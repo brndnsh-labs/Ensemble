@@ -443,12 +443,18 @@ export function getBassNote(
     const withImperfectSymmetry = (note: number): number => {
         // Gate conditions:
         //   - sectionOccurrence ≥ 2 (occurrence=1 is the "Statement", left untouched)
-        //   - musical guards: not during soloist busy, intensity ≥ 0.4 so quiet
-        //     ballad passages aren't disrupted by an unexpected octave jolt
+        //   - musical guards: not during soloist busy, intensity ≥ 0.25 so the
+        //     quietest ambient passages aren't disrupted by an unexpected octave
+        //     jolt. Floor lowered from 0.4 → 0.25 (Epic 12 S6 / LISTEN_TESTS B1):
+        //     ballad-style verses (~0.30) are exactly where the mechanical-loop
+        //     feel is most exposed, so this is where Imperfect Symmetry earns
+        //     its keep. 0.25 still suppresses true sub-ambient passages where
+        //     any octave jump would read as a glitch rather than a phrasing
+        //     choice.
         //   - current step is at a beat-start (sub-beat 16ths/8ths stay in-register;
         //     a mid-beat octave jump would sound like a glitch, not phrasing)
         //   - exactly one target beat per 4-bar phrase, seeded so Verse 2 ≠ Verse 1
-        if (!isRepeatPass || isSoloistBusyEarly || intensity < 0.4) {
+        if (!isRepeatPass || isSoloistBusyEarly || intensity < 0.25) {
             return note;
         }
         if (!isBeatStartEarly) {

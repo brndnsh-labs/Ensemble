@@ -73,7 +73,7 @@ const PHRASE_STEPS = PHRASE_BARS * 2 * STEPS_PER_BAR; // 128
 
 function makeMockState(overrides = {}) {
     return {
-        // why: intensity 0.5 sits ABOVE the imperfect-symmetry floor (0.4) and
+        // why: intensity 0.5 sits ABOVE the imperfect-symmetry floor (0.25) and
         // ABOVE the rock-style "switch to quarter notes" gate (intensity < 0.35),
         // yet BELOW the rock 5ths/octave embellishment gate (intensity > 0.65)
         // which uses raw Math.random(). This keeps the path through getBassNote
