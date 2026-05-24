@@ -113,6 +113,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/synth-drums.ts` | Procedural percussion synthesis. |
 | `public/engine/synth-harmonies.ts` | Background "Stab" and "Pad" synthesis. |
 | `public/engine/synth-soloist.ts` | Lead instrument synthesis and glides. |
+| `public/engine/wav-encoder.ts` | Minimal 16-bit PCM WAV encoder shared by the in-app audio export and the Node-side `mix-report --write-wav` path. |
 
 ## Data & Configuration
 
@@ -165,6 +166,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/performance-controller.ts` | Real-time keyboard performance logic. |
 | `public/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/midi-export.ts` | Main-thread MIDI file triggers. |
+| `public/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
 | `public/song-generator.ts` | Algorithmic song structure generation. |
 | `public/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.ts` | LocalStorage session saving. |

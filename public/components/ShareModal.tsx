@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { downloadExportResult, renderCurrentSessionToWav } from '../audio-export.js';
 import { exportToMidi } from '../midi-export.js';
 import { generateShareUrl } from '../sharing.js';
 import { dispatch, getState } from '../state.js';
@@ -9,6 +10,7 @@ import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 export function ShareModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.share);
     const [isExporting, setIsExporting] = useState(false);
+    const [isRenderingAudio, setIsRenderingAudio] = useState(false);
 
     const [includeSolo, setIncludeSolo] = useState(true);
     const [includeBass, setIncludeBass] = useState(true);
@@ -116,6 +118,31 @@ export function ShareModal() {
             });
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    const handleExportAudio = async () => {
+        setIsRenderingAudio(true);
+        try {
+            const options = getExportOptions();
+            const result = await renderCurrentSessionToWav({
+                loops: options.numLoops,
+                filename: options.filename,
+            });
+            downloadExportResult(result);
+            const secs = Math.round(result.durationSeconds);
+            dispatch(ACTIONS.SHOW_TOAST, {
+                message: `WAV ready — ${secs}s, ${Math.round(result.blob.size / 1024)} KB`,
+                type: 'success',
+            });
+        } catch (err) {
+            console.error('Audio export failed:', err);
+            dispatch(ACTIONS.SHOW_TOAST, {
+                message: 'Audio export failed.',
+                type: 'error',
+            });
+        } finally {
+            setIsRenderingAudio(false);
         }
     };
 
@@ -265,6 +292,24 @@ export function ShareModal() {
                                         disabled={isExporting}
                                     >
                                         {isExporting ? 'Generating...' : 'Download .mid'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="help-card share-card share-card--accent">
+                                <h4 class="share-card-title">🎧 Audio File (WAV)</h4>
+                                <p class="text-mini-muted share-card-copy">
+                                    Render the live arrangement to a stereo WAV — useful for sharing
+                                    a take, posting a clip, or feeding into another tool.
+                                </p>
+                                <div class="flex-col">
+                                    <button
+                                        class="secondary-btn w-full share-action-btn share-action-btn--accent"
+                                        onClick={handleExportAudio}
+                                        disabled={isRenderingAudio}
+                                        data-testid="export-audio-btn"
+                                    >
+                                        {isRenderingAudio ? 'Rendering…' : 'Download .wav'}
                                     </button>
                                 </div>
                             </div>

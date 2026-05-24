@@ -1,0 +1,243 @@
+import { validateProgression } from './engine/chords-engine.js';
+import { initAudio } from './engine/engine.js';
+import { scheduleGlobalEvent } from './engine/scheduler-core.js';
+import { generateNotesForStep } from './engine/tick-logic.js';
+import { encodeWav } from './engine/wav-encoder.js';
+import { getState } from './state.js';
+
+export interface AudioExportOptions {
+    /** How many times to repeat the current chord progression. Defaults to 1. */
+    loops?: number;
+    /** Sample rate for the render. Defaults to 44100 (matches mix-report). */
+    sampleRate?: number;
+    /** Filename hint for the resulting Blob (used by the UI for the download). */
+    filename?: string;
+}
+
+export interface AudioExportResult {
+    blob: Blob;
+    durationSeconds: number;
+    sampleRate: number;
+    filename: string;
+}
+
+/**
+ * Renders the user's current session into a downloadable WAV. Mirrors the
+ * offline-render approach proven by `scripts/mix-report.ts`: clone the live
+ * state, drive `initAudio` with an `OfflineAudioContext`, fill the per-
+ * instrument buffers via `generateNotesForStep`, then walk the schedule
+ * step by step. The result is the same audio graph that drives playback,
+ * captured to PCM and packaged as a Blob ready for `URL.createObjectURL`.
+ *
+ * The live session is not disturbed — only a cloned state participates in
+ * the offline graph.
+ */
+export async function renderCurrentSessionToWav(
+    opts: AudioExportOptions = {},
+): Promise<AudioExportResult> {
+    const loops = Math.max(1, Math.floor(opts.loops ?? 1));
+    const sampleRate = opts.sampleRate ?? 44100;
+    const filename = sanitizeFilename(opts.filename ?? 'ensemble-export');
+
+    const live = getState();
+    const state = cloneStateForRender(live);
+    validateProgression(state);
+
+    const sixteenth = 60 / state.playback.bpm / 4;
+    const leadIn = 0.25;
+    const stepsPerLoop = state.arranger.totalSteps;
+    if (stepsPerLoop <= 0) {
+        throw new Error('Cannot export audio: arranger has no steps to render');
+    }
+    const totalSteps = stepsPerLoop * loops;
+    const renderSeconds = leadIn + totalSteps * sixteenth + 2;
+    const frameCount = Math.ceil(renderSeconds * sampleRate);
+
+    const offlineCtx = new OfflineAudioContext(2, frameCount, sampleRate);
+    // initAudio's option type is AudioContext but the function already branches
+    // on `startRendering` to handle the OfflineAudioContext path (skips the
+    // watchdog, state-change resume, etc.). Same shape as `scripts/mix-report.ts`.
+    initAudio(state, {
+        audioContext: offlineCtx as unknown as AudioContext,
+        enableWatchdog: false,
+    });
+
+    fillBuffersForExport(state);
+
+    for (let step = 0; step < totalSteps; step++) {
+        const time = leadIn + step * sixteenth;
+        // Throwaway cloned state, not the live deepSignal — same pattern as the
+        // schedule loop in scripts/mix-report.ts.
+        state.playback.nextNoteTime = time; // @direct-mutation
+        state.playback.unswungNextNoteTime = time; // @direct-mutation
+        scheduleGlobalEvent(state, step % stepsPerLoop, time);
+    }
+
+    const rendered = await offlineCtx.startRendering();
+    const channels: Float32Array[] = [];
+    for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
+        // .slice() copies — without it, the underlying buffer is shared with
+        // the AudioBuffer and may be reclaimed by the context's GC.
+        channels.push(rendered.getChannelData(ch).slice());
+    }
+
+    const wav = encodeWav(channels, rendered.sampleRate);
+    return {
+        blob: new Blob([wav], { type: 'audio/wav' }),
+        durationSeconds: rendered.duration,
+        sampleRate: rendered.sampleRate,
+        filename: `${filename}.wav`,
+    };
+}
+
+/**
+ * Triggers a browser download for an export result. Returns the same result
+ * so callers can chain or display metadata.
+ */
+export function downloadExportResult(result: AudioExportResult): AudioExportResult {
+    const url = URL.createObjectURL(result.blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = result.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    // Defer revoke so Chromium gets a chance to start the download.
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    return result;
+}
+
+function sanitizeFilename(input: string): string {
+    const cleaned = input
+        .replace(/[^a-zA-Z0-9\s\-_()]/g, '')
+        .substring(0, 64)
+        .trim();
+    return cleaned || 'ensemble-export';
+}
+
+/**
+ * Mirrors the cloneState helper inlined in `scripts/mix-report.ts`. Strips
+ * the audio context and per-instrument runtime buffers so the offline render
+ * starts from a clean slate; preserves every user-facing setting from the
+ * live session (styles, volumes, intensity, etc.) so the export sounds like
+ * what's on screen.
+ */
+function cloneStateForRender(liveState: any): any {
+    return {
+        playback: {
+            ...liveState.playback,
+            modals: { ...(liveState.playback.modals || {}) },
+            drawQueue: [],
+            audio: null,
+            audioGraph: null,
+            isPlaying: false,
+            isScheduling: false,
+            nextNoteTime: 0,
+            unswungNextNoteTime: 0,
+        },
+        arranger: {
+            ...liveState.arranger,
+            sections: liveState.arranger.sections.map((section: any) => ({ ...section })),
+            progression: [],
+            stepMap: [],
+            sectionMap: [],
+            measureMap: [],
+        },
+        groove: {
+            ...liveState.groove,
+            instruments: liveState.groove.instruments.map((inst: any) => ({
+                ...inst,
+                steps: [...inst.steps],
+            })),
+            audioBuffers: {},
+            buffer: new Map(),
+            fillSteps: null,
+            fillMap: null,
+            accentMap: null,
+            lastHatGain: null,
+            lastRideGain: null,
+            lastCrashGain: null,
+        },
+        chords: {
+            ...liveState.chords,
+            buffer: new Map(),
+            held: {},
+            activeNotes: {},
+            activeInstrument: {},
+        },
+        bass: {
+            ...liveState.bass,
+            buffer: new Map(),
+            activeNotes: [],
+            lastFreq: null,
+            lastPlayedFreq: null,
+        },
+        soloist: {
+            ...liveState.soloist,
+            audio: {
+                ...(liveState.soloist.audio || {}),
+                activeVoices: [],
+                buffer: new Map(),
+                lastFreq: null,
+                lastMidiPlayed: null,
+                lastRenderedFreq: null,
+                lastPlayedFreq: null,
+                lastNoteEnd: 0,
+            },
+            motifBuffer: [...(liveState.soloist.motifBuffer || [])],
+            pitchHistory: [...(liveState.soloist.pitchHistory || [])],
+            deviceBuffer: [...(liveState.soloist.session.rhythm.deviceBuffer || [])],
+            phraseContext: { ...(liveState.soloist.session.currentPhrase.context || {}) },
+        },
+        harmony: {
+            ...liveState.harmony,
+            buffer: new Map(),
+            activeVoices: [],
+        },
+        vizState: { ...liveState.vizState, enabled: false },
+        midi: { ...liveState.midi, enabled: false, muteLocal: true },
+        conductor: {
+            ...liveState.conductor,
+            form: liveState.conductor.form
+                ? JSON.parse(JSON.stringify(liveState.conductor.form))
+                : null,
+        },
+        ui: { ...(liveState.ui || {}) },
+    };
+}
+
+function fillBuffersForExport(state: any): void {
+    const cursors = {
+        mainCursor: { index: 0, sectionIndex: 0 },
+        lookaheadCursor: { index: 0, sectionIndex: 0 },
+    };
+
+    for (let step = 0; step < state.arranger.totalSteps; step++) {
+        const result = generateNotesForStep(state, step, cursors, {
+            includeBass: state.bass.enabled,
+            includeChords: state.chords.enabled,
+            includeSoloist: state.soloist.enabled,
+            includeHarmony: state.harmony.enabled,
+            includeDrums: false,
+        });
+
+        for (const note of result.notes) {
+            if (note.module === 'bass') {
+                storeNote(state.bass.buffer, step, note);
+            } else if (note.module === 'chords') {
+                storeNote(state.chords.buffer, step, note);
+            } else if (note.module === 'harmony') {
+                storeNote(state.harmony.buffer, step, note);
+            } else if (note.module === 'soloist') {
+                storeNote(state.soloist.audio.buffer, step, note);
+            }
+        }
+    }
+}
+
+function storeNote(targetMap: Map<number, any[]>, step: number, note: any): void {
+    if (!targetMap.has(step)) {
+        targetMap.set(step, []);
+    }
+    targetMap.get(step)!.push(note);
+}

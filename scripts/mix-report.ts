@@ -9,6 +9,7 @@ import playwright from '@playwright/test';
 
 const { chromium } = playwright;
 
+import { encodeWav } from '../public/engine/wav-encoder.js';
 import {
     buildRenderedMixReport,
     DEFAULT_MIX_REPORT_SCENES,
@@ -18,7 +19,6 @@ import {
     resolveMixReportCliOptions,
     selectMixReportScenes,
 } from './mix-report-utils.js';
-import { encodeWav } from './wav-encoder.js';
 
 const REPO_ROOT = '/home/brandon/code/ensemble';
 const DIST_DIR = path.join(REPO_ROOT, 'dist');

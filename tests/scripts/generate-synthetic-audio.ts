@@ -1,7 +1,7 @@
 // @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
-import { encodeWav } from '../../scripts/wav-encoder.js';
+import { encodeWav } from '../../public/engine/wav-encoder.js';
 
 const SAMPLE_RATE = 44100;
 

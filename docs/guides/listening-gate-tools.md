@@ -66,6 +66,22 @@ The URL pin uses top-level `?seed=` so audition links don't have to
 round-trip through the base64 `bnd` payload that the in-app share
 modal produces.
 
+## Share modal → Download .wav
+
+In addition to the CLI tools above, the in-app **Share & Export** modal
+now has a "Download .wav" button next to the existing MIDI export. It
+renders the user's current arrangement (with whatever instruments,
+styles, and intensity are dialed in) through the same
+`OfflineAudioContext` path as `mix:report`, and triggers a browser
+download.
+
+This is the workflow path for handing a clip to another model
+(Gemini, GPT, etc.) for a second-opinion listen — no API integration
+required, just drag the file into another chat.
+
+Implementation: `public/audio-export.ts` + the shared
+`public/engine/wav-encoder.ts`.
+
 ## Why these are separate commands
 
 The render harness (`mix:report --write-wav`) and the audition link

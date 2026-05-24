@@ -404,7 +404,7 @@ export function initAudio(
         }
         (groove.audioBuffers as unknown as Record<string, AudioBuffer>).noise = buffer;
     }
-    if (playback.audio && playback.audio.state === 'suspended') {
+    if (!usingOfflineContext && playback.audio && playback.audio.state === 'suspended') {
         if (playback.audio) {
             playback.audio.resume();
         }
