@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { spawn } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import process from 'node:process';
@@ -18,6 +18,7 @@ import {
     resolveMixReportCliOptions,
     selectMixReportScenes,
 } from './mix-report-utils.js';
+import { encodeWav } from './wav-encoder.js';
 
 const REPO_ROOT = '/home/brandon/code/ensemble';
 const DIST_DIR = path.join(REPO_ROOT, 'dist');
@@ -265,9 +266,16 @@ function printHumanMixReport(report) {
     }
 }
 
-async function renderSceneReports({ scenes, seeds }) {
+async function renderSceneReports({ scenes, seeds, writeWav }) {
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
+    const writtenWavPaths = [];
+
+    let wavDir = null;
+    if (writeWav) {
+        wavDir = path.isAbsolute(writeWav) ? writeWav : path.resolve(REPO_ROOT, writeWav);
+        await mkdir(wavDir, { recursive: true });
+    }
 
     try {
         const browser = await chromium.launch({ headless: true });
@@ -280,6 +288,20 @@ async function renderSceneReports({ scenes, seeds }) {
             await page.addInitScript(() => {
                 (window as unknown as { __name: <T>(fn: T) => T }).__name = (fn) => fn;
             });
+
+            if (wavDir) {
+                // Bridge: the page hands raw float channel data back to Node so
+                // we can encode + write WAVs with the shared encoder, instead of
+                // shipping audio through the evaluate return value.
+                await page.exposeFunction('__writeWav', async (fileName, channels, sampleRate) => {
+                    const buffers = channels.map((channel) => Float32Array.from(channel));
+                    const wav = encodeWav(buffers, sampleRate);
+                    const outPath = path.join(wavDir, fileName);
+                    await writeFile(outPath, Buffer.from(wav));
+                    writtenWavPaths.push(outPath);
+                });
+            }
+
             await page.goto(baseUrl, { waitUntil: 'networkidle' });
             await page.waitForFunction(
                 () =>
@@ -289,8 +311,8 @@ async function renderSceneReports({ scenes, seeds }) {
                 { timeout: 20000 },
             );
 
-            return await page.evaluate(
-                async ({ scenes, stems, seeds }) => {
+            const sceneRuns = await page.evaluate(
+                async ({ scenes, stems, seeds, writeWav }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     const {
                         getState,
@@ -826,6 +848,19 @@ async function renderSceneReports({ scenes, seeds }) {
                             const peak = computePeak(mono);
                             const rms = computeRms(mono);
 
+                            if (writeWav) {
+                                const channels = [];
+                                for (let ch = 0; ch < rendered.numberOfChannels; ch++) {
+                                    channels.push(Array.from(rendered.getChannelData(ch)));
+                                }
+                                const fileName = `${scene.id}-${stem.id}-${seedLabel}.wav`;
+                                await /** @type {any} */ (window).__writeWav(
+                                    fileName,
+                                    channels,
+                                    rendered.sampleRate,
+                                );
+                            }
+
                             return {
                                 peak,
                                 peakDb: toDb(peak),
@@ -871,8 +906,10 @@ async function renderSceneReports({ scenes, seeds }) {
 
                     return sceneReports;
                 },
-                { scenes, stems: MIX_REPORT_STEMS, seeds },
+                { scenes, stems: MIX_REPORT_STEMS, seeds, writeWav: Boolean(writeWav) },
             );
+
+            return { sceneRuns, writtenWavPaths };
         } finally {
             await browser.close();
         }
@@ -904,7 +941,11 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         });
     }
 
-    const sceneRuns = await renderSceneReports({ scenes, seeds });
+    const { sceneRuns, writtenWavPaths } = await renderSceneReports({
+        scenes,
+        seeds,
+        writeWav: cliOptions.writeWav,
+    });
     const report = buildRenderedMixReport({
         sceneRuns,
         options: {
@@ -925,6 +966,10 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         );
     } else {
         printHumanMixReport(report);
+    }
+
+    if (writtenWavPaths && writtenWavPaths.length > 0) {
+        log.write(`\nWrote ${writtenWavPaths.length} WAV files to ${cliOptions.writeWav}\n`);
     }
 
     return report;

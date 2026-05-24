@@ -47,6 +47,7 @@ describe('mix report utilities', () => {
             '--jsonl',
             '--focus-from=report.json',
             '--focus-limit=4',
+            '--write-wav=tmp/audio',
         ]);
 
         expect(options.seeds).toEqual(['ALPHA', 'BETA']);
@@ -55,6 +56,10 @@ describe('mix report utilities', () => {
         expect(options.jsonl).toBe(true);
         expect(options.focusFrom).toBe('report.json');
         expect(options.focusLimit).toBe(4);
+        expect(options.writeWav).toBe('tmp/audio');
+
+        const defaults = resolveMixReportCliOptions([]);
+        expect(defaults.writeWav).toBeNull();
 
         const selected = selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES, ['jazz-ride']);
         expect(selected).toHaveLength(1);

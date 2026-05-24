@@ -82,6 +82,7 @@ npm run validate
 - `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` emits a compact multi-seed ensemble audit as JSON.
 - `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` emits rendered-audio metrics as JSONL for a compact multi-seed scene sweep.
 - `npm run mix:report -- --json --focus-from=report.json` rerenders an `ensemble:report` focus shortlist through the actual audio path and emits machine-readable mix metrics.
+- `npm run mix:report -- --write-wav=tmp/mix-render --scene=jazz-ride --seeds=ALPHA` also writes one `.wav` per scene/stem/seed combination (`{sceneId}-{stemId}-{seed}.wav`) so the rendered audio can be auditioned without spinning up the live app. Output dir is gitignored.
 
 ## Documentation
 

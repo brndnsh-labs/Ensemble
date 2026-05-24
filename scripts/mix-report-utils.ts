@@ -296,6 +296,7 @@ export function resolveMixReportCliOptions(argv = []) {
         focusFrom: readStringOption(options, 'focus-from', '') || null,
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
+        writeWav: readStringOption(options, 'write-wav', '') || null,
     };
 }
 

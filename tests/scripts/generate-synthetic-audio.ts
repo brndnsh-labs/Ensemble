@@ -1,6 +1,7 @@
 // @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
+import { encodeWav } from '../../scripts/wav-encoder.js';
 
 const SAMPLE_RATE = 44100;
 
@@ -69,36 +70,6 @@ const parseChord = (chordName) => {
 const saw = (t, freq) => 2 * ((t * freq) % 1) - 1;
 const sine = (t, freq) => Math.sin(2 * Math.PI * t * freq);
 const tri = (t, freq) => Math.abs(saw(t, freq) * 2) - 1;
-
-// Wav Encoder
-function encodeWAV(samples) {
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + samples.length * 2, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, SAMPLE_RATE, true);
-    view.setUint32(28, SAMPLE_RATE * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, samples.length * 2, true);
-    for (let i = 0; i < samples.length; i++) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    }
-    return buffer;
-}
-
-function writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-    }
-}
 
 // Presets
 const PRESETS = {
@@ -194,7 +165,7 @@ preset.progression.forEach((barChords) => {
     });
 });
 
-const wavBuffer = encodeWAV(output);
+const wavBuffer = encodeWav([output], SAMPLE_RATE);
 const outPath = path.resolve(`tests/resources/synthetic_${presetName}.wav`);
 fs.writeFileSync(outPath, Buffer.from(wavBuffer));
 console.log(`Saved to ${outPath}`);
