@@ -1048,6 +1048,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                             bpm: scene.bpm,
                             intensity: scene.intensity,
                             source: scene.source || 'default',
+                            findingThresholds: scene.findingThresholds || null,
                             seeds: seedReports,
                         });
                     }

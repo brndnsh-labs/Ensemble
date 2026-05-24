@@ -246,36 +246,64 @@ describe('mix report utilities', () => {
     });
 
     describe('architectural-bias findings', () => {
+        // Default thresholds are genre-agnostic (subPlusLow > 85%, air < 1%,
+        // corr > 0.92) — see DEFAULT_FINDING_THRESHOLDS in mix-report-utils.ts.
+        // Calibrated 2026-05-24 so they don't false-positive on pro reference
+        // mixes (Miles, Chic, STP, BB King). Tighter genre-specific thresholds
+        // live on each scene in DEFAULT_MIX_REPORT_SCENES.
+
         it('flags bottom-heavy mixes by sub+low share', () => {
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
                     probes: {
-                        sub: 0.45,
-                        low: 0.25,
-                        lowMid: 0.1,
-                        mid: 0.1,
-                        presence: 0.05,
-                        air: 0.05,
+                        sub: 0.55,
+                        low: 0.35,
+                        lowMid: 0.05,
+                        mid: 0.03,
+                        presence: 0.01,
+                        air: 0.01,
                     },
                 }),
             });
             expect(findings.some((n) => n.includes('bottom-heavy'))).toBe(true);
         });
 
-        it('does not flag a balanced mix as bottom-heavy', () => {
+        it('does not flag a typical non-jazz pro mix as bottom-heavy by default', () => {
+            // Calibrated against B.B. King "The Thrill Is Gone": sub 69%, low 10%
+            // — 79% combined. Above the old 55% threshold but below the new 85%.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
                     probes: {
-                        sub: 0.15,
-                        low: 0.15,
-                        lowMid: 0.2,
-                        mid: 0.2,
-                        presence: 0.15,
-                        air: 0.15,
+                        sub: 0.69,
+                        low: 0.1,
+                        lowMid: 0.1,
+                        mid: 0.05,
+                        presence: 0.02,
+                        air: 0.04,
                     },
                 }),
             });
             expect(findings.some((n) => n.includes('bottom-heavy'))).toBe(false);
+        });
+
+        it('flags bottom-heavy under a scene-specific (jazz) threshold', () => {
+            // Same 79% sub+low mix, but with jazz-tight thresholds — should flag.
+            const findings = summarizeRenderedFindings(
+                {
+                    full: createStemMetrics({
+                        probes: {
+                            sub: 0.69,
+                            low: 0.1,
+                            lowMid: 0.1,
+                            mid: 0.05,
+                            presence: 0.02,
+                            air: 0.04,
+                        },
+                    }),
+                },
+                { subPlusLowMax: 0.55 },
+            );
+            expect(findings.some((n) => n.includes('bottom-heavy'))).toBe(true);
         });
 
         it('flags missing air across all stems', () => {
@@ -284,40 +312,52 @@ describe('mix report utilities', () => {
                     probes: { sub: 0.3, low: 0.3, lowMid: 0.2, mid: 0.15, presence: 0.04, air: a },
                 });
             const findings = summarizeRenderedFindings({
-                full: lowAir(0.01),
-                drums: lowAir(0.02),
+                full: lowAir(0.005),
+                drums: lowAir(0.002),
                 bass: lowAir(0.0),
-                chords: lowAir(0.03),
-                harmony: lowAir(0.04),
-                soloist: lowAir(0.01),
+                chords: lowAir(0.003),
+                harmony: lowAir(0.008),
+                soloist: lowAir(0.001),
             });
             expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(true);
         });
 
-        it('does not flag missing air when at least one stem carries it', () => {
+        it('does not flag a pro mix as missing air under the default threshold', () => {
+            // Calibrated against Miles Davis "So What": full air 4.5% — clears
+            // both default (1%) and jazz-tight (3.5%) thresholds.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
                     probes: {
-                        sub: 0.2,
-                        low: 0.2,
-                        lowMid: 0.2,
-                        mid: 0.15,
-                        presence: 0.1,
-                        air: 0.15,
-                    },
-                }),
-                harmony: createStemMetrics({
-                    probes: {
-                        sub: 0.05,
-                        low: 0.05,
-                        lowMid: 0.1,
-                        mid: 0.1,
-                        presence: 0.2,
-                        air: 0.5,
+                        sub: 0.31,
+                        low: 0.16,
+                        lowMid: 0.26,
+                        mid: 0.18,
+                        presence: 0.04,
+                        air: 0.045,
                     },
                 }),
             });
             expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(false);
+        });
+
+        it('flags missing air under a scene-specific (jazz) threshold', () => {
+            // Air 2.5% — clears the default 1% but trips the jazz target of 3.5%.
+            const findings = summarizeRenderedFindings(
+                {
+                    full: createStemMetrics({
+                        probes: {
+                            sub: 0.5,
+                            low: 0.24,
+                            lowMid: 0.1,
+                            mid: 0.1,
+                            presence: 0.03,
+                            air: 0.025,
+                        },
+                    }),
+                },
+                { airMin: 0.035 },
+            );
+            expect(findings.some((n) => n.includes('no stem owns the air band'))).toBe(true);
         });
 
         it('flags a functionally mono mix by L/R correlation', () => {
@@ -329,13 +369,28 @@ describe('mix report utilities', () => {
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
         });
 
-        it('does not flag a wide mix as mono', () => {
+        it('does not flag a pro mix as mono under the default threshold', () => {
+            // Calibrated against Chic "I Want Your Love": correlation 0.834 —
+            // the narrowest of the four reference mixes, still passes the
+            // default 0.92 threshold.
             const findings = summarizeRenderedFindings({
                 full: createStemMetrics({
-                    stereo: { correlation: 0.6, sideRatio: 0.25 },
+                    stereo: { correlation: 0.834, sideRatio: 0.083 },
                 }),
             });
             expect(findings.some((n) => n.includes('functionally mono'))).toBe(false);
+        });
+
+        it('flags functional-mono under a scene-specific (jazz) threshold', () => {
+            const findings = summarizeRenderedFindings(
+                {
+                    full: createStemMetrics({
+                        stereo: { correlation: 0.75, sideRatio: 0.12 },
+                    }),
+                },
+                { stereoCorrelationMax: 0.7 },
+            );
+            expect(findings.some((n) => n.includes('functionally mono'))).toBe(true);
         });
 
         it('flags a front-loaded arc when the full mix is classified that way', () => {

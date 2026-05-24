@@ -9,6 +9,21 @@ import {
 
 const DEFAULT_SEED = 'MIX_AUDIT';
 
+// Per-scene finding thresholds calibrated 2026-05-24 against pro reference
+// mixes via `npm run mix:analyze` (see tmp/references/calibration.json):
+//   Jazz target  — Miles Davis "So What": sub+low 47%, air 4.5%, corr 0.59
+//   Rock target  — Stone Temple Pilots "Interstate Love Song": 73% / 1.7% / 0.70
+//   Blues target — B.B. King "The Thrill Is Gone": 79% / 3.6% / 0.72
+//   Funk target  — Chic "I Want Your Love": 75% / 1.7% / 0.83
+// Genre-agnostic defaults (used when a finding consumer doesn't pass scene
+// targets — e.g. mix:analyze on an arbitrary file) are looser; they only fire
+// on values none of the references hit.
+export const DEFAULT_FINDING_THRESHOLDS = {
+    subPlusLowMax: 0.85,
+    airMin: 0.01,
+    stereoCorrelationMax: 0.92,
+};
+
 export const DEFAULT_MIX_REPORT_SCENES = [
     {
         id: 'rock-backbeat',
@@ -26,6 +41,11 @@ export const DEFAULT_MIX_REPORT_SCENES = [
                 value: 'C | G | Am | F | C | G | F | G',
             },
         ],
+        findingThresholds: {
+            subPlusLowMax: 0.8,
+            airMin: 0.015,
+            stereoCorrelationMax: 0.85,
+        },
     },
     {
         id: 'blues-shuffle',
@@ -43,6 +63,11 @@ export const DEFAULT_MIX_REPORT_SCENES = [
                 value: 'C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7',
             },
         ],
+        findingThresholds: {
+            subPlusLowMax: 0.85,
+            airMin: 0.025,
+            stereoCorrelationMax: 0.85,
+        },
     },
     {
         id: 'jazz-ride',
@@ -60,6 +85,11 @@ export const DEFAULT_MIX_REPORT_SCENES = [
                 value: 'Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7 | Cmaj7 | Cmaj7',
             },
         ],
+        findingThresholds: {
+            subPlusLowMax: 0.55,
+            airMin: 0.035,
+            stereoCorrelationMax: 0.7,
+        },
     },
     {
         id: 'funk-pocket',
@@ -77,6 +107,11 @@ export const DEFAULT_MIX_REPORT_SCENES = [
                 value: 'Em7 | Em7 | A7 | A7 | Em7 | Em7 | A7 | B7',
             },
         ],
+        findingThresholds: {
+            subPlusLowMax: 0.8,
+            airMin: 0.015,
+            stereoCorrelationMax: 0.85,
+        },
     },
 ];
 
@@ -384,7 +419,11 @@ export function parseEnsembleAuditInput(text, options = {}) {
     };
 }
 
-export function summarizeRenderedFindings(stems) {
+export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_THRESHOLDS) {
+    const subPlusLowMax = thresholds?.subPlusLowMax ?? DEFAULT_FINDING_THRESHOLDS.subPlusLowMax;
+    const airMin = thresholds?.airMin ?? DEFAULT_FINDING_THRESHOLDS.airMin;
+    const stereoCorrelationMax =
+        thresholds?.stereoCorrelationMax ?? DEFAULT_FINDING_THRESHOLDS.stereoCorrelationMax;
     const full = stems.full;
     const fullWithSolo = stems['full+solo'];
     const drums = stems.drums;
@@ -447,12 +486,13 @@ export function summarizeRenderedFindings(stems) {
         notes.push('harmony stem shows sharp waveform edges worth auditing');
     }
 
-    // Architectural-bias findings (post-2026-05-23 audio-judge listening pass).
-    // These triangulated across two independent multimodal listens; the
-    // thresholds are starting points and may be tuned by ear over time.
+    // Architectural-bias findings, calibrated 2026-05-24 against pro reference
+    // mixes (see DEFAULT_FINDING_THRESHOLDS comment for sources). Defaults are
+    // genre-agnostic and intentionally loose; scene-aware callers pass tighter
+    // thresholds via the `findingThresholds` field on each scene.
     if (full?.probes) {
         const subPlusLow = (full.probes.sub || 0) + (full.probes.low || 0);
-        if (subPlusLow > 0.55) {
+        if (subPlusLow > subPlusLowMax) {
             notes.push(
                 `full mix is bottom-heavy — ${Math.round(subPlusLow * 100)}% of energy in sub+low bands`,
             );
@@ -461,13 +501,13 @@ export function summarizeRenderedFindings(stems) {
 
     const allStems = [full, fullWithSolo, drums, bass, chords, harmony, soloist].filter(Boolean);
     const maxAir = allStems.reduce((max, s) => Math.max(max, s.probes?.air || 0), 0);
-    if (allStems.length > 0 && maxAir < 0.05) {
+    if (allStems.length > 0 && maxAir < airMin) {
         notes.push(
             `no stem owns the air band above 5 kHz (max air ratio across stems: ${maxAir.toFixed(3)})`,
         );
     }
 
-    if (full?.stereo?.correlation != null && full.stereo.correlation > 0.95) {
+    if (full?.stereo?.correlation != null && full.stereo.correlation > stereoCorrelationMax) {
         notes.push(
             `full mix is functionally mono — L/R correlation ${full.stereo.correlation.toFixed(3)}, side energy ${((full.stereo.sideRatio || 0) * 100).toFixed(1)}%`,
         );
@@ -501,7 +541,7 @@ export function buildRenderedMixReport({ sceneRuns, options, source = { kind: 'm
         const seeds = sceneRun.seeds.map((seedRun) => ({
             seed: seedRun.seed,
             focus: focusLookup.get(seedRun.seed) || null,
-            findings: summarizeRenderedFindings(seedRun.stems),
+            findings: summarizeRenderedFindings(seedRun.stems, sceneRun.findingThresholds),
             stems: seedRun.stems,
         }));
 

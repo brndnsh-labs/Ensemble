@@ -80,6 +80,29 @@ The URL pin uses top-level `?seed=` so audition links don't have to
 round-trip through the base64 `bnd` payload that the in-app share
 modal produces.
 
+## `npm run mix:analyze -- <file> [<file> ...]`
+
+Runs the same spectral / stereo / RMS analysis as `mix:report` on an arbitrary
+audio file path. Used to calibrate engine output against professionally-mixed
+reference tracks. Anything ffmpeg can decode (mp3, wav, flac, m4a) is accepted;
+files are internally decoded to 48 kHz stereo / f32le.
+
+```bash
+npm run --silent mix:analyze -- ~/Downloads/*.mp3
+npm run --silent mix:analyze -- --json reference.wav > calibration.json
+```
+
+A `--loops=N` flag enables per-loop arc analysis on a single render that
+contains N choruses of the same length. Reports the same per-stem column
+shape as the table block from `mix:report` plus a `Findings:` summary using
+the **genre-agnostic** `DEFAULT_FINDING_THRESHOLDS` — these are looser than
+the per-scene thresholds in `DEFAULT_MIX_REPORT_SCENES` and are tuned not to
+false-positive on pro reference mixes.
+
+`tmp/references/calibration.json` is the persisted reference baseline
+(Miles Davis "So What" / Chic / STP / B.B. King), used to calibrate the
+per-scene thresholds at `scripts/mix-report-utils.ts`.
+
 ## Share modal → Download .wav
 
 In addition to the CLI tools above, the in-app **Share & Export** modal
