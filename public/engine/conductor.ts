@@ -241,14 +241,16 @@ export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
     }
 
     if (Math.abs(playback.bandIntensity - conductor.targetIntensity) > 0.001) {
-        // why: invert the prior 2.5×-down / 1.0×-up asymmetry to 0.5×-down / 1.5×-up.
-        // Real bands "settle in and build" — they lean into rises and ease out of drops,
-        // not the other way around. Combined with the random jitter at line 445/457 the
-        // old asymmetric down-ramp created a structural pull toward floor that parked
-        // funk/neo-soul/disco backbeats below the 0.4 Snare-vs-Sidestick gate
-        // (`grooves/funk.ts:195`). Inversion + per-genre floors below + drum-gate sweep
-        // are S8's three stacking fixes.
-        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 0.5 : 1.5;
+        // why: asymmetric ramp — bands "settle in and build," leaning into rises and
+        // easing out of drops. Original S8 inversion shipped 0.5×-down / 1.5×-up;
+        // softened to 0.75 / 1.25 (Epic 12 S6 / LISTEN_TESTS B2) because the 1.5×
+        // up-ramp could leap the realized bandIntensity by ≈+0.25 in a single
+        // measure, reading as a lurch on rising section boundaries. 0.75 / 1.25
+        // preserves the asymmetry intent (ups still faster than downs) but caps the
+        // per-measure rise at ≈+0.0625 — a musically natural swell rather than a step
+        // change. Companion fixes from S8 — per-genre floors below + the drum-gate
+        // sweep — still apply unchanged.
+        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 0.75 : 1.25;
         let newIntensity =
             playback.bandIntensity +
             (playback.bandIntensity < conductor.targetIntensity

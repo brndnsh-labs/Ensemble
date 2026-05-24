@@ -248,9 +248,11 @@ describe('Funk Backbeat Presence at Default Intensity (S8)', () => {
 // within the first 16 bars (S8 second acceptance criterion).
 //
 // Pre-S8: asymmetric down-ramp (`multiplier = 2.5` for down, `1.0` for up at
-// conductor.ts:185) created a structural pull toward floor. S8 inverts to
-// 0.5 (down) / 1.5 (up). Per-genre floors (Funk 0.45) keep targetIntensity
-// from sagging below the Snare gate even after random jitter.
+// conductor.ts:185) created a structural pull toward floor. S8 inverted to
+// 0.5 / 1.5; Epic 12 S6 / LISTEN_TESTS B2 then softened to 0.75 / 1.25 to keep
+// the rise from leaping ≈+0.25 in a single measure (it would read as a lurch).
+// Per-genre floors (Funk 0.45) keep targetIntensity from sagging below the
+// Snare gate even after random jitter.
 //
 // Driver shape: this is NOT a strict "no chart loaded" scenario because the
 // conductor needs a section transition to set targetIntensity (without one,
@@ -417,7 +419,7 @@ describe('Conductor Arc — default playback reaches >=0.5 within 16 bars (S8)',
         console.log(`[Bars]                  16`);
         console.log(`[Initial bandIntensity] 0.35`);
         console.log(`[Funk floor]            0.45 (GENRE_INTENSITY_FLOORS)`);
-        console.log(`[Ramp multiplier]       0.5 down / 1.5 up (S8 inversion)`);
+        console.log(`[Ramp multiplier]       0.75 down / 1.25 up (S6 B2 softening)`);
         console.log(`[Max bandIntensity]     ${maxIntensity.toFixed(3)}`);
         console.log(`[Reached >=0.5 at bar]  ${reached05 >= 0 ? reached05 : 'NEVER'}`);
         console.log(`[Sample trace]          ${samples.map((v) => v.toFixed(2)).join(' -> ')}`);
