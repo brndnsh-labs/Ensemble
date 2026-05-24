@@ -190,11 +190,12 @@ function printHumanReport(analyses: FileAnalysis[]): void {
             cell('lowMid', 8) +
             cell('mid%', 7) +
             cell('pres%', 7) +
-            cell('air%', 7) +
+            cell('5k%', 7) +
+            cell('7k%', 7) +
             cell('cent.', 7) +
             cell('spike/s', 9),
     );
-    console.log('-'.repeat(labelWidth + 7 + 8 + 8 + 7 + 8 + 8 + 7 + 7 + 8 + 7 + 7 + 7 + 7 + 9));
+    console.log('-'.repeat(labelWidth + 7 + 8 + 8 + 7 + 8 + 8 + 7 + 7 + 8 + 7 + 7 + 7 + 7 + 7 + 9));
 
     for (const a of analyses) {
         const truncated =
@@ -212,6 +213,7 @@ function printHumanReport(analyses: FileAnalysis[]): void {
                 cell(formatPct(a.probes.lowMid), 8) +
                 cell(formatPct(a.probes.mid), 7) +
                 cell(formatPct(a.probes.presence), 7) +
+                cell(formatPct(a.probes.air5k), 7) +
                 cell(formatPct(a.probes.air), 7) +
                 cell(`${Math.round(a.probes.centroid)}`, 7) +
                 cell(a.transients.spikeRate.toFixed(1), 9),

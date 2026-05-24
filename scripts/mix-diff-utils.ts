@@ -22,7 +22,7 @@ export const DEFAULT_DIFF_THRESHOLDS: MixDiffThresholds = {
 };
 
 export const DB_METRICS = ['peakDb', 'rmsDb', 'crestDb'] as const;
-export const SPECTRAL_BANDS = ['sub', 'low', 'lowMid', 'mid', 'presence', 'air'] as const;
+export const SPECTRAL_BANDS = ['sub', 'low', 'lowMid', 'mid', 'presence', 'air5k', 'air'] as const;
 
 interface StemMetrics {
     peakDb?: number;

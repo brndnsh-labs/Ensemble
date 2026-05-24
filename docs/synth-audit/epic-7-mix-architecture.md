@@ -125,6 +125,16 @@ Lean toward (a) — uses content we already half-built and addresses the `projec
 
 **Effort:** ~1h for S3a; ~2 days for S3b path (a); ~1 day for (b). **Model:** opus. **Reviewer:** synth-graph-reviewer, music-theory-reviewer (percussion lane content choices). **Source:** Reference comparison (Miles 4.5% / Get Lucky 0.5% at 7.2 kHz probe — the gap exposes the probe-location problem).
 
+**S3a status — shipped (2026-05-25, overnight branch).** A 5 kHz `air5k` probe lives alongside the legacy 7.2 kHz `air` probe in `scripts/audio-analysis.ts` (and the mirrored in-page version in `scripts/mix-report.ts`); `mix:analyze` now prints both as `5k%` and `7k%` columns; `mix:diff` flags deltas on both bands. No finding-gate change yet — that's an owner judgment call documented in [`tmp/overnight-s3a-probe.md`](../../tmp/overnight-s3a-probe.md).
+
+The re-measurement broke the simple framing. Daft Punk "Get Lucky" registers low at *both* probes (0.6% / 0.5%) — its audible brightness isn't a single-frequency phenomenon. The original Daft-Punk puzzle isn't a probe-location problem; it's a wider band-integral / perceptual-brightness question that single-point Goertzel probes can't answer. **But** the re-measurement DID expose a real pattern: rock production (STP 4.0% / 1.6%, Queens 2.1% / 0.8%) is 2–3× *brighter* at 5 kHz than at 7.2 kHz, while jazz/blues (Miles 2.5% / 4.4%, Bill Evans 1.2% / 2.4%, BB King 1.0% / 3.5%) is the inverse. The 7.2 kHz probe isn't wrong — it's right for jazz/blues, wrong for rock. The fix is *both probes*, not *one or the other*.
+
+Engine air content remains low at both frequencies (post-S2 full+solo: jazz 1.4% / 0.5%, rock 0.8% / 0.3%, blues 0.5% / 0.2%, funk 0.2% / 0.2%). The 5 kHz reading narrows the engine-vs-reference gap for jazz (5× → 1.8×) and blues (3.5× → 2×) but the rock (5×) and especially funk (11×) gaps are real and survive the re-location.
+
+**S3b recommendation:** proceed with path (a) — wire UI triggers for the orphaned aux-percussion lanes (shaker/conga/clave). The funk gap of 11× at 5 kHz is the largest engine air deficit and aligns 1:1 with the `project_orphaned_latin_content` memory note's debt: the funk drum preset has shaker/conga lanes in state but no UI surface fires them. Closing that surface closes both the air gap AND the orphaned-percussion debt simultaneously. Path (b) (a wash voice) looks weaker now because the per-genre patterns are different (rock wants 5 kHz cymbal; jazz wants 7 kHz brush; funk wants per-step shaker hits) — a single wash voice can't satisfy all of them; per-genre drum-bus enrichment is the right shape.
+
+**Open finding-gate question for the owner:** the current `summarizeRenderedFindings` air gate uses the 7.2 kHz probe only. Should it switch to `max(air, air5k)` so the gate fires only when neither probe registers? Recommended in the S3a memo. Easy to do, no measurement disruption.
+
 ### S4. Coordinated intensity arc across loops
 With `--loops=3+`, individual stems show motion (drums front-loaded, soloist dip, harmony building) but the full mix classifies as `flat` because they cancel. Real records have an arc: head → solos build → climax → release. The conductor today doesn't broadcast a shared intensity envelope that every instrument biases toward; each engine has its own loop-aware behavior and they run independently.
 

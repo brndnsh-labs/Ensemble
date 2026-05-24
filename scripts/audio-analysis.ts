@@ -17,6 +17,14 @@ export interface SpectralProbes {
     lowMid: number;
     mid: number;
     presence: number;
+    // Epic 7 S3a: dual air probes. `air5k` was added 2026-05-25 alongside
+    // the legacy 7.2 kHz probe after the 8-reference calibration pass
+    // showed Daft Punk "Get Lucky" — an audibly hat-and-shaker-aggressive
+    // track — registering only 0.5% at the 7.2 kHz probe (lower than our
+    // engine at 1.3%). The hypothesis was that the probe was sitting above
+    // where modern hi-hat / shaker energy actually lives. See
+    // `tmp/overnight-s3a-probe.md` for the re-measurement.
+    air5k: number;
     air: number;
     centroid: number;
 }
@@ -198,6 +206,9 @@ const SPECTRAL_BAND_CENTERS = {
     lowMid: 380,
     mid: 1000,
     presence: 2800,
+    // Epic 7 S3a: dual air probes. 5 kHz was added to test the hypothesis
+    // that modern hi-hat / shaker content lives below the 7.2 kHz original.
+    air5k: 5000,
     air: 7200,
 } as const;
 
@@ -206,7 +217,16 @@ export function computeSpectralProbes(samples: Float32Array, sampleRate: number)
     const active = samples.slice(bounds.start, bounds.end);
     const windowSize = Math.min(4096, active.length);
     if (windowSize < 256) {
-        return { sub: 0, low: 0, lowMid: 0, mid: 0, presence: 0, air: 0, centroid: 0 };
+        return {
+            sub: 0,
+            low: 0,
+            lowMid: 0,
+            mid: 0,
+            presence: 0,
+            air5k: 0,
+            air: 0,
+            centroid: 0,
+        };
     }
 
     const windows: Float32Array[] = [];
@@ -222,6 +242,7 @@ export function computeSpectralProbes(samples: Float32Array, sampleRate: number)
         lowMid: 0,
         mid: 0,
         presence: 0,
+        air5k: 0,
         air: 0,
     };
 

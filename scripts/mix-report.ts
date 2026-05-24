@@ -749,12 +749,17 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                     }
 
                     function computeSpectralProbes(samples, sampleRate) {
+                        // Epic 7 S3a — `air5k` added 2026-05-25 to test
+                        // whether the legacy 7.2 kHz probe was missing
+                        // modern hi-hat / shaker content. Mirror of
+                        // SPECTRAL_BAND_CENTERS in scripts/audio-analysis.ts.
                         const centers = {
                             sub: 60,
                             low: 140,
                             lowMid: 380,
                             mid: 1000,
                             presence: 2800,
+                            air5k: 5000,
                             air: 7200,
                         };
                         const bounds = activeBounds(samples);
@@ -767,6 +772,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                                 lowMid: 0,
                                 mid: 0,
                                 presence: 0,
+                                air5k: 0,
                                 air: 0,
                                 centroid: 0,
                             };
@@ -785,6 +791,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                             lowMid: 0,
                             mid: 0,
                             presence: 0,
+                            air5k: 0,
                             air: 0,
                         };
 
