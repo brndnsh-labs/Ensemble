@@ -54,6 +54,13 @@ const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // why: canonical `groove.genreFeel` is 'Bossa Nova' (see groove-engine.ts:34,
     // drum-presets.ts:830) — 'Bossa' key alone would never match in production.
     'Bossa Nova': 0.3,
+    // why: ska-punk's signature upbeat-crack (offbeat hat + snare-on-2-and-4) is
+    // genre identity; without a floor the conductor can park bandIntensity below
+    // the velocity threshold where that crack reads as energy. Epic 12 S6 B3 —
+    // chosen by analogy with Disco's 0.45 floor, one notch lower because ska-punk's
+    // snare-on-the-and is less load-bearing than disco's four-on-the-floor kick.
+    // Canonical key matches `groove-engine.ts:38` ('Ska-Punk' with hyphen).
+    'Ska-Punk': 0.4,
 };
 
 /**
