@@ -3,6 +3,7 @@ import { Fragment } from 'preact';
 import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
+import { AuditionOverlay } from './AuditionOverlay.jsx';
 
 const EditorModal = lazy(() =>
     import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
@@ -61,24 +62,30 @@ function AnimatedModalWrapper({ isOpen, component: Component }: AnimatedModalWra
  * Monitors global state to determine which modal to show.
  */
 export function Modals() {
-    const { settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen } = useEnsembleState(
-        (s) => ({
+    const { settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen, auditionOpen } =
+        useEnsembleState((s) => ({
             settingsOpen: s.playback.modals.settings,
             editorOpen: s.playback.modals.editor,
             generateSongOpen: s.playback.modals.generateSong,
             shareOpen: s.playback.modals.share,
             manualOpen: s.playback.modals.manual,
-        }),
-    );
+            auditionOpen: s.playback.modals.audition,
+        }));
 
     useEffect(() => {
-        const anyOpen = settingsOpen || editorOpen || generateSongOpen || shareOpen || manualOpen;
+        const anyOpen =
+            settingsOpen ||
+            editorOpen ||
+            generateSongOpen ||
+            shareOpen ||
+            manualOpen ||
+            auditionOpen;
         if (anyOpen) {
             document.body.classList.add('modal-open');
         } else {
             document.body.classList.remove('modal-open');
         }
-    }, [settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen]);
+    }, [settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen, auditionOpen]);
 
     return (
         <Fragment>
@@ -87,6 +94,7 @@ export function Modals() {
             <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
             <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
             <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
+            <AuditionOverlay />
         </Fragment>
     );
 }

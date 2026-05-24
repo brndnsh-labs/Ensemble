@@ -488,6 +488,23 @@ export function loadFromUrl(): void {
             }
         }
     }
+
+    // Top-level seed override. Lets a permalink (especially the audition
+    // links produced by `npm run audition-link`) pin the soloist seed
+    // without having to round-trip through the full base64 `bnd` payload.
+    const seedParam = params.get('seed');
+    if (seedParam) {
+        const safe = stripDangerousChars(seedParam).slice(0, 64);
+        if (safe) {
+            (arranger as Mutable<typeof arranger>).seed = safe; // @direct-mutation
+        }
+    }
+
+    // Audition permalink: show the AuditionOverlay so a single click satisfies
+    // browser autoplay policy and triggers togglePlay on the now-hydrated scene.
+    if (params.get('autoplay') === '1') {
+        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'audition', open: true });
+    }
 }
 
 function clearChordPresetHighlight() {}

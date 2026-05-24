@@ -135,6 +135,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
 | **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
+| **Orchestration** | `public/components/AuditionOverlay.tsx` | One-button "▶ Play" landing shown when the app is opened from an audition permalink (`?autoplay=1`); satisfies the browser autoplay gesture and starts the hydrated scene. |
 | **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface used by the editor modal and related flows. |
 | **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
 | **Controls** | `public/components/Transport.tsx` | Playback controls and tempo. |

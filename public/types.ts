@@ -86,6 +86,8 @@ export interface ModalsState {
     share: boolean;
     generateSong: boolean;
     manual: boolean;
+    /** Audition permalink (?autoplay=1) landing — see AuditionOverlay. */
+    audition: boolean;
 }
 
 // ---------------------------------------------------------------------------

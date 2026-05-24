@@ -10,6 +10,8 @@ export interface ShareOptions {
     includeHarmony?: boolean;
     includeDrums?: boolean;
     targetDuration?: number;
+    /** Appends `&autoplay=1` so the landing page shows the audition overlay. */
+    autoplay?: boolean;
 }
 
 /**
@@ -93,6 +95,10 @@ export function generateShareUrl(options: ShareOptions = {}): string {
 
     // High-fidelity band settings
     params.set('bnd', compressBandSettings(options));
+
+    if (options.autoplay) {
+        params.set('autoplay', '1');
+    }
 
     return `${window.location.origin + window.location.pathname}?${params.toString()}`;
 }

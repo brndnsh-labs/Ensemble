@@ -63,6 +63,10 @@ export const playback = deepSignal<GlobalContext>({
         share: false,
         generateSong: false,
         manual: false,
+        // Set true when the app is loaded with ?autoplay=1 (audition permalink).
+        // Renders the AuditionOverlay so a single click satisfies the browser
+        // autoplay gesture requirement and starts the rendered scene.
+        audition: false,
     },
 });
 
