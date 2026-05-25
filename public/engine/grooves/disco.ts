@@ -1,3 +1,4 @@
+import { scrambleHash } from '../hash-utils.js';
 import {
     applyStandardBase,
     DEFAULT_CONFIG,
@@ -16,29 +17,36 @@ export const config = {
 };
 
 /**
- * Maps intensity to motif complexity for Disco.
- * 0: Classic 4-on-the-floor, 1: Shimmering hats, 2: Syncopated interplay, 3: Octave Percussion
+ * Disco motif selection — two-motif system.
+ *
+ * 0: Foundation — strict 4-on-the-floor + offbeat open hat + on-beat closed
+ *    hat. The canonical disco skeleton with no extras.
+ * 1: Busy — adds support subdivisions on the closed hat, plus either snare
+ *    ghosts + syncopated hat texture OR an octave-cowbell lane on eighths
+ *    (sub-flavor chosen per-bar in applyOverrides).
+ *
+ * why drums.md §18 — pre-collapse the engine had 4 motifs gated behind
+ * `intensity > 0.7`, locking intensities 0-0.7 to motifs 0/1. The audit's
+ * musical claim is that disco scales on *velocity/timbre*, not density: a
+ * quiet chorus should still get cowbells (just quieter), and a loud verse
+ * should be free to stay sparse. So the busy/foundation decision is now
+ * seed-driven (density axis) and intensity governs velocity only via
+ * scaleVelocity calls below — never gates which lane fires.
  */
-export function getMotif(seed: number, complexity: number, intensity = 1.0): number {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Pure 4-on-the-floor foundation
+export function getMotif(seed: number, complexity: number, _intensity = 1.0): number {
+    // why: low-complexity sections still collapse to foundation. complexity is
+    // the user's "creativity" knob (drumComplexity ≈ 0.3 when creativity is
+    // off, 0.8 when on), so this preserves the existing foundation-only path
+    // when the user explicitly wants a minimal pattern.
+    if (complexity < 0.3) {
+        return 0;
     }
-
-    if (seed < 0.25) {
-        return 0; // Classic is always an option
-    }
-    if (seed < 0.55) {
-        return 1; // Shimmering hats reachable at mid intensity
-    }
-
-    if (intensity < 0.7) {
-        return seed < 0.8 ? 0 : 1;
-    }
-
-    if (seed < 0.8) {
-        return 2; // Syncopated interplay
-    }
-    return 3; // Octave Percussion
+    // why: 45/55 split toward "busy" — disco's signature texture (open hat
+    // shimmer + cowbells or ghost snares) is what makes it sound like disco
+    // rather than generic four-on-the-floor pop. Tilting slightly busy keeps
+    // the genre identifiable while still leaving foundation reachable for
+    // verse/section contrast.
+    return seed < 0.45 ? 0 : 1;
 }
 
 export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
@@ -67,6 +75,21 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
 
+    // why: when busy is selected, pick a per-bar sub-flavor that decides
+    // whether this bar leans into syncopation (ghost snares + e-of-2 closed
+    // hat) or octave cowbells. Keyed on (barIndex/2, sectionSeed) so flavor
+    // stays stable for 2 bars at a time — disco grooves typically commit to a
+    // texture for at least half a phrase before swapping. scrambleHash
+    // (mulberry32) gives a well-distributed float; see hash-utils.ts.
+    const sectionSeedInt = Math.floor(Math.max(0, Math.min(0.999, sectionSeed || 0)) * 256);
+    const flavorRoll =
+        activeMotif === 1 ? scrambleHash(Math.floor(barIndex / 2) * 131 + sectionSeedInt * 17) : 0;
+    // why: 50/50 split between syncopation and cowbell flavors — both are
+    // signature disco textures (hi-hat shimmer + ghost snares vs. cowbell
+    // eighths). Neither should dominate.
+    const isCowbellFlavor = activeMotif === 1 && flavorRoll >= 0.5;
+    const isSyncopationFlavor = activeMotif === 1 && flavorRoll < 0.5;
+
     // --- 1. KICK (Strict 4-on-the-floor) ---
     if (context.inst.name === 'Kick') {
         shouldPlay = isBeatStart;
@@ -84,8 +107,14 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = scaleVelocity(1.15, intensity, 0.1);
         }
 
-        // --- Snare Ghosts & Turnarounds ---
-        if (intensity > 0.7 && activeMotif >= 2) {
+        // --- Snare Ghosts ---
+        // why drums.md §18 — ghost no longer gated by `intensity > 0.7`. The
+        // density choice (foundation vs busy-syncopation) is now seed-driven,
+        // and ghost loudness comes from scaleVelocity below. roll(0.4,
+        // intensity) keeps the per-step rate proportional to intensity, so a
+        // low-intensity busy section gets quieter, sparser ghosts naturally —
+        // not a binary on/off cliff at 0.7.
+        if (isSyncopationFlavor) {
             if (isAOfBeat && beatIndex >= 3 && roll(0.4, intensity)) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
@@ -105,15 +134,25 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
     } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;
+        // why: support subdivisions and syncopated texture both live under the
+        // "busy" motif. The phrase seed picks WHERE the support hit lands
+        // (beat 2 or beat 0, e-or-a of beat) so the hat shimmer reads as a
+        // shaped phrase rather than a uniform 16th roll.
         const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 5);
         const supportBeat = phraseSeed > 0.6 ? 2 : 0;
         const supportUsesA = phraseSeed > 0.52;
         const supportSubdivisionHit = supportUsesA ? isAOfBeat : isEOfBeat;
+        // why: busy adds support subdivisions on both flavors (closed-hat
+        // shimmer is part of disco's identity regardless of whether the bar
+        // leans syncopated or cowbell-driven).
         const supportSubdivision =
-            (activeMotif === 1 || activeMotif === 3) &&
+            activeMotif === 1 &&
             supportSubdivisionHit &&
             (beatIndex === supportBeat || beatIndex === 3);
-        const syncopatedTexture = activeMotif === 2 && isEOfBeat && beatIndex === 1;
+        // why: syncopated texture (closed hat on e-of-2) only fires on the
+        // syncopation flavor — cowbell-flavor bars don't want a competing
+        // closed-hat accent on the syncopated 16th.
+        const syncopatedTexture = isSyncopationFlavor && isEOfBeat && beatIndex === 1;
         const phraseLift = isOffbeat && beatIndex === (phraseSeed < 0.5 ? 1 : 3);
 
         // Core Offbeat Open Hat (The Disco "And")
@@ -140,11 +179,26 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             instTimeOffset -= 0.0025;
         }
     } else if (context.inst.name === 'Perc' || context.inst.name.includes('Cowbell')) {
-        // Motif 3: Octave Cowbells
-        if (activeMotif === 3) {
+        // why drums.md §18 — cowbell no longer gated by `intensity > 0.7 &&
+        // seed >= 0.8`. Fires whenever the bar is on the cowbell-flavor sub-roll, at
+        // any intensity. Velocity scales via scaleVelocity, so a quiet
+        // chorus's cowbell is audibly softer than a loud one rather than
+        // disappearing entirely. The intensity > 0.9 fill roll on
+        // non-eighths is preserved as a high-intensity flourish only.
+        if (isCowbellFlavor) {
             if (isEighthNote) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.8, intensity, 0.2);
+                // why: reviewer P1 — old `scaleVelocity(0.8, intensity, 0.2)`
+                // gave only ~0.16 velocity delta across the full intensity
+                // range (0.83 at intensity 0.15 vs 0.99 at 0.95) — ≈1.5 dB,
+                // not enough to honor drums.md §18's "loudness, not density"
+                // claim. Wider range (0.62 at 0.15 vs 0.98 at 0.95, ≈4 dB)
+                // lets a quiet verse's cowbell sit notably under a loud
+                // chorus's, which is the audible arc the audit asked for.
+                velocity = scaleVelocity(0.55, intensity, 0.45);
+                // why: H/L alternation — High on beats 1 & 3, Low on the "&"
+                // (offbeats). Mirrors classic disco percussion arrangements
+                // where the cowbell carries an octave shape across the bar.
                 soundName =
                     isBeatStart && (beatIndex === 0 || beatIndex === 2)
                         ? 'CowbellHigh'

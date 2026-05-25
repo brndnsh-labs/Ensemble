@@ -15,11 +15,12 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S5 | Bass walking idiom | opus | Shipped 2026-05-23 |
 | S6 | Per-genre tuning sweep | sonnet | Shipped 2026-05-24 |
 | S7 | Final-bar cadence voice-leading | opus | Shipped 2026-05-24 |
-| S8 | Per-genre arrangement design | opus | Blocked → `LISTEN_TESTS.md` C2/C3 |
-| S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
-| S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
+| S8 | Per-genre arrangement design | opus | Shipped-by-decision 2026-05-25 (declined per C2/C3) |
+| S9 | Disco re-categorization (vibe-path closed-no-action) | opus | Shipped 2026-05-25 |
+| S10 | Ska-Punk shared-hook antiphony | opus | Ready (unblocked 2026-05-25 by C6) |
+| S11 | Per-genre final-bar drum gestures | opus | Ready (promoted 2026-05-25 from S7 deferred drum-gesture half via C1) |
 
-**7 / 10 shipped.** S7's drum-gesture half remains deferred on `LISTEN_TESTS.md` C1; S8–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**9 / 11 shipped.** Two stories remain (S10 Ska-Punk antiphony, S11 per-genre final-bar drum gestures), both ready for `/cycle`. After they ship, Epic 12 closes.
 
 ---
 
@@ -100,7 +101,7 @@ The bug: Epic 2 S4's `isFinalMeasureComp` branch built the cadence voicing in ro
 
 **Acceptance:** the chord-engine cadence routes through the existing `recenterVoicing` helper using `compingState.lastVoicingMidis` as the voice-leading anchor; the cadence cluster mean tracks the prior voicing's center (high-prior → higher cadence, low-prior → lower cadence); the cluster stays within the chord/harmony register slot [52, 84]; the empty-prior fallback (fresh playback) still produces a grounded resolution.
 **Effort:** ~1h. **Model:** opus. **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
-**Status:** Shipped 2026-05-24 — `accompaniment.ts:1734` `isFinalMeasureComp` branch now calls `recenterVoicing(rootPositionMidis, compingState.lastVoicingMidis, 52, 84)` — same helper the Jazz comping path uses at line 2895. Range widened 52–68 → 52–84 (full chord slot) so 4-note voicings (maj7 span 11 st) have valid octave shifts; grounding preserved by the helper's center-distance + span score and by the empty-prior fallback. New `tests/standards/final-bar-cadence.test.ts` voice-leading test uses a simple triad fixture (cleanest math for high-vs-low prior differentiation) plus an empty-prior grounded-fallback guard. Music-theory-reviewer 0 P0 / 0 P1 / 3 P2 (all patched inline: stale test comment about "only one valid maj7 shift" rewritten, empty-prior grounded assertion added, high-prior trade-off documented in this status). All 635 standards green; typecheck clean. **Deferred:** per-genre final-bar drum gestures (the other half of the original S7) remain blocked on `LISTEN_TESTS.md` C1 — owner has heard no regression with the universal Crash+Snare stinger in casual playback. **Known trade-off:** widening the cadence window to [52, 84] means high-prior cases (e.g. mean MIDI 79) now track upward to root-at-72 rather than dropping back to grounded root-at-60. The smooth voice-leading wins the named bug case (mid-register hand-jump on slow ballads, the more frequent issue), but loses some "structural landing weight" in the high-prior corner. If high-prior cadences ever sound airy in practice, consider a downward bias on `isFinalMeasureComp` (e.g. target = `min(prior_center, 65)`) as a follow-up.
+**Status:** Shipped 2026-05-24 — `accompaniment.ts:1734` `isFinalMeasureComp` branch now calls `recenterVoicing(rootPositionMidis, compingState.lastVoicingMidis, 52, 84)` — same helper the Jazz comping path uses at line 2895. Range widened 52–68 → 52–84 (full chord slot) so 4-note voicings (maj7 span 11 st) have valid octave shifts; grounding preserved by the helper's center-distance + span score and by the empty-prior fallback. New `tests/standards/final-bar-cadence.test.ts` voice-leading test uses a simple triad fixture (cleanest math for high-vs-low prior differentiation) plus an empty-prior grounded-fallback guard. Music-theory-reviewer 0 P0 / 0 P1 / 3 P2 (all patched inline: stale test comment about "only one valid maj7 shift" rewritten, empty-prior grounded assertion added, high-prior trade-off documented in this status). All 635 standards green; typecheck clean. **Deferred drum-gesture half promoted 2026-05-25** to a new story S11 (per-genre final-bar drum gestures) after `LISTEN_TESTS.md` C1 was decided yes-build. **Known trade-off:** widening the cadence window to [52, 84] means high-prior cases (e.g. mean MIDI 79) now track upward to root-at-72 rather than dropping back to grounded root-at-60. The smooth voice-leading wins the named bug case (mid-register hand-jump on slow ballads, the more frequent issue), but loses some "structural landing weight" in the high-prior corner. If high-prior cadences ever sound airy in practice, consider a downward bias on `isFinalMeasureComp` (e.g. target = `min(prior_center, 65)`) as a follow-up.
 
 ### S8. Per-genre arrangement design
 
@@ -108,23 +109,31 @@ The bug: Epic 2 S4's `isFinalMeasureComp` branch built the cadence voicing in ro
 
 **Acceptance:** intro/outro layering is per-genre; bossa and samba are distinct feels in config + engine, with compatibility shims for any persisted label; new coverage.
 **Effort:** ~5h. **Model:** opus. **Reviewer:** music-theory-reviewer (+ state-discipline-reviewer if the label split touches persisted state). **Source:** FOLLOWUPS §E.
-**Status:** Blocked — needs `LISTEN_TESTS.md` C2/C3.
+**Status:** Shipped-by-decision 2026-05-25 — both halves declined in the C2/C3 listening-decisions walkthrough. C2 (per-genre intro/outro mutes): owner reports intros feel natural across genres with the current app surface; revisit only as part of a future broader composition-experience effort. C3 (Bossa/samba split): owner prefers to keep a strong Bossa identity and leave room for a future Samba *genre addition* rather than a label split — this preserves backward compatibility with existing Bossa presets. No engine work shipped under this story; it's closed as a deliberate scope decision, not as deferred work.
 
-### S9. Disco re-categorization + vibe-path
+### S9. Disco re-categorization (vibe-path closed-no-action)
 
-`LISTEN_TESTS.md` C4 + C5. Disco intensity-axis re-categorization (`drums.md` P2 #18 — careful, load-bearing for `synth-drums` velocity scaling) + sparse-vibe cell collapse / active-vibe ornament collision (Epic 3 S2 chords/accompaniment vibe path).
+`LISTEN_TESTS.md` C4 (decided yes-fix) + C5 (decided no-action). Disco intensity-axis re-categorization (`drums.md` P2 #18) is the meat of the story; the sparse-vibe / active-vibe collision concern in the chords/accompaniment path (Epic 3 S2) is closed as not-audible-in-practice.
 
-**Acceptance:** Disco's motif/intensity mapping is corrected without breaking velocity scaling; the comping cell has a sparse-vibe floor and an active-vibe collision rule; new coverage; listen-test pass.
-**Effort:** ~5h. **Model:** opus. **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E/§F.
-**Status:** Blocked — needs `LISTEN_TESTS.md` C4/C5.
+**Acceptance:** Disco's motif/intensity mapping is corrected without breaking velocity scaling; the busy-flavor lanes (ghost snares, octave cowbells) are reachable at any intensity rather than gated behind `intensity > 0.7`; loudness scales via velocity, not via density; new coverage; listen-test pass.
+**Effort:** ~3-4h. **Model:** opus. **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E/§F.
+**Status:** Shipped 2026-05-25 — `disco.ts` `getMotif` collapsed from 4 motifs (intensity+seed gated) to 2 (foundation + busy, seed-only gated at 0.45/0.55). Busy bars get a per-2-bar sub-flavor sub-roll splitting ghosts (`isSyncopationFlavor`) vs. octave cowbells (`isCowbellFlavor`), keyed on `scrambleHash(floor(barIndex/2)*131 + sectionSeedInt*17)` for production 2-bar stickiness. `intensity > 0.7` gates removed from both ghost lane and cowbell lane. End-to-end verification: `tick-logic.ts:518` iterates all 13 lanes including `Perc`; `synth-drums.ts:2444` renders `CowbellHigh`/`CowbellLow` via the legacy voice; `KNOWN_SOUND_NAMES` contains all three Cowbell names → the original "Octave Cowbells" motif was wired but unreachable at verse-intensity. Updated `disco-drummer-critique.test.ts` (re-tuned ghost threshold; added headline "ghosts AND cowbells at mid intensity" test with independent lane floors after reviewer P2 split — `cowbellHits > 100` and `offBackbeatSnares > 2` over 256 bars at intensity 0.5). Updated `cowbell-brush-voices-critique.test.ts` (inverted old "no cowbells at low intensity" assertion — that was the OLD density-equals-loudness contract). Music-theory-reviewer P1 patched inline: cowbell `scaleVelocity(0.8, intensity, 0.2)` widened to `scaleVelocity(0.55, intensity, 0.45)` → ~4 dB dynamic arc (was ~1.5 dB) so the intensity axis carries audible loudness, not just nominal velocity. 30/30 reliability on both updated test files; all 636 standards green; typecheck clean. **Vibe-path half (C5) closed as decided-no-action** — owner reports vibe range feels usable end-to-end; sparse-dropout and active-collision not audible in practice. Pre-emptive fix not warranted; will file as fresh FOLLOWUPS entry if a regression ever surfaces at extremes. NIT-level reviewer notes filed in FOLLOWUPS §E: mutual-exclusion of syncopation/cowbell flavors (could be revisited if listeners report thin busy sections); 2-bar flavor stickiness comment over-promises in test harness (production-only stickiness via section-wide seed); `roll()` still uses bare `Math.random()` (pre-existing across all grooves, not introduced here). **Listen-test pending** — owner to audition; if a regression surfaces, file in FOLLOWUPS.md.
 
 ### S10. Ska-Punk shared-hook antiphony
 
-`LISTEN_TESTS.md` C6. The `playShadowMode` Ska-Punk branch that echoes soloist hooks is dead — `sharedHookBuffer` is never populated. Make it work: the soloist emits a `SoloistHook` on phrases it wants harmony to echo, harmony reads the contract surface (Epic 11 S9b already routed the buffer through `CoordinationContext`).
+`LISTEN_TESTS.md` C6 (decided 2026-05-25: yes-build). The `playShadowMode` Ska-Punk branch that echoes soloist hooks is dead — `sharedHookBuffer` is never populated. Make it work: the soloist emits a `SoloistHook` on phrases it wants harmony to echo, harmony reads the contract surface (Epic 11 S9b already routed the buffer through `CoordinationContext`).
 
 **Acceptance:** the soloist populates `sharedHookBuffer` on hook-worthy phrases; the Ska-Punk shadow branch fires in a production trace; new critique coverage; listen-test pass.
 **Effort:** ~3h. **Model:** opus. **Reviewer:** music-theory-reviewer + worker-contract-reviewer. **Source:** FOLLOWUPS §E.
-**Status:** Blocked — needs `LISTEN_TESTS.md` C6 (decide whether the feature is worth building).
+**Status:** Ready (unblocked 2026-05-25 by C6 yes-build decision). Owner finds the call-and-response horn-section idiom appealing; the engineering work is the remaining unfinished piece.
+
+### S11. Per-genre final-bar drum gestures
+
+Promoted 2026-05-25 from the deferred drum-gesture half of S7 after `LISTEN_TESTS.md` C1 was decided yes-build. Epic 2 S4's universal snare-stinger ends every genre the same way; owner confirms all genres currently sound about the same at song's end and there's clear room for per-genre variation (jazz/bossa ride-bell + comping figure; country quarter-note flourish; hip-hop trap-style outro hit; metal Crash + China + double-kick stack; reggae one-drop kick + rim accent; etc).
+
+**Acceptance:** each major genre family has a distinct final-bar drum treatment that reads as idiomatic to that style; a new critique test guards each treatment; the universal stinger remains as a sensible fallback for unhandled genres; listen-test pass across the handled genres.
+**Effort:** ~5-6h (per-genre design × ~6 genre families + per-treatment critique coverage). **Model:** opus (musical-taste calls per genre). **Reviewer:** music-theory-reviewer. **Source:** S7 deferred drum-gesture half; `LISTEN_TESTS.md` C1.
+**Status:** Ready (promoted 2026-05-25 from S7).
 
 ---
 

@@ -14,20 +14,20 @@ Three kinds of item:
 
 ## Part A — Verification of shipped engine work
 
-- [ ] **A1. SRDC Restatement motif echo** *(Epic 11 S4)*
+- [x] **A1. SRDC Restatement motif echo** *(Epic 11 S4)*
   Genre: any soloist-forward style (Jazz recommended). Play through at least one full SRDC cycle (Statement → Restatement → Departure → Conclusion — roughly two choruses).
   **Listen for:** the Restatement phrase should feel like a *paraphrase of the Statement* — same rhythmic grid, same melodic contour direction, but with looser landings (it should not resolve harder than the Statement did). It should not sound like a literal repeat, nor like an unrelated new phrase.
-  Result: ☐ sounds right ☐ regression — file in FOLLOWUPS
+  Result: ☑ sounds right — verified 2026-05-25. Owner can "guess where the soloist might be going as the song progresses," which is exactly the SRDC contract producing audible structure.
 
-- [ ] **A2. Production voice-leading in Jazz/Bossa/Blues comping** *(Epic 11 S6a)*
+- [x] **A2. Production voice-leading in Jazz/Bossa/Blues comping** *(Epic 11 S6a)*
   Genre: Jazz, then Bossa Nova, then Blues. Use a progression with stepwise-related chords (e.g. ii–V–I, Dm7–G7–Cmaj7).
   **Listen for:** comping voicings should move by common tone / guide tone — the chord changes should sound *connected and smooth*, voices sliding by small intervals, not the whole hand jumping register on every chord.
-  Result: ☐ sounds right ☐ regression — file in FOLLOWUPS
+  Result: ☑ sounds right — verified 2026-05-25.
 
-- [ ] **A3. China splash on Metal section boundaries** *(Epic 11 S8b)*
+- [x] **A3. China splash on Metal section boundaries** *(Epic 11 S8b)*
   Genre: Metal (or Shred). Play across a section boundary so the post-turnaround accent fires.
   **Listen for:** the accent should be a trashy *China* cymbal, not a Crash. **Also note the China's loudness relative to the Crash** — this is the input to decision **B4** below.
-  Result: ☐ sounds right ☐ regression — file in FOLLOWUPS
+  Result: ☑ default-pass — verified 2026-05-25 (no issues noticed in normal Metal playback; low-usage genre, will revisit if specific scenarios surface).
 
 - [x] **A4. Soloist engine determinism migration** *(Epic 12 S1)*
   Genre: any soloist-forward style. Play a few choruses, ideally looping.
@@ -58,33 +58,33 @@ Three kinds of item:
 
 ---
 
-## Part C — Design sessions (each maps to an Epic 12 story)
+## Part C — Design sessions (each maps to an Epic 12 story) — **DECIDED 2026-05-25**
 
-These need a proposal from Claude *and* a listening pass from you — book them as working sessions, not quick checks.
+All six C-items were decided in a single walkthrough session 2026-05-25. Story-level dispositions updated in `epic-followup-drain.md`.
 
-- [ ] **C1. Per-genre final-bar drum gestures** *(→ Epic 12 / S6)*
-  Epic 2 S4 uses a universal snare-stinger for every genre's final bar. Jazz/Bossa might want a ride-bell + comping figure; other genres their own idiom. Also: Epic 2 S4 final-bar cadence voicing discards `previousVoicingMidis` (no voice-leading into the resolution).
-  **Session goal:** decide per-genre final-bar treatments; confirm the cadence resolves with voice-leading by ear.
+- [x] **C1. Per-genre final-bar drum gestures** *(→ Epic 12 / S7 drum-gesture half)*
+  Epic 2 S4 uses a universal snare-stinger for every genre's final bar. Jazz/Bossa might want a ride-bell + comping figure; other genres their own idiom.
+  **Decision (2026-05-25):** **build per-genre final-bar drum gestures.** Owner confirms all genres currently end the same way, there's clear room for variation. Unblocks the deferred drum-gesture half of S7. Per-genre final-bar treatments to be designed across Jazz/Bossa/Country/Hip-Hop/Neo-Soul etc.
 
-- [ ] **C2. Per-genre intro/outro mute tuning** *(→ Epic 12 / S7)*
+- [x] **C2. Per-genre intro/outro mute tuning** *(→ Epic 12 / S8)*
   Epic 2 S5 ships genre-flat `INTRO_MUTES = { bass: 2, chords: 3, harmony: 4 }`. Different genres layer in differently (a jazz intro vs a metal intro).
-  **Session goal:** decide per-genre intro/outro layering-in schedules.
+  **Decision (2026-05-25):** **defer — keep genre-flat for now.** Owner says intros feel natural across genres with the current app surface; revisit as part of a broader future composition-experience improvement, not as a follow-up.
 
-- [ ] **C3. Bossa/samba label split** *(→ Epic 12 / S7)*
+- [x] **C3. Bossa/samba label split** *(→ Epic 12 / S8)*
   `bass.md` P2 #16 — the current single label conflates two distinct feels (bossa is laid-back, samba is driving).
-  **Session goal:** confirm by ear that the two need separate treatment, then split.
+  **Decision (2026-05-25):** **defer — keep strong Bossa identity for now.** Owner doesn't personally reach for samba; bossa-as-bossa works for current usage. Leaves room for a future Samba genre addition rather than a split. Preserves the option to add Samba as a new genre later without breaking existing Bossa presets.
 
-- [ ] **C4. Disco intensity-axis re-categorization** *(→ Epic 12 / S8)*
+- [x] **C4. Disco intensity-axis re-categorization** *(→ Epic 12 / S9 — disco half)*
   `drums.md` P2 #18 — Disco's 4-motif system is mis-categorized on the intensity axis; it's load-bearing for `synth-drums` velocity scaling so it needs care.
-  **Session goal:** audit Disco's motif/intensity mapping by ear and re-categorize it.
+  **Decision (2026-05-25):** **fix it.** Diagnosis pass confirmed the audit: Motif 2 (syncopated interplay) and Motif 3 (Octave Cowbells) are gated behind `intensity > 0.7`, so the cowbell + ghost-snare + syncopated-hat texture is unreachable at verse-level intensity (~6% of high-intensity sections only). End-to-end wiring verified — Perc lane *is* iterated by the worker, Cowbell voices *are* in `KNOWN_SOUND_NAMES`, synth-drums.ts:2444 *does* play Cowbell. Bug is purely the motif-selection gate. Audit-recommended fix: collapse 4 motifs → 2 (foundation + busy), pick density on a non-intensity axis, keep velocity scaling intensity-driven. Shipping in-flight (musical-engine-implementer, 2026-05-25).
 
-- [ ] **C5. Sparse-vibe cell collapse + active-vibe ornament collision** *(→ Epic 12 / S8)*
+- [x] **C5. Sparse-vibe cell collapse + active-vibe ornament collision** *(→ Epic 12 / S9 — vibe-path half)*
   Epic 3 S2 — at sparse vibe the comping cell can collapse to near-silence; at active vibe an ornament can collide with the cell's own hit.
-  **Session goal:** play the chords/accompaniment vibe path at both extremes, decide the floor (sparse) and the collision rule (active).
+  **Decision (2026-05-25):** **no concern — close as decided-no-action.** "Vibe" is a derived tri-state (sparse|balanced|active) computed inside `accompaniment.ts:1296-1307` from `bandIntensity` + `complexity` + soloist-busy flags. Owner confirms vibe range feels usable end-to-end in normal testing — neither sparse-dropout nor active-collision audible in practice. If a regression surfaces at extremes, file as a fresh FOLLOWUPS entry; not preemptively fixing.
 
-- [ ] **C6. Ska-Punk shared-hook antiphony** *(→ Epic 12 / S9)*
+- [x] **C6. Ska-Punk shared-hook antiphony** *(→ Epic 12 / S10)*
   The `playShadowMode` Ska-Punk branch that echoes soloist hooks is dead — `sharedHookBuffer` is never populated. Making it work needs the soloist to emit a hook on phrases it wants harmony to echo.
-  **Session goal:** decide whether Ska-Punk call-and-response antiphony is worth building, and if so what a "shareable hook" is.
+  **Decision (2026-05-25):** **build it.** Owner finds the call-and-response horn-section idiom appealing; Epic 11 S9b already routed the buffer through `CoordinationContext`, so the remaining work is the soloist-side hook emission + harmony-side consumption gate. Unblocks S10.
 
 ---
 

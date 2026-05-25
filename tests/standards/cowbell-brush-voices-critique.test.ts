@@ -179,9 +179,11 @@ describe('Cowbell + Brush Voices Critique', () => {
             const mockState = makeDiscoState({ intensity: 0.95 });
             getState.mockReturnValue(mockState);
 
-            // Simulate enough bars to land on multiple motif-3 sections.
-            // sectionSeed formula (groove-engine.ts:178) cycles every ~32 bars;
-            // at intensity 0.95 + seed >= 0.8 disco.getMotif returns 3.
+            // Simulate enough bars to land on multiple busy-cowbell-flavor
+            // sections. After drums.md §18 fix, the cowbell lane is reached
+            // when the busy motif is selected (seed >= 0.45) AND the per-bar
+            // flavor sub-roll picks cowbell (~50% of busy bars). Intensity
+            // governs velocity only, not whether the lane fires.
             const numBars = 64;
             const stepsPerBar = 16;
             const cowbellHits: { step: number; sound: string }[] = [];
@@ -209,36 +211,72 @@ describe('Cowbell + Brush Voices Critique', () => {
                     `------------------------------\n`,
             );
 
-            // why: at intensity 0.95, the deterministic sectionSeed formula
-            // produces seed > 0.8 (motif-3) on roughly 5-7 of every 32 bars. At 8 eighth
-            // notes per bar that yields 40+ cowbell hits across 64 bars. Threshold of 20
-            // catches the lane firing while tolerating seed-distribution variance.
+            // why: ~55% of bars land on busy motif; ~50% of those pick the
+            // cowbell flavor (~28% of bars). 8 eighth-note hits per cowbell
+            // bar × 18 bars ≈ 144 hits across 64 bars. Threshold of 20
+            // catches the lane firing while tolerating seed/flavor variance.
             expect(cowbellHits.length).toBeGreaterThan(20);
             // Both names should appear — they alternate by beatIndex inside motif 3.
             expect(highHits).toBeGreaterThan(0);
             expect(lowHits).toBeGreaterThan(0);
         });
 
-        it('does NOT emit Cowbell at low intensity (motif locked to 0)', () => {
-            const mockState = makeDiscoState({ intensity: 0.3 });
-            getState.mockReturnValue(mockState);
+        it('emits Cowbell at mid intensity but at quieter velocity (loudness, not density)', () => {
+            // why drums.md §18 — the old contract locked cowbells behind
+            // `intensity > 0.7 && seed >= 0.8`, so a mid-intensity section
+            // could not have cowbells at all. The audit's musical claim is
+            // that disco scales on velocity/timbre, not density: cowbells
+            // should fire at mid intensity (just quieter) so the texture is
+            // available throughout a song's dynamics arc. This test verifies
+            // the inversion holds — cowbells are reachable at intensity 0.5,
+            // and their velocity scales below the high-intensity reference.
+            const mockStateMid = makeDiscoState({ intensity: 0.5 });
+            const mockStateHigh = makeDiscoState({ intensity: 0.95 });
 
-            let cowbellHits = 0;
-            for (let bar = 0; bar < 32; bar++) {
-                for (let s = 0; s < 16; s++) {
-                    const result = runStep(bar * 16 + s, 'Perc', mockState);
-                    if (
-                        result.shouldPlay &&
-                        (result.soundName === 'CowbellHigh' || result.soundName === 'CowbellLow')
-                    ) {
-                        cowbellHits++;
+            const countCowbells = (state: any) => {
+                getState.mockReturnValue(state);
+                let hits = 0;
+                // Only count eighth-note cowbells (the primary lane). The
+                // high-intensity fill (intensity > 0.9 non-eighth) uses a
+                // hard-coded velocity 0.6 that would skew the average, so we
+                // measure the loudness axis on the main octave-cowbell lane.
+                let eighthVelSum = 0;
+                let eighthHits = 0;
+                for (let bar = 0; bar < 64; bar++) {
+                    for (let s = 0; s < 16; s++) {
+                        const result = runStep(bar * 16 + s, 'Perc', state);
+                        if (
+                            result.shouldPlay &&
+                            (result.soundName === 'CowbellHigh' ||
+                                result.soundName === 'CowbellLow')
+                        ) {
+                            hits++;
+                            // s % 2 === 0 → beat-start or offbeat (eighth-note grid).
+                            if (s % 2 === 0) {
+                                eighthVelSum += result.velocity;
+                                eighthHits++;
+                            }
+                        }
                     }
                 }
-            }
-            console.log(`[Disco low-intensity] Cowbell hits over 32 bars: ${cowbellHits}`);
-            // why: disco.getMotif returns 0 when intensity < INTENSITY_BANDS.LOW (0.35).
-            // No motif-3 path, so the cowbell lane should be silent.
-            expect(cowbellHits).toBe(0);
+                return {
+                    hits,
+                    avgEighthVel: eighthHits > 0 ? eighthVelSum / eighthHits : 0,
+                };
+            };
+
+            const mid = countCowbells(mockStateMid);
+            const high = countCowbells(mockStateHigh);
+            console.log(
+                `[Disco cowbell density vs loudness] mid(0.5): hits=${mid.hits} avgEighthVel=${mid.avgEighthVel.toFixed(2)}, high(0.95): hits=${high.hits} avgEighthVel=${high.avgEighthVel.toFixed(2)}`,
+            );
+            // Headline: cowbells fire at mid intensity (was 0 before §18 fix).
+            expect(mid.hits).toBeGreaterThan(0);
+            expect(high.hits).toBeGreaterThan(0);
+            // Velocity is the loudness axis — mid intensity should be
+            // audibly quieter than high. scaleVelocity(0.8, intensity, 0.2)
+            // → 0.5 yields 0.90, 0.95 yields 0.99 (delta 0.09).
+            expect(high.avgEighthVel).toBeGreaterThan(mid.avgEighthVel + 0.05);
         });
     });
 

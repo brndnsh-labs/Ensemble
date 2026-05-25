@@ -35,7 +35,10 @@ describe('Disco Drummer Critique', () => {
             const barSteps = [];
             for (let step = 0; step < 16; step++) {
                 const stepData = { step: bar * 16 + step, loopStep: step, instruments: {} };
-                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                // why: include the Perc lane so cowbell hits are observable.
+                // disco.ts routes 'CowbellHigh' / 'CowbellLow' through the
+                // 'Perc' instrument when the busy-cowbell flavor is selected.
+                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open', 'Perc']) {
                     const info = getStepInfo(
                         bar * 16 + step,
                         TIME_SIGNATURES['4/4'],
@@ -134,11 +137,11 @@ describe('Disco Drummer Critique', () => {
         expect(offbeatScore).toBeGreaterThan(0.95);
     });
 
-    it('should engage snare ghosts above intensity 0.7 with motifs 2-3', () => {
+    it('should engage snare ghosts on the busy-syncopation flavor at high intensity', () => {
         // Engine: snare ghost on `isAOfBeat && beatIndex >= 3 && roll(0.4, intensity)`
-        // gated by `intensity > 0.7 && activeMotif >= 2` (disco.ts:88-92).
-        // At intensity 0.9 with high seed mass landing on motifs 2/3, expect some
-        // off-backbeat snare hits.
+        // gated only by the seed-driven busy-syncopation sub-flavor (disco.ts
+        // §18 fix — intensity > 0.7 gate removed; intensity now controls
+        // ghost velocity + roll probability, not whether the lane fires).
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.9 },
@@ -160,10 +163,62 @@ describe('Disco Drummer Critique', () => {
         console.log(
             `[Disco Snare Ghosts] Off-backbeat: ${offBackbeatSnares}, Backbeat: ${backbeatSnares}`,
         );
-        // Motifs 2-3 occupy ~45% of seed mass at intensity 0.9. Ghost rolls 0.4 of
-        // those bars on a single position (a-of-4). Expected ghosts ~23 over 128 bars;
-        // threshold > 8 catches the lane firing without flaking on the roll variance.
-        expect(offBackbeatSnares).toBeGreaterThan(8);
+        // Busy motif takes ~55% of seed mass; syncopation sub-flavor takes
+        // ~50% of busy → ~28% of 128 bars = ~35 candidate bars. Ghost rolls
+        // 0.4 × 0.9 = 36% of those on a single position (a-of-4). Expected
+        // ghosts ~12 over 128 bars; threshold > 6 catches the lane firing
+        // without flaking on the roll variance.
+        expect(offBackbeatSnares).toBeGreaterThan(6);
+    });
+
+    it('should fire ghosts AND cowbells at mid intensity (both busy-flavor lanes alive, density decoupled from loudness)', () => {
+        // Headline drums.md §18 fix: a mid-intensity (0.5) section should
+        // STILL be able to land on the busy flavor and produce signature
+        // disco percussion (ghosts on syncopation, cowbells on cowbell
+        // flavor). Before the collapse, motifs 2-3 were locked behind
+        // `intensity > 0.7`, so 0.5 was forced to motif 0/1 — no ghosts, no
+        // cowbells, ever. After the fix the seed picks foundation vs busy
+        // independently of intensity.
+        //
+        // why reviewer P2 split: the original `ghosts + cowbells > 20` disjunction
+        // was structurally cowbell-only (cowbells fire ~8 per busy bar, ghosts
+        // ~1 per ~10 busy bars) — a regression of the syncopation lane would
+        // never make the sum drop below 20. Now two independent floors so
+        // either lane dying is caught.
+        const numBars = 256;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.5 },
+        });
+        let offBackbeatSnares = 0;
+        let cowbellHits = 0;
+        performance.forEach((bar) =>
+            bar.forEach((stepData) => {
+                const s = stepData.loopStep;
+                if (stepData.instruments.Snare && s !== 4 && s !== 12 && s !== 15) {
+                    // Exclude turnaround-final-step snare crack (disco.ts:124-130).
+                    offBackbeatSnares++;
+                }
+                const percSound = stepData.instruments.Perc?.sound;
+                if (percSound === 'CowbellHigh' || percSound === 'CowbellLow') {
+                    cowbellHits++;
+                }
+            }),
+        );
+        console.log(
+            `[Disco Mid-Intensity Density] ghosts=${offBackbeatSnares}, cowbells=${cowbellHits} (256 bars @ intensity 0.5)`,
+        );
+        // Cowbell lane: at intensity 0.5, busy-cowbell-flavor bars produce 8
+        // eighth-note hits each. ~half of bars are busy and half of those
+        // are cowbell flavor → ~64 busy-cowbell bars × 8 = ~512 cowbell hits.
+        // Floor of 100 catches a full-lane regression with ~5× headroom.
+        expect(cowbellHits).toBeGreaterThan(100);
+        // Snare ghost lane: only step 15 (a-of-4) qualifies per
+        // busy-syncopation bar with roll(0.4, 0.5) = 20% per-step.
+        // ~64 busy-sync bars × 0.2 = ~13 ghosts expected. Floor of 2 catches
+        // a dead-lane regression while tolerating high roll variance.
+        // (Old engine returned 0 ghosts at intensity 0.5 — motif gate required
+        // intensity > 0.7.)
+        expect(offBackbeatSnares).toBeGreaterThan(2);
     });
 
     it('should scale kick and backbeat velocity with intensity', () => {
@@ -212,10 +267,11 @@ describe('Disco Drummer Critique', () => {
     });
 
     it('should escalate hat articulation toward Open at higher intensity', () => {
-        // Engine: at intensity > 0.45 just after turnaround end uses Open; offbeat hat
-        // is always Open; HiHat 'closed' fires on beatstarts and support subdivisions.
-        // Higher intensity should increase Open share (motifs 2/3 add support cymbals
-        // routed as Open more often than HiHat).
+        // Engine: offbeat hat is always Open; HiHat 'closed' fires on
+        // beatstarts and (on busy motif) support subdivisions. Both
+        // intensity levels should keep a healthy Open share — disco's
+        // signature 4-on-the-floor offbeat-open is intensity-independent
+        // after drums.md §18 collapse (foundation vs busy is seed-driven).
         const measureOpenShare = (intensityValue) => {
             const perf = simulatePerformance(64, {
                 playback: { bandIntensity: intensityValue },
