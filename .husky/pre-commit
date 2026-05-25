@@ -1,4 +1,4 @@
 npm run typecheck
-npm run knip || true
+npm run knip
 npm run lint:docs
 npx lint-staged
