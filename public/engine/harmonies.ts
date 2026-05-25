@@ -928,7 +928,7 @@ export function getHarmonyNotes(
             activeStyle = 'strings';
         } else if (feel === 'Disco' || feel === 'Hip Hop') {
             activeStyle = 'plucks';
-        } else if (['Funk', 'Metal', 'Afrobeat', 'Ska'].includes(feel)) {
+        } else if (['Funk', 'Metal', 'Afrobeat', 'Ska', 'Ska-Punk'].includes(feel)) {
             activeStyle = 'horns';
         } else {
             activeStyle = 'strings';

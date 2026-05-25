@@ -7,6 +7,7 @@ import type {
     FormArcOccurrenceEntry,
     Mutable,
     SectionRecallEntry,
+    SoloistHook,
     StepInfo,
 } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
@@ -585,6 +586,12 @@ function trackPhraseNote(
         }
     }
 
+    const noteIsAnchor = Boolean(
+        sourceNode.seedNote?.isAnchor ||
+            sourceNode.responseCadenceTarget ||
+            sourceNode.responseEntryTarget,
+    );
+
     soloist.session.memory.recentNotes.push({
         step,
         durationSteps: Math.max(
@@ -604,12 +611,117 @@ function trackPhraseNote(
             sourceNode.timingOffset ||
             sourceNode.seedNote?.timingOffset ||
             0,
-        isAnchor: Boolean(
-            sourceNode.seedNote?.isAnchor ||
-                sourceNode.responseCadenceTarget ||
-                sourceNode.responseEntryTarget,
-        ),
+        isAnchor: noteIsAnchor,
     }); // @worker-mutation
+
+    // why: Epic 12 S10 — populate `memory.sharedHookBuffer` so the Ska-Punk
+    // shared-hook branch in harmonies.ts (playShadowMode tag B) actually fires.
+    // The buffer was previously initialized empty and never written, leaving
+    // the horn-section idiom dead. The harmony branch matches on `h.step ===
+    // step` in the same tick, so this is *shared-hook doubling* (horns punch
+    // alongside the soloist's anchor) rather than antiphony (the call-and-
+    // response role belongs to playShadowMode tag A `phraseEnd && !active`).
+    // We publish at NOTE-time, keyed on:
+    //   1. The note must be an anchor (seedNote.isAnchor OR a motivic-response
+    //      entry/cadence target). Strong beats alone are too dense — a horn
+    //      section punches on melodic landmarks, not every downbeat.
+    //   2. The current SRDC phase must NOT be `conclusion`. Statement /
+    //      Restatement get the verse horn-stab; Departure gets the chorus/
+    //      bridge horn-punch — Madness "One Step Beyond" chorus, Specials
+    //      "A Message To You Rudy" chorus, Reel Big Fish "Sell Out" chorus
+    //      stabs all sit in Departure-labeled sections. Only `conclusion` is
+    //      skipped — horn echoes over a cadence step on the resolution.
+    //   3. A deterministic ~50% per-anchor gate keyed on the (step, section,
+    //      loop) seed so loops are reproducible. With seed anchors at every
+    //      beat (~8 anchors per 2-bar phrase), this lands ~4 horn doublings
+    //      per phrase on average — dense enough to read as a horn section
+    //      (high-energy 90s ska-punk leans dense), sparse enough to avoid
+    //      mirroring every soloist note.
+    publishSoloistHook(soloist, step, primary, noteIsAnchor, loopCount);
+}
+
+/**
+ * Append a `SoloistHook` to `memory.sharedHookBuffer` when the just-tracked
+ * note qualifies as hook-worthy, and trim stale entries.
+ *
+ * The buffer is consumed by `harmonies.ts:playShadowMode` (Ska-Punk branch B)
+ * via `.find((h) => h.step === step)`, so:
+ *   - The `step` we publish is the absolute timeline step the harmony should
+ *     latch onto (= the soloist's anchor step itself; the producer order
+ *     soloist→bass→harmony in tick-logic.ts guarantees harmony sees this
+ *     tick's write).
+ *   - Entries with `step < currentStep - stepsPerMeasure * 2` are dropped
+ *     before push — they're permanently stale (`.find` will never match past
+ *     steps) and an unbounded buffer is a perf foot-gun for long sessions.
+ *   - The buffer is hard-capped at 16 entries to bound worker syncWorker cost
+ *     even when the gate decisions go consistently hot.
+ */
+function publishSoloistHook(
+    soloist: SoloistState,
+    step: number,
+    primary: any,
+    noteIsAnchor: boolean,
+    loopCount: number,
+): void {
+    if (!noteIsAnchor) {
+        return;
+    }
+    const srdcState = soloist.session.currentPhrase.context?.srdcState;
+    // why: skip only Conclusion. Statement/Restatement/Departure all qualify
+    // — Departure (chorus/bridge) is THE iconic ska horn-section moment, so
+    // gating it out would silence the loudest hook in a typical verse/chorus
+    // form. Only `conclusion` is excluded: a horn-stab over the cadence step
+    // steps on the resolution. See callsite comment above for refs.
+    if (srdcState === 'conclusion') {
+        return;
+    }
+
+    const sectionLabel = soloist.session.currentPhrase.sectionLabel || '';
+    const sectionOccurrence = soloist.session.currentPhrase.sectionOccurrence || 0;
+    const hookSeed = soloistSeedBase(step, sectionLabel, sectionOccurrence, loopCount) + 60;
+    // why: discriminator 60 — distinct from the call-block discriminators
+    // (1-3 role/recall, 10-12 timing/bends, 20-21 head, 50-53 phrasing) so
+    // the hook gate doesn't correlate with any of those decisions.
+    // ~50% per-anchor gate: with seed anchors on every beat (~8 per 2-bar
+    // phrase) this lands ~4 horn doublings per phrase on average — the
+    // intentionally dense horn-section feel of high-energy ska-punk. Drop
+    // toward 0.25 if a future genre wants the sparser 1-2-stabs feel.
+    if (scrambleHash(hookSeed) >= 0.5) {
+        return;
+    }
+
+    const memory = soloist.session.memory as Mutable<typeof soloist.session.memory>;
+    if (!Array.isArray(memory.sharedHookBuffer)) {
+        memory.sharedHookBuffer = []; // @worker-mutation
+    }
+    // why: drop entries the consumer can never match again (`.find` uses
+    // strict step equality). A 2-measure window is generous enough that a
+    // late-arriving Ska harmony pass still sees the hook in the same tick,
+    // but tight enough that the buffer doesn't grow unbounded across a long
+    // session. Without this trim the buffer accumulates one entry per
+    // qualifying anchor for the full playback duration.
+    const staleBefore = step - 32; // 2 measures at 16 steps/measure (test/prod default)
+    let buffer = memory.sharedHookBuffer;
+    if (buffer.length > 0 && buffer[0].step < staleBefore) {
+        buffer = buffer.filter((h) => h.step >= staleBefore);
+        memory.sharedHookBuffer = buffer; // @worker-mutation
+    }
+
+    const hook: SoloistHook = {
+        step,
+        midi: Math.round(primary.midi),
+        pitchClass: normalizeLoopStep(Math.round(primary.midi), 12),
+        durationSteps: Math.max(1, Math.round(primary.durationSteps || 1)),
+        sourcePhase: srdcState,
+    };
+    buffer.push(hook); // @worker-mutation
+
+    // why: hard cap at 16 entries — even if upstream gates change and start
+    // publishing very densely, the consumer's `.find` cost stays O(16) per
+    // step and the syncWorker payload stays bounded. Drop oldest first.
+    if (buffer.length > 16) {
+        buffer.splice(0, buffer.length - 16);
+    }
 }
 
 function preparePhraseResponseContext(
