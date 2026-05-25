@@ -1707,7 +1707,7 @@ export function getAccompanimentNotes(
         // if needed before the engine's downstream enforceRegisterSlotting
         // would clamp the spread.
         const rootMidi = chord.rootMidi;
-        let cadenceMidis = cadenceIntervals.map((iv) => rootMidi + iv);
+        const rootPositionMidis = cadenceIntervals.map((iv) => rootMidi + iv);
         // why: target the lower half of the chord slot (52-68) — a final cadence
         // is grounded, not airy. Floor at 52 (chord-slot bottom); ceiling at 68
         // keeps the cluster in the mid-register so it reads as grounded, not high.
@@ -1720,13 +1720,28 @@ export function getAccompanimentNotes(
         // instead of the grounded resolution a cadence needs. One bar of overlap
         // at the final measure causes no sustained voice-masking — playback ends
         // immediately after. (S5 micro-cleanup item 6.)
-        const cadenceFloor = 52;
-        while (cadenceMidis[0] < cadenceFloor) {
-            cadenceMidis = cadenceMidis.map((m) => m + 12);
-        }
-        while (cadenceMidis[0] > 68 && cadenceMidis[0] - 12 >= cadenceFloor) {
-            cadenceMidis = cadenceMidis.map((m) => m - 12);
-        }
+        //
+        // Voice-leading: bias the whole-octave shift toward `compingState.
+        // lastVoicingMidis` (the prior bar's voicing) so the cadence lands
+        // close to where the hand already was — no visible reset-jump on the
+        // resolution. `recenterVoicing` only shifts the cluster by whole
+        // octaves; root-position stays root-position. Range is the full
+        // chord slot [52, 84] — same as the Jazz comping path below — so
+        // 4-note voicings (e.g. maj7 span 11 st) always have a valid shift.
+        // Grounding is preserved by the score function: the lowest valid
+        // shift wins when previous is empty (cluster center is naturally
+        // lowest there) and stays grounded when previous is low; only when
+        // the prior bar sat high does the cadence track upward (the
+        // intended voice-leading behavior). When lastVoicingMidis is empty
+        // (first chord of a 1-bar form or fresh playback) the helper falls
+        // back to centering on the cluster itself — same effective grounded
+        // behavior as the prior manual octave-fit. (Epic 12 S7.)
+        const cadenceMidis = recenterVoicing(
+            rootPositionMidis,
+            compingState.lastVoicingMidis,
+            52,
+            84,
+        );
         // why: accent the cadence ABOVE ordinary comp downbeats (~0.71 at
         // intensity 0.55). 0.95 * velocityFactor lands at ~0.94 mid-intensity,
         // ~1.04 high-intensity — the "land together" gesture wants the chords

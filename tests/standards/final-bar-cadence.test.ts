@@ -37,7 +37,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { generateNotesForStep } from '../../public/engine/tick-logic.js';
@@ -509,6 +509,120 @@ describe('Final-bar cadence — Chords/Accompaniment (epic-form-arrangement S4)'
         // would be erased if we dropped to a bare triad here.
         expect(pcSet.has(0)).toBe(true);
         expect(pcSet.has(11)).toBe(true);
+    });
+
+    it('voice-leads the cadence cluster toward the previous voicing (Epic 12 S7)', () => {
+        // why: Epic 2 S4 originally built the cadence in root position from
+        // scratch, ignoring the prior bar's voicing — producing a visible
+        // hand-jump at the resolution on slow ballads with stepwise
+        // progressions. Epic 12 S7 routes the cadence through
+        // `recenterVoicing(_, compingState.lastVoicingMidis, 52, 84)` so the
+        // whole-octave shift is biased toward the previous voicing's center
+        // while staying within the chord slot.
+        //
+        // Fixture choice: a SIMPLE TRIAD (intervals [0,4,7], no 7th) is used
+        // for math readability — both root-at-60 and root-at-72 clusters are
+        // obviously valid in [52, 84]. A 4-note maj7 cadence also has two
+        // valid shifts in this window ([60-71] and [72-83]) and would also
+        // exercise voice-leading, but the report numbers are tidier on a
+        // triad. Follow-up worth tracking: an explicit maj7-high-prior test
+        // would guard the most common jazz tonic cadence quality directly.
+        //
+        // Test strategy: drive `getAccompanimentNotes` twice with the same
+        // chord + coordination but two different `compingState.lastVoicingMidis`
+        // priors (high vs low). The cadence cluster mean should track the
+        // prior.
+        const TRIAD_C = {
+            rootMidi: 60,
+            quality: 'maj',
+            beats: 4,
+            intervals: [0, 4, 7],
+            freqs: [261.63, 329.63, 392.0],
+            sectionId: 'sec-outro',
+        };
+        const state = makeChordsMockState();
+        getState.mockReturnValue(state);
+        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
+        const stepInfo = makeStepInfoForBeat(0);
+        const coordination = makeCoordination({ isFinalMeasure: true });
+
+        const meanOf = (notes: any[]): number => {
+            const midis = notes.filter((n) => !n.muted && n.midi > 0).map((n) => n.midi);
+            return midis.reduce((a, b) => a + b, 0) / midis.length;
+        };
+        const spanOf = (notes: any[]): { min: number; max: number } => {
+            const midis = notes.filter((n) => !n.muted && n.midi > 0).map((n) => n.midi);
+            return { min: Math.min(...midis), max: Math.max(...midis) };
+        };
+
+        // Case A: prior voicing sat high in the slot.
+        compingState.lastVoicingMidis = [76, 79, 83];
+        const notesHigh = getAccompanimentNotes(
+            state,
+            TRIAD_C,
+            finalDownbeat,
+            0,
+            0,
+            stepInfo,
+            coordination,
+        );
+        const meanHigh = meanOf(notesHigh);
+        const spanHigh = spanOf(notesHigh);
+
+        // Case B: prior voicing sat low in the slot.
+        compingState.lastVoicingMidis = [52, 55, 59];
+        const notesLow = getAccompanimentNotes(
+            state,
+            TRIAD_C,
+            finalDownbeat,
+            0,
+            0,
+            stepInfo,
+            coordination,
+        );
+        const meanLow = meanOf(notesLow);
+        const spanLow = spanOf(notesLow);
+
+        // eslint-disable-next-line no-console
+        console.log(
+            `[final-bar-cadence] voice-leading: high-prior mean=${meanHigh.toFixed(1)} ` +
+                `[${spanHigh.min}-${spanHigh.max}], low-prior mean=${meanLow.toFixed(1)} ` +
+                `[${spanLow.min}-${spanLow.max}]`,
+        );
+
+        // Voice-leading bias: the high-prior cadence sits higher than the
+        // low-prior cadence. If this assertion fails, recenterVoicing is not
+        // being routed `compingState.lastVoicingMidis` (regression to the
+        // pre-S7 manual octave-fit which ignored the prior).
+        expect(meanHigh).toBeGreaterThan(meanLow);
+
+        // Slot invariant: both clusters stay within the chord/harmony register
+        // slot [52, 84].
+        expect(spanHigh.min).toBeGreaterThanOrEqual(52);
+        expect(spanHigh.max).toBeLessThanOrEqual(84);
+        expect(spanLow.min).toBeGreaterThanOrEqual(52);
+        expect(spanLow.max).toBeLessThanOrEqual(84);
+
+        // Empty-prior fallback: fresh playback (no prior voicing) must still
+        // produce a grounded resolution — the score function falls back to
+        // centering on the cluster itself, which puts the lowest valid shift
+        // first. Explicit guard against a regression that re-targets recenter
+        // to a high default. (Reviewer P2 — empty-prior grounding coverage.)
+        compingState.lastVoicingMidis = [];
+        const notesFresh = getAccompanimentNotes(
+            state,
+            TRIAD_C,
+            finalDownbeat,
+            0,
+            0,
+            stepInfo,
+            coordination,
+        );
+        const meanFresh = meanOf(notesFresh);
+        expect(meanFresh).toBeLessThan(70);
+
+        // Reset for downstream tests (compingState is module-level).
+        compingState.lastVoicingMidis = [];
     });
 
     it('returns empty on sub-beats of the final bar (voicing rings out)', () => {

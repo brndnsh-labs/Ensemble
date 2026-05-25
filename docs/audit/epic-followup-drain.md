@@ -14,12 +14,12 @@ Story sizing follows the house rule — one focused session each, one engine tou
 | S4 | Micro-nit & test-rigor cleanup sweep | sonnet | Shipped 2026-05-23 |
 | S5 | Bass walking idiom | opus | Shipped 2026-05-23 |
 | S6 | Per-genre tuning sweep | sonnet | Shipped 2026-05-24 |
-| S7 | Final-bar polish | opus | Blocked → `LISTEN_TESTS.md` C1 |
+| S7 | Final-bar cadence voice-leading | opus | Shipped 2026-05-24 |
 | S8 | Per-genre arrangement design | opus | Blocked → `LISTEN_TESTS.md` C2/C3 |
 | S9 | Disco re-categorization + vibe-path | opus | Blocked → `LISTEN_TESTS.md` C4/C5 |
 | S10 | Ska-Punk shared-hook antiphony | opus | Blocked → `LISTEN_TESTS.md` C6 |
 
-**6 / 10 shipped.** S7–S10 unblock as their `LISTEN_TESTS.md` items are decided.
+**7 / 10 shipped.** S7's drum-gesture half remains deferred on `LISTEN_TESTS.md` C1; S8–S10 unblock as their `LISTEN_TESTS.md` items are decided.
 
 ---
 
@@ -92,13 +92,15 @@ Implements the six value/direction decisions recorded in `LISTEN_TESTS.md` Part 
 **Effort:** ~4h. **Model:** sonnet (mechanical once decided). **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
 **Status:** Shipped 2026-05-24 — all six B-items committed per-item. B1 (`118c5018`): bass Imperfect Symmetry floor 0.4 → 0.25 at `bass-engine.ts:451`. B2 (`9423fbbb`): conductor ramp 0.5/1.5 → 0.75/1.25 at `conductor.ts:251`. B3 (`a349b777`): `'Ska-Punk': 0.4` added to `GENRE_INTENSITY_FLOORS`. B4 (`7f875c9d`): China `volumeScale` 0.85 → 1.0 at `synth-drums.ts:464`. B5 (`c183362e`): funk motif-2 `+2` restructured as 1-bar gesture via `effectiveDisplacement` collapse on bar 2. B6 (`0ef382a9` + reviewer-patch `313e96d1`): `HAT_SPINE_GENRES = {Disco, Funk, Rock, Metal, Shred, Ska-Punk, Hip Hop, Neo-Soul}` gates the Epic 2 S4 final-bar HiHat suppression — sparse-hat genres still suppress, spine-hat genres keep the ticker. Music-theory-reviewer 0 P0 / 1 P1 (Hip Hop missing) / 4 P2; P1 + naming P2 (`HAT_DENSE_GENRES` → `HAT_SPINE_GENRES`) + Neo-Soul P2 patched inline. 634/634 standards green. Listen-test passed 2026-05-24 (no playback issues on owner's initial testing).
 
-### S7. Final-bar polish
+### S7. Final-bar cadence voice-leading
 
-`LISTEN_TESTS.md` C1. Per-genre final-bar drum gestures (replace the universal snare-stinger) + final-bar cadence voice-leading (Epic 2 S4 currently discards `previousVoicingMidis`).
+Re-scoped 2026-05-24: the per-genre drum-gesture half of the original S7 ("Final-bar polish") is genuinely blocked on `LISTEN_TESTS.md` C1 (taste call — owner reports no audible regression across casual playback). Ship the cadence voice-leading half now since it's a mechanical correctness fix with a clear win on slow ballads with stepwise progressions (ii-V-I in Jazz/Bossa). Drum-gesture half stays open against C1.
 
-**Acceptance:** final-bar drum treatment is per-genre; the cadence resolves with voice-leading from the previous voicing; new critique coverage; listen-test pass.
-**Effort:** ~4h. **Model:** opus. **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
-**Status:** Blocked — needs `LISTEN_TESTS.md` C1.
+The bug: Epic 2 S4's `isFinalMeasureComp` branch built the cadence voicing in root position from scratch and ignored `compingState.lastVoicingMidis`, producing a visible hand-jump at the resolution when the prior bar's voicing sat away from root position.
+
+**Acceptance:** the chord-engine cadence routes through the existing `recenterVoicing` helper using `compingState.lastVoicingMidis` as the voice-leading anchor; the cadence cluster mean tracks the prior voicing's center (high-prior → higher cadence, low-prior → lower cadence); the cluster stays within the chord/harmony register slot [52, 84]; the empty-prior fallback (fresh playback) still produces a grounded resolution.
+**Effort:** ~1h. **Model:** opus. **Reviewer:** music-theory-reviewer. **Source:** FOLLOWUPS §E.
+**Status:** Shipped 2026-05-24 — `accompaniment.ts:1734` `isFinalMeasureComp` branch now calls `recenterVoicing(rootPositionMidis, compingState.lastVoicingMidis, 52, 84)` — same helper the Jazz comping path uses at line 2895. Range widened 52–68 → 52–84 (full chord slot) so 4-note voicings (maj7 span 11 st) have valid octave shifts; grounding preserved by the helper's center-distance + span score and by the empty-prior fallback. New `tests/standards/final-bar-cadence.test.ts` voice-leading test uses a simple triad fixture (cleanest math for high-vs-low prior differentiation) plus an empty-prior grounded-fallback guard. Music-theory-reviewer 0 P0 / 0 P1 / 3 P2 (all patched inline: stale test comment about "only one valid maj7 shift" rewritten, empty-prior grounded assertion added, high-prior trade-off documented in this status). All 635 standards green; typecheck clean. **Deferred:** per-genre final-bar drum gestures (the other half of the original S7) remain blocked on `LISTEN_TESTS.md` C1 — owner has heard no regression with the universal Crash+Snare stinger in casual playback. **Known trade-off:** widening the cadence window to [52, 84] means high-prior cases (e.g. mean MIDI 79) now track upward to root-at-72 rather than dropping back to grounded root-at-60. The smooth voice-leading wins the named bug case (mid-register hand-jump on slow ballads, the more frequent issue), but loses some "structural landing weight" in the high-prior corner. If high-prior cadences ever sound airy in practice, consider a downward bias on `isFinalMeasureComp` (e.g. target = `min(prior_center, 65)`) as a follow-up.
 
 ### S8. Per-genre arrangement design
 
