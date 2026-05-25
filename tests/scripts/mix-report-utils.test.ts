@@ -474,5 +474,52 @@ describe('mix report utilities', () => {
             });
             expect(multiLoop.some((n) => n.includes('flat across loops'))).toBe(true);
         });
+
+        it('does not flag arc-shaped or building dynamics — Epic 7 S4 DoD', () => {
+            const arcShaped = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'arc',
+                    loopRmsDb: [-22, -19, -16, -20],
+                }),
+            });
+            expect(arcShaped.some((n) => n.includes('flat across loops'))).toBe(false);
+            expect(arcShaped.some((n) => n.includes('front-loaded'))).toBe(false);
+
+            const building = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'building',
+                    loopRmsDb: [-22, -20, -18, -16],
+                }),
+            });
+            expect(building.some((n) => n.includes('flat across loops'))).toBe(false);
+            expect(building.some((n) => n.includes('front-loaded'))).toBe(false);
+        });
+
+        it('arc finding reads full+solo (listener stem) when present, not full (bed)', () => {
+            // Epic 7 S4: bed stem (`full`) is bass-dominated and may stay flat
+            // even when the audible mix (full+solo) has a clear arc. Gate on
+            // the listener-meaningful stem.
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'flat',
+                    loopRmsDb: [-22, -22.5, -22.4, -22.1],
+                }),
+                'full+solo': createStemMetrics({
+                    arc: 'arc',
+                    loopRmsDb: [-19, -18, -16, -18.5],
+                }),
+            });
+            expect(findings.some((n) => n.includes('flat across loops'))).toBe(false);
+        });
+
+        it('arc finding falls back to full when full+solo is absent', () => {
+            const findings = summarizeRenderedFindings({
+                full: createStemMetrics({
+                    arc: 'flat',
+                    loopRmsDb: [-22, -22.5, -22.4, -22.1],
+                }),
+            });
+            expect(findings.some((n) => n.includes('flat across loops'))).toBe(true);
+        });
     });
 });

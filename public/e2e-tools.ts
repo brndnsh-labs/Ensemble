@@ -1,3 +1,4 @@
+import { loopArcMultiplier } from './engine/arc.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { initAudio } from './engine/engine.js';
 import { scheduleGlobalEvent } from './engine/scheduler-core.js';
@@ -19,5 +20,6 @@ export function installE2EGlobals(): void {
         initAudio,
         loadDrumPreset,
         generateNotesForStep,
+        loopArcMultiplier,
     };
 }

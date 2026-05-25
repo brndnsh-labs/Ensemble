@@ -339,6 +339,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                         loadDrumPreset,
                         scheduleGlobalEvent,
                         generateNotesForStep,
+                        loopArcMultiplier,
                     } = ensemble;
 
                     const sampleRate = 44100;
@@ -971,6 +972,17 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                                 // by bumping currentLoopCount the way scheduler-core
                                 // does at each `step % totalSteps === 0` boundary.
                                 state.playback.currentLoopCount = loopIndex;
+                                // Synth-audit Epic 7 S4: broadcast the loop-driven
+                                // intensity arc on bandIntensity so all four engines
+                                // (drums, bass, chords/harmony, soloist) bias in phase.
+                                // The conductor doesn't run in this render path
+                                // (autoIntensity=false, dispatch=undefined), so we
+                                // write the arc-modulated value directly.
+                                const arcMult = loopArcMultiplier(loopIndex, loopCount);
+                                state.playback.bandIntensity = Math.max(
+                                    0.1,
+                                    Math.min(1.0, scene.intensity * arcMult),
+                                );
                                 if (loopIndex > 0) {
                                     // Re-fill so chorus-evolution biases (ornamentation
                                     // rate, fatigue decay, common-tone reward) actually

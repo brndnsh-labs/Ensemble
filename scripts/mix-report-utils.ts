@@ -579,11 +579,23 @@ export function summarizeRenderedFindings(stems, thresholds = DEFAULT_FINDING_TH
         );
     }
 
-    if (full?.arc === 'front-loaded') {
+    // Arc finding reads `full+solo` (the listener-meaningful stem with the soloist
+    // in) rather than `full` (the bed-only stem). The bed stem's RMS is dominated
+    // by bass, whose per-tick intensity response is weak (~0.6 dB swing across the
+    // S4 arc multiplier range, under the 1.5 dB classifier floor). The audible
+    // arc lives in the with-soloist stem; gating there matches the S3a precedent
+    // of reading the listener-meaningful probe. Fall back to `full` if `full+solo`
+    // isn't present (e.g. older fixtures or stem-restricted renders).
+    const arcStem = fullWithSolo ?? full;
+    if (arcStem?.arc === 'front-loaded') {
         notes.push(
             'full mix intensity is front-loaded across loops — energy in loop 0 then collapses',
         );
-    } else if (full?.arc === 'flat' && Array.isArray(full.loopRmsDb) && full.loopRmsDb.length > 1) {
+    } else if (
+        arcStem?.arc === 'flat' &&
+        Array.isArray(arcStem.loopRmsDb) &&
+        arcStem.loopRmsDb.length > 1
+    ) {
         // Only flag flatness as a finding when we actually rendered multiple
         // loops — single-loop renders are always "flat" by definition.
         notes.push('full mix dynamics are flat across loops — no intensity arc');

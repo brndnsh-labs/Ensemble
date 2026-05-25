@@ -4,6 +4,7 @@ import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
+import { loopArcMultiplier } from './arc.js';
 import { generateProceduralFill } from './fills.js';
 import { REVERB_PRESETS } from './reverb.js';
 
@@ -321,7 +322,21 @@ export function checkSectionTransition(
         }
 
         if (playback.autoIntensity && nextSeededOrchestration?.energyLevel !== undefined) {
-            const targetEnergy = Math.max(0.1, Math.min(1.0, nextSeededOrchestration.energyLevel));
+            let targetEnergy = Math.max(0.1, Math.min(1.0, nextSeededOrchestration.energyLevel));
+            // Synth-audit Epic 7 S4: loop-driven intensity arc. When the user has set
+            // a finite loopLimit, ride a hold+lift envelope across loops so all four
+            // engines build/release in phase. loopLimit=0 (free-form jam) keeps
+            // bit-identical behavior.
+            if (playback.loopLimit > 1) {
+                targetEnergy = Math.max(
+                    0.1,
+                    Math.min(
+                        1.0,
+                        targetEnergy *
+                            loopArcMultiplier(playback.currentLoopCount, playback.loopLimit),
+                    ),
+                );
+            }
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
                 targetIntensity: targetEnergy,
                 stepSize: (targetEnergy - playback.bandIntensity) / stepsPerMeasure,
@@ -575,9 +590,25 @@ export function checkSectionTransition(
                 }
 
                 if (playback.autoIntensity) {
+                    // Synth-audit Epic 7 S4: arc-modulate the seed-driven target so the
+                    // loop envelope composes with the section's macro energy. See arc.ts.
+                    let arcedTarget = targetEnergy;
+                    if (playback.loopLimit > 1) {
+                        arcedTarget = Math.max(
+                            0.1,
+                            Math.min(
+                                1.0,
+                                targetEnergy *
+                                    loopArcMultiplier(
+                                        playback.currentLoopCount,
+                                        playback.loopLimit,
+                                    ),
+                            ),
+                        );
+                    }
                     dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
-                        targetIntensity: targetEnergy,
-                        stepSize: (targetEnergy - playback.bandIntensity) / stepsPerMeasure,
+                        targetIntensity: arcedTarget,
+                        stepSize: (arcedTarget - playback.bandIntensity) / stepsPerMeasure,
                     });
                 }
 
