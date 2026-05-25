@@ -133,7 +133,7 @@ Promoted 2026-05-25 from the deferred drum-gesture half of S7 after `LISTEN_TEST
 
 **Acceptance:** each major genre family has a distinct final-bar drum treatment that reads as idiomatic to that style; a new critique test guards each treatment; the universal stinger remains as a sensible fallback for unhandled genres; listen-test pass across the handled genres.
 **Effort:** ~5-6h (per-genre design × ~6 genre families + per-treatment critique coverage). **Model:** opus (musical-taste calls per genre). **Reviewer:** music-theory-reviewer. **Source:** S7 deferred drum-gesture half; `LISTEN_TESTS.md` C1.
-**Status:** Ready (promoted 2026-05-25 from S7).
+**Status:** Shipped 2026-05-25. `groove-engine.ts` final-bar block now dispatches via `PER_GENRE_FINAL_BAR` table consulting both `genreFeel` and `lastDrumPreset` (Latin/Salsa/Samba/Afro-Cuban 6/8 reached via preset). Per-genre treatments: Jazz/Blues/Bossa/Latin → Ride + Sidestick (refined swell); Country/Acoustic → universal Crash + beat-3-only Sidestick flourish (backbeats preserved per reviewer P1); Hip Hop → Kick 1.4 + Open 1.30 (trap stinger); Metal/Shred → Open lane swap to China + Kick 1.4 (single-voice limitation documented as compromise to audit's Crash+China stack); Reggae → Sidestick beat-1 + Crash kept (dub aesthetic, one-drop is a groove convention not a cadence rule). Universal Crash+Kick+Snare preserved as fallback. New `per-genre-final-bar-critique.test.ts` (21 tests across 9 describes); 30/30 reliability. Reviewer 0 P0 / 2 P1 / 2 P2 / 1 NIT — all patched inline (Country backbeat-preservation; `lastDrumPreset` Latin dispatch; Metal+RideBell compromise documented; Ska-Punk → Ska canonical key in test).
 
 ---
 

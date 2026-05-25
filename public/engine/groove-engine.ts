@@ -81,6 +81,180 @@ const HAT_SPINE_GENRES = new Set([
     'Neo-Soul',
 ]);
 
+// why (Epic 12 S11): Epic 2 S4's universal final-bar gesture (Crash on Open
+// + reinforced Kick + punctuation Snare) ends every genre the same way. Owner
+// listen-test (LISTEN_TESTS.md C1, decided 2026-05-25 yes-build) confirmed
+// that all genres currently sound about the same at song's end and there's
+// clear room for per-genre idiom — Jazz/Bossa want a refined ride swell, not
+// a Crash thud; Country wants a rolling quarter-note tag; Metal wants the
+// signature China cymbal; Reggae wants the dub-style rim accent. The table
+// below names the per-genre overrides on top of the universal gesture:
+//   - openSound       — which sample fires on the Open lane on beat 1
+//                       (default 'Crash'; Jazz/Bossa/Blues → 'Ride';
+//                        Metal/Shred → 'China')
+//   - snareSound      — which sample fires on the Snare lane on beat 1
+//                       (default 'Snare'; Jazz/Bossa/Blues/Reggae → 'Sidestick')
+//   - kickVelocity    — beat-1 Kick reinforcement (default 1.3; Hip Hop /
+//                       Metal / Shred → 1.4 for trap/double-kick weight)
+//   - openVelocity    — beat-1 Open lane velocity (default 1.25;
+//                       Jazz/Bossa/Blues lowered to 1.20 — a swell, not a stab;
+//                       Hip Hop raised to 1.30 — heavier trap-style sustain)
+//   - flourish        — after-beat-1 lane-specific fills. Country/Acoustic
+//                       add a Sidestick on quarter-note positions (loopSteps
+//                       4/8/12) for the rolling-tag country idiom.
+//
+// Genres not listed (Funk, Disco, Rock, Neo-Soul, Ska-Punk, Hip Hop's
+// flourish, Minimal, …) fall through to the universal defaults.
+//
+// Source: docs/audit/epic-followup-drain.md S11.
+type FinalBarTreatment = {
+    openSound: 'Crash' | 'Ride' | 'China';
+    snareSound: 'Snare' | 'Sidestick';
+    kickVelocity: number;
+    openVelocity: number;
+    // why: a 'flourish' is a per-genre per-lane override that fires on the
+    // post-beat-1 sub-beats. The function returns either a partial state
+    // override (shouldPlay/velocity/soundName) or null to defer to the
+    // default after-beat-1 logic (which silences Open + HiHat-in-sparse).
+    flourish?: (
+        instName: string,
+        loopStep: number,
+    ) => { shouldPlay: boolean; velocity?: number; soundName?: string } | null;
+};
+
+// why: shared country/acoustic flourish — beat 3 (loopStep 8) gets a Sidestick
+// rim hit at velocity 0.85 for the "rolling tag" idiom of country/acoustic
+// endings. Velocity 0.85 sits below the universal beat-1 hits (Kick 1.3 /
+// Crash 1.25 / Snare 1.15) so the downbeat remains the dominant gesture and
+// the rim flourish reads as embellishment, not as a competing accent.
+//
+// Scope (reviewer P1, Epic 12 S11): beat 3 ONLY — beats 2 and 4 are the
+// backbeats and must keep the strategy's full Snare crack (~vel 1.15 with
+// backbeatCrack multiplier), which is the loudest cadence-arrival snare
+// signal a country drummer makes. Replacing the final-bar backbeats with a
+// quiet rim-click would have the drummer pulling back at the moment the
+// cadence should peak. Beat 3 (the only non-backbeat quarter-note in 4/4)
+// is enough to read as a rolling tag without smothering the backbeats.
+function countryFlourish(
+    instName: string,
+    loopStep: number,
+): { shouldPlay: boolean; velocity?: number; soundName?: string } | null {
+    if (instName !== 'Snare') {
+        return null;
+    }
+    if (loopStep === 8) {
+        return { shouldPlay: true, velocity: 0.85, soundName: 'Sidestick' };
+    }
+    return null;
+}
+
+const UNIVERSAL_FINAL_BAR: FinalBarTreatment = {
+    openSound: 'Crash',
+    snareSound: 'Snare',
+    kickVelocity: 1.3,
+    openVelocity: 1.25,
+};
+
+const PER_GENRE_FINAL_BAR: Record<string, FinalBarTreatment> = {
+    // why: Jazz endings — Ride cymbal swell + brushy Sidestick on beat 1,
+    // not a Crash thud. A hard Crash is too thudding for a Jazz ending; the
+    // idiom is "land on the ride cymbal bell." Snare → Sidestick honors the
+    // brushwork aesthetic. Open velocity slightly lower (1.20) — a swell,
+    // not a stab.
+    //
+    // Compromise (Epic 12 S11): the audit asked for ride-BELL specifically;
+    // synth-drums.ts has no separate RideBell sample, so we route to plain
+    // 'Ride' at high velocity. Future-work: if/when RideBell becomes its own
+    // sample, route Jazz/Blues/Bossa Open → 'RideBell' here.
+    Jazz: { openSound: 'Ride', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.2 },
+    // why: Blues — same refined-ride idiom as Jazz (shared cymbal-led close).
+    Blues: { openSound: 'Ride', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.2 },
+    // why: Bossa Nova — Latin endings traditionally close on a sparse ride
+    // bell + clave-style rim, not a Crash. Same shape as Jazz.
+    'Bossa Nova': {
+        openSound: 'Ride',
+        snareSound: 'Sidestick',
+        kickVelocity: 1.3,
+        openVelocity: 1.2,
+    },
+    Latin: { openSound: 'Ride', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.2 },
+    // why: Country — universal Crash+Kick+Snare on beat 1 PLUS a sidestick
+    // flourish on beats 2/3/4 for the rolling-tag idiom. Country endings are
+    // busy, not minimal — the band lands hard then ornaments through the bar.
+    Country: {
+        openSound: 'Crash',
+        snareSound: 'Snare',
+        kickVelocity: 1.3,
+        openVelocity: 1.25,
+        flourish: countryFlourish,
+    },
+    // why: Acoustic — same rolling-tag idiom as Country (acoustic ballads end
+    // with a quarter-note flourish, not a single thud).
+    Acoustic: {
+        openSound: 'Crash',
+        snareSound: 'Snare',
+        kickVelocity: 1.3,
+        openVelocity: 1.25,
+        flourish: countryFlourish,
+    },
+    // why: Hip Hop — trap-style outro hit. Heavier Kick (1.4) + slightly
+    // heavier Crash sustain (1.30) for a trap-stinger arrival. Same gesture
+    // shape but harder hit. No sample swaps — Hip Hop endings DO crash.
+    'Hip Hop': {
+        openSound: 'Crash',
+        snareSound: 'Snare',
+        kickVelocity: 1.4,
+        openVelocity: 1.3,
+    },
+    // why: Metal — China cymbal is the signature metal cadence accent (see
+    // metal.ts accentCymbal: 'China'). Route Open lane to 'China' so the
+    // genre's idiomatic accent fires on the final downbeat alongside the
+    // reinforced double-kick weight (Kick 1.4). The China sample shares the
+    // Crash dispatch in synth-drums.ts:2206 (same buffer chain, bandpass-
+    // shaped for the bark-like trash), so no new audio plumbing is needed.
+    //
+    // Compromise (reviewer P2, Epic 12 S11): the audit spec'd "Crash + China
+    // stack." The Open lane dispatcher is single-voice (one sample per tick),
+    // so we ship China-alone rather than the layered stack. China's
+    // volumeScale=1.0 (vs Crash 0.9) keeps the accent strong; the missing
+    // Crash body is the acceptable trade-off for not plumbing multi-sample
+    // lanes. Future-work: if multi-sample lane dispatch lands, layer Crash
+    // under China here for the full audit spec.
+    Metal: { openSound: 'China', snareSound: 'Snare', kickVelocity: 1.4, openVelocity: 1.25 },
+    // why: Shred — same metal-China idiom (Shred shares Metal's accent-
+    // cymbal config and is in the same family).
+    Shred: { openSound: 'China', snareSound: 'Snare', kickVelocity: 1.4, openVelocity: 1.25 },
+    // why: Reggae — dub aesthetic loves the rim, not the snare crack. The
+    // cadence inversion: reggae skips beat-1 kick in the groove, but the
+    // FINAL bar IS the cadence arrival so we keep the reinforced Kick; the
+    // dub flavor surfaces by routing Snare beat-1 to 'Sidestick'. Open
+    // Crash stays — reggae endings DO crash.
+    Reggae: { openSound: 'Crash', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.25 },
+};
+
+// why: Latin/Salsa/Samba/Afro-Cuban 6/8 are reached via `groove.lastDrumPreset`,
+// not via `groove.genreFeel` (mirror of `getStrategy`'s dispatch at line ~228).
+// Without this set, the `Latin` row of PER_GENRE_FINAL_BAR would be dead code
+// because `genreFeel` is never assigned `'Latin'` in production. Reviewer P1,
+// Epic 12 S11.
+const LATIN_PRESETS = new Set(['Latin/Salsa', 'Afro-Cuban 6/8', 'Samba', 'Bossa Nova']);
+
+function getFinalBarTreatment(
+    genreFeel: string | undefined,
+    lastDrumPreset?: string,
+): FinalBarTreatment {
+    // why: Latin preset dispatch first — if the user picked a Latin drum preset
+    // we honor that idiom regardless of what genreFeel was set to (e.g., a Jazz
+    // standard with Bossa Nova drums should still close on a Latin ride swell).
+    if (lastDrumPreset && LATIN_PRESETS.has(lastDrumPreset)) {
+        return PER_GENRE_FINAL_BAR.Latin ?? UNIVERSAL_FINAL_BAR;
+    }
+    if (!genreFeel) {
+        return UNIVERSAL_FINAL_BAR;
+    }
+    return PER_GENRE_FINAL_BAR[genreFeel] ?? UNIVERSAL_FINAL_BAR;
+}
+
 function getStrategy(groove: any): any {
     const isLatinStyle =
         groove.genreFeel === 'Bossa Nova' ||
@@ -584,28 +758,38 @@ export function applyGrooveOverrides(
     // Source: docs/audit/form-arranger.md P1 #6;
     //         docs/audit/epic-form-arrangement.md S4.
     if (isFinalMeasureDrums) {
+        // why (Epic 12 S11): per-genre treatment selected once, then applied
+        // to whichever lane this tick is voicing. Universal fallback shape
+        // is preserved for any genre not in the table.
+        const treatment = getFinalBarTreatment(groove.genreFeel, groove.lastDrumPreset);
         if (isDownbeat) {
             // Beat 1 of the final bar: fire the resolution gesture per-lane.
             if (inst.name === 'Open') {
-                // why: Open lane carries the Crash for the final-bar swell —
-                // same routing convention as the section-boundary crash above
-                // (line ~225). Velocity 1.25 — strong arrival, kept below the
-                // synth ceiling 1.4 so it doesn't clip.
+                // why: Open lane carries the per-genre accent — universal
+                // 'Crash', Jazz/Bossa/Blues 'Ride' (refined swell), Metal/
+                // Shred 'China' (signature metal trash accent). Velocity
+                // sourced from the treatment so Jazz lands softer (1.20)
+                // and Hip Hop lands heavier (1.30), with universal default
+                // 1.25 — all kept below the synth ceiling 1.4 so they
+                // don't clip.
                 currentState.shouldPlay = true;
-                currentState.soundName = 'Crash';
-                currentState.velocity = 1.25;
+                currentState.soundName = treatment.openSound;
+                currentState.velocity = treatment.openVelocity;
             } else if (inst.name === 'Kick') {
-                // why: reinforced kick on the final downbeat — the bass and
-                // chord cadence both anchor on beat 1; the kick anchors the
-                // drums alongside them.
+                // why: reinforced kick on the final downbeat — universal
+                // 1.3; Hip Hop / Metal / Shred bump to 1.4 for trap stinger
+                // / double-kick weight.
                 currentState.shouldPlay = true;
-                currentState.velocity = 1.3;
+                currentState.velocity = treatment.kickVelocity;
             } else if (inst.name === 'Snare') {
                 // why: a punctuation snare on the final downbeat (a real
                 // drummer would not skip the backbeat-arrival accent). 1.15 —
                 // strong but below the kick/crash so the swell remains the
-                // dominant gesture.
+                // dominant gesture. Jazz/Bossa/Blues/Reggae route to
+                // 'Sidestick' to honor brushwork / dub rim aesthetics on
+                // the cadence arrival.
                 currentState.shouldPlay = true;
+                currentState.soundName = treatment.snareSound;
                 currentState.velocity = 1.15;
             } else if (inst.name === 'HiHat' && !HAT_SPINE_GENRES.has(groove.genreFeel)) {
                 // why: suppress the closed-hat on beat 1 — the Open Crash is
@@ -622,14 +806,29 @@ export function applyGrooveOverrides(
             // the hat ticker continue through the final bar (Epic 12 S6 B6) —
             // chopping it for a swell that doesn't fit the genre would read
             // as the band dropping out, not as a cadence gesture.
-            if (inst.name === 'Open') {
+            //
+            // why (Epic 12 S11): per-genre flourish first — Country/Acoustic
+            // add a Sidestick rim hit on beats 2/3/4 for the rolling-tag
+            // idiom. The flourish takes precedence over the Open/HiHat
+            // suppression because it operates on the Snare lane only.
+            const flourish = treatment.flourish?.(inst.name ?? '', loopStep);
+            if (flourish !== null && flourish !== undefined) {
+                currentState.shouldPlay = flourish.shouldPlay;
+                if (flourish.velocity !== undefined) {
+                    currentState.velocity = flourish.velocity;
+                }
+                if (flourish.soundName !== undefined) {
+                    currentState.soundName = flourish.soundName;
+                }
+            } else if (inst.name === 'Open') {
                 currentState.shouldPlay = false;
             } else if (inst.name === 'HiHat' && !HAT_SPINE_GENRES.has(groove.genreFeel)) {
                 currentState.shouldPlay = false;
             }
-            // Snare/Kick: let the strategy/entropy decide as usual — a real
-            // drummer might add a backbeat or a kick echo on beat 3 of the
-            // final bar. We don't actively suppress those.
+            // Snare/Kick: let the strategy/entropy decide as usual (when no
+            // per-genre flourish applies) — a real drummer might add a
+            // backbeat or a kick echo on beat 3 of the final bar. We don't
+            // actively suppress those.
         }
     }
 
