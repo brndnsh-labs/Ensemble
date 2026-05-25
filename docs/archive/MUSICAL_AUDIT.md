@@ -149,9 +149,9 @@ Replaced bare `Math.random()` with `barIndex`-seeded variation across engines.
 ## Related
 
 - `docs/guides/musical-engine-patterns.md` — extracted live recipes (5 smells, coordination, loop-awareness, final-stage multiplier discipline, dual-gate activation, determinism).
-- `docs/audit/EPICS.md` — post-audit backlog (Epic 9, 10 for follow-up sweeps).
-- `docs/audit/FOLLOWUPS.md` — deferred items surfaced during the cycle.
-- `docs/audit/*.md` — per-area findings (soloist, bass, chords, drums, harmony+coordination, form/arranger).
+- `docs/archive/musical-audit-2026-05/` — full archive of the post-audit cycle (Epics 1-12 final tracker, per-epic story files, LISTEN_TESTS.md, source findings). Frozen 2026-05-25 — 80 stories shipped.
+- `docs/audit/EPICS.md` — tombstone pointer; future audit cycles re-fill this.
+- `docs/audit/FOLLOWUPS.md` — ongoing follow-up backlog (live; not an audit-cycle artifact).
 - `tests/standards/CRITIQUE_GUIDELINES.md` — original critique-test principles and target thresholds.
 - `docs/archive/ARCHITECTURE_FOLLOWUPS.md` — sibling archived tracker (TS-migration, May 2026).
 - `CLAUDE.md` § Musical Logic & Generative Standards — operating rules for engine work.

@@ -1,14 +1,15 @@
 # Musical Engine Patterns
 
-Reusable recipes for working on the generative musical engines (soloist, bass, drums, chords, harmony, conductor, arranger). Captured from the May 2026 musical-audit cycle — these are the patterns that proved durable across ~50 shipped stories.
+Reusable recipes for working on the generative musical engines (soloist, bass, drums, chords, harmony, conductor, arranger). Captured from the May 2026 musical-audit cycle — these are the patterns that proved durable across the cycle's 80 shipped stories.
 
 If you're picking up new engine work and not sure how to shape the change, start here. The "5 smells" section is also the working checklist for reviewing critique tests.
 
 ## Related
 
-- `docs/archive/MUSICAL_AUDIT.md` — completed audit chapter (history, Shipped table). Frozen.
-- `docs/audit/EPICS.md` — current open backlog (post-audit follow-ups).
-- `docs/audit/FOLLOWUPS.md` — deferred items that don't justify a fresh story yet.
+- `docs/archive/MUSICAL_AUDIT.md` — Epics 1-8 history snapshot. Frozen.
+- `docs/archive/musical-audit-2026-05/` — full cycle archive (EPICS.md, 12 epic-*.md files, LISTEN_TESTS.md, 6 source-finding audit reports). Frozen 2026-05-25 after all 80 stories shipped.
+- `docs/audit/EPICS.md` — tombstone pointer; the next audit cycle (if any) re-fills this.
+- `docs/audit/FOLLOWUPS.md` — ongoing follow-up backlog (~28 open items, mostly NIT/listen-only). Live.
 - `tests/standards/CRITIQUE_GUIDELINES.md` — original critique-test principles and target thresholds.
 - `CLAUDE.md` § Musical Logic & Generative Standards — operating rules for engine work.
 

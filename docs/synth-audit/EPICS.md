@@ -6,7 +6,7 @@ This is a **separate track** from the musical audit (`docs/audit/`). It delibera
 
 - **Definition of Done.** The musical audit gates on critique tests (statistical ranges, an automated oracle). Synth sound design has no such oracle — this track gates on **listening through the A/B audition harness** (Epic 0 S1).
 - **Agents.** This track uses an audio-DSP implementer and `synth-graph-reviewer` (Epic 0 S2), not `musical-engine-implementer` / `music-theory-reviewer`.
-- **`docs/audit/EPICS.md` is live** (Epic 12 in flight) — mixing tracks would confuse phase logic.
+- **Tracker isolation.** The musical-audit cycle shipped 2026-05-25 and `docs/audit/EPICS.md` is now a tombstone (full history at `docs/archive/musical-audit-2026-05/`); even with that track closed, mixing this tracker with the musical one would confuse phase logic and reviewer routing.
 
 ## North star
 

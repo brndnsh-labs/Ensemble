@@ -1,6 +1,6 @@
 # Follow-ups & Deferred Work
 
-Companion to [`EPICS.md`](EPICS.md). Captures every "shippable but flagged" item that surfaced during audit work — items that don't justify a fresh story yet but shouldn't be lost to grep.
+Captures every "shippable but flagged" item that surfaced during audit work — items that don't justify a fresh story yet but shouldn't be lost to grep. The 2026-05-16 audit cycle that originated most of these is archived at [`docs/archive/musical-audit-2026-05/`](../archive/musical-audit-2026-05/); this file is the LIVE follow-up backlog and survives the archive pass.
 
 Each entry: **location** · what it is · why it's deferred · size estimate · provenance (which story or review surfaced it).
 
