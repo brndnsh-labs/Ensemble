@@ -133,6 +133,17 @@ export function createCoordinationContext(
         // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318
         // readable-after: soloist producer (bass, chords, harmony can read this)
         soloistBusy: false,
+        // writer: updateCoordinationContext('soloist') — set true whenever the
+        // soloist's main result has midi > 0 on this tick. Read by harmony
+        // (spectral-gap branch, yield-when-active) and accompaniment
+        // (unison-avoidance, dynamic-density) to decide whether to step out of
+        // the soloist's way.
+        soloistActive: false,
+        // writer: soloist.ts (end-of-phrase guard, ~line 1792) — true ONLY on
+        // the tick the soloist completes a phrase. Read by harmony to time
+        // entry/exit gestures against phrase boundaries rather than against
+        // raw rests.
+        soloistPhraseEnd: false,
         // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318 (current tick only)
         // readable-after: soloist producer (bass, chords, harmony can read this)
         // NOTE: this is 0 on most harmony-stab steps because harmony yields away from soloist-active
@@ -172,6 +183,13 @@ export function createCoordinationContext(
         // writer: tick-logic.ts updateCoordinationContext('chords') at line ~400
         // readable-after: chords producer (harmony can read this)
         avgChordMidi: 0,
+        // writer: tick-logic.ts chord-data preamble at lines ~118-119 (before producers run)
+        // readable-after: chord-data preamble (any producer)
+        // Absolute step indices for the current section's boundaries. Default 0
+        // means "no chord data yet" — consumers all guard via `|| 0`, `?? null`,
+        // or `sectionEnd > 0` checks, so the sentinel is safe.
+        sectionStart: 0,
+        sectionEnd: 0,
         // writer: tick-logic.ts chord-data preamble at line ~142 (before producers run)
         // readable-after: chord-data preamble (any producer including soloist)
         upcomingSectionFirstChord: null as any,
@@ -376,7 +394,11 @@ export function createCoordinationContext(
  */
 export type CoordinationContext = ReturnType<typeof createCoordinationContext>;
 
-export function updateCoordinationContext(context: any, module: string, result: any): void {
+export function updateCoordinationContext(
+    context: CoordinationContext,
+    module: string,
+    result: any,
+): void {
     if (!result) {
         return;
     }
