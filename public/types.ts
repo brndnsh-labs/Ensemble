@@ -532,12 +532,18 @@ export interface RecentSoloistNote {
 
 /**
  * A short motif retained across phrases — used by groove engines (e.g. Ska-Punk
- * harmony in `harmonies.ts`) to echo soloist hooks. The shape is intentionally
- * loose because producers add genre-specific fields.
+ * harmony in `harmonies.ts`) to echo soloist hooks.
+ *
+ * Current production consumers match on `step` only. `sourcePhase` is carried
+ * for tests + future phase-aware consumers (no cost — the producer derives
+ * srdcState upstream regardless). If a future genre wants pitch-aware
+ * latching (e.g. tuning the horn-stab to the soloist's anchor pitch), add
+ * `midi`/`pitchClass` back explicitly — they were trimmed in the 2026-05-26
+ * micro-sweep because no consumer read them.
  */
 export interface SoloistHook {
     step: number;
-    [key: string]: unknown;
+    sourcePhase?: 'statement' | 'restatement' | 'departure' | 'conclusion';
 }
 
 /**

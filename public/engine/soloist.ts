@@ -637,7 +637,7 @@ function trackPhraseNote(
     //      per phrase on average — dense enough to read as a horn section
     //      (high-energy 90s ska-punk leans dense), sparse enough to avoid
     //      mirroring every soloist note.
-    publishSoloistHook(soloist, step, primary, noteIsAnchor, loopCount);
+    publishSoloistHook(soloist, step, noteIsAnchor, loopCount);
 }
 
 /**
@@ -659,7 +659,6 @@ function trackPhraseNote(
 function publishSoloistHook(
     soloist: SoloistState,
     step: number,
-    primary: any,
     noteIsAnchor: boolean,
     loopCount: number,
 ): void {
@@ -699,7 +698,11 @@ function publishSoloistHook(
     // late-arriving Ska harmony pass still sees the hook in the same tick,
     // but tight enough that the buffer doesn't grow unbounded across a long
     // session. Without this trim the buffer accumulates one entry per
-    // qualifying anchor for the full playback duration.
+    // qualifying anchor for the full playback duration. NOTE: the only
+    // current consumer (Ska-Punk in `harmonies.ts`) matches `h.step === step`
+    // in the same tick the producer wrote, so the buffer is functionally a
+    // one-tick handoff register and the trim+cap below are forward-compat
+    // insurance against a future consumer that reads back-looking.
     const staleBefore = step - 32; // 2 measures at 16 steps/measure (test/prod default)
     let buffer = memory.sharedHookBuffer;
     if (buffer.length > 0 && buffer[0].step < staleBefore) {
@@ -707,11 +710,13 @@ function publishSoloistHook(
         memory.sharedHookBuffer = buffer; // @worker-mutation
     }
 
+    // why: minimal payload — only `step` (consumer match key) + `sourcePhase`
+    // (observability + test signal). `midi` / `pitchClass` / `durationSteps`
+    // were carried before but no consumer read them; trimmed in the
+    // 2026-05-26 sweep. Re-add explicitly if a future pitch-aware consumer
+    // needs them. FOLLOWUPS §F (Epic 12 S10 review).
     const hook: SoloistHook = {
         step,
-        midi: Math.round(primary.midi),
-        pitchClass: normalizeLoopStep(Math.round(primary.midi), 12),
-        durationSteps: Math.max(1, Math.round(primary.durationSteps || 1)),
         sourcePhase: srdcState,
     };
     buffer.push(hook); // @worker-mutation

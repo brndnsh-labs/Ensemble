@@ -15,12 +15,12 @@ A follow-up that's been sitting here for >2 months without being touched is sign
 
 ## Open count (reconciled 2026-05-26)
 
-After the 2026-05-26 micro-sweep (Commits 1–3), **~23 items remain open**, clustering into two shapes:
+After the 2026-05-26 micro-sweep (Commits 1–4), **~21 items remain open**, clustering into two shapes:
 
 - **~17 per-genre listen-test / taste items** (all of §E) — acceptance is by-ear, not critique-test-gated. Best handled as genre-grouped listening sessions, not stories.
-- **~6 small mechanical nits + 1 mid-size canonicalization** (§B, §D, §F, §G) — 5 min – 4 h each. Most are candidates for further micro-cleanup; §G.16 (Bossa genre-key audit) is properly canonicalization-story-sized and slated for Commit 5 of the same sweep.
+- **~4 small mechanical nits + 1 mid-size canonicalization** (§B, §D, §F, §G) — 5 min – 4 h each. Most are candidates for further micro-cleanup; §G.16 (Bossa genre-key audit) is properly canonicalization-story-sized and slated for Commit 5 of the same sweep.
 
-Epic 12 S1–S11 closures were folded in (Epic 12 shipped 2026-05-20 → 2026-05-25; previous reconciliation pre-dated most of it). The two "promote to a real story" candidates flagged in the previous reconciliation (`evansIntervals` chord-quality and profile-rotation sticky-retain) shipped silently in Epic 12 S2 and S3 respectively; both entries removed from §E. The 2026-05-26 sweep additionally closed §G.17 (funk slap-bass PRNG), §F.9 (classifyChordQuality case), §F.10 (defensive pinnedProfile clear), §F.12 (ska-punk Restatement phase coverage), §F.14 (per-quality test controls).
+Epic 12 S1–S11 closures were folded in (Epic 12 shipped 2026-05-20 → 2026-05-25; previous reconciliation pre-dated most of it). The two "promote to a real story" candidates flagged in the previous reconciliation (`evansIntervals` chord-quality and profile-rotation sticky-retain) shipped silently in Epic 12 S2 and S3 respectively; both entries removed from §E. The 2026-05-26 sweep additionally closed §G.17 (funk slap-bass PRNG), §F.9 (classifyChordQuality case), §F.10 (defensive pinnedProfile clear), §F.11 (publishSoloistHook trim+cap rationale), §F.12 (ska-punk Restatement phase coverage), §F.13 (SoloistHook field trim), §F.14 (per-quality test controls).
 
 Plus `TECH_DEBT.md` #1 (the `arranger.progression` dispatch refactor) — non-musical, multi-day, tracked separately.
 
@@ -175,11 +175,11 @@ Most items promoted on 2026-05-19 to **Epic 10 / S2 (soloist)** and **Epic 10 / 
 
 **New entries surfaced during Epic 12 S10:**
 
-- **`publishSoloistHook` buffer-trim + 16-entry cap is defensive over-engineering.** Because the Ska-Punk shadow consumer matches on `h.step === step` in the same tick the producer wrote (`harmonies.ts:365`), the buffer is functionally a one-tick handoff register — entries become unmatchable on tick+1. The 32-step (2-measure) trim window at `soloist.ts:~691` and the 16-entry hard cap at `~707` defend against a future consumer that reads back-looking, but no such consumer exists today. Not harmful; worth one comment sentence acknowledging "this is effectively single-entry under normal operation; the trim+cap exist defensively in case a future consumer reads back-looking." ~10min cleanup, or leave as forward-compat insurance. *Source: Epic 12 S10 music-theory-reviewer (2026-05-25) P2-1.*
+- **`publishSoloistHook` buffer-trim + 16-entry cap is defensive over-engineering** → ✅ DOCUMENTED — 2026-05-26 micro-sweep (one-tick-handoff rationale appended to the trim block comment in `soloist.ts:~699`; trim+cap kept as forward-compat insurance). *Source: Epic 12 S10 music-theory-reviewer (2026-05-25) P2-1.*
 
 - **`ska-punk-shared-hook-critique.test.ts` Restatement phase never witnessed** → ✅ SHIPPED — 2026-05-26 micro-sweep. The engine doesn't drive `preparePhraseResponseContext` on the head-playback test path (so engine-derived phase transitions don't fire from a multi-section arranger map). Closed by mirroring the existing Conclusion negative-control pattern: two new tests force `srdcState` directly (per-tick re-pin) and assert `phases.size === 1` matching the forced phase — one for `'restatement'`, one for `'departure'`. The existing Statement assertion was also tightened from a vacuous `toContain` over an (always-empty under the original sectionMap) Set to an explicit `publishedPhases.has('statement')` check. *Source: Epic 12 S10 music-theory-reviewer (2026-05-25) P2-2.*
 
-- **`SoloistHook.midi` / `pitchClass` / `durationSteps` fields are unused by the Ska-Punk consumer.** `publishSoloistHook` writes a rich hook record, but the consumer at `harmonies.ts:365` only reads `step`. The extra fields are forward-compatible per the `SoloistHook` open-index signature (`public/types.ts:521`), but they're currently dead-on-the-wire. Document the intent (e.g. future consumers may want to pitch-match the latch to the soloist's anchor pitch) or trim to `{ step, sourcePhase }`. ~10min decision. *Source: Epic 12 S10 implementer note (2026-05-25).*
+- **`SoloistHook.midi` / `pitchClass` / `durationSteps` fields are unused by the Ska-Punk consumer** → ✅ SHIPPED — 2026-05-26 micro-sweep. Trimmed `SoloistHook` to `{ step, sourcePhase? }` in `public/types.ts:538` (dropped the open-index `[key: string]: unknown` signature); `publishSoloistHook` writer + signature simplified to drop the now-unused `primary` parameter. If a future pitch-aware consumer needs midi/pitchClass/durationSteps, re-add explicitly. *Source: Epic 12 S10 implementer note (2026-05-25).*
 
 - **`harmonies.ts:931` smart-style fallback list did not include `'Ska-Punk'`** → ✅ Patched in Epic 12 S10 — added `'Ska-Punk'` to `['Funk', 'Metal', 'Afrobeat', 'Ska']` so the Smart Genre / preset-import path correctly routes Ska-Punk to the horns timbre. *Source: Epic 12 S10 music-theory-reviewer (2026-05-25) P1-3 (adjacent).*
 
