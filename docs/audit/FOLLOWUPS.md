@@ -13,13 +13,14 @@ Each entry: **location** · what it is · why it's deferred · size estimate · 
 
 A follow-up that's been sitting here for >2 months without being touched is signal: either promote it to a story (it's load-bearing) or delete it (we've decided we don't care). Don't let this file become a graveyard.
 
-## Open count (reconciled 2026-05-20)
+## Open count (reconciled 2026-05-26)
 
-After the post-Epic-11 reconciliation pass — and Epic 12 S1 (2026-05-20) — **~28 items remain open**, clustering into three shapes:
+After folding in the Epic 12 S1–S11 closures (Epic 12 shipped 2026-05-20 → 2026-05-25; previous reconciliation pre-dated most of it), **~28 items remain open**, clustering into two shapes:
 
-- **~19 per-genre listen-test / taste items** (all of §E) — acceptance is by-ear, not critique-test-gated. Best handled as genre-grouped listening sessions, not stories.
-- **~7 small mechanical nits** (§B, §C, §D, §G) — 5min–2h each. Candidates for a future micro-cleanup sweep in the Epic 11 S5 mould.
-- **2 genuine stories** — `evansIntervals` chord-quality awareness (§E) and profile-rotation sticky-retain (§E). (The soloist `scrambleHash` migration shipped as Epic 12 S1 on 2026-05-20 — it was the load-bearing one.)
+- **~17 per-genre listen-test / taste items** (all of §E) — acceptance is by-ear, not critique-test-gated. Best handled as genre-grouped listening sessions, not stories.
+- **~11 small mechanical nits** (§B, §D, §F, §G) — 5 min – 4 h each. Most are candidates for an Epic 11 S5-style micro-cleanup sweep; one (§G.16 Bossa genre-key audit) is properly canonicalization-story-sized.
+
+The two "promote to a real story" candidates flagged in the previous reconciliation (`evansIntervals` chord-quality and profile-rotation sticky-retain) shipped silently in Epic 12 S2 and S3 respectively; both entries removed from §E.
 
 Plus `TECH_DEBT.md` #1 (the `arranger.progression` dispatch refactor) — non-musical, multi-day, tracked separately.
 
@@ -44,7 +45,7 @@ All three items promoted to **Epic 9 / S5 (Multiplier placement hardening)** on 
 
 **Not promoted (still deferred from Epic 9 S5 review):**
 
-- **Soloist rhythm critique fixture doesn't exercise active stepCoordination boosts.** Epic 9 S5.a moved the `1 + loopCount * 0.15` multiplier from `densityScale` to a final-stage `attackProb *=`, which is the canonical placement (mirrors pitch-engine). But the existing critique fixture (`soloist-chorus-evolution-rhythm.test.ts`) feeds a synthetic `stepCoordination` with no `kickHit` / `snareHit` / seed steps, so the additive boost-stack the audit-doc described (`+= 0.4` seed + `+= 0.2` per landmark = `attackProb` near 1.0 BEFORE the multiplier, where the move matters most) isn't observable — realized fixture delta is unchanged at +25%. The placement is correct for production; the test is just blind to the production-relevant case. Extend the fixture (or add a second case) with active `stepCoordination` boosts so the test guards the wash-out the placement prevents. ~1h. *Source: Epic 9 S5 review (2026-05-19).*
+- **Soloist rhythm critique fixture doesn't exercise active stepCoordination boosts** → ✅ SHIPPED — fixture now exercises active `stepCoordination` boosts (`kickHit` / `snareHit`) via the "final-stage multiplier survives active coordination boosts on non-forced steps" case in `soloist-chorus-evolution-rhythm.test.ts:259-398`; the wash-out scenario the audit-doc described is directly tested and passes. *Source: Epic 9 S5 review (2026-05-19); shipped during post-Epic-10 S2 fixture consolidation.*
 
 - **`accompanimentMidis` device-floor scope is run/enclosure only.** Epic 9 S5.b added a skip-or-flip unison floor to `run` and `enclosure` devices in `soloist-devices.ts`. Other devices (`bebopScale`, `bluesLick`, `chickenPick`, `quartal`, `birdFlurry`) walk chord tones by genre-defining design, so they're correctly left alone — the realized 23.1pp mean-abs-gap (vs audit-doc target 30pp) is the structural ceiling under the current device set. If a future story wants to push the absolute drop higher, the lever isn't widening the floor's scope but biasing device *selection* away from chord-tone walkers when the comper is dense. ~2h if pursued; flagged as a known structural limit, not a defect. *Source: Epic 9 S5 review (2026-05-19).*
 
@@ -66,10 +67,11 @@ Three items promoted on 2026-05-19; remainder reconciled below.
 - **`walking-ska` style slash-chord-blind predicate** → ✅ SHIPPED — Epic 11 S5 (`bass-styles.ts:1041` migrated to `isChordChangeApproach`). *Source: Epic 9 S4 review.*
 - **Hash-helper consolidation across 3 engines** → ✅ SHIPPED — Epic 11 S9a (`public/engine/hash-utils.ts` exports canonical `scrambleHash` + `stringHash33` + `stringHash31`; every call site kept its exact prior variant, byte-identical distributions). *Source: Epic 2 S3 review.*
 - **Three remaining `soloist.session.*` reads in `harmonies.ts`** → ✅ SHIPPED — Epic 11 S9b (two new `CoordinationContext` fields — `soloistSharedHookBuffer` + `soloistSeed`; `grep 'soloist.session' harmonies.ts` returns zero). *Source: Epic 1 S4 follow-up.*
+- **Three remaining `Math.random()` in `groove-engine.ts` (lines 259/281/293)** → ✅ SHIPPED — Epic 12 S4 (drum-strategy probability/velocity randomness migrated to `scrambleHash`-keyed entropy). *Source: Epic 3 S5 Status block.*
 
 **Not promoted (still deferred):**
 
-- **Three remaining `Math.random()` in `groove-engine.ts`.** Lines 259/281/293 (drum-strategy probability/velocity randomness). Promote if drum tests start flaking. ~1h. *Source: Epic 3 S5 Status block.*
+(none — all entries reconciled to "promoted" or "shipped" above.)
 
 ## D. Coordination consumption gaps
 
@@ -102,10 +104,6 @@ Four items promoted on 2026-05-19; remainder reconciled below.
 
 Taste-driven gestures or per-genre values still flat. **Acceptance for this section is by-ear** — these are not critique-test-gated stories; the natural home is genre-grouped listening sessions. Each one is a future candidate, not a follow-up to anything in particular.
 
-> **Two items in this section are mis-bucketed correctness/product bugs, not taste nits — promote them to real stories:** the **profile-rotation churn** (user-selected soloist style silently overridden) and **`evansIntervals` chord-quality blindness** (a real theory defect touching all Greats profiles).
-
-- **Per-genre final-bar drum gestures.** Epic 2 S4 uses a universal snare-stinger; jazz/bossa might prefer ride-bell + comping. *Source: Epic 2 S4 review.*
-- **Final-bar voice-leading discards `previousVoicingMidis`.** Epic 2 S4 cadence voicing is chart-driven but drops voice-leading into the resolution. ~2h. *Source: Epic 2 S4 review.*
 - **HiHat suppression on final bar reads abrupt in 8th-note-hat genres.** Epic 2 S4. Per-genre gate. ~1h. *Source: Epic 2 S4 review.*
 - **Imperfect Symmetry intensity 0.4 floor.** Epic 2 S2 gates the gesture at `intensity ≥ 0.4`, suppressing it during quiet ballad-style Verse 2 — exactly where subtle variation is most musical. Consider 0.25 or gentler upward bias at low intensity. ~1h. *Source: Epic 2 S2 review.*
 - **Per-genre intro/outro mute tuning.** Epic 2 S5 currently genre-flat (`INTRO_MUTES = { bass: 2, chords: 3, harmony: 4 }`). ~3h. *Source: Epic 2 S5 Deferred.*
@@ -116,8 +114,6 @@ Taste-driven gestures or per-genre values still flat. **Acceptance for this sect
 - **Walking-ska M6 over minor chords.** `bass.md` P1 #9. Small follow-on. ~1h. *Source: Epic 5 Notes.*
 - **Generic walking target-awareness.** `bass.md` P1 #10. ~2h. *Source: Epic 5 Notes.*
 - **Funk pop/chuck/hammer probability documentation.** `bass.md` P2 #17. Doc/comment pass. ~1h. *Source: Epic 5 Notes.*
-- **Profile-rotation churn silently overrides user-selected soloist style.** `soloist.ts:1262` re-rolls `currentPhrase.context.profile` at every section boundary with `Math.random() < 0.8`, sampling from the genre's full influence pool. A user who selects "Bill Evans" gets Evans for ~1 section before the engine swaps to a random pool entry. Audit P1 #4 framed this as a tuning artifact but it's a real product issue: user-selected profile should sticky-retain at >90%, with pool rotation a smaller (~10-15%) optional variation. Couples with the Evans multiplier tuning in S2 — lower multipliers are musically defensible only when the profile actually persists. **Promote to a story.** ~2h. *Source: soloist-idiom/S2 review (2026-05-17).*
-- **`evansIntervals` is chord-quality blind.** `soloist-pitch-engine.ts` `evansIntervals = new Set([2, 5, 6, 9])` (9, #11/b5, 13). The `6` is a real Evans color (#11 on dom7, Lydian on maj7) but lands as the *b5 avoid note* on min7 chords. Pre-S2 the +500 floor blanketed it; post-S2 at +60/×3.5 it's audible as ~25% of Evans extensions. Extension sets should be quality-aware (dom7 / min7 / maj7 / alt7 each get their own legal-extension list). Touches all Greats profiles, not just Evans. **Promote to a story.** ~4h. *Source: soloist-idiom/S2 review (2026-05-17).*
 - **`findNextBebopMidi` whole-tone fallback.** `soloist-devices.ts` bebopScale branch's `findNextBebopMidi` falls back to `from + stepDir * 2` (a whole step) when no bebop-set PC is found within 4 semitones — only triggers on degenerate scales (whole-tone, diminished). The fallback steps a fixed whole tone regardless of which scale; for whole-tone scales it stays inside the scale (no-op), for diminished it lands on a non-scale tone. NIT-level; never observed in jazz-style runs. ~30min. *Source: Epic 4 / S3 review 2026-05-17.*
 - **China cymbal `volumeScale` recalibration after triple-stack fix.** `synth-drums.ts` China runtime profile ships `volumeScale: 0.85` — picked to trim slightly under Crash's 0.90 as defensive headroom against the metal.ts triple-stack that fired three China voices per downbeat. After the Epic 7 S5 P0 fix scopes the accent to the Open lane only, that justification no longer holds. A real Holy China / Mb20 Trash typically peaks *above* the Crash in a kit; 0.85 leaves China reading quieter than the Crash it replaces. Listen-test 0.90 / 0.95 / 1.0 against Crash at the same accent and pick by ear. ~30min. *Source: drums-idiom/S5 review (2026-05-18).*
 - **Funk motif-2 `+2` displacement frequency may be too high.** `grooves/funk.ts:184` ships `< 0.4 ? 0 : < 0.75 ? 1 : 2` — 25% of motif-2 phrases land on `+2` (both backbeats shifted to & of 2 / & of 4 for a sustained 2-bar phrase). Stubblefield/Garibaldi displacement is far more often the laid-back `+1` (e of backbeat); the full `+2` substitution is canonically a 1-bar fill setup, not a sustained groove. Consider 50%/35%/15% (normal-heavy) or restructure `+2` as a 1-bar gesture that returns to normal next bar. Listen-test required. ~1h. *Source: drums-idiom/S6 review (2026-05-18).*
@@ -125,6 +121,8 @@ Taste-driven gestures or per-genre values still flat. **Acceptance for this sect
 - **Ska-Punk shared-hook reinforcement branch is dead — `sharedHookBuffer` is never populated.** `harmonies.ts` `playShadowMode` has a Ska-Punk branch that echoes hooks the soloist has shared (`coordination.soloistSharedHookBuffer`). But repo-wide, the underlying buffer is only ever reset to `[]` — no code path ever pushes a `SoloistHook` entry, so the branch never fires in production. Pre-existing — S9(b) faithfully rerouted the (empty) buffer through the coordination contract without changing behavior. If Ska-Punk antiphony is intended to function, a separate story needs to write into the buffer (the soloist emitting a hook on a phrase it wants harmony to echo). ~3h if pursued. *Source: Epic 11 S9 review (2026-05-20).*
 
 **Shipped via Epic 11:** Brush voice pan / envelope-click / bandpass-comment fixes → S5 ✅. bebopScale locrian-bebop `halfdim` + `augmaj7` quality routing → S7b ✅ (`b5191e29`). Reggae + Ska-Punk tom templates → S8a ✅ (`af558bc7`). Post-turnaround China splash on metal sections → S8b ✅ (`0db01245`).
+
+**Shipped via Epic 12:** Profile-rotation churn (pinned profile sticky-retains at 100% via the `pinnedIsInPool` branch in `soloist.ts:1555-1576`) → S3 ✅. `evansIntervals` chord-quality blindness (`EVANS_INTERVALS_BY_QUALITY` per-quality table at `soloist-pitch-engine.ts:170-180`, dropping interval 6 on min/min6 and interval 9 on min6) → S2 ✅. Per-genre final-bar drum gestures (`PER_GENRE_FINAL_BAR` table in `groove-engine.ts:85-234`) → S11 ✅ (`0e9f889d`). Final-bar voice-leading discards `previousVoicingMidis` → S7 ✅ (`930bc3c7`).
 
 ## F. Test rigor & determinism
 
@@ -233,4 +231,6 @@ Pointers in case someone greps from a finding:
 
 ---
 
-**Last reviewed:** 2026-05-20 — full post-Epic-11 reconciliation pass. §A closed (all four product calls shipped via Epic 11 S1–S4). §B/§C/§D/§E/§F/§G shipped entries marked against their Epic 11 story (S5 micro-cleanup sweep, S6–S9 medium engine follow-ups, S10 anchor suppression). §G test-failure entries verified green on `main`. Epic 12 S1 (soloist `scrambleHash` migration) shipped 2026-05-20 — §F entry marked. ~28 items remain open — see the "Open count" block at the top.
+**Last reviewed:** 2026-05-26 — folded in Epic 12 S1–S11 closures (the cycle shipped 2026-05-20 → 2026-05-25). Stale entries removed from §B (B.1), §C (C.3), and §E (profile-rotation churn → S3, `evansIntervals` chord-quality → S2, per-genre final-bar drum gestures → S11, final-bar voice-leading → S7). The two previously-flagged "promote to a real story" candidates had already shipped silently. Open count refreshed — see the block at the top.
+
+**Previously:** 2026-05-20 — full post-Epic-11 reconciliation pass. §A closed (all four product calls shipped via Epic 11 S1–S4). §B/§C/§D/§E/§F/§G shipped entries marked against their Epic 11 story (S5 micro-cleanup sweep, S6–S9 medium engine follow-ups, S10 anchor suppression). §G test-failure entries verified green on `main`. Epic 12 S1 (soloist `scrambleHash` migration) shipped 2026-05-20 — §F entry marked.
