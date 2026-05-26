@@ -50,7 +50,7 @@ const FOUR_FOUR = TIME_SIGNATURES['4/4'];
 function buildState() {
     return {
         playback: { bandIntensity: 0.6, complexity: 0.5 },
-        groove: { genreFeel: 'Bossa', pocket: 0 },
+        groove: { genreFeel: 'Bossa Nova', pocket: 0 },
         arranger: { timeSignature: '4/4' },
     };
 }
@@ -78,7 +78,7 @@ describe('Bossa Partido-Alto Critique (S5.c)', () => {
             for (let phraseIndex = 0; phraseIndex < 8; phraseIndex++) {
                 const pattern = generateCompingPattern(
                     getState(),
-                    'Bossa',
+                    'Bossa Nova',
                     'balanced',
                     FOUR_FOUR,
                     16,
@@ -132,7 +132,7 @@ describe('Bossa Partido-Alto Critique (S5.c)', () => {
         for (let bar = 0; bar < totalBars; bar++) {
             const pattern = generateCompingPattern(
                 getState(),
-                'Bossa',
+                'Bossa Nova',
                 'balanced',
                 FOUR_FOUR,
                 16,
@@ -169,7 +169,7 @@ describe('Bossa Partido-Alto Critique (S5.c)', () => {
         for (let bar = 0; bar < totalBars; bar++) {
             const bossaPattern = generateCompingPattern(
                 getState(),
-                'Bossa',
+                'Bossa Nova',
                 'balanced',
                 FOUR_FOUR,
                 16,
@@ -214,7 +214,7 @@ describe('Bossa Partido-Alto Critique (S5.c)', () => {
             for (let phraseIndex = 0; phraseIndex < 8; phraseIndex++) {
                 const pattern = generateCompingPattern(
                     getState(),
-                    'Bossa',
+                    'Bossa Nova',
                     'balanced',
                     FOUR_FOUR,
                     16,

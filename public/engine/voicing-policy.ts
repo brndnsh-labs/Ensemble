@@ -1,14 +1,6 @@
 import type { EnsembleState } from '../types.js';
 
-const BASS_SPACE_FEELS = new Set([
-    'Swing',
-    'Jazz',
-    'Neo-Soul',
-    'Funk',
-    'Blues',
-    'Bossa',
-    'Bossa Nova',
-]);
+const BASS_SPACE_FEELS = new Set(['Swing', 'Jazz', 'Neo-Soul', 'Funk', 'Blues', 'Bossa Nova']);
 const PRACTICE_GROUNDING_QUALITIES = new Set([
     'halfdim',
     'dim',

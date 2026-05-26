@@ -487,7 +487,7 @@ describe('Final-bar cadence — Chords/Accompaniment (epic-form-arrangement S4)'
         // producing a bare triad on a maj7 chart. The chart-driven rule
         // honors whatever `chord.intervals` specifies regardless of genre.
         const state = makeChordsMockState({
-            groove: { genreFeel: 'Bossa', pocket: 0, instruments: [] },
+            groove: { genreFeel: 'Bossa Nova', pocket: 0, instruments: [] },
         });
         getState.mockReturnValue(state);
 

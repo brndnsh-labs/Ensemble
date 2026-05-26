@@ -72,7 +72,7 @@ export const compingState: CompingState = {
 //      `grooveRetentionCount = 0` branch — without STICKY membership the
 //      picker re-runs every bar and the (sectionId, barIndex>>2) hash never
 //      gets to hold a cell across the 4-bar phrase.
-const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa', 'Blues'];
+const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
 
 // why: epic-deterministic-phrasing S2 — picker genres whose 6th-param
 //      `phraseIndex` argument is the load-bearing hash input (Funk uses
@@ -81,16 +81,16 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bos
 //      cell as last bar" result is the desired locked-cell / phrase-stable
 //      behavior, not stochastic collision to be re-rolled. Stochastic genres
 //      (Rock, Country, Pop default) still benefit from the retry.
-const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa', 'Blues']);
+const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blues']);
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
 // rather than as a premature downbeat. Block-chord styles (Reggae skank,
 // country boom-chick, power-metal) play only on downbeats so an anticipated
 // stab would feel out of place. Note: `'Soul'` is not in the live `genreFeel`
-// vocabulary (`Neo-Soul` is); kept for forward compatibility omitted here.
+// vocabulary (`Neo-Soul` is); omitted intentionally.
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
-const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa']);
+const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
 
 // why: all altered-dominant qualities share one comping idiom — guide tones (3, b7)
 // plus 1–2 altered colors. The resolving-voicing path (buildResolvingAlteredVoicing)
@@ -941,7 +941,7 @@ export function generateCompingPattern(
         return pattern;
     }
 
-    if (genre === 'Bossa' && ts.beats >= 4 && spb === 4) {
+    if (genre === 'Bossa Nova' && ts.beats >= 4 && spb === 4) {
         // why: epic-coordination-consistency S5.c — partido-alto cell bank,
         //      distinct from Jazz Charleston. The picker mirrors the Jazz
         //      branch structure (`(sectionId, phraseHash)` keyed cell pick,
@@ -1000,7 +1000,7 @@ export function generateCompingPattern(
         return pattern;
     }
 
-    if (genre === 'Jazz' || genre === 'Bossa') {
+    if (genre === 'Jazz' || genre === 'Bossa Nova') {
         // why: chords.md P0 #2 / epic-deterministic-phrasing S2 — Jazz/Bossa
         //      Charleston-family comping is phrase-stable. Pick one cell from
         //      the bank, keyed by `(sectionId, barIndex >> 2)`, and hold it for
@@ -1215,8 +1215,18 @@ function updateRhythmicIntent(
     let genre = groove.genreFeel;
 
     // --- Style Override ---
+    // why: `chords.style === 'jazz'` is set by Smart Genres for Jazz, Blues,
+    // AND Bossa Nova (see `public/data/smart-genres.ts`) — all three share
+    // upper-structure jazz voicing logic, but they have distinct comping
+    // banks in this file (Bossa partido-alto at ~944/~1003, Blues cells at
+    // ~884). Preserving the more-specific `groove.genreFeel` for these two
+    // keeps those banks alive in production; without the carve-out the
+    // override collapses both to 'Jazz' and the genre-specific cells become
+    // dead code. FOLLOWUPS §G.16.
     if (chords.style === 'jazz') {
-        genre = 'Jazz';
+        if (genre !== 'Bossa Nova' && genre !== 'Blues') {
+            genre = 'Jazz';
+        }
     } else if (chords.style === 'funk') {
         genre = 'Funk';
     } else if (chords.style === 'strum8') {
@@ -1249,7 +1259,7 @@ function updateRhythmicIntent(
         //      retention here so each `bossaRotationIndex` increment lands a fresh
         //      cell; idempotent and applied on every Bossa tick (covers the initial
         //      section bar where maxGrooveLength may be stale from a prior section).
-        if (genre === 'Bossa') {
+        if (genre === 'Bossa Nova') {
             compingState.maxGrooveLength = 2;
         }
         compingState.grooveRetentionCount++;
@@ -1278,7 +1288,7 @@ function updateRhythmicIntent(
             //      Partial fix for chords.md P2 #13 — full arranger-aware snap is
             //      tracked separately. Weighting `{4: 0.5, 8: 0.5}` (mod 2); the
             //      optional 16-bar bucket from chords.md is deferred.
-            if (genre === 'Bossa') {
+            if (genre === 'Bossa Nova') {
                 // why: keep Bossa pinned to 2-bar retention through rotation events
                 //      (see top of STICKY block). The {4, 8} draw is Funk-shaped and
                 //      would re-erase the partido-alto bar-A/bar-B alternation.
@@ -1322,7 +1332,7 @@ function updateRhythmicIntent(
         compingState.funkRotationIndex = funkPickIndex + 1;
     }
     const bossaPickIndex = compingState.bossaRotationIndex;
-    if (genre === 'Bossa') {
+    if (genre === 'Bossa Nova') {
         // why: same shape as Funk above — snapshot pre-increment so this pick uses
         //      the index valid for *this* rotation event, then advance. With 2-bar
         //      STICKY retention forced above, picker fires every 2 bars and the
@@ -1331,7 +1341,7 @@ function updateRhythmicIntent(
         compingState.bossaRotationIndex = bossaPickIndex + 1;
     }
     const pickerBarIndex =
-        genre === 'Funk' ? funkPickIndex : genre === 'Bossa' ? bossaPickIndex : barIndex;
+        genre === 'Funk' ? funkPickIndex : genre === 'Bossa Nova' ? bossaPickIndex : barIndex;
     let newCell = generateCompingPattern(
         state,
         genre,
@@ -1390,7 +1400,7 @@ function updateRhythmicIntent(
     (chords as Mutable<typeof chords>).rhythmicMask = mask; // @worker-mutation
 
     playback.intent.anticipation = intensity * 0.2; // @worker-mutation
-    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
+    if (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues') {
         playback.intent.anticipation += 0.15;
     }
 
@@ -2472,7 +2482,7 @@ export function getAccompanimentNotes(
     if (
         !isHit &&
         chords.style === 'smart' &&
-        (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues')
+        (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues')
     ) {
         if ((coordination.snareHit || coordination.kickHit) && Math.random() < 0.4) {
             isHit = true;
@@ -2499,7 +2509,7 @@ export function getAccompanimentNotes(
         isHit = true;
     }
 
-    if (genre === 'Jazz' || genre === 'Bossa' || genre === 'Blues') {
+    if (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues') {
         // Conversational Displacement for Jazz/Blues
         // why: migrated from soloist.session.phrasing.busySteps (session-state
         // direct read) to coordination.soloistBusy (coordination-context field)
@@ -2612,7 +2622,7 @@ export function getAccompanimentNotes(
             reserveBassSpace &&
             !groundingRequired &&
             chord.is7th &&
-            (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa');
+            (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa Nova');
 
         // --- Holistic Pocket Implementation ---
         let timingOffset = calculateTimingOffset('chords', groove.pocket, intensity);
@@ -2655,7 +2665,7 @@ export function getAccompanimentNotes(
                     : intentHits >= 3
                       ? ts.stepsPerBeat * 1
                       : ts.stepsPerBeat * 1.25;
-        } else if (genre === 'Bossa') {
+        } else if (genre === 'Bossa Nova') {
             durationSteps = ts.stepsPerBeat * 1.5;
         }
 

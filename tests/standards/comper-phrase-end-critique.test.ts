@@ -242,7 +242,7 @@ describe('Comper Phrase-End Critique', () => {
         // currently shares Jazz's cell bank as a port-for-fidelity (see
         // accompaniment.ts:148-156); thinning Bossa here would compound with
         // the upcoming S5.c partido-alto bank when it ships. Leave Bossa alone.
-        groove.genreFeel = 'Bossa';
+        groove.genreFeel = 'Bossa Nova';
 
         const phraseEndCoord = () => ({
             soloistResting: true,

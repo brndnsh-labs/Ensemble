@@ -44,7 +44,13 @@ describe('Soloist Motivic Response', () => {
         const blues = buildMotivicSummary('Blues', arrangement);
         const rock = buildMotivicSummary('Rock', arrangement);
         const neo = buildMotivicSummary('Neo-Soul', arrangement, FIXED_NEO_SEEDS);
-        const bossa = buildMotivicSummary('Bossa', arrangement, FIXED_NEO_SEEDS);
+        // why: the soloist has no per-genre branch on Bossa Nova specifically;
+        // this row exercises the genre-agnostic motivic-response metrics under
+        // a Bossa-shaped RNG-stream alignment (different from Jazz/Blues/Rock
+        // by virtue of `chord: 'jazz'` + `bass: 'bossa'` smart-genre routing
+        // shifting downstream draw counts). Not a "Bossa-specific behavior"
+        // assertion — see the §G.16 canonicalization commit for context.
+        const bossa = buildMotivicSummary('Bossa Nova', arrangement, FIXED_NEO_SEEDS);
 
         // why (S7a re-baseline): Epic 11 S7a swapped the soloist's uniform device
         // pick for a rank-weighted one (`pickByRank`). That changes WHICH device

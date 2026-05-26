@@ -344,7 +344,7 @@ export function generateSoloistAccents(
             let type = 'snare-stab';
             if (genre === 'Jazz' || genre === 'Blues') {
                 type = 'snare-stab'; // Jazz catching is usually snare+kick, no crash
-            } else if (genre === 'Funk' || genre === 'Disco' || genre === 'Bossa') {
+            } else if (genre === 'Funk' || genre === 'Disco' || genre === 'Bossa Nova') {
                 type = prng() > 0.5 ? 'hat-bark' : 'snare-stab';
             } else {
                 // Rock / Ska / Metal: Use Crash for high-velocity peaks

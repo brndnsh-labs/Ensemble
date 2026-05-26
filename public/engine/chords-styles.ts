@@ -165,7 +165,7 @@ export function getIntervals(
     let intervals: number[] | null = null;
 
     // 2. POP & ROCK: SPREAD 10ths
-    if (genre === 'Rock' || (genre === 'Bossa' && !shouldBeRootless)) {
+    if (genre === 'Rock' || (genre === 'Bossa Nova' && !shouldBeRootless)) {
         if (quality === 'major') {
             intervals = [0, 7, 16, 19]; // 1, 5, 10, 12
         } else if (quality === 'minor') {

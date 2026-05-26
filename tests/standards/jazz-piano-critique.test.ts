@@ -169,7 +169,12 @@ describe('Jazz Piano Critique', () => {
     //      is the number of bars sharing a single cell (= STICKY retention).
     describe.each([
         { genre: 'Jazz', bankSize: 5, phraseLength: 4, phraseIndexFor: (bar: number) => bar },
-        { genre: 'Bossa', bankSize: 4, phraseLength: 2, phraseIndexFor: (bar: number) => bar >> 1 },
+        {
+            genre: 'Bossa Nova',
+            bankSize: 4,
+            phraseLength: 2,
+            phraseIndexFor: (bar: number) => bar >> 1,
+        },
         { genre: 'Blues', bankSize: 4, phraseLength: 4, phraseIndexFor: (bar: number) => bar },
     ])('$genre comping cell bank (S2: phrase-stable Charleston picker)', ({
         genre,
