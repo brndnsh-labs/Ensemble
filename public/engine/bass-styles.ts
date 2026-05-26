@@ -1,6 +1,7 @@
 import { REGGAE_RIDDIMS } from '../config.js';
 import type { EnsembleState, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
+import { scrambleHash } from './hash-utils.js';
 
 type ChordChangeShape = {
     rootMidi: number;
@@ -816,6 +817,20 @@ export function getBassNoteStyle(
         const isOne = stepInChord === 0;
         const isSecondarySlap = isBeatStart && intBeat === 2; // Beat 3
 
+        // why: deterministic-per-step entropy for the six articulation gates in
+        // this block (pop / high-complexity pop / chuck / hammer-on / approach
+        // gate / approach direction). Mirrors the Epic 12 S4 groove-engine
+        // pattern — one base seed mixed via the golden-ratio multiplier, distinct
+        // integer discriminators per draw. `currentLoopCount` is XOR'd in so a
+        // 4-bar funk vamp doesn't lock to bit-identical pop placement across
+        // every loop (Imperfect Symmetry drift, standard elsewhere in the
+        // codebase). Replaces bare `Math.random()` so loops + critique tests
+        // stay coherent. Per CLAUDE.md "deterministic phrasing" +
+        // feedback_seeded_prng_mulberry32 (no bare LCG on small seeds).
+        // FOLLOWUPS §G.17.
+        const slapSeedBase =
+            ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+
         // 1. "The One" (and Beat 3) - Primary Slaps
         if (isOne || isSecondarySlap) {
             const slapVel = 1.2 + intensity * 0.2;
@@ -832,7 +847,7 @@ export function getBassNoteStyle(
             // Upper-octave (+12) is idiomatic — the pop string rings an octave above the
             // slapped root, giving the signature bright snap. Source: bass.md P2 #17.
             const popProb = 0.6 + intensity * 0.4;
-            if (Math.random() < popProb) {
+            if (scrambleHash((slapSeedBase + 1) | 0) < popProb) {
                 const note = baseRoot + 12;
                 // Pop velocity: triggers bright, snappy tone
                 const popVel = 1.25 + intensity * 0.2;
@@ -855,7 +870,7 @@ export function getBassNoteStyle(
                 // a surprise accent rather than a structural note. Only fires when complexity
                 // is high (>0.7) so it's absent on straightforward grooves.
                 // Source: bass.md P2 #17.
-                Math.random() < 0.3 + intensity * 0.3 &&
+                scrambleHash((slapSeedBase + 2) | 0) < 0.3 + intensity * 0.3 &&
                 !isSoloistBusyLocal
             ) {
                 const note = baseRoot + 12;
@@ -873,7 +888,7 @@ export function getBassNoteStyle(
             // soloist is busy — yield some 16th space so the two don't clutter.
             // Source: bass.md P2 #17.
             const chuckProb = (isSoloistBusyLocal ? 0.1 : 0.2) + intensity * 0.4;
-            if (Math.random() < chuckProb && !isSoloistBusyLocal) {
+            if (scrambleHash((slapSeedBase + 3) | 0) < chuckProb && !isSoloistBusyLocal) {
                 // Usually repeat root or previous note as a ghost
                 return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, 1);
             }
@@ -890,7 +905,7 @@ export function getBassNoteStyle(
                 // clean. Target note is M2 (Dorian) or b2 (approach) above root depending
                 // on scale content — both idiomatic hammer-on destinations.
                 // Source: bass.md P2 #17.
-                Math.random() < 0.3 &&
+                scrambleHash((slapSeedBase + 4) | 0) < 0.3 &&
                 !isSoloistBusyLocal
             ) {
                 const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
@@ -903,10 +918,10 @@ export function getBassNoteStyle(
             intensity > 0.75 &&
             stepInBeat === ts.stepsPerBeat - 1 &&
             isChordChangeApproach(nextChord, chord) &&
-            Math.random() < 0.6
+            scrambleHash((slapSeedBase + 5) | 0) < 0.6
         ) {
             const target = normalizeToRange(nextChord.rootMidi);
-            const approach = Math.random() < 0.5 ? target - 1 : target + 1;
+            const approach = scrambleHash((slapSeedBase + 6) | 0) < 0.5 ? target - 1 : target + 1;
             return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.1);
         }
 
