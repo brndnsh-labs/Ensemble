@@ -35,10 +35,10 @@ async function openEditorFromLibraryPreset(page: Page): Promise<Locator> {
     await expect(libraryModal).toBeVisible();
     await libraryModal.getByRole('button', { name: 'All The Things You Are', exact: true }).click();
 
-    // Open editor (topbar button on desktop, overflow on mobile)
+    // Unlock the chart (Edit button toggles chartLocked → false → InlineEditor renders).
     await openEditorFromSurface(page);
-    await page.waitForSelector('#editorOverlay', { state: 'visible' });
-    return page.locator('#editorOverlay .settings-content');
+    await page.waitForSelector('.inline-editor', { state: 'visible' });
+    return page.locator('.inline-editor');
 }
 
 test.describe('Modals Responsiveness @ui', () => {
@@ -68,31 +68,22 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#settingsOverlay', { state: 'hidden' });
     });
 
-    test('Editor Modal - Content Layout', async ({ page }) => {
-        const editorModal = await openEditorFromLibraryPreset(page);
-        await expect(editorModal).toBeVisible();
+    test('Inline editor — content layout', async ({ page }) => {
+        const editor = await openEditorFromLibraryPreset(page);
+        await expect(editor).toBeVisible();
 
-        await expect(editorModal).toContainText('Arrangement Editor');
-        await expect(editorModal).toContainText('7 sections');
-        await expect(page.locator('#editorOverlay .section-card')).toHaveCount(7);
-        await expect(page.locator('#addSectionBtn')).toBeVisible();
-        await expect(page.locator('#arrangerActionTrigger')).toBeVisible();
+        await expect(page.locator('.inline-editor .section-card')).toHaveCount(7);
+        await expect(editor.getByRole('button', { name: /Add Section/ })).toBeVisible();
+        await expect(editor.getByRole('button', { name: /Arrangement Tools Menu/ })).toBeVisible();
 
-        await page.click('#arrangerActionTrigger');
-        const toolsMenu = page.locator('#arrangerActionMenu');
+        await editor.getByRole('button', { name: /Arrangement Tools Menu/ }).click();
+        const toolsMenu = page.locator('.editor-action-menu');
         await expect(toolsMenu).toBeVisible();
-        await expect(toolsMenu).toContainText('Inspiration Hub');
+        await expect(toolsMenu).toContainText('Library');
         await expect(toolsMenu).toContainText('Clear All');
         await page.locator('.menu-click-away').dispatchEvent('click');
 
-        const viewport = page.viewportSize();
-        const editorBox = await editorModal.boundingBox();
-        expect(viewport).not.toBeNull();
-        expect(editorBox).not.toBeNull();
-        expect(editorBox.width).toBeGreaterThan(viewport.width * 0.9);
-        expect(editorBox.height).toBeGreaterThan(viewport.height * 0.8);
-
-        const linkedGroup = page.locator('#editorOverlay .section-group').first();
+        const linkedGroup = page.locator('.inline-editor .section-group').first();
         await expect(linkedGroup).toBeVisible();
         await expect(linkedGroup.locator('.section-card')).toHaveCount(2);
         const [leftCard, rightCard] = await Promise.all([
@@ -104,34 +95,14 @@ test.describe('Modals Responsiveness @ui', () => {
         expect(rightCard).not.toBeNull();
         expect(Math.abs(leftCard.y - rightCard.y)).toBeLessThan(16);
         expect(rightCard.x).toBeGreaterThan(leftCard.x + leftCard.width * 0.45);
-
-        await page.click('#closeEditorBtn');
-        await page.waitForSelector('#editorOverlay', { state: 'hidden' });
     });
 
-    test('Editor Modal - Mobile fullscreen shell @mobile', async ({ page }) => {
-        const editorModal = await openEditorFromLibraryPreset(page);
-        await expect(editorModal).toBeVisible();
-        await expect(editorModal).toContainText('Arrangement Editor');
-        await expect(page.locator('#addSectionBtn')).toBeVisible();
-        await expect(page.locator('#closeEditorBtn')).toBeVisible();
+    test('Inline editor — linked sections stack vertically on mobile @mobile', async ({ page }) => {
+        const editor = await openEditorFromLibraryPreset(page);
+        await expect(editor).toBeVisible();
+        await expect(editor.getByRole('button', { name: /Add Section/ })).toBeVisible();
 
-        const viewport = page.viewportSize();
-        const editorBox = await editorModal.boundingBox();
-        const computedShell = await editorModal.evaluate((el) => ({
-            width: parseFloat(getComputedStyle(el).width),
-            height: parseFloat(getComputedStyle(el).height),
-        }));
-        expect(viewport).not.toBeNull();
-        expect(editorBox).not.toBeNull();
-        expect(editorBox.x).toBeGreaterThanOrEqual(0);
-        expect(editorBox.y).toBeGreaterThanOrEqual(0);
-        expect(editorBox.x + editorBox.width).toBeLessThanOrEqual(viewport.width);
-        expect(editorBox.y + editorBox.height).toBeLessThanOrEqual(viewport.height + 1);
-        expect(computedShell.width).toBeGreaterThanOrEqual(viewport.width - 2);
-        expect(computedShell.height).toBeGreaterThanOrEqual(viewport.height - 2);
-
-        const linkedGroup = page.locator('#editorOverlay .section-group').first();
+        const linkedGroup = page.locator('.inline-editor .section-group').first();
         await expect(linkedGroup).toBeVisible();
         await expect(linkedGroup.locator('.section-card')).toHaveCount(2);
         const [topCard, bottomCard] = await Promise.all([
@@ -143,9 +114,6 @@ test.describe('Modals Responsiveness @ui', () => {
         expect(bottomCard).not.toBeNull();
         expect(Math.abs(topCard.x - bottomCard.x)).toBeLessThan(16);
         expect(bottomCard.y).toBeGreaterThan(topCard.y + topCard.height * 0.55);
-
-        await page.click('#closeEditorBtn');
-        await page.waitForSelector('#editorOverlay', { state: 'hidden' });
     });
 
     test('Share & Export Modal - Content and Consolidation', async ({ page }) => {
@@ -166,30 +134,36 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#shareOverlay', { state: 'hidden' });
     });
 
-    test('Inspiration Hub Modal - Layout and Actions', async ({ page }) => {
-        // Open the Inspiration Hub via the overflow panel → Generate Song
-        await page.getByRole('button', { name: 'More options' }).click();
-        await page
-            .locator('#chartOverflowPanel')
-            .getByRole('button', { name: 'Generate Song' })
-            .click();
+    test('Library — three modes accessible from the topbar', async ({ page }) => {
+        // Topbar 📚 Library on desktop; overflow → Library on mobile.
+        const topbarBtn = page
+            .locator('.chart-surface__topbar')
+            .getByRole('button', { name: /Library/ });
+        if (await topbarBtn.isVisible()) {
+            await topbarBtn.click();
+        } else {
+            await page.getByRole('button', { name: 'More options' }).click();
+            await page
+                .locator('#chartOverflowPanel')
+                .getByRole('button', { name: /Library/ })
+                .click();
+        }
 
-        await page.waitForSelector('#generateSongOverlay', { state: 'visible' });
+        await page.waitForSelector('#surpriseMeOverlay', { state: 'visible' });
+        const modal = page.locator('#surpriseMeOverlay .modal-content');
+        await expect(modal).toBeVisible();
+        await expect(modal).toContainText('Library');
 
-        const generatorModal = page.locator('#generateSongOverlay .settings-content');
-        await expect(generatorModal).toBeVisible();
+        // Library mode is default — verify the replace/append toggle is present.
+        await expect(modal.getByRole('button', { name: /Replace chart/ })).toBeVisible();
+        await expect(modal.getByRole('button', { name: /Append as section/ })).toBeVisible();
 
-        // Verify content
-        await expect(generatorModal).toContainText('Inspiration Hub');
+        // Switch to Templates and confirm the template grid renders.
+        await modal.getByRole('button', { name: /Templates/ }).click();
+        await expect(modal.locator('.template-card-btn').first()).toBeVisible();
 
-        // Switch to Randomize tab to see these settings
-        await page.getByRole('button', { name: /Randomize/ }).click();
-        await expect(generatorModal).toContainText('Root Key');
-        await expect(generatorModal).toContainText('Key Quality');
-        await expect(generatorModal).toContainText('Structure');
-
-        // Close modal
-        await page.click('#closeGenerateSongBtn');
-        await page.waitForSelector('#generateSongOverlay', { state: 'hidden' });
+        // Switch to Roll and verify the dice button.
+        await modal.getByRole('button', { name: /Roll/ }).click();
+        await expect(modal.getByRole('button', { name: /Roll the Dice/ })).toBeVisible();
     });
 });

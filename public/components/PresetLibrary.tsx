@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
-import { validateAndAnalyze } from '../arranger-controller.js';
+import { appendSections, validateAndAnalyze } from '../arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import { flushBuffers } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
@@ -299,9 +299,15 @@ function withViewTransition(update: () => void): void {
 
 interface PresetLibraryProps {
     onSelect?: () => void;
+    /**
+     * `replace` (default) swaps the entire arrangement; `append` pushes the preset's
+     * sections onto the end of the current chart so users can audition without
+     * losing what they have.
+     */
+    mode?: 'replace' | 'append';
 }
 
-export function PresetLibrary({ onSelect }: PresetLibraryProps) {
+export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps) {
     const currentKey = useEnsembleState((state) => state.arranger.key);
     const lastChordPreset = useEnsembleState((state) => state.arranger.lastChordPreset);
     const isDirty = useEnsembleState((state) => state.arranger.isDirty);
@@ -495,6 +501,17 @@ export function PresetLibrary({ onSelect }: PresetLibraryProps) {
         const preset = entry.preset;
         const sections = getPresetSections(preset);
         if (sections.length === 0) {
+            return;
+        }
+
+        if (mode === 'append') {
+            // Append-as-section flow: keep the user's existing chart intact and
+            // tack the preset's sections onto the end. Skip settings overrides
+            // (BPM/style/timeSig) since they belong to a "fresh start" gesture.
+            appendSections(sections);
+            recordRecentPreset(entry.id);
+            saveCurrentState();
+            onSelect?.();
             return;
         }
 
