@@ -108,30 +108,36 @@ function classifyChordQuality(quality: string | undefined): ChordQualityClass {
     if (!quality) {
         return 'maj';
     }
-    if (quality === '7alt' || quality === '7b9' || quality === '7#9' || quality === '7b13') {
+    // why: lowercase-normalize so capital-M strings ('Major', 'Minor') don't
+    // fall through to the 'dom' fallback and silently re-introduce the
+    // b5-on-m7 bug Epic 12 S2 fixed. Production qualities are all lowercase
+    // today, but a future test fixture or chord-source emitting capital-M
+    // would defeat the per-quality table. FOLLOWUPS §F (Epic 12 S2 review).
+    const q = quality.toLowerCase();
+    if (q === '7alt' || q === '7b9' || q === '7#9' || q === '7b13') {
         return 'alt';
     }
-    if (quality === 'halfdim') {
+    if (q === 'halfdim') {
         return 'halfdim';
     }
-    if (quality === 'dim' || quality === 'dim7' || quality === 'diminished') {
+    if (q === 'dim' || q === 'dim7' || q === 'diminished') {
         return 'dim';
     }
-    if (quality === 'sus2' || quality === 'sus4') {
+    if (q === 'sus2' || q === 'sus4') {
         return 'sus';
     }
-    if (quality === 'aug' || quality === 'augmaj7' || quality === 'augmented') {
+    if (q === 'aug' || q === 'augmaj7' || q === 'augmented') {
         return 'aug';
     }
-    if (quality === 'm6') {
+    if (q === 'm6') {
         return 'min6';
     }
     // Minor family: 'minor', 'm', 'm7', 'm9', 'm11', 'm13'. Mirrors the
     // theory-scales.ts isMinorQuality predicate: starts with 'm' but NOT 'maj'.
-    if (quality.startsWith('m') && !quality.startsWith('maj')) {
+    if (q.startsWith('m') && !q.startsWith('maj')) {
         return 'min';
     }
-    if (quality.startsWith('maj') || quality === 'major' || quality === '6' || quality === 'add9') {
+    if (q.startsWith('maj') || q === 'major' || q === '6' || q === 'add9') {
         return 'maj';
     }
     // Numeric dominant: '7', '9', '11', '13', '7#11'. Default for unrecognized

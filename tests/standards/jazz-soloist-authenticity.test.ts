@@ -8,7 +8,11 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
     beforeEach(() => {
         dispatch(ACTIONS.RESET_STATE);
         dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Jazz', enabled: true });
-        dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'jazz' });
+        // why: defensively clear pinnedProfile alongside RESET_STATE so a
+        // future test file that runs UPDATE_SB { pinnedProfile: 'evans' } and
+        // skips RESET_STATE can't sticky-retain into this file's profile-
+        // rotation expectations. FOLLOWUPS §F (Epic 12 S3 review).
+        dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'jazz', pinnedProfile: null });
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'debugSoloist', value: true });
     });
 
@@ -377,5 +381,143 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         // extensions" test guards the all-chords mean; this guards maj7
         // specifically.
         expect(maj7ExtensionRate).toBeGreaterThan(0.15);
+    });
+
+    // why: Epic 12 S2 controls — the m7/maj7 split test above guards the two
+    // load-bearing buckets, but EVANS_INTERVALS_BY_QUALITY has three more shapes
+    // that deserve explicit regression guards:
+    //   - min6 = {2, 5}: drops both interval 6 (b5 avoid) AND interval 9 (which
+    //     is M6 = chord tone on m6, so the chord-tone bonus already fires and
+    //     an extension reward would double-count).
+    //   - dom  = {2, 5, 6, 9}: interval 6 (#11/13) is a legitimate Evans color
+    //     on dom7 (positive control — the per-quality split must not have
+    //     accidentally suppressed it).
+    //   - alt  = empty: altered dominants route through alteredHookIntervals
+    //     elsewhere; the Evans diatonic set must not pull toward unaltered
+    //     9/13 against the chord's b9/#9/b13/#11.
+    // FOLLOWUPS §F (Epic 12 S2 review P2).
+    it('Evans per-quality buckets: min6 drops 9, dom retains 6, alt is empty (Epic 12 S2 controls)', () => {
+        // Cm6 — min6 bucket: Set([2, 5]). The 9 (M6 above C = A) is the
+        // chord's defining sixth; chord-tone bonus already handles it. Drop
+        // 9 from extensions to avoid double-counting and (more importantly)
+        // to keep the engine from over-emphasizing the 6 voicing relative
+        // to genuine extensions like 9 (D) and 11 (F).
+        const m6Chord = {
+            rootMidi: 60,
+            quality: 'm6',
+            intervals: [0, 3, 7, 9],
+            sectionStart: 0,
+            sectionEnd: 64,
+        };
+        // C7 — dom bucket: Set([2, 5, 6, 9]). Interval 6 (F# = #11/b5 of C7
+        // — the "lydian dominant" color) is a legitimate Evans color on
+        // dom7 (think the dominant-resolution voicings on a ii-V).
+        const dom7Chord = {
+            rootMidi: 60,
+            quality: '7',
+            intervals: [0, 4, 7, 10],
+            sectionStart: 0,
+            sectionEnd: 64,
+        };
+        // G7alt — alt bucket: empty. Picker delegates to alteredHookIntervals;
+        // the Evans diatonic boost must not fire. Compared against the C7
+        // baseline above, G7alt's extension landings (intervals 2/5/6/9 above
+        // G) should sit notably lower because no Evans set pull is active.
+        const altChord = {
+            rootMidi: 67,
+            quality: '7alt',
+            intervals: [0, 4, 7, 10],
+            sectionStart: 0,
+            sectionEnd: 64,
+        };
+        const { soloist } = getState();
+
+        const tally = (chord: { rootMidi: number; quality: string; intervals: number[] }) => {
+            let interval6Count = 0;
+            let interval9Count = 0;
+            let extensionCount = 0; // intervals 2/5/6/9 — the "extension class"
+            let totalNotes = 0;
+            for (let i = 1; i < 801; i++) {
+                soloist.session.currentPhrase.context.profile = 'evans';
+                soloist.session.currentPhrase.context.role = 'call';
+                const note = getSoloistNote(
+                    getState(),
+                    chord,
+                    null,
+                    i,
+                    440,
+                    0,
+                    'jazz',
+                    i % 16,
+                    { sectionStart: 0, sectionEnd: 512 },
+                    { mStep: i % 16 },
+                );
+                if (!note) {
+                    continue;
+                }
+                const results = Array.isArray(note) ? note : [note];
+                const last = results[results.length - 1];
+                const rel = ((last.midi % 12) - (chord.rootMidi % 12) + 12) % 12;
+                totalNotes++;
+                if (rel === 6) {
+                    interval6Count++;
+                }
+                if (rel === 9) {
+                    interval9Count++;
+                }
+                if (rel === 2 || rel === 5 || rel === 6 || rel === 9) {
+                    extensionCount++;
+                }
+            }
+            return { interval6Count, interval9Count, extensionCount, totalNotes };
+        };
+
+        const m6 = tally(m6Chord);
+        const dom7 = tally(dom7Chord);
+        const alt = tally(altChord);
+
+        const m6Interval9Rate = m6.interval9Count / Math.max(m6.totalNotes, 1);
+        const dom7Interval6Rate = dom7.interval6Count / Math.max(dom7.totalNotes, 1);
+        const dom7ExtensionRate = dom7.extensionCount / Math.max(dom7.totalNotes, 1);
+        const altExtensionRate = alt.extensionCount / Math.max(alt.totalNotes, 1);
+
+        console.log(
+            '\n[Jazz Audit] Evans per-quality controls\n' +
+                `  Cm6  : interval-9 ${(m6Interval9Rate * 100).toFixed(1)}% (n=${m6.totalNotes})\n` +
+                `  C7   : interval-6 ${(dom7Interval6Rate * 100).toFixed(1)}% | ` +
+                `all-extensions ${(dom7ExtensionRate * 100).toFixed(1)}% (n=${dom7.totalNotes})\n` +
+                `  G7alt: all-extensions ${(altExtensionRate * 100).toFixed(1)}% (n=${alt.totalNotes})\n`,
+        );
+
+        // Sample sanity.
+        expect(m6.totalNotes).toBeGreaterThan(100);
+        expect(dom7.totalNotes).toBeGreaterThan(100);
+        expect(alt.totalNotes).toBeGreaterThan(100);
+
+        // Cm6 negative control: interval 9 must stay low. The min6 bucket
+        // drops 9 specifically to prevent double-counting against the chord
+        // tone — if a future change reverts min6 to {2, 5, 9}, the +60/×3.5
+        // Evans multiplier stacks on the chord-tone bonus and interval 9
+        // jumps to the 5-10% band (estimated by analogy to C7 interval 6's
+        // 7.3%, since both are "extension present in bucket" scenarios).
+        // Threshold 0.02 sits well above the deterministic 0.0% baseline
+        // while halving the failure margin vs. a 0.05 ceiling.
+        expect(m6Interval9Rate).toBeLessThan(0.02);
+
+        // C7 positive control: interval 6 (#11/lydian-dominant color)
+        // remains a legitimate Evans extension on dom7. Floor at 0.03 (vs
+        // observed 7.3%) guards "this color survives at a musical rate"
+        // rather than the weaker "interval 6 ever appeared" of a 0.005
+        // floor — a regression that suppresses dom-interval-6 partially
+        // (say to 1-2% via over-tuning) still trips.
+        expect(dom7Interval6Rate).toBeGreaterThan(0.03);
+
+        // G7alt suppression: alt bucket is empty, so the Evans boost never
+        // fires on G7alt. Without the +60/×3.5 pull toward intervals 2/5/6/9,
+        // the picker's chord-tone + scale-mask logic dominates and the
+        // "extension class" landings drop notably below the C7 baseline.
+        // This is the cleanest behavioral signal that the alt bucket is
+        // actually empty (vs. silently inheriting the dom set).
+        expect(altExtensionRate).toBeLessThan(dom7ExtensionRate);
     });
 });

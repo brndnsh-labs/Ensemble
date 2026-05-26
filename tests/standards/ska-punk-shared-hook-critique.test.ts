@@ -178,6 +178,113 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
             for (const phase of publishedPhases) {
                 expect(['statement', 'restatement', 'departure']).toContain(phase);
             }
+            // why: positive control on this single-section setup — every
+            // published hook here lands in `statement` (the run uses one
+            // Verse section, label not in DEPARTURE_LABEL_KEYWORDS, occurrence=1).
+            // Confirms the gate does fire on `statement` (was a vacuous pass
+            // before — `toContain` over an empty Set always passes). The
+            // two follow-up tests below pin restatement + departure
+            // explicitly. FOLLOWUPS §F.12 (Epic 12 S10 review P2-2).
+            expect(publishedPhases.has('statement')).toBe(true);
+        });
+
+        // why: positive controls for the other two hook-eligible phases. The
+        // engine doesn't drive preparePhraseResponseContext (which is what sets
+        // srdcState from sectionContext) on this test path — head playback
+        // calls trackPhraseNote directly, bypassing the wake-up sequence that
+        // would naturally derive a phase from a multi-section arranger map.
+        // Pinning srdcState directly mirrors the Conclusion negative control
+        // pattern below: the test asserts the *gate behavior* (publish on
+        // {statement, restatement, departure}, skip on conclusion) without
+        // depending on engine-driven phase derivation, which is exercised
+        // separately by the integration-level soloist tests.
+        // FOLLOWUPS §F.12 (Epic 12 S10 review P2-2).
+        const runProducerWithForcedPhase = (
+            phase: 'statement' | 'restatement' | 'departure',
+        ): { totalHooks: number; phases: Set<string> } => {
+            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska-Punk', enabled: true });
+            dispatch(ACTIONS.UPDATE_SB, {
+                enabled: true,
+                style: 'scalar',
+                sessionSeed: makeSeededHook(),
+            });
+
+            // Park the section so deriveSrdcPhase doesn't reset srdcState off
+            // the forced value if the engine happens to call preparePhrase-
+            // ResponseContext (it generally doesn't on this path, but the
+            // belt-and-suspenders is cheap).
+            const sessionSteps = 32 * STEPS_PER_BAR; // shorter — control case
+            const state = getState();
+            (state.arranger as any).sectionMap = [
+                { label: 'Verse', start: 0, end: sessionSteps * 2 },
+            ];
+            (state.arranger as any).totalSteps = sessionSteps * 2;
+            (state.soloist.session.currentPhrase.context as any).srdcState = phase;
+
+            const phases: Set<string> = new Set();
+            let totalHooks = 0;
+            let lastFreq = 440;
+            for (let i = 0; i < sessionSteps; i++) {
+                // Re-pin every tick — anything in the engine that re-derives
+                // srdcState mid-run gets overwritten back to our forced value
+                // before the next publish.
+                (state.soloist.session.currentPhrase.context as any).srdcState = phase;
+                const chord = PROGRESSION[Math.floor(i / STEPS_PER_BAR) % PROGRESSION.length];
+                const note = getSoloistNote(
+                    getState(),
+                    chord,
+                    null,
+                    i,
+                    lastFreq,
+                    0,
+                    'scalar',
+                    i % STEPS_PER_BAR,
+                    { sectionStart: 0, sectionEnd: sessionSteps },
+                    { mStep: i % STEPS_PER_BAR },
+                );
+                if (note) {
+                    const results = Array.isArray(note) ? note : [note];
+                    lastFreq = results[results.length - 1].frequency || lastFreq;
+                }
+                const buf = getState().soloist.session.memory.sharedHookBuffer;
+                if (Array.isArray(buf)) {
+                    for (const h of buf) {
+                        if (h.sourcePhase) {
+                            phases.add(h.sourcePhase);
+                        }
+                    }
+                    totalHooks = buf.length;
+                }
+            }
+            return { totalHooks, phases };
+        };
+
+        it('publishes hooks tagged "restatement" when srdcState = restatement', () => {
+            const { totalHooks, phases } = runProducerWithForcedPhase('restatement');
+            console.log(
+                '\n--- SKA-PUNK SHARED-HOOK PRODUCER (Restatement positive control) ---\n' +
+                    `[Hook buffer length]     ${totalHooks}\n` +
+                    `[Hook source phases]     ${[...phases].join(', ') || '(none)'}\n` +
+                    '----------------------------------------------------------------------\n',
+            );
+            expect(totalHooks).toBeGreaterThan(0);
+            expect(phases.has('restatement')).toBe(true);
+            // No leakage into other phases — the forced value must be the
+            // only sourcePhase emitted.
+            expect(phases.size).toBe(1);
+        });
+
+        it('publishes hooks tagged "departure" when srdcState = departure', () => {
+            const { totalHooks, phases } = runProducerWithForcedPhase('departure');
+            console.log(
+                '\n--- SKA-PUNK SHARED-HOOK PRODUCER (Departure positive control) ---\n' +
+                    `[Hook buffer length]     ${totalHooks}\n` +
+                    `[Hook source phases]     ${[...phases].join(', ') || '(none)'}\n` +
+                    '--------------------------------------------------------------------\n',
+            );
+            expect(totalHooks).toBeGreaterThan(0);
+            expect(phases.has('departure')).toBe(true);
+            expect(phases.size).toBe(1);
         });
 
         it('publishes zero hooks when SRDC phase is forced to conclusion', () => {
