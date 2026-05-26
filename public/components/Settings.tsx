@@ -7,6 +7,7 @@ const { playback } = getState();
 
 import { applyTheme } from '../app-controller.js';
 import { APP_VERSION, MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
@@ -394,22 +395,36 @@ export function Settings() {
                                                     saveCurrentState();
                                                 }}
                                             />
-                                            {loopLimit > 0 && (
-                                                <div class="text-mini-muted settings-estimated-time">
-                                                    {(() => {
-                                                        const { arranger, playback } = getState();
-                                                        const totalSteps =
-                                                            arranger.totalSteps * loopLimit;
-                                                        const secPerStep = 60 / playback.bpm / 4;
-                                                        const totalSec = totalSteps * secPerStep;
+                                            <div class="text-mini-muted settings-estimated-time">
+                                                {(() => {
+                                                    const { arranger, playback } = getState();
+                                                    if (!arranger.totalSteps || !playback.bpm) {
+                                                        return null;
+                                                    }
+                                                    const secPerStep = 60 / playback.bpm / 4;
+                                                    const secPerLoop =
+                                                        arranger.totalSteps * secPerStep;
+                                                    if (loopLimit > 0) {
+                                                        const totalSec = secPerLoop * loopLimit;
                                                         const mins = Math.floor(totalSec / 60);
                                                         const secs = Math.round(totalSec % 60);
-                                                        return `Est. Time: ${mins}:${secs
-                                                            .toString()
-                                                            .padStart(2, '0')}`;
-                                                    })()}
-                                                </div>
-                                            )}
+                                                        return `Est. Time: ${mins}:${secs.toString().padStart(2, '0')}`;
+                                                    }
+                                                    // Timer mode: surface the resolved loop count so
+                                                    // the user sees "3 min ≈ 12 loops" and isn't
+                                                    // surprised by the macro-arc shape.
+                                                    if (sessionTimer > 0 && secPerLoop > 0) {
+                                                        const resolved = getEffectiveLoopLimit(
+                                                            loopLimit,
+                                                            sessionTimer,
+                                                            playback.bpm,
+                                                            arranger.totalSteps,
+                                                        );
+                                                        return `≈ ${resolved} loop${resolved === 1 ? '' : 's'} at this tempo`;
+                                                    }
+                                                    return null;
+                                                })()}
+                                            </div>
                                         </div>
                                     </SettingRow>
                                 </div>

@@ -2,8 +2,9 @@ import { lazy, Suspense } from 'preact/compat';
 import { useCallback, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { useMediaQuery } from '../ui-bridge.js';
+import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
+import { InlineEditor } from './InlineEditor.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
 import { MobileActionBar } from './MobileActionBar.jsx';
@@ -11,9 +12,6 @@ import { SongSeedControl } from './SongSeedControl.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 import { Transport } from './Transport.jsx';
 
-const LibraryModal = lazy(() =>
-    import('./LibraryModal.jsx').then((m) => ({ default: m.LibraryModal })),
-);
 const VisualizerOverlay = lazy(() =>
     import('./VisualizerOverlay.jsx').then((m) => ({ default: m.VisualizerOverlay })),
 );
@@ -26,13 +24,7 @@ interface ChartSurfaceProps {
 }
 
 export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
-    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-    const [libraryEverOpened, setLibraryEverOpened] = useState(false);
     const [isVizOpen, setIsVizOpen] = useState(false);
-    const openLibrary = useCallback(() => {
-        setLibraryEverOpened(true);
-        setIsLibraryOpen(true);
-    }, []);
     const [isSharedUrl, setIsSharedUrl] = useState(() => {
         if (typeof window === 'undefined') {
             return false;
@@ -42,8 +34,25 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
     });
     const isNarrow = useMediaQuery(NARROW_MQ);
     const isMobile = useMediaQuery(MOBILE_MQ);
+    const { chartLocked, isPlaying } = useEnsembleState((s) => ({
+        chartLocked: s.playback.chartLocked,
+        isPlaying: s.playback.isPlaying,
+    }));
 
     const openModal = (modal: string) => dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
+
+    // Unlock-while-playing pauses the band (the music-stand metaphor:
+    // you don't rewrite the chart mid-take). Lock-while-stopped just locks.
+    const toggleLock = useCallback(() => {
+        if (!chartLocked) {
+            dispatch(ACTIONS.SET_CHART_LOCKED, true);
+            return;
+        }
+        if (isPlaying) {
+            dispatch(ACTIONS.TOGGLE_PLAY, undefined);
+        }
+        dispatch(ACTIONS.SET_CHART_LOCKED, false);
+    }, [chartLocked, isPlaying]);
 
     const closeViz = useCallback(() => setIsVizOpen(false), []);
 
@@ -73,15 +82,31 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                     )}
                     {!isMobile && (
                         <>
-                            <button type="button" class="header-btn" onClick={openLibrary}>
-                                Library
+                            <button
+                                type="button"
+                                class="header-btn chart-surface__surprise-btn"
+                                title="Library — presets, templates, roll the dice"
+                                onClick={() => openModal('surpriseMe')}
+                            >
+                                <span aria-hidden="true">📚</span>
+                                <span class="chart-surface__surprise-label"> Library</span>
                             </button>
                             <button
                                 type="button"
-                                class="header-btn"
-                                onClick={() => openModal('editor')}
+                                class={`header-btn chart-surface__lock-btn${
+                                    chartLocked ? '' : ' active'
+                                }`}
+                                aria-pressed={!chartLocked}
+                                aria-label={chartLocked ? 'Unlock chart to edit' : 'Lock chart'}
+                                title={
+                                    chartLocked ? 'Unlock to edit (stops playback)' : 'Lock chart'
+                                }
+                                onClick={toggleLock}
                             >
-                                Edit
+                                <span aria-hidden="true">{chartLocked ? '🔒' : '✏️'}</span>
+                                <span class="chart-surface__lock-label">
+                                    {chartLocked ? 'Edit' : 'Lock'}
+                                </span>
                             </button>
                             <button
                                 type="button"
@@ -110,38 +135,26 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                         {({ closePopover }) => (
                             <div class="chart-surface__overflow-menu">
                                 {isMobile && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            class="workspace-toolbar-panel__action"
-                                            onClick={() => {
-                                                openLibrary();
-                                                closePopover();
-                                            }}
-                                        >
-                                            Library
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="workspace-toolbar-panel__action"
-                                            onClick={() => {
-                                                openModal('editor');
-                                                closePopover();
-                                            }}
-                                        >
-                                            Edit
-                                        </button>
-                                    </>
+                                    <button
+                                        type="button"
+                                        class="workspace-toolbar-panel__action"
+                                        onClick={() => {
+                                            toggleLock();
+                                            closePopover();
+                                        }}
+                                    >
+                                        {chartLocked ? '✏️ Edit' : '🔒 Lock'}
+                                    </button>
                                 )}
                                 <button
                                     type="button"
                                     class="workspace-toolbar-panel__action"
                                     onClick={() => {
-                                        openModal('generateSong');
+                                        openModal('surpriseMe');
                                         closePopover();
                                     }}
                                 >
-                                    Generate Song
+                                    📚 Library
                                 </button>
                                 <button
                                     type="button"
@@ -168,8 +181,10 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                     </ToolbarPopover>
                 </div>
             </div>
-            <div class="chart-surface__chart">
-                <ChordVisualizer />
+            <div
+                class={`chart-surface__chart${chartLocked ? '' : ' chart-surface__chart--unlocked'}`}
+            >
+                {chartLocked ? <ChordVisualizer /> : <InlineEditor />}
             </div>
             {!isMobile && (
                 <div class="chart-surface__rail">
@@ -178,11 +193,6 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
             )}
             {isMobile && (
                 <MobileActionBar isVizOpen={isVizOpen} onOpenViz={() => setIsVizOpen(true)} />
-            )}
-            {libraryEverOpened && (
-                <Suspense fallback={null}>
-                    <LibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} />
-                </Suspense>
             )}
             {isVizOpen && (
                 <Suspense fallback={null}>

@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
+import { sectionAtStep } from '../engine/section-overrides.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
@@ -418,8 +419,17 @@ function StudioMixRow({
     showSettings,
     triggerRef,
 }: StudioMixRowProps) {
-    const enabled = useEnsembleState((s) => (s as any)[instrument.module].enabled);
-    const powerClass = `power-btn ${enabled ? 'active' : ''}`;
+    const { enabled, sectionOverride } = useEnsembleState((s) => {
+        const mod = instrument.module;
+        const baseEnabled = (s as any)[mod].enabled as boolean;
+        const sec = sectionAtStep(s.arranger, s.playback.step || 0);
+        const override = sec?.instruments?.[mod as keyof NonNullable<typeof sec.instruments>];
+        return { enabled: baseEnabled, sectionOverride: override };
+    });
+    const overrideActive = typeof sectionOverride === 'boolean' && sectionOverride !== enabled;
+    const powerClass = `power-btn ${enabled ? 'active' : ''} ${
+        overrideActive ? 'section-override' : ''
+    }`;
 
     return (
         <div
@@ -434,6 +444,16 @@ function StudioMixRow({
                 </span>
                 <div class="workspace-studio-mix-row-copy">
                     <h3>{instrument.label}</h3>
+                    {overrideActive && (
+                        <span
+                            class="workspace-studio-section-override"
+                            title={`This section overrides ${instrument.label.toLowerCase()} to ${
+                                sectionOverride ? 'on' : 'off'
+                            }`}
+                        >
+                            section: {sectionOverride ? 'on' : 'off'}
+                        </span>
+                    )}
                 </div>
             </div>
             <div class="workspace-studio-mix-row-actions">

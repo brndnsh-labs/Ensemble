@@ -8,6 +8,23 @@
     border-radius: 0;
 }
 
+.workspace-studio-section-override {
+    display: inline-block;
+    margin-top: 0.15rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.65rem;
+    line-height: 1.4;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-color, dodgerblue), transparent 70%);
+    color: var(--accent-color, dodgerblue);
+    font-style: italic;
+    letter-spacing: 0.02em;
+}
+
+.power-btn.section-override {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, dodgerblue), transparent 60%);
+}
+
 /* Horizontal strip — no header, genre selector, or mixer accordion */
 .instrument-rail--horizontal .workspace-studio-live-mix-header,
 .instrument-rail--horizontal .workspace-studio-panel-genre,

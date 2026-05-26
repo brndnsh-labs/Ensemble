@@ -72,6 +72,38 @@
     align-content: safe center;
 }
 
+/* --- Inline editor (unlocked chart) ---
+ *
+ * Fills the chart slot like ChordVisualizer does in locked mode. The toolbar
+ * stays pinned at the top; the section list scrolls below it so adding a 5th
+ * (or 20th) section doesn't push content off-screen. `min-height: 0` is the
+ * standard flex-scroll incantation — without it, the flex parent expands to
+ * fit its content and the inner overflow-y never kicks in.
+ */
+.chart-surface__chart .inline-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.inline-editor__toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: var(--space-2) var(--space-3);
+    flex-wrap: wrap;
+}
+
+.inline-editor__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 var(--space-3) var(--space-3);
+}
+
 .chart-surface__rail {
     grid-area: rail;
     overflow-y: auto;

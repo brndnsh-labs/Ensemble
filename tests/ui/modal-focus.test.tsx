@@ -6,7 +6,6 @@
 import { render } from 'preact';
 import React from 'preact/compat';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EditorModal } from '../../public/components/EditorModal.jsx';
 import { Settings } from '../../public/components/Settings.jsx';
 import { Transport } from '../../public/components/Transport.jsx';
 import { dispatch } from '../../public/state.js';
@@ -45,7 +44,6 @@ describe('Modal Accessibility Focus', () => {
 
         // Reset state for each test
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: false });
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: false });
 
         // Polyfill requestAnimationFrame for Preact
         global.requestAnimationFrame = (cb) => setTimeout(cb, 0);
@@ -88,15 +86,9 @@ describe('Modal Accessibility Focus', () => {
 
         render(<Transport />, document.getElementById('transportContainer'));
         render(<Settings />, document.getElementById('settingsContainer'));
-        render(<EditorModal />, document.getElementById('editorContainer'));
 
         // Wait for Preact to mount and subscribe
         await new Promise((resolve) => setTimeout(resolve, 50));
-
-        // Use direct dispatch for editArrangementBtn to avoid complex listener issues in test
-        document.getElementById('editArrangementBtn').addEventListener('click', () => {
-            dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
-        });
     });
 
     it('should set aria-hidden="true" on modals by default', () => {
@@ -124,17 +116,5 @@ describe('Modal Accessibility Focus', () => {
 
         expect(document.getElementById('settingsOverlay').classList.contains('active')).toBe(false);
         expect(document.getElementById('settingsOverlay').getAttribute('aria-hidden')).toBe('true');
-    });
-
-    it('should correctly handle Editor modal toggling', async () => {
-        const editor = document.getElementById('editorOverlay');
-        expect(editor.getAttribute('aria-hidden')).toBe('true');
-
-        const btn = document.getElementById('editArrangementBtn');
-        btn.click();
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(editor.classList.contains('active')).toBe(true);
-        expect(editor.getAttribute('aria-hidden')).toBe('false');
     });
 });

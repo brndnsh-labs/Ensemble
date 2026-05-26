@@ -151,7 +151,10 @@ describe('ChordVisualizer Component', () => {
         });
 
         expect(container.querySelectorAll('.lead-sheet-row')).toHaveLength(1);
-        expect(container.querySelectorAll('.lead-sheet-row-marker')).toHaveLength(1);
+        // Section identifier moved into the SectionHeaderStrip label
+        // (the per-row `(A)` marker was retired to make room for the strip).
+        expect(container.querySelectorAll('.section-strip__label')).toHaveLength(1);
+        expect(container.querySelector('.section-strip__label')?.textContent).toBe('Verse');
     });
 
     it('exposes layout profile attributes on the visualizer container', () => {

@@ -32,7 +32,11 @@ export function Arranger() {
 
     useEffect(() => {
         const handleReorder = (e: Event) => {
-            const { draggedId, targetId } = (e as CustomEvent).detail;
+            const { draggedId, targetId, position } = (e as CustomEvent).detail as {
+                draggedId: string;
+                targetId: string;
+                position?: 'before' | 'after';
+            };
             const draggedIdx = sections.findIndex((sec: Section) => sec.id === draggedId);
             const targetIdx = sections.findIndex((sec: Section) => sec.id === targetId);
 
@@ -40,9 +44,14 @@ export function Arranger() {
                 return;
             }
 
+            // Compute the insertion index in the post-removal list so the
+            // dragged section lands above or below the target as indicated.
             const newOrder = sections.map((sec: Section) => sec.id);
             newOrder.splice(draggedIdx, 1);
-            newOrder.splice(targetIdx, 0, draggedId);
+            const targetIdxAfterRemove = targetIdx > draggedIdx ? targetIdx - 1 : targetIdx;
+            const insertIdx =
+                position === 'after' ? targetIdxAfterRemove + 1 : targetIdxAfterRemove;
+            newOrder.splice(insertIdx, 0, draggedId);
 
             onSectionUpdate(null as any, 'reorder', newOrder);
         };

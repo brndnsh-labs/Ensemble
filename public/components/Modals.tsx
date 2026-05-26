@@ -5,13 +5,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { useEnsembleState } from '../ui-bridge.js';
 import { AuditionOverlay } from './AuditionOverlay.jsx';
 
-const EditorModal = lazy(() =>
-    import('./EditorModal.jsx').then((m) => ({ default: m.EditorModal })),
-);
 const ShareModal = lazy(() => import('./ShareModal.jsx').then((m) => ({ default: m.ShareModal })));
-const GenerateSongModal = lazy(() =>
-    import('./GenerateSongModal.jsx').then((m) => ({ default: m.GenerateSongModal })),
-);
+const SurpriseMe = lazy(() => import('./SurpriseMe.jsx').then((m) => ({ default: m.SurpriseMe })));
 const Settings = lazy(() => import('./Settings.jsx').then((m) => ({ default: m.Settings })));
 const ManualModal = lazy(() =>
     import('./ManualModal.jsx').then((m) => ({ default: m.ManualModal })),
@@ -62,36 +57,29 @@ function AnimatedModalWrapper({ isOpen, component: Component }: AnimatedModalWra
  * Monitors global state to determine which modal to show.
  */
 export function Modals() {
-    const { settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen, auditionOpen } =
-        useEnsembleState((s) => ({
+    const { settingsOpen, surpriseMeOpen, shareOpen, manualOpen, auditionOpen } = useEnsembleState(
+        (s) => ({
             settingsOpen: s.playback.modals.settings,
-            editorOpen: s.playback.modals.editor,
-            generateSongOpen: s.playback.modals.generateSong,
+            surpriseMeOpen: s.playback.modals.surpriseMe,
             shareOpen: s.playback.modals.share,
             manualOpen: s.playback.modals.manual,
             auditionOpen: s.playback.modals.audition,
-        }));
+        }),
+    );
 
     useEffect(() => {
-        const anyOpen =
-            settingsOpen ||
-            editorOpen ||
-            generateSongOpen ||
-            shareOpen ||
-            manualOpen ||
-            auditionOpen;
+        const anyOpen = settingsOpen || surpriseMeOpen || shareOpen || manualOpen || auditionOpen;
         if (anyOpen) {
             document.body.classList.add('modal-open');
         } else {
             document.body.classList.remove('modal-open');
         }
-    }, [settingsOpen, editorOpen, generateSongOpen, shareOpen, manualOpen, auditionOpen]);
+    }, [settingsOpen, surpriseMeOpen, shareOpen, manualOpen, auditionOpen]);
 
     return (
         <Fragment>
             <AnimatedModalWrapper isOpen={settingsOpen} component={Settings} />
-            <AnimatedModalWrapper isOpen={editorOpen} component={EditorModal} />
-            <AnimatedModalWrapper isOpen={generateSongOpen} component={GenerateSongModal} />
+            <AnimatedModalWrapper isOpen={surpriseMeOpen} component={SurpriseMe} />
             <AnimatedModalWrapper isOpen={shareOpen} component={ShareModal} />
             <AnimatedModalWrapper isOpen={manualOpen} component={ManualModal} />
             <AuditionOverlay />

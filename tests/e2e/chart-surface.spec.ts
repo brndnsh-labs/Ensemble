@@ -169,15 +169,15 @@ test.describe('ChartSurface @ui', () => {
         });
     });
 
-    test.describe('Editor mobile UX @mobile', () => {
-        test('shows sticky symbol row above textarea in editor on touch viewport @mobile', async ({
+    test.describe('Inline editor mobile UX @mobile', () => {
+        test('shows sticky symbol row above textarea when unlocked on touch viewport @mobile', async ({
             page,
         }) => {
             await page.setViewportSize({ width: 390, height: 844 });
             await page.locator('.chart-surface__overflow-btn').click();
-            await page.getByRole('button', { name: 'Edit' }).click();
+            await page.getByRole('button', { name: /Edit/ }).click();
 
-            const editor = page.locator('#editorOverlay');
+            const editor = page.locator('.inline-editor');
             await expect(editor).toBeVisible();
 
             // Symbol row should be visible (touch device = coarse pointer via emulation)
@@ -185,16 +185,15 @@ test.describe('ChartSurface @ui', () => {
             await expect(symbolRow).toBeVisible();
         });
 
-        test('editor modal fills viewport on mobile @mobile', async ({ page }) => {
+        test('inline editor fills the chart slot on mobile @mobile', async ({ page }) => {
             await page.setViewportSize({ width: 390, height: 844 });
             await page.locator('.chart-surface__overflow-btn').click();
-            await page.getByRole('button', { name: 'Edit' }).click();
+            await page.getByRole('button', { name: /Edit/ }).click();
 
-            const content = page.locator('#editorOverlay .settings-content');
-            await expect(content).toBeVisible();
-            const box = await content.boundingBox();
+            const editor = page.locator('.inline-editor');
+            await expect(editor).toBeVisible();
+            const box = await editor.boundingBox();
             expect(box).not.toBeNull();
-            // Full-bleed: content should span nearly the full viewport width (allows for scrollbar)
             expect(box.width).toBeGreaterThanOrEqual(360);
         });
     });

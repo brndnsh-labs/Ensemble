@@ -257,7 +257,9 @@ describe('UI Layout Integrity', () => {
             const card = document.querySelector('.section-card');
             expect(card.querySelector('.section-label-input')).not.toBeNull();
             expect(card.querySelector('.section-prog-input')).not.toBeNull();
-            expect(card.querySelector('.section-delete-btn')).not.toBeNull();
+            // Delete moved into the section-actions kebab menu — verify the
+            // kebab itself is present.
+            expect(card.querySelector('.section-kebab-btn')).not.toBeNull();
         });
     });
 });

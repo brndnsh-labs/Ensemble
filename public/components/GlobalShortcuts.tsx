@@ -28,7 +28,8 @@ export function GlobalShortcuts() {
                 dispatch(ACTIONS.TOGGLE_PLAY);
             }
 
-            // 'E': Toggle Editor
+            // 'E': Toggle chart lock (unlock pauses; lock-on-play is enforced
+            // by the TOGGLE_PLAY effect).
             if (
                 e.key.toLowerCase() === 'e' &&
                 !isTyping &&
@@ -37,23 +38,35 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
-                const isOpen = playback.modals.editor;
-                dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: !isOpen });
+                if (!playback.chartLocked) {
+                    dispatch(ACTIONS.SET_CHART_LOCKED, true);
+                } else {
+                    if (playback.isPlaying) {
+                        dispatch(ACTIONS.TOGGLE_PLAY, undefined);
+                    }
+                    dispatch(ACTIONS.SET_CHART_LOCKED, false);
+                }
             }
 
-            // Escape: Close Modal
+            // Escape: Close Modal, then re-lock the chart if it's unlocked.
             if (e.key === 'Escape') {
                 e.preventDefault();
+                let closedAny = false;
                 Object.keys(playback.modals).forEach((key) => {
                     if ((playback.modals as any)[key]) {
                         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
+                        closedAny = true;
                     }
                 });
+                if (!closedAny && !playback.chartLocked) {
+                    dispatch(ACTIONS.SET_CHART_LOCKED, true);
+                }
             }
         };
 
         const handleOpenEditor = (e: Event) => {
             const { sectionId } = (e as CustomEvent).detail || {};
+            const { playback } = getState();
             if (sectionId) {
                 dispatch(ACTIONS.SET_PARAM, {
                     module: 'arranger',
@@ -61,7 +74,10 @@ export function GlobalShortcuts() {
                     value: sectionId,
                 });
             }
-            dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'editor', open: true });
+            if (playback.isPlaying) {
+                dispatch(ACTIONS.TOGGLE_PLAY, undefined);
+            }
+            dispatch(ACTIONS.SET_CHART_LOCKED, false);
         };
 
         window.addEventListener('keydown', handleKeyDown);

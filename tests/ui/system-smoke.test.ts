@@ -171,7 +171,7 @@ const setupMinimalDOM = () => {
             <div id="liveChordDisplay"></div>
             <button id="captureLiveHistoryBtn"></button>
             <div id="bpm-label"></div>
-            <div id="generateSongOverlay" aria-hidden="true"></div>
+            <div id="surpriseMeOverlay" aria-hidden="true"></div>
         </div>
     `;
 };

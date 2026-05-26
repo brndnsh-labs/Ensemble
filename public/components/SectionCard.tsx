@@ -6,7 +6,55 @@ import type { Section } from '../state/arranger.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
+import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
 import { SymbolMenu } from './SymbolMenu.jsx';
+
+/**
+ * Trigger-based autocomplete for chord-quality shorthand. Typing a `:` prefix
+ * followed by a keyword and then a separator (space, `|`, `,` or end-of-text)
+ * replaces the token in-place. Examples:
+ *   `:maj7 ` → `maj7 `
+ *   `:halfdim ` → `ø `
+ *   `:flat`  → `♭` (when the user hits a separator next)
+ * Returns the (possibly updated) value plus the new cursor position, or
+ * `cursor: null` when no substitution happened.
+ */
+const AUTOCOMPLETE_TRIGGERS: Record<string, string> = {
+    maj: 'Δ',
+    maj7: 'Δ7',
+    dim: '°',
+    halfdim: 'ø',
+    flat: '♭',
+    sharp: '♯',
+    bar: '|',
+    repeat: '|: :|',
+};
+
+function applyAutocomplete(value: string, caret: number): { value: string; cursor: number | null } {
+    if (caret <= 0) {
+        return { value, cursor: null };
+    }
+    const lastChar = value[caret - 1];
+    if (lastChar !== ' ' && lastChar !== '|' && lastChar !== ',') {
+        return { value, cursor: null };
+    }
+    // Look back for a `:keyword` token immediately before the separator.
+    const window = value.substring(0, caret - 1);
+    const match = window.match(/(?:^|\s):([a-zA-Z0-9]+)$/);
+    if (!match) {
+        return { value, cursor: null };
+    }
+    const keyword = match[1].toLowerCase();
+    const replacement = AUTOCOMPLETE_TRIGGERS[keyword];
+    if (!replacement) {
+        return { value, cursor: null };
+    }
+    const tokenStart = caret - 1 - match[1].length - 1; // -1 for the `:`
+    const before = value.substring(0, tokenStart);
+    const after = value.substring(caret - 1); // keep the separator
+    const next = before + replacement + after;
+    return { value: next, cursor: before.length + replacement.length };
+}
 
 interface SectionCardProps {
     section: Section;
@@ -23,6 +71,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
     ({ section, index, totalSections }, ref) => {
         const dispatch = useDispatch();
         const [isMenuOpen, setIsMenuOpen] = useState(false);
+        const [isFocused, setIsFocused] = useState(false);
         const isTouch = useMediaQuery('(pointer: coarse)');
         const textareaRef = useRef<HTMLTextAreaElement | null>(null);
         const rootRef = useRef<HTMLDivElement | null>(null);
@@ -69,52 +118,96 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
 
         const isMutated = mutatedSectionId === section.id;
 
-        const handleDragStart = (e: DragEvent) => {
-            if (e.dataTransfer) {
-                e.dataTransfer.setData('text/plain', section.id);
-            }
-            if (e.currentTarget instanceof HTMLElement) {
-                e.currentTarget.classList.add('dragging');
-            }
+        // Drop-position semantics: cursor in the top half of a card → insert
+        // before; bottom half → insert after. Computed at dragover time and
+        // mirrored as a CSS class so the user sees a horizontal indicator line
+        // exactly where the drop will land.
+        const positionFromEvent = (e: DragEvent, target: HTMLElement): 'before' | 'after' => {
+            const r = target.getBoundingClientRect();
+            return e.clientY < r.top + r.height / 2 ? 'before' : 'after';
         };
 
-        const handleDragEnd = (e: DragEvent) => {
-            if (e.currentTarget instanceof HTMLElement) {
-                e.currentTarget.classList.remove('dragging');
-            }
+        const clearDropTargets = () => {
             document
                 .querySelectorAll('.section-card')
-                .forEach((el) => el.classList.remove('drag-over'));
+                .forEach((el) =>
+                    el.classList.remove('drag-over', 'drag-over--before', 'drag-over--after'),
+                );
+        };
+
+        const handleDragStart = (e: DragEvent) => {
+            // The drag source is the handle, but the data references the card.
+            if (e.dataTransfer) {
+                e.dataTransfer.setData('text/plain', section.id);
+                e.dataTransfer.effectAllowed = 'move';
+                // Custom drag image: a small label chip so the user sees the
+                // section name floating with the cursor, not the whole card.
+                const chip = document.createElement('div');
+                chip.textContent = section.label || 'Section';
+                chip.className = 'section-drag-chip';
+                document.body.appendChild(chip);
+                e.dataTransfer.setDragImage(chip, 0, 0);
+                // Remove after the browser has snapshotted it.
+                setTimeout(() => chip.remove(), 0);
+            }
+            // Lift state lives on the card root, not the handle.
+            rootRef.current?.classList.add('dragging');
+        };
+
+        const handleDragEnd = () => {
+            rootRef.current?.classList.remove('dragging');
+            clearDropTargets();
         };
 
         const handleDragEnter = (e: DragEvent) => {
             e.preventDefault();
+            // DataTransfer.getData is empty during dragenter in most browsers
+            // for privacy — use a side channel: skip self-target by id check
+            // at drop time. Always show indicator on enter.
+            if (e.currentTarget instanceof HTMLElement) {
+                e.currentTarget.classList.add('drag-over');
+            }
+        };
+
+        const handleDragOver = (e: DragEvent) => {
+            e.preventDefault();
+            if (!(e.currentTarget instanceof HTMLElement)) {
+                return;
+            }
+            const pos = positionFromEvent(e, e.currentTarget);
+            e.currentTarget.classList.toggle('drag-over--before', pos === 'before');
+            e.currentTarget.classList.toggle('drag-over--after', pos === 'after');
             if (e.dataTransfer) {
-                const draggedId = e.dataTransfer.getData('text/plain');
-                if (draggedId !== section.id && e.currentTarget instanceof HTMLElement) {
-                    e.currentTarget.classList.add('drag-over');
-                }
+                e.dataTransfer.dropEffect = 'move';
             }
         };
 
         const handleDragLeave = (e: DragEvent) => {
+            // Only clear when we've actually left the card (not when entering
+            // a child element). relatedTarget being inside the card means
+            // we're still over it.
             if (e.currentTarget instanceof HTMLElement) {
-                e.currentTarget.classList.remove('drag-over');
+                const card = e.currentTarget;
+                const next = e.relatedTarget as Node | null;
+                if (!next || !card.contains(next)) {
+                    card.classList.remove('drag-over', 'drag-over--before', 'drag-over--after');
+                }
             }
         };
 
         const handleDrop = (e: DragEvent) => {
             e.preventDefault();
-            if (e.currentTarget instanceof HTMLElement) {
-                e.currentTarget.classList.remove('drag-over');
-            }
+            const targetEl = e.currentTarget instanceof HTMLElement ? e.currentTarget : null;
+            const position = targetEl ? positionFromEvent(e, targetEl) : 'after';
+            clearDropTargets();
             if (e.dataTransfer) {
                 const draggedId = e.dataTransfer.getData('text/plain');
                 if (draggedId && draggedId !== section.id) {
-                    const event = new CustomEvent('reorder-sections', {
-                        detail: { draggedId, targetId: section.id },
-                    });
-                    window.dispatchEvent(event);
+                    window.dispatchEvent(
+                        new CustomEvent('reorder-sections', {
+                            detail: { draggedId, targetId: section.id, position },
+                        }),
+                    );
                 }
             }
         };
@@ -155,193 +248,186 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
             });
         };
 
+        const canMoveUp = index > 0;
+        const canMoveDown = index < totalSections - 1;
+
         return (
             <div
                 ref={rootRef}
-                class={`section-card ${section.seamless ? 'linked' : ''} ${isMenuOpen ? 'menu-active' : ''}`}
+                class={`section-card ${section.seamless ? 'linked' : ''} ${
+                    isMenuOpen ? 'menu-active' : ''
+                } ${isFocused ? 'is-focused' : ''}`}
                 data-id={section.id}
                 style={{ viewTransitionName: `editor-card-${section.id}` }}
-                draggable={true}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={handleDragOver}
                 onDrop={handleDrop}
             >
-                <div class="section-header">
-                    <div class="section-title-row">
-                        <input
-                            class="section-label-input"
-                            value={section.label}
-                            aria-label="Section Name"
-                            maxLength={100}
-                            onChange={(e: any) =>
-                                onSectionUpdate(section.id, 'label', e.target.value)
+                <SectionHeaderStrip section={section} />
+
+                <div class="section-title-row">
+                    {!isTouch && (
+                        <span
+                            class="section-drag-handle"
+                            draggable={true}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                            role="button"
+                            tabIndex={0}
+                            title="Drag to reorder"
+                            aria-label="Drag handle"
+                        >
+                            ⋮⋮
+                        </span>
+                    )}
+                    <input
+                        class="section-label-input"
+                        value={section.label}
+                        aria-label="Section Name"
+                        maxLength={100}
+                        onChange={(e: any) => onSectionUpdate(section.id, 'label', e.target.value)}
+                    />
+                    {section.seamless && <span class="section-status-chip">Linked</span>}
+                    <div class="section-title-actions">
+                        <button
+                            class="section-move-btn"
+                            title="Move Up"
+                            aria-label="Move Section Up"
+                            onClick={() =>
+                                handleViewTransition(() => onSectionUpdate(section.id, 'move', -1))
                             }
-                        />
-                        <div class="section-title-meta">
-                            {section.seamless && <span class="section-status-chip">Linked</span>}
-                            <span class="drag-handle" title="Drag to reorder" aria-hidden="true">
-                                ⋮⋮
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="section-controls-row">
-                        <div class="section-settings-row">
-                            <div class="section-setting-item">
-                                <span class="setting-label">x</span>
-                                <input
-                                    type="number"
-                                    class="section-repeat-input"
-                                    value={section.repeat || 1}
-                                    min="1"
-                                    max="8"
-                                    aria-label="Repeat Count"
-                                    onChange={(e: any) =>
-                                        onSectionUpdate(
-                                            section.id,
-                                            'repeat',
-                                            parseInt(e.target.value, 10),
-                                        )
-                                    }
-                                />
-                            </div>
-
-                            <select
-                                class="section-key-select"
-                                value={section.key || ''}
-                                aria-label="Section Key"
-                                onChange={(e: any) =>
-                                    onSectionUpdate(section.id, 'key', e.target.value)
-                                }
-                            >
-                                <option value="">Key: Auto</option>
-                                {KEY_ORDER.map((k) => (
-                                    <option key={k} value={k}>
-                                        Key: {formatUnicodeSymbols(k)}
-                                        {isMinor ? 'm' : ''}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <select
-                                class="section-ts-select"
-                                value={section.timeSignature || ''}
-                                aria-label="Time Signature"
-                                onChange={(e: any) =>
-                                    onSectionUpdate(section.id, 'timeSignature', e.target.value)
-                                }
-                            >
-                                <option value="">TS: Auto</option>
-                                {Object.keys(TIME_SIGNATURES).map((ts) => (
-                                    <option key={ts} value={ts}>
-                                        TS: {ts}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div class="section-actions">
+                            disabled={!canMoveUp}
+                        >
+                            ▴
+                        </button>
+                        <button
+                            class="section-move-btn"
+                            title="Move Down"
+                            aria-label="Move Section Down"
+                            onClick={() =>
+                                handleViewTransition(() => onSectionUpdate(section.id, 'move', 1))
+                            }
+                            disabled={!canMoveDown}
+                        >
+                            ▾
+                        </button>
+                        <div style="position: relative; display: inline-block;" ref={menuRef}>
                             <button
-                                class={`section-link-btn ${section.seamless ? 'active' : ''}`}
-                                title={
-                                    section.seamless
-                                        ? 'Unlink from previous (Enable Fills)'
-                                        : 'Link to previous (Seamless Transition)'
-                                }
-                                aria-label={
-                                    section.seamless
-                                        ? 'Disable seamless transition'
-                                        : 'Enable seamless transition'
-                                }
-                                onClick={() =>
-                                    handleViewTransition(() =>
-                                        onSectionUpdate(section.id, 'seamless', !section.seamless),
-                                    )
-                                }
+                                class="section-kebab-btn"
+                                aria-label={`Actions for ${section.label || 'Section'}`}
+                                aria-expanded={isMenuOpen}
+                                aria-haspopup="true"
+                                title="Section actions"
+                                onClick={(e: MouseEvent) => {
+                                    e.stopPropagation();
+                                    setIsMenuOpen(!isMenuOpen);
+                                }}
                             >
-                                🔗
+                                ⋮
                             </button>
-
-                            <button
-                                class="section-move-btn"
-                                title="Move Up"
-                                aria-label="Move Section Up"
-                                onClick={() =>
-                                    handleViewTransition(() =>
-                                        onSectionUpdate(section.id, 'move', -1),
-                                    )
-                                }
-                                disabled={index === 0}
-                            >
-                                ▴
-                            </button>
-
-                            <button
-                                class="section-move-btn"
-                                title="Move Down"
-                                aria-label="Move Section Down"
-                                onClick={() =>
-                                    handleViewTransition(() =>
-                                        onSectionUpdate(section.id, 'move', 1),
-                                    )
-                                }
-                                disabled={index === totalSections - 1}
-                            >
-                                ▾
-                            </button>
-
-                            <button
-                                class="section-duplicate-btn"
-                                title="Duplicate"
-                                aria-label="Duplicate Section"
-                                onClick={() => onSectionDuplicate(section.id)}
-                            >
-                                ⎘
-                            </button>
-
-                            {!isTouch && (
-                                <div
-                                    style="position: relative; display: inline-block;"
-                                    ref={menuRef}
-                                >
+                            {isMenuOpen && (
+                                <div class="section-actions-menu" role="menu">
+                                    <div class="section-actions-menu__row">
+                                        <span class="section-actions-menu__label">Repeat</span>
+                                        <input
+                                            type="number"
+                                            class="section-repeat-input"
+                                            value={section.repeat || 1}
+                                            min="1"
+                                            max="8"
+                                            aria-label="Repeat Count"
+                                            onChange={(e: any) =>
+                                                onSectionUpdate(
+                                                    section.id,
+                                                    'repeat',
+                                                    parseInt(e.target.value, 10),
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div class="section-actions-menu__row">
+                                        <span class="section-actions-menu__label">Key</span>
+                                        <select
+                                            class="section-key-select"
+                                            value={section.key || ''}
+                                            aria-label="Section Key"
+                                            onChange={(e: any) =>
+                                                onSectionUpdate(section.id, 'key', e.target.value)
+                                            }
+                                        >
+                                            <option value="">Auto</option>
+                                            {KEY_ORDER.map((k) => (
+                                                <option key={k} value={k}>
+                                                    {formatUnicodeSymbols(k)}
+                                                    {isMinor ? 'm' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div class="section-actions-menu__row">
+                                        <span class="section-actions-menu__label">Time</span>
+                                        <select
+                                            class="section-ts-select"
+                                            value={section.timeSignature || ''}
+                                            aria-label="Time Signature"
+                                            onChange={(e: any) =>
+                                                onSectionUpdate(
+                                                    section.id,
+                                                    'timeSignature',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        >
+                                            <option value="">Auto</option>
+                                            {Object.keys(TIME_SIGNATURES).map((ts) => (
+                                                <option key={ts} value={ts}>
+                                                    {ts}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div class="section-actions-menu__divider" />
                                     <button
-                                        class="section-kebab-btn"
-                                        title="Insert Symbol"
-                                        aria-label={`Actions for ${section.label || 'Section'}`}
-                                        aria-expanded={isMenuOpen}
-                                        aria-haspopup="true"
-                                        onClick={(e: MouseEvent) => {
-                                            e.stopPropagation();
-                                            setIsMenuOpen(!isMenuOpen);
+                                        class="section-actions-menu__btn"
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            handleViewTransition(() =>
+                                                onSectionUpdate(
+                                                    section.id,
+                                                    'seamless',
+                                                    !section.seamless,
+                                                ),
+                                            );
                                         }}
                                     >
-                                        ⋮
+                                        🔗 {section.seamless ? 'Unlink' : 'Link to previous'}
                                     </button>
-                                    {isMenuOpen && (
-                                        <SymbolMenu
-                                            onSelect={insertSymbol}
-                                            onClose={() => setIsMenuOpen(false)}
-                                        />
-                                    )}
+                                    <button
+                                        class="section-actions-menu__btn"
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            onSectionDuplicate(section.id);
+                                        }}
+                                    >
+                                        ⎘ Duplicate
+                                    </button>
+                                    <button
+                                        class="section-actions-menu__btn section-actions-menu__btn--danger"
+                                        onClick={() => {
+                                            setIsMenuOpen(false);
+                                            onSectionDelete(section.id);
+                                        }}
+                                    >
+                                        🗑️ Delete
+                                    </button>
                                 </div>
                             )}
-
-                            <button
-                                class="section-delete-btn"
-                                title="Delete"
-                                aria-label="Delete Section"
-                                onClick={() => onSectionDelete(section.id)}
-                            >
-                                ✕
-                            </button>
                         </div>
                     </div>
                 </div>
 
-                {isTouch && <SymbolMenu variant="row" onSelect={insertSymbol} />}
+                {isFocused && <SymbolMenu variant="row" onSelect={insertSymbol} />}
 
                 <textarea
                     ref={textareaRef}
@@ -350,14 +436,26 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                     aria-label="Chord Progression"
                     maxLength={1000}
                     placeholder="Enter chords (e.g. C Am F G)"
-                    onInput={(e: any) => onSectionUpdate(section.id, 'value', e.target.value)}
+                    onInput={(e: any) => {
+                        const ta = e.target as HTMLTextAreaElement;
+                        const result = applyAutocomplete(ta.value, ta.selectionStart || 0);
+                        onSectionUpdate(section.id, 'value', result.value);
+                        if (result.cursor !== null) {
+                            const pos = result.cursor;
+                            setTimeout(() => {
+                                ta.selectionStart = ta.selectionEnd = pos;
+                            }, 0);
+                        }
+                    }}
                     onFocus={() => {
+                        setIsFocused(true);
                         dispatch(ACTIONS.SET_PARAM, {
                             module: 'arranger',
                             param: 'lastInteractedSectionId',
                             value: section.id,
                         });
                     }}
+                    onBlur={() => setIsFocused(false)}
                 />
             </div>
         );

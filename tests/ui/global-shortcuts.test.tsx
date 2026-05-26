@@ -19,7 +19,9 @@ vi.mock('../../public/state.js', () => {
     const mockState = {
         playback: {
             viz: {},
-            modals: { editor: false, settings: false },
+            modals: { settings: false },
+            chartLocked: true,
+            isPlaying: false,
         },
         dispatch: vi.fn(),
     };
@@ -56,23 +58,20 @@ describe('Global Shortcuts', () => {
 
     it('should NOT toggle playback if modal is open via state', async () => {
         const { playback, dispatch } = await import('../../public/state.js');
-        playback.modals.editor = true;
+        playback.modals.settings = true;
 
         const event = new KeyboardEvent('keydown', { key: ' ' });
         window.dispatchEvent(event);
 
         expect(dispatch).not.toHaveBeenCalledWith(ACTIONS.TOGGLE_PLAY, expect.anything());
-        playback.modals.editor = false; // Reset
+        playback.modals.settings = false; // Reset
     });
 
-    it('should toggle editor on E', async () => {
+    it('should unlock chart on E when locked', async () => {
         const { dispatch } = await import('../../public/state.js');
         const event = new KeyboardEvent('keydown', { key: 'e' });
         window.dispatchEvent(event);
 
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_MODAL_OPEN, {
-            modal: 'editor',
-            open: true,
-        });
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_CHART_LOCKED, false);
     });
 });
