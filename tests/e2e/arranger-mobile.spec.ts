@@ -9,11 +9,14 @@ const { expect, test } = pkg;
 // Opens the preset library via the overflow button (mobile pattern).
 async function openLibraryFromArranger(page: Page): Promise<void> {
     await page.locator('.chart-surface__overflow-btn').click();
-    await page.getByRole('button', { name: 'Library' }).click();
+    await page
+        .locator('#chartOverflowPanel')
+        .getByRole('button', { name: /Library/ })
+        .click();
 }
 
 async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
-    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    const modal = page.locator('#surpriseMeOverlay');
     await modal.getByRole('button', { name: presetName, exact: true }).click();
 }
 
@@ -36,7 +39,7 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.setViewportSize({ width: 360, height: 640 });
         await openLibraryFromArranger(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         await expect(modal.getByTestId('preset-library-search')).toBeVisible();
         await modal.getByTestId('preset-library-search').fill('Donna');
         await choosePresetFromLibrary(page, 'Donna Lee');
@@ -62,7 +65,7 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         expect(metrics.height).toBeGreaterThan(0);
 
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.section-strip--compact')).toHaveCount(4);
         await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect
             .poll(async () =>
@@ -100,7 +103,7 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await page.setViewportSize({ width: 390, height: 844 });
         await openLibraryFromArranger(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
 
         await expect(modal).toBeVisible();
 

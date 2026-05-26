@@ -31,7 +31,7 @@ async function openLibrary(page: Page): Promise<void> {
 async function openEditorFromLibraryPreset(page: Page): Promise<Locator> {
     // Load preset via Library modal
     await openLibrary(page);
-    const libraryModal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    const libraryModal = page.locator('#surpriseMeOverlay');
     await expect(libraryModal).toBeVisible();
     await libraryModal.getByRole('button', { name: 'All The Things You Are', exact: true }).click();
 

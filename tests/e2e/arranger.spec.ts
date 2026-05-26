@@ -25,7 +25,7 @@ async function openLibrary(page: Page): Promise<void> {
 }
 
 async function choosePresetFromLibrary(page: Page, presetName: string): Promise<void> {
-    const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+    const modal = page.locator('#surpriseMeOverlay');
     // Chips are always visible in the chip wall. Click the first matching chip by aria-label.
     await modal.locator(`.preset-library-chip-name[aria-label="${presetName}"]`).first().click();
 }
@@ -59,7 +59,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const visualizer = page.locator('#chordVisualizer');
         // Verify structural elements are present
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.section-strip--compact')).toHaveCount(4);
         await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
         await expect(visualizer.locator('.measure-box').first()).toBeVisible();
@@ -87,9 +87,9 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Progression Library Modal opens from topbar', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await openLibrary(page);
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         await expect(modal).toBeVisible();
-        await expect(modal.locator('#workspaceLibraryTitle')).toHaveText('Progression Library');
+        await expect(modal.locator('#surprise-me-title')).toContainText('Library');
         await expect(modal.getByTestId('preset-library-search')).toBeVisible();
         await expect(modal.getByTestId('preset-library-result-summary')).toBeVisible();
         // Chip wall is the default view — Jazz row and a colored chip should be visible.
@@ -113,7 +113,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     test('Progression library supports search, pinning, and recents', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 900 });
         await openLibrary(page);
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         const search = modal.getByTestId('preset-library-search');
 
         // Search hides non-matching chips and collapses empty rows.
@@ -147,7 +147,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(modal).toBeHidden();
 
         await openLibrary(page);
-        const reopened = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const reopened = page.locator('#surpriseMeOverlay');
         const recentRow = reopened.locator(
             '[data-testid="preset-library-chip-row"][data-row-label="Recent"]',
         );
@@ -162,9 +162,9 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.setViewportSize({ width: 1280, height: 600 });
         await openLibrary(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         const toolbar = modal.getByTestId('preset-library-toolbar');
-        const body = page.locator('.workspace-library-body');
+        const body = page.locator('#surpriseMeOverlay .settings-content');
 
         await body.evaluate((element) => {
             element.scrollTop = 400;
@@ -184,7 +184,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await openLibrary(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         await expect(modal).toBeVisible();
 
         await choosePresetFromLibrary(page, 'Autumn Leaves');
@@ -195,7 +195,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await expect(firstChord).toBeVisible();
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(4);
+        await expect(visualizer.locator('.section-strip--compact')).toHaveCount(4);
         await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fit');
         await expect
             .poll(async () =>
@@ -218,7 +218,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         await openLibrary(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         await expect(modal).toBeVisible();
 
         await choosePresetFromLibrary(page, 'All The Things You Are');
@@ -235,7 +235,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
         await expect(visualizer).toHaveAttribute('data-scroll-mode', 'guided');
         await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-guided');
-        await expect(visualizer.locator('.lead-sheet-row-marker')).toHaveCount(7);
+        await expect(visualizer.locator('.section-strip--compact')).toHaveCount(5);
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(9);
         expect(rowMeasureCounts).toEqual([4, 4, 4, 4, 4, 4, 4, 4, 4]);
         await expect(firstChord).toBeVisible();
@@ -252,7 +252,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await page.setViewportSize({ width: 1024, height: 768 });
         await openLibrary(page);
 
-        const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+        const modal = page.locator('#surpriseMeOverlay');
         await expect(modal).toBeVisible();
 
         await choosePresetFromLibrary(page, 'Pop (Standard)');

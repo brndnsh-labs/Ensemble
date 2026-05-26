@@ -137,7 +137,7 @@ test.describe('ChartSurface @ui', () => {
             await page.setViewportSize({ width: 1366, height: 900 });
             await page.getByRole('button', { name: 'Library' }).click();
 
-            const modal = page.locator('[role="dialog"][aria-labelledby="workspaceLibraryTitle"]');
+            const modal = page.locator('#surpriseMeOverlay');
             await expect(modal).toBeVisible();
 
             await page.keyboard.press('Escape');
@@ -146,13 +146,13 @@ test.describe('ChartSurface @ui', () => {
     });
 
     test.describe('Overflow menu', () => {
-        test('opens and exposes Generate Song, Settings, and Manual actions', async ({ page }) => {
+        test('opens and exposes Library, Settings, and Manual actions', async ({ page }) => {
             await page.setViewportSize({ width: 1366, height: 900 });
             await page.getByRole('button', { name: 'More options' }).click();
 
             const panel = page.locator('#chartOverflowPanel');
             await expect(panel).toBeVisible();
-            await expect(panel.getByRole('button', { name: 'Generate Song' })).toBeVisible();
+            await expect(panel.getByRole('button', { name: /Library/ })).toBeVisible();
             await expect(panel.getByRole('button', { name: 'Settings' })).toBeVisible();
             await expect(panel.getByRole('button', { name: 'Manual' })).toBeVisible();
         });
