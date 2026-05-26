@@ -70,6 +70,12 @@ export function arrangerReducer(action: Action): boolean {
             if (action.payload.isMinor !== undefined) {
                 a.isMinor = action.payload.isMinor;
             }
+            if (action.payload.key !== undefined) {
+                a.key = action.payload.key;
+            }
+            if (action.payload.timeSignature !== undefined) {
+                a.timeSignature = action.payload.timeSignature;
+            }
             a.isDirty = true;
             return true;
         case ACTIONS.SET_ARRANGEMENT:

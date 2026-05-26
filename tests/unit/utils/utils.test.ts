@@ -354,5 +354,49 @@ describe('Utility Functions', () => {
                 isMinor: false,
             });
         });
+
+        it('should round-trip per-section targetIntensity and instrument overrides', () => {
+            const sections = [
+                {
+                    id: '1',
+                    label: 'Verse',
+                    value: 'I | IV',
+                    targetIntensity: 0.2,
+                    instruments: { groove: false, soloist: true },
+                },
+                { id: '2', label: 'Chorus', value: 'V | I' },
+            ] as any[];
+            const decompressed = decompressSections(compressSections(sections));
+
+            expect(decompressed[0].targetIntensity).toBeCloseTo(0.2, 5);
+            expect(decompressed[0].instruments).toEqual({ groove: false, soloist: true });
+            // Section without overrides should not gain spurious fields
+            expect(decompressed[1].targetIntensity).toBeUndefined();
+            expect(decompressed[1].instruments).toBeUndefined();
+        });
+
+        it('should clamp out-of-range targetIntensity on decompress', () => {
+            const sections = [
+                { id: '1', label: 'Verse', value: 'I', targetIntensity: 1.5 },
+                { id: '2', label: 'Chorus', value: 'V', targetIntensity: -0.3 },
+            ] as any[];
+            const decompressed = decompressSections(compressSections(sections));
+            expect(decompressed[0].targetIntensity).toBe(1);
+            expect(decompressed[1].targetIntensity).toBe(0);
+        });
+
+        it('should ignore unknown instrument keys in the override map', () => {
+            // Craft a payload with a malicious extra key — should drop it.
+            const compressed = compressSections([
+                {
+                    id: '1',
+                    label: 'Verse',
+                    value: 'I',
+                    instruments: { groove: true, bogus: true } as any,
+                },
+            ]);
+            const decompressed = decompressSections(compressed);
+            expect(decompressed[0].instruments).toEqual({ groove: true });
+        });
     });
 });

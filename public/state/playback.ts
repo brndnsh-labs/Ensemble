@@ -57,11 +57,11 @@ export const playback = deepSignal<GlobalContext>({
     updateAvailable: false,
     resolutionTriggered: false,
     isScheduling: false,
+    chartLocked: true,
     modals: {
         settings: false,
-        editor: false,
         share: false,
-        generateSong: false,
+        surpriseMe: false,
         manual: false,
         // Set true when the app is loaded with ?autoplay=1 (audition permalink).
         // Renders the AuditionOverlay so a single click satisfies the browser
@@ -110,6 +110,9 @@ export function playbackReducer(action: Action): boolean {
                 return true;
             }
             return false;
+        case ACTIONS.SET_CHART_LOCKED:
+            p.chartLocked = !!action.payload;
+            return true;
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'playback') {
                 (playback as any)[action.payload.param] = action.payload.value;

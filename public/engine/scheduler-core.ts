@@ -57,6 +57,7 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
+import { isInstrumentActiveAtStep } from './section-overrides.js';
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed, killActiveVoices } from './synth-utils.js';
@@ -584,7 +585,7 @@ function scheduleDrums(
             lookaheadCursor: { index: 0, sectionIndex: 0 },
         },
         {
-            includeDrums: true,
+            includeDrums: isInstrumentActiveAtStep(state, 'groove', absoluteStep),
             includeBass: false,
             includeChords: false,
             includeHarmony: false,

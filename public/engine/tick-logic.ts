@@ -23,6 +23,7 @@ import {
 import { shouldFireDropMute } from './drop-mechanic.js';
 import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
 import { getHarmonyNotes } from './harmonies.js';
+import { isInstrumentActiveAtStep } from './section-overrides.js';
 import { getSoloistNote } from './soloist.js';
 import { getChordAtStep } from './worker-utils.js';
 
@@ -84,13 +85,15 @@ export function generateNotesForStep(
     options: GenerateNotesOptions = {},
     carryover: CoordinationCarryover | null = null,
 ): GenerateNotesResult {
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
+    const { arranger, bass, soloist, harmony, groove, playback } = state;
 
-    const includeChords = options.includeChords ?? chords.enabled;
-    const includeBass = options.includeBass ?? bass.enabled;
-    const includeSoloist = options.includeSoloist ?? soloist.enabled;
-    const includeHarmony = options.includeHarmony ?? harmony.enabled;
-    const includeDrums = options.includeDrums ?? groove.enabled;
+    const includeChords = options.includeChords ?? isInstrumentActiveAtStep(state, 'chords', step);
+    const includeBass = options.includeBass ?? isInstrumentActiveAtStep(state, 'bass', step);
+    const includeSoloist =
+        options.includeSoloist ?? isInstrumentActiveAtStep(state, 'soloist', step);
+    const includeHarmony =
+        options.includeHarmony ?? isInstrumentActiveAtStep(state, 'harmony', step);
+    const includeDrums = options.includeDrums ?? isInstrumentActiveAtStep(state, 'groove', step);
 
     const notesToMain: NoteResult[] = [];
     const drumHits: DrumHitInfo[] = [];

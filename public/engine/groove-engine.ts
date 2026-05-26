@@ -22,6 +22,7 @@ import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG } from './grooves/utils.js';
 import { scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
+import { isInstrumentActiveAtStep } from './section-overrides.js';
 
 const strategies: Record<string, any> = {
     Jazz: jazz,
@@ -454,7 +455,13 @@ export function applyGrooveOverrides(
         isFirstStepOfNewBar,
         sectionSeed,
         isTurnaround,
-        isSoloistBusy: soloist.enabled && soloist.session.phrasing.busySteps > 0,
+        // why: read effective soloist activity (section override may force-off the
+        // soloist even when the global flag is on). Without this, drums hear a
+        // mid-phrase soloist that isn't producing notes and apply busy-yield
+        // behavior in a section that's supposed to feature the drums.
+        isSoloistBusy:
+            isInstrumentActiveAtStep(state, 'soloist', step) &&
+            soloist.session.phrasing.busySteps > 0,
     };
 
     if (strategy) {

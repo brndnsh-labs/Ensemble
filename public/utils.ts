@@ -330,6 +330,20 @@ export function compressSections(sections: Section[]): string {
         if (s.seamless) {
             m.s = 1;
         }
+        if (typeof s.targetIntensity === 'number') {
+            m.i = Math.max(0, Math.min(1, s.targetIntensity));
+        }
+        if (s.instruments && Object.keys(s.instruments).length > 0) {
+            const e: Record<string, 0 | 1> = {};
+            for (const [k, v] of Object.entries(s.instruments)) {
+                if (typeof v === 'boolean') {
+                    e[k] = v ? 1 : 0;
+                }
+            }
+            if (Object.keys(e).length > 0) {
+                m.e = e;
+            }
+        }
         return m;
     });
     const json = JSON.stringify(minified);
@@ -377,7 +391,7 @@ export function decompressSections(str: string): Section[] {
 
             safeValue = stripDangerousChars(safeValue);
 
-            return {
+            const out: Section = {
                 id: generateId(),
                 label: safeLabel,
                 value: safeValue,
@@ -387,6 +401,31 @@ export function decompressSections(str: string): Section[] {
                 timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
                 seamless: !!s.s,
             };
+            if (typeof s.i === 'number' && Number.isFinite(s.i)) {
+                out.targetIntensity = Math.max(0, Math.min(1, s.i));
+            }
+            if (s.e && typeof s.e === 'object') {
+                const allowed: Section['instruments'] = {};
+                const keys: Array<keyof NonNullable<Section['instruments']>> = [
+                    'groove',
+                    'bass',
+                    'chords',
+                    'harmony',
+                    'soloist',
+                ];
+                for (const k of keys) {
+                    const raw = (s.e as Record<string, unknown>)[k];
+                    if (raw === 0 || raw === 1) {
+                        allowed[k] = raw === 1;
+                    } else if (typeof raw === 'boolean') {
+                        allowed[k] = raw;
+                    }
+                }
+                if (Object.keys(allowed).length > 0) {
+                    out.instruments = allowed;
+                }
+            }
+            return out;
         });
     } catch (e) {
         console.error('Failed to decompress sections', e);

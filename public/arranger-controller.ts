@@ -13,6 +13,7 @@ import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState, stateMap } from './state.js';
+import type { SectionInstrumentKey } from './types.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
@@ -193,6 +194,48 @@ export function addSection(): void {
     refreshArrangerUI();
 }
 
+/**
+ * Append a batch of pre-built sections to the current arrangement (e.g. inserted
+ * from the library drawer). Mirrors `addSection`'s post-update side effects so
+ * the worker's `sectionMap`/`stepMap`/`progression` are re-validated and the
+ * persistence + audio buffers get refreshed.
+ */
+export function appendSections(
+    toAppend: ReadonlyArray<{
+        label?: string;
+        value: string;
+        key?: string;
+        isMinor?: boolean;
+        timeSignature?: string;
+        repeat?: number;
+        seamless?: boolean;
+    }>,
+): void {
+    if (!toAppend || toAppend.length === 0) {
+        return;
+    }
+    const { arranger } = getState();
+    const next = toAppend.map((s) => ({
+        id: generateId(),
+        label: s.label || `Section ${arranger.sections.length + 1}`,
+        value: s.value,
+        ...(s.key ? { key: s.key } : {}),
+        ...(typeof s.isMinor === 'boolean' ? { isMinor: s.isMinor } : {}),
+        ...(s.timeSignature ? { timeSignature: s.timeSignature } : {}),
+        ...(s.repeat ? { repeat: s.repeat } : {}),
+        ...(s.seamless ? { seamless: s.seamless } : {}),
+    }));
+    pushHistory();
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'arranger',
+        param: 'sections',
+        value: [...arranger.sections, ...next],
+    });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
+    clearChordPresetHighlight();
+    refreshArrangerUI();
+}
+
 export function transposeKey(delta: number): void {
     const { arranger } = getState();
     const currentKeyName = arranger.key || 'C';
@@ -284,4 +327,111 @@ export function switchToRelativeKey(): void {
     showToast(
         `Switched to Relative ${arranger.isMinor ? 'Minor' : 'Major'}: ${newKey}${arranger.isMinor ? 'm' : ''}`,
     );
+}
+
+/**
+ * Set or clear a section's intensity override. `value === undefined` removes the
+ * override so the section follows the global conductor target again.
+ *
+ * @staged Wired to the engine + persistence; awaits the Phase B SectionHeaderStrip
+ * UI to expose it to users.
+ */
+export function setSectionIntensity(id: string, value: number | undefined): void {
+    const { arranger } = getState();
+    const index = arranger.sections.findIndex((s: any) => s.id === id);
+    if (index === -1) {
+        return;
+    }
+    const newSections = [...arranger.sections];
+    const current = newSections[index];
+    if (value === undefined) {
+        const { targetIntensity: _omit, ...rest } = current;
+        newSections[index] = rest;
+    } else {
+        newSections[index] = { ...current, targetIntensity: Math.max(0, Math.min(1, value)) };
+    }
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
+    refreshArrangerUI();
+}
+
+/**
+ * Set or clear a per-instrument override on a section. Tri-state: `true` (force on),
+ * `false` (force off), `undefined` (follow the global instrument enabled flag).
+ *
+ * @staged Wired to the engine + persistence; awaits the Phase B SectionHeaderStrip
+ * UI to expose it to users.
+ */
+export function setSectionInstrumentEnabled(
+    id: string,
+    instrument: SectionInstrumentKey,
+    enabled: boolean | undefined,
+): void {
+    const { arranger } = getState();
+    const index = arranger.sections.findIndex((s: any) => s.id === id);
+    if (index === -1) {
+        return;
+    }
+    const newSections = [...arranger.sections];
+    const current = newSections[index];
+    const nextInstruments: Partial<Record<SectionInstrumentKey, boolean>> = {
+        ...(current.instruments || {}),
+    };
+    if (enabled === undefined) {
+        delete nextInstruments[instrument];
+    } else {
+        nextInstruments[instrument] = enabled;
+    }
+    if (Object.keys(nextInstruments).length === 0) {
+        const { instruments: _omit, ...rest } = current;
+        newSections[index] = rest;
+    } else {
+        newSections[index] = { ...current, instruments: nextInstruments };
+    }
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
+    refreshArrangerUI();
+}
+
+/**
+ * Surgically swap a single chord in a section's text without disturbing the
+ * surrounding chords. Used by the locked-mode tap-chord picker — the user picks
+ * a new chord and the section's `value` is spliced at the chord's `charStart` /
+ * `charEnd` (preserved by `parseProgressionPart`).
+ *
+ * Returns `true` if a chord was found and the section value updated; `false`
+ * otherwise (unknown section or no chord at that index).
+ */
+export function replaceChordInSection(
+    sectionId: string,
+    localIndex: number,
+    newText: string,
+): boolean {
+    const { arranger } = getState();
+    const section = arranger.sections.find((s: any) => s.id === sectionId);
+    if (!section) {
+        return false;
+    }
+    // localIndex repeats per `repeatIndex` for sections with repeat > 1; the
+    // charStart/charEnd are identical across repeats since they index the
+    // single source text. Pick the first occurrence.
+    const chord = (arranger.progression as any[]).find(
+        (c) => c.sectionId === sectionId && c.localIndex === localIndex && c.repeatIndex === 0,
+    );
+    if (!chord || typeof chord.charStart !== 'number' || typeof chord.charEnd !== 'number') {
+        return false;
+    }
+    const trimmed = newText.trim();
+    if (!trimmed) {
+        return false;
+    }
+    const before = section.value.slice(0, chord.charStart);
+    const after = section.value.slice(chord.charEnd);
+    const nextValue = `${before}${trimmed}${after}`;
+    if (nextValue === section.value) {
+        return false;
+    }
+    pushHistory();
+    onSectionUpdate(sectionId, 'value', nextValue);
+    return true;
 }

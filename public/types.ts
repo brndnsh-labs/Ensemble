@@ -82,9 +82,12 @@ export interface PlaybackIntent {
 
 export interface ModalsState {
     settings: boolean;
-    editor: boolean;
     share: boolean;
-    generateSong: boolean;
+    /**
+     * Consolidated "Surprise Me" affordance (🎲): dice / templates / library —
+     * replaces the prior Library + Generate Song + Inspiration-Hub entry points.
+     */
+    surpriseMe: boolean;
     manual: boolean;
     /** Audition permalink (?autoplay=1) landing — see AuditionOverlay. */
     audition: boolean;
@@ -114,7 +117,21 @@ export interface Section {
     timeSignature?: string;
     /** Whether this section transitions seamlessly from the previous one (suppresses fills). */
     seamless?: boolean;
+    /** Section-local override for conductor target intensity (0–1). Undefined → follow global. */
+    targetIntensity?: number;
+    /**
+     * Per-instrument enabled overrides for this section. Missing keys → follow each
+     * instrument's global `enabled` flag. Present keys take precedence.
+     */
+    instruments?: Partial<Record<SectionInstrumentKey, boolean>>;
 }
+
+/**
+ * Instrument lanes that a section can override on/off. Names match the state slices
+ * (`groove` = drums, `chords` = keys/comping, etc.) but the UI labels these as
+ * Drums / Bass / Chords / Harmony / Solo.
+ */
+export type SectionInstrumentKey = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 
 export interface ArrangerState {
     /** List of song sections. */
@@ -1055,6 +1072,12 @@ export interface GlobalContext {
     readonly loopLimit: number;
     /** Current loop iteration counter. */
     readonly currentLoopCount: number;
+    /**
+     * Whether the chord chart is read-only ("locked"). Defaults true so the
+     * chart behaves like sheet music on a stand; unlocking pauses playback
+     * and reveals the inline editor. Auto-locks on play.
+     */
+    readonly chartLocked: boolean;
 }
 
 export interface VisualizerState {
@@ -1148,6 +1171,10 @@ export interface ActionPayloadSetModalOpen {
 export interface ActionPayloadLoadTemplate {
     sections: Section[];
     isMinor?: boolean;
+    /** Optional one-shot key override. When set, replaces `arranger.key` atomically. */
+    key?: string;
+    /** Optional one-shot time-signature override. */
+    timeSignature?: string;
 }
 
 export interface ActionPayloadSetGenreFeel {
@@ -1315,6 +1342,7 @@ export interface ActionPayloadMap {
     TRIGGER_FLASH?: number;
     SET_UPDATE_AVAILABLE: boolean;
     SET_MODAL_OPEN: ActionPayloadSetModalOpen;
+    SET_CHART_LOCKED: boolean;
     TOGGLE_PLAY: undefined;
     SET_BPM: number | string;
     SET_STYLE: ActionPayloadSetStyle;
@@ -1391,6 +1419,7 @@ export const ACTIONS = {
     TRIGGER_FLASH: 'TRIGGER_FLASH',
     SET_UPDATE_AVAILABLE: 'SET_UPDATE_AVAILABLE',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
+    SET_CHART_LOCKED: 'SET_CHART_LOCKED',
     TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',
 

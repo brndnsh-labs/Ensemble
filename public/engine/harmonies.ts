@@ -4,6 +4,7 @@ import { getFrequency } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
 import { scrambleHash } from './hash-utils.js';
+import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     isTensionChordQuality,
     shouldPreferGroundedPracticeVoicing,
@@ -48,6 +49,13 @@ interface StyleConfig {
 interface HarmonyContext {
     step: number;
     soloist: any;
+    /**
+     * Effective soloist-enabled flag at this step: respects per-section overrides.
+     * Differs from `soloist.enabled` only when the current section explicitly
+     * forces the soloist on or off. Computed once at the producer entry so all
+     * mode handlers see a consistent view.
+     */
+    soloistEffectiveEnabled: boolean;
     coordination: any;
     playback: any;
     chord: Chord;
@@ -436,13 +444,16 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
  * Standard procedural rhythmic comping.
  */
 function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
-    const { step, motif, playback, coordination, ts, measureStep, soloist } = context;
+    const { step, motif, playback, coordination, ts, measureStep, soloistEffectiveEnabled } =
+        context;
 
     const isSoloistBusy =
         // why: soloistResting is published to the coordination context by tick-logic.ts
         // soloist producer block (S4); reading from the contract surface rather than
         // private session state directly ensures mocked tests exercise this branch.
-        coordination.soloistBusy || (soloist.enabled && !coordination.soloistResting);
+        // soloistEffectiveEnabled respects per-section overrides, so a section that
+        // mutes the soloist no longer leaves harmonies in "yield to the soloist" mode.
+        coordination.soloistBusy || (soloistEffectiveEnabled && !coordination.soloistResting);
 
     // Coordination: Yield to soloist if not reinforcing
     if (lastPlayedStep !== -1 && step === lastPlayedStep + 1 && coordination.soloistActive) {
@@ -523,7 +534,7 @@ function finalizeHarmonyNotes(
     coordination: any,
     octave: number,
 ): HarmonyNote[] {
-    const { playback, harmony, groove, soloist, chords } = activeState;
+    const { playback, harmony, groove, chords } = activeState;
     const {
         duration: baseDuration,
         isLatched,
@@ -542,8 +553,10 @@ function finalizeHarmonyNotes(
         // why: soloistResting and soloistNotesInPhrase are published via coordination
         // context by the tick-logic soloist producer block (S4); reading from the
         // contract surface rather than private session state keeps the contract honest.
+        // `isInstrumentActiveAtStep` threads through section-override semantics so
+        // muting the soloist for a section lets harmonies stop yielding to a phantom.
         coordination.soloistBusy ||
-        (soloist.enabled &&
+        (isInstrumentActiveAtStep(activeState, 'soloist', step) &&
             (!coordination.soloistResting || coordination.soloistNotesInPhrase > 3));
     const accompanimentCrowding = coordination.accompanimentHit && !isLatched && !isBloom;
 
@@ -1048,6 +1061,7 @@ export function getHarmonyNotes(
     const context: HarmonyContext = {
         step,
         soloist,
+        soloistEffectiveEnabled: isInstrumentActiveAtStep(activeState, 'soloist', step),
         coordination,
         playback,
         chord,

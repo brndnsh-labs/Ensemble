@@ -7,6 +7,7 @@ import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
 import { generateProceduralFill } from './fills.js';
 import { REVERB_PRESETS } from './reverb.js';
+import { effectiveTargetIntensity } from './section-overrides.js';
 
 /**
  * Genres that get the lush hall reverb preset; everything else gets the tight
@@ -248,7 +249,14 @@ export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
         return;
     }
 
-    if (Math.abs(playback.bandIntensity - conductor.targetIntensity) > 0.001) {
+    // why: when the playhead is inside a section that carries a `targetIntensity`
+    // override, the auto-conductor should ramp toward that section-local target
+    // instead of the global one. Falls back to `conductor.targetIntensity` when
+    // no override is present, preserving identical behavior for charts that
+    // don't use per-section arrangement.
+    const effectiveTarget = effectiveTargetIntensity(state, playback.step || 0);
+
+    if (Math.abs(playback.bandIntensity - effectiveTarget) > 0.001) {
         // why: asymmetric ramp — bands "settle in and build," leaning into rises and
         // easing out of drops. Original S8 inversion shipped 0.5×-down / 1.5×-up;
         // softened to 0.75 / 1.25 (Epic 12 S6 / LISTEN_TESTS B2) because the 1.5×
@@ -258,10 +266,10 @@ export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
         // per-measure rise at ≈+0.0625 — a musically natural swell rather than a step
         // change. Companion fixes from S8 — per-genre floors below + the drum-gate
         // sweep — still apply unchanged.
-        const multiplier = playback.bandIntensity > conductor.targetIntensity ? 0.75 : 1.25;
+        const multiplier = playback.bandIntensity > effectiveTarget ? 0.75 : 1.25;
         let newIntensity =
             playback.bandIntensity +
-            (playback.bandIntensity < conductor.targetIntensity
+            (playback.bandIntensity < effectiveTarget
                 ? Math.abs(conductor.stepSize)
                 : -Math.abs(conductor.stepSize)) *
                 multiplier;
@@ -327,6 +335,12 @@ export function checkSectionTransition(
             // a finite loopLimit, ride a hold+lift envelope across loops so all four
             // engines build/release in phase. loopLimit=0 (free-form jam) keeps
             // bit-identical behavior.
+            // why: macro-arc gated on explicit `loopLimit > 1`. Timer mode is
+            // shaped by the separate session-progress arc above (elapsed-minute
+            // ramp) — stacking both produces a 0.85× early-loop crush that
+            // contradicts the session-progress shape. The fuzzy-timer fix lives
+            // in scheduler-core's end condition + the Arrange tab's loop-strip
+            // visualization, not here.
             if (playback.loopLimit > 1) {
                 targetEnergy = Math.max(
                     0.1,
@@ -337,9 +351,19 @@ export function checkSectionTransition(
                     ),
                 );
             }
+            // why: when the upcoming measure falls inside a section with a
+            // `targetIntensity` override, size the per-tick stepSize to close
+            // that gap (not the orchestration-map target). Without this, an
+            // override of 0.9 against a global of 0.5 would still ramp at the
+            // smaller stride — likely never reaching the override before the
+            // section ends. updateAutoConductor then uses effectiveTarget for
+            // direction; this aligns the magnitude.
+            const overrideTarget = effectiveTargetIntensity(state, currentStep + stepsPerMeasure);
+            const rampTarget =
+                overrideTarget !== state.conductor.targetIntensity ? overrideTarget : targetEnergy;
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
                 targetIntensity: targetEnergy,
-                stepSize: (targetEnergy - playback.bandIntensity) / stepsPerMeasure,
+                stepSize: (rampTarget - playback.bandIntensity) / stepsPerMeasure,
             });
         }
 
@@ -592,6 +616,8 @@ export function checkSectionTransition(
                 if (playback.autoIntensity) {
                     // Synth-audit Epic 7 S4: arc-modulate the seed-driven target so the
                     // loop envelope composes with the section's macro energy. See arc.ts.
+                    // Gated on explicit `loopLimit > 1` only — timer-mode sessions use
+                    // the session-progress arc above instead.
                     let arcedTarget = targetEnergy;
                     if (playback.loopLimit > 1) {
                         arcedTarget = Math.max(
@@ -606,9 +632,17 @@ export function checkSectionTransition(
                             ),
                         );
                     }
+                    const overrideTarget = effectiveTargetIntensity(
+                        state,
+                        currentStep + stepsPerMeasure,
+                    );
+                    const rampTarget =
+                        overrideTarget !== state.conductor.targetIntensity
+                            ? overrideTarget
+                            : arcedTarget;
                     dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
                         targetIntensity: arcedTarget,
-                        stepSize: (arcedTarget - playback.bandIntensity) / stepsPerMeasure,
+                        stepSize: (rampTarget - playback.bandIntensity) / stepsPerMeasure,
                     });
                 }
 

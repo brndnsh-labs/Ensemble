@@ -24,6 +24,12 @@ export function handleEffects(
         case ACTIONS.TOGGLE_PLAY: {
             const { playback, arranger, soloist, groove } = stateMap;
             if (playback.isPlaying) {
+                // Auto-lock the chart whenever playback starts. The chart is a
+                // music stand — you don't rewrite while the band is playing.
+                // Unlock pauses; lock-on-play is the symmetric rule.
+                if (!playback.chartLocked) {
+                    dispatch(ACTIONS.SET_CHART_LOCKED, true);
+                }
                 // --- Soloist Seeder ---
                 let currentSongSeed = arranger.seed;
                 if (!currentSongSeed) {
