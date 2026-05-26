@@ -89,61 +89,98 @@ body.modal-open {
     margin-top: 1.5rem;
 }
 
-.generate-modal-shell {
-    min-height: 700px;
+/* --- SurpriseMe modal (consolidated dice / templates / library) --- */
+.surprise-me-shell {
+    min-height: 560px;
     display: flex;
     flex-direction: column;
 }
 
-.generate-modal-body {
-    padding: var(--space-5);
-    flex-grow: 1;
-}
-
-.generate-success {
+.surprise-me-mode-switcher {
     display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    padding: 2rem 0;
-    text-align: center;
+    padding: var(--space-3) var(--space-5) 0;
 }
 
-.generate-success-icon {
-    font-size: 4rem;
+.surprise-me-mode-group {
+    width: 100%;
+    gap: var(--space-2);
+}
+
+.surprise-me-mode-group .button-group-btn {
+    flex: 1;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+    border-radius: var(--radius-md);
+}
+
+.surprise-me-body {
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.surprise-me-pitch {
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
     margin-bottom: 1rem;
-    filter: drop-shadow(0 0 10px var(--accent-color));
-}
-
-.generate-success-title {
-    margin-bottom: 0.5rem;
-    color: var(--accent-color);
-}
-
-.generate-success-copy {
-    color: var(--text-muted);
     font-size: 0.9rem;
-    margin-bottom: 2rem;
 }
 
-.generate-success-button {
+.surprise-me-dice {
     width: 100%;
     padding: 1rem;
-    font-size: 1rem;
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
 }
 
-.generate-mode-switcher {
+.surprise-me-advanced-toggle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted, rgba(255, 255, 255, 0.55));
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0.4rem 0;
+}
+
+.surprise-me-advanced-toggle:hover {
+    color: var(--accent-primary, #6aa3ff);
+}
+
+.surprise-me-advanced {
     display: flex;
-    justify-content: center;
-    margin-bottom: 2rem;
-    padding: var(--space-2);
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
 }
 
-.generate-mode-toggle-group {
-    gap: var(--space-2);
+.surprise-me-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+}
+
+.surprise-me-field select,
+.surprise-me-field input[type="range"] {
+    width: 100%;
+}
+
+.surprise-me-value {
+    color: var(--accent-primary, #6aa3ff);
+    font-style: normal;
+    font-weight: 600;
+    margin-left: 0.4em;
+}
+
+.surprise-me-library-mode {
+    margin-bottom: 0.75rem;
+}
+
+.surprise-me-library-mode-group {
     width: 100%;
 }
 
@@ -152,26 +189,6 @@ body.modal-open {
     padding: 0.75rem;
     font-size: 1rem;
     border-radius: var(--radius-md);
-}
-
-.generate-copy {
-    margin-bottom: 1.5rem;
-}
-
-.generate-section-spaced {
-    margin-top: 1rem;
-}
-
-.generate-section-borderless {
-    padding-bottom: 0;
-    margin-bottom: 0;
-}
-
-.generate-template-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-    padding-bottom: 1rem;
 }
 
 .generate-template-card {
@@ -212,44 +229,6 @@ body.modal-open {
     color: var(--text-muted);
 }
 
-.generate-select--sm {
-    min-width: 100px;
-}
-
-.generate-select--md {
-    min-width: 150px;
-}
-
-.generate-text-input {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--input-bg);
-    color: var(--text-color);
-}
-
-.generate-value-highlight {
-    margin-right: 0.5rem;
-    color: var(--accent-color);
-    font-weight: bold;
-}
-
-.generate-range {
-    width: 100px;
-}
-
-.generate-subsection {
-    margin-top: 0.5rem;
-}
-
-.generate-submit-btn {
-    width: 100%;
-    margin-top: 1rem;
-    padding: 1rem;
-    font-size: 1rem;
-}
-
 /* Settings Grid for Desktop */
 @media (min-width: 900px) {
     .settings-controls {
@@ -263,26 +242,6 @@ body.modal-open {
     .settings-section:last-child {
         grid-column: span 2;
     }
-}
-
-/* --- Editor Modal Redesign --- */
-#editorOverlay .settings-content {
-    width: 100vw;
-    height: 100dvh;
-    max-width: 100vw;
-    max-height: 100dvh;
-    border-radius: 0;
-    border: none;
-    padding: 0;
-}
-
-.editor-modal {
-    padding: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--panel-color);
 }
 
 .modal-header,
@@ -303,51 +262,6 @@ body.modal-open {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-}
-
-.editor-modal-header {
-    padding: 1rem 1rem 0.85rem;
-    align-items: flex-start;
-    gap: 1rem;
-}
-
-.editor-modal-header h2 {
-    color: var(--text-color);
-    text-transform: none;
-    letter-spacing: normal;
-}
-
-.editor-modal-header-copy {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.editor-modal-kicker {
-    margin: 0;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-
-.editor-modal-summary {
-    margin: 0;
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    line-height: 1.45;
-    max-width: 56rem;
-}
-
-.editor-modal-header-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.65rem;
-    margin-left: auto;
 }
 
 .editor-toolbar-btn {
@@ -422,41 +336,383 @@ body.modal-open {
     color: var(--text-muted);
 }
 
-.editor-modal-toolbar {
+.editor-tab.active {
+    background: var(--accent-color, var(--panel-color));
+    color: var(--accent-text, var(--text-color));
+}
+
+.arrange-view {
+    padding: 1rem;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.arrange-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.arrange-slider {
+    width: 100%;
+    accent-color: var(--text-muted);
+}
+
+.arrange-slider.override {
+    accent-color: var(--accent-color, dodgerblue);
+}
+
+/* --- Loop strip (macro / session view above the section timeline) --- */
+
+.arrange-loop-strip {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel-color), black 4%);
+    padding: 0.55rem 0.75rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.arrange-loop-strip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.arrange-loop-strip-title {
+    font-weight: 600;
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem;
+}
+
+.arrange-loop-strip-meta {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.arrange-loop-ticks {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 44px;
+}
+
+.arrange-loop-tick {
+    flex: 1 1 auto;
+    min-width: 6px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: stretch;
+    background: color-mix(in srgb, var(--input-bg), transparent 40%);
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition:
+        background 120ms ease,
+        border-color 120ms ease;
+}
+
+.arrange-loop-tick-fill {
+    width: 100%;
+    background: color-mix(in srgb, var(--text-muted), transparent 50%);
+    border-radius: 3px;
+    transition: height 180ms ease;
+}
+
+.arrange-loop-tick.state-done .arrange-loop-tick-fill {
+    background: color-mix(in srgb, var(--text-muted), transparent 70%);
+}
+
+.arrange-loop-tick.state-current {
+    background: color-mix(in srgb, var(--accent-color, dodgerblue), transparent 80%);
+    border-color: var(--accent-color, dodgerblue);
+}
+
+.arrange-loop-tick.state-current .arrange-loop-tick-fill {
+    background: var(--accent-color, dodgerblue);
+}
+
+.arrange-loop-tick.state-upcoming .arrange-loop-tick-fill {
+    background: color-mix(in srgb, var(--text-muted), transparent 55%);
+}
+
+.arrange-loop-jam {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    height: 32px;
+}
+
+.arrange-loop-jam-bar {
+    flex: 0 0 60px;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--accent-color, dodgerblue), transparent 50%),
+        color-mix(in srgb, var(--accent-color, dodgerblue), transparent 80%) 50%,
+        color-mix(in srgb, var(--accent-color, dodgerblue), transparent 50%)
+    );
+}
+
+.arrange-loop-jam-hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.arrange-song-stats {
+    display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-color);
-    background: color-mix(in srgb, var(--panel-color), black 3%);
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
-.editor-modal-stats {
+.arrange-song-progress {
+    flex: 1 1 auto;
+    min-width: 60px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--input-bg);
+    overflow: hidden;
+}
+
+.arrange-song-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--accent-color, dodgerblue);
+    transition: width 200ms ease;
+}
+
+/* --- Timeline view --- */
+
+.arrange-toolbar {
     display: flex;
+    align-items: center;
+    gap: 0.75rem;
     flex-wrap: wrap;
-    gap: 0.5rem;
 }
 
-.editor-stat-chip {
+.arrange-auto-toggle {
     display: inline-flex;
     align-items: center;
-    min-height: 30px;
-    padding: 0.25rem 0.7rem;
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    background: var(--input-bg);
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.arrange-pinned-count {
     font-size: 0.78rem;
     color: var(--text-muted);
 }
 
+.arrange-reset-all {
+    appearance: none;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-color);
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+.arrange-reset-all:hover {
+    background: var(--panel-color);
+}
+
+.arrange-timeline-wrapper {
+    position: relative;
+    background: color-mix(in srgb, var(--panel-color), black 3%);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.6rem;
+    overflow-x: auto;
+}
+
+.arrange-timeline {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+    min-width: 100%;
+}
+
+.arrange-playhead {
+    position: absolute;
+    top: 0.6rem;
+    bottom: 0.6rem;
+    width: 2px;
+    background: var(--accent-color, dodgerblue);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent-color, dodgerblue), transparent 50%);
+    pointer-events: none;
+    z-index: 2;
+    transition: left 100ms linear;
+}
+
+.arrange-block {
+    flex: 0 0 auto;
+    min-width: 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.arrange-block-hit {
+    appearance: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--panel-color);
+    cursor: pointer;
+    padding: 0.35rem 0.4rem 0.3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    color: var(--text-color);
+    position: relative;
+    overflow: hidden;
+    height: 96px;
+    text-align: left;
+    transition:
+        border-color 120ms ease,
+        background 120ms ease;
+}
+
+.arrange-block-hit:hover {
+    border-color: var(--accent-color, dodgerblue);
+}
+
+.arrange-block.is-expanded .arrange-block-hit {
+    border-color: var(--accent-color, dodgerblue);
+    background: color-mix(in srgb, var(--panel-color), var(--accent-color, dodgerblue) 8%);
+}
+
+.arrange-block-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+}
+
+.arrange-block-fill-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    display: flex;
+    align-items: flex-end;
+}
+
+.arrange-block-fill {
+    width: 100%;
+    transition: height 180ms ease;
+}
+
+.arrange-block-fill--pinned {
+    background: linear-gradient(
+        to top,
+        color-mix(in srgb, var(--accent-color, dodgerblue), transparent 40%),
+        color-mix(in srgb, var(--accent-color, dodgerblue), transparent 75%)
+    );
+}
+
+.arrange-block-fill--ghost {
+    background-image: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--text-muted), transparent 70%) 0,
+        color-mix(in srgb, var(--text-muted), transparent 70%) 4px,
+        transparent 4px,
+        transparent 8px
+    );
+}
+
+.arrange-block-intensity-value {
+    align-self: flex-end;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    position: relative;
+    z-index: 1;
+}
+
+.arrange-block-instruments {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+}
+
+.arrange-inst-dot {
+    appearance: none;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    font-weight: 600;
+    border-radius: 4px;
+    height: 18px;
+    padding: 0;
+    cursor: pointer;
+    transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+.arrange-inst-dot.state-on {
+    background: color-mix(in srgb, var(--accent-color, dodgerblue), transparent 60%);
+    border-color: var(--accent-color, dodgerblue);
+    color: var(--text-color);
+}
+
+.arrange-inst-dot.state-off {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--border-color), red 30%);
+    color: color-mix(in srgb, var(--text-muted), red 20%);
+    text-decoration: line-through;
+}
+
+.arrange-inst-dot.effective-off:not(.state-off) {
+    opacity: 0.45;
+}
+
+/* --- Inline editor --- */
+
 @media (max-width: 700px) {
-    .editor-modal-header-actions {
-        width: 100%;
-        justify-content: flex-start;
-        margin-left: 0;
+    .arrange-block {
+        min-width: 60px;
     }
 
+    .arrange-inst-dot {
+        font-size: 0.55rem;
+        height: 16px;
+    }
+}
+
+.editor-chart-layout.drawer-open {
+    grid-template-columns: 1fr minmax(260px, 320px);
+}
+
+@media (max-width: 700px) {
+    .editor-chart-layout.drawer-open {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
     .editor-toolbar-btn,
     .editor-action-container {
         width: 100%;
@@ -666,14 +922,6 @@ body.modal-open {
     opacity: 0.7;
 }
 
-.editor-scroll-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 1rem;
-    background: color-mix(in srgb, var(--bg-color), black 10%);
-    -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
-}
-
 .modal-footer {
     padding: 1rem;
     border-top: 1px solid var(--border-color);
@@ -706,36 +954,6 @@ body.modal-open {
 
 /* Desktop Enhancements */
 @media (min-width: 900px) {
-    #editorOverlay .settings-content {
-        width: min(calc(100vw - 32px), 1680px);
-        max-width: min(calc(100vw - 32px), 1680px);
-        height: calc(100vh - 32px);
-        max-height: calc(100vh - 32px);
-        border-radius: 20px;
-        border: 1px solid var(--border-color);
-    }
-
-    .editor-modal {
-        margin: 0;
-        height: 100%;
-    }
-
-    .editor-modal-header {
-        padding: 1.1rem 1.4rem 0.95rem;
-    }
-
-    .editor-modal-header h2 {
-        font-size: 1.25rem;
-    }
-
-    .editor-modal-toolbar {
-        padding: 0.85rem 1.4rem;
-    }
-
-    .editor-scroll-area {
-        padding: 1.25rem 1.4rem 1.5rem;
-    }
-
     .section-list {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -935,32 +1153,6 @@ input[type="range"] {
     transform: translateY(-1px);
 }
 
-.drag-handle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 0.3rem;
-    border-radius: 999px;
-    border: 1px solid var(--border-color);
-    background: var(--input-bg);
-    cursor: grab;
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    letter-spacing: -0.18em;
-    user-select: none;
-    transition: color 0.2s;
-}
-
-.drag-handle:hover {
-    color: var(--accent-color);
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-}
-
 .section-card:active {
     cursor: grabbing;
 }
@@ -992,31 +1184,9 @@ input[type="range"] {
 .section-duplicate-btn,
 .section-kebab-btn,
 .section-delete-btn,
-.section-link-btn {
-    background: none;
-    border: 1px solid transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 1rem;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border-radius: 999px;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
 .section-move-btn:hover,
 .section-duplicate-btn:hover,
 .section-kebab-btn:hover,
-.section-link-btn:hover {
-    color: var(--text-color);
-    background: color-mix(in srgb, var(--card-bg), white 8%);
-    border-color: color-mix(in srgb, var(--accent-color), transparent 60%);
-}
-
 .section-link-btn.active {
     color: var(--accent-color);
     background: color-mix(in srgb, var(--accent-color), transparent 85%);
@@ -1026,11 +1196,6 @@ input[type="range"] {
 
 .section-link-btn.active:hover {
     background: color-mix(in srgb, var(--accent-color), transparent 78%);
-}
-
-.section-delete-btn:hover {
-    color: var(--red);
-    background: rgba(239, 68, 68, 0.1);
 }
 
 /* Visual Connection for Linked Sections */
@@ -1057,18 +1222,435 @@ input[type="range"] {
     margin-bottom: 0.75rem;
 }
 
+/* --- Section direction strip (per-section intensity + instrument dots) ---
+ *
+ * Single-row banner: [label] [fixed-width intensity] [5 dots pushed right].
+ * The intensity slider is fixed-width (not flex-grow) so the strip stays
+ * compact even on chord-blocks that span the full chart — keeps chord
+ * density readable on song-length charts. Target height ~32px.
+ */
+.section-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    min-height: 32px;
+}
+
+.section-strip__label {
+    flex: 0 0 auto;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+    min-width: 1.5rem;
+    max-width: 9rem;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.section-strip__intensity {
+    flex: 0 0 auto;
+    width: 160px;
+}
+
+/* Compact mode: dynamic letter button replaces the slider entirely, so the
+ * intensity column shrinks to ~3ch + comfortable hit-target. */
+.section-strip--compact .section-strip__intensity {
+    width: auto;
+}
+
+.section-strip__dynamic {
+    appearance: none;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--accent-color);
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.5rem;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    min-width: 2.4rem;
+    line-height: 1.2;
+    transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+.section-strip__dynamic:hover {
+    border-color: var(--accent-color);
+}
+
+/* Follow-global state: dimmed em-dash placeholder. */
+.section-strip__dynamic--follow {
+    color: var(--text-muted);
+    font-style: normal;
+    opacity: 0.7;
+}
+
+.section-strip__intensity-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.section-strip__intensity-text {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    min-width: 2em;
+    text-align: right;
+    font-size: 0.7rem;
+}
+
+.section-strip__intensity input[type="range"] {
+    flex: 1 1 auto;
+    accent-color: var(--accent-color);
+    min-width: 0;
+    height: 4px;
+}
+
+/* Following global → dim the slider and percentage so the user reads "default". */
+.section-strip--intensity-follow .section-strip__intensity input[type="range"] {
+    opacity: 0.4;
+}
+
+.section-strip--intensity-follow .section-strip__intensity-text {
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.section-strip__lanes {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto; /* push to the right edge */
+    flex-shrink: 0;
+}
+
+.section-strip__lane {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease,
+        opacity 120ms ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.section-strip__lane:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.section-strip__lane--follow {
+    border-style: dashed;
+    color: var(--text-muted);
+}
+
+.section-strip__lane--follow.section-strip__lane--muted {
+    opacity: 0.45;
+}
+
+.section-strip__lane--on {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--bg-color);
+}
+
+.section-strip__lane--off {
+    background: transparent;
+    color: var(--text-muted);
+    border-color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+}
+
+/* Compact variant for the chord-visualizer (locked) view. */
+.section-strip--compact {
+    padding: 0.2rem 0.5rem;
+    gap: 0.5rem;
+    min-height: 28px;
+}
+
+/* Playing state: collapse to just the section label so the chart reads as
+ * clean sheet music while the band performs. Direction controls reappear
+ * the moment playback stops. */
+.section-strip--playing {
+    background: transparent;
+    border-color: transparent;
+    min-height: 22px;
+    padding: 0.15rem 0.5rem;
+}
+
+.section-strip--compact .section-strip__lane {
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.6rem;
+}
+
+.section-strip--compact .section-strip__intensity {
+    width: 130px;
+}
+
+/* On narrow viewports drop the percentage readout and shrink the slider so
+ * dots stay reachable. */
+@media (max-width: 640px) {
+    .section-strip__intensity {
+        width: 110px;
+    }
+    .section-strip__intensity-text {
+        display: none;
+    }
+}
+
+/* --- Chord picker popover (locked-mode tap-to-swap) --- */
+.chord-picker {
+    position: fixed;
+    z-index: var(--z-popover, 1000);
+    width: 280px;
+    padding: 0.6rem;
+    background: var(--bg-elevated, #20232b);
+    border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: var(--radius-md, 8px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.chord-picker__row {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.chord-picker__row--roots {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.chord-picker__row--qualities {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.chord-picker__root,
+.chord-picker__quality {
+    appearance: none;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    background: transparent;
+    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    border-radius: var(--radius-sm, 6px);
+    padding: 0.4rem 0.25rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition:
+        background 100ms ease,
+        border-color 100ms ease,
+        color 100ms ease;
+    min-height: 36px; /* mobile touch target */
+}
+
+.chord-picker__root:hover,
+.chord-picker__quality:hover {
+    border-color: var(--accent-primary, #6aa3ff);
+    color: var(--text-high, #fff);
+}
+
+.chord-picker__root.is-active,
+.chord-picker__quality.is-active {
+    background: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-primary, #6aa3ff);
+    color: var(--bg-base, #1a1a1f);
+}
+
 .section-title-row {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
 }
 
-.section-title-meta {
+.section-title-actions {
     display: flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.25rem;
     flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Drag handle: small grab affordance, only this element is draggable now
+ * (no more whole-card drags grabbing accidental input focus / scrolls). */
+.section-drag-handle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.6rem;
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: grab;
+    user-select: none;
+    font-size: 1rem;
+    line-height: 1;
+    transition:
+        background 120ms ease,
+        color 120ms ease;
+}
+
+.section-drag-handle:hover {
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+
+.section-drag-handle:active,
+.section-card.is-dragging .section-drag-handle {
+    cursor: grabbing;
+}
+
+/* Actions menu (kebab popover): consolidated home for repeat, key, time
+ * signature, link, duplicate, delete — everything not core to writing chords. */
+.section-actions-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--panel-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    z-index: var(--z-floating);
+    min-width: 200px;
+}
+
+.section-actions-menu__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.25rem 0.4rem;
+}
+
+.section-actions-menu__label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.section-actions-menu__row select,
+.section-actions-menu__row input[type="number"] {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    min-width: 6rem;
+}
+
+.section-actions-menu__divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.15rem 0;
+}
+
+.section-actions-menu__btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-color);
+    text-align: left;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.section-actions-menu__btn:hover {
+    background: var(--input-bg);
+}
+
+.section-actions-menu__btn--danger {
+    color: #d65b5b;
+}
+
+.section-actions-menu__btn--danger:hover {
+    background: color-mix(in srgb, #d65b5b, transparent 90%);
+}
+
+/* Card-level drop-target indicator — a thin colored line at the top or bottom
+ * of the target card depending on cursor position. Reads like "the dragged
+ * section will land here." */
+.section-card.drag-over {
+    position: relative;
+}
+
+.section-card.drag-over--before::before,
+.section-card.drag-over--after::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 3px;
+    background: var(--accent-color);
+    border-radius: 2px;
+    box-shadow: 0 0 6px color-mix(in srgb, var(--accent-color), transparent 50%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.section-card.drag-over--before::before {
+    top: -2px;
+}
+
+.section-card.drag-over--after::after {
+    bottom: -2px;
+}
+
+.section-card.dragging {
+    opacity: 0.5;
+}
+
+/* Custom drag image: a small label chip that floats with the cursor instead of
+ * the entire card. Inserted off-screen during dragstart, removed on next tick. */
+.section-drag-chip {
+    position: absolute;
+    top: -1000px;
+    left: -1000px;
+    padding: 0.35rem 0.7rem;
+    background: var(--accent-color);
+    color: var(--bg-color);
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    z-index: 9999;
 }
 
 .section-status-chip {
@@ -1084,15 +1666,6 @@ input[type="range"] {
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-}
-
-.section-controls-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    width: 100%;
 }
 
 .section-label-input {
@@ -1218,13 +1791,6 @@ input[type="range"] {
 }
 
 /* Arrangement Editor: Section Settings */
-.section-settings-row {
-    display: flex;
-    gap: 0.45rem;
-    align-items: center;
-    margin: 0;
-    flex-wrap: wrap;
-}
 
 .section-setting-item,
 .form-control-compact {

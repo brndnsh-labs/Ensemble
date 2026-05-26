@@ -82,6 +82,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, seeded humanization). | `rampGain`, `killActiveVoices`, `humanizeNote` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
+| `public/engine/section-overrides.ts` | Per-section intensity + instrument-enabled override lookup. | `sectionAtStep`, `effectiveTargetIntensity`, `isInstrumentActiveAtStep` |
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers shared across engines. | `scrambleHash`, `stringHash33`, `stringHash31` |
@@ -132,11 +133,15 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
 | **Containers** | `public/App.tsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, and notification layers. |
-| **Surface** | `public/components/ChartSurface.tsx` | Chart-first single surface. Three slot regions: TopBar (transport + key/time + actions), Chart (ChordVisualizer), Rail (InstrumentRail). Visualizer overlay is gated behind the 🌈 button. |
+| **Surface** | `public/components/ChartSurface.tsx` | Chart-first single surface. Branches on `playback.chartLocked`: locked → `ChordVisualizer` (read-only), unlocked → `InlineEditor`. Topbar lock toggle pauses playback when unlocking. |
+| **Surface** | `public/components/InlineEditor.tsx` | Inline section-card editor mounted on ChartSurface when unlocked. Hosts the Arranger + slim toolbar (Add Section, Tools menu, inspiration drawer). Replaces the deleted EditorModal. |
+| **Controls** | `public/components/editor/SectionHeaderStrip.tsx` | Per-section direction strip — intensity slider + 5 tri-state instrument dots (D/B/C/H/S). Mounted above each section in both ChordVisualizer (locked) and SectionCard (unlocked). |
+| **Controls** | `public/components/editor/ChordPicker.tsx` | Tap-a-chord popover for locked-mode chart edits. Diatonic + borrowed roots × 8 qualities; emits notation-aware text (`roman`/`nns`/`name`) via `onSelect`. Anchored to the tapped cell, dismisses on Esc / outside-tap. |
 | **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
 | **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
 | **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
 | **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
+| **Inspiration** | `public/components/SurpriseMe.tsx` | Single 🎲 entry point hosting three flows — Roll (instant random `generateSong`), Templates (`SONG_TEMPLATES`), Library (`PresetLibrary` replace/append). Replaces the prior GenerateSongModal + LibraryModal + LibraryDrawer trio. |
 | **Orchestration** | `public/components/AuditionOverlay.tsx` | One-button "▶ Play" landing shown when the app is opened from an audition permalink (`?autoplay=1`); satisfies the browser autoplay gesture and starts the hydrated scene. |
 | **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface used by the editor modal and related flows. |
 | **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |

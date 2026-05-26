@@ -45,9 +45,10 @@ If you want to take over the rhythm section or just troubleshoot the kit:
     - **Fills:** `R`, `T`, `Y` (Toms) and `U` (Crash)
 
 ### "I'm writing a new song"
-Use the **Arranger** tools to bridge your ideas with the AI.
-- **Progression Library:** Open the Arranger actions menu and use **Library** when you want a quick starting point or a standard form to practice over.
-- **Inspiration Hub:** From the editor, open **Inspiration Hub** to generate full song forms or seed a new arrangement from existing material.
+The chart is locked by default — your music stand. Tap **🔒 Edit** in the topbar (or press `E`) to unlock and start editing; lock re-engages automatically when you hit play.
+- **🎲 Surprise me:** Roll a random arrangement in your current key, pick a curated template, or load a chord-progression preset. One button replaces the older Library + Generate Song + Inspiration Hub entry points.
+- **Tap-a-chord:** While the chart is locked, tap any chord to swap it via a popover — no keyboard needed.
+- **Per-section direction:** Each section header shows a dynamic-mark button (`pp` / `mp` / `mf` / `ff`) and five instrument dots (D · B · C · H · S) — tap to dial intensity per-section or mute an instrument just inside that section.
 
 ### "I want to record into my DAW"
 Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hardware synths.
