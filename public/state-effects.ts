@@ -12,6 +12,7 @@ import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
 import type { EnsembleState } from './types.js';
 import { ACTIONS } from './types.js';
+import { clearToastActions } from './ui.js';
 
 export function handleEffects(
     action: string,
@@ -157,11 +158,21 @@ export function handleEffects(
             break;
         }
         case ACTIONS.SHOW_TOAST: {
-            const toastId = stateMap.playback.toasts[stateMap.playback.toasts.length - 1]?.id;
-            if (toastId) {
+            const lastToast = stateMap.playback.toasts[stateMap.playback.toasts.length - 1];
+            if (lastToast?.id) {
+                // Actionable toasts linger so the user has time to click; plain
+                // toasts dismiss in 2s as before.
+                const expireMs = lastToast.actions?.length ? 8000 : 2000;
                 setTimeout(() => {
-                    dispatch(ACTIONS.TOAST_EXPIRED, toastId);
-                }, 2000);
+                    dispatch(ACTIONS.TOAST_EXPIRED, lastToast.id);
+                }, expireMs);
+            }
+            break;
+        }
+        case ACTIONS.TOAST_EXPIRED: {
+            // Free any registered action callbacks for the dismissed toast.
+            if (typeof payload === 'string') {
+                clearToastActions(payload);
             }
             break;
         }

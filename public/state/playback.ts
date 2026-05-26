@@ -192,13 +192,15 @@ export function playbackReducer(action: Action): boolean {
             break;
         case ACTIONS.SHOW_TOAST: {
             const toast = action.payload;
-            const id =
-                (typeof toast === 'object' ? toast.id : undefined) ||
-                Math.random().toString(36).substr(2, 9);
-            const message = String(
-                (typeof toast === 'object' ? toast.message : undefined) || toast,
-            );
-            p.toasts = [...p.toasts, { id, message }];
+            const isObj = typeof toast === 'object' && toast !== null;
+            const id = (isObj ? toast.id : undefined) || Math.random().toString(36).substr(2, 9);
+            const message = String((isObj ? toast.message : undefined) || toast);
+            const actions = isObj && Array.isArray(toast.actions) ? toast.actions : undefined;
+            const entry: { id: string; message: string; actions?: string[] } = { id, message };
+            if (actions && actions.length > 0) {
+                entry.actions = actions;
+            }
+            p.toasts = [...p.toasts, entry];
             return true;
         }
         case 'TOAST_EXPIRED':

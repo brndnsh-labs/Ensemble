@@ -174,6 +174,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/midi-export.ts` | Main-thread MIDI file triggers. |
 | `public/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
 | `public/song-generator.ts` | Algorithmic song structure generation. |
+| `public/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
 | `public/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |

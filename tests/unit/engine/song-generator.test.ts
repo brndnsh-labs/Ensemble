@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateSong } from '../../../public/song-generator.js';
+import { generateSong, predictStructure } from '../../../public/song-generator.js';
 
 describe('Song Generator', () => {
-    it('should generate a song with default options', () => {
+    it('generates a song with default options', () => {
         const result = generateSong();
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBeGreaterThan(0);
@@ -11,117 +11,212 @@ describe('Song Generator', () => {
         expect(result[0]).toHaveProperty('key');
     });
 
-    it('should respect a specific key', () => {
-        const result = generateSong({ key: 'Eb' });
+    it('respects a specific key', () => {
+        const result = generateSong({ key: 'Eb', feel: 'Rock' });
         expect(result[0].key).toBe('Eb');
     });
 
-    it('should generate minor progressions when isMinor is true', () => {
+    it('uses minor pool when isMinor is set', () => {
         const sections = generateSong({
-            structure: 'pop',
+            feel: 'Rock',
             isMinor: true,
-            key: 'Am',
+            key: 'A',
         });
-
-        // Check if common minor Roman numerals exist in the output
+        // Minor pool emits lowercase Roman numerals like 'i', 'iv', 'v', 'bVI'.
         const allChords = sections.map((s) => s.value).join(' ');
-        expect(allChords.toLowerCase()).toContain('i');
-        // Minor progressions in the pool use 'i', 'iv', 'bVI', etc.
-        expect(allChords).toMatch(/\bi\b|\biv\b|\bv\b/);
+        expect(allChords).toMatch(/\bi\b|\biv\b|\bv\b|bVI|bVII/);
     });
 
-    it('should respect a specific time signature', () => {
-        const result = generateSong({ timeSignature: '3/4' });
+    it('respects a specific time signature', () => {
+        const result = generateSong({ timeSignature: '3/4', feel: 'Rock' });
         expect(result[0].timeSignature).toBe('3/4');
     });
 
-    it('should handle random time signature selection', () => {
+    it('handles random time signature selection', () => {
         const spy = vi.spyOn(Math, 'random');
-
-        // 4/4 branch (< 0.7)
         spy.mockReturnValue(0.5);
-        let result = generateSong({ timeSignature: 'Random' });
+        let result = generateSong({ timeSignature: 'Random', feel: 'Rock' });
         expect(result[0].timeSignature).toBe('4/4');
 
-        // 3/4 branch (0.7 - 0.9)
         spy.mockReturnValue(0.8);
-        result = generateSong({ timeSignature: 'Random' });
+        result = generateSong({ timeSignature: 'Random', feel: 'Rock' });
         expect(result[0].timeSignature).toBe('3/4');
 
-        // 6/8 branch (> 0.9)
         spy.mockReturnValue(0.95);
-        result = generateSong({ timeSignature: 'Random' });
+        result = generateSong({ timeSignature: 'Random', feel: 'Rock' });
         expect(result[0].timeSignature).toBe('6/8');
 
         spy.mockRestore();
     });
 
-    it('should generate a Blues structure', () => {
-        const result = generateSong({ structure: 'blues' });
-        const labels = result.map((s) => s.label);
-        expect(labels).toContain('Verse');
-        expect(labels).toContain('Solo');
-        // Blues should have 12 bars per section
-        expect(result[0].value.split(' | ').length).toBe(12);
-    });
-
-    it('should implement Jazz AABA structure with motif memory', () => {
-        const sections = generateSong({
-            structure: 'jazz',
-            complexity: 0.5,
-        });
-
-        // Verify structure labels
-        expect(sections.map((s) => s.label)).toEqual(['A1', 'A2', 'B', 'A3']);
-
-        // Verify A sections are identical (motif memory)
-        expect(sections[0].value).toBe(sections[1].value);
-        expect(sections[0].value).toBe(sections[3].value);
-
-        // Verify B section is different
-        expect(sections[2].value).not.toBe(sections[0].value);
-    });
-
-    it('should add chord extensions at high complexity', () => {
-        const simpleSections = generateSong({
-            structure: 'pop',
-            complexity: 0.1,
-        });
-        const complexSections = generateSong({
-            structure: 'pop',
-            complexity: 0.9,
-        });
-
-        const simpleChords = simpleSections.map((s) => s.value).join(' ');
-        const complexChords = complexSections.map((s) => s.value).join(' ');
-
-        // Complex should contain extensions like maj9, 13, 9
-        expect(complexChords).toMatch(/maj9|13|9/);
-        expect(simpleChords).not.toMatch(/maj9|13/);
-    });
-
-    it('should generate a Simple structure', () => {
-        const result = generateSong({ structure: 'simple' });
-        const labels = result.map((s) => s.label);
-        expect(labels).toEqual(['Verse', 'Chorus', 'Verse', 'Chorus']);
-    });
-
-    it('should respect the seed from a current section', () => {
-        const seedValue = 'I | IV | V | I';
-        const result = generateSong({
-            structure: 'simple',
-            seed: { type: 'Verse', value: seedValue },
-        });
-
+    it('produces 12-bar verses for Blues feel', () => {
+        const result = generateSong({ feel: 'Blues', targetMinutes: 2, bpm: 80 });
         const verses = result.filter((s) => s.label === 'Verse');
-        verses.forEach((v) => {
-            expect(v.value).toBe(seedValue);
-        });
+        expect(verses.length).toBeGreaterThan(0);
+        expect(verses[0].value.split(' | ').length).toBe(12);
     });
 
-    it('should reuse generated progressions for same labels (memory logic)', () => {
-        const result = generateSong({ structure: 'simple' }); // Verse, Chorus, Verse, Chorus
-        expect(result[0].value).toBe(result[2].value); // First and second Verse should match
-        expect(result[1].value).toBe(result[3].value); // First and second Chorus should match
+    it('emits AABA structure for Jazz feel', () => {
+        const sections = generateSong({ feel: 'Jazz', targetMinutes: 2.5, bpm: 120 });
+        const labels = sections.map((s) => s.label);
+        // Should contain A1, A2, B, A3 (potentially with Intro/Outro at the ends).
+        expect(labels).toContain('A1');
+        expect(labels).toContain('A2');
+        expect(labels).toContain('B');
+        expect(labels).toContain('A3');
+    });
+
+    it('motif memory: A sections share the same progression in jazz', () => {
+        const sections = generateSong({ feel: 'Jazz', targetMinutes: 1.5, bpm: 120 });
+        const aSections = sections.filter((s) => /^A\d/.test(s.label));
+        expect(aSections.length).toBeGreaterThanOrEqual(2);
+        const first = aSections[0].value;
+        aSections.forEach((a) => expect(a.value).toBe(first));
+    });
+
+    it('Jazz feel tilts the majority of bare degrees to maj7 / 7 / m7', () => {
+        const sections = generateSong({ feel: 'Jazz', targetMinutes: 2, bpm: 120 });
+        const tokens = sections.flatMap((s) => s.value.split(' | ').map((c) => c.trim()));
+        // Tokens of interest are the degrees that JAZZ_TILT touches (no accidentals).
+        const tilted = tokens.filter((t) => /^(Imaj7|IVmaj7|V7|ii7|vi7|iii7|im7|iv7)$/.test(t));
+        const candidates = tokens.filter((t) =>
+            /^(I|IV|V|ii|vi|iii|i|iv|Imaj7|IVmaj7|V7|ii7|vi7|iii7|im7|iv7)$/.test(t),
+        );
+        expect(candidates.length).toBeGreaterThan(0);
+        // The jazz pool is dominated by these degrees; tilt should hit the majority.
+        const ratio = tilted.length / candidates.length;
+        expect(ratio).toBeGreaterThanOrEqual(0.6);
+    });
+
+    it('Rock feel keeps triads (no automatic 7ths)', () => {
+        const sections = generateSong({ feel: 'Rock', targetMinutes: 2, bpm: 120 });
+        const allChords = sections.map((s) => s.value).join(' ');
+        // Should contain at least some bare Roman numerals (no maj7/9 overlay).
+        // The pop pool itself contains some bVII/bVI but no maj7 unless we tilt.
+        expect(allChords).not.toMatch(/maj7|maj9/);
+    });
+
+    it('Funk feel adds 7ths on common scale degrees', () => {
+        const sections = generateSong({ feel: 'Funk', targetMinutes: 2, bpm: 110 });
+        const allChords = sections.map((s) => s.value).join(' ');
+        expect(allChords).toMatch(/I7|IV7|V7|ii7/);
+    });
+
+    it('targetMinutes + bpm together drive the section count (longer ≥ shorter)', () => {
+        const short = generateSong({
+            feel: 'Rock',
+            targetMinutes: 1,
+            bpm: 120,
+            timeSignature: '4/4',
+        });
+        const long = generateSong({
+            feel: 'Rock',
+            targetMinutes: 6,
+            bpm: 120,
+            timeSignature: '4/4',
+        });
+        expect(long.length).toBeGreaterThanOrEqual(short.length);
+    });
+
+    it('form="loop" produces a single Main section', () => {
+        const result = generateSong({
+            feel: 'Funk',
+            form: 'loop',
+            targetMinutes: 2,
+            bpm: 100,
+        });
+        expect(result.length).toBe(1);
+        expect(result[0].label).toBe('Main');
+    });
+
+    it('places a seed at the matching Role section and copies it to repeats', () => {
+        const seed = { chords: ['I', 'IV', 'V', 'I'], role: 'chorus' as const };
+        const result = generateSong({
+            feel: 'Rock',
+            targetMinutes: 3,
+            bpm: 120,
+            seed,
+        });
+        const choruses = result.filter((s) => s.label === 'Chorus');
+        expect(choruses.length).toBeGreaterThan(0);
+        // The seed becomes a 4-bar progression; choruses should all match.
+        const expected = 'I | IV | V | I | I | IV | V | I'; // looped to 8 bars
+        choruses.forEach((c) => expect(c.value).toBe(expected));
+    });
+
+    it('Role "unknown" still places the seed somewhere in the song', () => {
+        const seed = { chords: ['vi', 'IV', 'I', 'V'], role: 'unknown' as const };
+        const result = generateSong({
+            feel: 'Rock',
+            targetMinutes: 2,
+            bpm: 120,
+            seed,
+        });
+        const allChords = result.map((s) => s.value).join(' | ');
+        expect(allChords).toContain('vi | IV | I | V');
+    });
+
+    it('predictStructure returns the same labels generateSong would use', () => {
+        const opts = {
+            feel: 'Rock',
+            targetMinutes: 3,
+            bpm: 120,
+            timeSignature: '4/4',
+        };
+        const predicted = predictStructure(
+            opts.targetMinutes,
+            opts.bpm,
+            opts.timeSignature,
+            'verse-chorus',
+            opts.feel,
+        );
+        const generated = generateSong(opts).map((s) => s.label);
+        expect(generated).toEqual(predicted);
+    });
+
+    it('Jazz feel + isMinor uses the jazz_minor pool (lowercase i, dominant V)', () => {
+        const sections = generateSong({
+            feel: 'Jazz',
+            isMinor: true,
+            key: 'A',
+            targetMinutes: 2,
+            bpm: 120,
+        });
+        const tokens = sections.flatMap((s) => s.value.split(' | ').map((c) => c.trim()));
+        // Minor tonic should dominate; major I should be absent.
+        const minorTonic = tokens.filter((t) => t === 'im7' || t === 'i').length;
+        const majorTonic = tokens.filter((t) => t === 'Imaj7' || t === 'I').length;
+        expect(minorTonic).toBeGreaterThan(0);
+        expect(majorTonic).toBe(0);
+        // The cadence dominant should be V7 (uppercase V got tilted), not v7.
+        expect(tokens).not.toContain('v7');
+    });
+
+    it('Blues feel + isMinor uses the blues_minor pool (minor tonic + dominant V)', () => {
+        const sections = generateSong({
+            feel: 'Blues',
+            isMinor: true,
+            key: 'A',
+            targetMinutes: 2,
+            bpm: 110,
+        });
+        const tokens = sections.flatMap((s) => s.value.split(' | ').map((c) => c.trim()));
+        // Should see minor tonic (i) and dominant V7, never major I7.
+        expect(tokens).toContain('i');
+        expect(tokens).toContain('V7');
+        expect(tokens).not.toContain('I7');
+    });
+
+    it('reuses memory for repeated Verse sections', () => {
+        const result = generateSong({
+            feel: 'Rock',
+            targetMinutes: 2.5,
+            bpm: 120,
+            timeSignature: '4/4',
+        });
+        const verses = result.filter((s) => s.label === 'Verse');
+        if (verses.length >= 2) {
+            expect(verses[0].value).toBe(verses[1].value);
+        }
     });
 });

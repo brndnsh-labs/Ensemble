@@ -278,6 +278,34 @@ input:focus-visible + .toggle-slider {
     max-width: 90vw;
 }
 
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.notification-action-btn {
+    background: var(--panel-2-color, rgba(255, 255, 255, 0.08));
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.3rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.notification-action-btn:hover {
+    background: var(--accent-color, rgba(99, 102, 241, 0.2));
+}
+
 /* Layout Utilities */
 .flex-row {
     display: flex;

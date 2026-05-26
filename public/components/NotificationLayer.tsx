@@ -1,27 +1,43 @@
-import { useEffect, useState } from 'preact/hooks';
+import { invokeToastAction } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
+interface Toast {
+    id: string;
+    message: string;
+    actions?: string[];
+    type?: string;
+}
+
 export function NotificationLayer() {
-    const notifications = useEnsembleState((s) => (s.playback as any).notifications ?? []);
-    const [visibleNotify, setVisibleNotify] = useState<any[]>([]);
+    const toasts = useEnsembleState((s) => s.playback.toasts ?? []) as Toast[];
 
-    useEffect(() => {
-        setVisibleNotify(notifications);
-    }, [notifications]);
-
-    if (!visibleNotify || visibleNotify.length === 0) {
+    if (!toasts || toasts.length === 0) {
         return null;
     }
 
     return (
         <div id="notificationLayer" class="notification-layer" role="alert" aria-live="polite">
-            {visibleNotify.map((n: any) => (
-                <div key={n.id} class="notification-box">
+            {toasts.map((t) => (
+                <div key={t.id} class="notification-box">
                     <span class="notification-icon">
-                        {n.type === 'error' ? '⚠️' : n.type === 'success' ? '✅' : 'ℹ️'}
+                        {t.type === 'error' ? '⚠️' : t.type === 'success' ? '✅' : 'ℹ️'}
                     </span>
                     <div class="notification-content">
-                        <div class="notification-message">{n.message}</div>
+                        <div class="notification-message">{t.message}</div>
+                        {t.actions && t.actions.length > 0 && (
+                            <div class="notification-actions">
+                                {t.actions.map((label) => (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        class="notification-action-btn"
+                                        onClick={() => invokeToastAction(t.id, label)}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}

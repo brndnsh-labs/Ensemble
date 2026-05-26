@@ -9,7 +9,9 @@ import { SurpriseMe } from '../../../public/components/SurpriseMe.jsx';
 const mockDispatch = vi.fn();
 const mockClearChordPresetHighlight = vi.fn();
 const mockRefreshArrangerUI = vi.fn();
+const mockAppendSections = vi.fn();
 const mockPushHistory = vi.fn();
+const mockUndo = vi.fn();
 const mockGenerateSong = vi.fn();
 const mockShowToast = vi.fn();
 const mockGenerateId = vi.fn(() => 'new-id');
@@ -21,16 +23,19 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 vi.mock('../../../public/arranger-controller.js', () => ({
+    appendSections: (...args: any[]) => mockAppendSections(...args),
     clearChordPresetHighlight: () => mockClearChordPresetHighlight(),
     refreshArrangerUI: () => mockRefreshArrangerUI(),
 }));
 
 vi.mock('../../../public/history.js', () => ({
     pushHistory: () => mockPushHistory(),
+    undo: (...args: any[]) => mockUndo(...args),
 }));
 
 vi.mock('../../../public/song-generator.js', () => ({
     generateSong: (...args: any[]) => mockGenerateSong(...args),
+    predictStructure: () => ['Verse', 'Chorus', 'Verse', 'Chorus'],
 }));
 
 vi.mock('../../../public/ui.js', () => ({
@@ -44,8 +49,9 @@ vi.mock('../../../public/utils.js', () => ({
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector: any) =>
         selector({
-            playback: { modals: { surpriseMe: true } },
-            arranger: { key: 'C', isMinor: false, timeSignature: '4/4' },
+            playback: { modals: { surpriseMe: true }, bpm: 100 },
+            arranger: { key: 'C', isMinor: false, timeSignature: '4/4', sections: [] },
+            groove: { genreFeel: 'Rock' },
         }),
 }));
 
@@ -84,6 +90,16 @@ describe('SurpriseMe', () => {
         render(<SurpriseMe />, document.getElementById('app'));
     }
 
+    async function tick() {
+        await new Promise((r) => setTimeout(r, 10));
+    }
+
+    function switchTo(label: string) {
+        Array.from(document.querySelectorAll('.button-group-btn'))
+            .find((b) => b.textContent?.includes(label))!
+            .click();
+    }
+
     it('renders with Library mode active by default', () => {
         mount();
         const lib = document.querySelector('[data-testid="preset-library"]');
@@ -91,40 +107,117 @@ describe('SurpriseMe', () => {
         expect(lib.getAttribute('data-mode')).toBe('replace');
     });
 
-    it('Roll the Dice calls generateSong with current key/timeSig/isMinor', async () => {
+    it('Surprise Me calls generateSong with wizard options', async () => {
         mockGenerateSong.mockReturnValue([
             { id: 'a', label: 'Verse', value: 'C', key: 'C', timeSignature: '4/4' },
         ]);
         mount();
-        // Switch from default Library mode to Roll mode.
-        Array.from(document.querySelectorAll('.button-group-btn'))
-            .find((b) => b.textContent?.includes('Roll'))!
-            .click();
-        await new Promise((r) => setTimeout(r, 10));
+        switchTo('Roll');
+        await tick();
         document.querySelector('.surprise-me-dice').click();
-        expect(mockGenerateSong).toHaveBeenCalledWith(
-            expect.objectContaining({
-                key: 'C',
-                isMinor: false,
-                timeSignature: '4/4',
-                structure: 'random',
-                complexity: 0.3,
-            }),
-        );
+        expect(mockGenerateSong).toHaveBeenCalledTimes(1);
+        const opts = mockGenerateSong.mock.calls[0][0];
+        // Defaults at zero-answers: chart key/TS, current bpm, "My groove" feel.
+        expect(opts).toMatchObject({
+            key: 'C',
+            isMinor: false,
+            timeSignature: '4/4',
+            bpm: 100,
+            form: 'verse-chorus',
+            feel: 'Rock', // resolved from groove.genreFeel
+            targetMinutes: 3,
+        });
+        // No seed at zero answers.
+        expect(opts.seed).toBeUndefined();
         expect(mockPushHistory).toHaveBeenCalled();
-        // Closes the modal after success.
+        // Modal closes after success.
         expect(mockDispatch).toHaveBeenCalledWith('SET_MODAL_OPEN', {
             modal: 'surpriseMe',
             open: false,
         });
     });
 
+    it('Surprise Me with Append mode calls appendSections instead of dispatch', async () => {
+        mockGenerateSong.mockReturnValue([
+            { id: 'a', label: 'Verse', value: 'C', key: 'C', timeSignature: '4/4' },
+        ]);
+        mount();
+        switchTo('Roll');
+        await tick();
+        // Find the Apply toggle and click "Append".
+        const appendBtn = Array.from(document.querySelectorAll('.button-group-btn')).find(
+            (b) => b.textContent === 'Append',
+        );
+        appendBtn!.click();
+        await tick();
+        document.querySelector('.surprise-me-dice').click();
+        expect(mockAppendSections).toHaveBeenCalled();
+        // LOAD_TEMPLATE should NOT be dispatched in append mode.
+        expect(mockDispatch).not.toHaveBeenCalledWith('LOAD_TEMPLATE', expect.anything());
+    });
+
+    it('typing a seed populates seed.chords with the parsed result', async () => {
+        mockGenerateSong.mockReturnValue([{ id: 'a', label: 'Verse', value: 'C' }]);
+        mount();
+        switchTo('Roll');
+        await tick();
+        // Click "+ Add chords…" to expand the input.
+        const addBtn = document.querySelector('.surprise-me-seed-add');
+        addBtn.click();
+        await tick();
+        const input = document.querySelector('.surprise-me-seed-input') as HTMLInputElement;
+        input.value = 'C Am F G';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await tick();
+        // Confirm via OK button.
+        document.querySelector('.surprise-me-seed-confirm').click();
+        await tick();
+        // Roll and verify the seed is passed through.
+        document.querySelector('.surprise-me-dice').click();
+        const opts = mockGenerateSong.mock.calls[0][0];
+        expect(opts.seed).toEqual({ chords: ['C', 'Am', 'F', 'G'], role: 'verse' });
+    });
+
+    it('suggestion chip populates the seed', async () => {
+        mockGenerateSong.mockReturnValue([{ id: 'a', label: 'Verse', value: 'C' }]);
+        mount();
+        switchTo('Roll');
+        await tick();
+        // Click the I-V-vi-IV suggest chip.
+        const chip = Array.from(document.querySelectorAll('.surprise-me-suggest-chip')).find(
+            (b) => b.textContent === 'I-V-vi-IV',
+        );
+        chip!.click();
+        await tick();
+        document.querySelector('.surprise-me-dice').click();
+        const opts = mockGenerateSong.mock.calls[0][0];
+        expect(opts.seed.chords).toEqual(['I', 'V', 'vi', 'IV']);
+    });
+
+    it('Reset answers clears seed + restores defaults', async () => {
+        mockGenerateSong.mockReturnValue([{ id: 'a', label: 'Verse', value: 'C' }]);
+        mount();
+        switchTo('Roll');
+        await tick();
+        // Apply a suggestion to set the seed.
+        const chip = Array.from(document.querySelectorAll('.surprise-me-suggest-chip')).find(
+            (b) => b.textContent === 'ii-V-I',
+        );
+        chip!.click();
+        await tick();
+        // Reset.
+        document.querySelector('.surprise-me-reset').click();
+        await tick();
+        // Now Surprise Me should fire without a seed.
+        document.querySelector('.surprise-me-dice').click();
+        const opts = mockGenerateSong.mock.calls[0][0];
+        expect(opts.seed).toBeUndefined();
+    });
+
     it('switching to Templates mode shows the template grid', async () => {
         mount();
-        const buttons = document.querySelectorAll('.button-group-btn');
-        const templatesBtn = Array.from(buttons).find((b) => b.textContent?.includes('Templates'));
-        templatesBtn.click();
-        await new Promise((r) => setTimeout(r, 10));
+        switchTo('Templates');
+        await tick();
         const cards = document.querySelectorAll('.template-card-btn');
         expect(cards.length).toBe(2);
         expect(cards[0].textContent).toContain('Standard Pop');
@@ -132,31 +225,21 @@ describe('SurpriseMe', () => {
 
     it('template card requires two clicks (confirm pattern)', async () => {
         mount();
-        const buttons = document.querySelectorAll('.button-group-btn');
-        Array.from(buttons)
-            .find((b) => b.textContent?.includes('Templates'))!
-            .click();
-        await new Promise((r) => setTimeout(r, 10));
-
+        switchTo('Templates');
+        await tick();
         const firstCard = document.querySelector('.template-card-btn');
         firstCard.click();
-        // First click: confirm chip appears, no LOAD_TEMPLATE yet.
         expect(mockDispatch).not.toHaveBeenCalledWith('LOAD_TEMPLATE', expect.anything());
-        await new Promise((r) => setTimeout(r, 10));
+        await tick();
         expect(firstCard.textContent).toContain('Tap again to replace');
-
-        // Second click loads it.
         firstCard.click();
         expect(mockDispatch).toHaveBeenCalledWith('LOAD_TEMPLATE', expect.any(Object));
     });
 
     it('switching to Library mode renders PresetLibrary defaulting to replace', async () => {
         mount();
-        const buttons = document.querySelectorAll('.button-group-btn');
-        Array.from(buttons)
-            .find((b) => b.textContent?.includes('Library'))!
-            .click();
-        await new Promise((r) => setTimeout(r, 10));
+        switchTo('Library');
+        await tick();
         const lib = document.querySelector('[data-testid="preset-library"]');
         expect(lib).toBeTruthy();
         expect(lib.getAttribute('data-mode')).toBe('replace');
@@ -164,35 +247,15 @@ describe('SurpriseMe', () => {
 
     it('Library mode allows toggling to Append mode', async () => {
         mount();
-        // Switch to library
-        Array.from(document.querySelectorAll('.button-group-btn'))
-            .find((b) => b.textContent?.includes('Library'))!
-            .click();
-        await new Promise((r) => setTimeout(r, 10));
-        // Switch sub-mode to Append
+        switchTo('Library');
+        await tick();
         const appendBtn = Array.from(document.querySelectorAll('.button-group-btn')).find((b) =>
             b.textContent?.includes('Append'),
         );
         appendBtn.click();
-        await new Promise((r) => setTimeout(r, 10));
+        await tick();
         expect(
             document.querySelector('[data-testid="preset-library"]').getAttribute('data-mode'),
         ).toBe('append');
-    });
-
-    it('Advanced disclosure reveals structure + complexity controls', async () => {
-        mount();
-        // Switch from default Library mode to Roll mode.
-        Array.from(document.querySelectorAll('.button-group-btn'))
-            .find((b) => b.textContent?.includes('Roll'))!
-            .click();
-        await new Promise((r) => setTimeout(r, 10));
-        const toggle = document.querySelector('.surprise-me-advanced-toggle');
-        toggle.click();
-        await new Promise((r) => setTimeout(r, 10));
-        const advanced = document.querySelector('.surprise-me-advanced');
-        expect(advanced).toBeTruthy();
-        expect(advanced.textContent).toMatch(/Structure/);
-        expect(advanced.textContent).toMatch(/Complexity/);
     });
 });

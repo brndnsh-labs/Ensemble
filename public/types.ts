@@ -1063,7 +1063,7 @@ export interface GlobalContext {
     /** Whether haptic feedback is enabled. */
     readonly haptic: boolean;
     /** List of active toast notifications. */
-    readonly toasts: Array<{ id: string; message: string }>;
+    readonly toasts: Array<{ id: string; message: string; actions?: string[] }>;
     /** Current intensity of the screen flash effect. */
     readonly flashIntensity: number;
     /** Whether a PWA update is pending. */
@@ -1222,6 +1222,9 @@ export interface ActionPayloadShowToast {
     id?: string;
     message?: string;
     type?: string;
+    /** Optional action button labels. Callbacks are looked up in the toast
+     *  action registry (see public/ui.ts) so functions never enter state. */
+    actions?: string[];
 }
 
 export interface ActionPayloadSetMidiConfig {
