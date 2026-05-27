@@ -91,6 +91,13 @@
     justify-content: center;
 }
 
+/* The class selector outranks the [hidden] UA rule, so re-assert hiding here
+ * — without this, 4/4 (and any other TS without grouping options) shows an
+ * inert button instead of staying hidden. */
+.grouping-toggle[hidden] {
+    display: none;
+}
+
 .time-sig-group {
     display: flex;
     flex-direction: column;

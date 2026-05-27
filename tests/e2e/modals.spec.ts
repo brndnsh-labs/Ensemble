@@ -162,8 +162,9 @@ test.describe('Modals Responsiveness @ui', () => {
         await modal.getByRole('button', { name: /Templates/ }).click();
         await expect(modal.locator('.template-card-btn').first()).toBeVisible();
 
-        // Switch to Roll and verify the dice button.
+        // Switch to Roll and verify the dice button (renamed to "Surprise Me"
+        // in the wizard rebuild — commit 25a550e6).
         await modal.getByRole('button', { name: /Roll/ }).click();
-        await expect(modal.getByRole('button', { name: /Roll the Dice/ })).toBeVisible();
+        await expect(modal.getByRole('button', { name: /Surprise Me/ })).toBeVisible();
     });
 });
