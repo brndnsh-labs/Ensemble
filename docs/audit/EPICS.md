@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 4 / 10 stories shipped.**
+**Cycle 2026-05-27 → in progress: 5 / 10 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 10 | 4 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that can fan out in parallel. S6 audits the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 10 | 5 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that can fan out in parallel. S6 audits the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). |
 
 ## Phased rollout
 

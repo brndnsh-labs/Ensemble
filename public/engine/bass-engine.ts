@@ -96,27 +96,33 @@ export function isBassActive(
     // why: epic-coordination-consistency S2.b — reggae bass conversational fill.
     // Reggae bass is normally locked into the riddim tables; on a soloist
     // phrase-end (≥3 notes then rest) we permit a single approach note at the
-    // "and-of-4" of the bar so the bass answers the soloist's exhale with a
-    // pickup into the next downbeat. Without this force-activation, dub's
-    // riddim-only gate (checkBassActiveStyle line ~212) would skip step 14 on
-    // every riddim except 54-46, and the conversational gesture would be dead
-    // code. The actual approach-note emission lives in getBassNote's reggae
+    // anticipation point of the bar so the bass answers the soloist's exhale
+    // with a pickup into the next downbeat. Without this force-activation, dub's
+    // riddim-only gate (checkBassActiveStyle line ~212) would skip the anticipation
+    // step on every riddim except 54-46, and the conversational gesture would be
+    // dead code. The actual approach-note emission lives in getBassNote's reggae
     // coordination block (just before the call to getBassNoteStyle).
     //
-    // Gate: step is at stepsPerMeasure - 2 (step 14 in 4/4) AND coordination
-    // signals a phrase-end. Tension-chord-change approach (the second branch
-    // in the audit-doc sketch) is also gated here via upcomingSectionFirstChord
-    // when present, but bar-to-bar nextChord cases are handled inside getBassNote
-    // where the nextChord argument is in scope. ANTICIPATION_STYLES already
-    // covers section-boundary anticipation for jazz/walking/etc.; reggae gets
-    // its own narrower force-activation so non-section-boundary phrase-end
-    // fills still fire.
+    // Gate: step is at `isAnticipation` (stepsPerBar - 2 in 4/4; stepsPerBar - 1
+    // in 6/8 — see compound-meter S5) AND coordination signals a phrase-end.
+    // Tension-chord-change approach (the second branch in the audit-doc sketch)
+    // is also gated here via upcomingSectionFirstChord when present, but
+    // bar-to-bar nextChord cases are handled inside getBassNote where the
+    // nextChord argument is in scope. ANTICIPATION_STYLES already covers
+    // section-boundary anticipation for jazz/walking/etc.; reggae gets its own
+    // narrower force-activation so non-section-boundary phrase-end fills still
+    // fire.
     const isReggaeStyle = style === 'dub' || (groove.genreFeel || '') === 'Reggae';
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
-    const isAndOfFour = step % stepsPerBar === stepsPerBar - 2;
+    // why: in 6/8 the natural anticipation is the final eighth before the downbeat
+    // (step 11 of 12, "and of 6"); in 4/4 it is the "and of 4" (step 14 of 16,
+    // stepsPerBar - 2). Compound meters use stepsPerBar - 1; simple meters keep
+    // stepsPerBar - 2 (unchanged behavior).
+    const anticipationOffset = ts.isCompound ? 1 : 2;
+    const isAnticipation = step % stepsPerBar === stepsPerBar - anticipationOffset;
     const soloistRestingForFill = coordination?.soloistResting === true;
     const notesInPhraseForFill = coordination?.soloistNotesInPhrase ?? 0;
-    if (isReggaeStyle && isAndOfFour && soloistRestingForFill && notesInPhraseForFill >= 3) {
+    if (isReggaeStyle && isAnticipation && soloistRestingForFill && notesInPhraseForFill >= 3) {
         return true;
     }
 
@@ -943,16 +949,18 @@ export function getBassNote(
     // why: bass-engine.ts previously read only kickHit for reggae lock-in. On a
     // soloist phrase-end (≥3 notes then rest) OR a real chord change at the bar
     // boundary, the dub bassist can answer with a single approach note at the
-    // "and-of-4" of the bar — a conversational gesture during the soloist's
+    // bar's anticipation slot — a conversational gesture during the soloist's
     // exhale, then drop straight back into the riddim on the next downbeat. The
     // reggae bass is locked-in by default; these are ADDITIONS on specific
     // gated steps, not a replacement of the kick-lock pattern.
     //
     // Gate conditions (all must hold for the block to fire at all):
     //   1. style === 'dub' OR genre === 'Reggae'.
-    //   2. step is at stepsPerMeasure - 2 (the "and-of-4" in 4/4 — universally
-    //      the pickup slot, and matches the existing ANTICIPATION_STYLES site
-    //      for jazz/walking so the gesture lands in the same rhythmic place).
+    //   2. step is at the meter-aware anticipation slot: stepsPerMeasure - 2
+    //      in simple meters (the "and-of-4" in 4/4) and stepsPerMeasure - 1
+    //      in compound meters (the final eighth in 6/8 = step 11). Matches
+    //      the ANTICIPATION_STYLES site for jazz/walking so the gesture lands
+    //      in the same rhythmic place across meters.
     //
     // Then EITHER trigger fires the fill (ORed; we don't double-emit — one
     // approach note per step, period):
@@ -977,7 +985,10 @@ export function getBassNote(
     // Source: docs/audit/epic-coordination-consistency.md S2.b;
     //         FOLLOWUPS §D (reggae bass).
     const reggaeFillStyle = style === 'dub' || groove.genreFeel === 'Reggae';
-    const reggaeFillStep = stepInMeasure === stepsPerMeasure - 2;
+    // why: compound-meter S5 — anticipation is the final eighth before the
+    // downbeat; in 6/8 (stepsPerMeasure=12) that's step 11, in 4/4 it's
+    // step 14 ("and of 4"). Stays paired with isAnticipation at line ~122.
+    const reggaeFillStep = stepInMeasure === stepsPerMeasure - (ts.isCompound ? 1 : 2);
     if (reggaeFillStyle && reggaeFillStep) {
         const reggaeSoloistResting = context?.stepCoordination?.soloistResting === true;
         const reggaeNotesInPhrase = context?.stepCoordination?.soloistNotesInPhrase ?? 0;
@@ -1121,7 +1132,9 @@ export function getBassNote(
     const isApproachPoint =
         (stepInMeasure % ts.stepsPerBeat === 0 && (isLastBeatOfMeasure || isEndOfChord)) ||
         isEighthSkip ||
-        step % 16 === 14;
+        // why: compound-meter S5 — meter-aware anticipation slot (final eighth
+        // in compound = step 11 of 12, "and of 4" in simple = step 14 of 16).
+        step % stepsPerMeasure === stepsPerMeasure - (ts.isCompound ? 1 : 2);
 
     if (isApproachPoint && isChordChangeApproach(nextChord, chord)) {
         const nextTarget = nextChord.bassMidi ?? nextChord.rootMidi;

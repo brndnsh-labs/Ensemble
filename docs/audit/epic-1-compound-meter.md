@@ -64,7 +64,7 @@ Simplest fix: gate the current clave logic on `!isCompound`, and rely on the exp
 
 **Effort:** ~2h. **Model:** sonnet. **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S5. Bass "and-of-four" anticipation in 6/8
+### S5. Bass "and-of-four" anticipation in 6/8 ✅ Done 2026-05-27
 
 `public/engine/bass-engine.ts:116`: `const isAndOfFour = step % stepsPerBar === stepsPerBar - 2;` — in 4/4 this is step 14 (the "and of 4"). In 6/8 the same math gives step 10 of 12, which is musically wrong — the anticipation point in 6/8 is the final eighth before the downbeat (step 11, "and of 6").
 
