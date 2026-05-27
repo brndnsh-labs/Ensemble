@@ -47,6 +47,8 @@
  *     is small (5%) and the absolute clamp at 0.1 still guards.
  */
 
+import { secondsPerStepFor } from '../utils.js';
+
 const ARC_CURVES: Record<number, readonly number[]> = {
     1: [1.0],
     2: [0.9, 1.25],
@@ -115,6 +117,7 @@ export function getEffectiveLoopLimit(
     sessionTimer: number,
     bpm: number,
     totalSteps: number,
+    ts?: { bpmUnit?: string; stepsPerBeat?: number },
 ): number {
     // Explicit loop count always wins.
     if (Number.isFinite(loopLimit) && loopLimit > 0) {
@@ -131,9 +134,12 @@ export function getEffectiveLoopLimit(
     ) {
         return 0;
     }
-    // 16 steps per bar at 4/4, 4 steps per beat → seconds-per-step = 60/bpm/4.
-    // This matches the same calc Settings.tsx uses for its "Est. Time" display.
-    const secPerStep = 60 / bpm / 4;
+    // why: epic-1-compound-meter S1 — route through the canonical helper so
+    // 6/8 / 12/8 timer-mode sessions resolve to the right loop count at the
+    // displayed (dotted-quarter) tempo. Falls back to 4/4 quarter-BPM math
+    // when `ts` is omitted, matching the prior behavior for callers that
+    // haven't yet been threaded.
+    const secPerStep = secondsPerStepFor(ts, bpm);
     const secPerLoop = totalSteps * secPerStep;
     if (secPerLoop <= 0) {
         return 0;

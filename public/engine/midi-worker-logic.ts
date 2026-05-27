@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm } from '../form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
-import { binarySearchMap, getStepInfo } from '../utils.js';
+import { binarySearchMap, getStepInfo, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
@@ -119,8 +119,15 @@ export class ExportProcessor {
         this.ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
         this.totalStepsOneLoop = arranger.totalSteps;
         this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
-        const loopSeconds =
-            (this.totalStepsOneLoop / (this.ts.stepsPerBeat || 4)) * (60 / (playback.bpm || 120));
+        // why: epic-1-compound-meter S1 — loop-duration estimate must match
+        // the bpmUnit-aware step accumulation used by `calculateStepDuration`
+        // and `stepTimes` below. Old formula `(stepsOneLoop / stepsPerBeat) *
+        // (60/bpm)` assumed BPM = quarter-bpm and one step = 1/stepsPerBeat
+        // quarters; under dotted-quarter bpmUnit a step is (60/bpm)/6 so the
+        // estimate was 1.5× too long for 6/8 / 12/8 and target-duration
+        // exports got too-few loops.
+        const stepSecForLoop = secondsPerStepFor(this.ts, playback.bpm || 120);
+        const loopSeconds = this.totalStepsOneLoop * stepSecForLoop;
         this.loopCount =
             this.loopMode === 'once'
                 ? 1
@@ -133,8 +140,23 @@ export class ExportProcessor {
 
         // Timing Map
         this.stepTimes = new Array(this.totalStepsExport + 128);
+        // why: epic-1-compound-meter S1 — `secondsPerBeat` is used for ride /
+        // crash sustains and is the duration of one tempo-pulse (which is
+        // exactly what `bpmUnit` declares: quarter in simple, dotted-quarter
+        // in compound). 60/bpm yields one tempo-pulse for both bpmUnits by
+        // construction, so the literal is correct in all meters. Not routed
+        // through `secondsPerBeatFor` because that helper returns one
+        // `ts.beats`-native unit (one quarter for 4/4 but one eighth for
+        // 6/8 / 7/8 / 12/8), which is shorter than the conventional cymbal
+        // ring-length we want here.
         this.secondsPerBeat = 60.0 / playback.bpm;
-        this.sixteenthSec = 0.25 * this.secondsPerBeat;
+        // why: `sixteenthSec` is misnamed but consumers use it as "duration
+        // of one step." With bpmUnit-aware step duration this is
+        // (60/bpm)/4 for quarter and (60/bpm)/6 for dotted-quarter — matches
+        // `calculateStepDuration` and the `stepTimes` accumulation below so
+        // `nextStepTimeS` fallbacks and durationSteps→seconds conversions
+        // stay aligned in compound meters.
+        this.sixteenthSec = stepSecForLoop;
 
         let accumulatedSeconds = 0;
 
@@ -164,7 +186,17 @@ export class ExportProcessor {
         this.drumTrack = new MidiTrack();
 
         this.metaTrack.setName(0, 'Ensemble Export');
-        this.metaTrack.setTempo(0, playback.bpm || 120);
+        // why: epic-1-compound-meter S1 — MIDI tempo is canonically expressed
+        // in quarter-notes/min, but Ensemble's displayed BPM for compound
+        // meters (6/8, 12/8) is dotted-quarter/min. Convert so external MIDI
+        // players hear the same tempo we render: 1 dotted-quarter = 1.5
+        // quarters, so quarter-BPM = displayed-BPM × 1.5 for compound.
+        // For simple meters this is a no-op (multiplier = 1).
+        {
+            const displayed = playback.bpm || 120;
+            const tempoMultiplier = this.ts.bpmUnit === 'dotted-quarter' ? 1.5 : 1.0;
+            this.metaTrack.setTempo(0, displayed * tempoMultiplier);
+        }
         this.metaTrack.setKeySig(0, (arranger.key as any) || 'C', arranger.isMinor || false);
         const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
         this.metaTrack.setTimeSig(0, tsNum, tsDenom);
@@ -250,7 +282,13 @@ export class ExportProcessor {
 
     toPulses(t: number): number {
         const { playback } = this.state;
-        return Math.round(t * (playback.bpm / 60.0) * PPQ);
+        // why: epic-1-compound-meter S1 — `t` comes in real seconds (computed
+        // via the bpmUnit-aware step durations). PPQ is per-quarter, so we
+        // need quarter-BPM here, which is `displayed_bpm * 1.5` for compound
+        // meters (1 dotted-quarter = 1.5 quarters).
+        const quarterBpmMultiplier = this.ts.bpmUnit === 'dotted-quarter' ? 1.5 : 1.0;
+        const quarterBpm = playback.bpm * quarterBpmMultiplier;
+        return Math.round(t * (quarterBpm / 60.0) * PPQ);
     }
 
     /**

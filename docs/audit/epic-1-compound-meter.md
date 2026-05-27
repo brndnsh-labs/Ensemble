@@ -19,7 +19,7 @@ Investigation under `/home/brandon/.claude/plans/i-have-a-very-lucky-wren.md` (2
 
 ## Stories
 
-### S1. BPM unit per time signature
+### S1. BPM unit per time signature ✅ Done 2026-05-27
 
 `public/engine/scheduler-core.ts:444, 531, 576, 780, 866, 883, 987, 1098` all compute `secondsPerStep` from BPM as quarter-notes/min (`60 / bpm / stepsPerBeat`). Add a `bpmUnit: 'quarter' | 'dotted-quarter'` field to each entry in `TIME_SIGNATURES` (`public/config.ts:46-113`). Default `'quarter'` for simple meters (2/4, 3/4, 4/4, 5/4, 7/4); `'dotted-quarter'` for 6/8 and 12/8. In the scheduler, branch:
 

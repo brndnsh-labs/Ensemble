@@ -6,11 +6,12 @@ import { useEnsembleState } from '../ui-bridge.js';
 const { playback } = getState();
 
 import { applyTheme } from '../app-controller.js';
-import { APP_VERSION, MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { APP_VERSION, MIXER_GAIN_MULTIPLIERS, TIME_SIGNATURES } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
+import { secondsPerStepFor } from '../utils.js';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
@@ -393,7 +394,16 @@ export function Settings() {
                                                     if (!arranger.totalSteps || !playback.bpm) {
                                                         return null;
                                                     }
-                                                    const secPerStep = 60 / playback.bpm / 4;
+                                                    // why: epic-1-compound-meter S1 — Est. Time
+                                                    // must honor `bpmUnit` so 6/8 / 12/8 sessions
+                                                    // surface the right minute count at the
+                                                    // dotted-quarter pulse.
+                                                    const ts =
+                                                        TIME_SIGNATURES[arranger.timeSignature];
+                                                    const secPerStep = secondsPerStepFor(
+                                                        ts,
+                                                        playback.bpm,
+                                                    );
                                                     const secPerLoop =
                                                         arranger.totalSteps * secPerStep;
                                                     if (loopLimit > 0) {
@@ -411,6 +421,7 @@ export function Settings() {
                                                             sessionTimer,
                                                             playback.bpm,
                                                             arranger.totalSteps,
+                                                            ts,
                                                         );
                                                         return `≈ ${resolved} loop${resolved === 1 ? '' : 's'} at this tempo`;
                                                     }

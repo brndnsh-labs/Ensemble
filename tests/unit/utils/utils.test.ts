@@ -14,6 +14,8 @@ import {
     getStepInfo,
     midiToNote,
     normalizeKey,
+    secondsPerBeatFor,
+    secondsPerStepFor,
     transposeKeyName,
 } from '../../../public/utils.js';
 
@@ -143,6 +145,97 @@ describe('Utility Functions', () => {
             const info12 = getStepInfo(12, ts44, [], TIME_SIGNATURES); // Beat 4
             expect(info4.isBackbeat).toBe(true);
             expect(info12.isBackbeat).toBe(true);
+        });
+    });
+
+    // why: epic-1-compound-meter S1 — `secondsPerStepFor` / `secondsPerBeatFor`
+    // are the single canonical resolution of BPM-unit semantics. Lock in:
+    //   - quarter-BPM meters with stepsPerBeat=4 (2/4, 3/4, 4/4, 5/4, 7/4):
+    //     1 step (16th) = (60/bpm)/4, 1 ts.beats unit = 60/bpm (one quarter).
+    //   - quarter-BPM meters with stepsPerBeat=2 (7/8): 1 step (16th) = (60/bpm)/4,
+    //     1 ts.beats unit = (60/bpm)/2 (one eighth — `ts.beats=7` counts eighths).
+    //   - compound meters (6/8, 12/8): dotted-quarter BPM, stepsPerBeat=2; 1 step
+    //     = (60/bpm)/6, 1 ts.beats unit = (60/bpm)/3 (one eighth = 1/3 of pulse).
+    describe('secondsPerStepFor / secondsPerBeatFor (BPM unit per time signature)', () => {
+        const bpm = 120;
+        const FLOAT_TOL = 1e-9;
+
+        const quarterBeatMeters = ['2/4', '3/4', '4/4', '5/4', '7/4'];
+        const eighthBeatMeters = ['7/8', '6/8', '12/8'];
+
+        quarterBeatMeters.forEach((tsName) => {
+            it(`returns one-sixteenth-of-a-quarter step for ${tsName} (quarter beat)`, () => {
+                const ts = TIME_SIGNATURES[tsName];
+                expect(ts.bpmUnit).toBe('quarter');
+                expect(secondsPerStepFor(ts, bpm)).toBeCloseTo(60 / bpm / 4, 12);
+                // ts.beats counts quarters → one beat = one quarter
+                expect(secondsPerBeatFor(ts, bpm)).toBeCloseTo(60 / bpm, 12);
+            });
+        });
+
+        eighthBeatMeters.forEach((tsName) => {
+            it(`returns one-eighth-per-ts-beat for ${tsName} (eighth beat)`, () => {
+                const ts = TIME_SIGNATURES[tsName];
+                // ts.beats counts eighths in all three (7/8, 6/8, 12/8)
+                expect(ts.stepsPerBeat).toBe(2);
+                // one ts.beats unit = one eighth, regardless of bpmUnit
+                if (ts.bpmUnit === 'dotted-quarter') {
+                    expect(secondsPerStepFor(ts, bpm)).toBeCloseTo(60 / bpm / 6, 12);
+                    expect(secondsPerBeatFor(ts, bpm)).toBeCloseTo(60 / bpm / 3, 12);
+                } else {
+                    // 7/8: quarter-BPM but eighth-pulse
+                    expect(secondsPerStepFor(ts, bpm)).toBeCloseTo(60 / bpm / 4, 12);
+                    expect(secondsPerBeatFor(ts, bpm)).toBeCloseTo(60 / bpm / 2, 12);
+                }
+            });
+        });
+
+        it('matches the All-Blues 6/8 acceptance criterion: ~0.545s per dotted-quarter pulse at bpm=110', () => {
+            const ts = TIME_SIGNATURES['6/8'];
+            const stepSec = secondsPerStepFor(ts, 110);
+            // a dotted-quarter pulse = 6 steps (= 6 sixteenths)
+            const pulseSec = stepSec * 6;
+            expect(pulseSec).toBeCloseTo(60 / 110, 6); // ≈ 0.5454s
+            expect(pulseSec).toBeGreaterThan(0.5);
+            expect(pulseSec).toBeLessThan(0.6);
+        });
+
+        it('keeps 4/4 step duration identical to the pre-fix formula', () => {
+            // why: regression guard — 4/4 critique tests rely on
+            // 0.25 * (60/bpm) per step. The new branch must reduce to that
+            // exact value for `bpmUnit: 'quarter'`.
+            const ts = TIME_SIGNATURES['4/4'];
+            const oldFormula = 0.25 * (60 / bpm);
+            expect(secondsPerStepFor(ts, bpm)).toBeCloseTo(oldFormula, FLOAT_TOL);
+        });
+
+        it('keeps the bar shape: total bar duration = stepsPerBar × stepSec', () => {
+            // 4/4 (16 steps): 1 bar = 4 quarters
+            const ts44 = TIME_SIGNATURES['4/4'];
+            expect(16 * secondsPerStepFor(ts44, bpm)).toBeCloseTo(4 * (60 / bpm), 9);
+            // 6/8 (12 steps): 1 bar = 2 dotted-quarters
+            const ts68 = TIME_SIGNATURES['6/8'];
+            expect(12 * secondsPerStepFor(ts68, bpm)).toBeCloseTo(2 * (60 / bpm), 9);
+            // 12/8 (24 steps): 1 bar = 4 dotted-quarters
+            const ts128 = TIME_SIGNATURES['12/8'];
+            expect(24 * secondsPerStepFor(ts128, bpm)).toBeCloseTo(4 * (60 / bpm), 9);
+            // 3/4 (12 steps): 1 bar = 3 quarters
+            const ts34 = TIME_SIGNATURES['3/4'];
+            expect(12 * secondsPerStepFor(ts34, bpm)).toBeCloseTo(3 * (60 / bpm), 9);
+            // 7/8 (14 steps): 1 bar = 7 eighths at quarter-BPM = 3.5 quarters
+            const ts78 = TIME_SIGNATURES['7/8'];
+            expect(14 * secondsPerStepFor(ts78, bpm)).toBeCloseTo(3.5 * (60 / bpm), 9);
+        });
+
+        it('handles a missing/unknown ts config by defaulting to quarter', () => {
+            // why: defensive — the helpers accept undefined and unknown
+            // `bpmUnit` strings; either should fall back to quarter to keep
+            // 4/4 the safe default for unmapped meters.
+            expect(secondsPerStepFor(undefined, bpm)).toBeCloseTo(60 / bpm / 4, 12);
+            expect(secondsPerStepFor({ bpmUnit: 'something-weird' } as any, bpm)).toBeCloseTo(
+                60 / bpm / 4,
+                12,
+            );
         });
     });
     describe('formatUnicodeSymbols', () => {
