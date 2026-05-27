@@ -33,7 +33,7 @@ Goals:
 | 2 | TypeScript hygiene | 🔁 deferred — sub-agent write failure, retry in future session |
 | 3 | Doc & config drift | ✅ shipped — commit `6eaa05c4` |
 | 4 | Visualizer frame allocations (perf) | ✅ shipped — commit `d1f4b48c` |
-| 5 | Scheduler hot-path allocations (perf) | 🔁 deferred — sub-agent write failure, retry in future session |
+| 5 | Scheduler hot-path allocations (perf) | ✅ shipped — strum-rank Map→indexed array; chord-MIDI WeakMap cache; persistent drum-section cursor; nested forEach→for |
 | 6 | Test debt + 3 P0 bug fixes (Part 1) | ✅ shipped — commit `98588145` (P0 reducer arms, comping Scenario D, test hygiene, PRNG migration) |
 | 6 | Math.random multi-fixture sweep (Part 2) | ✅ shipped — commit `d7f6717b` (sweeps + canonical seeded helper migration; no engine bugs surfaced) |
 

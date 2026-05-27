@@ -66,6 +66,55 @@ import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-ut
 
 type Dispatch = (action: any, payload?: any) => void;
 
+// Persistent cursor for scheduleDrums' section lookup. The scheduler ticks
+// strictly forward through `absoluteStep`, so most calls land in the same
+// section or the next one — a cursor-walk avoids the per-step Array.findIndex
+// pass over sectionMap.
+let drumSectionCursor = 0;
+function findSectionIndexFromCursor(
+    sectionMap: readonly { start: number; end: number }[] | undefined,
+    step: number,
+): number {
+    if (!sectionMap || sectionMap.length === 0) {
+        return 0;
+    }
+    if (drumSectionCursor >= sectionMap.length) {
+        drumSectionCursor = 0;
+    }
+    if (step < sectionMap[drumSectionCursor].start) {
+        drumSectionCursor = 0;
+    }
+    for (let i = drumSectionCursor; i < sectionMap.length; i++) {
+        const s = sectionMap[i];
+        if (step >= s.start && step < s.end) {
+            drumSectionCursor = i;
+            return i;
+        }
+        if (s.start > step) {
+            break;
+        }
+    }
+    return 0;
+}
+
+// Per-chord MIDI cache for visualizer payloads. Chord objects are immutable per
+// progression index, so the freqs → MIDI mapping only changes when the chord
+// itself changes. Caching avoids three per-step `new Array(n)` allocations
+// inside the visualizer hot path (bass, soloist, chord events).
+const chordMidiCache = new WeakMap<{ freqs: number[] }, number[]>();
+function getChordMidiNotes(chord: { freqs: number[] }): number[] {
+    let cached = chordMidiCache.get(chord);
+    if (!cached) {
+        const fLen = chord.freqs.length;
+        cached = new Array(fLen);
+        for (let i = 0; i < fLen; i++) {
+            cached[i] = getMidi(chord.freqs[i]) ?? 0;
+        }
+        chordMidiCache.set(chord, cached);
+    }
+    return cached;
+}
+
 const DRUM_VIS_PITCHES: Record<string, number> = {
     Kick: 36,
     Snare: 38,
@@ -574,10 +623,7 @@ function scheduleDrums(
 
     // Evaluate fills and standard groove patterns via our unified tick logic
     // This maintains 1:1 playback/export parity.
-    const sectionIndex =
-        arranger.sectionMap?.findIndex(
-            (s: any) => absoluteStep >= s.start && absoluteStep < s.end,
-        ) || 0;
+    const sectionIndex = findSectionIndexFromCursor(arranger.sectionMap, absoluteStep);
     const tickResult = generateNotesForStep(
         state,
         absoluteStep,
@@ -736,11 +782,7 @@ function scheduleBass(
                 const finalVel =
                     (velocity || 1.0) * (playback.conductorVelocity || 1.0) * h.velocityMult;
                 if (vizState.enabled) {
-                    const fLen = chord.freqs.length;
-                    const chordNotes = new Array(fLen);
-                    for (let i = 0; i < fLen; i++) {
-                        chordNotes[i] = getMidi(chord.freqs[i] as any);
-                    }
+                    const chordNotes = getChordMidiNotes(chord);
 
                     queueVisualizerNoteEvent(playback, {
                         track: 'bass',
@@ -874,11 +916,7 @@ function scheduleSoloist(
                 );
 
                 if (vizState.enabled) {
-                    const fLen = chord.freqs.length;
-                    const chordNotes = new Array(fLen);
-                    for (let i = 0; i < fLen; i++) {
-                        chordNotes[i] = getMidi(chord.freqs[i] as any);
-                    }
+                    const chordNotes = getChordMidiNotes(chord);
 
                     queueVisualizerNoteEvent(playback, {
                         track: 'soloist',
@@ -904,12 +942,7 @@ export function scheduleChordVisuals(
 ): void {
     const { playback, chords, vizState } = state;
     if (chordData.stepInChord === 0) {
-        const freqs = chordData.chord.freqs;
-        const fLen = freqs.length;
-        const chordNotes = new Array(fLen);
-        for (let i = 0; i < fLen; i++) {
-            chordNotes[i] = getMidi(freqs[i]);
-        }
+        const chordNotes = getChordMidiNotes(chordData.chord);
 
         if (chords.lastActiveChordIndex !== chordData.chordIndex) {
             (chords as Mutable<typeof chords>).lastActiveChordIndex = chordData.chordIndex; // @direct-mutation
@@ -964,37 +997,36 @@ function scheduleChords(
         // the chord low→high; rank each non-muted note by ascending pitch and
         // pass that rank as `index`. The `current` voice keeps `index: 0`
         // (mechanically simultaneous, bit-identical) so the A/B stays honest.
-        const strumRank = new Map<unknown, number>();
+        let strumRank: number[] | null = null;
         if (chords.voice === 'new') {
-            notes
-                .filter((n: any) => !n.muted && n.freq)
-                .slice()
-                .sort((a: any, b: any) => a.freq - b.freq)
-                .forEach((n: any, rank: number) => strumRank.set(n, rank));
+            const playable: number[] = [];
+            for (let i = 0; i < notes.length; i++) {
+                if (!notes[i].muted && notes[i].freq) {
+                    playable.push(i);
+                }
+            }
+            playable.sort((a, b) => notes[a].freq - notes[b].freq);
+            strumRank = new Array(notes.length).fill(0);
+            for (let r = 0; r < playable.length; r++) {
+                strumRank[playable[r]] = r;
+            }
         }
 
-        notes.forEach((n: any) => {
-            const {
-                freq,
-                velocity,
-                timingOffset,
-                durationSteps,
-                muted,
-                instrument,
-
-                ccEvents,
-            } = n;
+        for (let ni = 0; ni < notes.length; ni++) {
+            const n = notes[ni];
+            const { freq, velocity, timingOffset, durationSteps, muted, instrument, ccEvents } = n;
             const playTime = time + (timingOffset || 0);
 
             if (ccEvents && ccEvents.length > 0) {
-                ccEvents.forEach((cc: any) => {
+                for (let ci = 0; ci < ccEvents.length; ci++) {
+                    const cc = ccEvents[ci];
                     if (cc.controller === 64) {
                         const isSustain = cc.value >= 64;
                         const ccTime = playTime + (cc.timingOffset || 0);
                         updateSustain(state, isSustain, ccTime);
                         dispatchMidiChordSustain(state, cc.value, ccTime);
                     }
-                });
+                }
             }
 
             if (!muted && freq) {
@@ -1022,7 +1054,7 @@ function scheduleChords(
                 const { name, octave } = midiToNote(midiNum);
                 playNote(state, freq, playTime, duration, {
                     vol: safeVelocity,
-                    index: strumRank.get(n) ?? 0,
+                    index: strumRank ? strumRank[ni] : 0,
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
                 });
@@ -1040,7 +1072,7 @@ function scheduleChords(
                     });
                 }
             }
-        });
+        }
     }
 }
 
