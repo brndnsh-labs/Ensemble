@@ -654,13 +654,13 @@ const PRESETS_RAW = [
         category: 'Jazz',
         isMinor: false,
         settings: {
-            bpm: 110,
+            bpm: 60,
             style: 'jazz',
             timeSignature: '6/8',
         },
         provenance: {
             variant: 'Kind of Blue 6/8 modal-blues frame',
-            notes: 'Retains the compound-meter head and chromatic D7#9 -> Eb7#9 D7alt turnaround so the modal-blues color stays closer to the Miles Davis small-group language.',
+            notes: 'Retains the compound-meter head and chromatic D7#9 -> Eb7#9 D7alt turnaround so the modal-blues color stays closer to the Miles Davis small-group language. BPM=60 = dotted-quarter pulses/min, close to the original recording (~46 dq/min). Pre-S1 the preset BPM was 110 under the old quarter-note interpretation; post-S1 (BPM is dotted-quarter/min for compound) the preset value had to be re-tuned to match the intended feel.',
             references: ['Miles Davis, All Blues (Kind of Blue, 1959)'],
         },
     },
