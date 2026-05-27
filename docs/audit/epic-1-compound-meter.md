@@ -175,7 +175,7 @@ Decide during implementation; the design call is "what does a jazz-waltz comp so
 
 **Note (2026-05-27 implementation):** The engine fix was already shipped in S3 (commit `d6d094b8`) via `COMPOUND_COMPING_CELLS` at `accompaniment.ts:250-268` + routing at line 1065. S13's deliverable became the end-to-end emission-path critique that proves the engine produces sparse pulse-aligned comping at the full `getAccompanimentNotes` layer (S3's critique guarded only the pattern picker). Measured: 2.73 hits/bar, 100% pulse-aligned, 22.8% density. The "thick mush" the user originally reported was always going to be fixed by S3; this story confirmed it.
 
-### S14. Soloist rest-cadence pipeline (phrasing budget)
+### S14. Soloist rest-cadence pipeline (phrasing budget) ✅ Done 2026-05-27
 
 `public/engine/soloist.ts` only decrements `restSteps` from a manually-seeded value; once `restSteps` reaches 0 there is no per-tick path that forces a rest after N bars of continuous play. In production-shaped state with the All Blues preset, the soloist runs 50–90 bars between rest flips. Human soloists breathe every 4–8 bars in jazz; the engine doesn't.
 

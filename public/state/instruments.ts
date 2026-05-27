@@ -101,6 +101,9 @@ export const soloist = deepSignal<SoloistState>({
             isWaitingForEntry: false,
             isYielding: false,
             lastAttackStep: -100,
+            // why: S14 phrasing-budget timer — increments at each bar boundary
+            // while active, resets to 0 on rest entry. Starts at 0 (resting).
+            barsSinceRest: 0,
         },
         currentPhrase: {
             startStep: null,
@@ -224,6 +227,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     isWaitingForEntry: { kind: 'phrasing', key: 'isWaitingForEntry' },
     isYielding: { kind: 'phrasing', key: 'isYielding' },
     lastAttackStep: { kind: 'phrasing', key: 'lastAttackStep' },
+    barsSinceRest: { kind: 'phrasing', key: 'barsSinceRest' },
 
     // --- Current phrase ---
     phraseStartStep: { kind: 'currentPhrase', key: 'startStep' },

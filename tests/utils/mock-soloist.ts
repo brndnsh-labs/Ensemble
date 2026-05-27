@@ -48,6 +48,7 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
             isWaitingForEntry: false,
             isYielding: false,
             lastAttackStep: -100,
+            barsSinceRest: 0,
         },
         currentPhrase: {
             startStep: null,
@@ -142,6 +143,9 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         },
         lastAttackStep: (v) => {
             session.phrasing.lastAttackStep = v;
+        },
+        barsSinceRest: (v) => {
+            session.phrasing.barsSinceRest = v;
         },
         phraseStartStep: (v) => {
             session.currentPhrase.startStep = v;

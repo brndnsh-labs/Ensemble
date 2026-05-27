@@ -644,6 +644,13 @@ export interface SoloistPhrasing {
     readonly isYielding: boolean;
     /** Step of the last note attack. */
     readonly lastAttackStep: number;
+    /**
+     * Bars elapsed since the last rest entry (S14 — phrasing-budget timer).
+     * Increments at each bar boundary while the soloist is active; resets to 0
+     * on rest entry. Used to force a breath after N bars regardless of whether
+     * the rhythm-plan + `isStrongResolution` coincidence ever aligns.
+     */
+    readonly barsSinceRest: number;
 }
 
 /**
@@ -1314,6 +1321,7 @@ export type ActionPayloadUpdateSB = Partial<{
     isWaitingForEntry: boolean;
     isYielding: boolean;
     lastAttackStep: number;
+    barsSinceRest: number;
     phraseStartStep: number | null;
     phraseLoopCount: number | null;
     phraseSectionLabel: string | null;

@@ -98,6 +98,7 @@ export function resetSoloistState(state: EnsembleState): void {
     phrasing.restSteps = 0;
     phrasing.activeSteps = 0;
     phrasing.busySteps = 0;
+    phrasing.barsSinceRest = 0;
 
     currentPhrase.startStep = null;
     currentPhrase.loopCount = null;
@@ -1832,17 +1833,102 @@ export function getSoloistNote(
     } else {
         phr.activeSteps = (soloist.session.phrasing.activeSteps || 0) - 1; // @worker-mutation
 
+        // why: S14 phrasing-budget timer. The pre-S14 rest-entry gate required
+        // BOTH `activeSteps <= 0` AND `isStrongResolution` to coincide; if
+        // `activeSteps` ran out mid-bar without `isStrongResolution` aligning,
+        // the rhythm-plan-empty path at line ~1894 silently re-seeded
+        // `activeSteps` from a fresh `planSteps` roll, perpetually extending
+        // the phrase. In production-shaped state with the All Blues preset
+        // this gave 50–90 bars of continuous play between rest flips. Human
+        // soloists breathe every 4–8 bars. We now also track elapsed active
+        // bars since the last rest entry and force a breath when the budget
+        // is exceeded, regardless of whether the random `activeSteps` roll
+        // and `isStrongResolution` ever align.
+        //
+        // Bar increment: a new bar begins when measureStep === 0. The first
+        // bar after rest entry counts as bar 1 (the wake-up tick lives on
+        // measureStep === pulse-aligned strong position, often 0 itself).
+        if (isDownbeat) {
+            phr.barsSinceRest = (soloist.session.phrasing.barsSinceRest || 0) + 1; // @worker-mutation
+        }
+
         const isStrongResolution =
             measureStep === stepsPerMeasure - 1 || (isBackbeat && effectiveIntensity > 0.5);
 
-        if (
-            (soloist.session.phrasing.activeSteps || 0) <= 0 &&
-            isStrongResolution &&
+        // why: intensity-aware bar budget. At low intensity (calm, lyrical)
+        // human jazz soloists breathe every ~4 bars; at moderate intensity
+        // (the All Blues listening reference at 0.7) ~6 bars; at full burn
+        // ~8 bars. The audit doc recipe was budget ≈ 4 at low intensity
+        // and ≈ 8 at high, but the budget timer increments on `isDownbeat`
+        // which doesn't fire on the wake-up tick (wake can happen mid-bar
+        // via the `isGoodEntry` gate above). So the realized active-streak
+        // length is budget + 0..1 bars depending on wake-up alignment.
+        // We bias the formula down by 1 to put realized streaks in the
+        // ~4 / ~6 / ~8 bar range the audit doc named. Clamp to [3, 7]
+        // so the budget can't exceed the human breath range even at
+        // intensity == 1.0 with loop-fatigue stacking onto effective.
+        const clampedIntensity = Math.max(0, Math.min(1, effectiveIntensity));
+        const baseBarBudget = Math.max(
+            3,
+            Math.min(7, Math.round(3 + (clampedIntensity - 0.5) * 8)),
+        );
+        // why: S14 review patch (2026-05-27) — in seed mode the soloist is
+        // paraphrasing the head, so motivic phrases need extra runway before
+        // the budget interrupts them. 1.5× lets ii-V-I-style motifs play out
+        // (the neo-soul `laterLoopSectionRhythmRecallShare ≥ 0.75` threshold
+        // measures this exact behavior) while still bounding the longest
+        // run. Realized streaks in seed mode: ~5-10 bars vs ~4-7 unseeded.
+        const phraseBarBudget = hasSessionSeed ? Math.round(baseBarBudget * 1.5) : baseBarBudget;
+        const budgetExceeded = (soloist.session.phrasing.barsSinceRest || 0) >= phraseBarBudget;
+
+        // why: pulse-aligned rest gate. When the bar budget is exceeded we
+        // schedule the rest entry on the NEXT pulse boundary (not mid-pulse)
+        // so the breath lands musically. `isPulse` is canonical for compound
+        // meters; in simple meters every quarter is a pulse. End-of-bar
+        // (measureStep === stepsPerMeasure - 1) is kept as a fallback so we
+        // never miss the window.
+        const isPulseBoundary = stepInfo?.isPulse === true || isBeatStart;
+        // why: S14 — suppress budget-forced rest whenever a session seed
+        // exists. The seed-driven paths (head playback, themed improv,
+        // gap-fill) explicitly seed activeSteps to follow the head shape;
+        // forced rests chop motivic paraphrases and break section-rhythm-
+        // recall across loops (the neo-soul integration test measures
+        // `laterLoopSectionRhythmRecallShare` specifically). We can't gate
+        // on `isHeadPerformanceMode` alone because that derives from
+        // `headNotes.length > 0` which is per-step (most steps have no
+        // current head note), so the budget would still fire between seed
+        // hits and disrupt the inter-anchor improvisation. The natural-
+        // resolution gate (`activeSteps <= 0 + isStrongResolution`) still
+        // fires in seed mode and keeps phrases bounded.
+        //
+        // Gate (S14 review 2026-05-27 — P0 patch): defer to head-performance
+        // logic only on actual head-following steps. `isHeadPerformanceMode`
+        // is per-step (`headNotes.length > 0`), so the budget fires on
+        // inter-anchor steps within Loop 1 but snaps back to the seed on
+        // the next anchor — the right musical answer for "breathe between
+        // head hits if the budget says so."
+        // The earlier `!hasSessionSeed` form was dead in production:
+        // `state-effects.ts:43` writes a session seed on every TOGGLE_PLAY,
+        // so `hasSessionSeed` was always true at playback time.
+        const budgetForcesRest =
+            budgetExceeded &&
+            (isPulseBoundary || measureStep === stepsPerMeasure - 1) &&
             !coordination.bypassRhythm &&
-            !isStrictHeadPlayback
+            !isHeadPerformanceMode;
+
+        if (
+            ((soloist.session.phrasing.activeSteps || 0) <= 0 &&
+                isStrongResolution &&
+                !coordination.bypassRhythm &&
+                !isStrictHeadPlayback) ||
+            budgetForcesRest
         ) {
             phr.isResting = true; // @worker-mutation
             phr.state = 'rest'; // @worker-mutation
+            // why: S14 — reset bar counter on every rest entry so the next
+            // active phrase starts from zero. Both the natural-resolution
+            // path and the budget-forced path land here.
+            phr.barsSinceRest = 0; // @worker-mutation
             if (coordination) {
                 coordination.soloistPhraseEnd = true;
             }
@@ -1850,12 +1936,29 @@ export function getSoloistNote(
             // Fatigue Decay: Shorten breaths as song progresses (0.9x per loop)
             const fatigueMultiplier = Math.max(0.5, 1.0 - Math.max(0, loopCount) * 0.1);
             // why: discriminator 52 — rest-length roll on phrase resolution.
-            const nextRestSteps = Math.floor(
+            let nextRestSteps = Math.floor(
                 stepsPerMeasure *
                     restMultiplier *
                     fatigueMultiplier *
                     (0.5 + scrambleHash(callSeedBase + 52) * 1.5),
             );
+            // why: S14 — when the budget *forced* the rest (rather than the
+            // natural roll matching `isStrongResolution`), give the soloist
+            // a real breath. Pre-S14 rest lengths for jazz collapsed to the
+            // `minimumRestSteps=3` floor (well under a bar) because the
+            // restMultiplier formula = 0.05 * (2.0 - 1.05) ≈ 0.0475 yielded
+            // a fraction of a step at jazz defaults. A budget-forced rest
+            // should breathe ~1 bar at moderate intensity, ~2 bars at low
+            // intensity (longer breaths when the band is calm), ~0.5 bar at
+            // full burn. Linear ramp on `1 - effectiveIntensity`.
+            if (budgetForcesRest) {
+                const budgetRestBars =
+                    0.5 + (1 - Math.max(0, Math.min(1, effectiveIntensity))) * 1.5;
+                nextRestSteps = Math.max(
+                    nextRestSteps,
+                    Math.floor(stepsPerMeasure * budgetRestBars),
+                );
+            }
             phr.restSteps = nextRestSteps; // @worker-mutation
 
             const minimumRestSteps =
@@ -1870,7 +1973,7 @@ export function getSoloistNote(
                 phr.restSteps = minimumRestSteps; // @worker-mutation
             }
             logDebug(
-                `Active steps expired on strong resolution. Entering 'rest' state for ~${soloist.session.phrasing.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)})`,
+                `${budgetForcesRest ? 'Bar budget exceeded' : 'Active steps expired on strong resolution'}. Entering 'rest' state for ~${soloist.session.phrasing.restSteps} steps. (Fatigue: ${fatigueMultiplier.toFixed(2)}, budget: ${phraseBarBudget} bars)`,
             );
             // Clear rhythm plan just in case
             commitTrackedPhraseSignature(soloist, loopCount);
