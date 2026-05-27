@@ -101,14 +101,13 @@ describe('Rock Drummer Critique', () => {
         });
 
         let backbeatHits = 0;
-        const _weakBackbeats = 0;
         let eighthNoteHats = 0;
         let nonEighthNoteHats = 0;
         let snareGhostHits = 0;
         let kickSolidHits = 0;
-        let _openHatHighIntensityCount = 0;
-        let _totalSnareVelocity = 0;
-        let _totalGhostVelocity = 0;
+        let openHatHighIntensityCount = 0;
+        let totalSnareVelocity = 0;
+        let totalGhostVelocity = 0;
         let rideHits = 0;
 
         performance.forEach((bar) => {
@@ -121,11 +120,11 @@ describe('Rock Drummer Critique', () => {
                 if (snare) {
                     if (snare.velocity >= 1.1) {
                         backbeatHits++;
-                        _totalSnareVelocity += snare.velocity;
+                        totalSnareVelocity += snare.velocity;
                     } else {
                         // --- CRITIQUE: Snare Ghost/Entropy ---
                         snareGhostHits++;
-                        _totalGhostVelocity += snare.velocity;
+                        totalGhostVelocity += snare.velocity;
                     }
                 }
 
@@ -140,7 +139,7 @@ describe('Rock Drummer Critique', () => {
                     if (isEighth) {
                         eighthNoteHats++;
                         if (hat.sound === 'Open') {
-                            _openHatHighIntensityCount++;
+                            openHatHighIntensityCount++;
                         }
                         if (hat.sound === 'Ride') {
                             rideHits++;
@@ -170,6 +169,12 @@ describe('Rock Drummer Critique', () => {
         console.log(`[Kick Solidity]        ${(kickScore * 100).toFixed(1)}% (Target: 100%)`);
         console.log(`[Ghost Note Density]   ${(snareGhostHits / totalBars).toFixed(2)} hits/bar`);
         console.log(`[Ride Participation]   ${rideHits} hits (at 0.75 intensity)`);
+        const ghostAvg = totalGhostVelocity / Math.max(1, snareGhostHits);
+        const backbeatAvg = totalSnareVelocity / Math.max(1, backbeatHits);
+        console.log(
+            `[Snare Dynamics]       ghost avg ${ghostAvg.toFixed(2)} vs backbeat avg ${backbeatAvg.toFixed(2)} (target: ghost < 0.6 * backbeat)`,
+        );
+        console.log(`[Open Hat @ 0.75]      ${openHatHighIntensityCount} hits`);
         console.log('------------------------------------\n');
 
         // CRITICAL: Rock drummer MUST hit the backbeat on 2 AND 4. Engine
@@ -188,6 +193,18 @@ describe('Rock Drummer Critique', () => {
 
         // MUSICAL: Snare extra hits (ghosting) should be minimal.
         expect(snareGhostHits / totalBars).toBeLessThan(2.0);
+
+        // MUSICAL: Ghost snare hits must be substantially quieter than backbeat
+        // hits — the dynamic contrast IS the Rock idiom. Asserting ghost avg <
+        // 60% of backbeat avg locks in real dynamic shaping; without this gate
+        // a flat-velocity engine could still ship green on count-based checks.
+        expect(ghostAvg).toBeLessThan(backbeatAvg * 0.6);
+
+        // Note: open-hat reachability at intensity 0.75 is intentionally NOT
+        // asserted here — opens fire on off-beats (non-eighth steps) in this
+        // engine, so this window under-counts. The dedicated low-vs-high
+        // intensity test below covers the open-hat ramp directly.
+        void openHatHighIntensityCount;
     });
 
     it('should switch from HiHat to Open sounds at high intensity', () => {

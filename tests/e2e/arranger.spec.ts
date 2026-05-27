@@ -262,11 +262,9 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         const keyPanel = page.locator('#arrangerKeyPanel');
 
         await page.mouse.click(5, 5);
-        await page.waitForTimeout(150);
         await expect(keyPanel).toBeHidden();
 
         await keyTrigger.click();
-        await page.waitForTimeout(250);
         await expect(keyPanel).toBeVisible();
         await expectLocatorFitsViewport(page, keyPanel);
         await expectOwnsInteriorProbe(keyPanel);
@@ -274,7 +272,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expectWithinSurface(keyPanel, page.locator('#transUpBtn'));
 
         await page.mouse.click(5, 5);
-        await page.waitForTimeout(150);
         await expect(keyPanel).toBeHidden();
     });
 

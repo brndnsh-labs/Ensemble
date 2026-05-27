@@ -81,6 +81,13 @@ export function arrangerReducer(action: Action): boolean {
         case ACTIONS.SET_ARRANGEMENT:
             a.sections = action.payload;
             return true;
+        case ACTIONS.SET_SECTIONS:
+            a.sections = action.payload;
+            a.isDirty = true;
+            return true;
+        case ACTIONS.SET_IS_MINOR:
+            a.isMinor = !!action.payload;
+            return true;
         case ACTIONS.SET_SONG_SEED:
             a.seed = action.payload;
             return true;

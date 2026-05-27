@@ -44,6 +44,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateRhythmPlan } from '../../public/engine/soloist-rhythm-engine.js';
 import { makeSoloistMock } from '../utils/mock-soloist.js';
+import { makeMulberry32 } from '../utils/seeded-random.js';
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -81,23 +82,8 @@ function buildSoloistState() {
     });
 }
 
-/**
- * mulberry32 — small, fast, deterministic 32-bit PRNG. Seeded to the
- * same value at the start of each generateAtLoop call so Loop 0 and
- * Loop 2 see the SAME RNG sequence; the only thing that differs is
- * the loopCount argument. Canonical project pattern; see
- * feedback_seeded_prng_mulberry32 in user memory.
- */
-function makeMulberry32(seed: number): () => number {
-    let s = seed >>> 0;
-    return () => {
-        s = (s + 0x6d2b79f5) >>> 0;
-        let t = s;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
+// mulberry32 lives in tests/utils/seeded-random.ts — same algorithm, single
+// source of truth. See feedback_seeded_prng_mulberry32 in user memory.
 
 /**
  * Generate one plan at a given loop count. A mulberry32 PRNG is INJECTED

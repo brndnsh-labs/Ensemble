@@ -23,6 +23,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FILL_TEMPLATES, generateDeterministicFill } from '../../public/engine/fills.js';
+import { makeMulberry32 } from '../utils/seeded-random.js';
 
 const TOM_NAMES = ['High Tom', 'Mid Tom', 'Low Tom'];
 
@@ -40,21 +41,11 @@ function countTomTemplates(templates: { instruments: string[] }[] | undefined): 
 }
 
 /**
- * Tiny seeded LCG so the test PRNG is reproducible across runs but cycles
- * through every template across a sweep — Math.random would let us miss a
- * regression where the tom template is defined but unreachable by `prng()`.
- * The fill engine itself picks templates via `Math.floor(prng() * length)`.
+ * Canonical mulberry32 — `feedback_seeded_prng_mulberry32` documents that bare
+ * LCGs sawtooth on small integer seeds, so we use the project-wide helper to
+ * keep the template-index sweep uniform.
  */
-function makePrng(seed: number): () => number {
-    let s = seed | 0;
-    return () => {
-        s = (s * 1664525 + 1013904223) | 0;
-        // why: standard LCG → [0,1) float by dividing the unsigned 32-bit
-        // state by 2^32. Uniform across the template index space when we
-        // sweep 100+ seeds, which is what the reachability assertions need.
-        return (s >>> 0) / 0x100000000;
-    };
-}
+const makePrng = makeMulberry32;
 
 /**
  * Sweep N seeds at a given intensity and count how many fills contain a tom.

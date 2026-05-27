@@ -123,14 +123,8 @@ describe('Accompaniment Consistency Standards', () => {
         // We need to simulate the step advancing
         getAccompanimentNotes(getState(), chordB, 32, 0, 0, { isBeatStart: true });
 
-        const _patternB = [...compingState.currentCell];
-
-        // Should NOT be equal (mostly) - but technically it *could* randomly pick the same one.
-        // However, we want to verify that the logic *attempted* a reset.
-        // We can check if grooveRetentionCount was reset.
-
-        // But since we can't easily access internal count if not exported (it is exported in my plan),
-        // let's rely on the probability or check `compingState.lastSectionId`.
+        // We intentionally don't compare cells here — a small cell pool could legitimately
+        // re-pick patternA. The reset is proven below via the tamper-and-check trick.
         expect(compingState.lastSectionId).toBe('sectionB');
 
         // To be sure, let's manually tamper the cell to be something impossible before the switch,
@@ -159,21 +153,15 @@ describe('Accompaniment Consistency Standards', () => {
         // Accompaniment should shift up
         const notes = getAccompanimentNotes(getState(), lowChord, 0, 0, 0, { isBeatStart: true });
 
-        if (notes.length > 0) {
-            const _lowestNote = Math.min(...notes.map((n) => n.midi).filter((m) => m > 0));
-            // Bass is ~36-48 range. Accompaniment should be > 48 + buffer or shifted.
-            // bass.lastFreq C2 is midi 36. C3 is 48.
-            // If logic holds, it should shift up or avoid.
+        // Accompaniment MUST produce notes for a populated chord; silent generation is itself a bug.
+        expect(notes.length).toBeGreaterThan(0);
 
-            // Note: The logic in accompaniment.js says:
-            // if (lowestMidi <= bassMidi + 12) voicing[0] = ... + 12
+        const lowestNote = Math.min(...notes.map((n) => n.midi).filter((m) => m > 0));
 
-            // Let's verify that logic.
-            // If bass is 36, limit is 48. If note is 48, 48 <= 48 is true.
-            // So 48 should become 60.
-
-            // Wait, I need to make sure I mock bass.lastFreq correctly or bass state.
-            // In the real code `bass.lastFreq` is read.
-        }
+        // bass.lastFreq = 65.41 Hz = C2 = MIDI 36. The interlocking rule shifts the
+        // accompaniment up by an octave when lowestMidi <= bassMidi + 12, so post-shift
+        // the floor must be ABOVE bassMidi + 12 = 48.
+        const bassMidi = 36;
+        expect(lowestNote).toBeGreaterThan(bassMidi + 12);
     });
 });

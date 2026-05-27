@@ -93,7 +93,7 @@ describe('Rock Groove Integrity', () => {
             const turnaroundBarIndex = 3; // 3 % 4 === 3
             const beat4 = turnaroundBarIndex * 16 + 12; // step 12 is beat 4
 
-            const _mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            vi.spyOn(Math, 'random').mockReturnValue(0.1);
             const resultTom = applyGrooveOverrides(getState(), createParams(beat4, 'High Tom'));
             expect(resultTom.shouldPlay).toBe(true);
         });
