@@ -57,6 +57,7 @@ export function getSyncState() {
             lyricalBias: playback.lyricalBias,
             songMode: playback.songMode,
             isEndingPending: playback.isEndingPending,
+            currentLoopCount: playback.currentLoopCount,
         },
         arranger: {
             progression: arranger.progression,

@@ -260,6 +260,11 @@ export function syncWorker(action?: string, payload?: any): void {
                 sessionStartTime: playback.sessionStartTime,
             };
             break;
+        case 'LOOP_BOUNDARY':
+            // Main thread is the canonical writer of playback.currentLoopCount;
+            // pushed to the worker each time the scheduler crosses a chorus boundary.
+            data.playback = { currentLoopCount: playback.currentLoopCount };
+            break;
         case 'ARRANGER_UPDATE': // Custom action for large structural changes
             data.arranger = {
                 progression: arranger.progression,

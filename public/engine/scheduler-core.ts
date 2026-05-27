@@ -323,6 +323,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 // If ending is pending or stopAtEnd is active, check for appropriate boundary (Next Chorus)
                 if (playback.step > 0 && playback.step % arranger.totalSteps === 0) {
                     (playback as Mutable<typeof playback>).currentLoopCount++; // @direct-mutation
+                    syncWorker('LOOP_BOUNDARY');
 
                     // --- Loop Limit Check ---
                     if (playback.songMode && playback.loopLimit > 0 && !playback.isEndingPending) {

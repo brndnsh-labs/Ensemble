@@ -732,7 +732,9 @@ export function applyWorkerTransition(
     if (modStep === 0 && step > 0) {
         conductorState.loopCount++;
         conductorState.formIteration++;
-        (playback as Mutable<typeof playback>).currentLoopCount = conductorState.loopCount; // @worker-mutation
+        // playback.currentLoopCount is owned by the main-thread scheduler now;
+        // it arrives via syncWorker('LOOP_BOUNDARY'). The worker uses conductorState.loopCount
+        // for its own bookkeeping; engines that need a unified field read playback.currentLoopCount.
     }
 
     const entry = binarySearchMap(arranger.stepMap || [], modStep);

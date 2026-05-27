@@ -46,7 +46,7 @@ Goals:
 | 7 | Modal a11y + chord-card button | _pending_ |
 | 8 | Inline styles → CSS classes; `class=` consistency | _pending_ |
 | 9 | State-discipline cleanup + `@direct-mutation` migration | _pending_ |
-| 10 | `playback.currentLoopCount` dual-write fix | _pending_ |
+| 10 | `playback.currentLoopCount` dual-write fix | ✅ shipped — main-thread canonical writer + `LOOP_BOUNDARY` syncWorker delta |
 
 ### Multi-session work (book separately)
 
