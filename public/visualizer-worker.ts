@@ -14,6 +14,8 @@ let syncAudioTime = 0;
 let syncPerfTime = 0;
 let isRunning = false;
 let isPlayingLocal = false;
+/** True while the playing→paused transition render hasn't fired yet. */
+let needsPausedRender = false;
 
 function getInterpolatedTime() {
     if (!syncPerfTime) {
@@ -31,6 +33,20 @@ function tick() {
     }
 
     if (engine) {
+        // While paused, only render once to paint the frozen frame, then skip
+        // every subsequent frame until playback resumes.
+        if (!isPlayingLocal) {
+            if (needsPausedRender) {
+                needsPausedRender = false;
+                const now = getInterpolatedTime();
+                if (now > 0) {
+                    engine.render(now, currentBpm, currentTS);
+                }
+            }
+            requestAnimationFrame(tick);
+            return;
+        }
+
         const now = getInterpolatedTime();
         if (now > 0) {
             engine.render(now, currentBpm, currentTS);
@@ -89,9 +105,16 @@ if (typeof self !== 'undefined') {
                 }
                 break;
 
-            case 'SET_PLAYING':
+            case 'SET_PLAYING': {
+                const wasPlaying = isPlayingLocal;
                 isPlayingLocal = !!isPlaying;
+                // Transitioning playing→paused: request one final render so the
+                // frozen frame is correct, then skip all subsequent frames until play resumes.
+                if (wasPlaying && !isPlayingLocal) {
+                    needsPausedRender = true;
+                }
                 break;
+            }
 
             case 'ADD_TRACK':
                 if (engine) {

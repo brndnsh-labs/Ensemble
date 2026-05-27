@@ -5,6 +5,30 @@ import { INTERVAL_CATEGORY, RingBuffer } from './visualizer-utils.js';
 const { PI, abs, max, min } = Math;
 const DEFAULT_TRACK_RANGE = { midiMin: 48, midiMax: 84 };
 
+/** Pre-allocated per-lane overlay config list — hoisted out of the 60fps render path. */
+const OVERLAY_CONFIGS: ReadonlyArray<{
+    readonly laneName: string;
+    readonly alpha: number;
+    readonly toneHeight: number;
+    readonly showMarkers: boolean;
+    readonly showLabels: boolean;
+}> = [
+    {
+        laneName: 'chords',
+        alpha: 0.16,
+        toneHeight: 4,
+        showMarkers: true,
+        showLabels: true,
+    },
+    {
+        laneName: MODULES.SOLOIST,
+        alpha: 0.08,
+        toneHeight: 3,
+        showMarkers: false,
+        showLabels: false,
+    },
+];
+
 function getXStandalone(
     t: number,
     currentTime: number,
@@ -68,6 +92,10 @@ export class VisualizerEngine {
     private _font = '';
     private _textAlign = '';
     private _textBaseline = '';
+    /** Memoization cache for getChordOverlayEntries, keyed by "laneName:chordIndex". */
+    private _overlayCache = new Map<string, Array<{ midi: number; colorIdx: number }>>();
+    /** The chordEvents array reference the cache was last populated from. */
+    private _overlayCacheEventsRef: unknown[] = [];
 
     constructor(
         canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -482,13 +510,48 @@ export class VisualizerEngine {
         laneName: string,
         event: unknown,
     ): Array<{ midi: number; colorIdx: number }> {
-        const { midiMin, midiMax } = this.getTrackMidiRange(laneName);
+        // Invalidate the whole cache when chordEvents array identity changes
+        // (chart load / clear() replaces this.chordEvents with a new array).
+        if (this.chordEvents !== this._overlayCacheEventsRef) {
+            this._overlayCache.clear();
+            this._overlayCacheEventsRef = this.chordEvents;
+        }
+
         const ev = event as {
+            index?: number;
             rootMidi: number;
             notes?: number[];
             chordNotes?: number[];
             intervals?: number[];
         };
+
+        // Only memoize entries that carry a stable chord index.
+        const cacheKey = ev.index !== undefined ? `${laneName}:${ev.index}` : null;
+        if (cacheKey !== null) {
+            const cached = this._overlayCache.get(cacheKey);
+            if (cached !== undefined) {
+                return cached;
+            }
+        }
+
+        const result = this._computeChordOverlayEntries(laneName, ev);
+
+        if (cacheKey !== null) {
+            this._overlayCache.set(cacheKey, result);
+        }
+        return result;
+    }
+
+    private _computeChordOverlayEntries(
+        laneName: string,
+        ev: {
+            rootMidi: number;
+            notes?: number[];
+            chordNotes?: number[];
+            intervals?: number[];
+        },
+    ): Array<{ midi: number; colorIdx: number }> {
+        const { midiMin, midiMax } = this.getTrackMidiRange(laneName);
         const rootPc = ((ev.rootMidi % 12) + 12) % 12;
         const notes: number[] = Array.isArray(ev.notes)
             ? ev.notes
@@ -622,24 +685,8 @@ export class VisualizerEngine {
 
     drawChordLaneBackdrop(currentTime: number, minTime: number): void {
         const ctx = this.ctx;
-        const overlayConfigs = [
-            {
-                laneName: 'chords',
-                alpha: 0.16,
-                toneHeight: 4,
-                showMarkers: true,
-                showLabels: true,
-            },
-            {
-                laneName: MODULES.SOLOIST,
-                alpha: 0.08,
-                toneHeight: 3,
-                showMarkers: false,
-                showLabels: false,
-            },
-        ];
 
-        for (const config of overlayConfigs) {
+        for (const config of OVERLAY_CONFIGS) {
             const lane = this.getLane(config.laneName);
             const track = this.tracks[config.laneName];
             if (!lane || !track) {
