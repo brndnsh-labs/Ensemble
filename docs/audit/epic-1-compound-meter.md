@@ -137,7 +137,7 @@ Some genres are tied to specific meters in real practice (Funk = 4/4, Bossa Nova
 
 **Effort:** ~2h (design call) + 2-4h (implementation depending on choice). **Model:** opus (product decision). **Reviewer:** none required. **Source:** investigation 2026-05-27.
 
-### S11. Jazz 6/8 ride skip-beat lands on the last eighth, not the last 16th
+### S11. Jazz 6/8 ride skip-beat lands on the last eighth, not the last 16th ✅ Done 2026-05-27
 
 `public/engine/grooves/jazz.ts:80` defines `isSkipBeat = stepInGroup === groupSteps - 1`. In 6/8 (`grouping=[3,3]`, `stepsPerBeat=2`, so `groupSteps = 6`), this places the skip-beat at `stepInGroup === 5` → mStep ∈ **{5, 11}**, which is the last *sixteenth* of each dotted-quarter group.
 

@@ -71,13 +71,20 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     const lastBeatIndex = Math.max(1, Math.round(stepsPerBar / 4) - 1);
     const isPulse = tsConfig?.pulse?.includes(mStep);
 
-    // In compound meters, the "skip" beat is typically the last beat of a grouping
+    // In compound meters the "skip" beat is the anticipating eighth before each pulse.
     let isSkipBeat = false;
     let isRideStep = false;
 
     if (isCompound) {
         const groupSteps = (tsConfig?.grouping?.[groupIndex] || 3) * (tsConfig?.stepsPerBeat || 2);
-        isSkipBeat = stepInGroup === groupSteps - 1; // Last step of the group
+        // why: canonical jazz 6/8 "spang-a-lang" places the skip-beat on the
+        // *last eighth* of each dotted-quarter group (the anticipation before
+        // the next pulse), not on the final sixteenth. In 6/8 (groupSteps=6)
+        // `groupSteps - 2` lands on mStep ∈ {4, 10} — the third eighth of
+        // each group — which is one 16th earlier than `groupSteps - 1` (mStep
+        // ∈ {5, 11}).  The old placement was one 16th too late and was the
+        // dominant source of the "jumbled" 6/8 feel. (epic-1-compound-meter S11)
+        isSkipBeat = stepInGroup === groupSteps - 2;
         isRideStep = isPulse || isSkipBeat;
     } else {
         isSkipBeat = isOffbeat && beatIndex % 2 !== 0;
