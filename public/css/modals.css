@@ -1102,6 +1102,11 @@ input[type="range"] {
     background: var(--input-bg);
 }
 
+.section-kebab-wrap {
+    position: relative;
+    display: inline-block;
+}
+
 .section-move-btn,
 .section-duplicate-btn,
 .section-kebab-btn,

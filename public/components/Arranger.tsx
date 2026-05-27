@@ -91,7 +91,7 @@ export function Arranger() {
                 }
 
                 return (
-                    <div className="section-group" key={`group-${group[0].id}`}>
+                    <div class="section-group" key={`group-${group[0].id}`}>
                         {group.map((section) => {
                             const index = sections.findIndex((s: Section) => s.id === section.id);
                             return (

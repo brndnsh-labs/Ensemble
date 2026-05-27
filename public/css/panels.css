@@ -85,6 +85,12 @@
     gap: var(--space-1);
 }
 
+.grouping-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .time-sig-group {
     display: flex;
     flex-direction: column;

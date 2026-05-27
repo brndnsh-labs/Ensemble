@@ -312,7 +312,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                         >
                             ▾
                         </button>
-                        <div style="position: relative; display: inline-block;" ref={menuRef}>
+                        <div class="section-kebab-wrap" ref={menuRef}>
                             <button
                                 class="section-kebab-btn"
                                 aria-label={`Actions for ${section.label || 'Section'}`}

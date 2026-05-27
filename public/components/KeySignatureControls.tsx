@@ -101,14 +101,7 @@ export function TimeSignatureControl() {
                     </option>
                 ))}
             </select>
-            <div
-                id="groupingToggle"
-                style={{
-                    display: supportsGrouping ? 'flex' : 'none',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}
-            >
+            <div id="groupingToggle" class="grouping-toggle" hidden={!supportsGrouping}>
                 <button
                     id="groupingLabel"
                     type="button"

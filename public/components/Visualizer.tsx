@@ -377,13 +377,9 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     }, [enabled, isPlaying]);
 
     return (
-        <div
-            id="unifiedVizContainer"
-            ref={containerRef}
-            style={{ position: 'relative', width: '100%', height: '100%' }}
-        >
-            <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-            <canvas ref={staticCanvasRef} style={{ display: 'none' }} />
+        <div id="unifiedVizContainer" ref={containerRef}>
+            <canvas ref={canvasRef} />
+            <canvas ref={staticCanvasRef} hidden />
         </div>
     );
 }

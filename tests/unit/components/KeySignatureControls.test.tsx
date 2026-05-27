@@ -138,7 +138,7 @@ describe('KeySignatureControls Component', () => {
         expect(keyMenuBtn.textContent).toContain('C maj');
         expect(keySelect.value).toBe('C');
         expect(timeSigSelect.value).toBe('4/4');
-        expect(groupingToggle.style.display).toBe('none');
+        expect((groupingToggle as HTMLElement).hidden).toBe(true);
     });
 
     it('handles key change', async () => {
@@ -237,7 +237,7 @@ describe('KeySignatureControls Component', () => {
         });
 
         const groupingToggle = document.body.querySelector('#groupingToggle');
-        expect(groupingToggle.style.display).toBe('flex');
+        expect((groupingToggle as HTMLElement).hidden).toBe(false);
 
         const groupingLabel = document.body.querySelector('#groupingLabel');
         expect(groupingLabel.textContent).toBe('3+2');

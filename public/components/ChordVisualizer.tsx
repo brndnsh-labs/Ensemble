@@ -78,17 +78,15 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
         .join(' ');
 
     return (
-        <div className={classNames} ref={cardRef} onClick={handleClick}>
+        <div class={classNames} ref={cardRef} onClick={handleClick}>
             {disp ? (
-                <span className="chord-symbol">
-                    <span className="root">{formatUnicodeSymbols(disp.root)}</span>
-                    <span className="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
-                    {disp.bass && (
-                        <span className="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>
-                    )}
+                <span class="chord-symbol">
+                    <span class="root">{formatUnicodeSymbols(disp.root)}</span>
+                    <span class="suffix">{formatUnicodeSymbols(disp.suffix)}</span>
+                    {disp.bass && <span class="bass-note">/{formatUnicodeSymbols(disp.bass)}</span>}
                 </span>
             ) : (
-                <span className="chord-symbol">{formatUnicodeSymbols(chord.absName) || '...'}</span>
+                <span class="chord-symbol">{formatUnicodeSymbols(chord.absName) || '...'}</span>
             )}
         </div>
     );
@@ -333,7 +331,7 @@ export function ChordVisualizer() {
     return (
         <>
             <div
-                className={`display-area lead-sheet lead-sheet--${density} lead-sheet--viewport-${layoutProfile.viewport} lead-sheet--scroll-${layoutProfile.scrollMode}`}
+                class={`display-area lead-sheet lead-sheet--${density} lead-sheet--viewport-${layoutProfile.viewport} lead-sheet--scroll-${layoutProfile.scrollMode}`}
                 id="chordVisualizer"
                 ref={containerRef}
                 style={containerStyle}
@@ -352,7 +350,7 @@ export function ChordVisualizer() {
                     return (
                         <div
                             key={sectionGroup.id}
-                            className={`lead-sheet-section-group${
+                            class={`lead-sheet-section-group${
                                 isActiveSection ? ' lead-sheet-section-group--active' : ''
                             }`}
                             data-section-id={sectionGroup.sectionId}
@@ -375,7 +373,7 @@ export function ChordVisualizer() {
                                 return (
                                     <div
                                         key={row.id}
-                                        className={`lead-sheet-row${
+                                        class={`lead-sheet-row${
                                             row.isSectionStart
                                                 ? ' lead-sheet-row--section-start'
                                                 : ''
@@ -394,7 +392,7 @@ export function ChordVisualizer() {
                                             return (
                                                 <div
                                                     key={`${row.id}-${measureIndex}`}
-                                                    className={`measure-box${
+                                                    class={`measure-box${
                                                         isActiveMeasure
                                                             ? ' measure-box--active'
                                                             : ''
