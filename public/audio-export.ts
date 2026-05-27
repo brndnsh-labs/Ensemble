@@ -66,8 +66,8 @@ export async function renderCurrentSessionToWav(
 
     for (let step = 0; step < totalSteps; step++) {
         const time = leadIn + step * sixteenth;
-        // Throwaway cloned state, not the live deepSignal — same pattern as the
-        // schedule loop in scripts/mix-report.ts.
+        // Throwaway cloned state, not the live deepSignal — no reactivity to
+        // route through. Same pattern as the schedule loop in scripts/mix-report.ts.
         state.playback.nextNoteTime = time; // @direct-mutation
         state.playback.unswungNextNoteTime = time; // @direct-mutation
         scheduleGlobalEvent(state, step % stepsPerLoop, time);

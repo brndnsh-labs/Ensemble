@@ -45,7 +45,7 @@ Goals:
 |---|---|---|
 | 7 | Modal a11y + chord-card button | ✅ shipped — `useModalA11y` hook + applied to Settings, ShareModal, ManualModal, VisualizerOverlay, StudioSurface; chord card → `<button>` |
 | 8 | Inline styles → CSS classes; `class=` consistency | ✅ shipped — 3 inline blocks → CSS; 11 HTML-element `className` sites converted (custom-component callsites preserved) |
-| 9 | State-discipline cleanup + `@direct-mutation` migration | _pending_ |
+| 9 | State-discipline cleanup + `@direct-mutation` migration | ✅ shipped — arranger-controller `switchToRelativeKey` mutate-in-place → atomic dispatch; `regenerateSessionSeeds` helper extracted from two duplicated blocks in state-effects. Chords-engine `Object.assign(arranger, …)` cache writes left as-is: they share the validateProgression path with the sanctioned line 1019 mutation, so partial migration would split a unified write across two contracts. |
 | 10 | `playback.currentLoopCount` dual-write fix | ✅ shipped — main-thread canonical writer + `LOOP_BOUNDARY` syncWorker delta |
 
 ### Multi-session work (book separately)

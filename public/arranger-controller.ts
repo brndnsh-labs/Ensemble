@@ -304,22 +304,28 @@ export function switchToRelativeKey(): void {
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isMinor', value: !wasMinor });
 
     pushHistory();
-    arranger.sections.forEach((section: any) => {
-        section.value = transformRelativeProgression(section.value, shift);
 
+    // Build a fresh section array off the live snapshot — no in-place writes,
+    // so we route through dispatch atomically without the prior duplicate
+    // mutate-then-clone step.
+    const transformedSections = arranger.sections.map((section: any) => {
+        const next = {
+            ...section,
+            value: transformRelativeProgression(section.value, shift),
+        };
         if (section.key) {
             const secKeyIndex = KEY_ORDER.indexOf(normalizeKey(section.key));
             if (secKeyIndex !== -1) {
-                section.key = KEY_ORDER[(secKeyIndex + shift + 12) % 12];
+                next.key = KEY_ORDER[(secKeyIndex + shift + 12) % 12];
             }
         }
+        return next;
     });
 
-    // We mutated sections directly in the loop, so dispatch an updated array reference
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
         param: 'sections',
-        value: [...arranger.sections],
+        value: transformedSections,
     });
 
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });

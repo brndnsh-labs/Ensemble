@@ -20,6 +20,61 @@ interface HandleEffectsContext {
     oldBpm?: number;
 }
 
+/**
+ * Re-seed the soloist (and, optionally, the drum orchestration / fills /
+ * accents bag) from the current state. Shared by the play-start path and the
+ * during-playback "arrangement changed" path so both routes use the same
+ * recipe — bandIntensity, song seed, genre feel, and the dispatch shape.
+ */
+function regenerateSessionSeeds(
+    stateMap: EnsembleState,
+    songSeed: string,
+    seedTimelineStartStep: number,
+    dispatch: HandleEffectsContext['dispatch'],
+): void {
+    const { arranger, soloist, groove, playback } = stateMap;
+    const soloGenerated = generateSessionSeed(
+        stateMap,
+        arranger,
+        soloist.style || 'smart',
+        playback.bandIntensity,
+        songSeed,
+    );
+    dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
+
+    if (groove.enabled) {
+        const genreFeel = groove.genreFeel || 'Rock';
+        const drumOrchGenerated = generateDrumOrchestration(
+            stateMap,
+            arranger,
+            genreFeel,
+            playback.bandIntensity,
+            songSeed,
+        );
+        const drumFillsGenerated = generateDrumFills(
+            stateMap,
+            arranger,
+            genreFeel,
+            playback.bandIntensity,
+            songSeed,
+        );
+        const drumAccentsGenerated = generateSoloistAccents(
+            stateMap,
+            arranger,
+            soloGenerated,
+            genreFeel,
+            playback.bandIntensity,
+            songSeed,
+        );
+        dispatch(ACTIONS.UPDATE_GB, {
+            orchestrationMap: drumOrchGenerated,
+            fillMap: drumFillsGenerated,
+            accentMap: drumAccentsGenerated,
+            seedTimelineStartStep,
+        });
+    }
+}
+
 export function handleEffects(
     action: string,
     payload: any,
@@ -29,7 +84,7 @@ export function handleEffects(
     const { dispatch } = context;
     switch (action) {
         case ACTIONS.TOGGLE_PLAY: {
-            const { playback, arranger, soloist, groove } = stateMap;
+            const { playback, arranger } = stateMap;
             if (playback.isPlaying) {
                 // Auto-lock the chart whenever playback starts. The chart is a
                 // music stand — you don't rewrite while the band is playing.
@@ -37,7 +92,6 @@ export function handleEffects(
                 if (!playback.chartLocked) {
                     dispatch(ACTIONS.SET_CHART_LOCKED, true);
                 }
-                // --- Soloist Seeder ---
                 let currentSongSeed = arranger.seed;
                 if (!currentSongSeed) {
                     currentSongSeed = Math.floor(Math.random() * 0xffffff)
@@ -47,47 +101,7 @@ export function handleEffects(
                     dispatch(ACTIONS.SET_SONG_SEED, currentSongSeed);
                 }
 
-                const soloGenerated = generateSessionSeed(
-                    stateMap,
-                    arranger,
-                    soloist.style || 'smart',
-                    playback.bandIntensity,
-                    currentSongSeed,
-                );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
-
-                // --- Drum Seeder ---
-                if (groove.enabled) {
-                    const currentDrumSeed = currentSongSeed;
-                    const drumOrchGenerated = generateDrumOrchestration(
-                        stateMap,
-                        arranger,
-                        groove.genreFeel || 'Rock',
-                        playback.bandIntensity,
-                        currentDrumSeed,
-                    );
-                    const drumFillsGenerated = generateDrumFills(
-                        stateMap,
-                        arranger,
-                        groove.genreFeel || 'Rock',
-                        playback.bandIntensity,
-                        currentDrumSeed,
-                    );
-                    const drumAccentsGenerated = generateSoloistAccents(
-                        stateMap,
-                        arranger,
-                        soloGenerated,
-                        groove.genreFeel || 'Rock',
-                        playback.bandIntensity,
-                        currentDrumSeed,
-                    );
-                    dispatch(ACTIONS.UPDATE_GB, {
-                        orchestrationMap: drumOrchGenerated,
-                        fillMap: drumFillsGenerated,
-                        accentMap: drumAccentsGenerated,
-                        seedTimelineStartStep: playback.step || 0,
-                    });
-                }
+                regenerateSessionSeeds(stateMap, currentSongSeed, playback.step || 0, dispatch);
             } else {
                 dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
                 dispatch(ACTIONS.UPDATE_GB, {
@@ -110,45 +124,12 @@ export function handleEffects(
             validateProgression(stateMap, dispatch);
             // If arrangement changes during playback, we must regenerate seeds
             if (stateMap.playback.isPlaying) {
-                const soloGenerated = generateSessionSeed(
+                regenerateSessionSeeds(
                     stateMap,
-                    stateMap.arranger,
-                    stateMap.soloist.style || 'smart',
-                    stateMap.playback.bandIntensity,
                     stateMap.arranger.seed,
+                    stateMap.playback.step || 0,
+                    dispatch,
                 );
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
-
-                if (stateMap.groove.enabled) {
-                    const drumOrchGenerated = generateDrumOrchestration(
-                        stateMap,
-                        stateMap.arranger,
-                        stateMap.groove.genreFeel || 'Rock',
-                        stateMap.playback.bandIntensity,
-                        stateMap.arranger.seed,
-                    );
-                    const drumFillsGenerated = generateDrumFills(
-                        stateMap,
-                        stateMap.arranger,
-                        stateMap.groove.genreFeel || 'Rock',
-                        stateMap.playback.bandIntensity,
-                        stateMap.arranger.seed,
-                    );
-                    const drumAccentsGenerated = generateSoloistAccents(
-                        stateMap,
-                        stateMap.arranger,
-                        soloGenerated,
-                        stateMap.groove.genreFeel || 'Rock',
-                        stateMap.playback.bandIntensity,
-                        stateMap.arranger.seed,
-                    );
-                    dispatch(ACTIONS.UPDATE_GB, {
-                        orchestrationMap: drumOrchGenerated,
-                        fillMap: drumFillsGenerated,
-                        accentMap: drumAccentsGenerated,
-                        seedTimelineStartStep: stateMap.playback.step || 0,
-                    });
-                }
             }
             break;
         }
