@@ -1124,6 +1124,12 @@ export interface StepInfo {
     isGroupStart: boolean;
     /** 8th-note offbeat. */
     isOffbeat: boolean;
+    /**
+     * True when the step falls on an eighth-note grid position.
+     * For 16th-grid meters (stepsPerBeat=4: 2/4, 3/4, 4/4, 5/4, 7/4): every other step.
+     * For 8th-grid meters (stepsPerBeat=2: 6/8, 7/8, 12/8): every step (each step IS an eighth).
+     */
+    isEighthBoundary: boolean;
     /** "e" of a 16th-note beat. */
     isEOfBeat: boolean;
     /** "a" of a 16th-note beat. */

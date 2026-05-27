@@ -39,7 +39,9 @@ export function checkBassActiveStyle(
     ts: { stepsPerBeat: number; beats: number },
     intBeat: number,
     isQuarter: boolean,
-    is8th: boolean,
+    // why: epic-1-compound-meter S2 — renamed from is8th; now supplied from
+    // stepInfo.isEighthBoundary which is correct for all meters including 6/8.
+    isEighthBoundary: boolean,
     playback: EnsembleState['playback'],
     groove: EnsembleState['groove'],
 ) {
@@ -53,7 +55,7 @@ export function checkBassActiveStyle(
         return stepInChord % ts.stepsPerBeat === 0;
     }
     if (style === 'rock') {
-        return is8th;
+        return isEighthBoundary;
     }
     if (style === 'bossa') {
         // Semantic Bossa: 1, 2&, 3, 4&
@@ -174,7 +176,7 @@ export function checkBassActiveStyle(
         return step % (stepsPerBeat * 2) === 0; // Two-Step half-notes on beats 1 and 3
     }
     if (style === 'metal') {
-        if (is8th) {
+        if (isEighthBoundary) {
             return true;
         }
         // Gallop/Chug: 16th note subdivisions at higher intensity/complexity
@@ -208,7 +210,7 @@ export function checkBassActiveStyle(
         if (playback.bpm > 185 && !isQuarter && Math.random() < 0.3) {
             return false;
         }
-        return is8th;
+        return isEighthBoundary;
     }
     if (style === 'dub') {
         // why: dub fires at riddim positions selected by intensity. Same band thresholds
@@ -254,7 +256,6 @@ export function getBassNoteStyle(
     stepsPerMeasure: number,
     intBeat: number,
     _isQuarter: boolean,
-    _is8th: boolean,
     isBeatStart: boolean,
     isDownbeat: boolean,
     stepInMeasure: number,
@@ -641,8 +642,13 @@ export function getBassNoteStyle(
 
     // --- ROCK STYLE (Driving 8ths) ---
     if (style === 'rock') {
-        const is8th = step % Math.floor(ts.stepsPerBeat / 2) === 0;
-        if (!is8th) {
+        // why: epic-1-compound-meter S2 — old `step % Math.floor(spb/2) === 0`
+        // degenerates to always-true for stepsPerBeat=2 (6/8, 7/8, 12/8). Use
+        // the canonical isEighthBoundary from stepInfo when available so the
+        // "driving 8ths" gate actually gates on eighth-grid positions.
+        const isEighthBoundary =
+            _stepInfo?.isEighthBoundary ?? (ts.stepsPerBeat >= 4 ? step % 2 === 0 : true);
+        if (!isEighthBoundary) {
             return null;
         }
 
@@ -1094,8 +1100,10 @@ export function getBassNoteStyle(
 
     // --- WALKING SKA STYLE (Fast 8ths / Bouncy) ---
     if (style === 'walking-ska') {
-        const is8th = step % Math.floor(ts.stepsPerBeat / 2) === 0;
-        if (!is8th) {
+        // why: epic-1-compound-meter S2 — same `is8th` bug as rock above.
+        const isEighthBoundary =
+            _stepInfo?.isEighthBoundary ?? (ts.stepsPerBeat >= 4 ? step % 2 === 0 : true);
+        if (!isEighthBoundary) {
             return null;
         }
 

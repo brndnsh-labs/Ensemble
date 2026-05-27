@@ -2079,7 +2079,12 @@ export function getAccompanimentNotes(
 
     if (chords.style === 'power-metal') {
         // Driving 8th notes (chugs) with Power Chords (Root + 5th + Octave)
-        const isEighth = step % (ts.stepsPerBeat / 2) === 0;
+        // why: epic-1-compound-meter S2 (P2 follow-up) — the original
+        // `step % (ts.stepsPerBeat / 2) === 0` formula degenerates to
+        // always-true for `stepsPerBeat=2` (6/8, 7/8, 12/8). Read the canonical
+        // `isEighthBoundary` from stepInfo with a per-meter fallback.
+        const isEighth =
+            stepInfo?.isEighthBoundary ?? (ts.stepsPerBeat >= 4 ? step % 2 === 0 : true);
 
         if (isEighth) {
             // Power Chord Voicing: quality-aware interval above root + octave double.

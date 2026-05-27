@@ -158,7 +158,12 @@ export function isBassActive(
         ? stepInfo.beatIndex
         : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
     const isQuarter = stepInfo ? stepInfo.isBeatStart : step % ts.stepsPerBeat === 0;
-    const is8th = step % (ts.stepsPerBeat / 2) === 0;
+    // why: epic-1-compound-meter S2 — the old formula (step % (stepsPerBeat / 2) === 0)
+    // degenerates to step % 1 === 0 (always-true) for 6/8 (stepsPerBeat=2). Use the
+    // named isEighthBoundary field from getStepInfo when available; partial test
+    // mocks may omit the field, so fall back to the per-meter eighth grid.
+    const isEighthBoundary =
+        stepInfo?.isEighthBoundary ?? (ts.stepsPerBeat >= 4 ? step % 2 === 0 : true);
 
     return checkBassActiveStyle(
         style,
@@ -168,7 +173,7 @@ export function isBassActive(
         ts,
         intBeat,
         isQuarter,
-        is8th,
+        isEighthBoundary,
         playback,
         groove,
     );
@@ -1076,7 +1081,6 @@ export function getBassNote(
         stepsPerMeasure,
         intBeat,
         step % ts.stepsPerBeat === 0,
-        step % (ts.stepsPerBeat / 2) === 0,
         stepInMeasure % ts.stepsPerBeat === 0,
         isDownbeat,
         stepInMeasure,

@@ -695,6 +695,13 @@ export function getStepInfo(
     // Semantic Timing Flags
     const stepInBeat = ((mStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
     const isOffbeat = stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1; // 8th note offbeat
+    // why: epic-1-compound-meter S2 — "every eighth-note boundary" flag. For 16th-grid
+    // meters (stepsPerBeat=4), an eighth note spans 2 steps, so fire every other step.
+    // For 8th-grid meters (stepsPerBeat=2: 6/8, 7/8, 12/8), each step already IS an eighth
+    // note, so every step is a boundary. The broken bass-engine formula (step % (spb/2) === 0)
+    // degenerated to step % 1 === 0 = always-true for stepsPerBeat=2; using this named field
+    // makes the intent explicit and meters correct for any supported stepsPerBeat.
+    const isEighthBoundary = stepsPerBeat >= 4 ? mStep % 2 === 0 : true;
     const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
     const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;
 
@@ -710,6 +717,7 @@ export function getStepInfo(
         isPulseStart,
         isBackbeat,
         isOffbeat,
+        isEighthBoundary,
         isEOfBeat,
         isAOfBeat,
         isCompound,

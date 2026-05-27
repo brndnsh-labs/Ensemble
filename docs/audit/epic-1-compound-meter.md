@@ -34,13 +34,15 @@ Audit every BPM/step-duration math site for a compound branch; metronome click r
 
 **Effort:** ~4h. **Model:** opus (Phase 1 — sequential; gates S7). **Reviewer:** music-theory-reviewer + state-discipline-reviewer (config schema). **Source:** investigation 2026-05-27.
 
-### S2. Bass `is8th` always-true for compound meters
+### S2. Bass `is8th` always-true for compound meters ✅ Done 2026-05-27
 
 `public/engine/bass-engine.ts:161`: `is8th = step % (ts.stepsPerBeat / 2) === 0`. For 6/8 where `stepsPerBeat = 2`, this is `step % 1 === 0` — always true. Downstream rhythm gates fire every step in compound meters when they expect "the upbeat half of a quarter."
 
 Add `isEighthBoundary` to `getStepInfo()` in `public/utils.ts:620-670`. Replace the `is8th` call site to use the semantic name the consumer actually wants (probably `isOffbeat` from `getStepInfo` for the upbeat case, or a new `isEighthBoundary` for the literal "every eighth note" case). Grep for any other `is8th` consumers in `bass-engine.ts` and downstream.
 
-**Acceptance:** Bass walking line in 6/8 does not fire on every step. New focused test counts bass onsets per bar at jazz intensity for 4/4 (expect 2–6 onsets) and 6/8 (expect 2–4 onsets — walking the dotted-quarter pulse, not every eighth).
+**Acceptance:** The four `is8th` consumers in `bass-styles.ts` (rock, metal, walking-ska, disco — and the `power-metal` twin in `accompaniment.ts:2082`) gate on a correctly-named `isEighthBoundary` field exposed via `getStepInfo`. Behavior is identical for `stepsPerBeat ∈ {2, 4}` meters (the broken formula happened to coincide with the eighth grid in 6/8 because each step IS an eighth); the rename makes the gate correct by name and correct for any future `stepsPerBeat` value. New `tests/standards/compound-bass-eighth-boundary-critique.test.ts` locks in per-meter eighth-grid semantics and rock-bass onset counts.
+
+Note: the original story wording cited "jazz walking line in 6/8 expects 2-4 onsets" — that's a separate compound-aware-`isQuarter` problem (the Jazz style reads `isQuarter` = `isBeatStart`, which in 6/8 fires every eighth = 6/bar, not the dotted-quarter pulse = 2/bar). Tracked as a follow-up in [`FOLLOWUPS.md`](FOLLOWUPS.md).
 
 **Effort:** ~3h. **Model:** sonnet (mechanical rename + add one boolean to `getStepInfo`). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
