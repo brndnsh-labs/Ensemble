@@ -1,6 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { sectionAtStep } from '../engine/section-overrides.js';
 import { togglePower } from '../instrument-controller.js';
@@ -13,6 +13,7 @@ import { syncWorker } from '../worker-client.js';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
 
@@ -143,20 +144,7 @@ export function StudioSurface({
     const surfaceRef = useRef<HTMLDivElement | null>(null);
     const [surfaceStyle, setSurfaceStyle] = useState<StyleObject | undefined>(undefined);
 
-    useEffect(() => {
-        if (!isOpen) {
-            return undefined;
-        }
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    useModalA11y(surfaceRef, isOpen, onClose, title);
 
     useLayoutEffect(() => {
         if (!isOpen || isCompactViewport || typeof window === 'undefined') {

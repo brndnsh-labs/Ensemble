@@ -27,7 +27,7 @@ interface ChordCardProps {
 const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProps) => {
     const disp = chord.display ? chord.display[notation] : null;
 
-    const cardRef = useRef<HTMLDivElement | null>(null);
+    const cardRef = useRef<HTMLButtonElement | null>(null);
 
     useEffect(() => {
         if (!cardRef.current) {
@@ -78,7 +78,7 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
         .join(' ');
 
     return (
-        <div class={classNames} ref={cardRef} onClick={handleClick}>
+        <button type="button" class={classNames} ref={cardRef} onClick={handleClick}>
             {disp ? (
                 <span class="chord-symbol">
                     <span class="root">{formatUnicodeSymbols(disp.root)}</span>
@@ -88,7 +88,7 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
             ) : (
                 <span class="chord-symbol">{formatUnicodeSymbols(chord.absName) || '...'}</span>
             )}
-        </div>
+        </button>
     );
 };
 

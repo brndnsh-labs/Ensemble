@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { downloadExportResult, renderCurrentSessionToWav } from '../audio-export.js';
 import { exportToMidi } from '../midi-export.js';
 import { generateShareUrl } from '../sharing.js';
@@ -6,6 +6,7 @@ import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 export function ShareModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.share);
@@ -34,20 +35,11 @@ export function ShareModal() {
     const secs = Math.floor(totalSeconds % 60);
     const durationDisplay = `~${mins}:${secs.toString().padStart(2, '0')}`;
 
-    useEffect(() => {
-        if (isOpen && overlayRef.current) {
-            const focusable = overlayRef.current.querySelector<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            );
-            if (focusable) {
-                setTimeout(() => focusable.focus(), 50);
-            }
-        }
-    }, [isOpen]);
-
     const closeModal = () => {
         dispatchAction(ACTIONS.SET_MODAL_OPEN, { modal: 'share', open: false });
     };
+
+    useModalA11y(overlayRef, isOpen, closeModal, 'Share and export');
 
     const getExportOptions = () => ({
         includeSolo,

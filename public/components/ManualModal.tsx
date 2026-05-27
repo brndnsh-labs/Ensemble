@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { injectManualMetadata } from '../utils/manual-metadata.js';
 import { escapeHTML } from '../utils.js';
+import { useModalA11y } from './use-modal-a11y.js';
 
 /**
  * A tiny, zero-dependency Markdown-to-HTML converter.
@@ -97,8 +98,11 @@ export function ManualModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'manual', open: false });
     };
 
+    const overlayRef = useRef<HTMLDivElement | null>(null);
+    useModalA11y(overlayRef, true, close, 'Ensemble manual');
+
     return (
-        <div class="modal-overlay active" onClick={close}>
+        <div class="modal-overlay active" ref={overlayRef} onClick={close}>
             <div class="settings-content manual-modal" onClick={(e) => e.stopPropagation()}>
                 <div class="modal-header-shared">
                     <h2>Ensemble Manual</h2>

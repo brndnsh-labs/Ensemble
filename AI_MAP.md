@@ -141,6 +141,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
 | **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
 | **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
+| **Shared** | `public/components/use-modal-a11y.ts` | `useModalA11y(ref, isOpen, onClose, ariaLabel?)` — applies `role="dialog"` + `aria-modal`, Esc-to-close, focus trap, and focus restoration to a modal container. |
 | **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
 | **Inspiration** | `public/components/SurpriseMe.tsx` | Single 🎲 entry point hosting three flows — Roll (instant random `generateSong`), Templates (`SONG_TEMPLATES`), Library (`PresetLibrary` replace/append). Replaces the prior GenerateSongModal + LibraryModal + LibraryDrawer trio. |
 | **Orchestration** | `public/components/AuditionOverlay.tsx` | One-button "▶ Play" landing shown when the app is opened from an audition permalink (`?autoplay=1`); satisfies the browser autoplay gesture and starts the hydrated scene. |

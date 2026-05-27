@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -12,6 +12,7 @@ import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 export function Settings() {
     const {
@@ -130,16 +131,7 @@ export function Settings() {
     const playbackState = useEnsembleState((s) => s.playback);
     const overlayRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => {
-        if (isOpen && overlayRef.current) {
-            const focusable = overlayRef.current.querySelector<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            );
-            if (focusable) {
-                setTimeout(() => focusable.focus(), 50);
-            }
-        }
-    }, [isOpen]);
+    useModalA11y(overlayRef, isOpen, closeSettings, 'Settings');
 
     return (
         <div

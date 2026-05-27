@@ -1,5 +1,5 @@
 import { createPortal } from 'preact/compat';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import {
@@ -7,6 +7,7 @@ import {
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
 } from '../visualizer-events.js';
+import { useModalA11y } from './use-modal-a11y.js';
 import { Visualizer } from './Visualizer.jsx';
 
 function VisualizerLegend() {
@@ -44,24 +45,18 @@ interface VisualizerOverlayProps {
 }
 
 export function VisualizerOverlay({ getVisualTime, onClose }: VisualizerOverlayProps) {
+    const overlayRef = useRef<HTMLDivElement | null>(null);
+    useModalA11y(overlayRef, true, onClose, 'Full-screen visualizer');
+
     useEffect(() => {
         dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: true });
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                onClose();
-            }
-        };
-        document.addEventListener('keydown', handleKeyDown);
-
         return () => {
-            document.removeEventListener('keydown', handleKeyDown);
             dispatch(ACTIONS.SET_PARAM, { module: 'vizState', param: 'enabled', value: false });
         };
-    }, [onClose]);
+    }, []);
 
     const overlay = (
-        <div class="viz-overlay" onClick={onClose}>
+        <div class="viz-overlay" ref={overlayRef} onClick={onClose}>
             <div class="viz-overlay__header">
                 <button
                     type="button"

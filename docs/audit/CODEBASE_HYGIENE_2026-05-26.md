@@ -43,7 +43,7 @@ Goals:
 
 | Batch | Scope | Status |
 |---|---|---|
-| 7 | Modal a11y + chord-card button | _pending_ |
+| 7 | Modal a11y + chord-card button | ✅ shipped — `useModalA11y` hook + applied to Settings, ShareModal, ManualModal, VisualizerOverlay, StudioSurface; chord card → `<button>` |
 | 8 | Inline styles → CSS classes; `class=` consistency | ✅ shipped — 3 inline blocks → CSS; 11 HTML-element `className` sites converted (custom-component callsites preserved) |
 | 9 | State-discipline cleanup + `@direct-mutation` migration | _pending_ |
 | 10 | `playback.currentLoopCount` dual-write fix | ✅ shipped — main-thread canonical writer + `LOOP_BOUNDARY` syncWorker delta |
