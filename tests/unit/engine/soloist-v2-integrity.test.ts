@@ -20,57 +20,58 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
 
     describe('Rhythmic Entropy & Mutation', () => {
         it('should change note density when rhythmicEntropy is mutated', () => {
-            const soloistState = makeSoloistMock({
-                sessionSteps: 64,
-                phraseCount: 1,
-                rhythmicEntropy: -1.0, // Suppress
-            });
+            // Sweep three random fixtures so a `Math.random < X` gate inside
+            // the rhythm engine can't be silently bypassed by the old single
+            // 0.5 pin (per feedback_determinism_test_pattern). The high>low
+            // density inequality MUST hold at every fixture.
+            for (const r of [0.05, 0.5, 0.95]) {
+                const soloistState = makeSoloistMock({
+                    sessionSteps: 64,
+                    phraseCount: 1,
+                    rhythmicEntropy: -1.0, // Suppress
+                });
 
-            // Force random to 0.5 to make attackProb changes deterministic
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+                const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(r);
 
-            const planLow = generateRhythmPlan(
-                0,
-                512,
-                style,
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 512 },
-                64,
-                soloistState,
-                null,
-            );
+                const planLow = generateRhythmPlan(
+                    0,
+                    512,
+                    style,
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 512 },
+                    64,
+                    soloistState,
+                    null,
+                );
 
-            soloistState.session.rhythm.entropy = 1.0; // Boost
-            const planHigh = generateRhythmPlan(
-                0,
-                512,
-                style,
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 512 },
-                64,
-                soloistState,
-                null,
-            );
+                soloistState.session.rhythm.entropy = 1.0; // Boost
+                const planHigh = generateRhythmPlan(
+                    0,
+                    512,
+                    style,
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 512 },
+                    64,
+                    soloistState,
+                    null,
+                );
 
-            const lowLen = planLow.length;
-            const highLen = planHigh.length;
-            randomSpy.mockRestore();
+                const lowLen = planLow.length;
+                const highLen = planHigh.length;
+                randomSpy.mockRestore();
 
-            console.log(`[Entropy Audit] Low: ${lowLen}, High: ${highLen}`);
-            expect(highLen).toBeGreaterThan(lowLen);
+                console.log(`[Entropy Audit r=${r}] Low: ${lowLen}, High: ${highLen}`);
+                expect(highLen, `entropy boost should raise density at r=${r}`).toBeGreaterThan(
+                    lowLen,
+                );
+            }
         });
 
         it('should drift toward syncopation during Syncopation Drift cycles', () => {
-            const soloistState = makeSoloistMock({
-                sessionSteps: 0,
-                phraseCount: 1,
-                rhythmicEntropy: 0,
-            });
-
             const getSyncopationRatio = (plan) => {
                 if (plan.length === 0) {
                     return 0;
@@ -79,45 +80,60 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
                 return offbeats / plan.length;
             };
 
-            // Force random to 0.5 for all calls so breathing offset doesn't trigger random attacks
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+            // Sweep three fixtures. The original 0.5 pin was framed as "avoid
+            // random attacks" — sweeping high (0.95) keeps that property,
+            // sweeping low (0.05) is the stress case where breathing-offset
+            // gates ARE active. The drift >= normal inequality must hold
+            // across all three, per feedback_determinism_test_pattern.
+            for (const r of [0.05, 0.5, 0.95]) {
+                const soloistState = makeSoloistMock({
+                    sessionSteps: 0,
+                    phraseCount: 1,
+                    rhythmicEntropy: 0,
+                });
 
-            const planNormal = generateRhythmPlan(
-                0,
-                512,
-                style,
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 512 },
-                0,
-                soloistState,
-                null,
-            );
+                const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(r);
 
-            soloistState.session.sessionSteps = 128;
-            const planDrift = generateRhythmPlan(
-                512,
-                512,
-                style,
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 1024 },
-                128,
-                soloistState,
-                null,
-            );
+                const planNormal = generateRhythmPlan(
+                    0,
+                    512,
+                    style,
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 512 },
+                    0,
+                    soloistState,
+                    null,
+                );
 
-            const normalRatio = getSyncopationRatio(planNormal);
-            const driftRatio = getSyncopationRatio(planDrift);
+                soloistState.session.sessionSteps = 128;
+                const planDrift = generateRhythmPlan(
+                    512,
+                    512,
+                    style,
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 1024 },
+                    128,
+                    soloistState,
+                    null,
+                );
 
-            randomSpy.mockRestore();
+                const normalRatio = getSyncopationRatio(planNormal);
+                const driftRatio = getSyncopationRatio(planDrift);
 
-            console.log(
-                `[Syncopation Audit] Normal Ratio: ${normalRatio.toFixed(3)}, Drift Ratio: ${driftRatio.toFixed(3)}`,
-            );
-            expect(driftRatio).toBeGreaterThanOrEqual(normalRatio);
+                randomSpy.mockRestore();
+
+                console.log(
+                    `[Syncopation Audit r=${r}] Normal: ${normalRatio.toFixed(3)}, Drift: ${driftRatio.toFixed(3)}`,
+                );
+                expect(
+                    driftRatio,
+                    `drift should stay at or above normal at r=${r}`,
+                ).toBeGreaterThanOrEqual(normalRatio);
+            }
         });
     });
 
@@ -125,45 +141,56 @@ describe('Soloist V2 Integrity - Entropy, Sustain, and Rotation', () => {
         it('should produce longer durations for blues style than funk', () => {
             const soloistState = makeSoloistMock({ sessionSteps: 64 }); // Warmed up
 
-            // Force low random to trigger sustains reliably
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            // Sweep the sustain trigger zone — the pin was 0.1 to keep the
+            // sustain gate firing; sweeping within [0.05, 0.1, 0.2] confirms
+            // the trigger zone is wide enough that blues' longer-sustain bias
+            // survives natural variation. A blanket [0.05, 0.5, 0.95] would
+            // be wrong here: 0.95 silences sustains entirely, making the
+            // blues-vs-funk inequality measurement meaningless.
+            for (const r of [0.05, 0.1, 0.2]) {
+                const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(r);
 
-            const planBlues = generateRhythmPlan(
-                0,
-                1024,
-                'blues',
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 1024 },
-                64,
-                soloistState,
-                null,
-            );
-            const planFunk = generateRhythmPlan(
-                0,
-                1024,
-                'funk',
-                intensity,
-                stepsPerMeasure,
-                stepsPerBeat,
-                { sectionEnd: 1024 },
-                64,
-                soloistState,
-                null,
-            );
+                const planBlues = generateRhythmPlan(
+                    0,
+                    1024,
+                    'blues',
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 1024 },
+                    64,
+                    soloistState,
+                    null,
+                );
+                const planFunk = generateRhythmPlan(
+                    0,
+                    1024,
+                    'funk',
+                    intensity,
+                    stepsPerMeasure,
+                    stepsPerBeat,
+                    { sectionEnd: 1024 },
+                    64,
+                    soloistState,
+                    null,
+                );
 
-            const avgDurationBlues =
-                planBlues.reduce((sum, n) => sum + n.durationSteps, 0) / (planBlues.length || 1);
-            const avgDurationFunk =
-                planFunk.reduce((sum, n) => sum + n.durationSteps, 0) / (planFunk.length || 1);
+                const avgDurationBlues =
+                    planBlues.reduce((sum, n) => sum + n.durationSteps, 0) /
+                    (planBlues.length || 1);
+                const avgDurationFunk =
+                    planFunk.reduce((sum, n) => sum + n.durationSteps, 0) / (planFunk.length || 1);
 
-            randomSpy.mockRestore();
+                randomSpy.mockRestore();
 
-            console.log(
-                `[Sustain Audit] Blues Avg: ${avgDurationBlues.toFixed(2)}, Funk Avg: ${avgDurationFunk.toFixed(2)}`,
-            );
-            expect(avgDurationBlues).toBeGreaterThan(avgDurationFunk);
+                console.log(
+                    `[Sustain Audit r=${r}] Blues: ${avgDurationBlues.toFixed(2)}, Funk: ${avgDurationFunk.toFixed(2)}`,
+                );
+                expect(
+                    avgDurationBlues,
+                    `blues should sustain longer than funk at r=${r}`,
+                ).toBeGreaterThan(avgDurationFunk);
+            }
         });
 
         it('should suppress subsequent notes when a sustain is triggered', () => {

@@ -285,7 +285,6 @@ describe('Conductor Logic', () => {
         });
 
         it('should use asymmetric ramping (faster builds, S8 inversion)', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
             // why: S8 inverted the prior 2.5×-down / 1.0×-up asymmetry to
             // 0.5×-down / 1.5×-up. Real bands lean into rises and ease out of
             // drops ("settle in and build"), not the other way around. The
@@ -293,32 +292,48 @@ describe('Conductor Logic', () => {
             // created a structural pull toward floor that parked funk/neo-soul
             // backbeats below the Snare-vs-Sidestick gate. See
             // `docs/audit/epic-form-arrangement.md` S8.
-            // Test Build
-            playback.bandIntensity = 0.35;
-            conductor.targetIntensity = 0.7;
-            conductor.stepSize = 0.01;
-            updateAutoConductor(getState(), dispatch);
-            const buildDiff = playback.bandIntensity - 0.35;
+            //
+            // Sweep three random fixtures so the random-jitter line can't
+            // silently mask a regression — the asymmetric inequality must
+            // hold across the full jitter range, not just at the median.
+            for (const r of [0.05, 0.5, 0.95]) {
+                vi.spyOn(Math, 'random').mockReturnValue(r);
 
-            // Test Drop
-            playback.bandIntensity = 0.35;
-            conductor.targetIntensity = 0.1; // Lower than 0.35 to ensure a drop
-            updateAutoConductor(getState(), dispatch);
-            const dropDiff = 0.35 - playback.bandIntensity;
+                // Test Build
+                playback.bandIntensity = 0.35;
+                conductor.targetIntensity = 0.7;
+                conductor.stepSize = 0.01;
+                updateAutoConductor(getState(), dispatch);
+                const buildDiff = playback.bandIntensity - 0.35;
 
-            // Build should now be faster (multiplier 1.5 when target > intensity,
-            // multiplier 0.5 when target < intensity).
-            expect(buildDiff).toBeGreaterThan(dropDiff);
+                // Test Drop
+                playback.bandIntensity = 0.35;
+                conductor.targetIntensity = 0.1; // Lower than 0.35 to ensure a drop
+                updateAutoConductor(getState(), dispatch);
+                const dropDiff = 0.35 - playback.bandIntensity;
+
+                vi.restoreAllMocks();
+
+                // Build should now be faster (multiplier 1.5 when target > intensity,
+                // multiplier 0.5 when target < intensity).
+                expect(buildDiff, `build should outpace drop at r=${r}`).toBeGreaterThan(dropDiff);
+            }
         });
     });
 
     describe('checkSectionTransition', () => {
         it('should trigger a fill and update target energy at loop end', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            groove.enabled = true;
-            conductor.formIteration = 0;
-            checkSectionTransition(getState(), 0, 16, dispatch);
-            expect(conductor.formIteration).toBeGreaterThan(0);
+            for (const r of [0.05, 0.5, 0.95]) {
+                vi.spyOn(Math, 'random').mockReturnValue(r);
+                groove.enabled = true;
+                conductor.formIteration = 0;
+                checkSectionTransition(getState(), 0, 16, dispatch);
+                vi.restoreAllMocks();
+                expect(
+                    conductor.formIteration,
+                    `loop-end should advance formIteration at r=${r}`,
+                ).toBeGreaterThan(0);
+            }
         });
 
         it('should prefer seeded fills over procedural fallback when a drum plan is present', () => {
@@ -352,62 +367,73 @@ describe('Conductor Logic', () => {
         });
 
         it('should adhere to the Grand Story macro-arc cycles', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            groove.enabled = true;
+            for (const r of [0.05, 0.5, 0.95]) {
+                vi.spyOn(Math, 'random').mockReturnValue(r);
+                groove.enabled = true;
 
-            // Cycle 0: Warm up (Macro Ceiling 0.45)
-            conductor.formIteration = 0;
-            checkSectionTransition(getState(), 0, 16, dispatch);
-            expect(conductor.targetIntensity).toBeLessThanOrEqual(0.45 + 0.15);
+                // Cycle 0: Warm up (Macro Ceiling 0.45)
+                conductor.formIteration = 0;
+                checkSectionTransition(getState(), 0, 16, dispatch);
+                expect(conductor.targetIntensity, `warm-up ceiling at r=${r}`).toBeLessThanOrEqual(
+                    0.45 + 0.15,
+                );
 
-            // Cycle 4: The Peak (Macro Floor 0.6)
-            conductor.formIteration = 4;
-            checkSectionTransition(getState(), 0, 16, dispatch);
-            expect(conductor.targetIntensity).toBeGreaterThanOrEqual(0.6 - 0.15);
+                // Cycle 4: The Peak (Macro Floor 0.6)
+                conductor.formIteration = 4;
+                checkSectionTransition(getState(), 0, 16, dispatch);
+                expect(conductor.targetIntensity, `peak floor at r=${r}`).toBeGreaterThanOrEqual(
+                    0.6 - 0.15,
+                );
+                vi.restoreAllMocks();
+            }
         });
 
         it('should apply Local Functional Roles when form analysis is present', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            groove.enabled = true;
-            conductor.formIteration = 4; // Peak cycle, allows high ceiling
-            arranger.totalSteps = 32; // <--- FIX HERE
+            for (const r of [0.05, 0.5, 0.95]) {
+                vi.spyOn(Math, 'random').mockReturnValue(r);
+                groove.enabled = true;
+                conductor.formIteration = 4; // Peak cycle, allows high ceiling
+                arranger.totalSteps = 32;
 
-            arranger.stepMap = [
-                { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
-                { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Chorus' } },
-            ];
-            arranger.sections = [
-                { id: 's1', seamless: false },
-                { id: 's2', seamless: false },
-            ];
+                arranger.stepMap = [
+                    { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
+                    { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Chorus' } },
+                ];
+                arranger.sections = [
+                    { id: 's1', seamless: false },
+                    { id: 's2', seamless: false },
+                ];
 
-            conductor.form = {
-                sections: [{ id: 's2', role: 'Peak', flux: 3.0, iteration: 2 }],
-            };
+                conductor.form = {
+                    sections: [{ id: 's2', role: 'Peak', flux: 3.0, iteration: 2 }],
+                };
 
-            // Transitioning from s1 -> s2
-            checkSectionTransition(getState(), 0, 16, dispatch);
-
-            // Expected target energy should be influenced by 'Peak' role and high flux
-            expect(conductor.targetIntensity).toBeGreaterThan(0.6);
-
-            // Test other roles for coverage — must intersect with analyzeForm's
-            // emitted vocabulary (Intro/Outro/Peak/Main Theme/Theme B/Bridge/
-            // Variation/Refrain/Build).
-            const roles = [
-                'Intro',
-                'Outro',
-                'Main Theme',
-                'Theme B',
-                'Bridge',
-                'Variation',
-                'Refrain',
-                'Build',
-            ];
-            for (const role of roles) {
-                conductor.form.sections[0].role = role;
+                // Transitioning from s1 -> s2
                 checkSectionTransition(getState(), 0, 16, dispatch);
-                expect(conductor.targetIntensity).toBeGreaterThan(0); // Basic assertion, main goal is coverage
+
+                // Expected target energy should be influenced by 'Peak' role and high flux
+                expect(conductor.targetIntensity, `peak role at r=${r}`).toBeGreaterThan(0.6);
+
+                // Test other roles for coverage — must intersect with analyzeForm's
+                // emitted vocabulary (Intro/Outro/Peak/Main Theme/Theme B/Bridge/
+                // Variation/Refrain/Build).
+                const roles = [
+                    'Intro',
+                    'Outro',
+                    'Main Theme',
+                    'Theme B',
+                    'Bridge',
+                    'Variation',
+                    'Refrain',
+                    'Build',
+                ];
+                for (const role of roles) {
+                    conductor.form.sections[0].role = role;
+                    checkSectionTransition(getState(), 0, 16, dispatch);
+                    expect(conductor.targetIntensity, `${role} at r=${r}`).toBeGreaterThan(0);
+                }
+
+                vi.restoreAllMocks();
             }
         });
 

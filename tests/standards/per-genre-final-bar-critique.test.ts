@@ -41,11 +41,12 @@
 //
 // Source: docs/audit/epic-followup-drain.md S11.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { installSeededRandom } from '../utils/seeded-random.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -126,9 +127,7 @@ function buildDrumParams(
 // --- Jazz / Bossa / Blues: refined ride swell + sidestick -------------------
 
 describe('Per-genre final-bar — Jazz refined ride swell', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Open lane to Ride on the final downbeat (not Crash)', () => {
         // why: Jazz idiom — endings land on a ride cymbal swell, not a thud.
@@ -139,7 +138,6 @@ describe('Per-genre final-bar — Jazz refined ride swell', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         // eslint-disable-next-line no-console
@@ -163,7 +161,6 @@ describe('Per-genre final-bar — Jazz refined ride swell', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -172,9 +169,7 @@ describe('Per-genre final-bar — Jazz refined ride swell', () => {
 });
 
 describe('Per-genre final-bar — Blues refined ride swell', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Open lane to Ride on the final downbeat', () => {
         // why: Blues shares the cymbal-led close idiom with Jazz — same
@@ -184,7 +179,6 @@ describe('Per-genre final-bar — Blues refined ride swell', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -193,9 +187,7 @@ describe('Per-genre final-bar — Blues refined ride swell', () => {
 });
 
 describe('Per-genre final-bar — Bossa/Latin refined ride swell', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Open lane to Ride and Snare to Sidestick (Bossa Nova)', () => {
         // why: Bossa endings land on a sparse ride bell + clave-style rim,
@@ -206,7 +198,6 @@ describe('Per-genre final-bar — Bossa/Latin refined ride swell', () => {
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const openParams = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
         const snareParams = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const openResult = applyGrooveOverrides(state, openParams);
         const snareResult = applyGrooveOverrides(state, snareParams);
@@ -219,9 +210,7 @@ describe('Per-genre final-bar — Bossa/Latin refined ride swell', () => {
 // --- Country / Acoustic: rolling-tag quarter-note flourish ------------------
 
 describe('Per-genre final-bar — Country rolling-tag flourish', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('keeps the universal Crash on the Open lane on the final downbeat', () => {
         // why: Country endings still want the Crash arrival — the per-genre
@@ -231,7 +220,6 @@ describe('Per-genre final-bar — Country rolling-tag flourish', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -249,7 +237,6 @@ describe('Per-genre final-bar — Country rolling-tag flourish', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const params = buildDrumParams(finalDownbeat + 8, 'Snare', 0, state, true);
         const result = applyGrooveOverrides(state, params);
@@ -279,7 +266,6 @@ describe('Per-genre final-bar — Country rolling-tag flourish', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         for (const loopStep of [4, 12]) {
             const params = buildDrumParams(finalDownbeat + loopStep, 'Snare', 0, state, true);
@@ -303,7 +289,6 @@ describe('Per-genre final-bar — Country rolling-tag flourish', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         for (const loopStep of [2, 6]) {
             const params = buildDrumParams(finalDownbeat + loopStep, 'Snare', 0, state, true);
@@ -318,9 +303,7 @@ describe('Per-genre final-bar — Country rolling-tag flourish', () => {
 });
 
 describe('Per-genre final-bar — Acoustic rolling-tag flourish', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('fires Sidestick flourish on beat 3 of the final bar', () => {
         // why: Acoustic shares the rolling-tag idiom — same flourish as
@@ -329,7 +312,6 @@ describe('Per-genre final-bar — Acoustic rolling-tag flourish', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const params = buildDrumParams(finalDownbeat + 8, 'Snare', 0, state, true);
         const result = applyGrooveOverrides(state, params);
@@ -342,9 +324,7 @@ describe('Per-genre final-bar — Acoustic rolling-tag flourish', () => {
 // --- Latin preset dispatch via lastDrumPreset -------------------------------
 
 describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Latin/Salsa preset to the Latin treatment regardless of genreFeel', () => {
         // why (reviewer P1, Epic 12 S11): `groove.genreFeel` is never set to
@@ -360,7 +340,6 @@ describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () =>
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const openParams = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
         const snareParams = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const openResult = applyGrooveOverrides(state, openParams);
         const snareResult = applyGrooveOverrides(state, snareParams);
@@ -375,7 +354,6 @@ describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () =>
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.soundName).toBe('Ride');
@@ -387,7 +365,6 @@ describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () =>
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.soundName).toBe('Ride');
@@ -397,9 +374,7 @@ describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () =>
 // --- Hip Hop: trap-stinger arrival ------------------------------------------
 
 describe('Per-genre final-bar — Hip Hop trap stinger', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('reinforces Kick beyond the universal 1.3 (trap-stinger weight)', () => {
         // why: Hip Hop treatment bumps Kick to 1.4 (trap-style outro hit).
@@ -410,7 +385,6 @@ describe('Per-genre final-bar — Hip Hop trap stinger', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Kick', 0, stateHipHop, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const hipHopResult = applyGrooveOverrides(stateHipHop, params);
 
         getState.mockReturnValue(stateFunk);
@@ -441,7 +415,6 @@ describe('Per-genre final-bar — Hip Hop trap stinger', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, stateHipHop, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(stateHipHop, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -454,9 +427,7 @@ describe('Per-genre final-bar — Hip Hop trap stinger', () => {
 // --- Metal / Shred: China cymbal accent + double-kick weight ---------------
 
 describe('Per-genre final-bar — Metal China accent', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Open lane to China on the final downbeat (signature metal accent)', () => {
         // why: Metal idiom — the China cymbal is the iconic metal cadence
@@ -469,7 +440,6 @@ describe('Per-genre final-bar — Metal China accent', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         // eslint-disable-next-line no-console
@@ -489,7 +459,6 @@ describe('Per-genre final-bar — Metal China accent', () => {
         const stateFunk = makeDrumsMockState('Funk');
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         getState.mockReturnValue(stateMetal);
         const paramsMetal = buildDrumParams(finalDownbeat, 'Kick', 0, stateMetal, true);
@@ -510,7 +479,6 @@ describe('Per-genre final-bar — Metal China accent', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -521,9 +489,7 @@ describe('Per-genre final-bar — Metal China accent', () => {
 // --- Reggae: dub-style rim accent -------------------------------------------
 
 describe('Per-genre final-bar — Reggae dub rim accent', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('routes Snare beat-1 to Sidestick (dub aesthetic)', () => {
         // why: Reggae's dub aesthetic loves the rim, not the snare crack.
@@ -535,7 +501,6 @@ describe('Per-genre final-bar — Reggae dub rim accent', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         // eslint-disable-next-line no-console
@@ -557,7 +522,6 @@ describe('Per-genre final-bar — Reggae dub rim accent', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         expect(result.shouldPlay).toBe(true);
@@ -568,9 +532,7 @@ describe('Per-genre final-bar — Reggae dub rim accent', () => {
 // --- Universal fallback (negative control for unhandled genres) -------------
 
 describe('Per-genre final-bar — Universal fallback for unhandled genres', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    installSeededRandom();
 
     it('Funk falls through to the universal Crash treatment', () => {
         // why: negative control — Funk is NOT in the per-genre table, so it
@@ -583,7 +545,6 @@ describe('Per-genre final-bar — Universal fallback for unhandled genres', () =
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const openParams = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
         const snareParams = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         const openResult = applyGrooveOverrides(state, openParams);
         const snareResult = applyGrooveOverrides(state, snareParams);
@@ -600,7 +561,6 @@ describe('Per-genre final-bar — Universal fallback for unhandled genres', () =
         // caught the harness-string mismatch with HAT_SPINE_GENRES.
         const universalGenres = ['Disco', 'Rock', 'Neo-Soul', 'Ska', 'Minimal'];
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         for (const genre of universalGenres) {
             const state = makeDrumsMockState(genre);
@@ -625,7 +585,6 @@ describe('Per-genre final-bar — Universal fallback for unhandled genres', () =
         getState.mockReturnValue(state);
 
         const params = buildDrumParams(0, 'Open', 0, state, false);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const result = applyGrooveOverrides(state, params);
 
         // The cadence Ride must NOT have routed. Either the lane is silent

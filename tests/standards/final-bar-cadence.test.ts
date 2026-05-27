@@ -732,19 +732,23 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
         // The Open lane gets the Crash routing per the section-boundary pattern.
         const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
 
-        // why: pin Math.random so the entropy phase doesn't add noise.
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        const result = applyGrooveOverrides(state, params);
+        // Sweep three random fixtures so any `Math.random < X` gate in the
+        // entropy phase or downstream override can't silently bypass the
+        // crash routing — the Crash MUST fire across the full jitter range.
+        for (const r of [0.05, 0.5, 0.95]) {
+            vi.spyOn(Math, 'random').mockReturnValue(r);
+            const result = applyGrooveOverrides(state, params);
+            vi.restoreAllMocks();
 
-        // eslint-disable-next-line no-console
-        console.log(
-            `[final-bar-cadence] drum Open lane at final downbeat: shouldPlay=${result.shouldPlay}, soundName=${result.soundName}, velocity=${result.velocity}`,
-        );
+            console.log(
+                `[final-bar-cadence r=${r}] Open final downbeat: shouldPlay=${result.shouldPlay}, soundName=${result.soundName}, velocity=${result.velocity}`,
+            );
 
-        expect(result.shouldPlay).toBe(true);
-        expect(result.soundName).toBe('Crash');
-        // velocity ≥ 1.0 — strong arrival.
-        expect(result.velocity).toBeGreaterThanOrEqual(1.0);
+            expect(result.shouldPlay, `r=${r}`).toBe(true);
+            expect(result.soundName, `r=${r}`).toBe('Crash');
+            // velocity ≥ 1.0 — strong arrival.
+            expect(result.velocity, `r=${r}`).toBeGreaterThanOrEqual(1.0);
+        }
     });
 
     it('reinforces Kick on the final downbeat', () => {
@@ -753,12 +757,16 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
         const params = buildDrumParams(finalDownbeat, 'Kick', 0, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        const result = applyGrooveOverrides(state, params);
 
-        expect(result.shouldPlay).toBe(true);
-        // Reinforced velocity ≥ 1.0 (we set 1.3 pre-humanize, then ±4% jitter).
-        expect(result.velocity).toBeGreaterThanOrEqual(1.0);
+        for (const r of [0.05, 0.5, 0.95]) {
+            vi.spyOn(Math, 'random').mockReturnValue(r);
+            const result = applyGrooveOverrides(state, params);
+            vi.restoreAllMocks();
+
+            expect(result.shouldPlay, `r=${r}`).toBe(true);
+            // Reinforced velocity ≥ 1.0 (we set 1.3 pre-humanize, then ±4% jitter).
+            expect(result.velocity, `r=${r}`).toBeGreaterThanOrEqual(1.0);
+        }
     });
 
     it('suppresses HiHat on the final bar in sparse-hat genres (e.g. Jazz)', () => {
@@ -772,17 +780,21 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        // Downbeat HiHat: must be suppressed (the Open Crash carries the bar).
         const dbParams = buildDrumParams(finalDownbeat, 'HiHat', 1, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        let result = applyGrooveOverrides(state, dbParams);
-        expect(result.shouldPlay).toBe(false);
-
-        // Sub-beat HiHat: also suppressed — the closed-hat ticking past beat 1
-        // would chop the Crash's tail.
         const subParams = buildDrumParams(finalDownbeat + 4, 'HiHat', 1, state, true);
-        result = applyGrooveOverrides(state, subParams);
-        expect(result.shouldPlay).toBe(false);
+
+        for (const r of [0.05, 0.5, 0.95]) {
+            vi.spyOn(Math, 'random').mockReturnValue(r);
+            // Downbeat HiHat: must be suppressed (the Open Crash carries the bar).
+            const dbResult = applyGrooveOverrides(state, dbParams);
+            // Sub-beat HiHat: also suppressed — the closed-hat ticking past beat 1
+            // would chop the Crash's tail.
+            const subResult = applyGrooveOverrides(state, subParams);
+            vi.restoreAllMocks();
+
+            expect(dbResult.shouldPlay, `downbeat at r=${r}`).toBe(false);
+            expect(subResult.shouldPlay, `sub-beat at r=${r}`).toBe(false);
+        }
     });
 
     it('keeps the HiHat ticker through the final bar in hat-dense genres (e.g. Funk)', () => {
@@ -795,24 +807,21 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
         getState.mockReturnValue(state);
 
         const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        // Downbeat HiHat in Funk: the gate must not unconditionally suppress.
-        // (Whether the strategy actually fires is a separate decision; the
-        // assertion here is that the final-bar override no longer flips it to
-        // false outright.) We assert this by confirming the strategy's own
-        // shouldPlay value survives — if the gate had suppressed it, we'd see
-        // false here regardless of what the strategy decided.
         const dbParams = buildDrumParams(finalDownbeat, 'HiHat', 1, state, true);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        const dbResult = applyGrooveOverrides(state, dbParams);
-
-        // Compare against a non-final-bar identical step: if the only delta
-        // between the two results is the final-bar gate firing, then the gate
-        // is correctly NOT suppressing the hat in Funk. (Both should have the
-        // same shouldPlay value.)
         const dbParamsNonFinal = buildDrumParams(finalDownbeat, 'HiHat', 1, state, false);
-        const dbResultNonFinal = applyGrooveOverrides(state, dbParamsNonFinal);
 
-        expect(dbResult.shouldPlay).toBe(dbResultNonFinal.shouldPlay);
+        for (const r of [0.05, 0.5, 0.95]) {
+            vi.spyOn(Math, 'random').mockReturnValue(r);
+            // Downbeat HiHat in Funk: the gate must not unconditionally suppress.
+            const dbResult = applyGrooveOverrides(state, dbParams);
+            // Compare against a non-final-bar identical step: if the only delta
+            // between the two results is the final-bar gate firing, then the gate
+            // is correctly NOT suppressing the hat in Funk.
+            const dbResultNonFinal = applyGrooveOverrides(state, dbParamsNonFinal);
+            vi.restoreAllMocks();
+
+            expect(dbResult.shouldPlay, `r=${r}`).toBe(dbResultNonFinal.shouldPlay);
+        }
     });
 
     it('Crash does NOT fire on a non-final downbeat (baseline preserved)', () => {
@@ -824,14 +833,18 @@ describe('Final-bar cadence — Drums (epic-form-arrangement S4)', () => {
 
         // Bar 1 downbeat (not the final bar) — no Crash from the S4 path.
         const params = buildDrumParams(0, 'Open', 0, state, false);
-        vi.spyOn(Math, 'random').mockReturnValue(0.5);
-        const result = applyGrooveOverrides(state, params);
 
-        // Either silent or NOT routed to Crash (the section-boundary block
-        // could still route a section-start crash, but only via justFinishedTurnaround,
-        // which requires a prev section — not the case at step 0).
-        if (result.shouldPlay) {
-            expect(result.soundName).not.toBe('Crash');
+        for (const r of [0.05, 0.5, 0.95]) {
+            vi.spyOn(Math, 'random').mockReturnValue(r);
+            const result = applyGrooveOverrides(state, params);
+            vi.restoreAllMocks();
+
+            // Either silent or NOT routed to Crash (the section-boundary block
+            // could still route a section-start crash, but only via justFinishedTurnaround,
+            // which requires a prev section — not the case at step 0).
+            if (result.shouldPlay) {
+                expect(result.soundName, `r=${r}`).not.toBe('Crash');
+            }
         }
     });
 });
