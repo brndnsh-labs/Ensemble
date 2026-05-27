@@ -54,7 +54,7 @@ Note: the original story wording cited "jazz walking line in 6/8 expects 2-4 ons
 
 **Effort:** ~3h. **Model:** sonnet. **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S4. Latin clave 4/4-positioned hits
+### S4. Latin clave 4/4-positioned hits ✅ Done 2026-05-27
 
 `public/engine/grooves/latin.ts:91-100` hardcodes clave positions as `stepInBar === 0 || stepInBar === 6 || stepInBar === 12` — those are 4/4 16th-note positions. In 6/8 (`stepsPerBar = 12`), step 12 is the start of the next measure, so the hit never fires there; the spacing is also wrong (6/8 son clave is 3+3+2 / 2+3+3 over two bars in eighths, not 4/4 spacing).
 

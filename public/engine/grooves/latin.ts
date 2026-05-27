@@ -43,6 +43,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isBackbeat,
         isOffbeat,
         isAOfBeat,
+        isCompound,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
@@ -89,13 +90,20 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // Authentic 3-2 Son Clave (Cuban origin, foundational for bossa sidestick)
             // 3-side (bar 1): beat 1, "& of 2", beat 4 → 16th steps 0, 6, 12
             // 2-side (bar 2): beat 2, beat 3        → 16th steps 4, 8
-            if (isBar1) {
-                if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
-                    shouldPlay = true;
-                }
-            } else {
-                if (stepInBar === 4 || stepInBar === 8) {
-                    shouldPlay = true;
+            // why: these step indices (0, 6, 12 / 4, 8) are 4/4 16th-note positions.
+            // In 6/8 (stepsPerBar=12) step 12 is the start of the NEXT measure and
+            // never fires; the spacing also doesn't match a 6/8 son clave (3+3+2 in
+            // eighths). Gate entirely on !isCompound and rely on the explicit
+            // 'Afro-Cuban 6/8' drum preset for compound-meter latin patterns.
+            if (!isCompound) {
+                if (isBar1) {
+                    if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
+                        shouldPlay = true;
+                    }
+                } else {
+                    if (stepInBar === 4 || stepInBar === 8) {
+                        shouldPlay = true;
+                    }
                 }
             }
 
