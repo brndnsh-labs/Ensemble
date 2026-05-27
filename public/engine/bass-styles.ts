@@ -1264,6 +1264,140 @@ export function getBassNoteStyle(
     // --- QUARTER NOTE (WALKING) STYLE ---
     if (style === 'quarter') {
         const isJazz = groove.genreFeel === 'Jazz' || groove.lastDrumPreset === 'Jazz';
+
+        // --- COMPOUND METER (6/8, 12/8) PITCH PICKER ---
+        // why: epic-1-compound-meter S15 — the 4/4-shaped beat-position branches
+        // below (especially the `intBeat === 2` "beat 3 → fifth" idiom at line ~1303)
+        // fire on mStep 4 in 6/8 (intBeat = 4/2 = 2 in compound), which is the S11/S12
+        // PICKUP slot — not the strong "beat 3" of a 4/4 walking line. Canonical
+        // Paul Chambers 6/8 walking ("All Blues") leans on chromatic / scale-step
+        // *leading-tone* approaches at pickup slots and roots on pulses, NOT stable
+        // 5ths on the pickup. Without this branch, pickups played the 5th 70% of
+        // the time and held-chord pulses fell through to the generic scale-tone
+        // fallback (could return 3rd, 5th, or 7th of the held chord rather than
+        // the root). Density gate already lives in checkBassActiveStyle (S12); this
+        // branch only sets the PITCH for the slots that gate fires.
+        //
+        // Slot derivation mirrors checkBassActiveStyle's compound branch (bass-styles.ts:83-124):
+        //   - pulse:   stepInfo.isPulseStart        — mStep {0, 6} in 6/8
+        //   - pickup:  stepInGroup === groupSteps-2 — mStep {4, 10} in 6/8
+        //   - approach: stepInGroup === 2           — mStep {2, 8} in 6/8 (high intensity)
+        // Simple-meter 4/4 paths remain byte-identical: this branch only fires
+        // when stepInfo.tsConfig.isCompound is true.
+        if (_stepInfo?.tsConfig?.isCompound === true) {
+            const groupBeats = _stepInfo.tsConfig?.grouping?.[_stepInfo.groupIndex] ?? 3;
+            const groupSteps = groupBeats * ts.stepsPerBeat;
+            const isPulseSlot = _stepInfo.isPulseStart;
+            const isPickupSlot = _stepInfo.stepInGroup === groupSteps - 2;
+            const isApproachSlot = _stepInfo.stepInGroup === 2;
+
+            // why: deterministic seed for any chromatic-vs-scalar / above-vs-below
+            // pick in this branch. Same shape as the compound density gate seed
+            // (bass-styles.ts:130-131) and the funk slap seed — golden-ratio mix
+            // with currentLoopCount XOR, mulberry32-scrambled. No bare LCG
+            // (feedback_seeded_prng_mulberry32).
+            const compoundPitchSeed =
+                ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0xc2b2ae35)) | 0;
+
+            if (isPulseSlot) {
+                // why: pulses on a held or changing chord ALWAYS take the chord
+                // root. `baseRoot` is already register-normalized via the upstream
+                // normalizeToRange call (bass-engine.ts:413), so this respects the
+                // register slot (23–57) + previous-note proximity that
+                // clampAndNormalize embeds. `withOctaveJump` is reserved for
+                // explicit downbeat-displacement gestures — pulse roots should sit
+                // in the established register so the line breathes; we use
+                // clampAndNormalize without the octave-jump bias.
+                return result(
+                    getFrequency(clampAndNormalize(baseRoot)),
+                    ts.stepsPerBeat * 0.9, // why: hold across the eighth (compound stepsPerBeat=2)
+                    velocity,
+                );
+            }
+
+            if (isPickupSlot) {
+                // why: pickup is the leading-tone slot — approach the NEXT pulse's
+                // root. The "next pulse" depends on whether this pickup is at the
+                // end of the bar or mid-bar:
+                //   - mid-bar pickup (e.g. mStep 4 in 6/8, groupIndex 0 of 2):
+                //       next pulse is mStep 6 of the SAME bar — still the current
+                //       chord. Pickup is a chromatic neighbor of the current root.
+                //   - end-of-bar pickup (e.g. mStep 10 in 6/8, the final group):
+                //       next pulse is mStep 0 of the NEXT bar — possibly a chord
+                //       change. If nextChord differs, aim at nextChord's root.
+                // `nextChord` as passed into getBassNote is the next BAR's chord,
+                // not the next pulse's chord — so it's only the right target when
+                // we're in the final group of the current bar.
+                const grouping = _stepInfo.tsConfig?.grouping ?? [3];
+                const isLastGroupOfBar = _stepInfo.groupIndex === grouping.length - 1;
+                const isChange = isLastGroupOfBar && isChordChangeApproach(nextChord, chord);
+                const nextRootTarget =
+                    isChange && nextChord
+                        ? normalizeToRange(nextChord.bassMidi ?? nextChord.rootMidi)
+                        : baseRoot;
+                const dirDraw = scrambleHash((compoundPitchSeed + 11) | 0);
+                // why: 50/50 chromatic-below vs chromatic-above — matches the
+                // 4/4 jazz walking path (`bass-styles.ts:1244`). Both directions
+                // are idiomatic (Chambers uses below resolving from b7, above
+                // resolving from b2). A static bias toward one direction is
+                // programmer's math; let scale context emerge from the picker.
+                // A scale-degree-aware variant is in FOLLOWUPS.md.
+                const approachMidi = dirDraw < 0.5 ? nextRootTarget - 1 : nextRootTarget + 1;
+                return result(
+                    getFrequency(clampAndNormalize(approachMidi)),
+                    ts.stepsPerBeat * 0.6,
+                    velocity * 0.9,
+                );
+            }
+
+            if (isApproachSlot) {
+                // why: middle-of-group slot (mStep 2/8) only fires at intensity > 0.7
+                // (the density gate in checkBassActiveStyle gates this). Pick a chord
+                // tone that voice-leads into the pickup slot. The pickup will sit
+                // near root ±1; a chord tone in the same neighborhood (3rd or 5th)
+                // gives the line forward motion without doubling the root. Score
+                // candidates by:
+                //   - chord-tone class (3rd or 5th preferred)
+                //   - proximity to prevMidi (stepwise voice leading)
+                // and pick the best. If no chord tones in the scale, fall back to a
+                // scale neighbor of the root. This is the mid-bar "approach"
+                // gesture — chord tone, not chromatic.
+                const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
+                const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
+                const has_m3 =
+                    chord.quality.startsWith('m') ||
+                    chord.quality === 'dim' ||
+                    chord.quality === 'halfdim';
+                const thirdInterval = has_m3 ? 3 : 4;
+                const fifthInterval = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
+
+                const chordToneCandidates = [
+                    normalizeToRange(baseRoot + thirdInterval),
+                    normalizeToRange(baseRoot + fifthInterval),
+                ];
+
+                // why: pick whichever chord tone is closer to prevMidi (stepwise
+                // voice leading from the previous pulse). On a held-chord pulse →
+                // approach transition, prevMidi is the root; the 3rd is +3/+4
+                // semitones away and the 5th is +7 (or octave-displaced). Stepwise
+                // bonus prefers the 3rd in most cases — exactly the Paul Chambers
+                // mid-group gesture.
+                const prev = prevMidi ?? baseRoot;
+                chordToneCandidates.sort((a, b) => Math.abs(a - prev) - Math.abs(b - prev));
+                return result(
+                    getFrequency(clampAndNormalize(chordToneCandidates[0])),
+                    ts.stepsPerBeat * 0.6,
+                    velocity * 0.85,
+                );
+            }
+
+            // why: any other compound step that somehow reached here (e.g. odd-
+            // step leak — should not happen given checkBassActiveStyle's gating).
+            // Return null so the density gate's contract holds: only named slots
+            // produce onsets.
+            return null;
+        }
+
         if (isJazz && intensity < 0.3) {
             if (!isBeatStart || intBeat % 2 !== 0) {
                 return null;

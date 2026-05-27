@@ -87,7 +87,7 @@ Rename `isAndOfFour` → `isAnticipation`. Compute as `stepsPerBar - 1` for comp
 
 **Effort:** ~4h. **Model:** opus (musical-judgment audit). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S7. End-to-end "All Blues feels right" critique test — Blocked by S11–S14
+### S7. End-to-end "All Blues feels right" critique test — Unblocked 2026-05-27 (S11–S15 shipped)
 
 **Status:** Blocked. First S7 authoring attempt (2026-05-27) surfaced four real engine gaps that prevent the cycle's DoD from being met *with the engine as it stands today*. The scheduling foundation (S1–S6, S9) is correct, but the **musical content layer still assumes 4/4** in four places. Promoted to S11–S14 below; S7 will be rewritten and re-attempted after those land.
 
@@ -187,7 +187,7 @@ The S6 and S7 critique tests both depend on a hand-cycled mock to produce phrase
 
 **Effort:** ~6h (musical-design pass + budget timer + per-tick wake-up + critique test). **Model:** opus (phrasing pipeline is taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring (2026-05-27).
 
-### S15. Jazz 6/8 walking-bass picker (compound-aware pitch selection)
+### S15. Jazz 6/8 walking-bass picker (compound-aware pitch selection) ✅ Done 2026-05-27
 
 `public/engine/bass-styles.ts` `getBassNoteStyle 'quarter'` branch (around line 1260+) still applies 4/4-shaped beat-position pitch logic in compound meters. Specifically `intBeat === 2` (line ~1293) — meant as the 4/4 "beat 3 → fifth" idiom — fires on mStep 4 in 6/8, which is the S11/S12 pickup slot. Result: pickup notes play the 5th of the current chord 70% of the time instead of a chromatic / scale-step approach into the next pulse. Canonical Paul Chambers walking 6/8 leans on *leading-tone* approaches at pickup slots, not stable 5ths.
 
