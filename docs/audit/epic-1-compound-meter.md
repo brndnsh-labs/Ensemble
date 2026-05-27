@@ -159,7 +159,7 @@ Idiomatic jazz 6/8 "spang-a-lang" places the skip on the last *eighth* of each d
 
 **Effort:** ~3h. **Model:** opus (musical-judgment density curve). **Reviewer:** music-theory-reviewer. **Source:** existing FOLLOWUPS line 78 (S2 review) — promoted via S7 authoring (2026-05-27).
 
-### S13. Jazz 6/8 comping density (sparse compound comp bank)
+### S13. Jazz 6/8 comping density (sparse compound comp bank) ✅ Done 2026-05-27
 
 `public/engine/accompaniment.ts` jazz lane in 6/8 fires on ~80% of all steps (~9.6 hits per 12-step bar). Idiomatic jazz comping is *sparse and syncopated* — 1–3 chord hits per bar, lands on pulses and anticipations, leaves space for the soloist. The 80% density is "thick mush" — the dominant audible flaw the user reported.
 
@@ -172,6 +172,8 @@ Decide during implementation; the design call is "what does a jazz-waltz comp so
 **Acceptance:** A new `tests/standards/jazz-comping-6-8-critique.test.ts` asserts hits-per-bar ∈ [1, 4] at intensity 0.7, with ≥ 70% landing on pulse-aligned positions {0, 4, 6, 10}. Density-per-step ≤ 35% (vs. the current ~80%). Existing 4/4 jazz comping critique tests pass unchanged.
 
 **Effort:** ~4h (design + comping bank rework + critique). **Model:** opus (musical-judgment density + idiomatic syncopation). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring (2026-05-27).
+
+**Note (2026-05-27 implementation):** The engine fix was already shipped in S3 (commit `d6d094b8`) via `COMPOUND_COMPING_CELLS` at `accompaniment.ts:250-268` + routing at line 1065. S13's deliverable became the end-to-end emission-path critique that proves the engine produces sparse pulse-aligned comping at the full `getAccompanimentNotes` layer (S3's critique guarded only the pattern picker). Measured: 2.73 hits/bar, 100% pulse-aligned, 22.8% density. The "thick mush" the user originally reported was always going to be fixed by S3; this story confirmed it.
 
 ### S14. Soloist rest-cadence pipeline (phrasing budget)
 
