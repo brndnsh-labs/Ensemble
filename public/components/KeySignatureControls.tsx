@@ -62,7 +62,7 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
         return;
     }
 
-    const current = arranger.grouping || (TIME_SIGNATURES as any)[timeSignature].grouping;
+    const current = arranger.grouping || TIME_SIGNATURES[timeSignature].grouping;
     const currentIndex = options.findIndex((opt) => opt.join('+') === current.join('+'));
     const nextIndex = (currentIndex + 1) % options.length;
 
@@ -112,7 +112,7 @@ export function TimeSignatureControl() {
                 >
                     {grouping
                         ? grouping.join('+')
-                        : (TIME_SIGNATURES as any)[timeSignature]?.grouping.join('+') || '3+2'}
+                        : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
                 </button>
             </div>
         </div>

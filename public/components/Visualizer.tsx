@@ -195,8 +195,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
     useEffect(() => {
         if (vizRef.current) {
-            const signatures = TIME_SIGNATURES as any;
-            const ts = signatures[timeSignature] || signatures['4/4'];
+            const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
             vizRef.current.render(0, bpm, ts);
         }
     }, [bpm, timeSignature]);
@@ -291,8 +290,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                         stepMeasure !== groove.currentMeasure &&
                         playback.isPlaying
                     ) {
-                        // @ts-expect-error second arg isn't actually typed in instrument-controller
-                        switchMeasure(stepMeasure, true);
+                        switchMeasure(stepMeasure);
                     }
                     dispatch(ACTIONS.SET_PARAM, {
                         module: 'playback',

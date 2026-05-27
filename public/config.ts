@@ -33,7 +33,17 @@ export const INTERVAL_TO_ROMAN = {
     11: 'VII',
 };
 
-export const TIME_SIGNATURES = {
+export interface TimeSignatureConfig {
+    beats: number;
+    stepsPerBeat: number;
+    subdivision: string;
+    pulse: number[];
+    grouping: number[];
+    backbeat: number[];
+    isCompound?: boolean;
+}
+
+export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
     '2/4': {
         beats: 2,
         stepsPerBeat: 4,

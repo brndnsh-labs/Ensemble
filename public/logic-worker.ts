@@ -146,7 +146,7 @@ export function handleResolution(
     processStartTime: number | null = null,
 ): void {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
-    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES) || {
         mStep: 0,
         isMeasureStart: false,

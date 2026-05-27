@@ -590,8 +590,7 @@ export function generateSessionSeed(
 
     const prng = createPRNG(seedStr || generateRandomSeed());
 
-    const tsConfig: any =
-        (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const tsConfig: any = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
     const styleConfig: any = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;

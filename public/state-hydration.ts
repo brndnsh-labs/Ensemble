@@ -99,7 +99,7 @@ function validateSections(sections: any[]): any[] {
             isMinor: typeof s.isMinor === 'boolean' ? s.isMinor : undefined,
             repeat: Math.min(Math.max(1, parseInt(s.repeat, 10) || 1), 64),
             timeSignature:
-                typeof s.timeSignature === 'string' && (TIME_SIGNATURES as any)[s.timeSignature]
+                typeof s.timeSignature === 'string' && TIME_SIGNATURES[s.timeSignature]
                     ? s.timeSignature
                     : '',
             seamless: !!s.seamless,
@@ -123,7 +123,7 @@ export function hydrateState(): void {
         }
 
         let validatedTS = '4/4';
-        if (savedState.timeSignature && (TIME_SIGNATURES as any)[savedState.timeSignature]) {
+        if (savedState.timeSignature && TIME_SIGNATURES[savedState.timeSignature]) {
             validatedTS = savedState.timeSignature;
         }
 
@@ -357,7 +357,7 @@ export function loadFromUrl(): void {
 
     const tsParam = params.get('ts');
     if (tsParam) {
-        if ((TIME_SIGNATURES as any)[tsParam]) {
+        if (TIME_SIGNATURES[tsParam]) {
             (arranger as Mutable<typeof arranger>).timeSignature = tsParam; // @direct-mutation
         }
     }

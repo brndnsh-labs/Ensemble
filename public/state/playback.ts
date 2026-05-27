@@ -204,7 +204,7 @@ export function playbackReducer(action: Action): boolean {
             return true;
         }
         case 'TOAST_EXPIRED':
-            p.toasts = p.toasts.filter((t: any) => t.id !== action.payload);
+            p.toasts = p.toasts.filter((t) => t.id !== action.payload);
             return true;
         case ACTIONS.TRIGGER_FLASH:
             p.flashIntensity = action.payload || 0.25;

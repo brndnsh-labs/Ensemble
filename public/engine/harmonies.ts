@@ -222,7 +222,7 @@ export function generateCompingPattern(
     tsConfig?: TimeSignatureConfig,
     activeStyle?: string,
 ): number[] {
-    const ts = tsConfig || (TIME_SIGNATURES as any)['4/4'];
+    const ts = tsConfig || TIME_SIGNATURES['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
     const length = spm * 2;
     const pattern = new Array(length).fill(0);

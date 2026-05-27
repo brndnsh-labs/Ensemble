@@ -14,11 +14,17 @@ import type { EnsembleState } from './types.js';
 import { ACTIONS } from './types.js';
 import { clearToastActions } from './ui.js';
 
+interface HandleEffectsContext {
+    dispatch: (action: string, payload?: any) => void;
+    viz?: any;
+    oldBpm?: number;
+}
+
 export function handleEffects(
     action: string,
     payload: any,
     stateMap: EnsembleState,
-    context: any = {},
+    context: HandleEffectsContext,
 ): void {
     const { dispatch } = context;
     switch (action) {

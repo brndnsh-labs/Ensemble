@@ -206,8 +206,7 @@ export function generateDrumFills(
     const fillMap: Record<number, FillMapEntry> = {};
     const isVirtualMacroForm = unrolled.totalSteps !== unrolled.originalSteps;
 
-    const tsConfig =
-        (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
+    const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerMeasure = tsConfig.beats * tsConfig.stepsPerBeat;
 
     // Orchestration is needed to check energy levels for the "Crash Contract"
@@ -309,8 +308,7 @@ export function generateSoloistAccents(
     const prng = createPRNG(seedStr || generateRandomSeed());
     const accentMap: Record<number, AccentCatch> = {};
 
-    const tsConfig =
-        (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
+    const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
 
     let lastCatchStep = -100;

@@ -993,8 +993,7 @@ export function getSoloistNote(
     const intentBehavior = calculateSoloistIntent(effectiveIntensity, activeStyle);
 
     const config: any = (STYLE_CONFIG as any)[activeStyle] || STYLE_CONFIG.scalar;
-    const tsConfig: any =
-        (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const tsConfig: any = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBeat = tsConfig.stepsPerBeat;
     const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
 

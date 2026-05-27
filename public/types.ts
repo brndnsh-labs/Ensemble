@@ -1490,3 +1490,30 @@ export const ACTIONS = {
     PROG_VALIDATED: 'PROG_VALIDATED',
     DRUM_PRESET_LOADED: 'DRUM_PRESET_LOADED',
 } as const;
+
+/**
+ * E2E + preview helpers installed on `window` by `installE2EGlobals()` and
+ * `main.ts`. Augmented globally so callers can read the fields without
+ * `window as any` casts.
+ */
+declare global {
+    interface Window {
+        // The signatures here mirror the runtime helpers installed by
+        // installE2EGlobals(); callers consume them via Playwright tooling
+        // and devtools, not from typed app code, so the public surface is
+        // intentionally permissive. The typed action map for `dispatch` is
+        // parked in CODEBASE_HYGIENE_2026-05-26 multi-session followups.
+        ensemble?: {
+            dispatch: (action: any, payload?: any) => void;
+            getState: () => EnsembleState;
+            ACTIONS: typeof ACTIONS;
+            validateProgression: (state: EnsembleState, dispatch: any) => unknown;
+            scheduleGlobalEvent: (...args: any[]) => any;
+            initAudio: (state: EnsembleState) => unknown;
+            loadDrumPreset: (name: string) => unknown;
+            generateNotesForStep: (...args: any[]) => any;
+            loopArcMultiplier: (loopCount: number, loopLimit: number) => number;
+        };
+        previewChord?: (index: number) => void;
+    }
+}

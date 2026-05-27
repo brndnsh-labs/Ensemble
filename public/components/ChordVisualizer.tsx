@@ -63,8 +63,8 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
             onPick(chord, cardRef.current.getBoundingClientRect());
             return;
         }
-        if ((window as any).previewChord) {
-            (window as any).previewChord(chord.globalIndex);
+        if (window.previewChord) {
+            window.previewChord(chord.globalIndex);
         }
     };
 
@@ -145,7 +145,7 @@ export function ChordVisualizer() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
     const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
-    const timeSignatureConfig = (TIME_SIGNATURES as any)[timeSignature] || TIME_SIGNATURES['4/4'];
+    const timeSignatureConfig = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
 
     useEffect(() => {
         if (typeof window === 'undefined') {

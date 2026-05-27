@@ -395,7 +395,9 @@ export function SurpriseMe() {
                                     <span>Key</span>
                                     <select
                                         value={wizardKey}
-                                        onChange={(e: any) => setWizardKey(e.target.value)}
+                                        onChange={(e) =>
+                                            setWizardKey((e.target as HTMLSelectElement).value)
+                                        }
                                     >
                                         {KEY_ORDER.map((k) => (
                                             <option key={k} value={k}>
@@ -408,7 +410,9 @@ export function SurpriseMe() {
                                     <input
                                         type="checkbox"
                                         checked={wizardMinor}
-                                        onChange={(e: any) => setWizardMinor(e.target.checked)}
+                                        onChange={(e) =>
+                                            setWizardMinor((e.target as HTMLInputElement).checked)
+                                        }
                                     />
                                     <span>minor</span>
                                 </label>
@@ -416,7 +420,9 @@ export function SurpriseMe() {
                                     <span>Time</span>
                                     <select
                                         value={wizardTS}
-                                        onChange={(e: any) => setWizardTS(e.target.value)}
+                                        onChange={(e) =>
+                                            setWizardTS((e.target as HTMLSelectElement).value)
+                                        }
                                     >
                                         {TIME_SIGNATURE_KEYS.map((t) => (
                                             <option key={t} value={t}>
@@ -459,8 +465,11 @@ export function SurpriseMe() {
                                             <span>Role</span>
                                             <select
                                                 value={seedRole}
-                                                onChange={(e: any) =>
-                                                    setSeedRole(e.target.value as GenerateSongRole)
+                                                onChange={(e) =>
+                                                    setSeedRole(
+                                                        (e.target as HTMLSelectElement)
+                                                            .value as GenerateSongRole,
+                                                    )
                                                 }
                                             >
                                                 <option value="verse">Verse</option>
@@ -479,8 +488,10 @@ export function SurpriseMe() {
                                             class="surprise-me-seed-input"
                                             placeholder="e.g. C Am F G  or  I vi IV V"
                                             value={seedText}
-                                            onInput={(e: any) => setSeedText(e.target.value)}
-                                            onKeyDown={(e: any) => {
+                                            onInput={(e) =>
+                                                setSeedText((e.target as HTMLInputElement).value)
+                                            }
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     commitSeedText();
                                                 }
@@ -592,8 +603,10 @@ export function SurpriseMe() {
                                     max="7"
                                     step="0.1"
                                     value={targetMinutes}
-                                    onInput={(e: any) =>
-                                        setTargetMinutes(parseFloat(e.target.value))
+                                    onInput={(e) =>
+                                        setTargetMinutes(
+                                            parseFloat((e.target as HTMLInputElement).value),
+                                        )
                                     }
                                 />
                             </label>
@@ -614,7 +627,10 @@ export function SurpriseMe() {
                             {/* Feel */}
                             <label class="surprise-me-field">
                                 <span class="surprise-me-field-label">Feel</span>
-                                <select value={feel} onChange={(e: any) => setFeel(e.target.value)}>
+                                <select
+                                    value={feel}
+                                    onChange={(e) => setFeel((e.target as HTMLSelectElement).value)}
+                                >
                                     <option value={FEEL_GROOVE}>
                                         My groove ({currentFeel || 'Rock'})
                                     </option>

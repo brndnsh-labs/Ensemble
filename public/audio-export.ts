@@ -122,6 +122,11 @@ function sanitizeFilename(input: string): string {
  * live session (styles, volumes, intensity, etc.) so the export sounds like
  * what's on screen.
  */
+// The clone temporarily carries legacy soloist fields (motifBuffer,
+// pitchHistory) and a `ui` slot that the offline-render pipeline still
+// reaches for; those fields are not on the typed EnsembleState. Until that
+// scratch surface is migrated, this helper stays loosely typed.
+// biome-ignore lint/suspicious/noExplicitAny: see comment above
 function cloneStateForRender(liveState: any): any {
     return {
         playback: {

@@ -27,17 +27,14 @@ function init() {
 
         applyTheme(playback.theme);
 
-        validateProgression(getState(), (a: any, p: any) =>
-            (window as any).ensemble?.dispatch(a, p),
-        );
+        validateProgression(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p));
 
         // --- ASSEMBLE UI ---
         mountComponents(() => getVisualTime(getState()));
 
         // --- WORKER INIT ---
         initWorker(
-            () =>
-                scheduler(getState(), (a: any, p: any) => (window as any).ensemble?.dispatch(a, p)),
+            () => scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p)),
             (
                 notes: any[],
                 requestTimestamp: number,
@@ -104,15 +101,13 @@ function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler(getState(), (a: any, p: any) =>
-                        (window as any).ensemble?.dispatch(a, p),
-                    );
+                    scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p));
                 }
             },
         );
 
         setInstrumentControllerRefs(() =>
-            scheduler(getState(), (a: any, p: any) => (window as any).ensemble?.dispatch(a, p)),
+            scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p)),
         );
 
         const hasDrumPattern = groove.instruments.some((inst: any) =>
@@ -146,7 +141,7 @@ function init() {
     }
 }
 
-(window as any).previewChord = (index: number) => {
+window.previewChord = (index: number) => {
     const { playback, arranger } = getState();
     if (playback.isPlaying) {
         return;

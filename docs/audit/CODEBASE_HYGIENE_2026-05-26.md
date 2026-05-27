@@ -30,7 +30,7 @@ Goals:
 | Batch | Scope | Status |
 |---|---|---|
 | 1 | Dead CSS sweep | ✅ shipped — commit `d6a9c68f` (679 lines deleted) |
-| 2 | TypeScript hygiene | 🔁 deferred — sub-agent write failure, retry in future session |
+| 2 | TypeScript hygiene | ✅ shipped — ~50 any-casts collapsed: CoordinationContext expansion (27), TIME_SIGNATURES typed Record (8), Window augmentation for `window.ensemble`/`previewChord` (6), `@ts-expect-error` removed, handleEffects context type, SurpriseMe event handlers (8), Toast filter, one `(coordination as any)` in accompaniment |
 | 3 | Doc & config drift | ✅ shipped — commit `6eaa05c4` |
 | 4 | Visualizer frame allocations (perf) | ✅ shipped — commit `d1f4b48c` |
 | 5 | Scheduler hot-path allocations (perf) | ✅ shipped — strum-rank Map→indexed array; chord-MIDI WeakMap cache; persistent drum-section cursor; nested forEach→for |

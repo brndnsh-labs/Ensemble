@@ -1856,7 +1856,7 @@ export function getAccompanimentNotes(
     //      quality (e.g. a dom7 shell on a maj7 misleads where the form is heading).
     //
     // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
-    const upcomingSectionChord = (coordination as any).upcomingSectionFirstChord;
+    const upcomingSectionChord = coordination.upcomingSectionFirstChord;
     const sectionBoundaryMeasureStep = spm - Math.floor(ts.stepsPerBeat / 2);
     const upcomingHasFreqs = (upcomingSectionChord?.freqs?.length || 0) > 0;
 

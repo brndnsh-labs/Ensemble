@@ -14,6 +14,7 @@ import { getSectionContext } from './arranger-utils.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
     type CoordinationCarryover,
+    type CoordinationContext,
     createCoordinationContext,
     enforceRegisterSlotting,
     getAltPitchClasses,
@@ -66,7 +67,7 @@ export interface GenerateNotesOptions {
 
 export interface GenerateNotesResult {
     notes: NoteResult[];
-    coordination: any;
+    coordination: CoordinationContext;
     drumHits: DrumHitInfo[];
 }
 
@@ -98,7 +99,7 @@ export function generateNotesForStep(
     const notesToMain: NoteResult[] = [];
     const drumHits: DrumHitInfo[] = [];
 
-    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
     const chordData = getChordAtStep(step, arranger, cursors.mainCursor);
@@ -107,7 +108,7 @@ export function generateNotesForStep(
     // 1. Context Assembly (Anchor: Groove)
     const coordination = createCoordinationContext(step, stepInfo as any, carryover);
     // writer: groove preamble (this line); readable-after: any producer
-    (coordination as any).pocketOffset = calculatePocketOffset(playback, groove);
+    coordination.pocketOffset = calculatePocketOffset(playback, groove);
 
     if (chordData) {
         const { sectionEnd, sectionStart } = chordData;
@@ -118,14 +119,14 @@ export function generateNotesForStep(
         // that receive bare coordination (e.g. isBassActive) can read sectionEnd
         // without depending on the wrapper-context shape passed to getBassNote.
         // writer: chord-data preamble (these lines); readable-after: any producer
-        (coordination as any).sectionStart = sectionStart;
-        (coordination as any).sectionEnd = sectionEnd;
+        coordination.sectionStart = sectionStart;
+        coordination.sectionEnd = sectionEnd;
 
         // --- Structural Awareness: Turnaround Detection ---
         // writer: chord-data preamble (this line); readable-after: any producer
         const sectionSteps = sectionEnd - sectionStart;
         const isLongEnough = sectionSteps >= stepsPerMeasure * 8;
-        (coordination as any).isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
+        coordination.isTurnaround = isLongEnough && remainingSteps <= stepsPerMeasure * 2;
 
         // --- Tension-chord publication (writer: chord-preamble; readable-after: any producer) ---
         // why: must be published BEFORE the soloist producer runs (line ~254) so the
@@ -135,8 +136,8 @@ export function generateNotesForStep(
         // would be one tick too late. Both fields are pure functions of the current chord.
         const currentChord = chordData.chord;
         if (currentChord) {
-            (coordination as any).isTensionChord = isTensionChordForSoloist(currentChord.quality);
-            (coordination as any).altPitchClasses = getAltPitchClasses(
+            coordination.isTensionChord = isTensionChordForSoloist(currentChord.quality);
+            coordination.altPitchClasses = getAltPitchClasses(
                 currentChord.quality,
                 currentChord.rootMidi,
             );
@@ -150,7 +151,7 @@ export function generateNotesForStep(
                 cursors.lookaheadCursor,
             );
             if (nextSectionChordData?.chord) {
-                (coordination as any).upcomingSectionFirstChord = nextSectionChordData.chord;
+                coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
 
                 // --- Section-boundary lookahead (epic-deferred-followups S1(a)) ---
                 // why: `upcomingSectionFirstChord` only tells engines WHICH chord
@@ -162,12 +163,12 @@ export function generateNotesForStep(
                 // window `upcomingSectionFirstChord` is populated in), hence the
                 // shared `remainingSteps <= stepsPerMeasure` guard.
                 const upcomingLabel = (nextSectionChordData.chord as any)?.sectionLabel ?? null;
-                (coordination as any).upcomingSectionLabel = upcomingLabel;
+                coordination.upcomingSectionLabel = upcomingLabel;
                 // why: energy delta uses form-analysis.ts's 0..1 SECTION_ENERGY_MAP
                 // (drop=1.0, breakdown=0.3, chorus=0.9, …). A large positive delta
                 // means "the band is about to lift hard"; the drop mechanic and
                 // S2's rock push both gate on it.
-                (coordination as any).upcomingSectionEnergyDelta =
+                coordination.upcomingSectionEnergyDelta =
                     getSectionEnergy(upcomingLabel) -
                     getSectionEnergy((currentChord as any)?.sectionLabel);
                 // why: whole measures remaining until the boundary. `remainingSteps`
@@ -175,7 +176,7 @@ export function generateNotesForStep(
                 // and subtracting the trailing partial bar gives "0 = we are IN the
                 // last bar before the change." Clamped at 0 — when the lookahead is
                 // available we are by construction within the final measure.
-                (coordination as any).barsUntilSectionChange = Math.max(
+                coordination.barsUntilSectionChange = Math.max(
                     0,
                     Math.floor((remainingSteps - 1) / stepsPerMeasure),
                 );
@@ -211,16 +212,16 @@ export function generateNotesForStep(
         if (
             shouldFireDropMute(
                 groove.genreFeel,
-                (coordination as any).barsUntilSectionChange,
-                (coordination as any).upcomingSectionLabel,
-                (coordination as any).upcomingSectionEnergyDelta,
+                coordination.barsUntilSectionChange,
+                coordination.upcomingSectionLabel,
+                coordination.upcomingSectionEnergyDelta,
                 dropFormProgress,
             )
         ) {
-            (coordination as any).dropMuteActive = true;
+            coordination.dropMuteActive = true;
             // why: the crash marks the START of the empty bar — fire it on the
             // measure downbeat only, then leave the rest of the bar silent.
-            (coordination as any).dropCrashPending = stepInfo
+            coordination.dropCrashPending = stepInfo
                 ? stepInfo.isMeasureStart
                 : step % stepsPerMeasure === 0;
         }
@@ -236,7 +237,7 @@ export function generateNotesForStep(
         // invoked further down at line ~340.
         // writer: chord-data preamble (this line); readable-after: any producer
         const sectionCtx = getSectionContext(arranger, step);
-        (coordination as any).sectionOccurrence = sectionCtx.occurrence;
+        coordination.sectionOccurrence = sectionCtx.occurrence;
 
         // --- Final-measure publication (epic-form-arrangement S4) ---
         // why: form-arranger.md P1 #6 — only the soloist senses the form's end
@@ -315,9 +316,7 @@ export function generateNotesForStep(
             // lookup contract, but floor() handles the boundary cleanly.
             // Bar 0 spans `sectionStart .. sectionStart + spm - 1`; bar 1
             // spans `sectionStart + spm .. + 2spm - 1`; etc.
-            (coordination as any).introBarsElapsed = Math.floor(
-                (step - sectionStart) / stepsPerMeasure,
-            );
+            coordination.introBarsElapsed = Math.floor((step - sectionStart) / stepsPerMeasure);
         } else if (isOutroSectionLabel(currentLabel)) {
             // why: `Math.ceil` ensures the LAST step of the last bar still
             // reports `1` (not `0`) — so engines whose mute is `OUTRO_MUTES
@@ -326,7 +325,7 @@ export function generateNotesForStep(
             // E.g. sectionEnd=64, step=48, spm=16 → ceil((64-48)/16)=1
             //   (the LAST bar). step=47 → ceil(17/16)=2 (the second-to-last).
             const remaining = sectionEnd - step;
-            (coordination as any).outroBarsRemaining =
+            coordination.outroBarsRemaining =
                 remaining > 0 ? Math.ceil(remaining / stepsPerMeasure) : 0;
         }
     }
@@ -357,9 +356,9 @@ export function generateNotesForStep(
     // `snareHit` stay false (already their defaults) so any consumer reading
     // them sees the silence honestly. Drum genres that are drop-friendly only
     // — `shouldFireDropMute` already gated `dropMuteActive` on genre.
-    const dropMuteActive = (coordination as any).dropMuteActive === true;
+    const dropMuteActive = coordination.dropMuteActive === true;
     if (dropMuteActive) {
-        if (includeDrums && (coordination as any).dropCrashPending === true) {
+        if (includeDrums && coordination.dropCrashPending === true) {
             const crashInst = groove.instruments.find((i) => i.name === 'Crash') || {
                 name: 'Crash',
                 muted: false,

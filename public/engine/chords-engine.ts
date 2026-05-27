@@ -774,7 +774,7 @@ function parseProgressionPart(
         const chordTokens = barText.split(/(\s+)/);
         const actualChordParts = chordTokens.filter((t) => t.trim() && t !== '|');
 
-        const ts = (TIME_SIGNATURES as any)[timeSignature] || TIME_SIGNATURES['4/4'];
+        const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
         const beatsPerChord = actualChordParts.length > 0 ? ts.beats / actualChordParts.length : 0;
 
         let barInternalOffset = 0;
@@ -1044,7 +1044,7 @@ function updateProgressionCache(state: any): void {
     let current = 0;
     const newStepMap = arranger.progression.map((chord: any) => {
         const tsName = chord.timeSignature || arranger.timeSignature;
-        const ts = (TIME_SIGNATURES as any)[tsName] || TIME_SIGNATURES['4/4'];
+        const ts = TIME_SIGNATURES[tsName] || TIME_SIGNATURES['4/4'];
         const steps = Math.round(chord.beats * ts.stepsPerBeat);
         const entry = { start: current, end: current + steps, chord };
         current += steps;
@@ -1103,7 +1103,7 @@ function updateProgressionCache(state: any): void {
         if (iterationSteps > 0) {
             const repeats = section.repeat || 1;
             const tsName = section.timeSignature || arranger.timeSignature;
-            const ts = (TIME_SIGNATURES as any)[tsName] || TIME_SIGNATURES['4/4'];
+            const ts = TIME_SIGNATURES[tsName] || TIME_SIGNATURES['4/4'];
             const stepsPerMeasure = Math.round(ts.beats * ts.stepsPerBeat);
 
             let stepAccLocal = sectionStart;

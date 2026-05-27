@@ -101,7 +101,7 @@ export interface UnrolledArrangement {
 
 export function unrollArrangement(arranger: ArrangerState, targetBars = 64): UnrolledArrangement {
     const originalTotalSteps = arranger.totalSteps || 0;
-    const ts = (TIME_SIGNATURES as any)[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const originalBars = originalTotalSteps / stepsPerBar;
 

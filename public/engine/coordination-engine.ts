@@ -190,6 +190,12 @@ export function createCoordinationContext(
         // or `sectionEnd > 0` checks, so the sentinel is safe.
         sectionStart: 0,
         sectionEnd: 0,
+        // True iff the soloist/drummer should treat the current bars as the
+        // section's turnaround (final ~2 measures). Published per-tick by
+        // tick-logic.ts from sectionEnd / step / stepsPerMeasure.
+        // writer: tick-logic.ts (chord-data preamble, before producers run)
+        // readable-after: chord-data preamble (any producer)
+        isTurnaround: false,
         // writer: tick-logic.ts chord-data preamble at line ~142 (before producers run)
         // readable-after: chord-data preamble (any producer including soloist)
         upcomingSectionFirstChord: null as any,

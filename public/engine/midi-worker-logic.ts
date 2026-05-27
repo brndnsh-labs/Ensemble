@@ -116,8 +116,7 @@ export class ExportProcessor {
         this.CHUNK_MS = 12; // Allow execution for ~12ms per frame
 
         // Initialize Export State
-        this.ts =
-            (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
+        this.ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
         this.totalStepsOneLoop = arranger.totalSteps;
         this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
         const loopSeconds =
@@ -459,7 +458,7 @@ export class ExportProcessor {
 
         const stepInfo = getStepInfo(
             globalStep,
-            (TIME_SIGNATURES as any)[arranger.timeSignature] || (TIME_SIGNATURES as any)['4/4'],
+            TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'],
             arranger.measureMap,
             TIME_SIGNATURES,
         );
