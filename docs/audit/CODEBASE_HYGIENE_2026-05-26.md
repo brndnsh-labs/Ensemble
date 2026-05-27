@@ -189,6 +189,26 @@ Main thread writes (`scheduler-core.ts:325`) + worker writes (`tick-logic.ts:735
 
 ---
 
+## Lessons learned (2026-05-26 session)
+
+### Sub-agent writes can silently fail in background mode
+The big surprise of the session: spawning sub-agents with `run_in_background: true` and a `npm run format` PostToolUse hook caused Batches 1, 2, 5, and most of 6 to report `completed` status with detailed code descriptions while **none of the writes reached disk**. Batches 3 and 4 succeeded fine. The pattern correlates with file type touched (markdown + visualizer-engine.ts worked; CSS deletions, scheduler-core.ts, arranger.ts reducer arms did not), not with batch complexity. Future fan-outs: **smoke-test ONE agent before launching the full batch** — verify the diff actually exists with `git status --short` and `stat -c '%y %n' <expected-files>` before trusting subsequent agents.
+
+### The sub-agent-as-planner pattern saved this session
+When the sub-agent writes failed, their detailed reports (file paths, line numbers, ready-to-paste code) were exhaustive enough to execute on the main thread without re-deriving anything. Worth budgeting for: even a "failed" sub-agent produces a usable plan. See [[feedback-subagent-as-planner]].
+
+### Audit site counts can be too low
+The per-genre-final-bar-critique audit said "9 sites between lines 142-332." Actual count: 22+ sites spread further down the file. Always `grep -c` the pattern in the actual file before scoping the work. Audits surface findings; they're not a complete index.
+
+### installSeededRandom over blanket sweeps for dense-pin files
+When ~20+ `vi.spyOn(Math, 'random').mockReturnValue(0.5)` sites exist in one file, prefer `installSeededRandom()` from `tests/utils/seeded-random.ts` at the `describe` level over wrapping each test in a `[0.05, 0.5, 0.95]` for-loop. One helper call replaces N pin-deletions and gives the tests a properly-distributed stream rather than three sample points. The Math.random sweep commit (`d7f6717b`) used this for per-genre-final-bar-critique (22 sites → 10 install calls) and the explicit-sweep pattern for the 13 sites in 3 other files.
+
+### Sweep within the trigger zone for deliberate pins
+Not all `mockReturnValue(0.5)` pins are naive. Read the pin's comment: `// force low to trigger sustains reliably` (pinned at 0.1) is a deliberate gate-bypass for measurement, not noise reduction. Blanket `[0.05, 0.5, 0.95]` would silence the sustain at 0.95 and make the inequality measurement meaningless. Use a narrow zone-aware sweep instead (e.g. `[0.05, 0.1, 0.2]` for low-trigger gates).
+
+### git status snapshot is a moving target during fan-out
+While background agents are writing, `git status --short` returns inconsistent snapshots from call to call (files appear and disappear as agents flush writes). For verification, prefer mtime-based checks (`stat -c '%y %n'`) which give point-in-time truth rather than a transactional view.
+
 ## Verification (per batch + final)
 
 Per batch: agent reports diff + test results; spot-check diff against the batch's findings list; verify `npm run typecheck`, `npm test`, `npm run lint`, `npm run lint:docs` green on merged tree.
