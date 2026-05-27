@@ -149,13 +149,13 @@ Idiomatic jazz 6/8 "spang-a-lang" places the skip on the last *eighth* of each d
 
 **Effort:** ~1.5h (1-line engine fix + new critique). **Model:** sonnet. **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring + review (2026-05-27).
 
-### S12. Jazz 6/8 walking bass density (compound-aware `isQuarter`)
+### S12. Jazz 6/8 walking bass density (compound-aware `isQuarter`) ✅ Done 2026-05-27
 
 `public/engine/bass-styles.ts:74` jazz/walking branch reads `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`). In 6/8 (`stepsPerBeat=2`) that fires on **every eighth** (steps 0,2,4,6,8,10), producing 8+ onsets per bar — running, not walking. Jazz waltz walking targets the dotted-quarter pulse with 2–4 melodic onsets per bar (think the iconic "All Blues" Paul Chambers line, not a 4/4 ride).
 
 **The fix:** In the jazz walking branch, when `isCompound`, drive density off `stepInfo.isPulseStart` (steps 0, 6) rather than `isBeatStart`. Add an intensity taper: at low band intensity, ~2 onsets/bar (pulses only); at high intensity, allow tasteful pickups on the final eighth of each group (steps 4, 10 — the S11 skip-beat slot). The shape is a *melodic* walk, not a sixteenth grid.
 
-**Acceptance:** A new `tests/standards/jazz-walking-bass-6-8-critique.test.ts` asserts onsets-per-bar ∈ [2, 5] at intensity ≤ 0.7 (target ~3) and ∈ [3, 7] at intensity > 0.7 (target ~5). Bass roots cluster on pulse positions {0, 6} (≥ 90%). Existing 4/4 jazz-walking-bass critique passes unchanged.
+**Acceptance:** A new `tests/standards/jazz-walking-bass-6-8-critique.test.ts` asserts onsets-per-bar ∈ [2, 5] at intensity ≤ 0.7 (target ~3) and ∈ [3, 7] at intensity > 0.7 (target ~5). Bass *onset positions* (not pitch) cluster on pulses {0, 6} (≥ 90%) at low intensity. Existing 4/4 jazz-walking-bass critique passes unchanged. **Note (2026-05-27 review):** the original acceptance said "Bass roots cluster on pulses" — a pitch claim. The current `getBassNoteStyle 'quarter'` picker is still 4/4-shaped and can return a 5th or scale-tone on pulses when the chord is held; the strict pitch-clustering claim cannot be guarded without picker-layer work (S15). The shipped test guards the onset-position claim only.
 
 **Effort:** ~3h. **Model:** opus (musical-judgment density curve). **Reviewer:** music-theory-reviewer. **Source:** existing FOLLOWUPS line 78 (S2 review) — promoted via S7 authoring (2026-05-27).
 
@@ -184,6 +184,23 @@ The S6 and S7 critique tests both depend on a hand-cycled mock to produce phrase
 **Acceptance:** A new `tests/standards/soloist-rest-cadence-critique.test.ts` drives the soloist over 64 bars of production-shaped state (NOT mock-cycled) and asserts: at least one rest entry per 8 bars at intensity 0.7, at least one per 5 bars at intensity 0.5. Mean active-streak length ≤ 8 bars. Existing 4/4 soloist phrasing critique tests pass unchanged. The S6 compound-soloist-phrasing-critique can be refactored to drop its hand-cycle harness (or kept as the picker-level guard while this becomes the end-to-end guard).
 
 **Effort:** ~6h (musical-design pass + budget timer + per-tick wake-up + critique test). **Model:** opus (phrasing pipeline is taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring (2026-05-27).
+
+### S15. Jazz 6/8 walking-bass picker (compound-aware pitch selection)
+
+`public/engine/bass-styles.ts` `getBassNoteStyle 'quarter'` branch (around line 1260+) still applies 4/4-shaped beat-position pitch logic in compound meters. Specifically `intBeat === 2` (line ~1293) — meant as the 4/4 "beat 3 → fifth" idiom — fires on mStep 4 in 6/8, which is the S11/S12 pickup slot. Result: pickup notes play the 5th of the current chord 70% of the time instead of a chromatic / scale-step approach into the next pulse. Canonical Paul Chambers walking 6/8 leans on *leading-tone* approaches at pickup slots, not stable 5ths.
+
+Additional symptom: on pulses where the chord is *held* (no chord change at mStep 6), the picker falls through to the generic scale-tone fallback in `getBassNote`, which can return root, 3rd, 5th, or 7th of the held chord — so even the bass *roots* on pulses are not actually rooted ≥ 90% of the time. This is what blocks the strict pitch-clustering reading of S12's original acceptance.
+
+**The fix:** In the `getBassNoteStyle 'quarter'` branch, branch on `stepInfo.tsConfig?.isCompound`:
+- On a pulse (`isPulseStart`), force chord root (with octave choice driven by register-slotting + previous note proximity).
+- On a pickup slot (last eighth of the group, mStep 4/10 in 6/8), pick a chromatic-step or scale-step approach into the next pulse's root. Reuse `isChordChangeApproach` or whatever predicate the existing 4/4 leading-tone path uses — don't invent a parallel system.
+- On an approach slot (mStep 2/8 — the "and of beat 1"), if it fires at high intensity, prefer chord tones that voice-lead into the pickup slot.
+
+Simple-meter (4/4) `intBeat === 2` behavior must remain byte-identical.
+
+**Acceptance:** A new `tests/standards/jazz-walking-bass-6-8-pitch-critique.test.ts` (or extend the S12 file with a new `describe`) asserts: bass *pitches* on pulses {0, 6} match the chord root ≥ 90% of the time across 30 seeded runs (4-bar progression with at least one held chord — confirms the held-chord pulse still roots). At high intensity, pickup pitches at mStep {4, 10} are within ±2 semitones of the next pulse's root ≥ 80% of the time (the leading-tone claim). Existing 4/4 jazz-walking critique tests pass unchanged.
+
+**Effort:** ~4h (the picker has several stacked biases — chord-tone bonus, register slotting, target awareness; the compound-aware branch needs to integrate cleanly without breaking 4/4). **Model:** opus (pitch-pick decisions are taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S12 review (2026-05-27). Implementer + reviewer both flagged the picker paired-site as out-of-scope of S12's density-gate fix; promoted to its own story to preserve S12's commit clean.
 
 ## Notes
 

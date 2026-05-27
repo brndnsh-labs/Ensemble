@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 8 / 14 stories shipped.**
+**Cycle 2026-05-27 → in progress: 9 / 15 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 14 | 8 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). S7 is blocked-by S11–S14. |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 15 | 9 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). S7 is blocked-by S11–S14. |
 
 ## Phased rollout
 
@@ -64,6 +64,7 @@ The scheduling foundation (S1–S6, S9) is correct, but the engine's per-genre m
 | S12 (jazz walking density) | `bass-styles.ts` jazz branch — drive density off `isPulseStart` not `isBeatStart` in compound. Opus (density curve is taste-driven). ~3h. |
 | S13 (jazz comping density) | `accompaniment.ts` jazz lane — compound-meter comping bank or per-step probability divisor. Opus. ~4h. |
 | S14 (soloist rest cadence) | New phrasing-budget timer so soloist breathes every 4–8 bars instead of 50+. Opus. ~6h. |
+| S15 (jazz walking-bass picker) | Compound-aware `getBassNoteStyle 'quarter'` picker — roots on pulses, leading-tone approaches on pickup slots. Promoted from S12 review (2026-05-27). Opus. ~4h. |
 
 ### Model + reviewer tags
 

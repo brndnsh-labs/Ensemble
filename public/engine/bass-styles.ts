@@ -72,6 +72,105 @@ export function checkBassActiveStyle(
         return false;
     }
     if (style === 'quarter' || groove.genreFeel === 'Jazz') {
+        // why: epic-1-compound-meter S12 — in compound meters (6/8, 12/8) the simple
+        // `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`) fires on every
+        // eighth (mStep 0,2,4,6,8,10 in 6/8) producing 6+ onsets/bar — that's a
+        // running line, not a walking jazz waltz. Idiomatic 6/8 walking bass (think
+        // Paul Chambers on "All Blues") targets the dotted-quarter pulse with 2-4
+        // melodic onsets per bar. We branch on tsConfig.isCompound (sourced from
+        // stepInfo) so simple-meter 4/4 jazz walking is byte-identical to before.
+        const isCompound = stepInfo?.tsConfig?.isCompound === true;
+        if (isCompound && stepInfo) {
+            // Pulse positions (mStep 0, 6 in 6/8; 0, 6, 12, 18 in 12/8) — always fire.
+            // These are the dotted-quarter pulses that define the meter; the bassist
+            // marks them on every bar regardless of intensity. (~2 onsets/bar in 6/8.)
+            if (stepInfo.isPulseStart) {
+                return true;
+            }
+            // High BPM safety: at very fast tempos even pickups become a blur. The
+            // 4/4 path already disables skips above 165 BPM; keep the same ceiling
+            // in compound so jazz-waltz at 200+ BPM stays pulse-only.
+            // (The 165 was tuned against eighth-skip density in 4/4; in 6/8 the
+            // pickup is one 16th later so the blur threshold may differ — re-tune
+            // by ear if a fast compound piece sounds smeared.)
+            if (playback.bpm > 165) {
+                return false;
+            }
+
+            // Pickup slot: the last eighth of each dotted-quarter group (mStep 4, 10
+            // in 6/8 — the same slot the S11 ride skip-beat lands on, by design:
+            // the bass approach-tone and the ride skip share the "anticipating the
+            // next pulse" function). `stepsPerBeat * grouping[i]` would let us
+            // compute groupSteps, but stepInfo.stepInGroup already gives us the
+            // index within the group. The last eighth is `stepsPerBeat - 1` slots
+            // into the group's final beat (since stepsPerBeat=2 in compound, each
+            // beat has 2 steps, the last eighth of a 3-beat dotted-quarter group is
+            // stepInGroup === groupSteps - 2 = 4 in 6/8). Use the canonical formula
+            // that S11 verified: `stepInGroup === groupSteps - 2`.
+            const groupBeats = stepInfo.tsConfig?.grouping?.[stepInfo.groupIndex] ?? 3;
+            const groupSteps = groupBeats * ts.stepsPerBeat;
+            const isPickupSlot = stepInfo.stepInGroup === groupSteps - 2;
+            // Approach slot: the middle eighth of each dotted-quarter group (mStep
+            // 2, 8 in 6/8 — stepInGroup === 2, since each eighth-note beat spans
+            // 2 16th-steps and the group has 3 eighths at stepInGroup ∈ {0, 2, 4}).
+            // At high intensity this becomes an occasional connector between
+            // pulse and pickup, helping the line breathe like Paul Chambers'
+            // walking 3-against-2 phrasing. Below high intensity we keep this
+            // slot silent so the line stays sparse and melodic.
+            const isApproachSlot = stepInfo.stepInGroup === 2;
+
+            if (!isPickupSlot && !isApproachSlot) {
+                return false;
+            }
+
+            // why: deterministic-per-step seed so loops + critique tests stay
+            // coherent. Mirrors the funk-bass slap seed pattern (golden-ratio mix
+            // with currentLoopCount XOR) — see bass-styles.ts:837. No bare LCG on
+            // small integer seeds (feedback_seeded_prng_mulberry32).
+            const compoundSeed =
+                ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+            const draw = scrambleHash(compoundSeed);
+
+            // Intensity-tapered density curve. Goal: ~3 onsets/bar at moderate
+            // intensity (0.5–0.7), ~5 onsets/bar at high intensity (>0.7). With
+            // 2 pulse slots (always-fire) and 2 pickup slots in 6/8:
+            //   - intensity ≤ 0.5  → pulse-only (~2 onsets/bar). Pickups silent.
+            //   - intensity 0.5–0.7 → pickup prob 0.5 (~3 onsets/bar). Approach silent.
+            //   - intensity > 0.7  → pickup prob 0.95 (~3.9 onsets/bar) + approach
+            //                        prob 0.55 (~1.1 onsets/bar) → ~5 onsets/bar.
+            // Probabilities here are the *only* gate (no competing biases), so
+            // these are direct density targets — not the kind of additive-vs-final
+            // stage decision called out in feedback_weight_tuning_multiplier_placement.
+            // Thresholds 0.5 / 0.7 match the engine-wide band-intensity trichotomy
+            // (low / mid / high) used by other density gates in this file and in
+            // coordination-engine.ts — not hand-picked for this branch.
+            const intensity = playback.bandIntensity;
+            if (intensity <= 0.5) {
+                // Pulse-only: leave pickups + approach silent. Sparsest, most
+                // exposed jazz-waltz texture — the bass "marks the changes."
+                return false;
+            }
+            if (isPickupSlot) {
+                // why: 0.5 at moderate, 0.95 at high — pickup is the primary
+                // melodic articulation in compound walking bass. The 0.95 ceiling
+                // (not 1.0) leaves a small "breath" gap so the line doesn't sound
+                // mechanical loop-to-loop.
+                const pickupProb = intensity > 0.7 ? 0.95 : 0.5;
+                return draw < pickupProb;
+            }
+            // isApproachSlot: only fires above 0.7 (high intensity) to reach the
+            // ~5 onsets/bar target without dominating the line.
+            if (intensity > 0.7) {
+                // why: separate sub-draw so approach and pickup don't share a
+                // probability stream (otherwise a "high" draw at mStep 2 would
+                // imply a "high" draw at mStep 4 — breaking the intent of two
+                // independent gates). Mix in a small distinct constant.
+                const approachDraw = scrambleHash((compoundSeed + 7) | 0);
+                return approachDraw < 0.55;
+            }
+            return false;
+        }
+
         if (isQuarter) {
             return true;
         }
