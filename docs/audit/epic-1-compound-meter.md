@@ -74,7 +74,7 @@ Rename `isAndOfFour` → `isAnticipation`. Compute as `stepsPerBar - 1` for comp
 
 **Effort:** ~2h. **Model:** sonnet. **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S6. Soloist phrasing audit pass
+### S6. Soloist phrasing audit pass ✅ Done 2026-05-27
 
 `soloist-seeder.ts:674-720` is already compound-aware (per `tsConfig.pulse`-driven cell generation). Audit the rest of the soloist pipeline (`public/engine/soloist.ts`, `public/engine/soloist-pitch-engine.ts`, motif-related modules) for 4/4-shaped phrase-length assumptions:
 

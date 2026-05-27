@@ -1969,11 +1969,17 @@ export function generateSessionSeed(
             }
 
             // Device 2: Syncopated Anticipations (Pushes)
-            // If the note lands squarely on a beat, push it early by half a beat and tie it
+            // If the note lands squarely on a beat, push it early by an eighth and tie it
             if (!mutationApplied && !tripletProtected && currentNote.step % stepsPerBeat === 0) {
                 // Only push if there's room before this note (i.e. it doesn't overlap the previous note)
                 const prevNote = processedNotes[processedNotes.length - 1];
-                const shiftAmount = stepsPerBeat * 0.5; // eighth note push
+                // why: epic-1-compound-meter S6 — an eighth-note push is
+                // `stepsPerBeat/2` on a 16th-grid (simple meters, where one
+                // step = one 16th) but `stepsPerBeat` on an 8th-grid (compound
+                // meters, where one step = one eighth). The old `* 0.5` was
+                // silently a 16th push in 6/8/12/8 — too small to be an
+                // idiomatic anticipation.
+                const shiftAmount = tsConfig.isCompound ? stepsPerBeat : stepsPerBeat * 0.5;
 
                 const canPush =
                     !prevNote ||

@@ -703,7 +703,15 @@ function publishSoloistHook(
     // in the same tick the producer wrote, so the buffer is functionally a
     // one-tick handoff register and the trim+cap below are forward-compat
     // insurance against a future consumer that reads back-looking.
-    const staleBefore = step - 32; // 2 measures at 16 steps/measure (test/prod default)
+    // why: 32-step stale window is forward-compat insurance only — the only
+    // current consumer (Ska-Punk, harmonies.ts) matches `h.step === step` in
+    // the same tick the producer wrote, so this is functionally a one-tick
+    // handoff. 32 steps covers 2 bars of 4/4 (16 steps/bar) and ~2.7 bars of
+    // 6/8 (12 steps/bar) — both bounded; the buffer.length > 16 hard cap
+    // below is the actual unbounded-growth guard. Not threaded through
+    // stepsPerMeasure because publishSoloistHook deliberately receives only
+    // the minimal four args (soloist, step, isAnchor, loopCount).
+    const staleBefore = step - 32;
     let buffer = memory.sharedHookBuffer;
     if (buffer.length > 0 && buffer[0].step < staleBefore) {
         buffer = buffer.filter((h) => h.step >= staleBefore);
@@ -1655,7 +1663,18 @@ export function getSoloistNote(
         !isStrictHeadPlayback
     ) {
         const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
-        const restBeatStart = tsConfig.beats >= 4 ? 2 : 1;
+        // why: epic-1-compound-meter S6 — "rest zone" is the back half of the bar.
+        // Simple meters: ≥4 beats → start of beat 3 (e.g. 4/4 step 8); <4 beats →
+        // start of beat 2 (3/4 step 4). Compound meters: start of the SECOND pulse
+        // group (6/8 → beatInMeasure 3, step 6; 12/8 → beatInMeasure 6, step 12).
+        // The previous `tsConfig.beats >= 4 ? 2 : 1` triggered at beatInMeasure≥2
+        // (step 4) in 6/8 because `tsConfig.beats=6` — mid-first-pulse-group, so
+        // the soloist could "enter rest" before resolving the bar's first half.
+        const restBeatStart = tsConfig.isCompound
+            ? Math.floor(tsConfig.beats / 2)
+            : tsConfig.beats >= 4
+              ? 2
+              : 1;
         if (beatInMeasure >= restBeatStart) {
             phr.isResting = true; // @worker-mutation
             phr.state = 'rest'; // @worker-mutation
@@ -1681,15 +1700,47 @@ export function getSoloistNote(
             coordination.bypassRhythm ||
             isStrictHeadPlayback
         ) {
+            // why: epic-1-compound-meter S6 — phrase wake-up gate must align to
+            // the meter's natural strong positions, not the 4/4 16th-grid.
+            //   - In simple meters (4/4, 3/4, 5/4, 7/4), strong = `isBeatStart`
+            //     (every quarter), and the syncopated branch fires on the 8th-grid
+            //     (every other step) — pre-existing behavior preserved bit-exactly.
+            //   - In compound meters (6/8, 12/8), strong = `isPulse` (dotted-quarter
+            //     pulse positions: steps 0,6 in 6/8). The syncopated branch is
+            //     disabled because `stepInfo.isOffbeat` in compound fires on every
+            //     odd step, which is musically just "any eighth" and would let
+            //     phrases wake up on every step. Compound phrases should breathe
+            //     on the pulse — exactly the assertion the new critique test locks.
+            //   The previous formula `measureStep % (stepsPerBeat / 2) === 0`
+            //   degenerated to `% 1 === 0` (always true) for stepsPerBeat=2, so
+            //   wake-up fired on EVERY step in 6/8 — phrase boundaries scattered
+            //   uniformly instead of clustering on pulses.
+            const isCompoundMeter = !!stepInfo?.isCompound || !!tsConfig.isCompound;
+            const isStrongEntryPosition = isCompoundMeter
+                ? stepInfo?.isPulse === true
+                : isBeatStart;
+            const isSyncopatedEntryCandidate =
+                !isCompoundMeter && measureStep % (stepsPerBeat / 2) === 0;
             const isGoodEntry =
-                isBeatStart ||
-                (measureStep % (stepsPerBeat / 2) === 0 &&
+                isStrongEntryPosition ||
+                (isSyncopatedEntryCandidate &&
                     // why: discriminator 50 — syncopated wake-up entry gate.
                     scrambleHash(callSeedBase + 50) < intentBehavior.syncopationBias);
+            // why: epic-1-compound-meter S6 — mirror restBeatStart so the
+            // "don't wake during last-section rest" floor opens at the same
+            // beatInMeasure where the rest zone began. Previously a bare
+            // `>= 2` literal that misfired in 6/8 (opened mid-first-pulse
+            // while rest zone didn't start until step 6) and 12/8 (opened at
+            // step 4 while rest didn't start until step 12).
+            const preventBreakoutBeatStart = tsConfig.isCompound
+                ? Math.floor(tsConfig.beats / 2)
+                : tsConfig.beats >= 4
+                  ? 2
+                  : 1;
             const preventBreakout =
                 isLastSectionMeasure &&
                 (soloist.session.phrasing.transitionState || null) === 'rest' &&
-                Math.floor(measureStep / stepsPerBeat) >= 2;
+                Math.floor(measureStep / stepsPerBeat) >= preventBreakoutBeatStart;
 
             if (
                 !preventBreakout &&

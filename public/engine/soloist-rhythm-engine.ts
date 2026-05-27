@@ -51,17 +51,64 @@ function pickResponseTransform(
     return 'exact';
 }
 
-function getStepStrength(stepTarget: number, stepsPerMeasure: number, stepsPerBeat: number) {
+function getStepStrength(
+    stepTarget: number,
+    stepsPerMeasure: number,
+    stepsPerBeat: number,
+    compoundBackbeatSteps: ReadonlySet<number> | null = null,
+) {
     const measureStep = ((stepTarget % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
     const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
     const isBeatStart = measureStep % stepsPerBeat === 0;
     const isDownbeat = measureStep === 0;
-    const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+    // why: epic-1-compound-meter S6 — honor the config-defined compound backbeat
+    // positions (e.g. 6/8 `backbeat:[1]` → step 6; 12/8 `backbeat:[1,3]` →
+    // steps 6,18). Caller pre-computes the step set from `tsConfig.grouping` +
+    // `tsConfig.backbeat`. In simple meters, the 4/4-shaped quarters-2-and-4
+    // literal applies; in compound, beatInMeasure indexes eighths (not quarters),
+    // so the literal is wrong and we use the precomputed set instead.
+    const isBackbeat = compoundBackbeatSteps
+        ? compoundBackbeatSteps.has(measureStep)
+        : (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
     return {
         isStrongBeat: isBeatStart || isDownbeat || isBackbeat,
         isDownbeat,
         isBackbeat,
     };
+}
+
+// why: epic-1-compound-meter S6 — precompute the set of measure-step indices
+// where a compound meter's backbeat fires, derived from `tsConfig.grouping`
+// (eighth-counts per pulse group) and `tsConfig.backbeat` (which group indices
+// are backbeats). Mirrors `getStepInfo`'s compound branch (`utils.ts:683-693`):
+// groupStart i is at `sum(grouping[0..i-1]) * stepsPerBeat`, and backbeat fires
+// when groupIndex ∈ backbeatArray. Returns `null` for simple meters so callers
+// can fall through to the 4/4-shaped backbeat logic.
+function computeCompoundBackbeatSteps(
+    tsConfig:
+        | { grouping?: number[]; backbeat?: number[]; isCompound?: boolean; stepsPerBeat?: number }
+        | null
+        | undefined,
+    fallbackStepsPerBeat: number,
+): ReadonlySet<number> | null {
+    if (!tsConfig?.isCompound) {
+        return null;
+    }
+    const grouping = tsConfig.grouping;
+    const backbeat = tsConfig.backbeat;
+    const stepsPerBeat = tsConfig.stepsPerBeat ?? fallbackStepsPerBeat;
+    if (!grouping?.length || !backbeat?.length) {
+        return new Set();
+    }
+    const out = new Set<number>();
+    let acc = 0;
+    for (let i = 0; i < grouping.length; i++) {
+        if (backbeat.includes(i)) {
+            out.add(acc);
+        }
+        acc += grouping[i] * stepsPerBeat;
+    }
+    return out;
 }
 
 function buildResponsePlanFromSignature(
@@ -75,6 +122,7 @@ function buildResponsePlanFromSignature(
     responseMode: ResponseMode,
     responseSource: ResponseSource,
     random: () => number = Math.random,
+    compoundBackbeatSteps: ReadonlySet<number> | null = null,
 ): any[] {
     if (!signature?.notes?.length) {
         return [];
@@ -140,7 +188,12 @@ function buildResponsePlanFromSignature(
             transform === 'compress' && index > 0
                 ? Math.max(1, Math.round((responseNote.sourceNote.durationSteps || 1) * 0.85))
                 : Math.max(1, Math.round(responseNote.sourceNote.durationSteps || 1));
-        const strength = getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat);
+        const strength = getStepStrength(
+            stepTarget,
+            stepsPerMeasure,
+            stepsPerBeat,
+            compoundBackbeatSteps,
+        );
         const velocityBase =
             (responseNote.sourceNote.velocity || 0.72) * (strength.isStrongBeat ? 1.06 : 0.96);
         const existing = deduped.get(stepTarget);
@@ -193,6 +246,7 @@ function buildRestatementEchoPlan(
     stepsPerBeat: number,
     intensity: number,
     signature: any,
+    compoundBackbeatSteps: ReadonlySet<number> | null = null,
 ): any[] {
     if ((signature?.notes?.length ?? 0) === 0) {
         return [];
@@ -205,7 +259,12 @@ function buildRestatementEchoPlan(
             }
             const stepTarget = startStep + stepOffset;
             const durationSteps = Math.max(1, Math.round(sourceNote.durationSteps || 1));
-            const strength = getStepStrength(stepTarget, stepsPerMeasure, stepsPerBeat);
+            const strength = getStepStrength(
+                stepTarget,
+                stepsPerMeasure,
+                stepsPerBeat,
+                compoundBackbeatSteps,
+            );
             // why: echo the Statement's velocity contour verbatim, only nudged
             //   by the live band intensity (±8% — same coefficient the
             //   call/response builder uses) so the Restatement still breathes
@@ -319,6 +378,22 @@ export function generateRhythmPlan(
 
     let notesInPhrase = 0;
 
+    // why: epic-1-compound-meter S6 — derive compound-meter backbeat positions
+    // from the live TS config (carried by `_stepInfo.tsConfig`). For 6/8 with
+    // `grouping:[3,3]` and `backbeat:[1]`, this yields {6}; for 12/8 with
+    // `grouping:[3,3,3,3]` and `backbeat:[1,3]`, {6,18}. The local backbeat
+    // re-computations below use this set instead of the 4/4-shaped `=== 1 || === 3`
+    // literal (which in 6/8 indexes eighth-positions, not pulse-groups).
+    // `computeCompoundBackbeatSteps` returns null in simple meters so callers
+    // fall through to the unchanged 4/4 logic.
+    const tsConfigFromStep = (_stepInfo?.tsConfig ?? null) as {
+        grouping?: number[];
+        backbeat?: number[];
+        isCompound?: boolean;
+        stepsPerBeat?: number;
+    } | null;
+    const compoundBackbeatSteps = computeCompoundBackbeatSteps(tsConfigFromStep, stepsPerBeat);
+
     // --- SRDC Restatement motif-echo (Epic 11 S4) ---
     // Checked BEFORE call/response mirroring: a Restatement that has captured
     // its Statement's signature always echoes it, regardless of genre or
@@ -337,6 +412,7 @@ export function generateRhythmPlan(
             stepsPerBeat,
             intensity,
             restatementEcho,
+            compoundBackbeatSteps,
         );
         if (echoPlan.length >= 3) {
             return echoPlan;
@@ -365,6 +441,7 @@ export function generateRhythmPlan(
                 responseMode,
                 responseSource,
                 rng,
+                compoundBackbeatSteps,
             ),
         );
     } else if (
@@ -428,7 +505,12 @@ export function generateRhythmPlan(
             const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
             const isBeatStart = stepInBeat === 0;
             const isDownbeat = measureStep === 0;
-            const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+            // why: epic-1-compound-meter S6 — in compound meters use the
+            // config-derived backbeat-step set (6/8 step 6, 12/8 steps 6+18);
+            // in simple meters keep the 4/4-shaped `beats 2 & 4` literal.
+            const isBackbeat = compoundBackbeatSteps
+                ? compoundBackbeatSteps.has(measureStep)
+                : (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
             // why: derive strong-beat from the response's own meter position only.
             // Inheriting the call's `srcIsStrongBeat` would leak meter context onto
             // response steps that land in positionally weak slots (e.g. a syncopated
@@ -881,7 +963,11 @@ export function generateRhythmPlan(
 
             const beatInMeasure = Math.floor(measureStep / stepsPerBeat);
             const isDownbeat = measureStep === 0;
-            const isBackbeat = (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
+            // why: epic-1-compound-meter S6 — match the response-builder branch
+            // above; compound uses the config-derived backbeat-step set.
+            const isBackbeat = compoundBackbeatSteps
+                ? compoundBackbeatSteps.has(measureStep)
+                : (beatInMeasure === 1 || beatInMeasure === 3) && isBeatStart;
             const isStrongBeat = isBeatStart || isDownbeat || isBackbeat;
 
             candidateSteps.push({
