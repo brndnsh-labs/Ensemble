@@ -65,11 +65,18 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 
 ### State (`public/state/`, `public/ui-bridge.ts`, `public/state-effects.ts`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `instruments`, `midi`, `ui`, `visualizer`, `conductor` — each a `deepSignal`.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist`, `harmony`, `midi`, `vizState`, `conductor` — each a `deepSignal`.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - `useEnsembleState()` in `public/ui-bridge.ts` — reading a property inside the selector establishes reactivity.
 - `public/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
-- **`@direct-mutation` exception:** allowed only in performance-critical engine code (`scheduler-core.ts`, `synth-*.ts`) for real-time audio parameters. Must be marked with `// @direct-mutation`.
+#### `@direct-mutation` policy
+
+`// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
+
+- **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis.
+- **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
+- **Sanctioned exception (pre-mount only):** `public/state-hydration.ts` — runs before Preact mounts, so no reactive listeners are attached yet.
+- **Everything else routes through reducers.** History/undo, audio export, conductor non-tick paths, and any site not in the three categories above must dispatch. (Migration of currently non-compliant sites is Batch 9.)
 
 ### Generative Engine Pipeline (worker thread)
 
@@ -118,7 +125,7 @@ The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, R
 
 ### Coordination & Register Slotting
 
-Source of truth: `public/engine/coordination-engine.ts`. Always pass `CoordinationContext` to instrument generators. `logic-worker.ts` enforces ranges via `enforceRegisterSlotting`:
+Source of truth: `public/engine/coordination-engine.ts`. Always pass `CoordinationContext` to instrument generators. `tick-logic.ts` enforces ranges via `enforceRegisterSlotting` (exported from `coordination-engine.ts`):
 
 - **Bass:** 23–57
 - **Chords/Harmony:** 52–84

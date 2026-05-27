@@ -16,6 +16,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/main.ts` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.ts` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
+| `public/visualizer-engine.ts` | `VisualizerEngine` class instantiated inside the worker; owns all Canvas rendering. (Worker-internal — only imported by `visualizer-worker.ts`.) | `VisualizerEngine` |
 | `public/sw.ts` | Service worker — Workbox `precacheAndRoute(self.__WB_MANIFEST)`. | `activate`, `message` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
@@ -36,7 +37,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
-| `public/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `subscribeToState` |
+| `public/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
 
 ## Generative Engines (Worker Thread)
@@ -78,7 +79,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/scheduler-core.ts` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
 | `public/engine/midi-scheduler.ts` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
-| `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` |
+| `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, seeded humanization). | `rampGain`, `killActiveVoices`, `humanizeNote` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
@@ -151,18 +152,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 
-## Domain State Slices (Modular State)
-
-| Path | Responsibility |
-| :--- | :--- |
-| `public/state/playback.ts` | Transport, BPM, master volume, and global intensity. |
-| `public/state/arranger.ts` | Progression, key signature, and sections. |
-| `public/state/groove.ts` | Drum patterns, genre feel, and pocket timing. |
-| `public/state/instruments.ts` | Bass, Chords, Soloist, and Harmony settings. |
-| `public/state/conductor.ts` | Auto-intensity target, tempo drift, and form tracking. |
-| `public/state/midi.ts` | MIDI device and channel configuration. |
-| `public/state/visualizer.ts` | Visualizer rendering and flash state. |
-
 ## High-Level Controllers & Integration
 
 | Path | Responsibility |
@@ -181,7 +170,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
 | `public/utils.ts` | General-purpose musical and math utilities. | `getFrequency` |
 | `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
-| `public/visualizer-engine.ts` | High-performance Canvas rendering logic. | `VisualizerEngine` |
 | `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
 
 ## Infrastructure & Lifecycle (Internal)

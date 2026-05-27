@@ -20,7 +20,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.
 - [`docs/guides/bundle-hygiene.md`](guides/bundle-hygiene.md) — reusable recipes for bundle-size work (budgets-as-baselines, DCE expectations, pre-flight grep for "orphaned" musical content, knip blind spots, code-splitting discipline, defense-in-depth hygiene). Extracted from the completed bundle audit.
 - [`docs/synth-audit/`](synth-audit/) — active synth-realism audit (7 epics revisiting every synthesized voice). Separate, semi-manual track — start at [`synth-audit/EPICS.md`](synth-audit/EPICS.md).
-- [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — ongoing follow-up backlog from the completed musical audit (~28 NIT/listen-only items). The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).
+- [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — ongoing follow-up backlog from the completed musical audit (~20 NIT/listen-only items). The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).
 - [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 

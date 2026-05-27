@@ -46,7 +46,7 @@ The same handful of root causes produced "toy-ish" across every voice. Epic 0 at
 4. **Three dead-code features** — shipped but disabled: chord strum-stagger (`index:0`), soloist legato/portamento (`isLegato` hardcoded `false`), harmony `tremoloGain` (allocated, never connected).
 5. **Shared-layer leverage.** FDN reverb, a glue compressor, and a humanization helper each lift *every* voice at once.
 
-## Status (2026-05-21)
+## Status (2026-05-25)
 
 Foundation-first ordering: Epic 0 lands the A/B harness and shared infrastructure, then per-instrument epics fan out (each independently auditable through the harness). Per-instrument order follows the owner's listening triage: harmony and chords are the worst offenders, soloist is highest-risk, bass is closest to done.
 
