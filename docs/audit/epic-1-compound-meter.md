@@ -8,6 +8,7 @@ The user reports 6/8 playback feels "jumbled" — All Blues + 6/8 should sound c
 2. **Several engines have 4/4-shaped fallbacks** that fire in 6/8 — `is8th` always true for compound, `% 4` literals in accompaniment, latin clave on hardcoded 4/4 16th-note positions, bass anticipation on the wrong step.
 3. **Soloist phrasing** is mostly compound-aware in `soloist-seeder.ts` but the rest of the pipeline hasn't been audited.
 4. **Chord chart sizing** shifted for the user on one long progression when switching 4/4 → 6/8 (no longer reproducible on default progression). Likely a density-threshold input that depends on step count rather than measure count.
+5. **Musical content layer still assumes 4/4** in four places (surfaced 2026-05-27 during the first S7 authoring attempt): jazz 6/8 ride skip-beat lands on the last 16th instead of the last eighth (S11); jazz walking bass density runs 8+/bar via `isBeatStart` on eighths instead of 2-4/bar on the dotted-quarter pulse (S12); jazz comping fires on ~80% of all steps instead of 1-3 sparse hits/bar (S13); soloist has no rest-cadence pipeline — runs 50-90 bars continuously in production-shaped state (S14). The scheduling foundation (S1-S6, S9) is correct; these gaps live in the content/density layer.
 
 ## Source
 
@@ -86,21 +87,25 @@ Rename `isAndOfFour` → `isAnticipation`. Compute as `stepsPerBar - 1` for comp
 
 **Effort:** ~4h. **Model:** opus (musical-judgment audit). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S7. End-to-end "All Blues feels right" critique test
+### S7. End-to-end "All Blues feels right" critique test — Blocked by S11–S14
+
+**Status:** Blocked. First S7 authoring attempt (2026-05-27) surfaced four real engine gaps that prevent the cycle's DoD from being met *with the engine as it stands today*. The scheduling foundation (S1–S6, S9) is correct, but the **musical content layer still assumes 4/4** in four places. Promoted to S11–S14 below; S7 will be rewritten and re-attempted after those land.
+
+The original spec also contained a musical error: the canonical jazz 6/8 "spang-a-lang" skip-beat lands on the LAST EIGHTH of each dotted-quarter group (steps **{4, 10}** in 6/8), not the middle eighth ({2, 8}) the original story spec listed. S11 fixes the engine to match {4, 10}; the rewritten S7 will assert that target.
 
 Add `tests/standards/all-blues-6-8-critique.test.ts`. Statistical, not snapshot. Loads the All Blues preset, generates N bars in 6/8 at BPM=110, asserts:
 
-- Ride cymbal hits cluster on pulse positions (steps 0 and 6) plus the canonical jazz "skip-beat" on the last eighth of each dotted-quarter (steps 2 and 8).
-- Bass plays roots on pulse positions; walking-line density is 2–4 onsets per bar (not 6+).
-- Soloist phrase boundaries respect pulse boundaries; no phrase crosses 5 bars without a rest.
-- Comping chord hits land on pulse (allow swing offset) and are not at every-step density.
+- Ride cymbal hits cluster on pulse positions (steps 0 and 6) plus the canonical jazz "skip-beat" on the last eighth of each dotted-quarter (steps **4 and 10** — corrected from the original "2 and 8" via S7 authoring; see S11).
+- Bass plays roots on pulse positions; walking-line density is 2–4 onsets per bar (not 6+). Gated on S12 landing.
+- Soloist phrase boundaries respect pulse boundaries; no phrase crosses 5 bars without a rest. Gated on S14 landing.
+- Comping chord hits land on pulse (allow swing offset) and are not at every-step density. Gated on S13 landing.
 - Measured `secondsPerStep` matches the dotted-quarter BPM interpretation from S1.
 
-This is the cycle's Definition of Done. The audit is not done until this passes.
+This is the cycle's Definition of Done. The audit is not done until this passes — and "passes" means every named assertion is enforced, not `.skip`'d.
 
-**Acceptance:** Test passes 30/30 on the reliability loop. Existing 4/4 critique tests still green.
+**Acceptance:** Test passes 30/30 on the reliability loop with no `.skip`'d assertions. Existing 4/4 critique tests still green. Manual A/B listening pass confirms slow jazz-waltz feel.
 
-**Effort:** ~5h. **Model:** opus (musical-judgment thresholds + statistical ranges). **Reviewer:** music-theory-reviewer + critique-test-author. **Source:** investigation 2026-05-27.
+**Effort:** ~5h (rewrite + thresholds + listening pass) AFTER S11–S14 ship. **Model:** opus (musical-judgment thresholds + statistical ranges). **Reviewer:** music-theory-reviewer + critique-test-author. **Source:** investigation 2026-05-27; first authoring attempt 2026-05-27 (cycle-paused, see review thread).
 
 ### S8. Visual chart sizing under TS change
 
@@ -131,6 +136,54 @@ Some genres are tied to specific meters in real practice (Funk = 4/4, Bossa Nova
 **Acceptance:** TBD on design decision. Could be (a) a hint badge, (b) a feel-genre filter that prefers TS-matched genres at the top of the picker, (c) a no-op with documented "user explores at their own risk."
 
 **Effort:** ~2h (design call) + 2-4h (implementation depending on choice). **Model:** opus (product decision). **Reviewer:** none required. **Source:** investigation 2026-05-27.
+
+### S11. Jazz 6/8 ride skip-beat lands on the last eighth, not the last 16th
+
+`public/engine/grooves/jazz.ts:80` defines `isSkipBeat = stepInGroup === groupSteps - 1`. In 6/8 (`grouping=[3,3]`, `stepsPerBeat=2`, so `groupSteps = 6`), this places the skip-beat at `stepInGroup === 5` → mStep ∈ **{5, 11}**, which is the last *sixteenth* of each dotted-quarter group.
+
+Idiomatic jazz 6/8 "spang-a-lang" places the skip on the last *eighth* of each dotted-quarter (the third eighth, anticipating the next pulse) → mStep ∈ **{4, 10}**. The current placement is rhythmically one 16th too late and is the single most audible source of the "jumbled" feel the user originally reported.
+
+**The fix:** In the compound branch, gate the skip-beat on the last eighth: `stepInGroup === groupSteps - 2` (and verify with `isEighthBoundary` if needed). Simple-meter behavior is bit-identical (this branch is compound-gated).
+
+**Acceptance:** A new `tests/standards/jazz-6-8-ride-position-critique.test.ts` asserts the ride hits cluster on `{0, 4, 6, 10}` (≥ 90% on-cluster) and *not* on `{5, 11}` (≤ 5% on those step positions). Existing 4/4 jazz drummer critique tests pass unchanged.
+
+**Effort:** ~1.5h (1-line engine fix + new critique). **Model:** sonnet. **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring + review (2026-05-27).
+
+### S12. Jazz 6/8 walking bass density (compound-aware `isQuarter`)
+
+`public/engine/bass-styles.ts:74` jazz/walking branch reads `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`). In 6/8 (`stepsPerBeat=2`) that fires on **every eighth** (steps 0,2,4,6,8,10), producing 8+ onsets per bar — running, not walking. Jazz waltz walking targets the dotted-quarter pulse with 2–4 melodic onsets per bar (think the iconic "All Blues" Paul Chambers line, not a 4/4 ride).
+
+**The fix:** In the jazz walking branch, when `isCompound`, drive density off `stepInfo.isPulseStart` (steps 0, 6) rather than `isBeatStart`. Add an intensity taper: at low band intensity, ~2 onsets/bar (pulses only); at high intensity, allow tasteful pickups on the final eighth of each group (steps 4, 10 — the S11 skip-beat slot). The shape is a *melodic* walk, not a sixteenth grid.
+
+**Acceptance:** A new `tests/standards/jazz-walking-bass-6-8-critique.test.ts` asserts onsets-per-bar ∈ [2, 5] at intensity ≤ 0.7 (target ~3) and ∈ [3, 7] at intensity > 0.7 (target ~5). Bass roots cluster on pulse positions {0, 6} (≥ 90%). Existing 4/4 jazz-walking-bass critique passes unchanged.
+
+**Effort:** ~3h. **Model:** opus (musical-judgment density curve). **Reviewer:** music-theory-reviewer. **Source:** existing FOLLOWUPS line 78 (S2 review) — promoted via S7 authoring (2026-05-27).
+
+### S13. Jazz 6/8 comping density (sparse compound comp bank)
+
+`public/engine/accompaniment.ts` jazz lane in 6/8 fires on ~80% of all steps (~9.6 hits per 12-step bar). Idiomatic jazz comping is *sparse and syncopated* — 1–3 chord hits per bar, lands on pulses and anticipations, leaves space for the soloist. The 80% density is "thick mush" — the dominant audible flaw the user reported.
+
+**The fix:** Audit the jazz comping per-step probabilities for compound meters. The 4/4 16th-grid gates pass through unchanged in 6/8 but each compound-meter step is a 16th of a *smaller* bar (12 sixteenths vs 16) and the per-step probabilities haven't been tuned. Two possible directions:
+1. Compound-specific comping bank with low base probability + boosted gates on pulse positions {0, 6} and anticipation slots {4, 10}.
+2. Inherit the 4/4 bank but apply a per-step probability divisor in compound (~0.3×) so density drops to ~3 hits/bar.
+
+Decide during implementation; the design call is "what does a jazz-waltz comp sound like at slow tempo?" Reference: Bill Evans' "Waltz for Debby" left hand, the comping on Miles "All Blues."
+
+**Acceptance:** A new `tests/standards/jazz-comping-6-8-critique.test.ts` asserts hits-per-bar ∈ [1, 4] at intensity 0.7, with ≥ 70% landing on pulse-aligned positions {0, 4, 6, 10}. Density-per-step ≤ 35% (vs. the current ~80%). Existing 4/4 jazz comping critique tests pass unchanged.
+
+**Effort:** ~4h (design + comping bank rework + critique). **Model:** opus (musical-judgment density + idiomatic syncopation). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring (2026-05-27).
+
+### S14. Soloist rest-cadence pipeline (phrasing budget)
+
+`public/engine/soloist.ts` only decrements `restSteps` from a manually-seeded value; once `restSteps` reaches 0 there is no per-tick path that forces a rest after N bars of continuous play. In production-shaped state with the All Blues preset, the soloist runs 50–90 bars between rest flips. Human soloists breathe every 4–8 bars in jazz; the engine doesn't.
+
+The S6 and S7 critique tests both depend on a hand-cycled mock to produce phrase boundaries — the real engine doesn't have the wake-up→rest cycle wired beyond initial seeding.
+
+**The fix:** Add a phrasing-budget timer that tracks "elapsed active bars in current phrase" and, when it crosses an intensity-aware target (e.g. 4 bars at low intensity, up to 8 at high), schedules a rest entry on the next pulse boundary. The rest length should also be intensity-aware (longer rests at lower intensity). Hook into the existing phrasing state machine rather than building a parallel path.
+
+**Acceptance:** A new `tests/standards/soloist-rest-cadence-critique.test.ts` drives the soloist over 64 bars of production-shaped state (NOT mock-cycled) and asserts: at least one rest entry per 8 bars at intensity 0.7, at least one per 5 bars at intensity 0.5. Mean active-streak length ≤ 8 bars. Existing 4/4 soloist phrasing critique tests pass unchanged. The S6 compound-soloist-phrasing-critique can be refactored to drop its hand-cycle harness (or kept as the picker-level guard while this becomes the end-to-end guard).
+
+**Effort:** ~6h (musical-design pass + budget timer + per-tick wake-up + critique test). **Model:** opus (phrasing pipeline is taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S7 authoring (2026-05-27).
 
 ## Notes
 

@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 7 / 10 stories shipped.**
+**Cycle 2026-05-27 → in progress: 7 / 14 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 10 | 7 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that can fan out in parallel. S6 audits the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 14 | 7 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). S7 is blocked-by S11–S14. |
 
 ## Phased rollout
 
@@ -49,10 +49,21 @@ Once S1 lands, S2, S3, S4, S5, S9 are mechanical 4/4-assumption fixes on disjoin
 
 | Story | Note |
 | :- | :- |
-| S6 (soloist phrasing audit) | Verify pipeline isn't 4/4-assuming; extend `tests/integration/odd-meter-authenticity.test.ts`. |
-| S7 (All Blues critique test) | The cycle's Definition of Done. New `tests/standards/all-blues-6-8-critique.test.ts`. |
-| S8 (chart sizing under TS change) | User-reported regression on a long progression; needs reproduction + lead-sheet-model fix. |
+| S6 (soloist phrasing audit) | ✅ Done. Verified pipeline isn't 4/4-assuming; extended critique coverage. |
+| S7 (All Blues critique test) | **Blocked-by S11–S14.** The cycle's Definition of Done. First authoring attempt 2026-05-27 surfaced 4 musical-content gaps; rewrite scheduled after S11–S14 ship. |
+| S8 (chart sizing under TS change) | User-reported regression on a long progression; needs reproduction + lead-sheet-model fix. Sonnet. |
 | S10 (genre × TS UX) | Design call on soft hint vs hard gate vs no-op. Defer if Phase 2/3 produce a passing S7. |
+
+### Phase 4 — Musical-content fixes (added 2026-05-27 after S7 authoring)
+
+The scheduling foundation (S1–S6, S9) is correct, but the engine's per-genre musical content still assumes 4/4 in four places. These gate S7's DoD.
+
+| Story | Note |
+| :- | :- |
+| S11 (jazz 6/8 ride skip-beat) | 1-line fix in `grooves/jazz.ts:80` — `groupSteps - 1` → `groupSteps - 2` in compound. Sonnet. ~1.5h. |
+| S12 (jazz walking density) | `bass-styles.ts` jazz branch — drive density off `isPulseStart` not `isBeatStart` in compound. Opus (density curve is taste-driven). ~3h. |
+| S13 (jazz comping density) | `accompaniment.ts` jazz lane — compound-meter comping bank or per-step probability divisor. Opus. ~4h. |
+| S14 (soloist rest cadence) | New phrasing-budget timer so soloist breathes every 4–8 bars instead of 50+. Opus. ~6h. |
 
 ### Model + reviewer tags
 

@@ -75,8 +75,8 @@ Three items promoted on 2026-05-19; remainder reconciled below.
 
 **Not promoted (still deferred):**
 
-- **Compound-aware `isQuarter` / jazz-walking density in 6/8 / 12/8** — `public/engine/bass-styles.ts:74` reads `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`) which fires every eighth in `stepsPerBeat=2` meters. Jazz/walking in 6/8 should target the dotted-quarter pulse via `stepInfo.isPulseStart` for ~2 onsets/bar at low intensity, tapering up. Size: ~3h (one style branch + a 6/8 jazz-bass critique test). *Source: epic-1-compound-meter S2 review (2026-05-27).*
-- **Intensity-tapered rock/metal density in compound meters** — `bass-styles.ts:58, 179, 213` and the rock/metal `getBassNoteStyle` branches fire every eighth in 6/8 (12 onsets/bar) regardless of `bandIntensity`. Power-ballad feel (*Nothing Else Matters*) needs an intensity-tapering "below 0.4, fire only on `isPulseStart`" branch. Size: ~3h. *Source: epic-1-compound-meter S2 review (2026-05-27).*
+- **Compound-aware `isQuarter` / jazz-walking density in 6/8 / 12/8** → 📌 PROMOTED — epic-1-compound-meter S12. *Source: epic-1-compound-meter S2 review (2026-05-27).*
+- **Intensity-tapered rock/metal density in compound meters** — `bass-styles.ts:58, 179, 213` and the rock/metal `getBassNoteStyle` branches fire every eighth in 6/8 (12 onsets/bar) regardless of `bandIntensity`. Power-ballad feel (*Nothing Else Matters*) needs an intensity-tapering "below 0.4, fire only on `isPulseStart`" branch. Size: ~3h. Out-of-scope for the All Blues jazz-waltz DoD; revisit when compound-rock content is on the agenda. *Source: epic-1-compound-meter S2 review (2026-05-27).*
 - **`getStepInfo.isEighthBoundary` formula assumes `stepsPerBeat ∈ {2, 4}`** — for a hypothetical triplet-grid meter (`stepsPerBeat=3`) the field returns `true` for every step, which is conceptually wrong (triplet partials aren't eighth boundaries). No real meter has `stepsPerBeat=3` yet so the impact is zero; tighten to fail-loud if a triplet-grid meter is added. Size: ~30min. *Source: epic-1-compound-meter S2 review (2026-05-27).*
 
 ## D. Coordination consumption gaps
