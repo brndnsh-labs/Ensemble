@@ -694,7 +694,11 @@ export function getStepInfo(
 
     // Semantic Timing Flags
     const stepInBeat = ((mStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
-    const isOffbeat = stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1; // 8th note offbeat
+    // why: midpoint of a beat — works for any stepsPerBeat value (floor(4/2)=2 for 16th-grid,
+    // floor(2/2)=1 for 8th-grid, floor(3/2)=1 for any future triplet-grid, etc.)
+    // Previously hard-coded `stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1` which
+    // silently mislabels offbeats for any stepsPerBeat other than 2 or 4.
+    const isOffbeat = stepInBeat === Math.floor(stepsPerBeat / 2); // 8th note offbeat
     // why: epic-1-compound-meter S2 — "every eighth-note boundary" flag. For 16th-grid
     // meters (stepsPerBeat=4), an eighth note spans 2 steps, so fire every other step.
     // For 8th-grid meters (stepsPerBeat=2: 6/8, 7/8, 12/8), each step already IS an eighth

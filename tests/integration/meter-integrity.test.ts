@@ -4,6 +4,47 @@ import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
 import { makeSoloistMock } from '../utils/mock-soloist.js';
 
+describe('getStepInfo isOffbeat — stepsPerBeat generalization', () => {
+    // S9: lock in Math.floor(stepsPerBeat / 2) formula for all supported stepsPerBeat values.
+
+    it('stepsPerBeat=4 (4/4 etc.): isOffbeat fires at stepInBeat === 2', () => {
+        // floor(4/2) = 2
+        const ts4 = TIME_SIGNATURES['4/4'];
+        for (let step = 0; step < 16; step++) {
+            const info = getStepInfo(step, ts4, [], TIME_SIGNATURES);
+            const stepInBeat = step % 4;
+            expect(info.isOffbeat).toBe(stepInBeat === 2);
+        }
+    });
+
+    it('stepsPerBeat=2 (6/8 etc.): isOffbeat fires at stepInBeat === 1', () => {
+        // floor(2/2) = 1
+        const ts68 = TIME_SIGNATURES['6/8'];
+        for (let step = 0; step < 12; step++) {
+            const info = getStepInfo(step, ts68, [], TIME_SIGNATURES);
+            const stepInBeat = step % 2;
+            expect(info.isOffbeat).toBe(stepInBeat === 1);
+        }
+    });
+
+    it('stepsPerBeat=3 (hypothetical triplet-grid): isOffbeat fires at stepInBeat === 1', () => {
+        // floor(3/2) = 1  — locks in the new formula for any future stepsPerBeat=3 TS
+        // Synthetic TS: 3 beats × 3 stepsPerBeat = 9 steps/bar (like 9/8 with triplet grid)
+        const syntheticTS = { beats: 3, stepsPerBeat: 3 as const, isCompound: false };
+        for (let step = 0; step < 9; step++) {
+            const info = getStepInfo(
+                step,
+                syntheticTS as Parameters<typeof getStepInfo>[1],
+                [],
+                TIME_SIGNATURES,
+            );
+            const stepInBeat = step % 3;
+            // why: midpoint of a 3-step beat is step 1 (floor(3/2)=1), not step 2 (3/3 boundary)
+            expect(info.isOffbeat).toBe(stepInBeat === 1);
+        }
+    });
+});
+
 describe('Meter Integrity & Musicality', () => {
     const defaultState = {
         soloist: makeSoloistMock({ enabled: true, busySteps: 0 }),

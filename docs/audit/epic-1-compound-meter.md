@@ -112,7 +112,7 @@ Investigate: load a 16+ bar progression in `npm run dev`, switch TS, inspect `da
 
 **Effort:** ~3h. **Model:** sonnet (investigation may upgrade to opus if cause is non-obvious). **Reviewer:** none required (chart layout, no engine touch). **Source:** investigation 2026-05-27.
 
-### S9. getStepInfo `stepsPerBeat === 4` fragility
+### S9. getStepInfo `stepsPerBeat === 4` fragility ✅ Done 2026-05-27
 
 `public/utils.ts:644`: `const isOffbeat = stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1;` — works for the current 2 supported `stepsPerBeat` values (2, 4) but hard-codes the discriminator. If a future TS uses `stepsPerBeat = 3` or `8`, silently mislabels offbeats.
 
