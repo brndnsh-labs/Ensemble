@@ -46,7 +46,7 @@ Note: the original story wording cited "jazz walking line in 6/8 expects 2-4 ons
 
 **Effort:** ~3h. **Model:** sonnet (mechanical rename + add one boolean to `getStepInfo`). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S3. Accompaniment `% 4` fallbacks
+### S3. Accompaniment `% 4` fallbacks ✅ Done 2026-05-27
 
 `public/engine/accompaniment.ts:1483` and `:1834`: `const isBeat = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;` — hard-coded `% 4` fallback that's wrong for any non-4/4 meter. In the tick path `stepInfo` is always defined, so the fallback is dead defensive code; drop it. Also line 944: `if (genre === 'Bossa Nova' && ts.beats >= 4 && spb === 4)` — `spb === 4` excludes 6/8 silently; either explicitly gate `if (genre === 'Bossa Nova' && !ts.isCompound && ts.beats >= 4)` or document that Bossa is canonically 4/4-only.
 

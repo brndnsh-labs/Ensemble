@@ -225,6 +225,49 @@ const JAZZ_COMPING_CELLS: readonly (readonly number[])[] = [
 ] as const;
 
 /**
+ * Compound-meter (6/8, 12/8) Jazz/Bossa comping cell bank.
+ *
+ * Source: epic-1-compound-meter S3 review (2026-05-27).
+ *
+ * The 4/4-shaped `JAZZ_COMPING_CELLS` above degenerates in 6/8 (12-step bar):
+ *   - `[14]` produces zero hits (step 14 out of range) → ~19% silent bars.
+ *   - `[2, 8]` lands on 4/4-derived offbeats that fight the dotted-quarter pulse.
+ *   - `[6, 14]` collapses to `[6]`.
+ *
+ * This bank is pulse-aware for 6/8: pulses at steps 0 and 6 (the two
+ * dotted-quarters), with cells that either land on those pulses or use the
+ * canonical 6/8 anticipation point (step 10 = last eighth before the next bar's
+ * downbeat = the "and-of-pulse-2" that jazz waltz comping pushes against).
+ *
+ * Step nomenclature in 6/8 (stepsPerBeat=2, 12 steps/bar, [3,3] grouping):
+ *   Steps:  0  1  2  3  4  5   6  7  8  9 10 11
+ *   Names:  1  &  2  &  3  &   4  &  5  &  6  &
+ *   Pulse:  P     .     .      P     .     .
+ *
+ * The picker uses `cellIndex % COMPOUND_COMPING_CELLS.length` so the bank size
+ * can differ from `JAZZ_COMPING_CELLS.length` without changing identity stability.
+ */
+const COMPOUND_COMPING_CELLS: readonly (readonly number[])[] = [
+    // why: pulse pair — the 6/8 analog of 4/4 Charleston. Both pulses land,
+    //      maximally idiomatic for a slow jazz waltz.
+    [0, 6],
+    // why: pulse pair + bar-ending anticipation. Step 10 is the last eighth
+    //      of the bar, pushing into the next bar's downbeat. The 6/8 equivalent
+    //      of Red Garland Lite.
+    [0, 6, 10],
+    // why: pulse 2 + bar-ending anticipation. Drops the downbeat for "breathing"
+    //      — comping enters from the second pulse and pushes into the next bar.
+    [6, 10],
+    // why: pulse 1 + offbeat of pulse 1 + pulse 2. The "a-of-1" anticipation
+    //      pushes into pulse 2; classic 6/8 jazz-waltz comping shape (think
+    //      Bill Evans "Waltz for Debby").
+    [0, 4, 6],
+    // why: sparse — single bar-ending anticipation. Maximum breathing room,
+    //      mirrors the 4/4 `[14]` cell's role but lands on an actual 6/8 step.
+    [10],
+] as const;
+
+/**
  * Bossa partido-alto comping cell bank.
  *
  * Source: chords.md P0 #2 / epic-deterministic-phrasing S2 follow-up;
@@ -941,14 +984,18 @@ export function generateCompingPattern(
         return pattern;
     }
 
-    if (genre === 'Bossa Nova' && ts.beats >= 4 && spb === 4) {
+    if (genre === 'Bossa Nova' && !ts.isCompound && ts.beats >= 4 && spb === 4) {
         // why: epic-coordination-consistency S5.c — partido-alto cell bank,
         //      distinct from Jazz Charleston. The picker mirrors the Jazz
         //      branch structure (`(sectionId, phraseHash)` keyed cell pick,
         //      vibe modulates the cell rather than re-rolls the pick) and the
-        //      partido-alto bank. `ts.beats >= 4 && spb === 4` preserves the
-        //      Jazz-Charleston fallback for non-standard Bossa time signatures
-        //      (rare) — partido-alto is structurally a 4/4 16th-note idiom.
+        //      partido-alto bank. `!ts.isCompound && ts.beats >= 4 && spb === 4`
+        //      makes the 4/4-only intent explicit (epic-1-compound-meter S3):
+        //      partido-alto is a 4/4 16th-note idiom; compound meters (6/8,
+        //      12/8) fall through to the Jazz-Charleston bank below instead of
+        //      silently skipping via the `spb === 4` check (which was always
+        //      false in 6/8 where spb=2). The isCompound guard prevents a
+        //      future compound Bossa meter from accidentally entering this path.
         //
         //      S5.c follow-up: `phraseIndex` here is `compingState.bossaRotationIndex`
         //      (caller — see `updateRhythmicIntent`), a counter advancing by 1 per
@@ -1008,13 +1055,19 @@ export function generateCompingPattern(
         //      index (see `updateRhythmicIntent`); we right-shift to convert
         //      bar → 4-bar phrase index. Hash multipliers `17` and `31` mirror
         //      the S1 Funk picker for cross-genre consistency.
+        //
+        //      why: epic-1-compound-meter S3 — `JAZZ_COMPING_CELLS` is
+        //      4/4-shaped (steps 0-15). In 6/8 (12-step bar), cell `[14]`
+        //      produces silent bars and `[2,8]` lands on 4/4-derived offbeats.
+        //      Route compound meters to `COMPOUND_COMPING_CELLS` which uses
+        //      the 6/8 pulse grid (steps 0, 6) and the canonical step-10
+        //      anticipation.
+        const bank = ts.isCompound ? COMPOUND_COMPING_CELLS : JAZZ_COMPING_CELLS;
         const phraseHash = phraseIndex >> 2;
         const sectionHash = hashSectionId(sectionId);
         const cellIndex =
-            (((sectionHash * 17 + phraseHash * 31) % JAZZ_COMPING_CELLS.length) +
-                JAZZ_COMPING_CELLS.length) %
-            JAZZ_COMPING_CELLS.length;
-        const cell = JAZZ_COMPING_CELLS[cellIndex];
+            (((sectionHash * 17 + phraseHash * 31) % bank.length) + bank.length) % bank.length;
+        const cell = bank[cellIndex];
 
         // why: `sparse` vibe drops the latest (highest-step) hit, matching the
         //      original picker's "if (vibe !== 'sparse') hit(secondNote)" pattern
@@ -1480,7 +1533,11 @@ function handleSustainEvents(
         return events;
     }
 
-    const isBeat = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;
+    // why: epic-1-compound-meter S3 — stepInfo is always defined in the tick
+    //      path (getAccompanimentNotes takes non-optional stepInfo). The old
+    //      `% 4 === 0` fallback was dead code AND wrong for non-4/4 meters.
+    //      Using stepInfo.isBeatStart directly is both correct and simpler.
+    const isBeat = stepInfo ? stepInfo.isBeatStart : false;
     const flutterProb = intensity * 0.4;
     if (isBeat && Math.random() < flutterProb) {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: -0.015 });
@@ -1831,7 +1888,12 @@ export function getAccompanimentNotes(
     const soloistActive = coordination.soloistActive || false;
 
     // Semantic abstractions
-    const isBeatStart = stepInfo ? stepInfo.isBeatStart : measureStep % 4 === 0;
+    // why: epic-1-compound-meter S3 — getAccompanimentNotes takes non-optional
+    //      stepInfo, so this is always defined in the tick path. The old
+    //      `% 4 === 0` fallback was dead AND wrong for non-4/4 meters.
+    //      intBeat fallback uses ts.stepsPerBeat (not hardcoded 4) so it's
+    //      correct for 6/8 and other compound meters even if stepInfo were absent.
+    const isBeatStart = stepInfo ? stepInfo.isBeatStart : false;
     const intBeat =
         stepInfo && stepInfo.beatIndex !== undefined
             ? stepInfo.beatIndex
@@ -1897,7 +1959,11 @@ export function getAccompanimentNotes(
         const isStrum = isBeatStart && intBeat % 2 !== 0;
 
         // Train Beat / Bluegrass 16th fills (ghost strums on offbeats)
-        const isGhost = measureStep % 4 !== 0 && Math.random() < intensity * 0.6;
+        // why: epic-1-compound-meter S3 — `measureStep % 4 !== 0` was a
+        //      hardcoded 4/4 "not a beat" gate. Using `!isBeatStart` reads the
+        //      actual time-signature config, so this stays correct even when
+        //      strum-country is played in non-4/4 time signatures.
+        const isGhost = !isBeatStart && Math.random() < intensity * 0.6;
 
         if (isBass) {
             // why: strict R-5 — country boom-chick is a deterministic idiom
