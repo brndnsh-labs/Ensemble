@@ -204,6 +204,22 @@ Simple-meter (4/4) `intBeat === 2` behavior must remain byte-identical.
 
 **Effort:** ~4h (the picker has several stacked biases — chord-tone bonus, register slotting, target awareness; the compound-aware branch needs to integrate cleanly without breaking 4/4). **Model:** opus (pitch-pick decisions are taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S12 review (2026-05-27). Implementer + reviewer both flagged the picker paired-site as out-of-scope of S12's density-gate fix; promoted to its own story to preserve S12's commit clean.
 
+### S16. Compound-meter drum density across genres
+
+S11-S15 fixed jazz 6/8 (ride skip-beat + walking bass density/pitch + comping density + soloist rest cadence). The same shape of bug — 4/4-shaped per-step density firing on every eighth in 6/8 — exists in drum grooves across other genres. User-reported 2026-05-27 during the listening session: "drums feel too busy in 6/8, especially obvious on rock; the genre-specific drum energy pushes too hard."
+
+Audit `grooves/*.ts` for compound-aware density gating in each genre's drum-strategy. Worst-suspected offenders (un-verified):
+- `grooves/rock.ts` — kick/snare gates probably fire every beat in compound regardless of `bandIntensity`. Power-ballad feel (*Nothing Else Matters* 6/8 section) needs intensity-tapered density: at low intensity, drums fire only on `isPulseStart`; at moderate, add backbeat on the configured `tsConfig.backbeat` position (mStep 3 in 6/8 grouping `[3,3]`); at high, allow eighth-grid fills sparingly.
+- `grooves/metal.ts` — same pattern.
+- `grooves/country.ts` — boom-chick at every eighth in 6/8 → ten kicks per bar.
+- `grooves/pop.ts`, `grooves/soul.ts`, `grooves/disco.ts`, `grooves/reggae.ts`, `grooves/latin.ts` (compound-route only), `grooves/funk.ts`, `grooves/hip-hop.ts`, `grooves/blues.ts`, `grooves/ska-punk.ts` — audit each for compound-density branches; many will already be 4/4-only by genre, but flag any genre that does have compound idiomatic shape and needs gating.
+
+Reuse the S12 / S13 pattern: drive low-intensity density off `stepInfo.isPulseStart`, allow backbeat at moderate intensity (`tsConfig.backbeat[*]` positions), allow eighth-grid fills at high intensity. Per-genre tuning required — rock's intensity ramp differs from country's. Listen-test each affected genre after engine work.
+
+**Acceptance:** Per-genre critique tests (e.g. `tests/standards/rock-drums-6-8-density-critique.test.ts`, similar for other affected genres) assert each lane's density at intensity 0.5 stays ≤ ~50% of its 4/4 density. Existing 4/4 drummer critiques pass unchanged. Listen-test gate: load each affected genre with 6/8 + a slow waltz progression, confirm the feel "holds energy without rushing."
+
+**Effort:** ~6h (multi-genre audit + per-genre engine touches + critiques + listen-test pass per genre). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer. **Source:** user listening session during S15 cycle (2026-05-27). Closely parallels S11-S13 in shape but spans all drum lanes across multiple genres rather than just jazz.
+
 ## Notes
 
 - The synth-audit track does NOT overlap. Voice-level audio changes are out of scope here.
