@@ -1647,6 +1647,15 @@ export function getAccompanimentNotes(
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
 
+    // why: seed for the per-step comp gates — both the per-genre lanes below
+    // (Epic 2 S5) and the smart-path overlay further down (the original comp-lock
+    // fix). Same (step, loopCount) shape bass/drums/soloist use, so the comp
+    // LOCKS with the band and repeats loop-to-loop. The genre lanes are
+    // early-return paths, so they use a distinct offset range (20+) from the
+    // overlay's 1-10 to keep the streams obviously independent.
+    const compRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+    const compDraw = (n: number) => scrambleHash((compRandSeed + n) | 0);
+
     // --- Imperfect Symmetry: per-phrase voicing inversion on repeat passes ---
     // why: epic-form-arrangement S3 — when a section repeats (Verse 2 vs Verse 1),
     // the comper otherwise produces identical voicings, making the band sound
@@ -1876,7 +1885,7 @@ export function getAccompanimentNotes(
         (soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0);
     updateRhythmicIntent(state, step, isSoloistBusy, spm, chord.sectionId);
 
-    if (isSoloistBusy && !stepInfo.isMeasureStart && Math.random() < 0.7) {
+    if (isSoloistBusy && !stepInfo.isMeasureStart && compDraw(20) < 0.7) {
         // Yield density to busy soloist: Skip offbeats and less-foundational hits
         if (ccEvents.length > 0) {
             return [
@@ -1973,7 +1982,7 @@ export function getAccompanimentNotes(
         //      hardcoded 4/4 "not a beat" gate. Using `!isBeatStart` reads the
         //      actual time-signature config, so this stays correct even when
         //      strum-country is played in non-4/4 time signatures.
-        const isGhost = !isBeatStart && Math.random() < intensity * 0.6;
+        const isGhost = !isBeatStart && compDraw(21) < intensity * 0.6;
 
         if (isBass) {
             // why: strict R-5 — country boom-chick is a deterministic idiom
@@ -2230,7 +2239,7 @@ export function getAccompanimentNotes(
         // This style favors stacks of 4ths and 2nds (clusters) for that "cloudy" feel.
         const isHit = compingState.currentCell[measureStep % spm] === 1;
         const ghostProb = 0.1 + intensity * 0.3;
-        const isGhost = !isHit && Math.random() < ghostProb;
+        const isGhost = !isHit && compDraw(22) < ghostProb;
 
         if (isHit || isGhost) {
             const reserveBassSpace = shouldReserveBassSpace(state);
@@ -2365,7 +2374,7 @@ export function getAccompanimentNotes(
             isHit &&
             playback.complexity > 0.7 &&
             coordination?.soloistBusy === true &&
-            Math.random() < 0.4
+            compDraw(23) < 0.4
         ) {
             isHit = false;
         }
@@ -2403,7 +2412,7 @@ export function getAccompanimentNotes(
         // The gate's whole point is loop-coherent silence — gate the ghost
         // too. (Epic 9 S2.a review P1 #1+#2.)
         const ghostProb = 0.15 + intensity * 0.35;
-        const isGhost = !isHit && !funkPhraseEndThinned && Math.random() < ghostProb;
+        const isGhost = !isHit && !funkPhraseEndThinned && compDraw(24) < ghostProb;
 
         if (isHit || isGhost) {
             const reserveBassSpace = shouldReserveBassSpace(state);
@@ -2546,12 +2555,9 @@ export function getAccompanimentNotes(
     // cell with coordination + anchoring decisions. It used raw Math.random,
     // which re-randomized the comp every bar AND every loop — the "unpredictable
     // / off-time" feel, worst in 6/8 where there are only two pulses to lock to.
-    // Seed all those decisions per (step, loopCount) so the comp LOCKS with the
-    // band (bass/drums/soloist already use this exact seed shape) and repeats
-    // deterministically loop-to-loop. Each gate adds a distinct discriminator so
-    // independent decisions don't share a draw.
-    const compRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
-    const compDraw = (n: number) => scrambleHash((compRandSeed + n) | 0);
+    // The seed + compDraw are hoisted to the top of this function (shared with
+    // the genre lanes); the gates below use offsets 1-10, distinct discriminators
+    // so independent decisions don't share a draw.
 
     // --- NEW: Multi-way Coordination ---
     if (isHit && chords.style === 'smart') {

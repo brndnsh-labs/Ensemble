@@ -74,10 +74,13 @@ The Epic-1 comp fix ([[two-layer-determinism]]) seeded the **smart/jazz comping 
 - **Verified:** full standards + engine-unit + integration suite green (1808 tests); typecheck clean; music-theory-reviewer confirmed completeness (all 5 gates seeded; pitch-picker color randomness correctly deferred) + recalibration honesty.
 - **Pitch picker** (`getBassNoteStyle`) raw-random (octave/approach-tone color) stays deferred — color doesn't break the groove lock ([[two-layer-determinism]]).
 
-### S5 — Accompaniment per-genre lanes: seed the emission overlays · Model: sonnet
-- **Where:** `getAccompanimentNotes` genre lanes: `strum-country` (~`:1964`), `power-metal` (~`:2156`), `Neo-Soul` (~`:2228`), `Reggae` (~`:2302`), `Funk` (~`:2352`). Each has its own raw-`Math.random` placement gates the comp-lock fix didn't reach.
-- **Bug:** same two-layer re-randomization, now exposed for non-jazz genres once their adjacent lanes lock.
-- **Acceptance:** each lane deterministic given `(step, loopCount)`; extend the existing `compRandSeed`/`compDraw` pattern (`accompaniment.ts:2543`). **Leave voicing-color random** (`:2811–3032`) raw — harmonic variation doesn't break the lock (FOLLOWUPS §F, intentional).
+### S5 — Accompaniment per-genre lanes: seed the emission overlays · Model: sonnet · ✅ SHIPPED 2026-05-28
+- **Where:** `getAccompanimentNotes` — hoisted the `compRandSeed`/`compDraw` helper to the function top (was mid-function in the smart overlay) so the genre lanes share it. Seeded **5 ONSET gates** (offsets 20–24): soloist-yield skip (shared), strum-country ghost, Neo-Soul ghost, Funk conversational-displacement, Funk ghost chuck.
+- **Bug fixed:** each lane decided whether a note plays via raw `Math.random`, re-randomizing offbeats every bar + loop — never locking.
+- **Boundary (reviewer-validated):** seeded ONSET/placement (the groove lock); **left per-note velocity + micro-timing humanize raw** (power-metal chug vel, Neo-Soul drunk timing, Reggae skank vel, Funk vel/timing) — color, not placement, matching the comp-lock fix's own boundary + deferred §F.
+- **Deliverable:** new `comp-lane-determinism-critique.test.ts` (strum-country, Neo-Soul, Funk) — determinism + produces-output + (for ghost-dominant lanes) non-tautology. 11 tests.
+- **Recalibration (reviewer-validated honest stream re-alignment):** the shared soloist-yield gate runs for All Blues too; `all-blues-6-8-critique`'s sequence-PRNG harness re-aligned when the comp draw was removed, nudging soloist mean active-streak 9.x → 10.29 (max unchanged at 12 < 16). Raised mean threshold `≤10` → `≤11`; soloist code untouched (the known PRNG-migration stream re-alignment effect).
+- **Verified:** full standards + engine-unit + integration suite green (1819 tests); typecheck clean; music-theory-reviewer confirmed completeness + boundary + recalibration honesty.
 
 ---
 
