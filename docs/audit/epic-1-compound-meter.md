@@ -87,9 +87,11 @@ Rename `isAndOfFour` → `isAnticipation`. Compute as `stepsPerBar - 1` for comp
 
 **Effort:** ~4h. **Model:** opus (musical-judgment audit). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S7. End-to-end "All Blues feels right" critique test ✅ Done 2026-05-27
+### S7. End-to-end "All Blues feels right" critique test ✅ Done 2026-05-27 · listening gate confirmed 2026-05-28
 
-**Status:** Blocked. First S7 authoring attempt (2026-05-27) surfaced four real engine gaps that prevent the cycle's DoD from being met *with the engine as it stands today*. The scheduling foundation (S1–S6, S9) is correct, but the **musical content layer still assumes 4/4** in four places. Promoted to S11–S14 below; S7 will be rewritten and re-attempted after those land.
+**Status:** ✅ Complete. Both halves of the DoD are met — the critique test passes 30/30 reliable with no `.skip`s, AND the manual A/B listening pass confirmed the slow jazz-waltz feel (2026-05-28, after the S16 drum-density family + S8 chart fix landed). The cycle's Definition of Done is satisfied.
+
+**History:** the first S7 authoring attempt (2026-05-27) surfaced four real engine gaps that prevented the DoD from being met with the engine as it stood — the scheduling foundation (S1–S6, S9) was correct, but the **musical content layer still assumed 4/4** in four places. Those were promoted to S11–S14, and S7 was rewritten and re-attempted after they landed.
 
 The original spec also contained a musical error: the canonical jazz 6/8 "spang-a-lang" skip-beat lands on the LAST EIGHTH of each dotted-quarter group (steps **{4, 10}** in 6/8), not the middle eighth ({2, 8}) the original story spec listed. S11 fixes the engine to match {4, 10}; the rewritten S7 will assert that target.
 
