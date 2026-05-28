@@ -1,5 +1,6 @@
 import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
+import { getCanonicalMeters } from '../data/smart-genres.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { arranger } from '../state.js';
@@ -74,12 +75,17 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
 
 export function TimeSignatureControl() {
     const dispatch = useDispatch();
-    const { timeSignature, grouping, lastDrumPreset } = useEnsembleState((s) => ({
+    const { timeSignature, grouping, lastDrumPreset, genreFeel } = useEnsembleState((s) => ({
         timeSignature: s.arranger.timeSignature,
         grouping: s.arranger.grouping,
         lastDrumPreset: s.groove.lastDrumPreset,
+        genreFeel: s.groove.genreFeel,
     }));
     const supportsGrouping = Boolean(GROUPING_OPTIONS[timeSignature]);
+    // Soft hint (S10): mark the meters idiomatic for the current genre with ★.
+    // Non-blocking — every meter stays selectable; this only highlights the
+    // canonical pairings so users know which are genre-authentic.
+    const canonicalMeters = getCanonicalMeters(genreFeel);
 
     return (
         <div class="time-sig-group">
@@ -97,7 +103,9 @@ export function TimeSignatureControl() {
             >
                 {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => (
                     <option key={timeSignatureOption} value={timeSignatureOption}>
-                        {timeSignatureOption}
+                        {canonicalMeters.includes(timeSignatureOption)
+                            ? `${timeSignatureOption} ★`
+                            : timeSignatureOption}
                     </option>
                 ))}
             </select>
@@ -115,6 +123,11 @@ export function TimeSignatureControl() {
                         : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
                 </button>
             </div>
+            {genreFeel && (
+                <span class="time-sig-hint" data-testid="time-sig-hint">
+                    ★ idiomatic for {genreFeel}
+                </span>
+            )}
         </div>
     );
 }

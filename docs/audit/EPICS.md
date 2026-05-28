@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 17 / 18 stories shipped.**
+**Cycle 2026-05-27 → ✅ COMPLETE: 18 / 18 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 18 | 17 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). **S16 split 2026-05-27** during its parallel-agent audit revealed the cross-genre scope is bigger than estimated: S16 shipped hat-density (universal helper + shimmer/sparse profiles), S16b shipped kick/snare per-genre (2026-05-28), S16c shipped reggae/latin repair (2026-05-28 — premise correction: One Drop was already correct; real fixes were Rockers kick over-density + Partido Alto 7-vs-1 split). S8 shipped chart-sizing fix (2026-05-28 — float-accumulation drift in measure grouping, not the suspected step-count density path). Remaining: S10 (genre×TS UX, deferred design call). |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 18 | 18 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). **S16 split 2026-05-27** during its parallel-agent audit revealed the cross-genre scope is bigger than estimated: S16 shipped hat-density (universal helper + shimmer/sparse profiles), S16b shipped kick/snare per-genre (2026-05-28), S16c shipped reggae/latin repair (2026-05-28 — premise correction: One Drop was already correct; real fixes were Rockers kick over-density + Partido Alto 7-vs-1 split). S8 shipped chart-sizing fix (2026-05-28 — float-accumulation drift in measure grouping, not the suspected step-count density path). S10 shipped genre×TS soft hint (2026-05-28 — ★ marks idiomatic meters in the TS picker; non-blocking). **Epic complete; cycle DoD (All Blues + 6/8 jazz-waltz feel) confirmed by listening pass 2026-05-28.** |
 
 ## Phased rollout
 
@@ -52,7 +52,7 @@ Once S1 lands, S2, S3, S4, S5, S9 are mechanical 4/4-assumption fixes on disjoin
 | S6 (soloist phrasing audit) | ✅ Done. Verified pipeline isn't 4/4-assuming; extended critique coverage. |
 | S7 (All Blues critique test) | ✅ Done 2026-05-27. The cycle's Definition of Done. 5/5 assertions green, 30/30 reliable. Surfaced architectural S14 gap (budget code unreachable behind head-bypass) — patched inline with hoisted budget timer + anchor-aware gate. Listening pass next. |
 | S8 (chart sizing under TS change) | ✅ Done 2026-05-28. Float-accumulation drift in `buildLeadSheetSections` measure grouping (not the suspected step-count density path) — fixed with an epsilon-tolerant bar-close comparison. Unit tests added. |
-| S10 (genre × TS UX) | Design call on soft hint vs hard gate vs no-op. Defer if Phase 2/3 produce a passing S7. |
+| S10 (genre × TS UX) | ✅ Done 2026-05-28. User chose the soft-hint option: ★ marks genre-idiomatic meters in the TS picker (`smart-genres.ts` canonical-meter map + `TimeSignatureControl` legend). Non-blocking — any pairing still plays. |
 
 ### Phase 4 — Musical-content fixes (added 2026-05-27 after S7 authoring)
 

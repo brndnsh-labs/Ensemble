@@ -131,15 +131,19 @@ Replace with `const isOffbeat = stepInBeat === Math.floor(stepsPerBeat / 2);` (m
 
 **Effort:** ~1h. **Model:** sonnet. **Reviewer:** none required. **Source:** investigation 2026-05-27.
 
-### S10. Genre × TS compatibility surfacing
+### S10. Genre × TS compatibility surfacing ✅ Done 2026-05-28
 
-Some genres are tied to specific meters in real practice (Funk = 4/4, Bossa Nova = 4/4, Reggae = 4/4, Waltz = 3/4, Afro-Cuban 6/8 = 6/8). The UI currently lets users pair any genre × TS, which can produce nonsense feels.
+Some genres are tied to specific meters in real practice. The UI lets users pair any genre × TS, which can produce non-idiomatic feels.
 
-**Decision needed:** soft hint vs hard gate vs no-op. Most likely a "feel hint" badge near the TS or genre selector ("Funk feel is canonically 4/4 — try 6/8 only for unconventional blends"). Defer if S1–S9 already produce a passing S7.
+**Decision (user, 2026-05-28):** option (a) — a **soft, positive hint**, not a gate. "I'm fine with things getting weird if a user inputs a genuinely unusual combination, but it's fair to highlight the time signatures that legitimately work well and are associated with a genre." Nothing is disabled; the idiomatic meters are simply marked. Chosen visual form: a ★ marker on canonical options in the time-signature dropdown + a legend caption.
 
-**Acceptance:** TBD on design decision. Could be (a) a hint badge, (b) a feel-genre filter that prefers TS-matched genres at the top of the picker, (c) a no-op with documented "user explores at their own risk."
+**Shipped:**
+- `public/data/smart-genres.ts` — added an optional `meters` field to `GENRE_OVERRIDES` and a `CANONICAL_METERS_BY_FEEL` lookup + `getCanonicalMeters(feel)` (defaults to `['4/4']`). Non-4/4 genres: Jazz `[4/4, 3/4, 6/8]`, Blues `[4/4, 12/8, 6/8]`, Country `[4/4, 3/4]`, Acoustic `[4/4, 3/4]`.
+- `public/components/KeySignatureControls.tsx` `TimeSignatureControl` — reads `groove.genreFeel`, appends ` ★` to idiomatic options, renders a `★ idiomatic for {genre}` legend (`.time-sig-hint`, styled in `public/css/panels.css`). Every meter stays selectable.
 
-**Effort:** ~2h (design call) + 2-4h (implementation depending on choice). **Model:** opus (product decision). **Reviewer:** none required. **Source:** investigation 2026-05-27.
+**Acceptance:** ✅ Unit tests in `tests/unit/engine/smart-genre.test.ts` (lookup correctness, 4/4 default, every feel covered, only-real-meters). Playwright smoke in `tests/e2e/arranger.spec.ts` confirms the hint renders and 4/4 carries ★ while 5/4 does not (verified in real Chromium).
+
+**Effort:** ~1.5h. **Model:** opus (product decision — made by user). **Reviewer:** none required (UI, no engine touch). **Source:** investigation 2026-05-27; design call 2026-05-28.
 
 ### S11. Jazz 6/8 ride skip-beat lands on the last eighth, not the last 16th ✅ Done 2026-05-27
 

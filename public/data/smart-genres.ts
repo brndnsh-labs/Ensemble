@@ -10,6 +10,10 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
     feel?: string;
     bass?: string;
     soloist?: string;
+    // Time signatures idiomatic for this genre — used to softly highlight
+    // canonical meters in the time-signature picker (S10). Omitted = ['4/4'].
+    // Non-blocking hint only: any genre × meter pairing still plays.
+    meters?: string[];
 };
 
 const GENRE_OVERRIDES: Record<string, GenreOverride> = {
@@ -29,6 +33,7 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         bass: 'quarter',
         soloist: 'bird',
         harmony: 'horns',
+        meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
         swing: 15,
@@ -61,6 +66,7 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         bass: 'blues',
         soloist: 'blues',
         harmony: 'horns',
+        meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
         swing: 30,
@@ -86,6 +92,7 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         bass: 'acoustic',
         soloist: 'minimal',
         harmony: 'strings',
+        meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
     Bossa: {
         drum: 'Bossa Nova',
@@ -102,6 +109,7 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         chord: 'strum-country',
         bass: 'country',
         soloist: 'country',
+        meters: ['4/4', '3/4'], // two-step · country waltz
     },
     Metal: {
         drum: 'Metal (Speed)',
@@ -132,3 +140,25 @@ export const SMART_GENRES: Record<string, SmartGenre> = Object.keys(GENRE_OVERRI
 
 export const GENRE_NAMES = Object.keys(GENRE_OVERRIDES);
 export const GENRE_FEELS = Object.values(GENRE_OVERRIDES).map((g) => g.feel);
+
+const DEFAULT_GENRE_METERS = ['4/4'];
+
+/**
+ * Canonical (idiomatic) time signatures per genre feel, keyed by `groove.genreFeel`.
+ * Drives the soft time-signature hint in the topbar (S10) — non-blocking; any
+ * genre × meter pairing still plays. Genres without an explicit `meters` field
+ * default to 4/4.
+ */
+export const CANONICAL_METERS_BY_FEEL: Record<string, string[]> = Object.values(
+    GENRE_OVERRIDES,
+).reduce<Record<string, string[]>>((acc, override) => {
+    if (override.feel) {
+        acc[override.feel] = override.meters ?? DEFAULT_GENRE_METERS;
+    }
+    return acc;
+}, {});
+
+/** Idiomatic meters for a genre feel; falls back to 4/4 for unknown feels. */
+export function getCanonicalMeters(genreFeel: string | undefined): string[] {
+    return (genreFeel && CANONICAL_METERS_BY_FEEL[genreFeel]) || DEFAULT_GENRE_METERS;
+}

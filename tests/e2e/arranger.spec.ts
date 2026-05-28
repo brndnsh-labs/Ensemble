@@ -66,6 +66,19 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(visualizer.locator('.chord-card').first()).toBeVisible();
     });
 
+    test('Time signature picker highlights genre-idiomatic meters (S10)', async ({ page }) => {
+        const hint = page.locator('[data-testid="time-sig-hint"]');
+        await expect(hint).toBeVisible();
+        await expect(hint).toContainText('idiomatic for');
+
+        const select = page.locator('#timeSigSelect');
+        // 4/4 is idiomatic for every genre, so it always carries the ★ marker;
+        // 5/4 is idiomatic for none, so it never does. (Non-blocking hint —
+        // both remain selectable.)
+        await expect(select.locator('option[value="4/4"]')).toContainText('★');
+        await expect(select.locator('option[value="5/4"]')).not.toContainText('★');
+    });
+
     test('Chord Visualizer highlights the active chord during playback', async ({ page }) => {
         const visualizer = page.locator('#chordVisualizer');
         await expect(visualizer.locator('.chord-card.active')).toHaveCount(0);
