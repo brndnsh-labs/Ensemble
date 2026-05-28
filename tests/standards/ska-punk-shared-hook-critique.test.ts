@@ -25,11 +25,12 @@
  *      `memory.sharedHookBuffer` is non-empty AND every published entry's
  *      `sourcePhase` is in {statement, restatement}.
  *
- *   2. CONSUMER — calling `getHarmonyNotes` with `feel: 'Ska-Punk'` and a
- *      pre-populated `coordination.soloistSharedHookBuffer` whose entry
- *      matches the current step produces an `isLatched=true` note (the
- *      shared-hook stab). A non-Ska-Punk negative control (e.g. 'Funk') at
- *      the same step does NOT (the branch gate is `feel === 'Ska-Punk'`).
+ *   2. CONSUMER — calling `getHarmonyNotes` with `feel: 'Ska'` (the Ska-Punk
+ *      genre's canonical genreFeel) and a pre-populated
+ *      `coordination.soloistSharedHookBuffer` whose entry matches the current
+ *      step produces an `isLatched=true` note (the shared-hook stab). A
+ *      non-Ska negative control (e.g. 'Funk') at the same step does NOT
+ *      (the branch gate is `feel === 'Ska'`).
  *
  * The 30-run reliability loop is inherited from the test driver
  * (`npm run test:loop`); the engine is deterministic by construction (no
@@ -96,7 +97,7 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
         });
 
         it('publishes a non-empty hook buffer after a multi-bar Statement run', () => {
-            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska-Punk', enabled: true });
+            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska', enabled: true });
             dispatch(ACTIONS.UPDATE_SB, {
                 enabled: true,
                 style: 'scalar',
@@ -202,7 +203,7 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
         const runProducerWithForcedPhase = (
             phase: 'statement' | 'restatement' | 'departure',
         ): { totalHooks: number; phases: Set<string> } => {
-            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska-Punk', enabled: true });
+            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska', enabled: true });
             dispatch(ACTIONS.UPDATE_SB, {
                 enabled: true,
                 style: 'scalar',
@@ -299,7 +300,7 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
             // (P0-1 patch — original test asserted Departure was skipped, but
             // Departure is the chorus/bridge horn-section moment and now
             // FIRES. Conclusion is the only phase the producer rejects.)
-            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska-Punk', enabled: true });
+            dispatch(ACTIONS.UPDATE_GROOVE, { genreFeel: 'Ska', enabled: true });
             dispatch(ACTIONS.UPDATE_SB, {
                 enabled: true,
                 style: 'scalar',
@@ -360,7 +361,7 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
             mockState = {
                 playback: { bandIntensity: 0.7, complexity: 0.5, currentLoopCount: 1 },
                 groove: {
-                    genreFeel: 'Ska-Punk',
+                    genreFeel: 'Ska',
                     pocket: {
                         globalDrive: 0,
                         tightness: 1,
@@ -444,7 +445,7 @@ describe('Ska-Punk shared-hook antiphony (Epic 12 S10)', () => {
         it('Non-Ska-Punk feel + matching hook step → no shared-hook latch', () => {
             // Negative control: change ONLY the genre feel. The buffer still
             // matches the step, but the playShadowMode gate is
-            // `feel === 'Ska-Punk'`, so tag B never fires. Other isLatched
+            // `feel === 'Ska'`, so tag B never fires. Other isLatched
             // sources (tag C — melodic shadowing) require a non-null
             // soloist seed; we pass `soloistSeed: null` so no other latch path
             // can pollute the count. Any isLatched note here would be a real

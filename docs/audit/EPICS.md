@@ -19,12 +19,14 @@ The Definition of Done for this cycle is **All Blues + 6/8 sounds like a slow ja
 
 Story sizing: each story is a single focused session (2–6 hours) — one engine touch + critique test + reliability loop. Same pattern as the 2026-05 musical-audit cycle.
 
-## Status (2026-05-27)
+## Status (2026-05-28)
 
-**Cycle 2026-05-27 → ✅ COMPLETE: 18 / 18 stories shipped.**
+**Compound-Meter cycle (2026-05-27) → ✅ COMPLETE: 18 / 18 stories shipped.**
+**Meter-Robustness cycle (Epic 2, synthesized 2026-05-28) → ⏳ 1 / 10 stories. S1 (dead-key cluster) shipped — grew from 3 to 8 sites.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
+| 2 | [Meter Robustness + Genre Correctness](epic-2-meter-robustness.md) | 10 | 1 | **Synthesized 2026-05-28** (2 discovery agents + main-thread hot-file triage). Every genre × instrument must groove in any time signature; non-jazz odd/compound meters in scope; correctness not taste. Phase 1 = a verified dead-key cluster (Ska-Punk feel is `'Ska'` but 4 tables key on `'Ska-Punk'`; Metal missing from `FILL_TEMPLATES`; Bossa Nova dead-key in `GENRE_MAP`) — wrong in every meter, single root cause, highest ROI. Phase 2 = determinism/lock (the Epic-1 comp fix applied to the bass density gate + non-jazz comping lanes). Phase 3 = compound groove density (minimal, ska-punk, acoustic kick). Phase 4 = bass bossa/dub 4/4-position math. Phase 5 = odd-meter (5/4,7/4,7/8) degradation sweep. **Not started.** |
 | 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 18 | 18 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). **S16 split 2026-05-27** during its parallel-agent audit revealed the cross-genre scope is bigger than estimated: S16 shipped hat-density (universal helper + shimmer/sparse profiles), S16b shipped kick/snare per-genre (2026-05-28), S16c shipped reggae/latin repair (2026-05-28 — premise correction: One Drop was already correct; real fixes were Rockers kick over-density + Partido Alto 7-vs-1 split). S8 shipped chart-sizing fix (2026-05-28 — float-accumulation drift in measure grouping, not the suspected step-count density path). S10 shipped genre×TS soft hint (2026-05-28 — ★ marks idiomatic meters in the TS picker; non-blocking). **Epic complete; cycle DoD (All Blues + 6/8 jazz-waltz feel) confirmed by listening pass 2026-05-28.** |
 
 ## Phased rollout

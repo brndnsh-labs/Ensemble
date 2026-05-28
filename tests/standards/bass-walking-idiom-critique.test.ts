@@ -45,7 +45,7 @@ const simulateWalkingSkaOverChord = (
     const mockState = {
         playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 175 },
         groove: {
-            genreFeel: 'Ska-Punk',
+            genreFeel: 'Ska',
             creativity: true,
             lastDrumPreset: 'Ska',
             instruments: [],

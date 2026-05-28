@@ -16,8 +16,9 @@ describe('Ska-Punk Genre Integrity', () => {
     const { groove, playback, chords, bass, soloist, harmony, arranger } = getState();
 
     beforeEach(() => {
-        // Reset state to Ska-Punk
-        groove.genreFeel = 'Ska-Punk';
+        // Reset state to Ska-Punk. genreFeel is the canonical 'Ska' (smart-genres.ts);
+        // lastSmartGenre keeps the genre display name 'Ska-Punk'.
+        groove.genreFeel = 'Ska';
         groove.lastSmartGenre = 'Ska-Punk';
         chords.style = 'ska-upstroke';
         bass.style = 'walking-ska';
@@ -136,7 +137,7 @@ describe('Ska-Punk Genre Integrity', () => {
     it('should reinforce soloist hooks in harmony section', () => {
         const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
         playback.bandIntensity = 0.7; // High intensity for hook reinforcement
-        groove.genreFeel = 'Ska-Punk';
+        groove.genreFeel = 'Ska';
         soloist.enabled = true;
 
         // 1. Prime the hook by simulating a motif replay

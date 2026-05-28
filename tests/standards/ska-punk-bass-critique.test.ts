@@ -20,7 +20,7 @@ describe('Ska-Punk Bassist Critique', () => {
         const mockState = {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 175 },
             groove: {
-                genreFeel: 'Ska-Punk',
+                genreFeel: 'Ska',
                 creativity: true,
                 lastDrumPreset: 'Ska',
                 instruments: [],

@@ -135,7 +135,10 @@ export function generateDrumOrchestration(
         const isRockFeel =
             _style === 'Rock' ||
             _style === 'Metal' ||
-            _style === 'Ska-Punk' ||
+            // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts), not
+            // the preset name — the old 'Ska-Punk' key never matched, so Ska-Punk's
+            // punchy backbeat could wrongly drop to sidestick at low energy. Epic 2 S1.
+            _style === 'Ska' ||
             _style === 'Country';
 
         if (isRockFeel) {

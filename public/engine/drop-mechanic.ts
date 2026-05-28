@@ -42,7 +42,11 @@ const DROP_FRIENDLY_GENRES: readonly string[] = [
     'hip-hop',
     'hiphop',
     'disco',
-    'ska-punk',
+    // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts). The
+    // needle must be 'ska' — with 'ska-punk', `'ska'.includes('ska-punk')` is
+    // false (haystack shorter than needle), so Ska-Punk got no stop-time drops
+    // despite the doc above. No other feel contains 'ska'. Epic 2 S1.
+    'ska',
 ];
 
 /**

@@ -369,7 +369,10 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     // coordination contract (writer: tick-logic soloist producer block) rather
     // than reached for across the soloist↔harmony engine boundary directly.
     const sharedHookBuffer = coordination.soloistSharedHookBuffer;
-    if (feel === 'Ska-Punk' && sharedHookBuffer && sharedHookBuffer.length > 0) {
+    // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts), never the
+    // preset name 'Ska-Punk' — the old gate meant this antiphony feature was dead
+    // in production. Epic 2 S1.
+    if (feel === 'Ska' && sharedHookBuffer && sharedHookBuffer.length > 0) {
         const hookMatch = sharedHookBuffer.find((h: any) => h.step === step);
         if (hookMatch) {
             return { type: 'reinforce', isLatched: true, duration: 1 };

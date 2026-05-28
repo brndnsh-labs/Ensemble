@@ -37,7 +37,10 @@ const strategies: Record<string, any> = {
     Reggae: reggae,
     'Bossa Nova': latin,
     Latin: latin,
-    'Ska-Punk': skaPunk,
+    // why: the Ska-Punk smart-genre sets genreFeel='Ska' (smart-genres.ts), so
+    // the strategy table must be keyed 'Ska'. Was 'Ska-Punk' (the preset name) —
+    // a dead key that fell through to DEFAULT_CONFIG in production. Epic 2 S1.
+    Ska: skaPunk,
     Country: country,
     Metal: metal,
     Minimal: minimal,
@@ -78,7 +81,11 @@ const HAT_SPINE_GENRES = new Set([
     'Rock',
     'Metal',
     'Shred',
-    'Ska-Punk',
+    // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts), not the
+    // preset name 'Ska-Punk' this set used before — the dead key meant Ska-Punk's
+    // offbeat skank (its sole low-intensity timekeeper) got suppressed on the
+    // final bar. Epic 2 S1.
+    'Ska',
     'Hip Hop',
     'Neo-Soul',
 ]);

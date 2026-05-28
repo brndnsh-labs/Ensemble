@@ -28,7 +28,8 @@ const GENRES = [
     'Reggae',
     'Acoustic',
     'Hip Hop',
-    'Ska-Punk',
+    // genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts).
+    'Ska',
 ];
 
 const INTENSITIES = [0.1, 0.5, 0.9];
@@ -114,7 +115,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                                         'Funk',
                                         'Reggae',
                                         'Neo-Soul',
-                                        'Ska-Punk',
+                                        'Ska',
                                     ].includes(genre) &&
                                     !bassNote.muted
                                 ) {
@@ -185,7 +186,7 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                                         'Funk',
                                         'Reggae',
                                         'Neo-Soul',
-                                        'Ska-Punk',
+                                        'Ska',
                                         'Acoustic',
                                         'Metal',
                                     ].includes(genre) &&

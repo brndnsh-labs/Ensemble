@@ -20,7 +20,7 @@ describe('Ska-Punk Drummer Critique', () => {
         const mockState = {
             playback: { bandIntensity: 0.6, bpm: 175, songMode: false },
             groove: {
-                genreFeel: 'Ska-Punk',
+                genreFeel: 'Ska',
                 creativity: true,
                 lastDrumPreset: 'Ska',
                 instruments: [],

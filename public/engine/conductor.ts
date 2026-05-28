@@ -61,8 +61,10 @@ const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // the velocity threshold where that crack reads as energy. Epic 12 S6 B3 —
     // chosen by analogy with Disco's 0.45 floor, one notch lower because ska-punk's
     // snare-on-the-and is less load-bearing than disco's four-on-the-floor kick.
-    // Canonical key matches `groove-engine.ts:38` ('Ska-Punk' with hyphen).
-    'Ska-Punk': 0.4,
+    // why: canonical genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts) —
+    // the old 'Ska-Punk' key (the preset name) never matched, so the floor was dead
+    // and the upbeat-crack could fall below the velocity threshold. Epic 2 S1.
+    Ska: 0.4,
 };
 
 /**
