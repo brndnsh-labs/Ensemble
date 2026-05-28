@@ -118,7 +118,24 @@ function resetCompingState() {
  * combinations of those biases — the acceptance ranges must hold across all
  * of them.
  */
-function runJazzCompingSixEight(numBars: number, seed: number) {
+/**
+ * Build a chord object from a root + intervals so the chord-change walk uses
+ * realistic voicings. `freqs` are derived from MIDI (equal temperament).
+ */
+function makeChord(rootMidi: number, quality: string, intervals: number[], sectionId: string) {
+    const midiToFreq = (m: number) => 440 * 2 ** ((m - 69) / 12);
+    return {
+        rootMidi,
+        quality,
+        intervals,
+        freqs: intervals.map((iv) => midiToFreq(rootMidi + iv)),
+        is7th: true,
+        beats: 6,
+        sectionId,
+    };
+}
+
+function runJazzCompingSixEight(numBars: number, seed: number, walkChords?: any[]) {
     const origRandom = Math.random;
     let rngSeed = seed >>> 0;
     // why: mulberry32-flavored deterministic PRNG. The inline `Math.random()`
@@ -151,7 +168,11 @@ function runJazzCompingSixEight(numBars: number, seed: number) {
         beats: 6,
         sectionId: `A_${seed.toString(16)}`,
     };
-    arranger.progression = [mockChord];
+    // why: when a chord walk is supplied, the production progression IS the walk
+    // (distinct objects per bar) so getAccompanimentNotes' `indexOf(chord)`
+    // resolves a new chordIndex each bar → exercises the new-chord-downbeat
+    // anchoring path. Otherwise fall back to the single-chord vamp.
+    arranger.progression = walkChords && walkChords.length > 0 ? walkChords : [mockChord];
 
     const totalSteps = numBars * STEPS_PER_BAR;
     let totalHits = 0;
@@ -160,6 +181,11 @@ function runJazzCompingSixEight(numBars: number, seed: number) {
 
     for (let step = 0; step < totalSteps; step++) {
         const measureStep = step % STEPS_PER_BAR;
+        const barIndex = Math.floor(step / STEPS_PER_BAR);
+        const chord =
+            walkChords && walkChords.length > 0
+                ? walkChords[barIndex % walkChords.length]
+                : mockChord;
         const info = getStepInfo(step, SIX_EIGHT, [], TIME_SIGNATURES);
         // why: production-shaped coordination — no soloist resting (so the
         // phrase-end thinning gate doesn't fire) and no drum hits (so the
@@ -179,7 +205,7 @@ function runJazzCompingSixEight(numBars: number, seed: number) {
 
         const notes = getAccompanimentNotes(
             getState(),
-            mockChord,
+            chord,
             step,
             step,
             measureStep,
@@ -313,5 +339,85 @@ describe('Jazz 6/8 Comping Density Critique (S13)', () => {
         for (let i = STEPS_PER_BAR; i < 16; i++) {
             expect(result.hitsByStep[i]).toBeUndefined();
         }
+    });
+});
+
+// epic-1-compound-meter S13 follow-up: the S13 test vamps on a single Cmaj7, so
+// it never exercises the new-chord-downbeat anchoring path (`isNewChord` at
+// accompaniment.ts, which forces a hit + re-voices on the bar a chord changes).
+// A regression that inflated density specifically on chord-change bars would
+// pass the single-chord test. This block drives a ii-V-I-VI walk (Dm7 | G7 |
+// Cmaj7 | A7 — 3 changes per 4-bar phrase, plus the wrap) and re-asserts the
+// same acceptance ranges, so chord-change bars stay sparse and pulse-clustered.
+describe('Jazz 6/8 Comping Density — chord-change walk (S13 follow-up)', () => {
+    const WALK = [
+        makeChord(62, 'min7', [0, 3, 7, 10], 'A'), // Dm7
+        makeChord(67, 'dom7', [0, 4, 7, 10], 'A'), // G7
+        makeChord(60, 'maj7', [0, 4, 7, 11], 'A'), // Cmaj7
+        makeChord(69, 'dom7', [0, 4, 7, 10], 'A'), // A7
+    ];
+
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        resetCompingState();
+    });
+
+    it('density + pulse-alignment hold across a ii-V-I-VI walk (8 seeds)', () => {
+        const seeds = [
+            0x1, 0xa1b2c3d4, 0xdeadbeef, 0x5eed5eed, 0x12345678, 0xabcdef01, 0xc0ffee, 0xbadf00d,
+        ];
+        const failures: string[] = [];
+
+        for (const seed of seeds) {
+            resetCompingState();
+            const result = runJazzCompingSixEight(32, seed, WALK);
+            const pulseAlignedHits = [...PULSE_ALIGNED_STEPS].reduce(
+                (sum, s) => sum + result.hitsByStep[s],
+                0,
+            );
+            const pulseShare = result.totalHits > 0 ? pulseAlignedHits / result.totalHits : 0;
+            const perStepDensity = result.totalHits / result.totalSteps;
+
+            if (result.hitsPerBar < 1 || result.hitsPerBar > 4) {
+                failures.push(
+                    `seed=0x${seed.toString(16)} hitsPerBar=${result.hitsPerBar.toFixed(2)}`,
+                );
+            }
+            if (pulseShare < 0.7) {
+                failures.push(
+                    `seed=0x${seed.toString(16)} pulseShare=${(pulseShare * 100).toFixed(1)}%`,
+                );
+            }
+            if (perStepDensity > 0.35) {
+                failures.push(
+                    `seed=0x${seed.toString(16)} perStepDensity=${(perStepDensity * 100).toFixed(1)}%`,
+                );
+            }
+            // Off-pulse 4/4-cell positions {2, 8} must stay silent on chord changes too.
+            if (result.hitsByStep[2] + result.hitsByStep[8] > 0) {
+                failures.push(
+                    `seed=0x${seed.toString(16)} off-pulse {2,8}=${result.hitsByStep[2] + result.hitsByStep[8]}`,
+                );
+            }
+        }
+
+        if (failures.length > 0) {
+            // biome-ignore lint/suspicious/noConsole: critique-test report
+            console.log('[Chord-change walk failures]', failures);
+        }
+        expect(failures).toEqual([]);
+    });
+
+    it('every bar downbeat (mStep 0) is anchored on chord changes', () => {
+        // why: the new-chord path forces a hit on the chord's first beat. Over a
+        // walk where every bar is a new chord, mStep 0 should be populated in
+        // (nearly) every bar — guards against the anchoring being lost in compound.
+        const numBars = 32;
+        const result = runJazzCompingSixEight(numBars, 0xdeadbeef, WALK);
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log(
+            `[Chord-change walk] downbeat hits = ${result.hitsByStep[0]}/${numBars}, hits/bar = ${result.hitsPerBar.toFixed(2)}`,
+        );
+        expect(result.hitsByStep[0]).toBeGreaterThanOrEqual(numBars * 0.9);
     });
 });

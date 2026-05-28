@@ -1,3 +1,4 @@
+import { scrambleHash } from '../hash-utils.js';
 import {
     applyStandardBase,
     binaryTier,
@@ -185,7 +186,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         if (shouldPlay && soundName === 'Sidestick') {
-            velocity = scaleVelocity(0.9, intensity, 0.1) + (Math.random() - 0.5) * 0.1;
+            // why: deterministic ±0.05 humanize on the sidestick velocity. Replaces
+            // bare Math.random() (FOLLOWUPS §F) so looped playback + seeded critique
+            // tests stay coherent. Seeded per step via the golden-ratio scramble
+            // (GrooveContext.playback doesn't expose currentLoopCount, so the jitter
+            // is loop-stable — fine for a sub-perceptual velocity nudge).
+            const velSeed = (step * 0x9e3779b1) | 0;
+            velocity = scaleVelocity(0.9, intensity, 0.1) + (scrambleHash(velSeed) - 0.5) * 0.1;
         }
     }
     // --- 3. HI-HAT (Steady 8ths) ---

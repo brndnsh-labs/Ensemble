@@ -33,7 +33,6 @@ vi.mock('../../public/state.js', () => ({
 
 // why: 6/8 has 12 steps per bar (6 eighth-note beats × 1 step/eighth = 12 steps)
 const SIX_EIGHT = TIME_SIGNATURES['6/8'];
-const STEPS_PER_BAR = SIX_EIGHT.beats * SIX_EIGHT.stepsPerBeat; // 12
 
 // why: after S11 fix, the canonical ride cluster is pulses {0, 6} + skip-beats {4, 10}
 const CLUSTER_STEPS = new Set([0, 4, 6, 10]);
@@ -41,7 +40,7 @@ const CLUSTER_STEPS = new Set([0, 4, 6, 10]);
 // why: the old wrong positions (last 16th of each group) must now be nearly silent
 const OLD_SKIP_STEPS = new Set([5, 11]);
 
-function buildJazzState() {
+function buildJazzState(timeSignature: string) {
     return {
         playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
         groove: {
@@ -51,28 +50,35 @@ function buildJazzState() {
             instruments: [],
         },
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
-        arranger: { timeSignature: '6/8' },
+        arranger: { timeSignature },
     };
 }
 
 /**
- * Simulate a multi-bar jazz 6/8 performance and collect ride hits.
+ * Simulate a multi-bar jazz performance in a compound meter and collect ride hits.
+ * Parameterized by tsConfig so the same harness covers 6/8 and 12/8.
  * Returns { totalRideHits, clusterHits, oldSkipHits, hitsByStep }.
  */
-function simulateRideHits(numBars: number) {
+function simulateRideHits(
+    numBars: number,
+    tsConfig: { beats: number; stepsPerBeat: number },
+    clusterSteps: Set<number>,
+    oldSkipSteps: Set<number>,
+) {
+    const stepsPerBar = tsConfig.beats * tsConfig.stepsPerBeat;
     let totalRideHits = 0;
     let clusterHits = 0;
     let oldSkipHits = 0;
     const hitsByStep: Record<number, number> = {};
 
     for (let bar = 0; bar < numBars; bar++) {
-        for (let stepInBar = 0; stepInBar < STEPS_PER_BAR; stepInBar++) {
-            const absoluteStep = bar * STEPS_PER_BAR + stepInBar;
+        for (let stepInBar = 0; stepInBar < stepsPerBar; stepInBar++) {
+            const absoluteStep = bar * stepsPerBar + stepInBar;
 
-            // why: use getStepInfo with the actual 6/8 tsConfig and TIME_SIGNATURES
+            // why: use getStepInfo with the actual compound tsConfig and TIME_SIGNATURES
             // map so isCompound, stepInGroup, groupIndex, isPulse are all populated
             // correctly — the production path does the same via tick-logic.ts.
-            const info = getStepInfo(absoluteStep, SIX_EIGHT, [], TIME_SIGNATURES);
+            const info = getStepInfo(absoluteStep, tsConfig, [], TIME_SIGNATURES);
 
             const params = {
                 step: absoluteStep,
@@ -105,10 +111,10 @@ function simulateRideHits(numBars: number) {
                 totalRideHits++;
                 const mStep = info.mStep;
                 hitsByStep[mStep] = (hitsByStep[mStep] || 0) + 1;
-                if (CLUSTER_STEPS.has(mStep)) {
+                if (clusterSteps.has(mStep)) {
                     clusterHits++;
                 }
-                if (OLD_SKIP_STEPS.has(mStep)) {
+                if (oldSkipSteps.has(mStep)) {
                     oldSkipHits++;
                 }
             }
@@ -121,7 +127,7 @@ function simulateRideHits(numBars: number) {
 describe('Jazz 6/8 Ride Skip-Beat Position (S11)', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
-        getState.mockReturnValue(buildJazzState());
+        getState.mockReturnValue(buildJazzState('6/8'));
     });
 
     it('ride hits cluster on {0,4,6,10} ≥ 90% and avoid old positions {5,11} ≤ 5% (128 bars)', () => {
@@ -131,7 +137,12 @@ describe('Jazz 6/8 Ride Skip-Beat Position (S11)', () => {
         // `0.6 + drumComplexity * 0.3` ≈ 0.84 at intensity 0.6 + creativity,
         // so cluster coverage is high but not always 100%.
         const numBars = 128;
-        const { totalRideHits, clusterHits, oldSkipHits, hitsByStep } = simulateRideHits(numBars);
+        const { totalRideHits, clusterHits, oldSkipHits, hitsByStep } = simulateRideHits(
+            numBars,
+            SIX_EIGHT,
+            CLUSTER_STEPS,
+            OLD_SKIP_STEPS,
+        );
 
         const clusterRatio = totalRideHits > 0 ? clusterHits / totalRideHits : 0;
         const oldSkipRatio = totalRideHits > 0 ? oldSkipHits / totalRideHits : 0;
@@ -168,12 +179,78 @@ describe('Jazz 6/8 Ride Skip-Beat Position (S11)', () => {
         // with the pulse positions at probability 1.0 and skip at ~0.84.
         // Expected ~3.7 hits/bar at intensity 0.6.
         const numBars = 64;
-        const { totalRideHits } = simulateRideHits(numBars);
+        const { totalRideHits } = simulateRideHits(
+            numBars,
+            SIX_EIGHT,
+            CLUSTER_STEPS,
+            OLD_SKIP_STEPS,
+        );
         const hitsPerBar = totalRideHits / numBars;
 
         // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Jazz 6/8 Ride Density] ${hitsPerBar.toFixed(2)} hits/bar (Target: ≥ 2.0)`);
 
+        expect(hitsPerBar).toBeGreaterThanOrEqual(2.0);
+    });
+});
+
+// epic-1-compound-meter S11 follow-up: the S11 fix (`groupSteps - 2`) is
+// meter-agnostic, so 12/8 (compound-quadruple, grouping [3,3,3,3], 24 steps)
+// should place the spang-a-lang skip on the last eighth of each group too.
+// Cluster = pulses {0,6,12,18} + skip-beats {4,10,16,22}; old wrong positions
+// (last 16th of each group) = {5,11,17,23}.
+describe('Jazz 12/8 Ride Skip-Beat Position (S11 follow-up)', () => {
+    const TWELVE_EIGHT = TIME_SIGNATURES['12/8'];
+    const CLUSTER_12_8 = new Set([0, 4, 6, 10, 12, 16, 18, 22]);
+    const OLD_SKIP_12_8 = new Set([5, 11, 17, 23]);
+
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        getState.mockReturnValue(buildJazzState('12/8'));
+    });
+
+    it('ride hits cluster on {0,4,6,10,12,16,18,22} ≥ 90% and avoid {5,11,17,23} ≤ 5% (128 bars)', () => {
+        const numBars = 128;
+        const { totalRideHits, clusterHits, oldSkipHits, hitsByStep } = simulateRideHits(
+            numBars,
+            TWELVE_EIGHT,
+            CLUSTER_12_8,
+            OLD_SKIP_12_8,
+        );
+
+        const clusterRatio = totalRideHits > 0 ? clusterHits / totalRideHits : 0;
+        const oldSkipRatio = totalRideHits > 0 ? oldSkipHits / totalRideHits : 0;
+
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log('\n--- JAZZ 12/8 RIDE POSITION CRITIQUE REPORT ---');
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log(
+            `[Cluster] ${clusterHits}/${totalRideHits} = ${(clusterRatio * 100).toFixed(1)}% (Target: ≥ 90%)`,
+        );
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log(
+            `[Old skip {5,11,17,23}] ${oldSkipHits} = ${(oldSkipRatio * 100).toFixed(1)}% (Target: ≤ 5%)`,
+        );
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log('[Hits by mStep]', hitsByStep);
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log('-----------------------------------------------\n');
+
+        expect(clusterRatio).toBeGreaterThanOrEqual(0.9);
+        expect(oldSkipRatio).toBeLessThanOrEqual(0.05);
+    });
+
+    it('ride hits are non-trivially dense (≥ 2 hits per bar on average)', () => {
+        const numBars = 64;
+        const { totalRideHits } = simulateRideHits(
+            numBars,
+            TWELVE_EIGHT,
+            CLUSTER_12_8,
+            OLD_SKIP_12_8,
+        );
+        const hitsPerBar = totalRideHits / numBars;
+        // biome-ignore lint/suspicious/noConsole: critique-test report
+        console.log(`[Jazz 12/8 Ride Density] ${hitsPerBar.toFixed(2)} hits/bar (Target: ≥ 2.0)`);
         expect(hitsPerBar).toBeGreaterThanOrEqual(2.0);
     });
 });

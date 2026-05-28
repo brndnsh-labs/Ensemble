@@ -699,13 +699,20 @@ export function getStepInfo(
     // Previously hard-coded `stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1` which
     // silently mislabels offbeats for any stepsPerBeat other than 2 or 4.
     const isOffbeat = stepInBeat === Math.floor(stepsPerBeat / 2); // 8th note offbeat
-    // why: epic-1-compound-meter S2 — "every eighth-note boundary" flag. For 16th-grid
-    // meters (stepsPerBeat=4), an eighth note spans 2 steps, so fire every other step.
-    // For 8th-grid meters (stepsPerBeat=2: 6/8, 7/8, 12/8), each step already IS an eighth
-    // note, so every step is a boundary. The broken bass-engine formula (step % (spb/2) === 0)
-    // degenerated to step % 1 === 0 = always-true for stepsPerBeat=2; using this named field
-    // makes the intent explicit and meters correct for any supported stepsPerBeat.
-    const isEighthBoundary = stepsPerBeat >= 4 ? mStep % 2 === 0 : true;
+    // why: epic-1-compound-meter S2 — "every eighth-note boundary" flag. An eighth
+    // note is half a beat, so a step is an eighth boundary iff its position is an
+    // integer multiple of half a beat: `(2 * mStep) % stepsPerBeat === 0`. This is
+    // correct for every grid:
+    //   16th grid (spb=4) → mStep % 2 === 0 (every other step);
+    //   8th grid (spb=2: 6/8, 7/8, 12/8) → always true (each step IS an eighth);
+    //   triplet grid (spb=3) → only beat-starts (mStep 0,3,6…), since triplet
+    //     partials don't land on eighth boundaries.
+    // epic-1-compound-meter S2 follow-up (2026-05-28): generalized from the old
+    // `stepsPerBeat >= 4 ? mStep % 2 === 0 : true`, which silently mislabelled
+    // every step of a triplet grid as an eighth boundary. Behavior is byte-
+    // identical for the shipped meters (spb 2 and 4); the change only fixes the
+    // hypothetical triplet-grid case (locked in by meter-integrity.test.ts).
+    const isEighthBoundary = (2 * mStep) % stepsPerBeat === 0;
     const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
     const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;
 

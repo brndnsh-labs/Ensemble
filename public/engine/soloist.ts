@@ -1823,6 +1823,11 @@ export function getSoloistNote(
 
                 const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
                 // why: discriminator 51 — phrase active-length roll.
+                // NB (epic-1-compound-meter S14 follow-up): `* stepsPerBeat` converts the
+                // beat-denominated baseLength into *steps*; it intentionally does NOT divide
+                // by tsConfig.beats. So a 6/8 phrase (stepsPerBeat=2) is ~half the step-count
+                // of a 4/4 phrase (stepsPerBeat=4) but proportionally similar in musical time
+                // — correct as-is. If you ever retune this expecting "bars", normalize first.
                 let _nextActiveSteps = Math.floor(
                     baseLength * stepsPerBeat * (0.3 + scrambleHash(callSeedBase + 51) * 1.2),
                 );
@@ -1973,7 +1978,9 @@ export function getSoloistNote(
         if (!soloist.session.phrasing.isResting) {
             const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
             // why: discriminator 53 — fallback plan-length roll (test-forced
-            // active state with no prior activeSteps).
+            // active state with no prior activeSteps). Same step-vs-bar note as the
+            // discriminator-51 site above: `* stepsPerBeat` yields steps, not bars,
+            // and is intentionally not normalized by tsConfig.beats.
             const planSteps =
                 soloist.session.phrasing.activeSteps && soloist.session.phrasing.activeSteps > 0
                     ? soloist.session.phrasing.activeSteps

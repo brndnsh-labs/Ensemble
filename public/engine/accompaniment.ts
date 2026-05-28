@@ -1098,10 +1098,20 @@ export function generateCompingPattern(
         //      Only fires when the step isn't already part of the parent cell to
         //      avoid double-strike.
         if (vibe === 'active' && ts.beats >= 4) {
-            const ornamentStep =
-                (sectionHash + phraseHash) % 2 === 0
-                    ? getBeatStep(1) // beat-2
-                    : getBeatStep(2, Math.floor(spb / 2)); // &-of-3
+            // why: epic-1-compound-meter S7 follow-up — in compound meters the
+            // idiomatic ornament slot is the "and-of-pulse" anticipation
+            // (mStep 4/10 in 6/8 grouping [3,3]; 4/10/16/22 in 12/8), NOT the
+            // 4/4 "beat 2" / "&-of-3" the simple-meter path uses. `getBeatStep(2)`
+            // = the third eighth of the first pulse group (mStep 4); `ts.beats-1`
+            // = the last group's anticipation. Alternate the two across phrases
+            // so the chatter still tracks phrase identity.
+            const ornamentStep = ts.isCompound
+                ? (sectionHash + phraseHash) % 2 === 0
+                    ? getBeatStep(2) // and-of-first-pulse → mStep 4
+                    : getBeatStep(ts.beats - 1) // and-of-last-pulse → mStep 10 (6/8)
+                : (sectionHash + phraseHash) % 2 === 0
+                  ? getBeatStep(1) // beat-2
+                  : getBeatStep(2, Math.floor(spb / 2)); // &-of-3
             if (pattern[ornamentStep] !== 1) {
                 hit(ornamentStep);
             }
