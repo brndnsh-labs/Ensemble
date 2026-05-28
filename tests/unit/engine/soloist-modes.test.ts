@@ -143,6 +143,11 @@ describe('Soloist Mode Differentiation Logic', () => {
         state.soloist.session.phrasing.state = 'active';
         state.soloist.session.phrasing.isYielding = false;
         state.soloist.session.phrasing.transitionState = null;
+        // S14 (compound-meter S7 author finding A) — clear the phrasing budget
+        // counter between test cases. Without this, the hoisted increment at
+        // getSoloistNote:1091 accumulates across tests in the file and breaks
+        // the "guitar double stops" test by triggering budget-forced rest.
+        state.soloist.session.phrasing.barsSinceRest = 0;
     };
 
     beforeEach(() => {

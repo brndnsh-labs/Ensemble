@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 12 / 16 stories shipped.**
+**Cycle 2026-05-27 → in progress: 13 / 16 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 16 | 12 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). S7 is blocked-by S11–S14. |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 16 | 13 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). S7 is blocked-by S11–S14. |
 
 ## Phased rollout
 
@@ -50,7 +50,7 @@ Once S1 lands, S2, S3, S4, S5, S9 are mechanical 4/4-assumption fixes on disjoin
 | Story | Note |
 | :- | :- |
 | S6 (soloist phrasing audit) | ✅ Done. Verified pipeline isn't 4/4-assuming; extended critique coverage. |
-| S7 (All Blues critique test) | **Unblocked 2026-05-27** — all of S11–S15 shipped. The cycle's Definition of Done. Ready for re-authoring with correct musical targets and no `.skip`'d assertions. |
+| S7 (All Blues critique test) | ✅ Done 2026-05-27. The cycle's Definition of Done. 5/5 assertions green, 30/30 reliable. Surfaced architectural S14 gap (budget code unreachable behind head-bypass) — patched inline with hoisted budget timer + anchor-aware gate. Listening pass next. |
 | S8 (chart sizing under TS change) | User-reported regression on a long progression; needs reproduction + lead-sheet-model fix. Sonnet. |
 | S10 (genre × TS UX) | Design call on soft hint vs hard gate vs no-op. Defer if Phase 2/3 produce a passing S7. |
 

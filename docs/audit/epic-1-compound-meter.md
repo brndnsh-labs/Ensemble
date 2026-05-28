@@ -87,7 +87,7 @@ Rename `isAndOfFour` → `isAnticipation`. Compute as `stepsPerBar - 1` for comp
 
 **Effort:** ~4h. **Model:** opus (musical-judgment audit). **Reviewer:** music-theory-reviewer. **Source:** investigation 2026-05-27.
 
-### S7. End-to-end "All Blues feels right" critique test — Unblocked 2026-05-27 (S11–S15 shipped)
+### S7. End-to-end "All Blues feels right" critique test ✅ Done 2026-05-27
 
 **Status:** Blocked. First S7 authoring attempt (2026-05-27) surfaced four real engine gaps that prevent the cycle's DoD from being met *with the engine as it stands today*. The scheduling foundation (S1–S6, S9) is correct, but the **musical content layer still assumes 4/4** in four places. Promoted to S11–S14 below; S7 will be rewritten and re-attempted after those land.
 
