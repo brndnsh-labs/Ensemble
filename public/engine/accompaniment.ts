@@ -2542,17 +2542,28 @@ export function getAccompanimentNotes(
     // --- STANDARD Pattern Logic ---
     let isHit = compingState.currentCell[measureStep % spm] === 1;
 
+    // why: the comp overlay below modulates the (deterministic, phrase-stable)
+    // cell with coordination + anchoring decisions. It used raw Math.random,
+    // which re-randomized the comp every bar AND every loop — the "unpredictable
+    // / off-time" feel, worst in 6/8 where there are only two pulses to lock to.
+    // Seed all those decisions per (step, loopCount) so the comp LOCKS with the
+    // band (bass/drums/soloist already use this exact seed shape) and repeats
+    // deterministically loop-to-loop. Each gate adds a distinct discriminator so
+    // independent decisions don't share a draw.
+    const compRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+    const compDraw = (n: number) => scrambleHash((compRandSeed + n) | 0);
+
     // --- NEW: Multi-way Coordination ---
     if (isHit && chords.style === 'smart') {
-        // 1. Yield to Bass: If bass is hitting hard, have a 40% chance to skip or reduce velocity
-        if (bassHit && Math.random() < 0.4) {
+        // 1. Yield to Bass: If bass is hitting hard, ~40% chance to skip the step.
+        if (bassHit && compDraw(1) < 0.4) {
             isHit = false; // Yield the step entirely
         }
 
         // 2. Yield to Soloist: If soloist is active, increase the skip probability
         if (soloistActive) {
             const skipProb = 0.5 + intensity * 0.3;
-            if (Math.random() < skipProb) {
+            if (compDraw(2) < skipProb) {
                 isHit = false;
             }
         }
@@ -2565,7 +2576,7 @@ export function getAccompanimentNotes(
         chords.style === 'smart' &&
         (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues')
     ) {
-        if ((coordination.snareHit || coordination.kickHit) && Math.random() < 0.4) {
+        if ((coordination.snareHit || coordination.kickHit) && compDraw(3) < 0.4) {
             isHit = true;
         }
     }
@@ -2576,18 +2587,28 @@ export function getAccompanimentNotes(
         // Assume rhythmic mask maps up to 16 steps, gracefully wrap for different meters
         const stepInMask = (stepInfo?.mStep ?? measureStep) % 16;
         const hasHarmonyHit = (harmony.rhythmicMask >> stepInMask) & 1;
-        if (hasHarmonyHit && Math.random() < 0.4 + playback.bandIntensity * 0.3) {
+        if (hasHarmonyHit && compDraw(4) < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop
             isHit = false;
         }
     }
 
-    // Force hit on "One" if empty
-    if (measureStep === 0 && !isHit && Math.random() < 0.8) {
+    // Force hit on "One" if empty — the downbeat is the chord-change landmark.
+    // why: anchor it near-deterministically in compound (0.97) so the 6/8 waltz
+    // spine is reliably present and the band locks; simple meters keep ~80%.
+    if (measureStep === 0 && !isHit && compDraw(5) < (ts.isCompound ? 0.97 : 0.8)) {
         isHit = true;
     }
-    if (stepInfo?.isGroupStart && !isHit && Math.random() < 0.4 + intensity * 0.4) {
-        isHit = true;
+    // why: group starts are the felt pulses. In compound (6/8 {0,6}, 12/8
+    // {0,6,12,18}) these are the dotted-quarter pulses — anchor them reliably
+    // (0.95) so the waltz locks onto a stable pulse rather than a coin-flip;
+    // the cell's identity then expresses through the ornament steps. Simple
+    // meters keep the lighter intensity-scaled add.
+    if (stepInfo?.isGroupStart && !isHit) {
+        const groupAddProb = ts.isCompound ? 0.95 : 0.4 + intensity * 0.4;
+        if (compDraw(6) < groupAddProb) {
+            isHit = true;
+        }
     }
 
     if (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues') {
@@ -2603,7 +2624,7 @@ export function getAccompanimentNotes(
             isHit &&
             coordination?.soloistBusy === true &&
             playback.complexity > 0.6 &&
-            Math.random() < 0.3
+            compDraw(7) < 0.3
         ) {
             isHit = false;
         }
@@ -2710,13 +2731,13 @@ export function getAccompanimentNotes(
 
         if (chords.style === 'smart') {
             const pushProb = 0.15 + intensity * 0.2;
-            if (!isDownbeat && Math.random() < pushProb) {
+            if (!isDownbeat && compDraw(8) < pushProb) {
                 timingOffset -= 0.025;
             }
-            if (Math.random() < playback.intent.anticipation) {
+            if (compDraw(9) < playback.intent.anticipation) {
                 timingOffset -= 0.01;
             }
-            if (Math.random() < playback.intent.layBack) {
+            if (compDraw(10) < playback.intent.layBack) {
                 timingOffset += 0.02;
             }
         }
