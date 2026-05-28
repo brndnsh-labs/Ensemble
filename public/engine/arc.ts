@@ -117,7 +117,6 @@ export function getEffectiveLoopLimit(
     sessionTimer: number,
     bpm: number,
     totalSteps: number,
-    ts?: { bpmUnit?: string; stepsPerBeat?: number },
 ): number {
     // Explicit loop count always wins.
     if (Number.isFinite(loopLimit) && loopLimit > 0) {
@@ -134,12 +133,9 @@ export function getEffectiveLoopLimit(
     ) {
         return 0;
     }
-    // why: epic-1-compound-meter S1 — route through the canonical helper so
-    // 6/8 / 12/8 timer-mode sessions resolve to the right loop count at the
-    // displayed (dotted-quarter) tempo. Falls back to 4/4 quarter-BPM math
-    // when `ts` is omitted, matching the prior behavior for callers that
-    // haven't yet been threaded.
-    const secPerStep = secondsPerStepFor(ts, bpm);
+    // BPM is quarter-notes/min for every meter, so loop length resolves the
+    // same way regardless of time signature.
+    const secPerStep = secondsPerStepFor(bpm);
     const secPerLoop = totalSteps * secPerStep;
     if (secPerLoop <= 0) {
         return 0;

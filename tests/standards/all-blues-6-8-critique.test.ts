@@ -4,7 +4,7 @@
  *
  * This is the Definition of Done for the compound-meter audit cycle. S11-S15
  * shipped the engine fixes; this test enforces that the All Blues preset,
- * played at its preset BPM (60 dotted-quarter/min) in 6/8 with style=jazz,
+ * played at its preset BPM (90 quarter-notes/min = the 60-dotted-quarter felt waltz) in 6/8 with style=jazz,
  * produces the musical structure of a slow Miles Davis jazz waltz.
  *
  * Unlike the per-story critique tests (S11 ride, S12 bass density, S13
@@ -54,7 +54,7 @@ vi.mock('../../public/state.js', () => ({
 
 // why: All Blues preset values from public/data/chord-presets.ts:639-666.
 const PRESET = {
-    bpm: 60, // dotted-quarter/min (post-S1 unit; was 110 pre-S1)
+    bpm: 90, // quarter-notes/min (= 60 dotted-quarter pulses/min — the felt waltz tempo)
     timeSignature: '6/8',
     style: 'jazz',
 };
@@ -469,21 +469,18 @@ describe('All Blues 6/8 End-to-End Critique (S7 — cycle DoD)', () => {
     });
 
     // -------------------------------------------------------------------
-    // (1) secondsPerStep math — the S1 contract: BPM=60 in 6/8 -> 1/3 s/step
+    // (1) secondsPerStep math: BPM=90 quarter-notes/min -> 1/6 s/step in 6/8
     // -------------------------------------------------------------------
-    it('(1) secondsPerStepFor at BPM=60 in 6/8 == 1/6 s (S1 dotted-quarter unit)', () => {
-        // why: All Blues preset BPM=60, ts=6/8 -> dotted-quarter/min. One
-        // dotted-quarter contains 6 sixteenths-equivalent positions, so each
-        // step (an eighth in 6/8 terms) = (60/60)/6 = 1/6 s. Equivalently:
-        // 1 dotted-quarter = 1 s @ BPM=60; 1 dotted-quarter = 3 eighths;
-        // step granularity is the eighth in compound (stepsPerBeat=2 over
-        // beats=6) so 1 step = 1/6 s. Verifies the entire cycle premise
-        // (S1: BPM unit per time signature). Pre-S1 this would have been
-        // (60/60)/4 = 1/4 s — wrong by a factor of 1.5.
-        const secs = secondsPerStepFor(SIX_EIGHT, PRESET.bpm);
+    it('(1) secondsPerStepFor at BPM=90 == 1/6 s (quarter-note BPM)', () => {
+        // why: All Blues preset BPM=90 (quarter-notes/min for every meter). A
+        // step is a 16th = (60/90)/4 = 1/6 s. The felt dotted-quarter pulse
+        // (6 steps) = 1.0 s = 60 dotted-quarter pulses/min — the Miles waltz
+        // tempo. The displayed BPM is meter-independent and exports to MIDI
+        // 1:1 (no dotted-quarter conversion).
+        const secs = secondsPerStepFor(PRESET.bpm);
         const expected = 1 / 6;
-        console.log('\n--- ALL BLUES SECONDS PER STEP (S1 contract) ---');
-        console.log(`[BPM]              ${PRESET.bpm} (dotted-quarter/min)`);
+        console.log('\n--- ALL BLUES SECONDS PER STEP ---');
+        console.log(`[BPM]              ${PRESET.bpm} (quarter-notes/min)`);
         console.log(`[Time signature]   ${PRESET.timeSignature}`);
         console.log(
             `[secondsPerStep]   ${secs.toFixed(6)} s (Target: ${expected.toFixed(6)} s = 1/6)`,

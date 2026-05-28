@@ -864,13 +864,9 @@ export function applyGrooveOverrides(
 }
 
 export function calculateStepDuration(step: number, bpm: number, ts: any, groove: any): number {
-    // why: epic-1-compound-meter S1 — step duration depends on the BPM unit
-    // declared by the time signature. For 4/4 (quarter) one step is a 16th =
-    // (60/bpm)/4. For 6/8 / 12/8 (dotted-quarter) one step is a 16th =
-    // (60/bpm)/6 (one dotted-quarter = 6 sixteenths). The previous
-    // hardcoded `0.25 * 60/bpm` formula made compound meters play 1.5×
-    // too slow because it kept treating BPM as quarters/min.
-    const stepSec = secondsPerStepFor(ts, bpm);
+    // BPM is quarter-notes/min for every meter, so one step (a 16th) is
+    // (60/bpm)/4 in all meters; swing below is applied per stepsPerBeat.
+    const stepSec = secondsPerStepFor(bpm);
     let duration = stepSec;
 
     if (groove.swing > 0) {

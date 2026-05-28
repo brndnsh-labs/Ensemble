@@ -34,22 +34,17 @@ export const INTERVAL_TO_ROMAN = {
 };
 
 /**
- * `bpmUnit` declares what musical note value the displayed BPM counts.
+ * The displayed BPM always counts quarter-notes/min, for every meter — the
+ * DAW/MIDI convention. In compound meters (6/8, 12/8) the felt pulse is the
+ * dotted-quarter (= 1.5 quarters), so a 6/8 jazz-waltz "feels" slower than the
+ * number suggests, but one BPM value maps to one absolute tempo regardless of
+ * meter and exported MIDI tempo equals the displayed BPM with no conversion.
+ * (Ensemble briefly used a dotted-quarter BPM unit for compound meters —
+ * epic-1-compound-meter S1 — but reverted to quarter-universal for DAW parity.)
  *
- * - `'quarter'`: BPM = quarter-notes/min. Canonical for simple meters
- *   (2/4, 3/4, 4/4, 5/4, 7/4) and for 7/8 where the eighth-note pulse is
- *   still felt over a quarter-note tempo grid.
- * - `'dotted-quarter'`: BPM = dotted-quarter pulses/min. Canonical for
- *   compound meters (6/8, 12/8) — "110 BPM" in a 6/8 jazz-waltz means
- *   110 dotted-quarter pulses/min, not 110 quarters. Without this distinction
- *   the scheduler plays compound meters at the wrong tempo and groove
- *   pocket math drifts off the dotted-quarter pulse. See
- *   `docs/audit/epic-1-compound-meter.md` (Story S1).
- *
- * Internal step granularity remains a 16th note in all meters
- * (`getStepsPerMeasure` returns 16 for 4/4, 12 for 6/8, etc.); the
- * `bpmUnit` only changes how seconds-per-step is computed from BPM.
- * See `secondsPerStepFor` / `secondsPerBeatFor` in `public/utils.ts`.
+ * Internal step granularity is a 16th note in all meters (`getStepsPerMeasure`
+ * returns 16 for 4/4, 12 for 6/8, etc.); see `secondsPerStepFor` /
+ * `secondsPerBeatFor` in `public/utils.ts`.
  */
 export interface TimeSignatureConfig {
     beats: number;
@@ -58,7 +53,6 @@ export interface TimeSignatureConfig {
     pulse: number[];
     grouping: number[];
     backbeat: number[];
-    bpmUnit: 'quarter' | 'dotted-quarter';
     isCompound?: boolean;
 }
 
@@ -70,7 +64,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4],
         grouping: [2],
         backbeat: [1],
-        bpmUnit: 'quarter',
     },
     '3/4': {
         beats: 3,
@@ -79,7 +72,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4, 8],
         grouping: [3],
         backbeat: [2],
-        bpmUnit: 'quarter',
     },
     '4/4': {
         beats: 4,
@@ -88,7 +80,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4, 8, 12],
         grouping: [2, 2],
         backbeat: [1, 3],
-        bpmUnit: 'quarter',
     },
     '5/4': {
         beats: 5,
@@ -97,7 +88,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4, 8, 12, 16],
         grouping: [3, 2],
         backbeat: [1, 3],
-        bpmUnit: 'quarter',
     },
     '6/8': {
         beats: 6,
@@ -107,11 +97,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         grouping: [3, 3],
         isCompound: true,
         backbeat: [1],
-        // why: epic-1-compound-meter S1 — 6/8 is canonically counted in
-        // dotted-quarter pulses (two per bar). At displayed bpm=110 a pulse
-        // takes 60/110 ≈ 0.545s; a step (=1 sixteenth = 1/6 of a dotted-quarter)
-        // is ≈ 0.091s.
-        bpmUnit: 'dotted-quarter',
     },
     '7/8': {
         beats: 7,
@@ -120,11 +105,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4, 8],
         grouping: [2, 2, 3],
         backbeat: [1, 2],
-        // why: 7/8 (not flagged `isCompound`) keeps a quarter-note BPM
-        // reference even though its pulse is in eighths — the conventional
-        // way to count 7/8 is "1-2 / 1-2 / 1-2-3" at the eighth, with BPM
-        // still expressed as quarters/min (so eighths = bpm × 2 per minute).
-        bpmUnit: 'quarter',
     },
     '7/4': {
         beats: 7,
@@ -133,7 +113,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         pulse: [0, 4, 8, 12, 16, 20, 24],
         grouping: [4, 3],
         backbeat: [1, 3, 5],
-        bpmUnit: 'quarter',
     },
     '12/8': {
         beats: 12,
@@ -143,9 +122,6 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
         grouping: [3, 3, 3, 3],
         isCompound: true,
         backbeat: [1, 3],
-        // why: epic-1-compound-meter S1 — 12/8 is compound-quadruple, four
-        // dotted-quarter pulses per bar. Same step/pulse math as 6/8.
-        bpmUnit: 'dotted-quarter',
     },
 };
 

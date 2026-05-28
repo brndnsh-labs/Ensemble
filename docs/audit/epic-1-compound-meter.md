@@ -20,7 +20,9 @@ Investigation under `/home/brandon/.claude/plans/i-have-a-very-lucky-wren.md` (2
 
 ## Stories
 
-### S1. BPM unit per time signature ✅ Done 2026-05-27
+### S1. BPM unit per time signature ✅ Done 2026-05-27 · ⏪ REVERTED 2026-05-28
+
+> **Reverted to quarter-universal (2026-05-28).** Per owner call, the displayed BPM is now quarter-notes/min for **every** meter — the DAW/MIDI convention — so one BPM value maps to one absolute tempo regardless of meter and exported MIDI tempo equals the displayed BPM with no conversion. The `bpmUnit` field and the dotted-quarter branch were removed; `secondsPerStepFor` is now `(60/bpm)/4` everywhere. The All Blues preset was re-migrated 60 → **90** (same felt 60-dotted-quarter waltz). The *felt dotted-quarter pulse* (mStep 0/6 grouping) is unchanged — only the BPM-unit interpretation reverted. The S1 description below is retained for history. See `FOLLOWUPS.md` and `chord-presets.ts` provenance.
 
 `public/engine/scheduler-core.ts:444, 531, 576, 780, 866, 883, 987, 1098` all compute `secondsPerStep` from BPM as quarter-notes/min (`60 / bpm / stepsPerBeat`). Add a `bpmUnit: 'quarter' | 'dotted-quarter'` field to each entry in `TIME_SIGNATURES` (`public/config.ts:46-113`). Default `'quarter'` for simple meters (2/4, 3/4, 4/4, 5/4, 7/4); `'dotted-quarter'` for 6/8 and 12/8. In the scheduler, branch:
 

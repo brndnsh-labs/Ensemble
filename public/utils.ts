@@ -435,31 +435,14 @@ export function decompressSections(str: string): Section[] {
 
 /**
  * Returns the duration, in seconds, of one internal step (always a 16th)
- * given a time-signature config and the displayed BPM.
+ * given the displayed BPM.
  *
- * Why this exists: prior to epic-1-compound-meter S1 the scheduler hard-coded
- * `0.25 * (60/bpm)` everywhere — i.e. it treated BPM as quarters/min for every
- * meter. That's wrong for compound meters: in 6/8 the natural tempo
- * reference is the dotted-quarter pulse, not the quarter. Branching on
- * `ts.bpmUnit` is the single canonical place to resolve that.
- *
- * Math:
- *   `quarter`        : a quarter = 60/bpm sec, divided into 4 sixteenths.
- *                      → stepSec = (60/bpm) / 4.
- *   `dotted-quarter` : a dotted-quarter = 60/bpm sec = 3 eighths
- *                      = 6 sixteenths.
- *                      → stepSec = (60/bpm) / 6.
- *
- * Internal step granularity stays a 16th in all meters; only the BPM-unit
- * interpretation changes.
+ * BPM is quarter-notes/min for every meter (DAW/MIDI convention), and an
+ * internal step is a 16th in all meters, so a step is always one quarter of
+ * a beat: `stepSec = (60/bpm) / 4`. This holds for compound meters too — a
+ * 6/8 bar is 12 sixteenths = 3 quarters' worth of clock time.
  */
-export function secondsPerStepFor(ts: { bpmUnit?: string } | undefined, bpm: number): number {
-    const unit = ts?.bpmUnit === 'dotted-quarter' ? 'dotted-quarter' : 'quarter';
-    if (unit === 'dotted-quarter') {
-        // why: 1 dotted-quarter = 6 sixteenths, so step = (60/bpm)/6.
-        return 60.0 / bpm / 6;
-    }
-    // why: simple-meter default — 1 quarter = 4 sixteenths.
+export function secondsPerStepFor(bpm: number): number {
     return 60.0 / bpm / 4;
 }
 
@@ -469,21 +452,17 @@ export function secondsPerStepFor(ts: { bpmUnit?: string } | undefined, bpm: num
  *
  * Definition: `ts.beats` is the denominator-derived count — quarters for
  * 4/4, eighths for 6/8 / 7/8 / 12/8 — so this helper returns
- * `stepsPerBeat * secondsPerStepFor(ts, bpm)`.
+ * `stepsPerBeat * secondsPerStepFor(bpm)`.
  *
- *   - 4/4 / 3/4 / 5/4 / 7/4 (quarter BPM, stepsPerBeat=4) → 60/bpm
- *   - 6/8 / 12/8 (dotted-quarter BPM, stepsPerBeat=2)     → (60/bpm)/3 (one eighth)
- *   - 7/8 (quarter BPM, stepsPerBeat=2)                   → (60/bpm)/2 (one eighth)
+ *   - 4/4 / 3/4 / 5/4 / 7/4 (stepsPerBeat=4) → 60/bpm (one quarter)
+ *   - 6/8 / 12/8 / 7/8 (stepsPerBeat=2)      → (60/bpm)/2 (one eighth)
  *
  * Use this for count-in (`ts.beats` clicks per bar), chord-duration
  * visualization (`chord.beats * secondsPerBeat`), etc.
  */
-export function secondsPerBeatFor(
-    ts: { bpmUnit?: string; stepsPerBeat?: number } | undefined,
-    bpm: number,
-): number {
+export function secondsPerBeatFor(ts: { stepsPerBeat?: number } | undefined, bpm: number): number {
     const stepsPerBeat = ts?.stepsPerBeat ?? 4;
-    return secondsPerStepFor(ts, bpm) * stepsPerBeat;
+    return secondsPerStepFor(bpm) * stepsPerBeat;
 }
 
 /**

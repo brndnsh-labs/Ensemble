@@ -445,12 +445,9 @@ function advanceCountIn(state: EnsembleState): void {
     const effectiveBpm = playback.bpm;
     const signatures: any = TIME_SIGNATURES;
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
-    // why: epic-1-compound-meter S1 — count-in clicks `ts.beats` per bar (4
-    // quarters in 4/4, 6 eighths in 6/8). `secondsPerBeatFor` returns the
-    // right duration for either `bpmUnit`: 60/bpm in simple, 60/bpm/3 (one
-    // eighth at dotted-quarter BPM) in compound. Previously beatDuration was
-    // always 60/bpm, making 6/8 count-in twice as long as it should be at
-    // the displayed (dotted-quarter) tempo.
+    // count-in clicks `ts.beats` per bar (4 quarters in 4/4, 6 eighths in 6/8).
+    // `secondsPerBeatFor` returns one ts.beats-native unit: 60/bpm (a quarter)
+    // in stepsPerBeat=4 meters, (60/bpm)/2 (an eighth) in stepsPerBeat=2 meters.
     const beatDuration = secondsPerBeatFor(ts, effectiveBpm);
     (playback as Mutable<typeof playback>).nextNoteTime += beatDuration; // @direct-mutation
     (playback as Mutable<typeof playback>).unswungNextNoteTime += beatDuration; // @direct-mutation
@@ -534,12 +531,10 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
 
     if (soloistNote) {
         const results = Array.isArray(soloistNote) ? soloistNote : [soloistNote];
-        const pickupStepSec = secondsPerStepFor(ts, playback.bpm);
+        const pickupStepSec = secondsPerStepFor(playback.bpm);
         results.forEach((res: any, voiceIndex: number) => {
             const freq = res.freq || getFrequency(res.midi);
-            // why: epic-1-compound-meter S1 — convert step count to seconds
-            // through the bpmUnit-aware helper so compound-meter pickups don't
-            // ring 1.5× too long.
+            // convert step count to seconds via the canonical step duration.
             const duration = (res.durationSteps || 4) * pickupStepSec;
 
             playSoloNote(
@@ -584,11 +579,10 @@ function advanceGlobalStep(state: EnsembleState): void {
     );
     const ts = signatures[sInfo.tsName || '4/4'] || signatures['4/4'];
 
-    // why: epic-1-compound-meter S1 — the "unswung" grid clock must advance
-    // by the bpmUnit-aware step duration (not a hardcoded 16th-of-a-quarter)
-    // so the soloistTime blend in `scheduleGlobalEvent` stays aligned with
-    // the swung `nextNoteTime` in 6/8 / 12/8.
-    const stepSec = secondsPerStepFor(ts, effectiveBpm);
+    // the "unswung" grid clock advances by one plain step (a 16th) so the
+    // soloistTime blend in `scheduleGlobalEvent` stays aligned with the swung
+    // `nextNoteTime`.
+    const stepSec = secondsPerStepFor(effectiveBpm);
     const duration = calculateStepDuration(playback.step, effectiveBpm, ts, groove);
 
     (playback as Mutable<typeof playback>).nextNoteTime += duration; // @direct-mutation
@@ -760,11 +754,9 @@ function scheduleBass(
     step: number,
     time: number,
 ): void {
-    const { bass, playback, vizState, groove, arranger } = state;
+    const { bass, playback, vizState, groove } = state;
     const notes = bass.buffer.get(step);
     bass.buffer.delete(step);
-    const tsForBass =
-        (TIME_SIGNATURES as any)[arranger?.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
 
     // Seeded per-note humanization (synth-audit Epic 5 S5): replaces the
     // shared per-tick `t` jitter for the bass voice. Tight `bass` profile —
@@ -795,10 +787,8 @@ function scheduleBass(
                 (bass as Mutable<typeof bass>).lastPlayedFreq = freq; // @direct-mutation
                 const midiNum = getMidi(freq || 0) || 0;
                 const { name, octave } = midiToNote(midiNum);
-                // why: epic-1-compound-meter S1 — step → seconds via the
-                // bpmUnit-aware helper. Bass durations in 6/8 / 12/8 used to
-                // ring 1.5× too long because step time assumed quarter-BPM.
-                const stepSecBass = secondsPerStepFor(tsForBass, playback.bpm);
+                // step → seconds via the canonical step duration.
+                const stepSecBass = secondsPerStepFor(playback.bpm);
                 const duration = (durationSteps || 4) * stepSecBass;
                 const finalVel =
                     (velocity || 1.0) * (playback.conductorVelocity || 1.0) * h.velocityMult;
@@ -843,12 +833,10 @@ function scheduleSoloist(
     step: number,
     playTime: number,
 ): void {
-    const { soloist, playback, vizState, arranger } = state;
+    const { soloist, playback, vizState } = state;
     const notes = soloist.audio.buffer.get(step);
     soloist.audio.buffer.delete(step);
-    const tsForSoloist =
-        (TIME_SIGNATURES as any)[arranger?.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
-    const soloistStepSec = secondsPerStepFor(tsForSoloist, playback.bpm);
+    const soloistStepSec = secondsPerStepFor(playback.bpm);
 
     if (notes && notes.length > 0) {
         // Optimization: Avoid allocation if we only play one note (Common case)
@@ -887,8 +875,7 @@ function scheduleSoloist(
 
                 const midiNum = noteEntry.midi || getMidi(freq || 0) || 0;
                 const { name, octave } = midiToNote(midiNum);
-                // why: epic-1-compound-meter S1 — bpmUnit-aware step duration
-                // so soloist phrases in compound meters don't ring 1.5× long.
+                // step → seconds via the canonical step duration.
                 const duration = (durationSteps || 4) * soloistStepSec;
                 const baseVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
                 const vel = baseVel * polyphonyComp;
@@ -905,9 +892,7 @@ function scheduleSoloist(
                 // chord) and notes with an explicit bend-in (the bend is an
                 // intentional articulation that legato would otherwise
                 // swallow — applyPitchEnvelope checks legato before bend).
-                // why: epic-1-compound-meter S1 — half-step slack in
-                // bpmUnit-aware seconds so the legato detector keeps its
-                // intended musical tolerance in 6/8 / 12/8.
+                // Slack is half a step (a 16th) of the current tempo.
                 const gridSlack = soloistStepSec * 0.5;
                 const isLegato =
                     !noteEntry.isDoubleStop &&
@@ -979,11 +964,10 @@ export function scheduleChordVisuals(
         // Only queue canvas events when the Visuals workspace is active.
         // Arranger highlighting is driven directly from the scheduler now.
         if (vizState.enabled) {
-            // why: epic-1-compound-meter S1 — `chord.beats` is measured in the
-            // TS-native beat (eighths for compound). Use the bpmUnit-aware
-            // per-beat duration so the chord-event viz lifetime matches the
-            // chord's actual ringing time in 6/8 / 12/8 (previously the
-            // visualizer showed 1.5× too long chord events in compound).
+            // why: `chord.beats` is measured in the TS-native beat (eighths for
+            // compound), so route through `secondsPerBeatFor` (which scales by
+            // stepsPerBeat) for the chord-event viz lifetime rather than a bare
+            // per-quarter duration.
             const tsForChordViz =
                 (TIME_SIGNATURES as any)[arranger?.timeSignature] ||
                 (TIME_SIGNATURES as any)['4/4'];
@@ -1015,17 +999,14 @@ function scheduleChords(
     step: number,
     time: number,
 ): void {
-    const { chords, playback, vizState, arranger } = state;
+    const { chords, playback, vizState } = state;
     const notes = chords.buffer.get(step);
     chords.buffer.delete(step);
 
     if (notes && notes.length > 0) {
-        // why: epic-1-compound-meter S1 — bpmUnit-aware step duration so
-        // chord-comp note lengths in compound meters match their
-        // `durationSteps` count in seconds (was 1.5× too long).
-        const tsForChords =
-            (TIME_SIGNATURES as any)[arranger?.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
-        const stepSecChords = secondsPerStepFor(tsForChords, playback.bpm);
+        // step → seconds via the canonical step duration so chord-comp note
+        // lengths match their `durationSteps` count.
+        const stepSecChords = secondsPerStepFor(playback.bpm);
         // Count how many non-muted notes are in this step for volume normalization
         let numVoices = 0;
         for (let i = 0; i < notes.length; i++) {
@@ -1131,19 +1112,13 @@ export function scheduleHarmonies(
     step: number,
     time: number,
 ): void {
-    const { harmony, playback, vizState, arranger } = state;
+    const { harmony, playback, vizState } = state;
     const notes = harmony.buffer.get(step);
     harmony.buffer.delete(step);
 
     if (notes && notes.length > 0) {
-        // why: epic-1-compound-meter S1 — bpmUnit-aware step duration for
-        // harmony pads/stabs in compound meters. Guarded against undefined
-        // arranger to keep harmony-legato unit-test mocks (which stub only
-        // the harmony slice) working without forcing them to construct a
-        // full arranger object.
-        const tsForHarmony =
-            (TIME_SIGNATURES as any)[arranger?.timeSignature] || (TIME_SIGNATURES as any)['4/4'];
-        const stepSecHarmony = secondsPerStepFor(tsForHarmony, playback.bpm);
+        // step → seconds via the canonical step duration for harmony pads/stabs.
+        const stepSecHarmony = secondsPerStepFor(playback.bpm);
 
         // If any note in this step is a chord start or movement,
         // clear previous voices once before scheduling the new ones.
