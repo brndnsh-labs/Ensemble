@@ -73,6 +73,114 @@ describe('Acoustic Drummer Critique', () => {
         return history;
     };
 
+    // --- Compound-meter coverage — epic-2 S8 ---
+    // The harness above is hardcoded 16-step 4/4 with a partial param set; this one
+    // drives a true compound bar through full getStepInfo so the compound* filters and
+    // isPulseStart/isCompound/groupIndex predicates are live. Acoustic's idiomatic
+    // meters are 4/4 + 3/4 — compound is off-idiom, so the bar is "groove, don't break".
+    const simulateCompound = (tsKey, numBars, intensityValue) => {
+        const ts = TIME_SIGNATURES[tsKey];
+        const STEPS = ts.grouping.reduce((a, b) => a + b, 0) * ts.stepsPerBeat;
+        const mockState = {
+            playback: { bandIntensity: intensityValue, bpm: 90, songMode: false },
+            groove: {
+                genreFeel: 'Acoustic',
+                creativity: true,
+                lastDrumPreset: 'Acoustic',
+                instruments: [],
+            },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(mockState);
+
+        const history = [];
+        for (let bar = 0; bar < numBars; bar++) {
+            const barSteps = [];
+            for (let step = 0; step < STEPS; step++) {
+                const abs = bar * STEPS + step;
+                const info = getStepInfo(abs, ts, [], TIME_SIGNATURES);
+                const stepData = { mStep: info.mStep, instruments: {} };
+                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                    const params = {
+                        step: abs,
+                        inst: { name: instName, muted: false, steps: [] },
+                        stepVal: 0,
+                        playback: mockState.playback,
+                        groove: mockState.groove,
+                        isDownbeat: info.isDownbeat,
+                        isBeatStart: info.isBeatStart,
+                        isBackbeat: info.isBackbeat,
+                        isGroupStart: info.isGroupStart,
+                        isPulse: info.isPulse,
+                        isPulseStart: info.isPulseStart,
+                        isCompound: info.isCompound,
+                        isOffbeat: info.isOffbeat,
+                        isEOfBeat: info.isEOfBeat,
+                        isAOfBeat: info.isAOfBeat,
+                        beatIndex: info.beatIndex,
+                        groupIndex: info.groupIndex,
+                        stepInGroup: info.stepInGroup,
+                        tsConfig: info.tsConfig,
+                    };
+                    const result = applyGrooveOverrides(getState(), params);
+                    if (result.shouldPlay) {
+                        stepData.instruments[instName] = { velocity: result.velocity };
+                    }
+                }
+                barSteps.push(stepData);
+            }
+            history.push(barSteps);
+        }
+        return history;
+    };
+
+    const kickHitsAtMStep = (perf, mStep) =>
+        perf.filter((bar) => bar.some((s) => s.mStep === mStep && s.instruments.Kick)).length;
+
+    it('should place the "beat 3 presence" kick on the felt secondary pulse in compound meters', () => {
+        // Regression guard for epic-2 S8: the old kick keyed "beat 3 presence" on
+        // beatIndex===2, which is mStep 4 in compound (a mid-group weak position) — not
+        // a dotted-quarter pulse. compoundKickAllowed can DROP but not ADD, so the
+        // secondary pulse would have been silent. The meter-relative isSecondStrongBeat
+        // moves it to the middle group's pulse (mStep 6 in 6/8, mStep 12 in 12/8).
+        // Assert by POSITION: the presence kick lands on the felt pulse, and the old
+        // mis-map position (mStep 4) gets NO kick. High intensity (0.95) selects motif
+        // >=1 on ~80% of bars (the tiers that carry the presence kick).
+        const cases = [
+            { ts: '6/8', secondary: 6 },
+            { ts: '12/8', secondary: 12 },
+        ];
+        for (const { ts, secondary } of cases) {
+            const numBars = 64;
+            const perf = simulateCompound(ts, numBars, 0.95);
+            const foundation = kickHitsAtMStep(perf, 0); // beat 1, every bar
+            const secondaryHits = kickHitsAtMStep(perf, secondary); // motif >=1 presence
+            const misMap = kickHitsAtMStep(perf, 4); // old beatIndex===2 position
+            console.log(
+                `[Acoustic ${ts} @0.95] foundation(m0): ${foundation}/${numBars}, secondary(m${secondary}): ${secondaryHits}/${numBars}, old-mis-map(m4): ${misMap}/${numBars}`,
+            );
+            expect(foundation).toBe(numBars); // downbeat anchored every bar
+            expect(secondaryHits).toBeGreaterThan(numBars * 0.5); // presence on the felt pulse
+            expect(misMap).toBe(0); // the 4/4 mis-map position never fires in compound
+        }
+    });
+
+    it('should keep the compound kick sparse (acoustic restraint, not over-dense)', () => {
+        // compoundKickAllowed trims the syncopation roll (mid-group weak steps) so the
+        // compound kick stays to the foundation + the single secondary pulse — at most
+        // ~2/bar. Guards against an over-dense kick in the off-idiom meter.
+        for (const ts of ['6/8', '12/8']) {
+            const perf = simulateCompound(ts, 64, 0.95);
+            const total = perf.reduce(
+                (sum, bar) => sum + bar.filter((s) => s.instruments.Kick).length,
+                0,
+            );
+            const perBar = total / perf.length;
+            console.log(`[Acoustic ${ts} kick density @0.95] ${perBar.toFixed(2)}/bar`);
+            expect(perBar).toBeLessThanOrEqual(2.5);
+        }
+    });
+
     it('should pass an authenticity critique for a 128-bar Acoustic performance', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {

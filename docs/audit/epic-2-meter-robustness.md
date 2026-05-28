@@ -104,9 +104,13 @@ Only 6/8 + 12/8 are `isCompound` (`config.ts`); the shared `compoundHatAllowed`/
 - **Snare left unfiltered (deferred):** motif-2's offbeat snare fires ~6/bar in 6/8 (off-idiom double-time); no shared snare-density filter exists, out of the "opt into the filters" scope.
 - **Verified:** typecheck + biome clean; full standards (789) + `meter-integrity` + `odd-meter-authenticity` green.
 
-### S8 — `acoustic.ts`: gate the kick lane · Model: sonnet
-- **Bug:** hat is gated by `compoundHatAllowed` (`:138`) but the **kick lane has no `compoundKickAllowed`** — kick keys on `beatIndex === 2/3` (`:92–108`), mis-firing in 6/8. (Acoustic's idiomatic meters are 4/4 + 3/4, so 6/8 is off-idiom — lower stakes, but the fix is one filter call.)
-- **Acceptance:** wrap the kick lane in `compoundKickAllowed`.
+### S8 — `acoustic.ts`: gate the kick lane · Model: sonnet · ✅ SHIPPED 2026-05-28
+- **Bug:** hat gated by `compoundHatAllowed` (S16) but the **kick lane had no `compoundKickAllowed`** — and its "beat 3 presence" keyed on `beatIndex === 2`, which is mStep 4 (mid-group weak position) in 6/8, not a pulse.
+- **Fixed:** (a) made the motif-≥1 "beat 3 presence" meter-relative via `isSecondStrongBeat` (the S6 pattern — compound → `isPulseStart && groupIndex === midGroup`, so mStep 6 in 6/8 / mStep 12 in 12/8); (b) gated the kick lane with `compoundKickAllowed`. **Motif 0 (half-time) deliberately left downbeat-only** — in 4/4 it's already one kick/bar, so a single downbeat kick in 6/8 is faithful half-time, not a collapse (the deliberate difference from S6/S7's blanket anchor).
+- **Deliverable:** `acoustic-drummer-critique.test.ts` extended with a parameterized 6/8 + 12/8 compound harness — asserts the presence kick lands on the felt secondary pulse (mStep 6/12), the foundation fires every bar, the **old mis-map position (mStep 4) gets ZERO kicks**, and density ≤2.5/bar (measured 1.8). Reviewer confirmed it would have failed on the old `beatIndex === 2` code; 30/30 reliable.
+- **Reviewer P1 → FOLLOWUPS §C (out of scope):** the snare lane's motif-0 `beatIndex === 2` predicate has the *same* mis-map (snare on mStep 4, not the felt pulse mStep 6) — kick-only scope here, logged for a snare-lane follow-up.
+- **Reviewer P2 → fixed inline:** comment overstated the and-of-pulse tier (a no-op for acoustic, which has no and-of-pulse kick predicate).
+- **Verified:** typecheck + biome clean; full standards (791) + `meter-integrity` + `odd-meter-authenticity` green. 4/4 + odd simple meters byte-identical (incl. 7/8, which has `stepsPerBeat:2` but no `isCompound`, so it stays on the legacy path).
 
 ---
 

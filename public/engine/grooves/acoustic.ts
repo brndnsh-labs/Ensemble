@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -43,11 +44,31 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     }
     const { base } = result;
 
-    const { drumComplexity, sectionSeed, isDownbeat, isBeatStart, isOffbeat, beatIndex } = context;
+    const {
+        drumComplexity,
+        sectionSeed,
+        isDownbeat,
+        isBeatStart,
+        isOffbeat,
+        beatIndex,
+        isPulseStart,
+        isCompound,
+        groupIndex,
+    } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+
+    // why: epic-2 S8 — "beat 3 presence" is the bar's single secondary strong beat.
+    // In 4/4 that's beat 3 (beatIndex 2). In compound (6/8/12/8, stepsPerBeat=2)
+    // beatIndex 2 is mStep 4 — a mid-group weak position, NOT a dotted-quarter pulse.
+    // Read it meter-relative as the middle group's pulse so the kick anchors the felt
+    // secondary pulse: 6/8 [3,3] → group 1 (mStep 6); 12/8 [3,3,3,3] → group 2 (mStep 12).
+    const midGroup = Math.floor((context.tsConfig?.grouping?.length ?? 2) / 2);
+    const isSecondStrongBeat = isCompound
+        ? isPulseStart && groupIndex === midGroup
+        : isBeatStart && beatIndex === 2;
 
     // --- Lay-back: Acoustic is relaxed ---
     instTimeOffset += 0.004 + intensity * 0.004;
@@ -94,8 +115,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = 1.2;
         }
 
-        // Motif 1 & 2: Beat 3 presence
-        if (activeMotif >= 1 && isBeatStart && beatIndex === 2) {
+        // Motif 1 & 2: Beat 3 presence (meter-relative secondary strong beat)
+        if (activeMotif >= 1 && isSecondStrongBeat) {
             shouldPlay = true;
             velocity = 1.05;
         }
@@ -106,6 +127,19 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 shouldPlay = true;
                 velocity = 0.85;
             }
+        }
+
+        // why: epic-2 S8 — post-hoc density safety-net for compound meters. The motif
+        // predicates above fire the syncopation roll on mid-group weak steps in 6/8
+        // (stepsPerBeat=2); compoundKickAllowed trims those, leaving the foundation
+        // (mStep 0) + the isSecondStrongBeat pulse (mStep 6 / 12), which survive via the
+        // isPulseStart passthrough. (The helper's >0.7 and-of-pulse tier is a no-op here:
+        // no acoustic kick predicate targets the and-of-pulse — it exists for genres that
+        // do.) Motif 0 (half-time, kick on beat 1 only) is faithful in compound — a single
+        // downbeat kick in 6/8 is intentional, not a collapse. Simple meters pass through
+        // unconditionally — no if(isCompound) wrapper needed.
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- 3. HI-HAT (Pulse Shaker) ---
