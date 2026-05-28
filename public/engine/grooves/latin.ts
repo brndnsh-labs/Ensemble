@@ -109,9 +109,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // why: these step indices (0, 6, 12 / 4, 8) are 4/4 16th-note positions.
             // In 6/8 (stepsPerBar=12) step 12 is the start of the NEXT measure and
             // never fires; the spacing also doesn't match a 6/8 son clave (3+3+2 in
-            // eighths). Gate entirely on !isCompound and rely on the explicit
+            // eighths). Gate compound out entirely and rely on the explicit
             // 'Afro-Cuban 6/8' drum preset for compound-meter latin patterns.
-            if (!isCompound) {
+            const ts = context.tsConfig;
+            const stepsPerBeat = ts?.stepsPerBeat ?? 4;
+            const meterBeats = (ts?.grouping ?? []).reduce((a, b) => a + b, 0);
+            const is44 = meterBeats === 4 && stepsPerBeat === 4;
+            if (!isCompound && is44) {
                 if (isBar1) {
                     if (stepInBar === 0 || stepInBar === 6 || stepInBar === 12) {
                         shouldPlay = true;
@@ -120,6 +124,32 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     if (stepInBar === 4 || stepInBar === 8) {
                         shouldPlay = true;
                     }
+                }
+            } else if (!isCompound) {
+                // why: epic-2 S10 — in non-4/4 simple meters (3/4, 5/4, 7/4, 7/8) the
+                // 4/4 clave literals above strand 4/4 positions and DROP THE BAR'S TAIL
+                // (5/4 leaves beats 4-5 silent, 7/4 beats 4-7) — and the clave is the
+                // structural timeline, not an ornament. Derive it from the meter's
+                // grouping so it spans the whole bar: the grouping pulse (isPulseStart)
+                // anchors both clave sides; the busier 3-side (bar 1) adds the pickup —
+                // the last eighth before the next pulse (stepInGroup === groupSteps - 2,
+                // the same syncopation slot S9/S12 use) — for the clave's signature
+                // off-beat feel; the 2-side (bar 2) stays on the pulses. "Do our best,
+                // groove" — there is no canonical son clave for 5/4/7/4/7/8.
+                const groupBeats = ts?.grouping?.[context.groupIndex] ?? 4;
+                const groupSteps = groupBeats * stepsPerBeat;
+                const isPickup = context.stepInGroup === groupSteps - 2;
+                // why: single-group meters (3/4 [3], 2/4 [2]) have only ONE grouping
+                // pulse per bar (mStep 0), so isPulseStart alone would collapse the
+                // 2-side to a lone downbeat. Use the beat as the pulse unit there so the
+                // clave spans the bar (3/4 → clicks on each beat). Multi-group odd meters
+                // (5/4, 7/4, 7/8) use the grouping pulse as designed.
+                const isSingleGroup = (ts?.grouping?.length ?? 1) <= 1;
+                const feltPulse = isSingleGroup ? isBeatStart : isPulseStart;
+                if (feltPulse) {
+                    shouldPlay = true;
+                } else if (isBar1 && isPickup) {
+                    shouldPlay = true;
                 }
             }
 
