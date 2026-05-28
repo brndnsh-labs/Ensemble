@@ -77,6 +77,125 @@ describe('Ska-Punk Drummer Critique', () => {
         return history;
     };
 
+    // --- Compound-meter coverage — epic-2 S7 ---
+    // The harness above is hardcoded 16-step 4/4 with a partial param set; this one
+    // drives a true compound bar through full getStepInfo so the compound* filters and
+    // isPulseStart/isCompound predicates are live. Parameterized over TS key (6/8 +
+    // 12/8). Ska-Punk's idiomatic meter is 4/4 — compound is off-idiom, so the bar is
+    // "groove, don't break / over-densify", not idiomatic perfection.
+    const simulateCompound = (tsKey, numBars, intensityValue) => {
+        const ts = TIME_SIGNATURES[tsKey];
+        const STEPS = ts.grouping.reduce((a, b) => a + b, 0) * ts.stepsPerBeat;
+        const mockState = {
+            playback: { bandIntensity: intensityValue, bpm: 175, songMode: false },
+            groove: {
+                genreFeel: 'Ska',
+                creativity: true,
+                lastDrumPreset: 'Ska',
+                instruments: [],
+            },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(mockState);
+
+        const history = [];
+        for (let bar = 0; bar < numBars; bar++) {
+            const barSteps = [];
+            for (let step = 0; step < STEPS; step++) {
+                const abs = bar * STEPS + step;
+                const info = getStepInfo(abs, ts, [], TIME_SIGNATURES);
+                const stepData = {
+                    mStep: info.mStep,
+                    isPulseStart: info.isPulseStart,
+                    instruments: {},
+                };
+                for (const instName of ['Kick', 'Snare', 'HiHat', 'Open']) {
+                    const params = {
+                        step: abs,
+                        inst: { name: instName, muted: false, steps: [] },
+                        stepVal: 0,
+                        playback: mockState.playback,
+                        groove: mockState.groove,
+                        isDownbeat: info.isDownbeat,
+                        isBeatStart: info.isBeatStart,
+                        isBackbeat: info.isBackbeat,
+                        isGroupStart: info.isGroupStart,
+                        isPulse: info.isPulse,
+                        isPulseStart: info.isPulseStart,
+                        isCompound: info.isCompound,
+                        isOffbeat: info.isOffbeat,
+                        isEOfBeat: info.isEOfBeat,
+                        isAOfBeat: info.isAOfBeat,
+                        beatIndex: info.beatIndex,
+                        groupIndex: info.groupIndex,
+                        stepInGroup: info.stepInGroup,
+                        tsConfig: info.tsConfig,
+                        isTurnaround: false,
+                    };
+                    const result = applyGrooveOverrides(getState(), params);
+                    if (result.shouldPlay) {
+                        stepData.instruments[instName] = { velocity: result.velocity };
+                    }
+                }
+                barSteps.push(stepData);
+            }
+            history.push(barSteps);
+        }
+        return history;
+    };
+
+    it('should anchor every felt pulse with the kick in compound meters across all motifs', () => {
+        // Regression guard for epic-2 S7: in 6/8/12/8 the 4/4 kick predicates miss the
+        // second dotted-quarter pulse — motif 0's `!isBackbeat` strips mStep 6, motif 3's
+        // beatIndex===2 lands on mStep 4. compoundKickAllowed can DROP but not ADD a hit,
+        // so the bar collapsed to a single downbeat. The hoisted `isCompound &&
+        // isPulseStart` anchor fixes ALL motifs. Assert by POSITION at every isPulseStart
+        // step (a single-downbeat bug would pass a naive density bound). Sweep intensity
+        // so the low-energy motif-0 tier (the reviewer-caught hole) is exercised.
+        for (const ts of ['6/8', '12/8']) {
+            for (const intensity of [0.4, 0.9]) {
+                const perf = simulateCompound(ts, 48, intensity);
+                let pulseSlots = 0;
+                let pulseSlotsWithKick = 0;
+                perf.forEach((bar) => {
+                    bar.forEach((s) => {
+                        if (s.isPulseStart) {
+                            pulseSlots++;
+                            if (s.instruments.Kick) {
+                                pulseSlotsWithKick++;
+                            }
+                        }
+                    });
+                });
+                console.log(
+                    `[Ska-Punk ${ts} @${intensity}] kick on pulse slots: ${pulseSlotsWithKick}/${pulseSlots}`,
+                );
+                // EVERY felt pulse must carry a kick, every bar, every motif.
+                expect(pulseSlotsWithKick).toBe(pulseSlots);
+            }
+        }
+    });
+
+    it('should not over-densify the compound hat (skank trimmed, not every-eighth)', () => {
+        // compoundHatAllowed('sparse') trims the offbeat skank below intensity 0.75 and
+        // readmits it above. Guards against regressing to the unfiltered every-step hat
+        // (~12/bar in 6/8). At high intensity the skank returns but stays bounded.
+        const perf = simulateCompound('6/8', 48, 0.9);
+        let hatHits = 0;
+        perf.forEach((bar) =>
+            bar.forEach((s) => {
+                if (s.instruments.HiHat || s.instruments.Open) {
+                    hatHits++;
+                }
+            }),
+        );
+        const perBar = hatHits / perf.length;
+        console.log(`[Ska-Punk 6/8 hat density @0.9] ${perBar.toFixed(2)}/bar`);
+        // 12 steps/bar; unfiltered bug was ~12/bar. Sparse high-intensity readmits
+        // offbeats but caps well below the every-step ceiling.
+        expect(perBar).toBeLessThan(11);
+    });
+
     it('should implement the "Skank" feel (Strong offbeat hi-hats)', () => {
         const performance = simulatePerformance(16, { playback: { bandIntensity: 0.5 } });
 

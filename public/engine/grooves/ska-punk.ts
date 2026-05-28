@@ -1,6 +1,8 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -44,6 +46,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isAOfBeat,
         isEOfBeat,
         beatIndex,
+        isPulseStart,
+        isCompound,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
@@ -97,6 +101,20 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             soundName = 'Crash';
             velocity = 1.4;
         }
+
+        // why: epic-2 S7 — 'sparse' is the better of the two shared profiles for ska's
+        // offbeat skank. The skank lives on offbeats (odd mSteps); 'shimmer' keeps only
+        // isBeatStart (even mSteps) and would kill the skank at EVERY intensity, so it's
+        // strictly worse here. 'sparse' readmits the offbeat skank at intensity >0.75
+        // (where ska-punk is energetic) and trims compound over-density below that —
+        // the low-intensity "Classic Ska" tier sacrifices the skank to the pulse, which
+        // is an acceptable off-idiom compromise (it grooves, doesn't over-densify). The
+        // shared filter has no profile that preserves an *offbeat* time-keeper across the
+        // range — a utils.ts limitation, out of S7's scope. 'Open'/'Crash' structural
+        // accents pass through unconditionally; pass soundName so the filter sees them.
+        if (shouldPlay && !compoundHatAllowed(context, { profile: 'sparse', soundName })) {
+            shouldPlay = false;
+        }
     }
     // --- 3. KICK DRUM ---
     else if (context.inst.name === 'Kick') {
@@ -128,8 +146,32 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         }
 
+        // why: epic-2 S7 — anchor every felt pulse in compound meters across ALL motifs.
+        // In 6/8/12/8 the 4/4 predicates above miss the second dotted-quarter pulse:
+        // motif 0's `!isBackbeat` strips mStep 6 (the backbeat IS the 2nd pulse in 6/8),
+        // and motif 3's `beatIndex===2` lands on mStep 4 (mid-group), never mStep 6.
+        // compoundKickAllowed can DROP a hit but cannot ADD one, so the predicate itself
+        // must place the pulse or the bar collapses to a single downbeat. isPulseStart
+        // marks every dotted-quarter pulse (m0/m6 in 6/8; m0/m6/m12/m18 in 12/8). Gated
+        // by isCompound so 4/4 is byte-identical (there isPulseStart=beat-starts, already
+        // covered by the motif predicates).
+        if (isCompound && isPulseStart) {
+            shouldPlay = true;
+        }
+
         if (shouldPlay) {
             velocity = scaleVelocity(1.2, intensity, 0.15);
+        }
+
+        // why: epic-2 S7 — post-hoc density safety-net for compound meters. The motif
+        // predicates above (isBeatStart, isOffbeat) fire on every step in 6/8
+        // (stepsPerBeat=2), producing up to 12 kick hits/bar. compoundKickAllowed trims
+        // to pulses only at intensity ≤0.7, adding the and-of-pulse syncopation slot at
+        // intensity >0.7. The isCompound/isPulseStart anchor above guarantees both
+        // pulses survive (isPulseStart → compoundKickAllowed returns true). Simple meters
+        // pass through unconditionally — no if(isCompound) wrapper needed.
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- 4. SNARE POCKET ---

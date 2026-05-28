@@ -95,10 +95,14 @@ Only 6/8 + 12/8 are `isCompound` (`config.ts`); the shared `compoundHatAllowed`/
 - **Deliverable:** `minimal-drummer-critique.test.ts` extended with a real compound harness (full `getStepInfo`, parameterized 6/8 + 12/8) — asserts both felt pulses carry a kick at motif 1+2 (32/32, position not count — a 1/bar bug would pass a naive density bound) + sparse density bound (2.00/bar both meters).
 - **Verified:** typecheck + biome clean; full standards (787) + `meter-integrity` + `odd-meter-authenticity` green. 4/4 behavior provably unchanged (filters + `isSecondStrongBeat` else-branch are byte-identical in simple meters).
 
-### S7 — `ska-punk.ts`: compound treatment · Model: sonnet · **blocked by S1**
-- **Bug:** 4/4-only (kick on `beatIndex === 0/2`, every-step hat) → very busy in 6/8.
-- **Prerequisite:** the skaPunk strategy doesn't even run today (S1) — fix S1 first, *then* this code is live and worth tuning.
-- **Acceptance:** opt into the shared filters; coherent (if off-idiom) groove in compound meters.
+### S7 — `ska-punk.ts`: compound treatment · Model: sonnet · ✅ SHIPPED 2026-05-28
+- **Bug:** 4/4-only (kick on `beatIndex === 0/2`, every-step hat) → very busy in 6/8. (Only live since S1 rekeyed Ska-Punk's `genreFeel` to `'Ska'`.)
+- **Fixed:** hat lane gated by `compoundHatAllowed(context, { profile: 'sparse', soundName })`; kick lane gated by `compoundKickAllowed`.
+- **Reviewer-caught P1 (pulse loss, same class as the S6 P0):** the `anchorPulse` (`isCompound && isPulseStart`) was first applied only to the motif-3 D-beat branch, but **motif 0 ("Classic Ska", the default low-intensity tier)** also lost the second 6/8 pulse — its `!isBackbeat` predicate strips mStep 6 (the backbeat IS the 2nd pulse in 6/8). The filter can drop but not add a hit. Fixed by **hoisting the anchor above the motif switch** (`if (isCompound && isPulseStart) shouldPlay = true;`) so all four motifs anchor every felt pulse (m0/m6 in 6/8; m0/m6/m12/m18 in 12/8). 4/4 byte-identical (gated by `isCompound`).
+- **Hat-profile call (reviewer-validated):** `'sparse'` is the better of the two shared profiles — `'shimmer'` keeps only `isBeatStart` (even mSteps) and would kill ska's *offbeat* skank at every intensity. `'sparse'` readmits the skank above intensity 0.75 (where ska-punk is energetic) and trims compound over-density below. The shared filter has no profile preserving an offbeat time-keeper — a `utils.ts` limitation, out of S7 scope (logged below).
+- **Deliverable:** `ska-punk-drummer-critique.test.ts` extended with a parameterized 6/8 + 12/8 compound harness — asserts every `isPulseStart` slot carries a kick across all motifs/intensities (96/96 + 192/192, position not count) + a hat-density bound (10.04/bar at 0.9, below the ~12/bar every-step ceiling).
+- **Snare left unfiltered (deferred):** motif-2's offbeat snare fires ~6/bar in 6/8 (off-idiom double-time); no shared snare-density filter exists, out of the "opt into the filters" scope.
+- **Verified:** typecheck + biome clean; full standards (789) + `meter-integrity` + `odd-meter-authenticity` green.
 
 ### S8 — `acoustic.ts`: gate the kick lane · Model: sonnet
 - **Bug:** hat is gated by `compoundHatAllowed` (`:138`) but the **kick lane has no `compoundKickAllowed`** — kick keys on `beatIndex === 2/3` (`:92–108`), mis-firing in 6/8. (Acoustic's idiomatic meters are 4/4 + 3/4, so 6/8 is off-idiom — lower stakes, but the fix is one filter call.)
