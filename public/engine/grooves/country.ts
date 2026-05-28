@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -134,6 +135,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     velocity = 0.85;
                 }
             }
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
 

@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -132,6 +133,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             soundName = 'Open';
             velocity = 0.95;
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
     // --- 4. PERCUSSION (Tambourine/Shaker) ---

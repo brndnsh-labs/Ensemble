@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -163,6 +164,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             const ownsArticulation =
                 context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
             shouldPlay = ownsArticulation;
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { profile: 'shimmer', soundName })) {
+            shouldPlay = false;
         }
     }
     // --- Snare Pocket ---

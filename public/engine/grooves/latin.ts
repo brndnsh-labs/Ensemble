@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -166,6 +167,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             soundName = 'HiHat';
             velocity = isBeatStart ? 0.8 : 0.6;
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
     // --- 4. PERCUSSION (Ganza/Shaker) ---

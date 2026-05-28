@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -167,6 +168,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     context.inst.name === 'Open' ? soundName === 'Open' : soundName !== 'Open';
                 shouldPlay = ownsArticulation;
             }
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
     // --- 2. KICK DRUM ---

@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -100,6 +101,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 soundName = 'Open';
                 velocity = scaleVelocity(0.7, intensity, 0.1);
             }
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
     // --- Kick Drum (Simplified Anchor) ---

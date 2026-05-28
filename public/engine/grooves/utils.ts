@@ -175,6 +175,84 @@ export function makeMotifSelector(
 }
 
 /**
+ * Compound-meter hat-density gate. In 6/8 / 12/8, callers that use `isBeatStart`
+ * or `isOffbeat` as hat-density predicates fire on every step of the bar (12/bar
+ * in 6/8) because `stepsPerBeat=2` makes each step itself an eighth note.
+ *
+ * Two profiles, since "the hat" plays different musical roles across genres:
+ *
+ *   'sparse'  — Rock / Metal / Country / Blues / Acoustic / Reggae / Latin:
+ *               the hat is *secondary* to the pulse, idiomatic compound density
+ *               is 2–4 hits/bar (think a 6/8 ballad ride pattern).
+ *
+ *     intensity ≤ 0.5    → pulses only            (2/bar in 6/8)
+ *     intensity 0.5–0.75 → pulses + and-of-pulse  (4/bar in 6/8)
+ *     intensity > 0.75   → pulses + offbeats      (10/bar in 6/8)
+ *
+ *   'shimmer' — Funk / Hip Hop / Neo-Soul / Disco: the hat IS the genre-identity
+ *               time-keeper (the constant 8th-grid shimmer between pulses).
+ *               Suppressing it to pulses-only at moderate intensity would invert
+ *               the role — hat becomes the ornament instead of the metronome.
+ *               Compound floor is *steady 8ths* (= `isBeatStart` = 6/bar in 6/8).
+ *
+ *     intensity ≤ 0.4    → pulses only            (2/bar in 6/8)
+ *     intensity > 0.4    → all 8th-grid beats     (6/bar in 6/8)
+ *
+ * Intentional structural accents (`'Open'`, `'HiHatHalf'`) pass through
+ * unconditionally — section-turnaround barks and phrase-end punctuation are not
+ * the over-density we're suppressing.
+ *
+ * Used as a post-hoc filter over each genre's existing 4/4 hat predicate, so
+ * velocity / voicing / motif shaping survives; only the over-density emissions
+ * are dropped. Returns `true` in simple meters so callers can apply
+ * unconditionally without an `if (isCompound)` wrapper.
+ *
+ * why: epic-1-compound-meter S16 — every genre's hat lane (excepting jazz, which
+ * has its own compound branch) gates on `isEighthNote` (= `isBeatStart \|\| isOffbeat`)
+ * and fires every step in 6/8. This is the dominant audible "drums feel too busy"
+ * symptom the user reported during the S15 listening session. The "and-of-pulse"
+ * slot at `stepInGroup === groupSteps - 2` matches the canonical compound
+ * syncopation position (mStep {4, 10} in 6/8 grouping [3,3]) — same slot the jazz
+ * S11 skip-beat fix uses. Two-profile split added 2026-05-27 per S16 review —
+ * uniform suppression would have inverted shimmer-genre identity at moderate
+ * intensity.
+ */
+export function compoundHatAllowed(
+    context: GrooveContext,
+    opts: { profile?: 'sparse' | 'shimmer'; soundName?: string } = {},
+): boolean {
+    if (!context.isCompound) {
+        return true;
+    }
+    if (opts.soundName === 'Open' || opts.soundName === 'HiHatHalf') {
+        return true;
+    }
+    if (context.isPulseStart) {
+        return true;
+    }
+    const intensity = context.playback.bandIntensity;
+    const profile = opts.profile ?? 'sparse';
+    if (profile === 'shimmer') {
+        if (intensity > 0.4 && context.isBeatStart) {
+            return true;
+        }
+        return false;
+    }
+    if (intensity > 0.75 && context.isOffbeat) {
+        return true;
+    }
+    if (intensity > 0.5) {
+        const groupSteps =
+            (context.tsConfig?.grouping?.[context.groupIndex] || 3) *
+            (context.tsConfig?.stepsPerBeat || 2);
+        if (context.stepInGroup === groupSteps - 2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Standard base logic for groove overrides.
  * Extracts context and handles early returns for muted instruments.
  */

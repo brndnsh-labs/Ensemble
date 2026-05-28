@@ -204,21 +204,47 @@ Simple-meter (4/4) `intBeat === 2` behavior must remain byte-identical.
 
 **Effort:** ~4h (the picker has several stacked biases — chord-tone bonus, register slotting, target awareness; the compound-aware branch needs to integrate cleanly without breaking 4/4). **Model:** opus (pitch-pick decisions are taste-driven). **Reviewer:** music-theory-reviewer. **Source:** epic-1-compound-meter S12 review (2026-05-27). Implementer + reviewer both flagged the picker paired-site as out-of-scope of S12's density-gate fix; promoted to its own story to preserve S12's commit clean.
 
-### S16. Compound-meter drum density across genres
+### S16. Compound-meter drum density across genres (hat-first pass) ✅ Done 2026-05-27
 
 S11-S15 fixed jazz 6/8 (ride skip-beat + walking bass density/pitch + comping density + soloist rest cadence). The same shape of bug — 4/4-shaped per-step density firing on every eighth in 6/8 — exists in drum grooves across other genres. User-reported 2026-05-27 during the listening session: "drums feel too busy in 6/8, especially obvious on rock; the genre-specific drum energy pushes too hard."
 
-Audit `grooves/*.ts` for compound-aware density gating in each genre's drum-strategy. Worst-suspected offenders (un-verified):
-- `grooves/rock.ts` — kick/snare gates probably fire every beat in compound regardless of `bandIntensity`. Power-ballad feel (*Nothing Else Matters* 6/8 section) needs intensity-tapered density: at low intensity, drums fire only on `isPulseStart`; at moderate, add backbeat on the configured `tsConfig.backbeat` position (mStep 3 in 6/8 grouping `[3,3]`); at high, allow eighth-grid fills sparingly.
-- `grooves/metal.ts` — same pattern.
-- `grooves/country.ts` — boom-chick at every eighth in 6/8 → ten kicks per bar.
-- `grooves/pop.ts`, `grooves/soul.ts`, `grooves/disco.ts`, `grooves/reggae.ts`, `grooves/latin.ts` (compound-route only), `grooves/funk.ts`, `grooves/hip-hop.ts`, `grooves/blues.ts`, `grooves/ska-punk.ts` — audit each for compound-density branches; many will already be 4/4-only by genre, but flag any genre that does have compound idiomatic shape and needs gating.
+**Scope chosen (hat-first):** A parallel 3-agent audit of all 13 groove files revealed the bug is wider than the audit-doc anticipated — ~9 files have critical hat over-density (12/bar in 6/8), reggae and latin are *partially* compound-aware (some motifs correct, others broken — the worst-to-debug shape), and acoustic is sparse-by-design except its hat lane. Rather than ship one mega-commit, scope was narrowed to the dominant audible symptom (hat over-density) across 10 files. Kick/snare per-genre tuning and reggae/latin partial-broken motif repair promoted to S16b / S16c.
 
-Reuse the S12 / S13 pattern: drive low-intensity density off `stepInfo.isPulseStart`, allow backbeat at moderate intensity (`tsConfig.backbeat[*]` positions), allow eighth-grid fills at high intensity. Per-genre tuning required — rock's intensity ramp differs from country's. Listen-test each affected genre after engine work.
+**The fix:** New shared `compoundHatAllowed(context, opts)` helper in `public/engine/grooves/utils.ts` with two profiles:
+- **sparse** (Rock, Metal, Country, Blues, Acoustic, Reggae, Latin): hat is *secondary* to the pulse. At intensity ≤ 0.5 → pulses only (2/bar in 6/8); 0.5–0.75 → +and-of-pulse (4/bar); > 0.75 → +offbeats (10/bar).
+- **shimmer** (Funk, Hip Hop, Neo-Soul, Disco): hat IS the time-keeping voice. At intensity ≤ 0.4 → pulses; > 0.4 → steady 8ths (6/bar). Suppressing to pulses-only would *invert* the genre identity (hat becomes ornament). Reviewer-required split — uniform suppression failed the music-theory review.
 
-**Acceptance:** Per-genre critique tests (e.g. `tests/standards/rock-drums-6-8-density-critique.test.ts`, similar for other affected genres) assert each lane's density at intensity 0.5 stays ≤ ~50% of its 4/4 density. Existing 4/4 drummer critiques pass unchanged. Listen-test gate: load each affected genre with 6/8 + a slow waltz progression, confirm the feel "holds energy without rushing."
+Open and HiHatHalf voicings pass through unconditionally (structural turnaround barks, phrase-end punctuation — not the over-density we're suppressing). Helper applied as a post-hoc filter at the end of each affected file's hat branch, preserving all velocity / voicing / motif shaping. 4/4 behavior byte-identical (helper returns `true` in simple meters). Ska-Punk explicitly excluded — offbeat-hat IS the skank identity.
 
-**Effort:** ~6h (multi-genre audit + per-genre engine touches + critiques + listen-test pass per genre). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer. **Source:** user listening session during S15 cycle (2026-05-27). Closely parallels S11-S13 in shape but spans all drum lanes across multiple genres rather than just jazz.
+**Acceptance:** `tests/standards/compound-hat-density-critique.test.ts` — parametric across all 11 genres + 4/4 no-op regression guard. Sparse genres assert 6/8 hat density ∈ [1, 4] hits/bar at intensity 0.5; shimmer genres ∈ [4, 8] hits/bar. Measured: sparse 2.0–2.1/bar, shimmer 6.0–6.1/bar. Existing 4/4 critiques pass unchanged (719/719). Listen-test gate: passed 2026-05-27.
+
+**Effort:** ~3h (parallel audit + helper + 10 surgical edits + parametric critique + reviewer iteration). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer (caught shimmer-genre identity issue; design revised). **Source:** user listening session during S15 cycle (2026-05-27).
+
+### S16b. Compound-meter kick/snare density per genre
+
+S16 fixed the universal hat-density bug via a shared helper. The same bug-shape persists in kick/snare lanes across many of the same files — they gate on `isBeatStart` / `isOffbeat`, firing on every eighth in 6/8. Per the Phase A audit (epic-1 S16, 2026-05-27):
+
+- **Critical (4-6 hits/bar over-density):** rock.ts:177-209 (kick foundation + motifs), metal.ts:72-97 (kick motifs, motif 3 is unconditional), country.ts:69-86 (snare train-beat + 16th ghosts), funk.ts:282/298 (kick), disco.ts:95 (4-on-the-floor in 6/8), hiphop.ts:66-77 (kick), neo-soul.ts:207 (kick).
+- **Major:** blues.ts:116-122 (shuffle push uses `beatIndex === lastBeatIndex` which is 4/4-shaped), latin.ts:60 (kick — "Surdo feel" gated to wrong grid).
+
+**The fix:** apply the S12 / S13 pattern per genre. Low intensity → `isPulseStart`-driven; moderate → add backbeat positions (mStep 3 in 6/8 grouping [3,3]); high → eighth-grid fills sparingly. Each genre needs its own intensity ramp — rock's differs from country's. A shared helper like S16's `compoundHatAllowed` may emerge if the patterns converge, but expect per-genre judgment calls.
+
+**Acceptance:** Per-genre critique tests asserting kick/snare 6/8 density at intensity 0.5 is ≤ ~50% of 4/4 density (or a per-profile absolute bound — the S16 test's hits/bar framing is cleaner than the ratio). Existing 4/4 critiques pass unchanged. Listen-test gate: each affected genre's 6/8 feel "holds energy without rushing" — this is the same gate S16 used.
+
+**Effort:** ~6h (multi-genre per-lane tuning + per-genre critiques + listen-test pass). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer. **Source:** S16 audit (2026-05-27).
+
+### S16c. Reggae One Drop + Latin Samba/Partido Alto partial-compound repair
+
+S16's audit surfaced an anti-pattern *worse* than no compound-awareness: files that use `isPulseStart` in some motifs but `isBeatStart` in others, creating "sometimes-correct, sometimes-wrong" behavior. Two files:
+
+- **reggae.ts:** Motif 1 (Steppers, line 80) uses `isPulseStart` correctly → 2 hits/bar in 6/8. **But** Motif 0 (One Drop — the genre-defining motif!) uses `isBackbeat && isBeatStart` at line 75, firing every eighth on the backbeat positions and **destroying the beat-1 silence that defines reggae**. The shared snare backbeat at line 106 uses the broken gate across all motifs.
+- **latin.ts:** Clave logic at line 98 is the audit's exemplar of correct compound gating (`if (!isCompound) { ... }`). **But** the kick (line 60), Samba snare (line 119, fires every eighth → 12/bar in 6/8), and Partido Alto motif (lines 134-140 — mixes correct bar-2 `isPulseStart` with broken bar-1 `isBeatStart`) all show partial compound-awareness.
+
+**The fix:** for each motif separately, decide: (a) gate the whole motif on `!isCompound` (4/4-specific feel — Samba probably falls here), (b) make every emission gate compound-aware (canonical fix), or (c) keep the `isPulseStart` branch and audit each surviving `isBeatStart` for correctness in compound. The Partido Alto bar-1 vs bar-2 split is the trickiest — likely needs a per-bar compound branch.
+
+**Acceptance:** Critique tests for Reggae One Drop in 6/8 (kick on mStep 6 only, beat-1 silence preserved) and Latin Samba in 6/8 (decide: Samba is 4/4-only, gate accordingly, OR introduce a 6/8 Afro-Samba variant). Listen-test gate critical — these motifs are genre-identity and any retuning needs careful A/B.
+
+**Effort:** ~5h (per-motif design call + surgical motif rewrites + critiques + listen-test). **Model:** opus (per-motif musical-judgment calls). **Reviewer:** music-theory-reviewer. **Source:** S16 audit (2026-05-27). Closely parallels S16b in shape but tighter in scope and higher in genre-identity risk.
 
 ## Notes
 

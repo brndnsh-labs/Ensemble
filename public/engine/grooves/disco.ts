@@ -1,6 +1,7 @@
 import { scrambleHash } from '../hash-utils.js';
 import {
     applyStandardBase,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -177,6 +178,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             soundName = 'Open';
             velocity = 1.14;
             instTimeOffset -= 0.0025;
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { profile: 'shimmer', soundName })) {
+            shouldPlay = false;
         }
     } else if (context.inst.name === 'Perc' || context.inst.name.includes('Cowbell')) {
         // why drums.md §18 — cowbell no longer gated by `intensity > 0.7 &&

@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     binaryTier,
+    compoundHatAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -175,6 +176,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             soundName = 'China';
             velocity = 1.4;
+        }
+
+        if (shouldPlay && !compoundHatAllowed(context, { soundName })) {
+            shouldPlay = false;
         }
     }
 
