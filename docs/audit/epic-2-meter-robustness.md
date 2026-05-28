@@ -88,9 +88,12 @@ The Epic-1 comp fix ([[two-layer-determinism]]) seeded the **smart/jazz comping 
 
 Only 6/8 + 12/8 are `isCompound` (`config.ts`); the shared `compoundHatAllowed`/`compoundKickAllowed` filters (`grooves/utils.ts`) are post-hoc density limiters that strategies must **opt into**. Two grooves never do.
 
-### S6 — `minimal.ts`: opt into compound filters + fix beat predicates · Model: sonnet
-- **Bug:** no `isCompound` ref; hat fires every eighth in 6/8 (over-dense); `safeIsOffbeat = loopStep % (stepsPerBar/8) === 2` (`:45`) hardcodes a 16-step bar; `beatIndex === 2` (`:51`) lands on the 3rd eighth, not beat 3.
-- **Acceptance:** call `compoundHatAllowed`/`compoundKickAllowed`; replace the 16-step `safeIsOffbeat` + `beatIndex` predicates with meter-aware reads. Coherent groove in 6/8 + 12/8.
+### S6 — `minimal.ts`: opt into compound filters + fix beat predicates · Model: sonnet · ✅ SHIPPED 2026-05-28
+- **Bug:** no `isCompound` ref; hat fired every eighth in 6/8 (over-dense); `safeIsOffbeat = loopStep % (stepsPerBar/8) === 2` (`:45`) hardcoded a 16-step bar (dead code — `isOffbeat` is non-optional on `GrooveContext`); `beatIndex === 2` (`:51`) lands on mStep 4 in 6/8, not a pulse.
+- **Fixed:** hat lane gated by `compoundHatAllowed(context, { profile: 'sparse', soundName })` (minimal's hat is a secondary voice, not a shimmer time-keeper); kick lane gated by `compoundKickAllowed`; dead `safeIsOffbeat` removed (reads `context.isOffbeat`).
+- **Reviewer-caught P0 (kick lost the secondary pulse):** the filter can drop but not add a hit, so leaving `beatIndex === 2` left **only the downbeat** anchored in 6/8 (the S16b F1 failure mode). Fixed by a meter-relative `isSecondStrongBeat`: 4/4 → `isBeatStart && beatIndex === 2`; compound → `isPulseStart && groupIndex === midGroup` where `midGroup = floor(grouping.length / 2)`. Keeps minimal's sparse "1 and 3" identity at **2/bar in every meter** — 6/8 → mStep {0,6}, 12/8 → mStep {0,12} (reviewer P1: `isPulseStart && !isDownbeat` would have fired four-on-the-pulse in 12/8, denser than minimal intends).
+- **Deliverable:** `minimal-drummer-critique.test.ts` extended with a real compound harness (full `getStepInfo`, parameterized 6/8 + 12/8) — asserts both felt pulses carry a kick at motif 1+2 (32/32, position not count — a 1/bar bug would pass a naive density bound) + sparse density bound (2.00/bar both meters).
+- **Verified:** typecheck + biome clean; full standards (787) + `meter-integrity` + `odd-meter-authenticity` green. 4/4 behavior provably unchanged (filters + `isSecondStrongBeat` else-branch are byte-identical in simple meters).
 
 ### S7 — `ska-punk.ts`: compound treatment · Model: sonnet · **blocked by S1**
 - **Bug:** 4/4-only (kick on `beatIndex === 0/2`, every-step hat) → very busy in 6/8.
