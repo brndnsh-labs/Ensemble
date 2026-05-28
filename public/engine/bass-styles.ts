@@ -69,6 +69,26 @@ export function checkBassActiveStyle(
     if (style === 'bossa') {
         // Semantic Bossa: 1, 2&, 3, 4&
         if (stepInfo) {
+            if (stepInfo.isCompound === true) {
+                // why: epic-2 S9 — the 4/4 bossa cell hardcodes a 4-beat bar: the
+                // root on `intBeat === 2` (beat 3) and the anticipations on
+                // `intBeat === 1 || 3` (the & of 2/4). In compound (6/8, 12/8,
+                // stepsPerBeat=2) intBeat===2 is mStep 4 — a mid-group weak step, not
+                // a dotted-quarter pulse — and the 4-beat assumption misses beats 5/6.
+                // Map the idiom meter-relative instead: the root anchors every
+                // dotted-quarter pulse (the bossa "1 and 3"), and the anticipation
+                // lands on the pickup slot — the last eighth before the next pulse
+                // (stepInGroup === groupSteps - 2; mStep 4/10 in 6/8, the same slot the
+                // S12 jazz-walking pickup uses) — preserving bossa's "anticipate the
+                // next chord" syncopation. ~4 onsets/bar in 6/8. "Do our best, groove"
+                // — bossa in 6/8 is off-idiom, not idiomatic perfection.
+                if (stepInfo.isPulseStart) {
+                    return true;
+                }
+                const groupBeats = stepInfo.tsConfig?.grouping?.[stepInfo.groupIndex] ?? 3;
+                const groupSteps = groupBeats * ts.stepsPerBeat;
+                return stepInfo.stepInGroup === groupSteps - 2;
+            }
             const isOffbeatAnd =
                 stepInfo.mStep % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
             // In 4/4: Steps 0, 6, 8, 14
@@ -348,6 +368,48 @@ export function checkBassActiveStyle(
             selectedRiddim = 'Stalag';
         } else if (intensity > 0.45) {
             selectedRiddim = '54-46';
+        }
+        // why: epic-2 S9 — REGGAE_RIDDIMS positions are 0–15 mStep literals on a
+        // 16-step 4/4 bar; in compound/odd they never align (Steppers' [12] doesn't
+        // exist in a 12-step 6/8 bar → dropped onset; One Drop's [8] lands mid-group;
+        // odd-meter bars don't span 0–15 at all). Outside 4/4, derive onsets from the
+        // pulse structure instead, preserving each riddim's CHARACTER rather than its
+        // literal grid. "Do our best, groove" — not the exact 4/4 riddim.
+        const is44 = ts.beats === 4 && ts.stepsPerBeat === 4;
+        if (!is44 && stepInfo) {
+            // feltBeat = the meter's pulse grid. why: NOT isBeatStart/isOffbeat — in an
+            // 8th-grid meter (7/8: stepsPerBeat=2) isBeatStart fires every eighth, and
+            // isOffbeat (the old simple-meter pickup) floods the 8th grid in 16th-grid
+            // odd meters (5/4, 7/4) → a constant running line, the opposite of the sparse
+            // dub idiom (S9 review P0). isPulse (= tsConfig.pulse) stays on the pulse grid:
+            // 6/8 → 0,6 and 7/8 → 0,4,8 (the true 2+2+3 grouping pulses); but 5/4/7/4 are
+            // 16th-grid, where tsConfig.pulse is EVERY QUARTER (0,4,8,12,16 / …,24) — so
+            // dub there plays a locked quarter-note root pedal: on-pulse and not flooding
+            // the 8th grid (meets the S9 "groove, don't break" bar), but denser than the
+            // 3+2 / 4+3 grouping-pulse idiom. Refining odd-meter dub to the grouping pulse
+            // (isPulseStart → 5/4 {0,12}, 7/4 {0,16}) is deferred to the S10 odd-meter
+            // sweep — see FOLLOWUPS §C. (S9 review P2.)
+            const feltBeat =
+                stepInfo.isCompound === true ? stepInfo.isPulseStart : stepInfo.isPulse;
+            if (selectedRiddim === 'Steppers') {
+                // four-on-the-floor character: bass on every felt pulse
+                return feltBeat === true;
+            }
+            if (selectedRiddim === 'One Drop') {
+                // the "drop": skip beat 1, hit the later felt pulse(s) (mStep 6 in 6/8)
+                return feltBeat === true && !stepInfo.isMeasureStart;
+            }
+            // Stalag / 54-46 are syncopated. In COMPOUND, add the and-of-pulse pickup
+            // (the last eighth before the next pulse — mStep 4/10 in 6/8) so the busier
+            // riddim character survives. In simple/odd meters the pickup collapses to
+            // the felt-pulse line — an acceptable off-idiom reduction (a dedicated
+            // odd-meter dub syncopation is the S10 broad sweep's job); the priority here
+            // is "groove + stay sparse," not flood the 8th grid.
+            const groupBeats = stepInfo.tsConfig?.grouping?.[stepInfo.groupIndex] ?? ts.beats;
+            const groupSteps = groupBeats * ts.stepsPerBeat;
+            const isPickup =
+                stepInfo.isCompound === true && stepInfo.stepInGroup === groupSteps - 2;
+            return feltBeat === true || isPickup === true;
         }
         const riddim = REGGAE_RIDDIMS[selectedRiddim] as [number, number, number, number][];
         const stepsPerBar = ts.beats * ts.stepsPerBeat;
@@ -900,6 +962,26 @@ export function getBassNoteStyle(
         // Bossa Timing: Subtle lay-back
         const lag = 0.01 + intensity * 0.005;
 
+        // why: epic-2 S9 paired site — checkBassActiveStyle fires compound bossa at the
+        // dotted-quarter pulses + the pickup slot (not the 4/4 isOne/isThree/isOffbeat
+        // positions below), so those would all fall through to `return null` here. Mirror
+        // the gate: root on the felt pulse (the bossa "1 and 3"), fifth on the pickup
+        // (the anticipation into the next pulse, matching the 4/4 upbeat-fifth voicing).
+        if (_stepInfo?.isCompound === true) {
+            if (_stepInfo.isPulseStart) {
+                const res = result(
+                    getFrequency(root),
+                    ts.stepsPerBeat * 0.9,
+                    1.1 + intensity * 0.1,
+                );
+                res.timingOffset += lag;
+                return res;
+            }
+            const res = result(getFrequency(fifthUp), 0.8, 1.0 + intensity * 0.15);
+            res.timingOffset += lag + 0.005;
+            return res;
+        }
+
         // Per-bar voicing variation: real bossa players octave-displace the root or fifth
         // every few bars even on a static chord, so the line breathes rather than looping.
         // Deterministic from barIndex per CLAUDE.md (no raw Math.random) so loops stay coherent
@@ -1199,6 +1281,24 @@ export function getBassNoteStyle(
             selectedRiddim = '54-46';
         } else {
             selectedRiddim = 'One Drop';
+        }
+
+        // why: epic-2 S9 paired site — checkBassActiveStyle now derives dub onsets
+        // from the pulse structure outside 4/4 (the 4/4 riddim step-literals don't
+        // map to compound/odd bars), so those active steps won't be found in
+        // REGGAE_RIDDIMS here. Mirror the gate: play the deep root (dub is root-driven;
+        // riddim intervals are mostly 0) with the riddim's typical velocity/duration.
+        // Keeps the WHEN gate and the WHAT note in sync across meters.
+        const is44 = ts.beats === 4 && ts.stepsPerBeat === 4;
+        if (!is44 && _stepInfo) {
+            const tunedVel = 1.0 * (0.8 + intensity * 0.3);
+            const res = result(
+                getFrequency(clampAndNormalize(finalDeepRoot)),
+                2,
+                tunedVel * (0.95 + Math.random() * 0.1),
+            );
+            res.timingOffset += 0.01 + intensity * 0.01;
+            return res;
         }
 
         const riddim = (

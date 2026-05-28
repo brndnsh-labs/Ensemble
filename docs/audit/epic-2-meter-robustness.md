@@ -116,9 +116,14 @@ Only 6/8 + 12/8 are `isCompound` (`config.ts`); the shared `compoundHatAllowed`/
 
 ## Phase 4 — Bass 4/4-position math in compound/odd
 
-### S9 — Bass density gate: bossa + dub meter-awareness · Model: opus (idiom design call)
-- **Bug:** `bossa` branch (`bass-styles.ts:60`) uses `intBeat === 2`, `intBeat === 1 || 3` — assumes 4 beats; wrong onsets in 6/8 and misses beats 5/6. `dub` branch (`:330`) matches `REGGAE_RIDDIMS` positions that are **0–15 mStep literals** — they never align in a 12-step (6/8) or odd-meter bar.
-- **Acceptance:** both produce a coherent groove in compound/odd. Mapping a clave/riddim idiom into compound is a design call — "do our best, groove," not idiomatic perfection.
+### S9 — Bass density gate: bossa + dub meter-awareness · Model: opus (idiom design call) · ✅ SHIPPED 2026-05-28
+- **Bug:** `bossa` branch used `intBeat === 2`, `intBeat === 1 || 3` — assumed 4 beats (mStep-4 mis-map in 6/8, missed beats 5/6). `dub` branch matched `REGGAE_RIDDIMS` positions that are **0–15 mStep literals** — never align in a 12-step (6/8) or odd-meter bar (dropped/mis-placed onsets).
+- **Design calls (user-approved 2026-05-28):** (a) dub outside 4/4 = **pulse-derived per riddim**, preserving character — One Drop = felt pulse(s) except beat 1 (the "drop"); Steppers = every felt pulse; Stalag/54-46 = pulses + and-of-pulse pickup (compound only). (b) bossa in compound = root on every dotted-quarter pulse + fifth on the pickup slot. Implemented directly on the main thread.
+- **PAIRED SITES (both fixed):** the WHEN gate (`checkBassActiveStyle`) and the WHAT-note picker (`getBassNoteStyle`) are separate functions. Fixing only the gate would fire the bass at new compound positions where the 4/4 note-pickers return `null` (told to play, no note). Fixed the note path for **both** styles — dub (`!is44` → deep-root note) and bossa (`isCompound` → root-on-pulse / fifth-on-pickup).
+- **Reviewer P0 (odd-meter regression) → fixed:** the first cut keyed simple-meter `feltBeat` on `isBeatStart` + pickup on `isOffbeat`, which flooded the 8th grid (7/8 → 14/bar, 5/4 → 10/bar — a running line, the opposite of dub). Re-routed to `stepInfo.isPulse` (the pulse grid) + compound-only pickup. Now every odd-meter dub onset lands on a pulse position.
+- **Reviewer P2s → folded in:** corrected the WHY comment (in 16th-grid 5/4·7/4 `isPulse` is every quarter → a locked quarter-pedal, denser than the grouping-pulse idiom; grouping-pulse refinement deferred to **S10**, logged FOLLOWUPS §C) + added a density-ceiling assertion (`avg ≤ pulses.size`) to the odd-meter guard.
+- **Deliverable:** new `bossa-dub-compound-bass-critique.test.ts` (8 tests) drives the FULL `isBassActive`→`getBassNote` pipeline (so a null note at a fired position fails the test — guards both paired sites) across 6/8, 12/8, 5/4, 7/4, 7/8, and 4/4; asserts onset positions + felt-pulse-only + no dropout + sparse density. 4/4 byte-identical for both styles.
+- **Verified:** typecheck + biome clean; full standards (799) + `meter-integrity` + `odd-meter-authenticity` green; reviewer confirmed P0 resolved + mutation-tested the guard.
 
 ---
 
