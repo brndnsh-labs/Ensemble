@@ -1094,7 +1094,19 @@ export function getSoloistNote(
         phr.barsSinceRest = (soloist.session.phrasing.barsSinceRest || 0) + 1; // @worker-mutation
     }
     const clampedIntensity = Math.max(0, Math.min(1, effectiveIntensity));
-    const baseBarBudget = Math.max(3, Math.min(7, Math.round(3 + (clampedIntensity - 0.5) * 8)));
+    // why: the §C.80/§C.81/§C.82 phrasing-budget + rest-length adjustments are
+    // jazz/blues "leave space" taste fixes (every FOLLOWUPS entry cites
+    // Miles/All Blues). Applying them band-wide reshapes denser genres'
+    // later-loop phrase structure and erodes motivic-grid recall (neo-soul
+    // regressed). Gate all three behind this flag.
+    const isSpaceStyle = activeStyle === 'jazz' || activeStyle === 'blues';
+    // why: §C.80 — jazz/blues get slope 10 / cap 8 so a high-intensity solo
+    // can sustain an 8-bar burst before the budget forces a breath (audit doc
+    // named "8 bars at high intensity"; the prior slope-8/cap-7 topped out at
+    // 7). i=0.5 → 3, i=0.7 → 5, i=1.0 → 8. Other genres keep slope-8/cap-7.
+    const baseBarBudget = isSpaceStyle
+        ? Math.max(3, Math.min(8, Math.round(3 + (clampedIntensity - 0.5) * 10)))
+        : Math.max(3, Math.min(7, Math.round(3 + (clampedIntensity - 0.5) * 8)));
     // why: 1.5× when seed exists — themed-improv paraphrases need extra
     // runway before the budget interrupts. Tuned empirically: the
     // anchor-aware `!isAnchorStep` term in `budgetForcesRest` does the
@@ -1289,8 +1301,16 @@ export function getSoloistNote(
                 fatigueMultiplier *
                 (0.5 + scrambleHash(callSeedBase + 52) * 1.5),
         );
-        // Budget-forced rest length floor: intensity-graded breath.
-        const budgetRestBars = 0.5 + (1 - clampedIntensity) * 1.5;
+        // why: §C.81 — jazz/blues get a quadratic intensity ramp so a quiet
+        // ballad section can sit out 3-4 bars (Miles laying out), while busy
+        // sections still take a short breath: i=0 → 4.0 bars, i=0.5 → 1.4,
+        // i=1.0 → 0.5. Scoped to jazz/blues — the prior linear `0.5+(1-i)*1.5`
+        // (kept for other genres) topped out under 2 bars, which is correct for
+        // denser idioms; widening it band-wide lengthens later-loop forced
+        // rests enough to erode motivic-grid recall (neo-soul regressed).
+        const budgetRestBars = isSpaceStyle
+            ? 0.5 + (1 - clampedIntensity) ** 2 * 3.5
+            : 0.5 + (1 - clampedIntensity) * 1.5;
         nextRestSteps = Math.max(nextRestSteps, Math.floor(stepsPerMeasure * budgetRestBars));
         phr.restSteps = Math.max(1, nextRestSteps); // @worker-mutation
         return null;
@@ -1940,11 +1960,28 @@ export function getSoloistNote(
                     fatigueMultiplier *
                     (0.5 + scrambleHash(callSeedBase + 52) * 1.5),
             );
-            // why: S14 — budget-forced rests are now handled by the hoisted
-            // force-rest block at ~line 1257 (before head bypass), so we no
-            // longer need the budget-rest length floor here. This branch
-            // is the natural-resolution path only.
-            phr.restSteps = nextRestSteps; // @worker-mutation
+            // why: §C.82 — the low-restBase "leave space" styles (jazz/blues,
+            // restBase=0.05) collapse their natural-resolution rest to a sub-bar
+            // breath clamped only by the 3-step `minimumRestSteps` hard floor —
+            // perceptually "barely there." Give just those styles an
+            // intensity-graded floor (mirrors the S14 budget-forced floor
+            // above). Quadratic so the extra breath concentrates at genuinely
+            // quiet sections (busy sections shouldn't suddenly gap out):
+            // i=1.0 → ~0.2 bar, i=0.35 (default) → ~0.5 bar, i=0 → ~0.9 bar.
+            // Scoped to jazz/blues only — bird (bebop) is dense by design, and
+            // higher-restBase genres (neo-soul etc.) already breathe audibly,
+            // so widening the floor there just thins them + erodes later-loop
+            // motivic recall. Budget-forced rests are still handled by the
+            // hoisted block at ~line 1257; this is the natural-resolution path.
+            if (isSpaceStyle) {
+                const naturalRestBars = 0.2 + (1 - clampedIntensity) ** 2 * 0.7;
+                phr.restSteps = Math.max(
+                    nextRestSteps,
+                    Math.floor(stepsPerMeasure * naturalRestBars),
+                ); // @worker-mutation
+            } else {
+                phr.restSteps = nextRestSteps; // @worker-mutation
+            }
 
             const minimumRestSteps =
                 activeStyle === 'bird'

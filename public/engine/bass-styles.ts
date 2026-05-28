@@ -71,7 +71,18 @@ export function checkBassActiveStyle(
         }
         return false;
     }
-    if (style === 'quarter' || groove.genreFeel === 'Jazz') {
+    if (
+        style === 'quarter' ||
+        groove.genreFeel === 'Jazz' ||
+        // why: All Blues via the Blues smart-genre uses bass style 'blues'
+        // (smart-genres.ts), which otherwise falls to the 4/4 shuffle branch
+        // below and fires `isQuarter` on every eighth in 6/8 (6+ onsets/bar —
+        // a running line, not a walking waltz). Route the compound case through
+        // the shared dotted-quarter walking gate so an All Blues progression
+        // has the same spare density in Jazz or Blues genre. 4/4 blues is
+        // unaffected (the clause requires isCompound). FOLLOWUPS §C.85.
+        (style === 'blues' && stepInfo?.tsConfig?.isCompound === true)
+    ) {
         // why: epic-1-compound-meter S12 — in compound meters (6/8, 12/8) the simple
         // `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`) fires on every
         // eighth (mStep 0,2,4,6,8,10 in 6/8) producing 6+ onsets/bar — that's a
@@ -132,12 +143,17 @@ export function checkBassActiveStyle(
             const draw = scrambleHash(compoundSeed);
 
             // Intensity-tapered density curve. Goal: ~3 onsets/bar at moderate
-            // intensity (0.5–0.7), ~5 onsets/bar at high intensity (>0.7). With
+            // intensity (0.5–0.7), ~4 onsets/bar at high intensity (>0.7). With
             // 2 pulse slots (always-fire) and 2 pickup slots in 6/8:
             //   - intensity ≤ 0.5  → pulse-only (~2 onsets/bar). Pickups silent.
             //   - intensity 0.5–0.7 → pickup prob 0.5 (~3 onsets/bar). Approach silent.
-            //   - intensity > 0.7  → pickup prob 0.95 (~3.9 onsets/bar) + approach
-            //                        prob 0.55 (~1.1 onsets/bar) → ~5 onsets/bar.
+            //   - intensity > 0.7  → pickup prob 0.8 (~3.6 onsets/bar) + approach
+            //                        prob 0.3 (~0.6 onsets/bar) → ~4.2 onsets/bar.
+            // why the high tier was tamed (was 0.95/0.55 → ~5/bar): All Blues is
+            // a spare, hypnotic vamp — even at peak energy the bass should not
+            // approach a busy bebop walk. 5/bar read "too busy" by ear in the
+            // high-intensity sections; ~4/bar keeps forward motion without
+            // crowding. The moderate (0.7) tier is unchanged.
             // Probabilities here are the *only* gate (no competing biases), so
             // these are direct density targets — not the kind of additive-vs-final
             // stage decision called out in feedback_weight_tuning_multiplier_placement.
@@ -151,22 +167,22 @@ export function checkBassActiveStyle(
                 return false;
             }
             if (isPickupSlot) {
-                // why: 0.5 at moderate, 0.95 at high — pickup is the primary
-                // melodic articulation in compound walking bass. The 0.95 ceiling
-                // (not 1.0) leaves a small "breath" gap so the line doesn't sound
-                // mechanical loop-to-loop.
-                const pickupProb = intensity > 0.7 ? 0.95 : 0.5;
+                // why: 0.5 at moderate, 0.8 at high — pickup is the primary
+                // melodic articulation in compound walking bass. The 0.8 ceiling
+                // (not 1.0) leaves a "breath" gap so the line doesn't sound
+                // mechanical loop-to-loop and stays spare even when energetic.
+                const pickupProb = intensity > 0.7 ? 0.8 : 0.5;
                 return draw < pickupProb;
             }
             // isApproachSlot: only fires above 0.7 (high intensity) to reach the
-            // ~5 onsets/bar target without dominating the line.
+            // ~4 onsets/bar target without dominating the line.
             if (intensity > 0.7) {
                 // why: separate sub-draw so approach and pickup don't share a
                 // probability stream (otherwise a "high" draw at mStep 2 would
                 // imply a "high" draw at mStep 4 — breaking the intent of two
                 // independent gates). Mix in a small distinct constant.
                 const approachDraw = scrambleHash((compoundSeed + 7) | 0);
-                return approachDraw < 0.55;
+                return approachDraw < 0.3;
             }
             return false;
         }
@@ -1262,7 +1278,16 @@ export function getBassNoteStyle(
     const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5);
 
     // --- QUARTER NOTE (WALKING) STYLE ---
-    if (style === 'quarter') {
+    if (
+        style === 'quarter' ||
+        // why: compound-meter All Blues via the Blues smart-genre (bass style
+        // 'blues') reuses the jazz compound walking PITCH picker so 6/8 blues
+        // gets idiomatic pulse-roots + leading-tone pickups instead of the
+        // 4/4-shaped universal fallback below. The compound sub-block returns
+        // first, so the 4/4 quarter logic further down is unreachable for
+        // blues. Mirrors the density routing in checkBassActiveStyle (§C.85).
+        (style === 'blues' && _stepInfo?.tsConfig?.isCompound === true)
+    ) {
         const isJazz = groove.genreFeel === 'Jazz' || groove.lastDrumPreset === 'Jazz';
 
         // --- COMPOUND METER (6/8, 12/8) PITCH PICKER ---
@@ -1335,14 +1360,22 @@ export function getBassNoteStyle(
                     isChange && nextChord
                         ? normalizeToRange(nextChord.bassMidi ?? nextChord.rootMidi)
                         : baseRoot;
-                const dirDraw = scrambleHash((compoundPitchSeed + 11) | 0);
-                // why: 50/50 chromatic-below vs chromatic-above — matches the
-                // 4/4 jazz walking path (`bass-styles.ts:1244`). Both directions
-                // are idiomatic (Chambers uses below resolving from b7, above
-                // resolving from b2). A static bias toward one direction is
-                // programmer's math; let scale context emerge from the picker.
-                // A scale-degree-aware variant is in FOLLOWUPS.md.
-                const approachMidi = dirDraw < 0.5 ? nextRootTarget - 1 : nextRootTarget + 1;
+                // why: §C.83 — the chromatic approach direction follows the
+                // line's contour, which IS the idiom Chambers uses: b7→root is
+                // an ascending resolution (approach from BELOW), b2→root
+                // descends (approach from ABOVE). Continuing prevMidi's
+                // direction into the target reproduces that rule directly from
+                // the established line, without needing the chord scale. Fall
+                // back to a seeded 50/50 only when there's no contour to
+                // continue (prevMidi sits exactly on the target).
+                const prevForDir = prevMidi ?? baseRoot;
+                const approachFromBelow =
+                    prevForDir < nextRootTarget
+                        ? true
+                        : prevForDir > nextRootTarget
+                          ? false
+                          : scrambleHash((compoundPitchSeed + 11) | 0) < 0.5;
+                const approachMidi = approachFromBelow ? nextRootTarget - 1 : nextRootTarget + 1;
                 return result(
                     getFrequency(clampAndNormalize(approachMidi)),
                     ts.stepsPerBeat * 0.6,
@@ -1371,21 +1404,24 @@ export function getBassNoteStyle(
                 const thirdInterval = has_m3 ? 3 : 4;
                 const fifthInterval = hasFlat5 ? 6 : hasSharp5 ? 8 : 7;
 
-                const chordToneCandidates = [
-                    normalizeToRange(baseRoot + thirdInterval),
-                    normalizeToRange(baseRoot + fifthInterval),
-                ];
+                const thirdMidi = normalizeToRange(baseRoot + thirdInterval);
+                const fifthMidi = normalizeToRange(baseRoot + fifthInterval);
 
-                // why: pick whichever chord tone is closer to prevMidi (stepwise
-                // voice leading from the previous pulse). On a held-chord pulse →
-                // approach transition, prevMidi is the root; the 3rd is +3/+4
-                // semitones away and the 5th is +7 (or octave-displaced). Stepwise
-                // bonus prefers the 3rd in most cases — exactly the Paul Chambers
-                // mid-group gesture.
+                // why: §C.84 — score by stepwise distance to prevMidi (voice
+                // leading) but tilt toward the 3rd. The 3rd carries the chord's
+                // major/minor identity (Paul Chambers' favored mid-group tone);
+                // pure distance alone picks the same chord tone on both halves
+                // of the bar at high intensity → borderline monotone. A seeded
+                // 70/30 tilt shaves ~1.5 semitones off the 3rd's effective cost
+                // so it wins unless the 5th is the clearly stronger stepwise
+                // move, while keeping bar-to-bar variety.
                 const prev = prevMidi ?? baseRoot;
-                chordToneCandidates.sort((a, b) => Math.abs(a - prev) - Math.abs(b - prev));
+                const thirdBias = scrambleHash((compoundPitchSeed + 21) | 0) < 0.7 ? 1.5 : 0;
+                const dThird = Math.abs(thirdMidi - prev) - thirdBias;
+                const dFifth = Math.abs(fifthMidi - prev);
+                const approachChordTone = dThird <= dFifth ? thirdMidi : fifthMidi;
                 return result(
-                    getFrequency(clampAndNormalize(chordToneCandidates[0])),
+                    getFrequency(clampAndNormalize(approachChordTone)),
                     ts.stepsPerBeat * 0.6,
                     velocity * 0.85,
                 );
