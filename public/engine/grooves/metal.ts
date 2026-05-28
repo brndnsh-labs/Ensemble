@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -52,6 +53,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -63,12 +66,20 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         base;
 
     const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    // why: epic-1-compound-meter S16b — force motif 0 in compound meters.
+    // Motifs 1 (Driving 8ths), 2 (Gallop), 3 (Double-16ths), 4 (Blast Beat) are
+    // 4/4-idiomatic and have no 6/8 metal equivalent. Without this, when the
+    // selector picks motif 1-4 in compound, the kick branches below would all
+    // fall through and produce zero kick hits on those bars — leaving metal's
+    // kick intermittently silent (~40% of bars at intensity 0.5). Forcing motif
+    // 0 in compound delivers the standard-heavy foundation on every bar.
+    const effectiveMotif = isCompound ? 0 : activeMotif;
 
     // --- 1. KICK DRUM (The Engine) ---
     if (context.inst.name === 'Kick') {
         shouldPlay = false;
 
-        if (activeMotif === 0) {
+        if (effectiveMotif === 0) {
             // Standard Heavy
             if (isBeatStart && !isBackbeat) {
                 shouldPlay = true;
@@ -76,25 +87,37 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isOffbeat && beatIndex === 2) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 1) {
-            // Driving 8ths
+            // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` guard above
+            // excludes mStep 6 in 6/8 (since the second-pulse position IS the
+            // backbeat in default grouping [3,3] + backbeat [1]). Without this
+            // line, compound metal kicks only on mStep 0 = 1/bar at intensity
+            // 0.5, dropping the second dotted-quarter heartbeat. This positive
+            // injection restores it; the post-hoc `compoundKickAllowed` filter
+            // below prunes anything outside the pulse set.
+            if (isCompound && isPulseStart) {
+                shouldPlay = true;
+            }
+        } else if (effectiveMotif === 1) {
+            // Driving 8ths — 4/4-only by `effectiveMotif` gating above.
             if (isEighthNote) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 2) {
-            // The Gallop (16-16-8)
+        } else if (effectiveMotif === 2) {
+            // The Gallop (16-16-8) — 4/4-only by `effectiveMotif` gating above.
             if (isBeatStart || isOffbeat || isAOfBeat) {
                 shouldPlay = true;
             }
-        } else if (activeMotif === 3) {
-            // Double Kick 16ths — continuous 16ths under the cymbal pulse.
+        } else if (effectiveMotif === 3) {
+            // Double Kick 16ths — 4/4-only by `effectiveMotif` gating above.
             shouldPlay = true;
-        } else if (activeMotif === 4) {
+        } else if (effectiveMotif === 4) {
             // why: blast-beat ALTERNATION (drums.md P1 #6) — kick fires only on offbeat
             // eighths (steps 2,6,10,14) so it interlocks with snare on the downbeat eighths.
             // Real blast beats (extreme-metal kick-on-offbeat style) are kick-snare ALTERNATION
             // at 8th-note rate, producing the genre-defining buzz; co-articulating both on
             // every eighth collapses the rhythm into unison thuds.
+            // S16b: 4/4-only by `effectiveMotif` gating above — the alternation
+            // arithmetic doesn't translate to 6/8's 12-step bar.
             if (isOffbeat) {
                 shouldPlay = true;
             }
@@ -107,13 +130,23 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 instTimeOffset += (Math.random() - 0.5) * 0.003;
             }
         }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
+        }
     }
     // --- 2. SNARE (The Anchor) ---
     else if (context.inst.name === 'Snare') {
         shouldPlay = false;
         soundName = 'Snare';
 
-        if (activeMotif === 4 && intensity > 0.85) {
+        // why: S16b F6 — the blast-beat snare gets a `!isCompound` guard to
+        // match its kick partner (which is gated via `effectiveMotif` above).
+        // Without it, motif 4 in compound at intensity > 0.85 fires `isBeatStart`
+        // snare (6 hits/bar in 6/8) with no kick alternation — a structureless
+        // snare 8th-roll, not a blast feel. Compound motif 4 falls through to
+        // the standard backbeat clause below.
+        if (activeMotif === 4 && intensity > 0.85 && !isCompound) {
             // why: blast-beat ALTERNATION (drums.md P1 #6) — snare fires only on downbeat
             // eighths (steps 0,4,8,12), answering the kick's offbeat-eighth alternation.
             // Snare-on-downbeat + kick-on-offbeat at 8th-note rate is the canonical blast

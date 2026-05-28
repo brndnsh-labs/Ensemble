@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -66,6 +67,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 instTimeOffset += 0.005;
             }
         }
+        // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` foundation
+        // above excludes the second-pulse position in default 6/8. Compound
+        // Latin (when not routed through the 'Afro-Cuban 6/8' preset's clave
+        // logic) needs the surdo heartbeat on both dotted-quarter pulses to
+        // anchor the bar.
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+            velocity = scaleVelocity(1.1, intensity, 0.1);
+        }
 
         // Samba variation: Add 16th note pushes
         if (activeMotif >= 2 && !shouldPlay) {
@@ -75,6 +85,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     velocity = scaleVelocity(0.7, intensity, 0.1);
                 }
             }
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- 2. CLAVE (Sidestick) ---
@@ -115,8 +129,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     velocity = 0.5;
                 }
             }
-        } else if (activeMotif === 2) {
-            // Samba (Busy cross-stick)
+        } else if (activeMotif === 2 && !isCompound) {
+            // Samba (Busy cross-stick) — 4/4-idiomatic.
+            // why: epic-1-compound-meter S16b — `isBeatStart || isOffbeat` fires
+            // every step in 6/8 → 12 cross-stick hits/bar at 70% probability.
+            // Samba is a 4/4 Brazilian pattern; 6/8 Latin should default to
+            // Afro-Cuban 6/8 bell patterns via the 'Afro-Cuban 6/8' drum
+            // preset (which routes through the clave block above). Gate Samba
+            // motif to simple meters; compound latin falls back to motif 0/1
+            // (clave-driven, which is correctly compound-gated at line 99).
             if (isBeatStart || isOffbeat) {
                 if (roll(0.7, intensity)) {
                     shouldPlay = true;

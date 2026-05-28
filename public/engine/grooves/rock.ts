@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -46,6 +47,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         orchestration,
@@ -183,6 +186,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             velocity = isDownbeat ? 1.25 : 1.15;
         }
+        // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` guard above
+        // excludes the second-pulse position in 6/8 (since default backbeat[1]
+        // aligns with isPulseStart at mStep 6), leaving only the downbeat as
+        // foundation. Compound rock at intensity 0.5 needs both dotted-quarter
+        // pulses to anchor the bar — without this line, the listener hears
+        // "kick on 1 only" instead of "kick on both pulses."
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+            velocity = 1.15;
+        }
 
         // Motif 1: Double Kicks (offbeats after non-backbeat pulses)
         if (activeMotif === 1 && isOffbeat && !isBackbeat) {
@@ -214,6 +227,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         if (intensity > 0.7 && !shouldPlay && isOffbeat && roll(0.2, intensity)) {
             shouldPlay = true;
             velocity = scaleVelocity(0.7, intensity, 0.2);
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- 3. SNARE ---

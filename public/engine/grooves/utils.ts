@@ -253,6 +253,56 @@ export function compoundHatAllowed(
 }
 
 /**
+ * Compound-meter kick-density gate. Mirrors the role of `compoundHatAllowed`
+ * but for the kick lane — kick is naturally a low-density voice in compound
+ * meters, idiomatically anchored on the dotted-quarter pulses with sparse
+ * syncopation, not the eighth grid.
+ *
+ *   intensity ≤ 0.7  → pulses only           (2/bar in 6/8)
+ *   intensity > 0.7  → pulses + and-of-pulse (4/bar in 6/8 — adds the canonical
+ *                                              compound syncopation slot at
+ *                                              mStep {4, 10})
+ *
+ * Used as a post-hoc filter over each genre's existing 4/4 kick predicate (same
+ * pattern as `compoundHatAllowed`). Genre files retain their velocity / motif /
+ * ghosting logic; only the over-density emissions in compound meters are
+ * dropped. Returns `true` in simple meters so callers can apply unconditionally.
+ *
+ * why: epic-1-compound-meter S16b — kick foundations across rock / metal /
+ * funk / disco / latin / hiphop / neo-soul gate on `isBeatStart` (or
+ * `isEighthNote`), firing 4–12 hits per 6/8 bar instead of the idiomatic 2.
+ * Same shape as the S16 hat bug, different lane. No `shimmer` profile here —
+ * kick is sparse-only across genres. Motif-level over-density (metal driving
+ * 8ths, latin Samba, country train-beat) is gated separately at the motif-block
+ * level with `!isCompound`, since those motifs are 4/4-idiomatic by design.
+ *
+ * why no separate `isBackbeat` tier: in the default 6/8 config (grouping [3,3],
+ * backbeat [1]), `isBackbeat` lands at mStep 6 — exactly where `isPulseStart`
+ * for group 1 fires. The two predicates overlap entirely, so a middle
+ * "backbeat-only" tier would be dead code. If a future TS config wants
+ * non-pulse backbeat positions, add a tier then. (Two-tier shape per S16b
+ * music-theory review F2.)
+ */
+export function compoundKickAllowed(context: GrooveContext): boolean {
+    if (!context.isCompound) {
+        return true;
+    }
+    if (context.isPulseStart) {
+        return true;
+    }
+    const intensity = context.playback.bandIntensity;
+    if (intensity > 0.7) {
+        const groupSteps =
+            (context.tsConfig?.grouping?.[context.groupIndex] || 3) *
+            (context.tsConfig?.stepsPerBeat || 2);
+        if (context.stepInGroup === groupSteps - 2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Standard base logic for groove overrides.
  * Extracts context and handles early returns for muted instruments.
  */

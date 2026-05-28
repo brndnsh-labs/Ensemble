@@ -1,6 +1,7 @@
 import {
     applyStandardBase,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -61,6 +62,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -214,8 +217,21 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         }
 
+        // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` standard
+        // foundation (and Dilla Skips' `isAOfBeat` predicates which are dead
+        // in 6/8) leave compound neo-soul with kick on the downbeat only.
+        // Inject an explicit second-pulse emission for compound — both
+        // dotted-quarter pulses give the genre its "lazy two-pulse" feel.
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+        }
+
         if (shouldPlay) {
             velocity = scaleVelocity(1.1, intensity, 0.1);
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
 

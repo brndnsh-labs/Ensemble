@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -45,6 +46,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isBeatStart,
         isBackbeat,
         isOffbeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -116,6 +119,14 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             velocity = isDownbeat ? 1.3 : 1.15;
         }
+        // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` guard above
+        // excludes mStep 6 in default 6/8 (backbeat overlaps with second
+        // pulse), leaving only mStep 0 as foundation. Compound blues shuffle
+        // needs both pulses to anchor the dotted-quarter feel.
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+            velocity = 1.15;
+        }
 
         // The Shuffle Push (ONLY on the offbeat of 4)
         if (isOffbeat && beatIndex === lastBeatIndex && activeMotif >= 1) {
@@ -127,6 +138,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         if (isBeatStart && isBackbeat && intensity > 0.8 && roll(0.7, intensity)) {
             shouldPlay = true;
             velocity = scaleVelocity(0.55, intensity, 0.1); // Significantly quieter than primary hits
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- Snare (The Pocket) ---

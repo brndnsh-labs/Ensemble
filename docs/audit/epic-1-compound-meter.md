@@ -220,18 +220,24 @@ Open and HiHatHalf voicings pass through unconditionally (structural turnaround 
 
 **Effort:** ~3h (parallel audit + helper + 10 surgical edits + parametric critique + reviewer iteration). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer (caught shimmer-genre identity issue; design revised). **Source:** user listening session during S15 cycle (2026-05-27).
 
-### S16b. Compound-meter kick/snare density per genre
+### S16b. Compound-meter kick/snare density per genre ✅ Done 2026-05-28
 
-S16 fixed the universal hat-density bug via a shared helper. The same bug-shape persists in kick/snare lanes across many of the same files — they gate on `isBeatStart` / `isOffbeat`, firing on every eighth in 6/8. Per the Phase A audit (epic-1 S16, 2026-05-27):
+S16 fixed the universal hat-density bug via a shared helper. The same bug-shape persisted in kick/snare lanes across many of the same files — they gated on `isBeatStart` / `isOffbeat`, firing on every eighth in 6/8.
 
-- **Critical (4-6 hits/bar over-density):** rock.ts:177-209 (kick foundation + motifs), metal.ts:72-97 (kick motifs, motif 3 is unconditional), country.ts:69-86 (snare train-beat + 16th ghosts), funk.ts:282/298 (kick), disco.ts:95 (4-on-the-floor in 6/8), hiphop.ts:66-77 (kick), neo-soul.ts:207 (kick).
-- **Major:** blues.ts:116-122 (shuffle push uses `beatIndex === lastBeatIndex` which is 4/4-shaped), latin.ts:60 (kick — "Surdo feel" gated to wrong grid).
+**The fix (two parts):**
+1. New `compoundKickAllowed(context)` helper in `grooves/utils.ts` — sparse-only profile (no shimmer analog; kick is always sparse in compound). Two-tier ramp: pulses at intensity ≤ 0.7, +and-of-pulse (mStep {4,10}) above. Applied as a post-hoc filter at the end of each affected file's Kick branch (same pattern as S16's `compoundHatAllowed`).
+2. `!isCompound` gates around 4/4-idiomatic motifs that have no 6/8 equivalent: metal motifs 1-4 (driving 8ths / gallop / double-16ths / blast — implemented via `effectiveMotif = isCompound ? 0 : activeMotif`, forcing motif 0 in compound so the kick isn't intermittently silent), country Train Beat snare (motif > 0), funk Funky Drummer snare-ghost layer (motif 1), latin Samba snare (motif 2).
 
-**The fix:** apply the S12 / S13 pattern per genre. Low intensity → `isPulseStart`-driven; moderate → add backbeat positions (mStep 3 in 6/8 grouping [3,3]); high → eighth-grid fills sparingly. Each genre needs its own intensity ramp — rock's differs from country's. A shared helper like S16's `compoundHatAllowed` may emerge if the patterns converge, but expect per-genre judgment calls.
+**Review (music-theory-reviewer) caught two P0s, both fixed before commit:**
+- **F1 (second-pulse loss):** rock/country/blues/hiphop/neo-soul/latin foundations gate on `!isBackbeat`, which in default 6/8 excludes mStep 6 (the second pulse coincides with the backbeat). Collapsed compound kick to downbeat-only (1/bar). Fixed with an explicit `if (isCompound && isPulseStart) shouldPlay = true` second-pulse injection per file.
+- **F6 (paired-site):** metal blast-beat snare wasn't `!isCompound`-gated to match its kick partner — would have fired a structureless snare 8th-roll in compound. Gated.
+- **F2:** helper's middle backbeat tier was dead code in default 6/8 (backbeat overlaps isPulseStart) — simplified to two-tier.
 
-**Acceptance:** Per-genre critique tests asserting kick/snare 6/8 density at intensity 0.5 is ≤ ~50% of 4/4 density (or a per-profile absolute bound — the S16 test's hits/bar framing is cleaner than the ratio). Existing 4/4 critiques pass unchanged. Listen-test gate: each affected genre's 6/8 feel "holds energy without rushing" — this is the same gate S16 used.
+**Applied to 9 files:** rock, metal, country, blues, disco, funk, hiphop, neo-soul, latin. Excluded: jazz (compound-aware), acoustic (fixed-position kick), ska-punk (skank identity), minimal/shred, reggae (deferred to S16c).
 
-**Effort:** ~6h (multi-genre per-lane tuning + per-genre critiques + listen-test pass). **Model:** opus (per-genre taste calls). **Reviewer:** music-theory-reviewer. **Source:** S16 audit (2026-05-27).
+**Acceptance:** `tests/standards/compound-kick-density-critique.test.ts` — parametric across 9 genres + 4/4 no-op guard. Asserts 6/8 kick density ∈ [1.8, 2.5] hits/bar at intensity 0.5 AND both pulses {0,6} populated (the both-pulses assertion is the load-bearing F1 regression guard). Measured: all 9 genres land at exactly 2.00/bar on both pulses. Existing 4/4 critiques pass unchanged (729/729). Listen-test gate: passed 2026-05-28.
+
+**Effort:** ~3h (helper + 9 files + critique + reviewer iteration on F1/F6/F2). **Model:** opus. **Reviewer:** music-theory-reviewer (2 P0s caught + fixed). **Source:** S16 audit (2026-05-27).
 
 ### S16c. Reggae One Drop + Latin Samba/Partido Alto partial-compound repair
 

@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -42,6 +43,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -55,7 +58,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         shouldPlay = false;
 
         // Train Beat snare is consistent 16ths
-        if (activeMotif > 0) {
+        // why: epic-1-compound-meter S16b — the train beat's full-16th lattice
+        // (`isBeatStart || isOffbeat || isEOfBeat || isAOfBeat`) is a 4/4 honky-
+        // tonk idiom. In 6/8 (stepsPerBeat=2) the predicates collapse to every
+        // step → 12 snare hits/bar. There is no idiomatic 6/8 country train beat;
+        // gate the train-beat motif to simple meters and fall back to motif 0
+        // (standard two-step backbeat).
+        if (activeMotif > 0 && !context.isCompound) {
             shouldPlay = true;
 
             // Add a small amount of random jitter to all snare hits to prevent "machine gun" effect
@@ -107,10 +116,23 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             velocity = isDownbeat ? 1.25 : 1.1;
         }
+        // why: epic-1-compound-meter S16b F1 — beat 3 (`beatIndex === 2`) does
+        // not exist in 6/8's 2-beat structure, so the boom-chick foundation
+        // above collapses to "downbeat only" in compound. Add an explicit
+        // second-pulse emission so the boom-chick alternation reads as
+        // "kick on each dotted-quarter pulse" in 6/8 (mStep {0, 6}).
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+            velocity = 1.1;
+        }
         // Four-on-the-floor drive at high intensity
         else if (isBeatStart && intensity > 0.8 && roll(0.8)) {
             shouldPlay = true;
             velocity = scaleVelocity(0.6, intensity, 0.1); // Feathered
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     } else if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {
         shouldPlay = false;

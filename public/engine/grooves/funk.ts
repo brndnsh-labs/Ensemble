@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -242,7 +243,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // Motif 1: The Funky Drummer (Dense Ghosting)
-        if (activeMotif === 1 && !shouldPlay) {
+        // why: epic-1-compound-meter S16b — `!isBeatStart` in 6/8 (stepsPerBeat=2)
+        // is every odd-mStep = 6 candidate steps/bar, firing ~3.6-5.4 ghost
+        // hits/bar at the 60-90% roll probability. The Funky Drummer (Clyde
+        // Stubblefield "Funky Drummer", 1970) is a 4/4 16th-grid ghost pattern
+        // with no 6/8 analog. Gate to simple meters; compound funk falls back to
+        // the standard backbeat above.
+        if (activeMotif === 1 && !shouldPlay && !context.isCompound) {
             // High probability for ghosting on all non-beat steps
             if (!isBeatStart && roll(0.6 + intensity * 0.3)) {
                 shouldPlay = true;
@@ -284,6 +291,14 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         shouldPlay = false;
 
         // Grounding
+        // why (S16b F3): `isPulse && isBackbeat` (not `isPulseStart`) is the
+        // intended predicate here — in compound it fires at the second
+        // dotted-quarter pulse (mStep 6 in 6/8), giving funk a kick on BOTH
+        // pulses without the F1 second-pulse-loss the other genres needed
+        // patching for. `isPulse` and `isPulseStart` happen to coincide at the
+        // pulse onsets in 6/8 grouping [3,3]; in finer groupings `isPulse`
+        // (any pulse-member step) is broader, but the `isBackbeat` conjunction
+        // pins it to the backbeat pulse either way. Leave as `isPulse`.
         if (isDownbeat || (isPulse && isBackbeat)) {
             shouldPlay = true;
             velocity = isDownbeat ? 1.3 : 1.1;
@@ -304,6 +319,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 shouldPlay = true;
                 velocity = 0.85;
             }
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
 

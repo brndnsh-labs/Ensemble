@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -45,6 +46,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
+        isCompound,
+        isPulseStart,
         beatIndex,
         drumComplexity,
         sectionSeed,
@@ -80,10 +83,23 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         }
 
+        // why: epic-1-compound-meter S16b F1 — Boom Bap "& of 3" (beatIndex 2)
+        // doesn't exist in 6/8's 2-beat structure; Trap's `beatIndex 1/2`
+        // syncopations also fail to fire in compound. Both motifs collapse to
+        // "downbeat only" in compound. Add an explicit second-pulse emission so
+        // compound hiphop anchors both dotted-quarter pulses (mStep {0, 6}).
+        if (isCompound && isPulseStart && !shouldPlay) {
+            shouldPlay = true;
+        }
+
         if (shouldPlay) {
             velocity = scaleVelocity(1.1, intensity, 0.15);
             // Kicks in Hip Hop are slightly lazy (behind)
             instTimeOffset += 0.005 + intensity * 0.005;
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     }
     // --- 2. SNARE / CLAP ---

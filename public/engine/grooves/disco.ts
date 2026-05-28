@@ -2,6 +2,7 @@ import { scrambleHash } from '../hash-utils.js';
 import {
     applyStandardBase,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -92,6 +93,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     const isSyncopationFlavor = activeMotif === 1 && flavorRoll < 0.5;
 
     // --- 1. KICK (Strict 4-on-the-floor) ---
+    // why: epic-1-compound-meter S16b — "4-on-the-floor" gating on `isBeatStart`
+    // fires every step in 6/8 (stepsPerBeat=2) → 6 kicks/bar instead of disco's
+    // canonical 4. The `compoundKickAllowed` filter below trims this to the
+    // dotted-quarter pulses (2/bar), which is the natural 6/8 reinterpretation
+    // of disco's anchored-bass-drum feel. Disco-in-6/8 is unusual; this keeps
+    // the genre marker (kick on every pulse) without the over-density.
     if (context.inst.name === 'Kick') {
         shouldPlay = isBeatStart;
         if (shouldPlay) {
@@ -99,6 +106,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 beatIndex === 0
                     ? scaleVelocity(1.2, intensity, 0.15)
                     : scaleVelocity(1.1, intensity, 0.1);
+        }
+
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
