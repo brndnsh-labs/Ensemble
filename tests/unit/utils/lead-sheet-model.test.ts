@@ -222,4 +222,71 @@ describe('lead-sheet-model', () => {
             verticalTypeScale: 1.18,
         });
     });
+
+    // S8: chart layout must depend on measure count + viewport, never on the
+    // time signature. The same progression-shape (N bars, K chords per bar)
+    // must produce the same measure count — and therefore the same layout
+    // profile — in any meter. The bug: `buildLeadSheetSections` closes a measure
+    // when `currentMeasureBeats >= timeSignatureConfig.beats`, and per-chord
+    // beats are `ts.beats / chordsPerBar`. In 4/4 a 6-chord bar gives 4/6 each,
+    // and 4/6 × 6 = 3.9999999999999996 < 4 (float error), so the measure fails
+    // to close at the bar line and the next bar's first chord bleeds into it —
+    // drifting the measure count (12 bars → 11 measures). In 6/8 the same shape
+    // gives 1.0 each (exact), sums to 6.0, closes cleanly → 12 measures.
+    // Switching 4/4 → 6/8 on such a progression shifted the measure count,
+    // hence the density/layout. (Whether a chord-count triggers it depends on
+    // the meter, so the comparison must tolerate float drift, not the shape.)
+    describe('TS-invariant measure grouping (S8)', () => {
+        const buildShape = (bars: number, chordsPerBar: number, tsBeats: number) =>
+            Array.from({ length: bars * chordsPerBar }, (_, index) => ({
+                sectionId: 'a',
+                sectionLabel: 'A',
+                beats: tsBeats / chordsPerBar,
+                absName: `Chord ${index + 1}`,
+            }));
+
+        const measureCount = (
+            bars: number,
+            chordsPerBar: number,
+            ts: { beats: number; stepsPerBeat: number },
+        ) =>
+            buildLeadSheetSections(
+                buildShape(bars, chordsPerBar, ts.beats),
+                [{ id: 'a', seamless: false }],
+                ts,
+            ).reduce((total, block) => total + block.measures.length, 0);
+
+        const FOUR_FOUR = { beats: 4, stepsPerBeat: 4 };
+        const SIX_EIGHT = { beats: 6, stepsPerBeat: 2 };
+
+        it('groups one bar into exactly one measure regardless of chords-per-bar or meter', () => {
+            for (const ts of [FOUR_FOUR, SIX_EIGHT]) {
+                for (const chordsPerBar of [1, 2, 3, 4, 5, 6, 7, 8]) {
+                    expect(
+                        measureCount(12, chordsPerBar, ts),
+                        `${ts.beats}-beat bar with ${chordsPerBar} chords/bar`,
+                    ).toBe(12);
+                }
+            }
+        });
+
+        it('yields the same measure count (and layout) across meters for a 6-chord-per-bar progression', () => {
+            const bars = 16;
+            const measures44 = measureCount(bars, 6, FOUR_FOUR);
+            const measures68 = measureCount(bars, 6, SIX_EIGHT);
+
+            expect(measures44).toBe(bars);
+            expect(measures68).toBe(bars);
+            expect(measures44).toBe(measures68);
+
+            const layoutFor = (totalMeasures: number) =>
+                getLeadSheetLayoutProfile({
+                    totalMeasures,
+                    rowCount: Math.ceil(totalMeasures / 4),
+                    viewportWidth: 1440,
+                    viewportHeight: 900,
+                });
+            expect(layoutFor(measures44)).toEqual(layoutFor(measures68));
+        });
+    });
 });

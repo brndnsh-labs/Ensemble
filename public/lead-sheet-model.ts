@@ -1,5 +1,13 @@
 const LEAD_SHEET_MEASURES_PER_ROW = 4;
 
+// Tolerance for the per-bar beat accumulator. Per-chord beats are
+// `ts.beats / chordsPerBar`, which is often not exactly representable in f64
+// (e.g. 4/6 × 6 = 3.9999999999999996 < 4). A strict `>= ts.beats` comparison
+// then fails to close the measure at the bar line, so the next bar's chords
+// bleed in and the measure count drifts — differently per meter, which made
+// chart density shift on 4/4 ↔ 6/8 switches. Tolerate sub-beat float drift.
+const MEASURE_BEATS_EPSILON = 1e-6;
+
 const COMPACT_MEASURE_THRESHOLD = 24;
 const ULTRA_COMPACT_MEASURE_THRESHOLD = 32;
 const LEAD_SHEET_MOBILE_MAX_WIDTH = 700;
@@ -289,7 +297,10 @@ export function buildLeadSheetSections(
             currentMeasureBeats = 0;
         }
 
-        if (!currentMeasure || currentMeasureBeats >= timeSignatureConfig.beats) {
+        if (
+            !currentMeasure ||
+            currentMeasureBeats >= timeSignatureConfig.beats - MEASURE_BEATS_EPSILON
+        ) {
             currentMeasure = {
                 chords: [],
                 sectionId: chord.sectionId,

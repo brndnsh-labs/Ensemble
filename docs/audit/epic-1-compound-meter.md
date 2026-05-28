@@ -107,15 +107,17 @@ This is the cycle's Definition of Done. The audit is not done until this passes 
 
 **Effort:** ~5h (rewrite + thresholds + listening pass) AFTER S11–S14 ship. **Model:** opus (musical-judgment thresholds + statistical ranges). **Reviewer:** music-theory-reviewer + critique-test-author. **Source:** investigation 2026-05-27; first authoring attempt 2026-05-27 (cycle-paused, see review thread).
 
-### S8. Visual chart sizing under TS change
+### S8. Visual chart sizing under TS change ✅ Done 2026-05-28
 
-User reported chord/measure sizes shifted when switching 4/4 → 6/8 on a long progression. Couldn't reproduce on default `I | V | vi | IV`. Suspect: `arranger.totalSteps` differs by TS (16 in 4/4 vs 12 in 6/8 for a full bar), which flows into `getLeadSheetLayoutProfile` density thresholds (`COMPACT_MEASURE_THRESHOLD`, `ULTRA_COMPACT_MEASURE_THRESHOLD` in `public/lead-sheet-model.ts:255-316, 363-373, 387-445`). If density depends on step count rather than measure count, layout will shift.
+User reported chord/measure sizes shifted when switching 4/4 → 6/8 on a long progression. Couldn't reproduce on default `I | V | vi | IV`.
 
-Investigate: load a 16+ bar progression in `npm run dev`, switch TS, inspect `data-total-measures` and `data-density` on `#chordVisualizer`. If density differs for the same measure count, fix the density input to be measure-count-only.
+**Root cause (premise corrected during investigation):** the density layer is *already* correct — `getLeadSheetLayoutProfile` / `getLeadSheetDensity` are pure functions of measure count + viewport, no step-count or TS input, and `chord.beats` is already TS-aware (`chords-engine.ts:778`, `ts.beats / chordsPerBar`). The real bug was a **float-accumulation error in measure grouping**: `buildLeadSheetSections` closed a measure on `currentMeasureBeats >= timeSignatureConfig.beats` (exact comparison). Per-chord beats are `ts.beats / chordsPerBar`, often not exactly representable in f64 — e.g. a 6-chord bar in 4/4 gives `4/6` each, summing to `3.9999999999999996 < 4`, so the measure failed to close at the bar line and the next bar's chords bled in, drifting the measure count (16 bars → 14 measures). In 6/8 the same shape gives `1.0` each (exact) → closes cleanly → 16 measures. Different measure count across meters → different density → the shift the user saw. Whether a given chord-count triggers it depends on the meter, so the default 1-chord-per-bar progression never tripped it.
 
-**Acceptance:** For any progression, layout profile (density, verticalFillScale, measuresPerRow) is a function of measure count and viewport, not step count or TS. Add unit test in `lead-sheet-model.test.ts` (or create) asserting identical layout output across TSes for identical sectionsState/progression-shape.
+**Fix:** epsilon-tolerant comparison — `currentMeasureBeats >= ts.beats - MEASURE_BEATS_EPSILON` (1e-6), `lead-sheet-model.ts`. Epsilon is far below any real beat fraction (a 16-chord bar in 4/4 = 0.25/chord), so it never closes a measure that is not genuinely full.
 
-**Effort:** ~3h. **Model:** sonnet (investigation may upgrade to opus if cause is non-obvious). **Reviewer:** none required (chart layout, no engine touch). **Source:** investigation 2026-05-27.
+**Acceptance:** ✅ Unit tests added to `tests/unit/utils/lead-sheet-model.test.ts` — (1) one bar groups to exactly one measure for chords-per-bar 1–8 in both 4/4 and 6/8; (2) a 16-bar × 6-chord progression yields identical measure count AND identical layout profile across 4/4 and 6/8. Both red before the fix, green after. Existing 11 layout tests unchanged.
+
+**Effort:** ~1h (investigation localized it to a one-line float-tolerance fix). **Model:** sonnet (ran inline). **Reviewer:** none required (chart layout, no engine touch). **Source:** investigation 2026-05-27.
 
 ### S9. getStepInfo `stepsPerBeat === 4` fragility ✅ Done 2026-05-27
 
