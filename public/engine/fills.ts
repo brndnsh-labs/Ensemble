@@ -425,7 +425,10 @@ export const FILL_TEMPLATES: Record<string, GenreFills> = {
             },
         ],
     },
-    'Ska-Punk': {
+    // why: keyed 'Ska' — the lookup is FILL_TEMPLATES[genreFeel] and the Ska-Punk
+    // genre's genreFeel is 'Ska' (smart-genres.ts). Was 'Ska-Punk' (the preset
+    // name), a dead key that fell back to Rock fills. Epic 2 S2.
+    Ska: {
         low: [
             {
                 steps: [12, 14, 15],
@@ -518,6 +521,78 @@ export const FILL_TEMPLATES: Record<string, GenreFills> = {
                 steps: [8, 10, 12, 13, 14, 15],
                 instruments: ['High Tom', 'High Tom', 'Mid Tom', 'Mid Tom', 'Low Tom', 'Snare'],
                 velocities: [0.75, 0.8, 0.85, 0.9, 0.95, 0.85],
+            },
+        ],
+    },
+    // why: Metal had NO entry and fell back to Rock fills (Epic 2 S2). Metal
+    // fills are tom-and-double-kick driven and resolve hot over the bar line on a
+    // Crash — louder and busier than Rock, with double-bass kick gallops woven
+    // under the toms rather than Rock's snare-led builds.
+    Metal: {
+        low: [
+            // Kick-snare gallop into the next bar — the half-time-feel "chug" fill.
+            {
+                steps: [12, 13, 14, 15],
+                instruments: ['Kick', 'Snare', 'Kick', 'Snare'],
+                velocities: [1.1, 0.9, 1.15, 1.0],
+            },
+        ],
+        medium: [
+            // Tom descent over a steady double-kick pulse, Crash over the bar line.
+            {
+                steps: [8, 9, 10, 11, 12, 13, 14, 15],
+                instruments: [
+                    'High Tom',
+                    'Kick',
+                    'Mid Tom',
+                    'Kick',
+                    'Low Tom',
+                    'Kick',
+                    'Low Tom',
+                    'Crash',
+                ],
+                velocities: [0.9, 1.0, 0.95, 1.0, 1.0, 1.05, 1.05, 1.25],
+            },
+            // Straight H→M→L tom roll slamming a Crash — the simpler section-cap fill.
+            {
+                steps: [8, 10, 12, 14],
+                instruments: ['High Tom', 'Mid Tom', 'Low Tom', 'Crash'],
+                velocities: [0.95, 1.0, 1.05, 1.25],
+            },
+        ],
+        high: [
+            // 16th blast-beat — alternating snare/double-kick tumbling into a Crash
+            // slam over the downbeat. The frantic, full-bar metal "lead-in to the
+            // breakdown" gesture.
+            {
+                steps: [8, 9, 10, 11, 12, 13, 14, 15],
+                instruments: [
+                    'Snare',
+                    'Kick',
+                    'Snare',
+                    'Kick',
+                    'Snare',
+                    'Kick',
+                    'Low Tom',
+                    'Crash',
+                ],
+                velocities: [1.0, 1.1, 1.0, 1.1, 1.05, 1.15, 1.1, 1.3],
+            },
+            // Full kit tom tumble with a kick punch and Crash payoff — the
+            // "down-the-toms" climax roll.
+            {
+                steps: [8, 9, 10, 11, 12, 13, 14, 15],
+                instruments: [
+                    'High Tom',
+                    'High Tom',
+                    'Mid Tom',
+                    'Mid Tom',
+                    'Low Tom',
+                    'Low Tom',
+                    'Kick',
+                    'Crash',
+                ],
+                velocities: [0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3],
             },
         ],
     },

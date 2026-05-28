@@ -46,10 +46,10 @@ Per [[canonical-genre-keys]], the fix is to rekey to the canonical feel (or add 
 - **Verified:** full critique suite green (743 tests), typecheck clean. Reviewer (music-theory) confirmed the newly-activated skaPunk strategy/harmony/snare is musically coherent punk-ska, a net improvement over the `DEFAULT_CONFIG` fall-through.
 - **Reviewer note carried to deferred item below:** `harmonies.ts:~328` (`feel === 'Ska-Punk'` offbeat-upstroke pattern) is unreachable for `feel='Ska'` because `:269` (`feel === 'Reggae' || feel === 'Ska'`) catches it first and gives Ska a *backbeat* skank. The follow-up should **DELETE 328 (vestigial), not activate it** — the ska offbeat upstroke is correctly owned by the chord channel (`accompaniment.ts:~837` `genre === 'Ska'`); activating 328 would recreate the harmony+chord double-stack bug Epic 6 S5 deleted.
 
-### S2 — `FILL_TEMPLATES`: rekey `'Ska'` + add `Metal` · Model: sonnet
-- **Where:** `fills.ts:428` (key `'Ska-Punk'` → `'Ska'`), and add a `Metal` entry (currently absent).
-- **Bug:** `FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock` at `:541`; Ska-Punk (`'Ska'`) **and** Metal both miss → both play **Rock** drum fills at section ends.
-- **Acceptance:** Ska-Punk + Metal play their own fills, not Rock. Metal fill content is a small taste call — keep it idiomatic (double-kick-friendly) but the deliverable is "not Rock fills."
+### S2 — `FILL_TEMPLATES`: rekey `'Ska'` + add `Metal` · Model: sonnet · ✅ SHIPPED 2026-05-28
+- **Where:** `fills.ts` — rekeyed the Ska-Punk fills `'Ska-Punk'` → `'Ska'`; added a new `Metal` entry (tom-and-double-kick driven, Crash over the bar line; low/medium/high tiers).
+- **Bug fixed:** `FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock` at `:541`; Ska-Punk (`'Ska'`) **and** Metal both missed → both played **Rock** drum fills at section ends.
+- **Verified:** `tom-vocabulary-critique.test.ts` extended to cover `'Ska'` + `'Metal'` (registry contract, 120-seed reachability sweeps at 0.6/0.85, voice-diversity) — 42 tests green; full standards suite green; typecheck clean. Metal fills use 3 tom voices, both medium + both high templates are tom-bearing.
 
 ### S3 — `GENRE_MAP` cadence coverage · Model: opus (taste call inside)
 - **Where:** `resolution.ts:47` `GENRE_MAP`.

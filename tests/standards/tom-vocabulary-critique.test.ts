@@ -101,7 +101,10 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             // tom vocabulary (One Drop tom-down out of the beat-1 gap;
             // Travis Barker / Tim Armstrong tom-laden punk fills).
             'Reggae',
-            'Ska-Punk',
+            // genreFeel for the Ska-Punk genre is 'Ska' (Epic 2 S1/S2).
+            'Ska',
+            // Metal gained a fills entry in Epic 2 S2 (was falling back to Rock).
+            'Metal',
         ];
 
         expectedTomGenres.forEach((genre) => {
@@ -154,7 +157,10 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             // tom vocabulary (One Drop tom-down out of the beat-1 gap;
             // Travis Barker / Tim Armstrong tom-laden punk fills).
             'Reggae',
-            'Ska-Punk',
+            // genreFeel for the Ska-Punk genre is 'Ska' (Epic 2 S1/S2).
+            'Ska',
+            // Metal gained a fills entry in Epic 2 S2 (was falling back to Rock).
+            'Metal',
         ];
         const SEEDS = 120;
 
@@ -203,7 +209,10 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             // tom vocabulary (One Drop tom-down out of the beat-1 gap;
             // Travis Barker / Tim Armstrong tom-laden punk fills).
             'Reggae',
-            'Ska-Punk',
+            // genreFeel for the Ska-Punk genre is 'Ska' (Epic 2 S1/S2).
+            'Ska',
+            // Metal gained a fills entry in Epic 2 S2 (was falling back to Rock).
+            'Metal',
         ];
         const SEEDS = 120;
 
@@ -251,7 +260,10 @@ describe('Tom Vocabulary Critique (drums-idiom/S4)', () => {
             'Hip Hop',
             // why: S8(a) — Reggae + Ska-Punk tom-template additions.
             'Reggae',
-            'Ska-Punk',
+            // genreFeel for the Ska-Punk genre is 'Ska' (Epic 2 S1/S2).
+            'Ska',
+            // Metal gained a fills entry in Epic 2 S2 (was falling back to Rock).
+            'Metal',
         ];
 
         expectedTomGenres.forEach((genre) => {
