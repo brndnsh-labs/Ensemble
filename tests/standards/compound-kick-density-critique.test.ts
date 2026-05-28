@@ -25,8 +25,9 @@
  * Genres covered: Rock, Metal, Country, Blues, Disco, Funk, Hip Hop, Neo-Soul,
  * Latin. Excluded: Jazz (already compound-aware via S11), Acoustic (kick is
  * already fixed-position/compound-safe per S16 audit), Ska-Punk (skank
- * identity), Minimal/Shred (sparse/re-export). Reggae excluded — its kick is
- * partial-compound-broken (One Drop motif), tracked in S16c.
+ * identity), Minimal/Shred (sparse/re-export). Reggae excluded — its One Drop
+ * kick is single-pulse (mStep 6 only, beat-1 silent) so it doesn't fit this
+ * both-pulses assertion; covered in compound-reggae-latin-critique.test.ts (S16c).
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';

@@ -21,11 +21,11 @@ Story sizing: each story is a single focused session (2–6 hours) — one engin
 
 ## Status (2026-05-27)
 
-**Cycle 2026-05-27 → in progress: 13 / 16 stories shipped.**
+**Cycle 2026-05-27 → in progress: 16 / 18 stories shipped.**
 
 | # | Epic | Stories | Done | Notes |
 | :- | :- | :-: | :-: | :- |
-| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 18 | 15 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). **S16 split 2026-05-27** during its parallel-agent audit revealed the cross-genre scope is bigger than estimated: S16 shipped hat-density (universal helper + shimmer/sparse profiles), S16b shipped kick/snare per-genre (2026-05-28), S16c queued reggae/latin partial-broken motif repair. Remaining: S8 (chart sizing), S10 (genre×TS UX), S16c. |
+| 1 | [Compound Meter (6/8, 12/8)](epic-1-compound-meter.md) | 18 | 16 | All Blues + 6/8 must feel like a slow jazz waltz. S1 (BPM unit per TS) is the dominant scheduling fix and gates S7 (end-to-end critique). S2–S5, S9 are mechanical 4/4-assumption fixes that ran in parallel. S6 audited the soloist pipeline. S8 investigates the chart-sizing shift user observed on a long progression. S10 is the genre × TS UX decision (defer if scope tight). **Epic expanded 2026-05-27** after S7 authoring surfaced 4 musical-content layer gaps the scheduling work didn't address: S11 (jazz ride skip-beat target), S12 (jazz walking density), S13 (jazz comping density), S14 (soloist rest cadence). **S16 split 2026-05-27** during its parallel-agent audit revealed the cross-genre scope is bigger than estimated: S16 shipped hat-density (universal helper + shimmer/sparse profiles), S16b shipped kick/snare per-genre (2026-05-28), S16c shipped reggae/latin repair (2026-05-28 — premise correction: One Drop was already correct; real fixes were Rockers kick over-density + Partido Alto 7-vs-1 split). Remaining: S8 (chart sizing), S10 (genre×TS UX). |
 
 ## Phased rollout
 
@@ -67,7 +67,7 @@ The scheduling foundation (S1–S6, S9) is correct, but the engine's per-genre m
 | S15 (jazz walking-bass picker) | Compound-aware `getBassNoteStyle 'quarter'` picker — roots on pulses, leading-tone approaches on pickup slots. Promoted from S12 review (2026-05-27). Opus. ~4h. |
 | S16 (compound drum density — hat-first) | ✅ Done 2026-05-27. Shipped universal `compoundHatAllowed` helper with sparse/shimmer profiles + Open/HiHatHalf passthrough. 10 affected groove files filter their hat lane post-hoc. Measured: sparse genres 2/bar in 6/8 (vs 12/bar bug), shimmer genres 6/bar (preserves time-keeper). Parallel 3-agent audit + music-theory reviewer iteration (caught shimmer-genre identity issue). |
 | S16b (compound drum density — kick/snare per-genre) | ✅ Done 2026-05-28. Shipped `compoundKickAllowed` helper (sparse two-tier) + `!isCompound` motif gates (metal 1-4 via effectiveMotif, country train-beat, funk Funky Drummer, latin Samba). Reviewer caught 2 P0s (second-pulse loss F1, blast-snare paired-site F6) — fixed. All 9 genres anchor both 6/8 pulses at 2/bar. |
-| S16c (reggae One Drop + Latin Samba/Partido Alto partial-compound repair) | Two files have *partial* compound-awareness — some motifs use `isPulseStart`, others use `isBeatStart`. Reggae's One Drop destroyed; Latin's Partido Alto bar-1 vs bar-2 split. Higher genre-identity risk; per-motif design calls. Promoted from S16 audit (2026-05-27). Opus. ~5h. |
+| S16c (reggae One Drop + Latin Samba/Partido Alto partial-compound repair) | ✅ Done 2026-05-28. Premise correction: reggae One Drop was already correct (`isBackbeat` = mStep 6 only in 6/8, beat-1 silent). Real fixes: `compoundKickAllowed` filter on reggae kick (trims Rockers from 8→2/bar) + Latin Partido Alto gated `!isCompound` (was 7-vs-1 bar split; also closed an S16b Samba fall-through). Reviewer 0 P0, 2 P1 patched, 2 P2 → FOLLOWUPS. Ran inline (~1.5h) after premise de-risk, not opus. |
 
 ### Model + reviewer tags
 

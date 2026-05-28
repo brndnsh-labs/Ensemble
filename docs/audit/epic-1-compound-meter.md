@@ -239,18 +239,22 @@ S16 fixed the universal hat-density bug via a shared helper. The same bug-shape 
 
 **Effort:** ~3h (helper + 9 files + critique + reviewer iteration on F1/F6/F2). **Model:** opus. **Reviewer:** music-theory-reviewer (2 P0s caught + fixed). **Source:** S16 audit (2026-05-27).
 
-### S16c. Reggae One Drop + Latin Samba/Partido Alto partial-compound repair
+### S16c. Reggae One Drop + Latin Samba/Partido Alto partial-compound repair ✅ Done 2026-05-28
 
-S16's audit surfaced an anti-pattern *worse* than no compound-awareness: files that use `isPulseStart` in some motifs but `isBeatStart` in others, creating "sometimes-correct, sometimes-wrong" behavior. Two files:
+S16's audit surfaced an anti-pattern *worse* than no compound-awareness: files that use `isPulseStart` in some motifs but `isBeatStart` in others. Two files were flagged — but implementing surfaced a **premise correction** plus an already-shipped overlap with S16b:
 
-- **reggae.ts:** Motif 1 (Steppers, line 80) uses `isPulseStart` correctly → 2 hits/bar in 6/8. **But** Motif 0 (One Drop — the genre-defining motif!) uses `isBackbeat && isBeatStart` at line 75, firing every eighth on the backbeat positions and **destroying the beat-1 silence that defines reggae**. The shared snare backbeat at line 106 uses the broken gate across all motifs.
-- **latin.ts:** Clave logic at line 98 is the audit's exemplar of correct compound gating (`if (!isCompound) { ... }`). **But** the kick (line 60), Samba snare (line 119, fires every eighth → 12/bar in 6/8), and Partido Alto motif (lines 134-140 — mixes correct bar-2 `isPulseStart` with broken bar-1 `isBeatStart`) all show partial compound-awareness.
+- **reggae.ts — One Drop is actually CORRECT.** The audit claimed Motif 0 (One Drop, `isBackbeat && isBeatStart`, line 76) "fires every eighth, destroys beat-1 silence." That was a misreading of `isBackbeat`: in 6/8 the compound branch of `getStepInfo` (`utils.ts:685-688`) resolves `isBackbeat` to **mStep 6 only** (`isGroupStart && backbeat.includes(groupIndex)`, backbeat [1]). So One Drop drops kick+snare on the second dotted-quarter pulse (mStep 6) with beat 1 silent — the structural analogue of the 4/4 beat-3 drop, and the genre's defining feature. No fix needed. The *real* reggae defect was the Rockers motif (motif 2) combining every offbeat → 8 kicks/bar, with reggae kick having no `compoundKickAllowed` filter at all (skipped in S16b).
+- **latin.ts — Samba already fixed in S16b; Partido Alto was the live bug.** Samba (motif 2) was gated `!isCompound` in S16b (line 132). The remaining defect was Partido Alto (motif 3): a 4/4 2-bar offbeat clave that produced a **7-hits-vs-1-hit bar split** in 6/8. Gating it surfaced a latent S16b fall-through too: `activeMotif===2 && isCompound` failed the Samba guard and dropped *through* into the Partido Alto `else`, running the broken pattern.
 
-**The fix:** for each motif separately, decide: (a) gate the whole motif on `!isCompound` (4/4-specific feel — Samba probably falls here), (b) make every emission gate compound-aware (canonical fix), or (c) keep the `isPulseStart` branch and audit each surviving `isBeatStart` for correctness in compound. The Partido Alto bar-1 vs bar-2 split is the trickiest — likely needs a per-bar compound branch.
+**Fix shipped:**
+- reggae.ts — added `compoundKickAllowed(context)` filter to the kick branch. No-op for One Drop/Steppers/Dub (all ⊆ `isPulseStart`); trims Rockers to the two pulses (its source predicate emits only odd-step offbeats, so the filter's and-of-pulse tier is inert here).
+- latin.ts — changed the Partido Alto `} else {` to `} else if (!isCompound) {`, consistent with the Samba decision. Closes the Samba fall-through in the same stroke. Compound latin snare/clave is deferred to the dedicated `Afro-Cuban 6/8` drum preset.
 
-**Acceptance:** Critique tests for Reggae One Drop in 6/8 (kick on mStep 6 only, beat-1 silence preserved) and Latin Samba in 6/8 (decide: Samba is 4/4-only, gate accordingly, OR introduce a 6/8 Afro-Samba variant). Listen-test gate critical — these motifs are genre-identity and any retuning needs careful A/B.
+**Acceptance (measured, `tests/standards/compound-reggae-latin-critique.test.ts`, 4/4 reliable):** Reggae One Drop — drop (mStep 6) fires 64/64 bars, beat 1 (mStep 0) fires only 26/64 (Steppers bars), density 1.41/bar. Reggae high-intensity — Rockers trimmed, max 2 kicks/bar, mean 1.77. Latin — no 7-vs-1 split: even-bar 1.22 vs odd-bar 1.19 snares (symmetric), 1.20/bar, 4/4 preserved at 4.06.
 
-**Effort:** ~5h (per-motif design call + surgical motif rewrites + critiques + listen-test). **Model:** opus (per-motif musical-judgment calls). **Reviewer:** music-theory-reviewer. **Source:** S16 audit (2026-05-27). Closely parallels S16b in shape but tighter in scope and higher in genre-identity risk.
+**Deferred (S16c review P2s, see FOLLOWUPS §C/§F):** verify generic 6/8 Latin auto-surfaces the Afro-Cuban 6/8 preset (else the snare lane is genuinely empty); migrate latin.ts:188 Sidestick velocity `Math.random()` to seeded entropy. The "build a real 6/8 partido-alto pattern" option was offered and the user chose gate-off (consistent with Samba).
+
+**Effort:** ~1.5h (premise verification de-risked it to mechanical; done inline on main thread, not opus). **Model:** opus-tagged but ran as inline sonnet-scope after premise correction. **Reviewer:** music-theory-reviewer (0 P0, 2 P1 descriptive-accuracy patched, 2 P2 → FOLLOWUPS). **Source:** S16 audit (2026-05-27).
 
 ## Notes
 

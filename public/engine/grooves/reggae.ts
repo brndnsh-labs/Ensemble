@@ -2,6 +2,7 @@ import {
     applyStandardBase,
     binaryTier,
     compoundHatAllowed,
+    compoundKickAllowed,
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
@@ -99,6 +100,18 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         if (shouldPlay) {
             velocity = scaleVelocity(1.15, intensity, 0.1);
+        }
+
+        // why: epic-1-compound-meter S16c — One Drop/Steppers/Dub already resolve to
+        // pulse-aligned hits in 6/8 (all ⊆ isPulseStart), so the filter is a no-op
+        // for them. Rockers (motif 2) is the only over-dense motif — it adds every
+        // offbeat → 8 kicks/bar. The filter collapses Rockers to the two
+        // dotted-quarter pulses {0,6}: its and-of-pulse tier (mStep {4,10}) is
+        // inert here because Rockers emits only odd-step offbeats {1,3,5,7,9,11},
+        // none of which is {4,10}. Net: every motif keeps One Drop's beat-1 silence
+        // behavior intact while the Rockers bloat is trimmed.
+        if (shouldPlay && !compoundKickAllowed(context)) {
+            shouldPlay = false;
         }
     } else if (context.inst.name === 'Snare') {
         shouldPlay = false;

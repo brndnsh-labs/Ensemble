@@ -150,8 +150,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 shouldPlay = true;
                 soundName = 'Snare';
             }
-        } else {
-            // Partido Alto
+        } else if (!isCompound) {
+            // Partido Alto — 4/4-idiomatic 2-bar cross-stick.
+            // why: epic-1-compound-meter S16c — the bar-1/bar-2 offbeat clave maps
+            // to 4/4 only. In 6/8 it produced a 7-hits-vs-1-hit bar split (bar-1's
+            // offbeats {1,3,5,7,9,11}+pulse vs bar-2's lone downbeat). Gate to simple
+            // meters, consistent with the Samba decision above; compound latin's
+            // snare/clave comes from the 'Afro-Cuban 6/8' drum preset. Gating the
+            // final `else` here also closes the S16b fall-through where Samba
+            // (motif 2) in compound dropped into this Partido Alto block.
             if (isBar1) {
                 if ((isOffbeat && !isBackbeat) || (isPulseStart && isBackbeat)) {
                     shouldPlay = true;
