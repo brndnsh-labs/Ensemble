@@ -45,6 +45,15 @@ export function checkBassActiveStyle(
     playback: EnsembleState['playback'],
     groove: EnsembleState['groove'],
 ) {
+    // why: several per-step density gates below (jazz/quarter eighth-skip, funk
+    // ghost, metal gallop, blues shuffle, walking-ska skip) used raw Math.random,
+    // so the bass re-rolled which offbeats it played every bar AND every loop —
+    // it never locked to a groove. Seed them on (step, loopCount) — the same shape
+    // the compound walking gate (:~150) and the comping overlay (accompaniment.ts)
+    // use — so the line repeats given the same step + loop. Distinct offsets per
+    // gate keep the streams independent. Epic 2 S4.
+    const bassRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+    const bassDraw = (n: number) => scrambleHash((bassRandSeed + n) | 0);
     if (style === 'whole') {
         return stepInChord === 0;
     }
@@ -200,7 +209,7 @@ export function checkBassActiveStyle(
             skipProb = 0;
         }
 
-        if (isEighthSkip && Math.random() < skipProb) {
+        if (isEighthSkip && bassDraw(5) < skipProb) {
             return true;
         }
 
@@ -219,7 +228,7 @@ export function checkBassActiveStyle(
         if (isFoundational) {
             return true;
         }
-        if (Math.random() < ghostProb) {
+        if (bassDraw(1) < ghostProb) {
             return true;
         }
         return false;
@@ -296,7 +305,7 @@ export function checkBassActiveStyle(
         }
         // Gallop/Chug: 16th note subdivisions at higher intensity/complexity
         const gallopProb = (playback.bandIntensity > 0.6 ? 0.5 : 0.1) + playback.complexity * 0.4;
-        return Math.random() < gallopProb;
+        return bassDraw(2) < gallopProb;
     }
     if (style === 'blues') {
         // Foundation: Always play on quarter notes
@@ -315,14 +324,14 @@ export function checkBassActiveStyle(
             const complexityWeight = playback.complexity * 0.3;
             // High consistency (>90%) at high levels, very sparse at low levels
             const shuffleProb = intensityWeight + complexityWeight;
-            if (Math.random() < shuffleProb) {
+            if (bassDraw(3) < shuffleProb) {
                 return true;
             }
         }
         return false;
     }
     if (style === 'walking-ska') {
-        if (playback.bpm > 185 && !isQuarter && Math.random() < 0.3) {
+        if (playback.bpm > 185 && !isQuarter && bassDraw(4) < 0.3) {
             return false;
         }
         return isEighthBoundary;

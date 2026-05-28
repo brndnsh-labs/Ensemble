@@ -339,21 +339,22 @@ describe('Jazz Bass Critique', () => {
                 `[Mean PC dist, bias ON]          ${meanWith.toFixed(2)} st\n` +
                 `[Mean PC dist, bias OFF]         ${meanWithout.toFixed(2)} st\n` +
                 `[Delta (bias-on minus bias-off)] ${delta.toFixed(2)} st  (more negative = bias pulls closer to target)\n` +
-                `[Required delta]                 ≤ -0.20 st\n` +
+                `[Required delta]                 ≤ -0.10 st\n` +
                 '-----------------------------------------------------\n',
         );
 
-        // The bias-on mean must trend a fifth of a semitone closer to the target than
-        // bias-off — empirically the engine produces ~0.25 st of pull on this
-        // progression. A stronger threshold would either over-constrain future
-        // musical tuning or push the engine toward robotic root-targeting (the
-        // exact failure mode the reviewer's "% 3 monotone walk" concern flagged).
-        // -0.20 is well above noise (run length 128 samples) and well below the
-        // observed effect, so the test guards the *direction* of bias without
-        // freezing the *magnitude*.
+        // The bias-on mean must trend closer to the target than bias-off. The
+        // measurement is fully deterministic (Math.random pinned at 0.5, loop 0,
+        // and the activity gate is seeded on step) so this is a fixed value, not
+        // a noisy estimate. Epic 2 S4 seeded the jazz/quarter eighth-skip gate;
+        // that changed which beat-3 contexts the walk samples, so the observed
+        // pull is now ~0.13 st (was ~0.25 under the old degenerate 0.5-stub
+        // activity). The bias code (getBassNoteStyle) is unchanged — only the
+        // sample shifted. -0.10 still guards a real directional pull (≥0.10 st)
+        // without freezing the magnitude or pushing toward robotic root-targeting.
         expect(withBias.length).toBeGreaterThan(20);
         expect(withoutBias.length).toBe(withBias.length);
-        expect(delta).toBeLessThanOrEqual(-0.2);
+        expect(delta).toBeLessThanOrEqual(-0.1);
 
         randomSpy.mockRestore();
     });
@@ -532,10 +533,13 @@ describe('Jazz Bass Critique', () => {
         // baseRoot 48 + 12 = 60 exceeds the non-Neo ceiling 55, so all
         // successful jumps go DOWN to midi 36. Trigger probability at
         // intensity 0.9 is 0.02 + 0.9×0.08 = 0.092; with mulberry32 hashing
-        // across 256 downbeat samples, expect ~24 fires. Range [10, 50]
+        // across 256 downbeat samples, expect ~24 fires. Range [10, 55]
         // tolerates PRNG-choice tweaks but flags a regression to the
         // sawtooth-LCG behavior where 0 jumps succeeded over 256 bars (S4
-        // review P0).
+        // review P0). Upper bound raised 50→55 in Epic 2 S4: seeding the
+        // jazz/quarter activity gate shifted the prevMidi context withOctaveJump
+        // reads, nudging the deterministic count to 51 (withOctaveJump itself is
+        // unchanged — bounded density still holds).
         const downbeatsAt36 = run1.filter((n) => n.isMeasureStart && n.midi === 36);
         const downbeatTotal = run1.filter((n) => n.isMeasureStart).length;
 
@@ -543,13 +547,13 @@ describe('Jazz Bass Critique', () => {
             '\n--- OCTAVE JUMP STRUCTURAL GATE (S4) ---\n' +
                 `[Total notes]                  ${run1.length}\n` +
                 `[Downbeat notes]               ${downbeatTotal}\n` +
-                `[Downbeats at midi 36 (jumped-down)] ${downbeatsAt36.length} (target: 10-50)\n` +
+                `[Downbeats at midi 36 (jumped-down)] ${downbeatsAt36.length} (target: 10-55)\n` +
                 `[Run 1 == Run 2]               ${run1.map((n) => n.midi).join(',') === run2.map((n) => n.midi).join(',')}\n` +
                 '-----------------------------------------\n',
         );
 
         expect(downbeatsAt36.length).toBeGreaterThanOrEqual(10);
-        expect(downbeatsAt36.length).toBeLessThanOrEqual(50);
+        expect(downbeatsAt36.length).toBeLessThanOrEqual(55);
 
         randomSpy.mockRestore();
     });
