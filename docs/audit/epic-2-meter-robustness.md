@@ -51,10 +51,14 @@ Per [[canonical-genre-keys]], the fix is to rekey to the canonical feel (or add 
 - **Bug fixed:** `FILL_TEMPLATES[genre] || FILL_TEMPLATES.Rock` at `:541`; Ska-Punk (`'Ska'`) **and** Metal both missed → both played **Rock** drum fills at section ends.
 - **Verified:** `tom-vocabulary-critique.test.ts` extended to cover `'Ska'` + `'Metal'` (registry contract, 120-seed reachability sweeps at 0.6/0.85, voice-diversity) — 42 tests green; full standards suite green; typecheck clean. Metal fills use 3 tom voices, both medium + both high templates are tom-bearing.
 
-### S3 — `GENRE_MAP` cadence coverage · Model: opus (taste call inside)
-- **Where:** `resolution.ts:47` `GENRE_MAP`.
-- **Bug (verified):** key `'Bossa'` is dead (genreFeel is `'Bossa Nova'`) → Bossa Nova gets the **Rock `BUTTON`** ending (`ritardando: 0`) instead of the intended `JAZZ_V_I` with `ritardando: 1.0` — **most audible**. `'Hip Hop'` and `'Country'` are absent entirely → Rock button. `'Ska-Punk'` dead-key is moot (its intended profile is `BUTTON`, same as the Rock fallback) but rekey to `'Ska'` for consistency.
-- **Acceptance:** Bossa Nova rekeyed → regains its ritardando. Hip Hop + Country get a deliberate cadence profile (design call — likely `STANDARD_V_I` light ritardando for Country, `BUTTON` for Hip Hop; orchestrator decides). Ska rekeyed.
+### S3 — `GENRE_MAP` cadence coverage · Model: opus (taste call inside) · ✅ SHIPPED 2026-05-28
+- **Where:** `resolution.ts:47` `GENRE_MAP` (keyed by genreFeel).
+- **Fixed:** `'Bossa'` → `'Bossa Nova'` (dead key → Bossa Nova regains its `JAZZ_V_I, ritardando 1.0` instead of the Rock button — the most audible fix); `'Ska-Punk'` → `'Ska'` (kept `BUTTON, 0.0` — punk-ska ends hard; rekey just makes it reachable).
+- **Cadence design call (orchestrator, user-delegated 2026-05-28):**
+  - **Hip Hop → `BUTTON, 0.0`** — metronomic loop music; endings are hard cuts, a tempo ritardando is anti-idiomatic. Matches Rock/Funk/Disco.
+  - **Country → `STANDARD_V_I, 0.8`** — strongly diatonic, resolves on a clear V-I authentic cadence with a gentle slow-down; matched to Blues' `0.8` (roots-Americana neighbor) rather than Acoustic's balladic `1.5`.
+  - These values are a judgment call — revisit by ear if a Country chart wants more/less ritard.
+- **Verified:** full standards + integration suite green (893 tests); typecheck clean.
 
 ---
 

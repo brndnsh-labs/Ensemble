@@ -44,16 +44,28 @@ const CADENCE_PROFILES: Record<string, CadenceStep[]> = {
     ],
 };
 
+// why: keyed by genreFeel (see :72). Epic 2 S3 fixed three dead/missing keys:
+//   - 'Bossa' → 'Bossa Nova' (the canonical feel; the old key never matched, so
+//     bossa charts got the Rock button instead of their jazz ritardando).
+//   - 'Ska-Punk' → 'Ska' (the Ska-Punk genre's feel; punk-ska ends hard, so the
+//     BUTTON value is unchanged — the rekey just makes it reachable/explicit).
+//   - Added 'Hip Hop' and 'Country' (both were absent → Rock button fallback).
+//     Hip Hop keeps a hard BUTTON cut: it's metronomic loop music, a ritardando
+//     (tempo slow-down) would read as wrong. Country resolves with a clear V-I
+//     authentic cadence and a gentle slow-down — matched to Blues' 0.8 (its
+//     roots-Americana neighbor), not Acoustic's balladic 1.5.
 const GENRE_MAP: Record<string, GenreConfig> = {
     Jazz: { profile: 'JAZZ_V_I', ritardando: 1.2 },
-    Bossa: { profile: 'JAZZ_V_I', ritardando: 1.0 },
+    'Bossa Nova': { profile: 'JAZZ_V_I', ritardando: 1.0 },
     'Neo-Soul': { profile: 'JAZZ_V_I', ritardando: 1.5 },
     Blues: { profile: 'STANDARD_V_I', ritardando: 0.8 },
+    Country: { profile: 'STANDARD_V_I', ritardando: 0.8 },
     Rock: { profile: 'BUTTON', ritardando: 0.0 },
     Metal: { profile: 'BUTTON', ritardando: 0.0 },
-    'Ska-Punk': { profile: 'BUTTON', ritardando: 0.0 },
+    Ska: { profile: 'BUTTON', ritardando: 0.0 },
     Disco: { profile: 'BUTTON', ritardando: 0.0 },
     Funk: { profile: 'BUTTON', ritardando: 0.0 },
+    'Hip Hop': { profile: 'BUTTON', ritardando: 0.0 },
     Acoustic: { profile: 'STANDARD_V_I', ritardando: 1.5 },
     Reggae: { profile: 'BUTTON', ritardando: 0.0 },
 };
