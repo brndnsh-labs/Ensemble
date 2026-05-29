@@ -1,15 +1,12 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
 test.describe('ChartSurface @ui', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test.describe('Visualizer overlay', () => {
@@ -202,11 +199,7 @@ test.describe('ChartSurface @ui', () => {
         test('shows "Shared with you" pill when URL has a chart payload', async ({ page }) => {
             // A minimal valid ?s= payload (base64 of a section array)
             const s = btoa(JSON.stringify([{ id: 'x', label: 'A', value: 'C Am F G' }]));
-            await page.goto(`/?s=${encodeURIComponent(s)}`);
-            await page.waitForSelector('html[data-hydrated="true"]', {
-                state: 'attached',
-                timeout: 15000,
-            });
+            await gotoHydrated(page, `/?s=${encodeURIComponent(s)}`);
 
             const pill = page.locator('.chart-surface__shared-pill');
             await expect(pill).toBeVisible();
@@ -215,11 +208,7 @@ test.describe('ChartSurface @ui', () => {
 
         test('dismisses "Shared with you" pill on button click', async ({ page }) => {
             const s = btoa(JSON.stringify([{ id: 'x', label: 'A', value: 'C Am F G' }]));
-            await page.goto(`/?s=${encodeURIComponent(s)}`);
-            await page.waitForSelector('html[data-hydrated="true"]', {
-                state: 'attached',
-                timeout: 15000,
-            });
+            await gotoHydrated(page, `/?s=${encodeURIComponent(s)}`);
 
             await page.locator('[aria-label="Dismiss shared notice"]').click();
             await expect(page.locator('.chart-surface__shared-pill')).toHaveCount(0);

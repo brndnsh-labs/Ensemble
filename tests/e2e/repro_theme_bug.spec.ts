@@ -1,5 +1,6 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -7,11 +8,7 @@ test.describe('Theme Reproduction Bug', () => {
     test.use({ colorScheme: 'light' });
 
     test('Auto theme should apply light mode when system is light', async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
 
         // 1. Open settings
         await page.click('#settingsBtn');

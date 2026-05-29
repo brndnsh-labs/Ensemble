@@ -1,5 +1,6 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -10,11 +11,7 @@ const { expect, test } = pkg;
 
 test.describe('Desktop Header - Layout @desktop', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
         await page.setViewportSize({ width: 1366, height: 900 });
     });
 

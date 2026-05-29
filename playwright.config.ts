@@ -82,7 +82,16 @@ export default defineConfig({
         },
     ],
 
-    /* Run your local dev server before starting the tests */
+    /* Warm the dev server's module graph ONCE before the parallel workers start.
+     * The dev server compiles modules on demand; under fullyParallel workers the
+     * first cold transforms can exceed a test's hydration wait and flake (a stale
+     * lingering server on the port is another local flake vector). `globalSetup`
+     * navigates to `/` and waits for hydration, so Vite's transform cache is hot
+     * before any spec runs and the cold-compile cost is paid once, off the clock.
+     * (Dev server is kept, not `vite preview`, because diagnostics like
+     * reverb-stability.spec.ts import raw `.ts` source at runtime — only the dev
+     * server serves that.) */
+    globalSetup: './tests/e2e/global-setup.ts',
     webServer: {
         command: 'npm run dev',
         url: 'http://localhost:5173',

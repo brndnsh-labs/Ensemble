@@ -3,6 +3,7 @@
 
 import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -28,11 +29,7 @@ async function choosePresetFromLibrary(page: Page, presetName: string): Promise<
 
 test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('Donna Lee renders cleanly in the mobile arranger viewport', async ({ page }) => {

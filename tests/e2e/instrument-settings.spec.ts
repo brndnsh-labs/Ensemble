@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -58,11 +59,7 @@ async function expectWithinViewport(page: Page, locator) {
 test.describe('Instrument settings — desktop @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('mixer accordion exposes all 5 instrument strips', async ({ page }) => {
@@ -128,11 +125,7 @@ test.describe('Instrument settings — desktop @ui', () => {
 
 test.describe('Instrument settings — mobile @mobile', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('mix sheet opens with 5 rows and instrument settings reachable from a row', async ({

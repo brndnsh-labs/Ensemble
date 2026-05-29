@@ -2,6 +2,7 @@
 // cspell:ignore labelledby
 import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 import {
     expectLocatorFitsViewport,
     expectOwnsInteriorProbe,
@@ -32,11 +33,7 @@ async function choosePresetFromLibrary(page: Page, presetName: string): Promise<
 
 test.describe('Arranger & Chord Visualizer @visual', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('Chord Visualizer - Default Layout', async ({ page }) => {
@@ -304,11 +301,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         for (const viewport of viewports) {
             await page.setViewportSize(viewport);
-            await page.goto('/');
-            await page.waitForSelector('html[data-hydrated="true"]', {
-                state: 'attached',
-                timeout: 15000,
-            });
+            await gotoHydrated(page);
 
             const keyTrigger = page.locator('#keyMenuBtn');
             const keyPanel = page.locator('#arrangerKeyPanel');

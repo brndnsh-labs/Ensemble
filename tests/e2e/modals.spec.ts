@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { Locator, Page } from '@playwright/test';
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -43,11 +44,7 @@ async function openEditorFromLibraryPreset(page: Page): Promise<Locator> {
 
 test.describe('Modals Responsiveness @ui', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('Settings Modal - Centering and Content', async ({ page }) => {

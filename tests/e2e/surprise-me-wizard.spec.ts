@@ -1,6 +1,7 @@
 // @ts-nocheck
 import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -18,11 +19,7 @@ async function openLibrary(page: Page): Promise<void> {
 
 test.describe('Surprise Me wizard @ui', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('Surprise Me at zero answers rolls a chart and shows toast actions', async ({ page }) => {

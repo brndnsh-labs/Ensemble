@@ -1,16 +1,13 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
+import { gotoHydrated } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
 test.describe('UI polish consistency @ui', () => {
     test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: 1366, height: 900 });
-        await page.goto('/');
-        await page.waitForSelector('html[data-hydrated="true"]', {
-            state: 'attached',
-            timeout: 15000,
-        });
+        await gotoHydrated(page);
     });
 
     test('shared shell controls use consistent theme radii and spacing', async ({ page }) => {
