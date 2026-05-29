@@ -35,6 +35,15 @@ const strategies: Record<string, any> = {
     Acoustic: acoustic,
     Disco: disco,
     Reggae: reggae,
+    // why (dormant-by-design, verified 2026-05-29): of the Latin family, only
+    // `Bossa` is a selectable smart-genre (smart-genres.ts → feel 'Bossa Nova',
+    // drum 'Bossa Nova'), so `'Bossa Nova'` is the only key the UI ever reaches.
+    // The generic `Latin` key and the `Latin/Salsa` / `Afro-Cuban 6/8` / `Samba`
+    // World/Latin drum presets are intentional curation — built and correct, but
+    // not surfaced in any genre or drum-preset picker (owner call: Bossa is the
+    // deliberate single Latin-family genre). They are NOT dead code to delete;
+    // they stay ready for if/when the World/Latin bank is exposed. Reachable in
+    // production today only via a Bossa selection forced to a compound meter.
     'Bossa Nova': latin,
     Latin: latin,
     // why: the Ska-Punk smart-genre sets genreFeel='Ska' (smart-genres.ts), so
