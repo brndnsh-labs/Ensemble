@@ -139,19 +139,33 @@ describe('Bossa + Dub compound-meter bass critique (epic-2 S9)', () => {
         expect(counts.get(6) ?? 0).toBe(0); // the 6/8 drop position is NOT used in 4/4
     });
 
-    it('dub: odd meters stay on the felt pulse (no 8th-grid running line, no dropout)', () => {
-        // S9 review P0: feltBeat keyed on isBeatStart + pickup on isOffbeat flooded
-        // the 8th grid in odd meters (7/8 → 14/bar, 5/4 → 10/bar) — a running line, the
-        // opposite of dub. The fix routes simple-meter feltBeat off isPulse (the true
-        // felt pulse) and drops the simple-meter pickup. The strongest guard: EVERY
-        // onset must land on a felt-pulse position (tsConfig.pulse), in every meter at
-        // every riddim intensity. That directly proves "no 8th-grid flood".
-        // NOTE: 7/8 is the load-bearing discriminator here. In 16th-grid 5/4 + 7/4,
-        // tsConfig.pulse IS every quarter, so "onset ∈ pulses" can't distinguish isPulse
-        // from a regression to isBeatStart — only 7/8 (8th-grid: isBeatStart fires every
-        // eighth, isPulse only on 0,4,8) catches that. Keep 7/8 in this list.
+    it('dub: odd meters use grouping-pulse onsets (epic-3 S5)', () => {
+        // epic-3-followup-cleanup S5: dub now keys feltBeat off isPulseStart (the
+        // grouping pulse) for any meter with a non-trivial grouping (length > 1).
+        //
+        // Before this fix, 16th-grid odd meters (5/4, 7/4) used isPulse = every
+        // quarter ({0,4,8,12,16} / {…,24}), producing a locked quarter-note root
+        // pedal — on-pulse but much denser than the sparse 3+2 / 4+3 grouping-pulse
+        // idiom dub actually uses. After the fix:
+        //   5/4 (grouping [3,2]): isPulseStart → {0, 12}         (was {0,4,8,12,16})
+        //   7/4 (grouping [4,3]): isPulseStart → {0, 16}         (was {0,4,8,12,16,20,24})
+        //   7/8 (grouping [2,2,3]): isPulseStart → {0,4,8}       (unchanged — matches isPulse)
+        //
+        // Grouping-pulse positions: derived from cumulative group starts
+        // (grouping[i] * stepsPerBeat accumulated). These are the expected onset
+        // ceilings for Steppers; One Drop drops beat 1 (mStep 0) → one onset/bar.
+        const GROUPING_PULSES: Record<string, number[]> = {
+            '5/4': [0, 12], // 3*4=12
+            '7/4': [0, 16], // 4*4=16
+            '7/8': [0, 4, 8], // 2*2=4, 2*2+2*2=8
+        };
+
+        // 7/8: 8th-grid discriminator — isBeatStart fires every eighth (0,2,4,6,8,10,12),
+        // isPulseStart only on {0,4,8}; this still catches any regression to isBeatStart.
+        // 5/4 + 7/4: the grouping-pulse set ({0,12}/{0,16}) is now tighter than isPulse,
+        // so the subset assertion directly proves the fix.
         for (const tsKey of ['5/4', '7/4', '7/8']) {
-            const pulses = new Set(TIME_SIGNATURES[tsKey].pulse ?? []);
+            const groupingPulses = new Set(GROUPING_PULSES[tsKey]);
             for (const intensity of [0.4, 0.5, 0.7, 0.95]) {
                 const { counts, perBarOnsets } = collectOnsets(
                     tsKey,
@@ -163,20 +177,59 @@ describe('Bossa + Dub compound-meter bass critique (epic-2 S9)', () => {
                 const firingSteps = [...counts.keys()];
                 const avg = perBarOnsets.reduce((a, b) => a + b, 0) / perBarOnsets.length;
                 console.log(
-                    `[Dub ${tsKey} @${intensity}] firing mSteps: ${JSON.stringify(firingSteps)} avg/bar=${avg.toFixed(2)} (pulses: ${JSON.stringify([...pulses])})`,
+                    `[Dub ${tsKey} @${intensity}] firing mSteps: ${JSON.stringify(firingSteps)} avg/bar=${avg.toFixed(2)} (grouping pulses: ${JSON.stringify([...groupingPulses])})`,
                 );
-                // Every onset is on a pulse-grid position — no 8th-grid flooding.
+                // Every onset must be within the grouping-pulse set — no quarter-grid flood.
                 for (const m of firingSteps) {
-                    expect(pulses.has(m)).toBe(true);
+                    expect(groupingPulses.has(m)).toBe(true);
                 }
                 // No silent bars (the bass holds the groove).
                 expect(Math.min(...perBarOnsets)).toBeGreaterThan(0);
-                // Density ceiling: at most one onset per pulse-grid position. Pins the
-                // current "quarter pedal in 16th-grid odd meters" behavior so an S10
-                // grouping-pulse refinement (sparser) is a deliberate test edit, and an
-                // isOffbeat-style flood (denser) fails here. (S9 review P2.)
-                expect(avg).toBeLessThanOrEqual(pulses.size);
+                // Density ceiling: at most one onset per grouping-pulse position.
+                // In 5/4: Steppers ≤ 2/bar, One Drop = 1/bar (beat 1 dropped → mStep 12 only).
+                // In 7/4: Steppers ≤ 2/bar, One Drop = 1/bar (mStep 16 only).
+                // In 7/8: Steppers ≤ 3/bar (unchanged).
+                // why: grouping-pulse size is the correct ceiling — far sparser than the
+                // old isPulse ceiling (5 or 7 pulses/bar in 5/4 and 7/4 respectively).
+                expect(avg).toBeLessThanOrEqual(groupingPulses.size);
             }
+        }
+    });
+
+    it('dub: 5/4 Steppers onsets ⊆ {0,12}; One Drop = {12} only', () => {
+        // Confirm the exact grouping-pulse positions for 5/4 (grouping [3,2]).
+        // Steppers: all grouping-pulse positions {0, 12} — up to 2 onsets/bar.
+        const { counts: steppersCounts } = collectOnsets('5/4', 'dub', 'Reggae', 0.95, 32);
+        console.log(`[Dub 5/4 Steppers] onsets: ${JSON.stringify([...steppersCounts])}`);
+        for (const m of [...steppersCounts.keys()]) {
+            expect([0, 12]).toContain(m); // only grouping-pulse positions
+        }
+        // One Drop: beat 1 (mStep 0) is silent; only mStep 12 fires (the "drop").
+        // This IS the dub "one drop" idiom — one sparse onset per bar. Keep it.
+        const { counts: dropCounts54 } = collectOnsets('5/4', 'dub', 'Reggae', 0.4, 32);
+        console.log(`[Dub 5/4 One Drop] onsets: ${JSON.stringify([...dropCounts54])}`);
+        expect(dropCounts54.get(0) ?? 0).toBe(0); // beat 1 is silent
+        expect(dropCounts54.get(12)).toBeGreaterThan(0); // the drop
+        for (const m of [...dropCounts54.keys()]) {
+            expect([12]).toContain(m); // strictly one-onset-per-bar drop
+        }
+    });
+
+    it('dub: 7/4 Steppers onsets ⊆ {0,16}; One Drop = {16} only', () => {
+        // Confirm the exact grouping-pulse positions for 7/4 (grouping [4,3]).
+        // Steppers: all grouping-pulse positions {0, 16}.
+        const { counts: steppersCounts } = collectOnsets('7/4', 'dub', 'Reggae', 0.95, 32);
+        console.log(`[Dub 7/4 Steppers] onsets: ${JSON.stringify([...steppersCounts])}`);
+        for (const m of [...steppersCounts.keys()]) {
+            expect([0, 16]).toContain(m); // only grouping-pulse positions
+        }
+        // One Drop: mStep 0 silent; only mStep 16 fires.
+        const { counts: dropCounts74 } = collectOnsets('7/4', 'dub', 'Reggae', 0.4, 32);
+        console.log(`[Dub 7/4 One Drop] onsets: ${JSON.stringify([...dropCounts74])}`);
+        expect(dropCounts74.get(0) ?? 0).toBe(0);
+        expect(dropCounts74.get(16)).toBeGreaterThan(0);
+        for (const m of [...dropCounts74.keys()]) {
+            expect([16]).toContain(m);
         }
     });
 

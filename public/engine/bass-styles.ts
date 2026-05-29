@@ -377,20 +377,29 @@ export function checkBassActiveStyle(
         // literal grid. "Do our best, groove" — not the exact 4/4 riddim.
         const is44 = ts.beats === 4 && ts.stepsPerBeat === 4;
         if (!is44 && stepInfo) {
-            // feltBeat = the meter's pulse grid. why: NOT isBeatStart/isOffbeat — in an
-            // 8th-grid meter (7/8: stepsPerBeat=2) isBeatStart fires every eighth, and
-            // isOffbeat (the old simple-meter pickup) floods the 8th grid in 16th-grid
-            // odd meters (5/4, 7/4) → a constant running line, the opposite of the sparse
-            // dub idiom (S9 review P0). isPulse (= tsConfig.pulse) stays on the pulse grid:
-            // 6/8 → 0,6 and 7/8 → 0,4,8 (the true 2+2+3 grouping pulses); but 5/4/7/4 are
-            // 16th-grid, where tsConfig.pulse is EVERY QUARTER (0,4,8,12,16 / …,24) — so
-            // dub there plays a locked quarter-note root pedal: on-pulse and not flooding
-            // the 8th grid (meets the S9 "groove, don't break" bar), but denser than the
-            // 3+2 / 4+3 grouping-pulse idiom. Refining odd-meter dub to the grouping pulse
-            // (isPulseStart → 5/4 {0,12}, 7/4 {0,16}) is deferred to the S10 odd-meter
-            // sweep — see FOLLOWUPS §C. (S9 review P2.)
-            const feltBeat =
-                stepInfo.isCompound === true ? stepInfo.isPulseStart : stepInfo.isPulse;
+            // feltBeat = the meter's grouping pulse. why: use isPulseStart (the start of
+            // each rhythmic group) whenever the meter has a non-trivial grouping structure
+            // (grouping.length > 1), else fall back to isPulse (the quarter grid).
+            //
+            // Unifying rule: hasGrouping covers BOTH compound meters (isCompound=true, e.g.
+            // 6/8 grouping [3,3]) AND simple odd meters (e.g. 5/4 grouping [3,2], 7/4
+            // grouping [4,3], 7/8 grouping [2,2,3]) in a single predicate. The old
+            // `isCompound ? isPulseStart : isPulse` left 16th-grid odd meters (5/4, 7/4)
+            // on isPulse — which is EVERY QUARTER ({0,4,8,12,16} / {…,24}) — producing a
+            // locked quarter-note root pedal, far denser than the 3+2 / 4+3 grouping-pulse
+            // idiom dub uses. (S9 review P2; epic-3-followup-cleanup S5.)
+            //
+            // Meter-by-meter mapping after the fix:
+            //   6/8  (compound, grouping [3,3])    → isPulseStart → {0,6}     (unchanged)
+            //   7/8  (simple,   grouping [2,2,3])  → isPulseStart → {0,4,8}   (unchanged; matches isPulse)
+            //   5/4  (simple,   grouping [3,2])    → isPulseStart → {0,12}    (NEW — was {0,4,8,12,16})
+            //   7/4  (simple,   grouping [4,3])    → isPulseStart → {0,16}    (NEW — was {0,4,8,12,16,20,24})
+            //   3/4  (simple,   grouping [3] len=1)→ isPulse      → {0,4,8}   (unchanged — trivial grouping)
+            //   4/4  handled by is44 branch above; never reaches here.
+            const hasGrouping = (stepInfo.tsConfig?.grouping?.length ?? 1) > 1;
+            // why: isPulseStart = start of each rhythmic group (the dub felt beat);
+            // isPulse = every quarter note (too dense in 16th-grid odd meters).
+            const feltBeat = hasGrouping ? stepInfo.isPulseStart : stepInfo.isPulse;
             if (selectedRiddim === 'Steppers') {
                 // four-on-the-floor character: bass on every felt pulse
                 return feltBeat === true;
