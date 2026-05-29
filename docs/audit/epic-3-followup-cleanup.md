@@ -26,8 +26,8 @@ These were decided "yes, change it" by the owner but the change already exists i
 
 | Disposition | Items |
 | :- | :- |
-| **Real stories** (this epic) | **6** — S1 ✅ shipped + S5, S6, S7, S10, S12 live |
-| **Closed-on-arrival** (synthesis error — already shipped/closed by the drain epic + Epic 12 S5/S6) | **6** — S2, S3, S4, S8, S9, S11 (see their blocks) |
+| **Real stories** (this epic) | **5** — S1 ✅ + S5 ✅ shipped; S7, S10, S12 live |
+| **Closed-on-arrival** (synthesis error — already shipped/closed by the drain epic + Epic 12 S4/S5/S6) | **7** — S2, S3, S4, S6, S8, S9, S11 (see their blocks; S6 = Epic 12 S4 eval=no, found mid-cycle) |
 | **Verified already-shipped at synthesis time** | 6 (above — China, hat gate, ramp, Ska floor, antiphony, +B5) |
 | **Deferred to a listening session** | 1 — per-genre intro/outro mute staggering (`FOLLOWUPS.md` §E; also drain S8) |
 | **Left as-is (intentional)** | comping harmonic-color RNG (variety is the point); §B.2 soloist device-floor ceiling (documented structural limit); non-jazz walking-bass compound pickers (latent — revisit per-genre when 6/8 support lands); Disco intensity-axis re-classification (drain S9 — closed) |
@@ -72,7 +72,8 @@ Unambiguous fixes with the value already chosen; no musical-taste decision left.
 - **Decision (owner 2026-05-28):** key the felt onset off **`isPulseStart`** (the *grouping* pulse: 5/4 → {0,12}, 7/4 → {0,16}; 8th-grid odd like 7/8 → {0,4,8} stays correct) for simple odd meters too. Watch the One Drop interaction: its `!isMeasureStart` then drops to a single onset/bar — keep that as a deliberate "one drop" only if it reads musically; otherwise guard it.
 - **Acceptance:** 5/4 + 7/4 dub sits on the grouping pulse, not every quarter; compound (6/8) and 8th-grid odd unchanged. **This deliberately edits the pinning test** (`avg <= pulses.size` → grouping-pulse bound) — call that out in the diff. *Source: FOLLOWUPS §C (meter-robustness S9 review, P2).*
 
-### S6 — Bossa phrase-end breath gate inclusion · Model: sonnet · Reviewer: music-theory
+### S6 — Bossa phrase-end breath gate inclusion · ❌ CLOSED-ON-ARRIVAL 2026-05-28 (eval=no)
+- **Closed:** the "eval-first" this story called for was **already performed** — `git log` shows `9f8fe473 revert(bossa): Epic 12 S4 patch — drop Bossa from PHRASE_END_THIN_GENRES; document eval=no (2026-05-23)`. Bossa was added, then reverted, with the rationale documented in-code (`accompaniment.ts:2671-2681`): the partido-alto bank (Epic 9 S5.c) already encodes soloist-busy thinning via the sparse cell `[0,10,14]` + the sparse-vibe drop; stacking a 65% phrase-end thin produces holes that fight Bossa's continuous-comp identity. If a future listening session wants more breath, the documented lever is narrowing cell selection (force `compFloor` for one beat), NOT the gate. The synthesis grep saw "no Bossa in the set" but missed the comment block above explaining the deliberate exclusion. Original story preserved below.
 - **Where:** `accompaniment.ts:2681` — `PHRASE_END_THIN_GENRES = new Set(['Jazz', 'Blues', 'Funk'])` (Bossa excluded).
 - **Context:** Bossa was excluded when the gate was tuned, before the partido-alto comping bank existed. The bank exists now.
 - **Decision (owner 2026-05-28):** add `'Bossa Nova'` to the breath gate — **but eval first**: confirm the partido-alto bank isn't already encoding phrase-end breath natively. If the generic thin reads too aggressive against Bossa's steadier comp, fall back to a gentler Bossa-shaped value instead of the blanket gate.

@@ -130,7 +130,7 @@ Four items promoted on 2026-05-19; remainder reconciled below.
 
 **Not promoted (still deferred):**
 
-- 📌 PROMOTED — **Epic 3/S6** (owner decision 2026-05-28: add `'Bossa Nova'` to the breath gate, eval-first against the partido-alto bank). **Bossa phrase-end breath after the partido-alto bank lands.** Epic 9 S2.a excludes Bossa from `PHRASE_END_THIN_GENRES` because the partido-alto bank (Epic 9 S5.c) didn't yet exist when the gate was tuned to Jazz/Blues/Funk clav comping. Now that S5.c has shipped, re-evaluate whether Bossa should inherit the gate or whether the partido-alto bank encodes breath natively. ~15min eval, ~1h if a Bossa-shaped gate is needed. *Source: Epic 9 S2 review (2026-05-19).*
+- ✅ CLOSED (eval=no — verified 2026-05-28): promoted to Epic 3/S6 then found the eval was already done — `9f8fe473 revert(bossa): Epic 12 S4 patch — drop Bossa from PHRASE_END_THIN_GENRES; document eval=no` (2026-05-23). The partido-alto bank already encodes the breath; stacking the gate fights Bossa's continuous-comp identity (rationale in `accompaniment.ts:2671-2681`). Future-want lever: narrow cell selection, not the gate. **Bossa phrase-end breath after the partido-alto bank lands.** Epic 9 S2.a excludes Bossa from `PHRASE_END_THIN_GENRES` because the partido-alto bank (Epic 9 S5.c) didn't yet exist when the gate was tuned to Jazz/Blues/Funk clav comping. Now that S5.c has shipped, re-evaluate whether Bossa should inherit the gate or whether the partido-alto bank encodes breath natively. ~15min eval, ~1h if a Bossa-shaped gate is needed. *Source: Epic 9 S2 review (2026-05-19).*
 
 ## E. Per-genre tuning & sound design
 
