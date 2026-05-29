@@ -4,6 +4,8 @@ Synthesized 2026-05-28 from a decision pass over the open items in [`FOLLOWUPS.m
 
 **Reconciliation note (important):** the `FOLLOWUPS.md` "Open count" block was last reconciled **2026-05-26**, *before* Epic 12 S6/S10/S11 and the two 2026-05-28 meter cycles (Epic 1 compound, Epic 2 meter-robustness) closed a chunk of §E. During synthesis, **six decided items were found already shipped** and were NOT promoted — see "Verified already-shipped" below. The lesson ([[followup-sweep-triage]]): verify each entry against live source before writing a story.
 
+**⚠️ POST-SYNTHESIS RECONCILIATION (2026-05-28, mid-S2):** the synthesis greps were too shallow — they matched *fix-landed* `why:` comments and read them as problem-markers. Cross-checking against the archived [`epic-followup-drain.md`](../archive/musical-audit-2026-05/epic-followup-drain.md) (the 2026-05 cycle's *own* follow-up drain, S1–S11) revealed **six more of the twelve promoted stories were already shipped or deliberately closed** by that drain epic + Epic 12 S5/S6 — the `FOLLOWUPS.md` §E entries were simply never marked closed. **The epic is really 6 stories** (S1 shipped + S5/S6/S7/S10/S12 live); **S2, S3, S4, S8, S9, S11 are CLOSED-ON-ARRIVAL** (see their blocks). The genuinely-live five all trace to the **2026-05-28 meter cycles**, which post-date the drain epic and so couldn't have been drained — the reliable signal for "is this follow-up real" was *recency of source*. Lesson banked: [[verify-followup-against-source]] — grep for a prior drain/cleanup epic before synthesizing a new one.
+
 **Goal:** burn down the genuinely-open follow-up backlog methodically via `/cycle`. The bar per story is the same as the prior cycles — one engine touch + critique test (or listen gate) + reliability loop. No new product surface; this is cleanup and per-genre correctness/taste the prior cycles deliberately deferred.
 
 ## How to use this doc
@@ -24,10 +26,11 @@ These were decided "yes, change it" by the owner but the change already exists i
 
 | Disposition | Items |
 | :- | :- |
-| **Promoted to story** (this epic) | 12 |
-| **Verified already-shipped** | 6 (above) |
-| **Deferred to a listening session** | 1 — per-genre intro/outro mute staggering (`FOLLOWUPS.md` §E, stays) |
-| **Left as-is (intentional)** | comping harmonic-color RNG (variety is the point); §B.2 soloist device-floor ceiling (documented structural limit); non-jazz walking-bass compound pickers (latent — revisit per-genre when 6/8 support lands); Disco intensity-axis re-classification (when Disco next gets a pass) |
+| **Real stories** (this epic) | **6** — S1 ✅ shipped + S5, S6, S7, S10, S12 live |
+| **Closed-on-arrival** (synthesis error — already shipped/closed by the drain epic + Epic 12 S5/S6) | **6** — S2, S3, S4, S8, S9, S11 (see their blocks) |
+| **Verified already-shipped at synthesis time** | 6 (above — China, hat gate, ramp, Ska floor, antiphony, +B5) |
+| **Deferred to a listening session** | 1 — per-genre intro/outro mute staggering (`FOLLOWUPS.md` §E; also drain S8) |
+| **Left as-is (intentional)** | comping harmonic-color RNG (variety is the point); §B.2 soloist device-floor ceiling (documented structural limit); non-jazz walking-bass compound pickers (latent — revisit per-genre when 6/8 support lands); Disco intensity-axis re-classification (drain S9 — closed) |
 
 ---
 
@@ -42,19 +45,22 @@ Unambiguous fixes with the value already chosen; no musical-taste decision left.
 - **Paired deliverable (same commit):** the §E motif-tier test floors are loose — `barsWithBeat1Displacement >= 5` (funk) and `burstBars >= 5` (hip-hop) pass even if the rate halved. The funk re-weight *changes* the expected displacement rate, so re-measure with a 20-run reliability sample and re-baseline both floors honestly (tighten toward the empirical rate, keep a statistical cushion — not a rigid snapshot). *Source: FOLLOWUPS §E (drums-idiom/S6) + §E motif-tier floors.*
 - **Acceptance:** funk critique test green at the new distribution; the two motif-tier floors tightened with a documented 20-run measurement; no other funk/hip-hop critique regresses.
 
-### S2 — Walking-ska 6th: chord-quality aware · Model: sonnet · Reviewer: music-theory
+### S2 — Walking-ska 6th: chord-quality aware · ❌ CLOSED-ON-ARRIVAL 2026-05-28
+- **Closed:** already shipped by **drain S5 / Epic 12 S5** (`8ac896ef`, `bass.md P1 #9`). `bass-styles.ts:1338` already does `targetInterval = scale.includes(9) ? 9 : scale.includes(8) ? 8 : 7` — the exact scale-aware sixth the owner chose. The synthesis grep saw the fix-landed `why:` comment and misread it as a problem-marker. Original story preserved below.
 - **Where:** `bass-styles.ts:~1341` (the `bass.md P1 #9` walking-ska "6th" block).
 - **Bug:** the walking-ska bass plays a major 6th over the chord regardless of quality; over a minor chord the M6 implies dorian, which is often wrong against the chord's actual quality.
 - **Decision (owner 2026-05-28):** make the 6th **chord-quality aware** — M6 over major (and genuine dorian-minor) but m6 / the scale-correct 6th when the chord or active scale calls for it. Read the chord quality / scale mask already available in the bass context rather than hardcoding M6.
 - **Acceptance:** over a minor-key ska progression the 6th matches the chord's scale; major chords unchanged. Add/extend the walking-ska critique coverage to assert the 6th's interval tracks chord quality. *Source: FOLLOWUPS §E (`bass.md` P1 #9).*
 
-### S3 — Bebop whole-tone fallback off-scale fix · Model: sonnet · Reviewer: music-theory
+### S3 — Bebop whole-tone fallback off-scale fix · ❌ CLOSED-ON-ARRIVAL 2026-05-28 (moot)
+- **Closed:** documented won't-fix by **drain S4** (§E NIT). `soloist-devices.ts:595-614` now carries a full analysis proving the fallback is **unreachable** for both whole-tone and diminished scales (the loop finds a match at semi≤2 before the fallback fires) — it only triggers on truly pathological input (<3-note scale / empty bebopPcSet), where no "correct" scale tone exists. The premise I presented ("lands off-scale for diminished") is false per the code's own proof. Making it scale-aware "has no practical benefit." Original story preserved below.
 - **Where:** `soloist-devices.ts:614` — `findNextBebopMidi` returns `from + stepDir * 2` (a fixed whole-tone step) when no bebop-set PC is found within 4 semitones (only on degenerate scales — whole-tone / diminished).
 - **Bug:** the fixed whole-tone step stays in-scale for whole-tone scales (no-op) but lands **off-scale** for diminished. NIT-level — never observed in jazz-style runs, but it's a latent wrong-note.
 - **Decision (owner 2026-05-28):** fix the fallback to step to the nearest *in-scale* tone in `stepDir` rather than a blind whole tone.
 - **Acceptance:** on a diminished scale the fallback returns a scale tone; whole-tone behavior unchanged. *Source: FOLLOWUPS §E (Epic 4 / S3 review).*
 
-### S4 — Funk slap pop/chuck/hammer probability documentation · Model: sonnet · Reviewer: music-theory
+### S4 — Funk slap pop/chuck/hammer probability documentation · ❌ CLOSED-ON-ARRIVAL 2026-05-28
+- **Closed:** already shipped by **drain S4** ("Funk pop/chuck/hammer probability documentation — `bass.md` P2 #17", Shipped 2026-05-23). The slap articulation gates in `bass-styles.ts` already carry inline probability comments (e.g. `useOctaveUpOnThree = variationSeed < 0.2; // ~20% of bars…`) plus the §G.17 seeding WHY-block. Original story preserved below.
 - **Where:** funk slap-bass strategy in `bass-styles.ts` (~919–1034, the six articulation gates seeded via `scrambleHash` per the §G.17 WHY-block).
 - **Note:** the §G.17 PRNG migration already added a WHY-comment block for the *seeding*; this story is the **musical-intent documentation** of the pop/chuck/hammer *probability values* themselves (why each gate sits where it does). **Verify what's already documented first** — if the §G.17 block already covers the probabilities, downscope to filling any gaps. No behavior change.
 - **Acceptance:** each articulation probability has an inline musical-intent comment; `npm run typecheck` + lint clean; zero behavior diff. *Source: FOLLOWUPS §E (`bass.md` P2 #17).*
@@ -81,12 +87,14 @@ Unambiguous fixes with the value already chosen; no musical-taste decision left.
 - **Decision (owner 2026-05-28):** mirror the kick's `isSecondStrongBeat` pattern on the snare lane (the established S6/S8 fix shape — compound → `isPulseStart && groupIndex === midGroup`), so kick and snare agree on the felt backbeat. Motif-≥1 snare (mSteps 2+6) already hits the pulse, so the work is really motif-0 placement.
 - **Acceptance:** extend `acoustic-drummer-critique.test.ts` with a 6/8 + 12/8 harness asserting the motif-0 snare lands on the felt secondary pulse (mStep 6/12) and **zero** snares on the old mis-map (mStep 4); 4/4 byte-identical; 30/30 reliable. *Source: FOLLOWUPS §C (meter-robustness S8 review, P1).*
 
-### S8 — Imperfect Symmetry at low intensity (INVESTIGATE → lower floor) · Model: opus · Reviewer: music-theory
+### S8 — Imperfect Symmetry at low intensity (INVESTIGATE → lower floor) · ❌ CLOSED-ON-ARRIVAL 2026-05-28
+- **Closed:** already shipped by **drain S6 B1** (`118c5018`) — the bass Imperfect Symmetry floor was lowered `0.4 → 0.25` at `bass-engine.ts:451`, exactly the value the owner chose. The synthesis "couldn't locate the gate" because it's in `bass-engine.ts`, not the soloist/groove paths I grepped. Original story (and the correct INVESTIGATE instinct) preserved below.
 - **Where:** unclear in current source — the §E entry cites the archived "Epic 2 S2 gates the gesture at `intensity >= 0.4`", but the gesture was refactored since: soloist SRDC symmetry moved to `arranger-utils.ts`, drum imperfect-symmetry (`groove-engine.ts:652`) is gated on `timeSignature === '4/4'` + repeat-pass (not an intensity floor). **No `intensity >= 0.4` suppressor was located during synthesis.**
 - **Decision (owner 2026-05-28):** lower the floor to **0.25** so subtle motivic drift still operates in quiet ballad-style sections (where a looping clone is most exposed) — **but first locate the actual current gating.** If the 0.4 floor no longer exists, downscope to documenting that and confirming low-intensity sections already get drift (then close, no behavior change). If it exists, lower to 0.25 and guard truly-silent/intro moments.
 - **Acceptance:** quiet repeated sections show motivic variation rather than mechanical repetition; if no gate is found, a written confirmation of current behavior + a closed note. Opus because it's investigation + a taste call. *Source: FOLLOWUPS §E (Epic 2 S2 review).*
 
-### S9 — Comping vibe edge-cases: sparse-floor + active-collision guard · Model: opus · Reviewer: music-theory
+### S9 — Comping vibe edge-cases: sparse-floor + active-collision guard · ❌ CLOSED-ON-ARRIVAL 2026-05-28 (decided-no-action)
+- **Closed:** explicitly triaged and closed by **drain S9 C5** as decided-no-action — owner reported the vibe range "feels usable end-to-end; sparse-dropout and active-collision not audible in practice. Pre-emptive fix not warranted; will file as fresh FOLLOWUPS entry if a regression ever surfaces at extremes." If you want to override that (the owner re-decided "fix both" at synthesis), re-open as a fresh story — but the prior owner call was no-action. Original story preserved below.
 - **Where:** the chords/accompaniment vibe path (`accompaniment.ts` comping-cell + ornament logic).
 - **Bug (two opposite edges):** at **sparse** vibe the comping cell can collapse to near-silence (comper drops out); at **active** vibe an ornament can collide with the cell's own hit (doubled/flammed attack).
 - **Decision (owner 2026-05-28):** add a **minimum-density floor** so sparse never fully collapses, and a **collision guard** so active-vibe ornaments don't land on an existing hit. The floor value is listen-set.
@@ -101,7 +109,8 @@ Unambiguous fixes with the value already chosen; no musical-taste decision left.
 
 ## Phase 3 — Larger / cross-cutting (opus)
 
-### S11 — Generic walking-bass next-chord target-awareness · Model: opus · Reviewer: music-theory
+### S11 — Generic walking-bass next-chord target-awareness · ❌ CLOSED-ON-ARRIVAL 2026-05-28
+- **Closed:** already shipped by **drain S5 / Epic 12 S5** (`8ac896ef`, `bass.md P1 #10`) — `bass-engine.ts:1191-1265` implements a target-distance multiplier (`APPROACH_STRENGTH = 8`, beat-2 max 3.67× → beat-4 max 9×) so the walking line aims at the next chord's target tone. Guarded by `bass-walking-idiom-critique.test.ts` (the reviewer there caught + fixed a tautological test). The same Epic 12 S5 commit shipped both this and S2. Original story preserved below.
 - **Where:** the generic walking-bass picker in `bass-styles.ts` / `bass-engine.ts` (`bass.md P1 #10`).
 - **Bug:** the generic walking line doesn't look ahead to the **next chord's root** when choosing its approach note, so it walks without consistently leading the ear into the upcoming change — the core mechanic of a good walking line.
 - **Decision (owner 2026-05-28):** add next-chord target-awareness — on the bar's final beat(s), bias toward a chromatic or scale-step approach into the next chord's root. **Verify it isn't already partially done** (the FOLLOWUPS reconciliation is stale; jazz walking already has compound/target work from S12/S15).
