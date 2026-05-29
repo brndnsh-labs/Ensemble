@@ -81,10 +81,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         soundName = intensity >= 0.75 ? 'Snare' : 'Sidestick';
 
         if (activeMotif === 0) {
-            // Half-time: Snare on beat 3 only (beatIndex 2).
+            // Half-time: Snare on the felt secondary strong beat only.
             // why: kick-1 + snare-3 is the textbook Americana half-time pattern; keeping snare
             // off beats 2 and 4 maintains the "space" that defines the half-time groove feel.
-            if (isBeatStart && beatIndex === 2) {
+            // why: epic-3-followup S7 — use the meter-relative isSecondStrongBeat so the snare
+            // agrees with the kick's beat-3 presence (S8). In 4/4 this is identical to the old
+            // `isBeatStart && beatIndex === 2` (beat 3); in compound it follows the middle
+            // group's dotted-quarter pulse (6/8 → mStep 6, 12/8 → mStep 12) instead of the
+            // mid-group weak eighth (mStep 4) the raw beatIndex test would have hit.
+            if (isSecondStrongBeat) {
                 shouldPlay = true;
             }
         } else {

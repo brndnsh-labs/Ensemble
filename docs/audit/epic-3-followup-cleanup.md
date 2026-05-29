@@ -83,7 +83,8 @@ Unambiguous fixes with the value already chosen; no musical-taste decision left.
 
 ## Phase 2 — Correctness needing a critique test or listen gate (mixed)
 
-### S7 — Acoustic 6/8 snare → felt secondary pulse (mStep 6) · Model: sonnet · Reviewer: music-theory
+### S7 — Acoustic 6/8 snare → felt secondary pulse (mStep 6) · Model: opus · Reviewer: music-theory · ✅ SHIPPED 2026-05-28
+- **Shipped:** the one real defect. Motif-0 half-time snare predicate `isBeatStart && beatIndex === 2` → the already-in-scope `isSecondStrongBeat` helper (`acoustic.ts:92`), so the snare agrees with the S8 kick's beat-3 presence: 6/8 → mStep 6, 12/8 → mStep 12; 4/4 byte-identical (helper's else branch IS the old predicate). New compound snare-motif-0 harness in `acoustic-drummer-critique.test.ts` (felt-pulse hit, **zero** at the old mis-map mStep 4, 4/4 regression guard) — non-tautology proven (reverting fails it). Reviewer: **0 P0 / 0 P1 / 2 P2** (both informational confirmations). 30/30 reliable; typecheck clean.
 - **Where:** `grooves/acoustic.ts:87` — motif-0 half-time snare predicate `isBeatStart && beatIndex === 2`.
 - **Bug:** in 6/8 that fires the snare on mStep 4 (a weak in-group eighth), not the felt secondary pulse (mStep 6). Meter-robustness S8 made the acoustic *kick*'s beat-3 presence meter-relative (`isSecondStrongBeat` → mStep 6) — so now the kick and snare **disagree** about the secondary position in motif-0 6/8, arguably worse than before. Logged as the one real defect from the synthesis pass.
 - **Decision (owner 2026-05-28):** mirror the kick's `isSecondStrongBeat` pattern on the snare lane (the established S6/S8 fix shape — compound → `isPulseStart && groupIndex === midGroup`), so kick and snare agree on the felt backbeat. Motif-≥1 snare (mSteps 2+6) already hits the pulse, so the work is really motif-0 placement.

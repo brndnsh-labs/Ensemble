@@ -137,6 +137,9 @@ describe('Acoustic Drummer Critique', () => {
     const kickHitsAtMStep = (perf, mStep) =>
         perf.filter((bar) => bar.some((s) => s.mStep === mStep && s.instruments.Kick)).length;
 
+    const snareHitsAtMStep = (perf, mStep) =>
+        perf.filter((bar) => bar.some((s) => s.mStep === mStep && s.instruments.Snare)).length;
+
     it('should place the "beat 3 presence" kick on the felt secondary pulse in compound meters', () => {
         // Regression guard for epic-2 S8: the old kick keyed "beat 3 presence" on
         // beatIndex===2, which is mStep 4 in compound (a mid-group weak position) — not
@@ -179,6 +182,76 @@ describe('Acoustic Drummer Critique', () => {
             console.log(`[Acoustic ${ts} kick density @0.95] ${perBar.toFixed(2)}/bar`);
             expect(perBar).toBeLessThanOrEqual(2.5);
         }
+    });
+
+    it('should place the motif-0 half-time snare on the felt secondary pulse in compound meters', () => {
+        // epic-3-followup S7 (parallel to the kick S8 fix): the motif-0 half-time snare
+        // keyed on `isBeatStart && beatIndex === 2`, which is mStep 4 in compound — a
+        // mid-group weak eighth, NOT a dotted-quarter pulse — and DISAGREED with the kick's
+        // meter-relative secondary pulse (mStep 6/12). The shared isSecondStrongBeat helper
+        // moves the snare to the middle group's pulse so kick and snare agree.
+        // Assert by POSITION: motif-0 snare lands on the felt pulse (mStep 6 / 12), and the
+        // old mis-map position (mStep 4) gets NO motif-0 snare. This pins the NEW position
+        // and would FAIL on the old `beatIndex === 2` code (which fired mStep 4, not 6/12).
+        // Low intensity (0.4) keeps the entropy/ghost-chatter branches off and biases the
+        // binaryTier toward motif 0 (the half-time tier) so this lane is well-sampled.
+        const cases = [
+            { ts: '6/8', secondary: 6 },
+            { ts: '12/8', secondary: 12 },
+        ];
+        for (const { ts, secondary } of cases) {
+            const numBars = 64;
+            const perf = simulateCompound(ts, numBars, 0.4);
+            const secondaryHits = snareHitsAtMStep(perf, secondary); // new felt-pulse position
+            const misMap = snareHitsAtMStep(perf, 4); // old beatIndex===2 position
+            console.log(
+                `[Acoustic ${ts} snare-motif0 @0.4] felt-pulse(m${secondary}): ${secondaryHits}/${numBars}, old-mis-map(m4): ${misMap}/${numBars}`,
+            );
+            // Motif 0 is selected on a majority of bars at intensity 0.4 (binaryTier first
+            // tier, breakpoint 0.6). Each motif-0 bar fires exactly one snare at the felt
+            // pulse. Floor at 30% catches the lane firing while allowing motif 1+ bars.
+            expect(secondaryHits).toBeGreaterThan(numBars * 0.3);
+            // The old mis-map mStep 4 must NEVER carry a snare — at intensity 0.4 entropy
+            // and ghost-chatter (>0.7) are off, so the only motif-0 snare lane is the felt
+            // pulse. A nonzero count here means the fix regressed back to beatIndex===2.
+            expect(misMap).toBe(0);
+        }
+    });
+
+    it('should keep the 4/4 motif-0 half-time snare on beat 3 (byte-identical to old predicate)', () => {
+        // 4/4 regression guard: isSecondStrongBeat reduces to `isBeatStart && beatIndex === 2`
+        // in simple meters — exactly the old motif-0 predicate. So the 4/4 half-time snare
+        // must still land on beat 3 (step 8) and never on beats 2/4 (steps 4/12). This is the
+        // "4/4 byte-identical" half of S7's acceptance, asserted via the 4/4 harness.
+        const numBars = 128;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.5 },
+        });
+        let halfTimeBars = 0;
+        performance.forEach((bar) => {
+            let hasBeat3 = false;
+            let hasBackbeat = false;
+            bar.forEach((stepData) => {
+                if (!stepData.instruments.Snare) {
+                    return;
+                }
+                if (stepData.loopStep === 8) {
+                    hasBeat3 = true;
+                }
+                if (stepData.loopStep === 4 || stepData.loopStep === 12) {
+                    hasBackbeat = true;
+                }
+            });
+            if (hasBeat3 && !hasBackbeat) {
+                halfTimeBars++;
+            }
+        });
+        console.log(
+            `[Acoustic 4/4 motif-0 snare] half-time bars (beat-3, no backbeat): ${halfTimeBars}/${numBars}`,
+        );
+        // ~60% of bars are motif 0 at intensity 0.5; each fires beat 3 only. Floor at 8 keeps
+        // generous headroom while proving the 4/4 placement is unchanged.
+        expect(halfTimeBars).toBeGreaterThan(8);
     });
 
     it('should pass an authenticity critique for a 128-bar Acoustic performance', () => {
