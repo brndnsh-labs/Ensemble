@@ -187,12 +187,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // (salt = activeMotif + 3 = 5 for motif 2) so snare and hat
             // displacement decisions are independent.
             const snarePhraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, 17);
-            // Buckets: 40% normal, 35% +1 (laid-back e of backbeat),
-            // 25% +2 (full offbeat shift). The "normal" bucket exists so a
+            // Buckets: 50% normal, 35% +1 (laid-back e of backbeat),
+            // 15% +2 (full offbeat shift). The "normal" bucket exists so a
             // motif-2 section still occasionally returns to the spine
             // backbeat — the displacement reads as a deliberate gesture, not
             // a permanent setting.
-            const displacement = snarePhraseSeed < 0.4 ? 0 : snarePhraseSeed < 0.75 ? 1 : 2;
+            // why: the full-offbeat +2 shift is canonically a rare 1-bar fill
+            // setup (Stubblefield/Garibaldi displacement is far more often the
+            // laid-back +1); de-weighted to 15%. Owner decision 2026-05-28.
+            const displacement = snarePhraseSeed < 0.5 ? 0 : snarePhraseSeed < 0.85 ? 1 : 2;
             // why (Epic 12 S6 B5): asymmetric phrase scope. +0 (normal) and +1
             // (laid-back e of backbeat) are canonically *sustained* groove choices
             // — a drummer who picks them commits for the phrase. +2 (full offbeat

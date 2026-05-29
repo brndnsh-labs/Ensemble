@@ -233,9 +233,10 @@ describe('Hip Hop Drummer Critique', () => {
         // CRITICAL: bursts must actually happen. At intensity 0.85 with
         // creativity:true, motif >= 2 fires for ~70% of bars; of those
         // rollPhraseSeed > 0.7 → ~30%. Expected ~30 burst bars per 128.
-        // Threshold pinned at 5 to absorb seed-sample variance and the
-        // narrowness of the > 0.7 gate.
-        expect(burstBars).toBeGreaterThanOrEqual(5);
+        // 20-run empirical min (2026-05-28): 26 bars (deterministic engine,
+        // same seed each run). Floor set to 18 with an 8-bar statistical
+        // cushion below the observed minimum (~31% headroom).
+        expect(burstBars).toBeGreaterThanOrEqual(18);
 
         // CRITICAL: bursts must be a MINORITY — they're a bar-level accent,
         // not every-bar wallpaper. Engine gates on phraseSeed > 0.7 so

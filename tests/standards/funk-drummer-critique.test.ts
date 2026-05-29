@@ -279,15 +279,17 @@ describe('Funk Drummer Critique', () => {
 
         // CRITICAL: displacement must actually happen. At intensity 0.8 with
         // creativity:true, motif 2 fires for ~25% of bars (~32 of 128); of
-        // those ~60% pick a non-zero displacement bucket → ~19 displaced
-        // bars per backbeat region. Threshold pinned at 5 to absorb
-        // seed-sample variance from the per-bar sectionSeed cycle.
-        expect(barsWithBeat1Displacement).toBeGreaterThanOrEqual(5);
-        expect(barsWithBeat3Displacement).toBeGreaterThanOrEqual(5);
+        // those ~50% pick a non-zero displacement bucket (50/35/15 weights:
+        // +1 is 35% of picks, +2 is 15% of picks) → ~16 displaced bars per
+        // backbeat region. 20-run empirical min (2026-05-28): 11 bars
+        // (deterministic engine, same seed each run). Floor set to 8 with
+        // a 3-bar statistical cushion below the observed minimum.
+        expect(barsWithBeat1Displacement).toBeGreaterThanOrEqual(8);
+        expect(barsWithBeat3Displacement).toBeGreaterThanOrEqual(8);
 
         // CRITICAL: most bars still land on canonical {4, 12} — the
         // displacement is an OCCASIONAL gesture (motif-2 minority of bars,
-        // and 40% of motif-2 bars also pick the "normal" bucket).
+        // and 50% of motif-2 bars also pick the "normal" bucket).
         const normalBackbeatBars =
             barsWithAnyBackbeat - Math.max(barsWithBeat1Displacement, barsWithBeat3Displacement);
         expect(normalBackbeatBars).toBeGreaterThan(barsWithBeat1Displacement);
