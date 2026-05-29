@@ -35,7 +35,7 @@ npm run format       # Biome write fixes
 npm run lint:docs    # repo-specific docs validation
 npm run typecheck    # tsc over public/**/*.{ts,tsx}
 npm test             # mutation check + Biome + docs lint + Vitest
-npm run test:e2e     # build dist/ and run Playwright
+npm run test:e2e     # run Playwright against the Vite dev server
 npm run validate     # typecheck + knip + jscpd + format + npm test
 ```
 

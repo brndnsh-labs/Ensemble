@@ -7,8 +7,9 @@ import type { Page } from '@playwright/test';
  * appears, so a large ceiling costs nothing on the happy path and only guards
  * the pathological slow-cold-start case (e.g. a loaded CI box). The historical
  * flake — the Vite dev server compiling modules on demand under `fullyParallel`
- * workers — is removed separately by serving the built artifact via
- * `vite preview` (see `playwright.config.ts` `webServer`).
+ * workers — is removed separately by pre-warming the dev server's transform
+ * cache once in `tests/e2e/global-setup.ts` before the workers start (see
+ * `playwright.config.ts` `globalSetup` / `webServer`).
  */
 export const HYDRATION_TIMEOUT = 30_000;
 

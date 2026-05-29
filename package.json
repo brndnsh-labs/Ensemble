@@ -20,7 +20,7 @@
         "check-mutations": "node scripts/check-mutations.ts \"public/**/*.{ts,tsx}\"",
         "test": "npm run check-mutations && npm run lint && npm run lint:docs && npx vitest run --reporter=dot --silent=true",
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",
-        "test:e2e": "npm run build:quiet && npx playwright test",
+        "test:e2e": "npx playwright test",
         "test:coverage": "npx vitest run --coverage",
         "test:bench": "npx vitest run --config vitest.bench.config.ts tests/bench",
         "test:loop": "node scripts/test-loop.ts",

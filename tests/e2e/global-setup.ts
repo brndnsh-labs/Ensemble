@@ -1,5 +1,15 @@
-import { chromium } from '@playwright/test';
+import pkg from '@playwright/test';
 import { HYDRATION_TIMEOUT } from './helpers/nav.js';
+
+// `@playwright/test` is CommonJS, and under this repo's `"type": "module"` setup
+// only the default import survives Playwright's loader: a named import
+// (`import { chromium }`) throws `SyntaxError: Named export 'chromium' not found`
+// at load time (aborting the whole run before any test), and a namespace import
+// (`import * as pkg`) leaves `pkg.chromium` undefined at runtime. The default
+// import binds the full CJS `module.exports`, which does carry `chromium` — the
+// same pattern every spec and `playwright.config.ts` use (the specs are
+// `@ts-nocheck`; this file isn't, so we cast to the module's namespace type).
+const { chromium } = pkg as unknown as typeof import('@playwright/test');
 
 /**
  * Warm the Vite dev server's module-transform cache once, before the parallel
