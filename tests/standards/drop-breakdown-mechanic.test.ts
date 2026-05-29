@@ -234,13 +234,21 @@ describe('Drop/Breakdown S1(a) — section-boundary lookahead publication', () =
                 .join(' ')}`,
         );
 
-        // Bars 0..2: not yet in the final measure — sentinels.
-        for (let bar = 0; bar < VERSE_BARS - 1; bar++) {
+        // Bars 0..1: not yet within the 2-bar window — full sentinels.
+        for (let bar = 0; bar < VERSE_BARS - 2; bar++) {
             expect(probes[bar].label).toBeNull();
             expect(probes[bar].delta).toBe(0);
             expect(probes[bar].bars).toBe(-1);
         }
-        // Bar 3 (last bar of the Verse): lookahead is live.
+        // Bar 2 (penultimate bar): Epic 3 S12 widened ONLY the structural counter
+        // to the penultimate bar, so `barsUntilSectionChange` reads 1 here — but the
+        // harmonic-lookahead fields stay final-bar-only (decouple guard), so label /
+        // delta are still sentinel. This proves voice-leading anticipation did NOT widen.
+        const penult = probes[VERSE_BARS - 2];
+        expect(penult.label).toBeNull();
+        expect(penult.delta).toBe(0);
+        expect(penult.bars).toBe(1);
+        // Bar 3 (last bar of the Verse): full lookahead is live.
         const last = probes[VERSE_BARS - 1];
         expect(last.label).toBe('Drop');
         // Verse energy 0.5 → Drop energy 1.0 = +0.5.
@@ -355,7 +363,10 @@ describe('Drop/Breakdown S1(b) — pre-drop mute window', () => {
     it('does NOT mute earlier bars of the Verse (mute is exactly 1 bar)', () => {
         // why: regression guard — the cut must be exactly the LAST bar. If the
         // gate fired on `barsUntilSectionChange >= 0` instead of `=== 0` it
-        // would silence the whole final-measure-lookahead window.
+        // would silence the whole final-measure-lookahead window. Bar 2 here is
+        // now the penultimate bar (Epic 3 S12: `barsUntilSectionChange === 1`);
+        // `shouldFireDropMute` still returns false there because it gates strictly
+        // on `=== 0`, so the drop mechanic did NOT widen with the structural counter.
         const state = makeState({ nextLabel: 'Drop', genreFeel: 'Rock' });
         const cursors = freshCursors();
 

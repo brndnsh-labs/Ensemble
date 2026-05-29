@@ -325,3 +325,169 @@ describe('Bass section-transition anticipation (S3)', () => {
         expect(forcedApproachCount).toBeLessThanOrEqual(15);
     });
 });
+
+// ============================================================================
+// Epic 3 S12 — Penultimate-bar approach window (three-tier rock push ramp)
+// ============================================================================
+//
+// S12 widened ONLY the structural counter `barsUntilSectionChange` in tick-logic
+// to the penultimate bar (`remainingSteps <= stepsPerMeasure * 2`), so it can now
+// hold `1` one bar before a section change (previously: 0 in the final bar, -1
+// otherwise). The rock anticipation push (bass-styles.ts) reads that counter and
+// applies a THREE-tier gate multiplier:
+//   barsUntilSectionChange === 0 → 1.0×  (boundary: full signpost probability)
+//   barsUntilSectionChange === 1 → 0.5×  (penultimate: approach window — a build)
+//   otherwise (-1 / undefined)   → 0.15× (residual: rare, spontaneous)
+//
+// We measure the push RATE directly by sweeping the engine's single push-gate
+// `Math.random()` draw across an even grid at a beat-4 push point, holding the
+// counter at each tier. Push fires when the beat-4 note lands on the upcoming G
+// root (pc 6/7/8) instead of the current C root (pc 0). The ordering
+// final > penultimate > residual proves the ramp.
+//
+// Structural-counter values (1 on penultimate, 0 on final, -1 outside the 2-bar
+// window) and the decouple guard (upcomingSectionFirstChord stays null on the
+// penultimate bar) are proven end-to-end in drop-breakdown-mechanic.test.ts via
+// generateNotesForStep; here we isolate the bass ramp itself.
+
+const PUSH_BEAT4_STEP = 12; // stepInMeasure 12 = beat-4 start in 4/4 (intBeat 3)
+
+function makeRockState() {
+    return {
+        playback: { bandIntensity: 0.7, bpm: 120, complexity: 0.6, intent: {} },
+        groove: { genreFeel: 'Rock', pocket: 0, instruments: [], measures: 2 },
+        soloist: makeSoloistMock({ busySteps: 0, tension: 0 }),
+        arranger: { timeSignature: '4/4', totalSteps: SECTION_END },
+    };
+}
+
+// Sweep the push-gate draw across `grid` even points; return the fraction of
+// draws that produced a push (beat-4 note pulled to the upcoming G root).
+function measurePushRate(barsUntilSectionChange: number, grid = 400): number {
+    const state = makeRockState();
+    getState.mockReturnValue(state);
+    const stepInfo = getStepInfo(PUSH_BEAT4_STEP, TS_CONFIG, [], TIME_SIGNATURES);
+    const gRootPc = ((CHORD_G_UPCOMING.rootMidi % 12) + 12) % 12; // 7
+    let fires = 0;
+
+    for (let i = 0; i < grid; i++) {
+        // Deterministic, evenly-spaced draw across [0,1). The push gate is the
+        // first Math.random() call; the chromatic sub-branch (if reached) reads
+        // the same stubbed value — both keep the note on the G class, so either
+        // counts as a push fire.
+        const v = (i + 0.5) / grid;
+        vi.spyOn(Math, 'random').mockReturnValue(v);
+
+        const note = getBassNote(
+            state,
+            CHORD_C,
+            CHORD_G_UPCOMING,
+            PUSH_BEAT4_STEP / STEPS_PER_BEAT,
+            null,
+            48,
+            'rock',
+            0,
+            PUSH_BEAT4_STEP,
+            PUSH_BEAT4_STEP % (CHORD_C.beats * STEPS_PER_BEAT),
+            { stepCoordination: { barsUntilSectionChange } },
+            stepInfo,
+        );
+        vi.restoreAllMocks();
+        getState.mockReturnValue(state);
+
+        if (!note?.midi) {
+            continue;
+        }
+        const pc = ((note.midi % 12) + 12) % 12;
+        // A push pulls toward the G root (pc 7) or its chromatic neighbors (6/8).
+        // The non-push fallback plays the C root (pc 0). Distance to G ≤ 1 = push.
+        const dist = Math.min(Math.abs(pc - gRootPc), 12 - Math.abs(pc - gRootPc));
+        if (dist <= 1) {
+            fires++;
+        }
+    }
+    return fires / grid;
+}
+
+describe('Bass section-anticipation S12 — three-tier approach-window ramp', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        getState.mockReturnValue(makeRockState());
+    });
+
+    it('push rate ramps: final-bar (1.0×) > penultimate (0.5×) > residual (0.15×)', () => {
+        const finalRate = measurePushRate(0); // barsUntilSectionChange === 0
+        const penultRate = measurePushRate(1); // barsUntilSectionChange === 1
+        const residualRate = measurePushRate(-1); // outside the window
+
+        // eslint-disable-next-line no-console
+        console.log(
+            `[bass-anticipation S12] push rates — final(0): ${(finalRate * 100).toFixed(1)}% ` +
+                `penultimate(1): ${(penultRate * 100).toFixed(1)}% ` +
+                `residual(-1): ${(residualRate * 100).toFixed(1)}%`,
+        );
+
+        // Strict ordering — the ramp's whole point. Deterministic grid sweep, so
+        // these are exact (no flake): with intensity 0.7 the base pushProb is
+        // 0.1 + 0.7*0.15 = 0.205, scaled by the tier mult → ~0.205 / ~0.1025 / ~0.031.
+        expect(finalRate).toBeGreaterThan(penultRate);
+        expect(penultRate).toBeGreaterThan(residualRate);
+        expect(residualRate).toBeGreaterThan(0); // 0.15× residual is non-zero by design
+
+        // The penultimate tier is the geometric/arithmetic middle: ~0.5× the final
+        // rate. Allow generous tolerance for the grid quantization + chromatic
+        // sub-branch. (final * 0.5 = the 0.5× tier target.)
+        expect(penultRate).toBeGreaterThan(finalRate * 0.35);
+        expect(penultRate).toBeLessThan(finalRate * 0.65);
+    });
+
+    it('undefined barsUntilSectionChange behaves like the -1 residual tier', () => {
+        // why: test mocks / no-coordination call sites pass undefined; the ramp
+        // must treat it identically to the -1 sentinel (0.15× residual), never
+        // the 1.0× boundary tier.
+        const undefinedRate = (() => {
+            const state = makeRockState();
+            getState.mockReturnValue(state);
+            const stepInfo = getStepInfo(PUSH_BEAT4_STEP, TS_CONFIG, [], TIME_SIGNATURES);
+            const gRootPc = ((CHORD_G_UPCOMING.rootMidi % 12) + 12) % 12;
+            const grid = 400;
+            let fires = 0;
+            for (let i = 0; i < grid; i++) {
+                const v = (i + 0.5) / grid;
+                vi.spyOn(Math, 'random').mockReturnValue(v);
+                const note = getBassNote(
+                    state,
+                    CHORD_C,
+                    CHORD_G_UPCOMING,
+                    PUSH_BEAT4_STEP / STEPS_PER_BEAT,
+                    null,
+                    48,
+                    'rock',
+                    0,
+                    PUSH_BEAT4_STEP,
+                    PUSH_BEAT4_STEP % (CHORD_C.beats * STEPS_PER_BEAT),
+                    { stepCoordination: {} }, // no barsUntilSectionChange → undefined
+                    stepInfo,
+                );
+                vi.restoreAllMocks();
+                getState.mockReturnValue(state);
+                if (note?.midi) {
+                    const pc = ((note.midi % 12) + 12) % 12;
+                    const dist = Math.min(Math.abs(pc - gRootPc), 12 - Math.abs(pc - gRootPc));
+                    if (dist <= 1) {
+                        fires++;
+                    }
+                }
+            }
+            return fires / grid;
+        })();
+
+        const residualRate = measurePushRate(-1);
+        // eslint-disable-next-line no-console
+        console.log(
+            `[bass-anticipation S12] undefined push rate ${(undefinedRate * 100).toFixed(1)}% ` +
+                `vs -1 residual ${(residualRate * 100).toFixed(1)}%`,
+        );
+        expect(undefinedRate).toBeCloseTo(residualRate, 2);
+    });
+});

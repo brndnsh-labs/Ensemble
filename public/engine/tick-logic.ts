@@ -143,6 +143,19 @@ export function generateNotesForStep(
             );
         }
 
+        // why (Epic 3 S12): widen ONLY the structural counter to the penultimate bar so
+        // the bass approach-window ramp has a `1` tier. Pure function of remainingSteps —
+        // deliberately does NOT call getChordAtStep (which mutates lookaheadCursor), so the
+        // harmonic lookahead schedule and cursor advance are untouched. The other three
+        // lookahead fields stay final-bar-only (below) to avoid premature voice-leading
+        // anticipation. Guarded on a resolvable form so an empty arrangement keeps -1.
+        if (arranger.totalSteps > 0 && remainingSteps <= stepsPerMeasure * 2) {
+            coordination.barsUntilSectionChange = Math.max(
+                0,
+                Math.floor((remainingSteps - 1) / stepsPerMeasure),
+            );
+        }
+
         // writer: chord-data preamble (this block); readable-after: any producer
         if (remainingSteps <= stepsPerMeasure) {
             const nextSectionChordData = getChordAtStep(
@@ -156,12 +169,13 @@ export function generateNotesForStep(
                 // --- Section-boundary lookahead (epic-deferred-followups S1(a)) ---
                 // why: `upcomingSectionFirstChord` only tells engines WHICH chord
                 // the next section opens on. The conductor / drop mechanic also
-                // need the STRUCTURAL context: which section, how much louder, and
-                // how many bars away. We publish all three here — pure functions
-                // of the lookahead chord — so no producer re-derives them. They
-                // are only meaningful in the last measure of a section (the same
-                // window `upcomingSectionFirstChord` is populated in), hence the
-                // shared `remainingSteps <= stepsPerMeasure` guard.
+                // need the STRUCTURAL context: which section and how much louder.
+                // We publish these here — pure functions of the lookahead chord —
+                // so no producer re-derives them. They are only meaningful in the
+                // last measure of a section (the same window `upcomingSectionFirstChord`
+                // is populated in), hence the shared `remainingSteps <= stepsPerMeasure`
+                // guard. (`barsUntilSectionChange` is the exception — Epic 3 S12 moved
+                // it to a wider penultimate-bar window above; see that block.)
                 const upcomingLabel = (nextSectionChordData.chord as any)?.sectionLabel ?? null;
                 coordination.upcomingSectionLabel = upcomingLabel;
                 // why: energy delta uses form-analysis.ts's 0..1 SECTION_ENERGY_MAP
@@ -171,15 +185,12 @@ export function generateNotesForStep(
                 coordination.upcomingSectionEnergyDelta =
                     getSectionEnergy(upcomingLabel) -
                     getSectionEnergy((currentChord as any)?.sectionLabel);
-                // why: whole measures remaining until the boundary. `remainingSteps`
-                // is steps until `sectionEnd`; floor-dividing by `stepsPerMeasure`
-                // and subtracting the trailing partial bar gives "0 = we are IN the
-                // last bar before the change." Clamped at 0 — when the lookahead is
-                // available we are by construction within the final measure.
-                coordination.barsUntilSectionChange = Math.max(
-                    0,
-                    Math.floor((remainingSteps - 1) / stepsPerMeasure),
-                );
+                // note (Epic 3 S12): `barsUntilSectionChange` is NO LONGER written here.
+                // It moved to the wider `<= stepsPerMeasure * 2` block above so it can
+                // hold `1` on the penultimate bar (the bass approach-window tier). The
+                // three other fields stay final-bar-only here — publishing the upcoming
+                // chord / label / energy delta a bar early would pull voice-leading
+                // anticipation toward the next section prematurely.
             }
         }
 

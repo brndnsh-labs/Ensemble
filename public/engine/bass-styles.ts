@@ -866,20 +866,25 @@ export function getBassNoteStyle(
             // (b) cluster the gesture at section boundaries where it's most
             // dramatic (the bass "announcing" an incoming chorus or bridge).
             //
-            // Section gate multiplier (two-tier):
+            // Section gate multiplier (three-tier approach ramp):
             //   barsUntilSectionChange === 0  → last bar before boundary: full probability
+            //   barsUntilSectionChange === 1  → penultimate bar (approach window): half the
+            //     boundary probability. Note this is one push opportunity per bar (beat 4
+            //     only), so at typical intensity it lands ~10% of penultimate bars vs ~20%
+            //     at the boundary — the bass occasionally LEANS IN a bar early, not a
+            //     continuous crescendo (a single-beat coin flip can't swell). The point is
+            //     a proportional, directional bias toward the change, not a guaranteed build.
             //   otherwise (undefined / -1):     15% residual — push can still appear
             //     mid-section on pure chord changes, but is rare enough to feel
             //     spontaneous rather than routine.
             //
-            // why two tiers, not three: S1(a)'s `barsUntilSectionChange` is only
-            // published inside `tick-logic.ts`'s `remainingSteps <= stepsPerMeasure`
-            // guard, so it only ever holds 0 (in the final bar) or -1 (the default).
-            // An intermediate "1 bar out, 60%" approach-window tier would be dead
-            // code against that plumbing. Widening the lookahead to the penultimate
-            // bar is S1-infrastructure scope (it would also shift when the drop
-            // mechanic and `upcomingSectionFirstChord` publish) — filed as a
-            // follow-up rather than smuggled in here.
+            // why three tiers: Epic 3 S12 widened the `tick-logic.ts` section-change
+            // lookahead so `barsUntilSectionChange` can now hold `1` on the penultimate
+            // bar (previously the `remainingSteps <= stepsPerMeasure` guard pinned it to
+            // 0-or-(-1), so the `=== 1` tier was dead code). The 0.5× penultimate tier
+            // biases the push a bar early so the band can lean toward the change. Only the
+            // STRUCTURAL counter widened; `upcomingSectionFirstChord` and the drop mechanic
+            // still publish/fire on the final bar only.
             //
             // why 0.15 residual (not 0): completely suppressing mid-section pushes
             // would make the engine dead-silent on intra-section chord changes in
@@ -889,7 +894,9 @@ export function getBassNoteStyle(
             const sectionGateMult =
                 barsUntilSectionChange === 0
                     ? 1.0 // why: at the boundary — full Stones signpost probability
-                    : 0.15; // why: no boundary imminent — rare, spontaneous feel
+                    : barsUntilSectionChange === 1
+                      ? 0.5 // why: penultimate bar — approach window, a build not the landing
+                      : 0.15; // why: no boundary imminent — rare, spontaneous feel
             const pushProb = (0.1 + intensity * 0.15) * sectionGateMult;
             const isPushPoint = intBeat === ts.beats - 1 && Math.random() < pushProb;
             if (isPushPoint && isChordChangeApproach(nextChord, chord)) {

@@ -338,9 +338,14 @@ export function createCoordinationContext(
         //     next label is unknown.
         //   - `barsUntilSectionChange`: whole measures remaining until the
         //     section boundary. 0 means "we are IN the last bar before the
-        //     change." -1 is the sentinel for "no upcoming change resolvable"
-        //     (matches the upcomingSectionFirstChord null contract — both are
-        //     only populated in the last measure of a section).
+        //     change"; 1 means "the penultimate bar" (Epic 3 S12 widened the
+        //     tick-logic lookahead to `<= stepsPerMeasure * 2` so the bass
+        //     approach-window ramp gets a `1` tier). -1 is the sentinel for
+        //     "no upcoming change resolvable." NOTE: unlike the three other
+        //     lookahead fields below, this counter is decoupled — it publishes
+        //     across the final TWO bars, while `upcomingSectionFirstChord` /
+        //     `upcomingSectionLabel` / `upcomingSectionEnergyDelta` stay
+        //     final-bar-only (no premature voice-leading anticipation).
         //
         // S1(b)'s Drop/Breakdown mechanic and S2's section-gated rock push
         // both consume these. Defaults (null / 0 / -1) mean "no lookahead
@@ -391,7 +396,8 @@ export function createCoordinationContext(
  * shape and gives future callers a migration target.
  *   - `upcomingSectionLabel`      — raw label of the next section ("Drop", "Chorus", …)
  *   - `upcomingSectionEnergyDelta`— getSectionEnergy(next) − getSectionEnergy(current)
- *   - `barsUntilSectionChange`    — 0 = last bar before change, −1 = not resolvable
+ *   - `barsUntilSectionChange`    — 0 = last bar before change, 1 = penultimate bar
+ *                                   (Epic 3 S12 approach window), −1 = not resolvable
  *   - `dropMuteActive`            — true every step of the 1-bar pre-drop cut window
  *   - `dropCrashPending`          — true only on the downbeat of the mute bar
  *
