@@ -292,7 +292,8 @@
         "Schroeder",
         "allpass",
         "allpasses",
-        "treemap"
+        "treemap",
+        "brndn"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

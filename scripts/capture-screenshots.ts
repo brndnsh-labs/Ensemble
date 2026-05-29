@@ -55,37 +55,59 @@ interface Shot {
     /** Output filename (written into docs/assets/readme/). */
     name: string;
     /** A scene id from DEFAULT_MIX_REPORT_SCENES that has a `sections` array. */
-    sceneId: string;
+    sceneId?: string;
+    /**
+     * A custom deep-link instead of a named scene — `prog` is required; the rest
+     * (`key`, `genre`, `bpm`, `notation`, …) are optional URL params handed
+     * straight to state-hydration's loadFromUrl(). `autoplay=1` is added for you.
+     */
+    params?: Record<string, string>;
     /** Desktop 1440×900 by default; pass a device profile for mobile shots. */
     device?: (typeof devices)[string];
     viewport?: { width: number; height: number };
 }
 
-// Single hero shot for now. The list is intentionally an array so future shots
-// (edit mode, the 🌈 visualizer overlay, a mobile view) are a one-line addition.
+// The list is intentionally an array so future shots (edit mode, the 🌈
+// visualizer overlay, a mobile view) are a one-line addition.
 const SHOTS: Shot[] = [
     {
         name: 'hero.png',
-        // Jazz head — a clean, recognizable lead sheet that reads well as the
-        // chart-first hero (topbar + locked chart + Live-mix rail).
-        sceneId: 'jazz-ride',
+        // "Autumn Leaves" head in Bb — a recognizable jazz-standard lead sheet
+        // with real chord names (notation=name). Fills the chart more than a
+        // short vamp while still reading clean as the chart-first hero.
+        params: {
+            prog: 'Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm7 | Gm7',
+            key: 'Bb',
+            genre: 'Jazz',
+            bpm: '120',
+            int: '0.6',
+            notation: 'name',
+        },
         viewport: { width: 1440, height: 900 },
     },
 ];
 
-async function captureShot(browser: Browser, shot: Shot): Promise<void> {
+function buildShotUrl(shot: Shot): string {
+    if (shot.params) {
+        const params = new URLSearchParams(shot.params);
+        params.set('autoplay', '1');
+        return `${BASE_URL}?${params.toString()}`;
+    }
     const scene = DEFAULT_MIX_REPORT_SCENES.find((s) => s.id === shot.sceneId);
     if (!scene || !('sections' in scene)) {
         throw new Error(`Scene "${shot.sceneId}" not found or has no sections to deep-link.`);
     }
-
     const args: SceneArgs = {
-        scene: shot.sceneId,
+        scene: shot.sceneId ?? null,
         seed: null,
         baseUrl: BASE_URL,
         autoplay: true,
     };
-    const url = buildAuditionLink(scene as Parameters<typeof buildAuditionLink>[0], args);
+    return buildAuditionLink(scene as Parameters<typeof buildAuditionLink>[0], args);
+}
+
+async function captureShot(browser: Browser, shot: Shot): Promise<void> {
+    const url = buildShotUrl(shot);
 
     // Fresh context per shot → empty localStorage, so the URL scene fully
     // determines state (hydrateState() loads persisted state before applying

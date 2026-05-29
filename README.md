@@ -4,6 +4,8 @@ Ensemble is a browser-based **virtual band and songwriting toolkit**. Sketch a c
 
 It is a PWA built for fast ideas: everything lives on one **chart-first surface**, so you write, perform, and visualize without ever leaving the page.
 
+**▶ Try it: [ensemble.brndn.zip](https://ensemble.brndn.zip/)**
+
 <p align="center">
   <img src="docs/assets/readme/hero.png" alt="The Ensemble chart-first surface: a lead sheet with the live transport, key/time controls, and the per-instrument Live mix rail." width="100%" />
 </p>
@@ -25,7 +27,7 @@ Ensemble turns a lead sheet into a playing band. The chord chart is always on sc
 
 A full walkthrough lives in the **in-app Manual** (open the `⋯` menu → **Manual**), and [`public/MANUAL.md`](public/MANUAL.md) includes a **Style Gallery** of one-click deep links to curated presets.
 
-> _Hosting a public instance? Add its URL here so visitors can try it without building._
+The public instance lives at **[ensemble.brndn.zip](https://ensemble.brndn.zip/)** — no install required.
 
 ---
 
