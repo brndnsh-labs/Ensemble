@@ -15,8 +15,11 @@ export default defineConfig({
     retries: process.env.CI ? 2 : 0,
     /* Opt out of parallel tests on CI. */
     workers: process.env.CI ? 1 : undefined,
-    /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-    reporter: process.env.CI ? [['github'], ['dot']] : [['list']],
+    /* Reporter to use. See https://playwright.dev/docs/test-reporters
+     * On CI the `html` reporter writes `playwright-report/` (uploaded as an
+     * artifact in ci.yml) so a failed run is debuggable after the fact;
+     * `open: 'never'` keeps it from trying to launch a browser in CI. */
+    reporter: process.env.CI ? [['github'], ['dot'], ['html', { open: 'never' }]] : [['list']],
 
     /* Shared settings for all the projects below. See https://playwright.dev/docs/test-use */
     use: {
