@@ -5,28 +5,30 @@ Welcome to Ensemble, your AI-powered virtual band. Whether you're practicing sol
 ---
 
 ## 🚀 The 30-Second Jam
-If you want to start playing immediately:
-1.  **Choose a Band Feel:** Open **Studio** and pick a genre from the **Band feel** chooser.
-2.  **Type Chords:** Enter your progression in **Arranger** (e.g., `C | F G`).
-3.  **Press Start:** The band will instantly begin playing.
-4.  **Move Between Workspaces:** Use the workspace navigation to jump between **Arranger**, **Studio**, **Perform**, and **Visuals** while the music keeps running.
-*✨ **Pro Tip:** In **Arranger**, open the `⋮` actions menu for edit, share, library, transpose, and soloist seed controls without covering the lead sheet.*
+Everything happens on one surface — the chart is always in front of you.
+1.  **Choose a Band Feel:** In the **Live mix** rail, open the genre chooser and pick a feel.
+2.  **Type Chords:** Tap **✏️ Edit** in the topbar (or press `E`) to unlock the chart, then enter your progression (e.g., `C | F G`).
+3.  **Press Start:** Hit play — the chart re-locks and the band begins playing immediately.
+4.  **Keep Going:** Tweak the genre, the per-instrument mix, the key, or the tempo on the fly — the music never stops, and nothing covers the chart.
+*✨ **Pro Tip:** The `⋯` overflow menu in the topbar holds share, library, transpose, soloist seed, and the Manual — all without leaving the lead sheet.*
 
 ---
 
 ## 🎹 Common Workflows
 
-### Understanding the Four Workspaces
-- **Arranger:** Your lead-sheet view for chords, form, transposition, sharing, and the progression library.
-- **Studio:** A compact live-mix surface where you can see which instruments are active, toggle them on or off, and open per-instrument settings.
-- **Perform:** A clean launchpad for manual performance tools such as the solo surface and drum pad.
-- **Visuals:** A dedicated visualizer view that stays out of the way until you want a larger visual performance display.
+### Understanding the Surface
+Ensemble is a single chart-first surface — there are no separate views to switch between. Everything radiates out from the lead sheet:
+- **The Chart (center):** Your lead sheet for chords and form. It's **locked by default** — your music stand. Tap **✏️ Edit** (or press `E`) to unlock it for writing; the lock re-engages when you press play. While locked, the currently-playing chord is highlighted as the band moves through the form.
+- **The Topbar:** The transport (play/stop, BPM, tap tempo) sits on the left; key, time signature, and the song seed (🎲) in the center; quick actions — Library, Edit, Share, and the **🌈 Visualizer** — on the right. The `⋯` overflow holds transpose, soloist seed, and the Manual.
+- **The Live Mix Rail:** The band, along one edge. See which of the five instruments are active, toggle each on or off, and open per-instrument settings (register, style, drum preset, trading). A genre chooser at the top sets the whole-band feel and intensity.
+- **🌈 Visualizer:** A full-screen overlay with a real-time piano-roll of every instrument, color-coded by track and chord tone. Open it any time; playback keeps running underneath.
+- **On a phone:** the rail collapses into a bottom action bar — 🎚️ Mix · 📤 Share · 🌈 Visuals — and the topbar reflows so the chart stays front and center.
 
 ### "I want to practice soloing"
-Ensemble is built for improvisation. 
-- **Trade Mode:** In **Studio**, open the Soloist settings and enable **Trade Sections**. The band will play for one section, then hand off the lead to you for the next.
-- **Status Indicator:** Watch the Soloist state pill in **Studio**. **On** means the AI is active, and **Queued** means the soloist is waiting for the next trading section.
-- **Soloist Performance:** Open **Perform** and launch **Soloist Performance**, or press `S`. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
+Ensemble is built for improvisation.
+- **Trade Mode:** In the **Live mix** rail, open the Soloist settings and enable **Trade Sections**. The band will play for one section, then hand off the lead to you for the next.
+- **Status Indicator:** Watch the Soloist state pill in the rail. **On** means the AI is active, and **Queued** means the soloist is waiting for the next trading section.
+- **Soloist Performance:** Press `S` to launch **Soloist Performance**. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
 
 ### "I want the soloist to sound more intentional"
 The AI Soloist uses a **Dynamic Head** system to provide thematic direction to each session. Every time you press play, the soloist generates a unique "seed melody" that fits your specific chord progression.
@@ -36,7 +38,7 @@ The AI Soloist uses a **Dynamic Head** system to provide thematic direction to e
 
 ### "I want to play the drums manually"
 If you want to take over the rhythm section or just troubleshoot the kit:
-- **Drum Pad:** Open **Perform** and launch the **Groove Drum Pad**, or press `D` to open **Drum Performance Mode** directly.
+- **Drum Pad:** Press `D` to open **Drum Performance Mode** directly.
 - **Performance Mode:** When the drum pad is open, the automatic drum patterns stop, giving you full manual control.
 - **Ergonomic Layout:** The pads are mapped to your home row:
     - **Kick:** `Space`

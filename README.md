@@ -1,121 +1,106 @@
 # Ensemble
 
-Ensemble is a browser-based virtual band and songwriting toolkit. It generates real-time drums, bass, chords, harmony, and solo lines that respond to your progression, genre, and intensity choices.
+Ensemble is a browser-based **virtual band and songwriting toolkit**. Sketch a chord progression, pick a feel, and a full rhythm section — drums, bass, chords, harmony, and an improvising soloist — interprets it in real time, right in the browser.
 
-It is built as a PWA, runs from the browser, and is designed for fast ideas: sketch a progression, hear the band interpret it immediately, and move between writing, performing, and visualizing without leaving the app.
+It is a PWA built for fast ideas: everything lives on one **chart-first surface**, so you write, perform, and visualize without ever leaving the page.
 
-## What Ensemble does
+<p align="center">
+  <img src="docs/assets/readme/hero.png" alt="The Ensemble chart-first surface: a lead sheet with the live transport, key/time controls, and the per-instrument Live mix rail." width="100%" />
+</p>
 
-- Builds full arrangements from chord charts and song sections.
-- Adapts the band feel with smart genre presets.
-- Lets you tune the live mix per instrument in Studio.
-- Launches performance-focused surfaces for soloing and drums.
-- Provides a visualizer workspace for harmonic playback.
-- Includes audio analysis and melody-to-harmony tooling.
-- Exports and routes MIDI for DAWs and external gear.
+---
 
-## Workspaces
+## I want to know what it is
 
-Ensemble is organized around four main workspaces:
+Ensemble turns a lead sheet into a playing band. The chord chart is always on screen — like a music stand — and every other control radiates out from it.
 
-- **Arranger**: Shape chords, sections, transposition, sharing, and progression library access.
-- **Studio**: Choose the band feel, toggle instruments, and adjust per-instrument settings.
-- **Perform**: Open focused live tools for soloist performance and the drum pad.
-- **Visuals**: Give the visualizer room to breathe while playback continues.
+- **Chart-first surface.** A lead sheet is always visible. It's locked by default (your music stand); tap **✏️ Edit** to rewrite chords and sections, and the lock re-engages when you press play.
+- **Smart genre presets.** Choose a feel (Jazz, Funk, Rock, Bossa, Neo-Soul, Hip-Hop, and more) and the whole band re-voices its drums, bass, comping, and phrasing to match.
+- **Per-instrument Live mix.** A rail along the edge shows the five band members — Drums, Bass, Chords, Harmony, Soloist. Toggle each one, and open per-instrument settings (register, style, drum preset, trading) without covering the chart.
+- **AI soloist with a Dynamic Head.** The soloist generates a seed melody that fits your progression, states it like a "head," then evolves and improvises over successive choruses — coherent rather than random. You can also trade fours with it or take over the lead yourself.
+- **🌈 Visualizer.** A full-screen overlay renders a real-time piano-roll of what every instrument is playing, color-coded by track and chord tone.
+- **Analysis & MIDI.** Audio analysis and melody-to-harmony tooling, plus MIDI export and live routing into a DAW or hardware.
 
-## Workspace screenshots
+**The surface at a glance:** the **topbar** holds the transport (play/stop, BPM, tap tempo), the key / time-signature / song-seed controls, and quick actions (Library, Edit, Share, 🌈). The **Live mix rail** holds the band. On a phone, the rail collapses into a bottom action bar (🎚️ Mix · 📤 Share · 🌈 Visuals).
 
-<p><em>A quick desktop tour of the four main workspaces.</em></p>
+A full walkthrough lives in the **in-app Manual** (open the `⋯` menu → **Manual**), and [`public/MANUAL.md`](public/MANUAL.md) includes a **Style Gallery** of one-click deep links to curated presets.
 
-<table>
-  <tr>
-    <td align="center">
-      <img src="docs/assets/readme/arranger.png" alt="Arranger workspace" width="100%" />
-      <br /><strong>Arranger</strong>
-    </td>
-    <td align="center">
-      <img src="docs/assets/readme/studio.png" alt="Studio workspace" width="100%" />
-      <br /><strong>Studio</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/assets/readme/perform.png" alt="Perform workspace" width="100%" />
-      <br /><strong>Perform</strong>
-    </td>
-    <td align="center">
-      <img src="docs/assets/readme/visuals.png" alt="Visuals workspace" width="100%" />
-      <br /><strong>Visuals</strong>
-    </td>
-  </tr>
-</table>
+> _Hosting a public instance? Add its URL here so visitors can try it without building._
 
-## Getting started
+---
+
+## I want to host it myself
+
+Ensemble is a static PWA — build it once and serve the `dist/` folder from anywhere.
+
+**Prerequisites:** Node.js (current LTS) and npm. This project is **npm-only** — don't use `pnpm`, `yarn`, or `bun`.
 
 ```bash
 npm install
 npm run dev
 ```
 
-`npm run dev` builds the app and serves the generated bundle on `http://localhost:5173`. It is a preview server, not a hot-reload dev server.
+`npm run dev` starts the Vite dev server with hot-module reload on `http://localhost:5173`.
 
-Once the app is running, you can:
-
-1. Open **Arranger** and enter a chord progression.
-2. Switch to **Studio** to pick a band feel and adjust the mix.
-3. Use **Perform** to launch the soloist or drum pad.
-4. Move to **Visuals** when you want the visualizer full-width.
-
-## Common commands
+**Production build:**
 
 ```bash
 npm run build
-npm test
-npm run test:e2e
-npm run validate
 ```
 
-- `npm run build` creates a production-style dry run in `dist/`.
-- `npm test` runs linting and the Vitest suite.
-- `npm run test:e2e` runs the Playwright smoke suite.
-- `npm run validate` performs the full repo validation pipeline.
-- `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` emits a compact multi-seed ensemble audit as JSON.
-- `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` emits rendered-audio metrics as JSONL for a compact multi-seed scene sweep.
-- `npm run mix:report -- --json --focus-from=report.json` rerenders an `ensemble:report` focus shortlist through the actual audio path and emits machine-readable mix metrics.
-- `npm run mix:report -- --write-wav=tmp/mix-render --scene=jazz-ride --seeds=ALPHA` also writes one `.wav` per scene/stem/seed combination (`{sceneId}-{stemId}-{seed}.wav`) so the rendered audio can be auditioned without spinning up the live app. Output dir is gitignored.
-- `npm run --silent mix:diff -- before.json after.json` compares two `mix:report --json` outputs and surfaces stems whose dynamics or spectral balance moved beyond a configurable threshold (defaults: ±1.5 dB, ±5% spectral, ±1.5 spikes/sec). Exits 1 if any significant delta is found.
-- `npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA` builds an autoplay-ready URL for one of the named scenes; opening it in the running app hydrates the scene and shows a one-click "▶ Play" overlay. See [`docs/guides/listening-gate-tools.md`](docs/guides/listening-gate-tools.md) for the full workflow.
+This emits an optimized bundle into `dist/`, including the service worker (via `vite-plugin-pwa`) so the app is installable and works offline. `dist/` is a plain static site — host it on any static file server or CDN.
 
-## Documentation
+**Deploy:** `npm run deploy:test` and `npm run deploy:prod` are thin wrappers around `vite build` + `rsync` (see [`scripts/deploy-test.sh`](scripts/deploy-test.sh) / [`scripts/deploy-prod.sh`](scripts/deploy-prod.sh)). Point them at your own host, or copy `dist/` wherever you like.
 
-- [`docs/README.md`](docs/README.md) — documentation index and repo navigation hub.
-- [`docs/VISION.md`](docs/VISION.md) — current open work and product direction.
-- [`public/MANUAL.md`](public/MANUAL.md) — the in-app manual, including generated reference tables.
-- [`CLAUDE.md`](CLAUDE.md) — operational rules and architectural overview for AI-assisted work. (`AGENTS.md` points here.)
-- [`AI_MAP.md`](AI_MAP.md) — a navigation map for the codebase.
+---
+
+## I want to contribute
+
+```bash
+npm test            # mutation check + lint + docs lint + Vitest
+npm run test:e2e    # Playwright smoke suite (Desktop + Mobile)
+npm run typecheck   # tsc over public/ and scripts/
+npm run validate    # full pipeline: typecheck + knip + jscpd + format + npm test
+```
+
+Run `npm run validate` before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
+
+**Refreshing the screenshots:** `npm run dev` in one shell, then `npm run screenshots` in another — [`scripts/capture-screenshots.ts`](scripts/capture-screenshots.ts) deep-links a populated scene and writes `docs/assets/readme/hero.png`.
+
+**Analysis & audit tooling:**
+
+- `npm run ensemble:report -- --genre=Jazz --seeds=ALPHA,BETA` — compact multi-seed ensemble audit as JSON.
+- `npm run mix:report -- --jsonl --scene=jazz-ride --seeds=ALPHA,BETA` — rendered-audio metrics as JSONL for a multi-seed scene sweep. `--write-wav=tmp/mix-render` also drops one `.wav` per scene/stem/seed so renders can be auditioned without the live app.
+- `npm run --silent mix:diff -- before.json after.json` — compares two `mix:report --json` outputs and flags stems whose dynamics or spectral balance moved past a threshold (defaults: ±1.5 dB, ±5% spectral, ±1.5 spikes/sec).
+- `npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA` — builds an autoplay-ready URL for a named scene; opening it in the running app hydrates the scene behind a one-click "▶ Play" overlay. See [`docs/guides/listening-gate-tools.md`](docs/guides/listening-gate-tools.md).
+
+**Tech stack:**
+
+- **UI:** Preact
+- **State:** deep-signal domain slices
+- **Audio & generation:** Web Audio + a worker-driven logic engine
+- **Build:** Vite (`vite-plugin-pwa` for the service worker)
+- **Testing:** Vitest + Playwright
+
+**Repository layout:**
+
+- `public/` — app source, controllers, engines, components, and styles
+- `tests/` — unit, integration, standards (critique), perf, and e2e coverage
+- `docs/` — docs index, living guides, roadmap, and archived reports
+- `scripts/` — build, deploy, and analysis tooling
+- `.github/` — contributor, security, and PR templates
+
+**Start here:**
+
+- [`docs/README.md`](docs/README.md) — documentation index and navigation hub.
+- [`docs/VISION.md`](docs/VISION.md) — product direction and open work.
+- [`CLAUDE.md`](CLAUDE.md) — operational rules and architectural overview. (`AGENTS.md` points here.)
+- [`AI_MAP.md`](AI_MAP.md) — file-by-file navigation map for the codebase.
 - [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) — contributor workflow and validation expectations.
 - [`.github/SECURITY.md`](.github/SECURITY.md) — private vulnerability reporting.
 - [`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md) — community standards.
-- [`docs/guides/`](docs/guides/) — deeper implementation notes and reference guides.
-- [`tests/README.md`](tests/README.md) — test-suite conventions and how to run checks.
-- [`.vscode/mcp.json`](.vscode/mcp.json) — optional VS Code Playwright MCP workspace helper.
 
-## Tech stack
-
-- **UI**: Preact
-- **State**: deep-signal domain slices
-- **Audio and generation**: WebAudio plus worker-driven logic
-- **Build**: Vite (with `vite-plugin-pwa` for the service worker)
-- **Testing**: Vitest and Playwright
-
-## Repository layout
-
-- `public/` — app source, controllers, engines, components, and styles
-- `tests/` — unit, integration, standards, perf, and e2e coverage
-- `docs/` — docs index, living guides, roadmap, and archived reports
-- `.github/` — contributor, security, and pull request templates
-- `.vscode/` — optional workspace helpers, including Playwright MCP
-- `scripts/` — repo maintenance and analysis tooling
+---
 
 ## License
 
