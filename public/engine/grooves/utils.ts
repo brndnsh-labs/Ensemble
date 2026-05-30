@@ -122,6 +122,41 @@ export const DEFAULT_CONFIG = {
     accentCymbal: 'Crash' as 'Crash' | 'China',
 };
 
+/**
+ * The 16th-note steps immediately flanking a backbeat (4/4: steps 3, 5, 11, 13).
+ * A non-backbeat snare landing on one of these reads as a snare a 16th
+ * before/after beat 2 or 4 — heard as "two snares in a row", since the backbeat
+ * already owns that pocket. Shared by every embellishment layer that can add a snare
+ * outside the canonical backbeat (soloist snare-stab accents in groove-engine,
+ * the entropy ghost phase, and the strategy 16th-ghosts) so they all keep clear
+ * of the backbeat's space and the backbeat reads clean.
+ *
+ * Backbeats sit on beats 2 & 4; for a 16-step (4/4) bar that's steps 4 & 12,
+ * whose flanking 16ths are {3,5} and {11,13}. Non-16-step bars (compound/odd
+ * meters) return false — matching the prior 4/4-only inline entropy guard.
+ * Extend per-meter if a non-4/4 crowding case ever surfaces by ear.
+ *
+ * Invariant: 4/4 is currently the ONLY meter with 16 steps/bar in
+ * TIME_SIGNATURES, so `stepsPerBar === 16` is an exact proxy for 4/4 and the
+ * "beats 2 & 4 are the backbeats" assumption holds. If a non-4/4 16-step meter
+ * is ever added, this must take the backbeat positions explicitly rather than
+ * assume them — otherwise it would silently apply 4/4 snare discipline there.
+ */
+export function isBackbeatAdjacentStep(loopStep: number, stepsPerBar: number): boolean {
+    if (stepsPerBar !== 16) {
+        return false;
+    }
+    const stepsPerBeat = stepsPerBar / 4;
+    const backbeat2 = stepsPerBeat; // beat 2 → step 4
+    const backbeat4 = stepsPerBeat * 3; // beat 4 → step 12
+    return (
+        loopStep === backbeat2 - 1 ||
+        loopStep === backbeat2 + 1 ||
+        loopStep === backbeat4 - 1 ||
+        loopStep === backbeat4 + 1
+    );
+}
+
 function pickBySeed(seed: number, picks: ([number, number] | number)[]): number {
     for (let i = 0; i < picks.length - 1; i++) {
         const [threshold, motif] = picks[i] as [number, number];

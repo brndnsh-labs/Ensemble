@@ -7,6 +7,7 @@ import {
     type DrumStepBase,
     type GrooveContext,
     INTENSITY_BANDS,
+    isBackbeatAdjacentStep,
     makeMotifSelector,
     roll,
     scaleVelocity,
@@ -163,14 +164,17 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 instTimeOffset += 0.008; // Lay it back for the 'shuffle' feel
             }
         } else if (activeMotif >= 2 && !isOffbeat && !isBeatStart) {
-            // Very occasional 16th ghost notes at high intensity
+            // Very occasional 16th ghost notes at high intensity.
             const stepInMeasure = context.step % context.stepsPerBar;
-            if (
-                stepInMeasure !== 1 &&
-                stepInMeasure !== 5 &&
-                stepInMeasure !== 9 &&
-                stepInMeasure !== 13
-            ) {
+            // Skip the "e" of beats 1 & 3 (steps 1, 9) — those flam against the
+            // kick — AND any 16th flanking a backbeat (3, 5, 11, 13), which would
+            // crowd the beat-2/4 snare and read as "two snares in a row". That
+            // leaves the "a" of beats 2 & 4 (steps 7, 15) as the open ghost slots
+            // — 15 is a natural pickup into the next downbeat. The Texas-shuffle
+            // offbeats (2/6/10/14) above are an 8th away and stay untouched.
+            const isEOfBeat1Or3 = stepInMeasure === 1 || stepInMeasure === 9;
+            const crowdsBackbeat = isBackbeatAdjacentStep(stepInMeasure, context.stepsPerBar);
+            if (!isEOfBeat1Or3 && !crowdsBackbeat) {
                 if (roll(0.2, intensity)) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.25, intensity, 0.1);

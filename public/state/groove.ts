@@ -58,7 +58,12 @@ export const groove = deepSignal<GrooveState>({
     fillLength: 0,
     snareMask: 0,
     pendingCrash: false,
-    creativity: false,
+    // why: generative fills/variations/entropy default ON (drum audit 2026-05-29).
+    // The snare-placement discipline (groove-engine.ts isBackbeatAdjacentStep gate)
+    // makes the always-on embellishments safe, so the default band sounds alive
+    // rather than metronomic. The toggle still exists as an escape hatch; full
+    // removal of the creativity concept is a tracked follow-up.
+    creativity: true,
     sectionSeedMap: {},
     variations: null,
     pocket: {

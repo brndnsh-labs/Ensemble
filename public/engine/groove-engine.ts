@@ -21,7 +21,7 @@ import * as reggae from './grooves/reggae.js';
 import * as rock from './grooves/rock.js';
 import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
-import { DEFAULT_CONFIG } from './grooves/utils.js';
+import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 
@@ -512,6 +512,14 @@ export function applyGrooveOverrides(
     }
 
     // --- Phase 3: Soloist Accent Catching ---
+    // why: the soloist snare-stab accent (drum-seeder.ts generateSoloistAccents)
+    // lands at the soloist's peak step with no beat-position discipline, and is
+    // applied here at velocity 1.2 — as loud as the backbeat. Compute the
+    // backbeat-crowding flag so the snare branch below can refuse to drop that
+    // loud snare on the downbeat (no backbeat lives on beat 1) or a 16th from
+    // beats 2/4 — the "early snare" / "two snares in a row" the owner reported. A
+    // snare-stab catching a syncopation in open space is still musical and kept.
+    const snareCrowdsBackbeat = isBackbeatAdjacentStep(loopStep, stepsPerBar);
     const accent = timelineStep >= 0 ? groove.accentMap?.[timelineStep] : null;
     if (accent) {
         if (accent.type === 'crash-catch') {
@@ -532,7 +540,13 @@ export function applyGrooveOverrides(
                 currentState.velocity = 1.25;
             }
         } else if (accent.type === 'snare-stab') {
-            if (inst.name === 'Snare') {
+            // Catch the peak with a loud snare only in open space — never on the
+            // downbeat or a 16th flanking the backbeat. When suppressed we leave
+            // currentState as the strategy set it (so a genre that intends a
+            // downbeat snare — e.g. a Metal blast — keeps it); we only stop the
+            // accent from ADDING a crowding snare. The Kick reinforcement is
+            // musical anywhere and is left untouched.
+            if (inst.name === 'Snare' && !isDownbeat && !snareCrowdsBackbeat) {
                 currentState.shouldPlay = true;
                 currentState.soundName = 'Snare';
                 currentState.velocity = 1.2;
@@ -615,14 +629,13 @@ export function applyGrooveOverrides(
         const subdivision = stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4);
         const isHeavySync = loopStep % subdivision === Math.floor(subdivision / 2);
 
-        // Simple hardcoded checks adapted to dynamic offset from backbeat
-        let isBackbeatAdjacent = false;
-        let isEOfBeatCheck = false;
-
-        if (arrangerState.timeSignature === '4/4') {
-            isBackbeatAdjacent = [3, 5, 11, 13].includes(loopStep);
-            isEOfBeatCheck = [1, 9].includes(loopStep);
-        }
+        // why: share the backbeat-crowding definition with the soloist accent
+        // gate and the strategy 16th-ghosts via isBackbeatAdjacentStep (4/4:
+        // {3,5,11,13}). The e-of-beat steps {1,9} stay an entropy-only extra
+        // guard. stepsPerBar === 16 ⇔ 4/4 in TIME_SIGNATURES, so this is exactly
+        // the prior `timeSignature === '4/4'` behavior with one shared helper.
+        const isBackbeatAdjacent = isBackbeatAdjacentStep(loopStep, stepsPerBar);
+        const isEOfBeatCheck = stepsPerBar === 16 && (loopStep === 1 || loopStep === 9);
         const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeatCheck);
 
         if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
