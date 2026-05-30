@@ -56,9 +56,10 @@ test.describe('Modals Responsiveness @ui', () => {
         const settingsModal = page.locator('#settingsOverlay .settings-content');
         await expect(settingsModal).toBeVisible();
 
-        // Verify content
-        await expect(settingsModal).toContainText('Visuals & Interface');
+        // Tabbed settings: the Appearance section hosts the theme picker.
+        await settingsModal.getByRole('tab', { name: 'Appearance' }).click();
         await expect(settingsModal).toContainText('Theme');
+        await expect(settingsModal.locator('.theme-picker')).toBeVisible();
 
         // Close modal
         await page.click('#closeSettingsBtn');
