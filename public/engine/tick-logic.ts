@@ -344,8 +344,7 @@ export function generateNotesForStep(
     // Pre-calculate Drum Hits for Coordination
     const drumStep = step % (groove.measures * stepsPerBar);
     const sectionId = chordData?.chord?.sectionId || null;
-    const seedIdx =
-        groove.sectionSeedMap && sectionId ? (groove.sectionSeedMap as any)[sectionId] || 0 : 0;
+    const seedIdx = groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
 
     // --- Calculate Turnaround State ---
     const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);

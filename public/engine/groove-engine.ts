@@ -441,7 +441,7 @@ export function applyGrooveOverrides(
 
     const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], step);
     const sectionId = chordEntry?.chord?.sectionId;
-    let sectionSeed = (groove.sectionSeedMap as Record<string, number>)?.[sectionId];
+    let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {
         // Latin/Bossa requires 2-bar stability for authentic Clave motifs
         const seedBarIndex = config.isLatin ? Math.floor(barIndex / 2) * 2 : barIndex;

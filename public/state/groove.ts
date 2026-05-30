@@ -156,7 +156,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             if (!groove.sectionSeedMap) {
                 g.sectionSeedMap = {};
             }
-            (groove.sectionSeedMap as any)[action.payload.sectionId] = action.payload.seed;
+            g.sectionSeedMap[action.payload.sectionId] = action.payload.seed;
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== action.payload) {

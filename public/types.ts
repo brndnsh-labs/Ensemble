@@ -266,8 +266,8 @@ export interface GrooveState {
     readonly snareMask: number;
     /** Whether a crash cymbal is queued for the next downbeat. */
     readonly pendingCrash: boolean;
-    /** Random seeds for each song section. */
-    readonly sectionSeedMap: object;
+    /** Random seeds for each song section, keyed by section id. */
+    readonly sectionSeedMap: Record<string, number>;
     /** Unified rhythmic pocket configuration. */
     readonly pocket: PocketState;
     /** Last selected smart genre. */
@@ -1226,7 +1226,7 @@ export interface ActionPayloadTriggerFill {
 
 export interface ActionPayloadSetGrooveSeed {
     sectionId: string;
-    seed: number | string;
+    seed: number;
 }
 
 export interface ActionPayloadShowToast {

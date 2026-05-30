@@ -675,7 +675,7 @@ export function checkSectionTransition(
                 // --- 3. THE DRUM SEED (section memory) ---
                 if (nextSection) {
                     // Re-evaluate the drum seed only if it hasn't been set for this section
-                    if ((groove.sectionSeedMap as any)?.[nextSection.id] === undefined) {
+                    if (groove.sectionSeedMap?.[nextSection.id] === undefined) {
                         // Generate a robust float seed (0.0 to 1.0) to serve as the abstract pool marker
                         const seed = Math.random();
                         dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
@@ -725,7 +725,7 @@ export function checkSectionTransition(
                     // Per-section seed so different sections don't pick up in
                     // lockstep; fall back to a stable hash of the section id
                     // for sections the creativity-memory block hasn't seeded.
-                    let sectionSeed = (groove.sectionSeedMap as any)?.[sectionEntry.id];
+                    let sectionSeed = groove.sectionSeedMap?.[sectionEntry.id];
                     if (typeof sectionSeed !== 'number') {
                         sectionSeed = (Math.abs(stringHash31(sectionEntry.id)) % 256) / 256;
                     }
