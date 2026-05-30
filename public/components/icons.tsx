@@ -122,10 +122,11 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <path d="M7.3 7.3a7 7 0 1 0 9.4 0" />
         </>
     ),
+    // A toothed cog (not a sun): notched outer body + hub. Lucide "settings".
     gear: () => (
         <>
-            <circle cx="12" cy="12" r="3.3" />
-            <path d="M12 2.4v3M12 18.6v3M2.4 12h3M18.6 12h3M5.05 5.05l2.1 2.1M16.85 16.85l2.1 2.1M18.95 5.05l-2.1 2.1M7.15 16.85l-2.1 2.1" />
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z" />
+            <circle cx="12" cy="12" r="3" />
         </>
     ),
     dice: () => (
@@ -292,12 +293,14 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <rect {...solid} x="13.4" y="6.5" width="2.5" height="6" rx="0.6" />
         </>
     ),
+    // Two voices joined by a slur — harmony/blend, distinct from the single
+    // soloist note and the bass waveform.
     harmony: () => (
         <>
-            <path d="M15.5 6v8.5" />
-            <circle {...solid} cx="13" cy="15" r="2.4" />
-            <circle {...solid} cx="13" cy="11" r="2.4" />
-            <circle {...solid} cx="13" cy="7" r="2.4" />
+            <circle {...solid} cx="7.5" cy="16" r="2.6" />
+            <circle {...solid} cx="15.5" cy="16" r="2.6" />
+            <path d="M9.9 16V9M17.9 16V9" />
+            <path d="M9.9 9q4-4 8 0" />
         </>
     ),
     soloist: () => (
