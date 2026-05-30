@@ -5,6 +5,9 @@ import {
     generateDrumOrchestration,
     generateSoloistAccents,
 } from '../../../public/engine/drum-seeder.js';
+import { generateSessionSeed } from '../../../public/engine/soloist-seeder.js';
+import { buildHookAuditArrangement } from '../../../scripts/soloist-analysis-utils.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 describe('Drum Seeder', () => {
     const mockArranger = {
@@ -211,5 +214,140 @@ describe('Drum Seeder', () => {
         const emptyArranger = { timeSignature: '4/4', sectionMap: [] };
         const map = generateDrumOrchestration(mockState, emptyArranger, 'Rock', 0.5);
         expect(map).toEqual([]);
+    });
+});
+
+describe('Drum Seeder — fill restraint + defer-to-soloist (drum audit 2026-05-29)', () => {
+    // Four same-label 'Verse' sections give pure base-rate (minor) seams: no
+    // chorus/drop arrival, no role change, flat energy, and not the loop return.
+    const minorArranger = {
+        timeSignature: '4/4',
+        sectionMap: [
+            { start: 0, end: 64, label: 'Verse' },
+            { start: 64, end: 128, label: 'Verse' },
+            { start: 128, end: 192, label: 'Verse' },
+            { start: 192, end: 256, label: 'Verse' },
+        ],
+    };
+    // Same, but section 2 → a Chorus arrival (structural boundary).
+    const chorusArranger = {
+        timeSignature: '4/4',
+        sectionMap: [
+            { start: 0, end: 64, label: 'Verse' },
+            { start: 64, end: 128, label: 'Verse' },
+            { start: 128, end: 192, label: 'Chorus' },
+            { start: 192, end: 256, label: 'Verse' },
+        ],
+    };
+    // Fill bar for the section ending at 128 is its last measure: [112, 128).
+    const BOUNDARY_STEP = 112;
+
+    const fillRateAt = (step, arranger, intensity, soloistSeed, runs = 300) => {
+        let hits = 0;
+        for (let i = 0; i < runs; i++) {
+            const map = generateDrumFills(
+                {},
+                arranger,
+                'Rock',
+                intensity,
+                `SEED-${i}`,
+                soloistSeed,
+            );
+            if (map[step]) {
+                hits++;
+            }
+        }
+        return hits / runs;
+    };
+
+    it('restrains fills on ordinary (minor) seams (~30% at mid intensity)', () => {
+        // base 0.15 + 0.25*0.6 = 0.30, well below the old 0.35 + 0.35*0.6 = 0.56.
+        const rate = fillRateAt(BOUNDARY_STEP, minorArranger, 0.6);
+        expect(rate).toBeGreaterThan(0.18);
+        expect(rate).toBeLessThan(0.42);
+    });
+
+    it('still fills hard into a structural chorus arrival', () => {
+        const rate = fillRateAt(BOUNDARY_STEP, chorusArranger, 0.6);
+        expect(rate).toBeGreaterThan(0.95);
+    });
+
+    // The Head melody averages ~4 onsets/bar (measured against generateSessionSeed),
+    // so "busy" must mean a genuine run: SOLOIST_BUSY_ONSETS is 6. These synthetic
+    // fixtures bracket that threshold.
+    const busySolo = {
+        loopLengthSteps: 256,
+        // 6 onsets inside [112, 128) — a sub-8th run through the turnaround bar.
+        notes: [112, 114, 116, 118, 120, 122].map((step) => ({ step, velocity: 0.85 })),
+    };
+    const normalSolo = {
+        loopLengthSteps: 256,
+        // 4 onsets — a typical melodic bar, below the busy threshold.
+        notes: [113, 117, 121, 125].map((step) => ({ step, velocity: 0.85 })),
+    };
+
+    it('lays out on a minor seam when the soloist is genuinely busy (a run) through it', () => {
+        expect(fillRateAt(BOUNDARY_STEP, minorArranger, 0.6, busySolo)).toBe(0);
+    });
+
+    it('still fills under a normal-density solo (a median bar is not "busy")', () => {
+        const rate = fillRateAt(BOUNDARY_STEP, minorArranger, 0.6, normalSolo);
+        expect(rate).toBeGreaterThan(0.18);
+        expect(rate).toBeLessThan(0.42);
+    });
+
+    it('still marks a structural arrival even when the soloist is busy', () => {
+        // The chorus arrival trumps the defer — the band's moment still lands.
+        expect(fillRateAt(BOUNDARY_STEP, chorusArranger, 0.6, busySolo)).toBeGreaterThan(0.95);
+    });
+
+    it('keeps the busy-defer threshold above the soloist Head density (calibration guard)', () => {
+        // generateDrumFills defers a minor-seam fill only when the soloist plays
+        // SOLOIST_BUSY_ONSETS (6) onsets in the fill bar. That constant MUST stay above
+        // the soloist's median bar density or the defer over-fires and collapses fills
+        // (the reviewed bug: a threshold of 3 fired on 82–97% of bars). Drive the REAL
+        // Blues seed (the busiest genre) and assert the density it produces still leaves
+        // 6 firmly in the "genuinely busy minority" zone — a permanent guard against the
+        // soloist drifting busier (or the threshold drifting down) under our feet.
+        const BUSY_THRESHOLD = 6;
+        const arrangement = buildHookAuditArrangement('4/4');
+        const stepsPerBar = Math.round(arrangement.totalSteps / arrangement.measuresPerLoop);
+        const totalBars = Math.round(arrangement.totalSteps / stepsPerBar);
+
+        const counts: number[] = [];
+        for (let i = 0; i < 16; i++) {
+            const state = {
+                soloist: makeSoloistMock({
+                    enabled: true,
+                    busySteps: 0,
+                    phraseContext: { role: 'call', profile: 'srv' },
+                }),
+                arranger: {
+                    timeSignature: arrangement.timeSignature,
+                    sectionMap: arrangement.sectionMap,
+                    totalSteps: arrangement.totalSteps,
+                    stepMap: arrangement.stepMap,
+                },
+                playback: { bandIntensity: 0.6, currentLoopCount: 0 },
+                groove: { genreFeel: 'Blues', creativity: false, instruments: [] },
+            };
+            const seed = generateSessionSeed(state, state.arranger, 'smart', 0.6, `CAL-${i}`);
+            const perBar = new Array(totalBars).fill(0);
+            for (const note of seed.notes) {
+                if (note.step >= 0 && note.step < arrangement.totalSteps) {
+                    perBar[Math.floor(note.step / stepsPerBar)]++;
+                }
+            }
+            counts.push(...perBar);
+        }
+
+        const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+        const busyFraction = counts.filter((c) => c >= BUSY_THRESHOLD).length / counts.length;
+
+        // The blues Head melody sits ~4 onsets/bar — comfortably below the threshold.
+        expect(mean).toBeGreaterThan(2.5);
+        expect(mean).toBeLessThan(BUSY_THRESHOLD);
+        // The defer must fire on only the genuinely-busy minority of bars, not the median.
+        expect(busyFraction).toBeLessThan(0.45);
     });
 });

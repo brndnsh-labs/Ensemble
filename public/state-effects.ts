@@ -57,6 +57,12 @@ function regenerateSessionSeeds(
             genreFeel,
             playback.bandIntensity,
             songSeed,
+            // why (drum audit 2026-05-29): pass the soloist seed so the fill generator
+            // can lay out when the solo is busy through a turnaround bar (defer-to-
+            // soloist) — but ONLY when the soloist is enabled. With no audible solo there
+            // is no line to step on, so the drummer should fill at the full base rate.
+            // soloGenerated carries { notes, loopLengthSteps }.
+            soloist.enabled ? soloGenerated : undefined,
         );
         const drumAccentsGenerated = generateSoloistAccents(
             stateMap,

@@ -197,6 +197,7 @@ export function generateDrumFills(
     genre: string,
     intensity: number,
     seedStr?: string,
+    soloistSeed?: { notes?: { step: number; velocity: number }[]; loopLengthSteps?: number },
 ): Record<number, FillMapEntry> {
     const unrolled = unrollArrangement(arranger, 128);
     const { sectionMap } = unrolled;
@@ -214,6 +215,42 @@ export function generateDrumFills(
 
     // Orchestration is needed to check energy levels for the "Crash Contract"
     const orchestrationMap = generateDrumOrchestration(state, arranger, genre, intensity, seedStr);
+
+    // Soloist-aware fill restraint: count the soloist seed's note onsets that fall
+    // in a given fill bar, folded into the seed's own loop frame (note steps recur
+    // every loopLengthSteps — cf. soloist-pitch-engine's `note.step % loopLengthSteps`).
+    // why (drum audit 2026-05-29; threshold calibrated by measuring generateSessionSeed):
+    // the Head melody averages ~3.8–4.6 onsets/bar (blues 4.4, jazz 4.6), so the
+    // *median* bar is already 3–4 notes. SOLOIST_BUSY_ONSETS must sit ABOVE that to
+    // mean "the solo is genuinely running a line through this turnaround" — 6 onsets
+    // is the busy top ~16–25% of bars (a sub-8th run), which leaves the realized
+    // minor-seam fill rate ~22–25%: the defer NUANCES fills, it must not collapse
+    // them. (A threshold of 3 fired on 82–97% of bars and nearly muted verse fills.)
+    // All seed velocities are ≥0.55, so every note is an audible onset — no ghost
+    // tier to filter out here.
+    const SOLOIST_BUSY_ONSETS = 6;
+    const soloLoopLen =
+        soloistSeed?.loopLengthSteps && soloistSeed.loopLengthSteps > 0
+            ? soloistSeed.loopLengthSteps
+            : 0;
+    const soloNotes = soloistSeed?.notes ?? [];
+    const foldToSoloLoop = (s: number) =>
+        soloLoopLen ? ((s % soloLoopLen) + soloLoopLen) % soloLoopLen : s;
+    const countSoloistOnsetsInBar = (barStart: number): number => {
+        if (soloNotes.length === 0) {
+            return 0;
+        }
+        const start = foldToSoloLoop(barStart);
+        const end = start + stepsPerMeasure;
+        let onsets = 0;
+        for (const note of soloNotes) {
+            const s = foldToSoloLoop(note.step);
+            if (s >= start && s < end) {
+                onsets++;
+            }
+        }
+        return onsets;
+    };
 
     sectionMap.forEach((sectionRange: any, index: number) => {
         // Keep the generated "Outro" quiet at the end of virtual macro form.
@@ -244,9 +281,21 @@ export function generateDrumFills(
         const isLoopReturn = !isVirtualMacroForm && nextIndex === 0;
         const isRoleChange = currentLabel !== nextLabel;
 
-        // 1. Decide if we need a fill
-        // Keep general fill density moderate, but make important returns read more clearly.
-        let fillProb = 0.35 + intensity * 0.35;
+        // 1. Identify the fill start step (start of the last measure of the section).
+        const measuresInSection = (sectionRange.end - sectionRange.start) / stepsPerMeasure;
+        if (measuresInSection < 1) {
+            return; // Too short for a proper fill
+        }
+        const fillStartStep = sectionRange.end - stepsPerMeasure;
+
+        // 2. Decide if we need a fill.
+        // why (drum audit 2026-05-29): a house drummer fills INTO important
+        // arrivals but lays out on ordinary verse→verse seams. The base rate is
+        // deliberately restrained (~0.30 at mid intensity, was ~0.53); the
+        // structural branches floor it back up so chorus/drop/loop-return/
+        // role-change arrivals still read big.
+        const baseFillProb = 0.15 + intensity * 0.25;
+        let fillProb = baseFillProb;
         if (isStructuralChorus && intensity > 0.35) {
             fillProb = 1;
         } else if (isLoopReturn && intensity > 0.45) {
@@ -256,17 +305,22 @@ export function generateDrumFills(
         } else if (isRoleChange && intensity > 0.55) {
             fillProb = Math.max(fillProb, 0.68);
         }
-        if (prng() > fillProb) {
+
+        // why (drum audit 2026-05-29): defer to an active solo. On an ordinary
+        // (non-structural) seam, if the soloist is carrying a busy melodic phrase
+        // through this turnaround bar, lay out — the section-boundary cymbal
+        // (conductor.ts harmonic anticipation) still marks the change. Structural
+        // arrivals fill regardless: the band's moment trumps. This is the fill-lane
+        // complement to the snare-stab accent discipline — the drummer both catches
+        // the soloist's peaks AND gets out of the way of their phrases.
+        const isStructural = fillProb > baseFillProb;
+        if (!isStructural && countSoloistOnsetsInBar(fillStartStep) >= SOLOIST_BUSY_ONSETS) {
             return;
         }
 
-        // 2. Identify fill start step (Start of the last measure of the current section)
-        const measuresInSection = (sectionRange.end - sectionRange.start) / stepsPerMeasure;
-        if (measuresInSection < 1) {
-            return; // Too short for a proper fill
+        if (prng() > fillProb) {
+            return;
         }
-
-        const fillStartStep = sectionRange.end - stepsPerMeasure;
 
         // 3. Generate the fill
         // Fills are generated for the last measure of the section.
