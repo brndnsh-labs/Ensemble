@@ -13,12 +13,11 @@ vi.mock('../public/state.js', () => ({
 }));
 
 describe('Rock Snare Density Reproduction', () => {
-    const simulateRockPerformance = (numBars, intensity = 0.8, creativity = true) => {
+    const simulateRockPerformance = (numBars, intensity = 0.8) => {
         const mockState = {
             playback: { bandIntensity: intensity, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Rock',
-                creativity: creativity,
                 lastDrumPreset: 'Basic Rock',
                 instruments: [],
             },
@@ -67,7 +66,7 @@ describe('Rock Snare Density Reproduction', () => {
 
     it('should measure snare density in Rock 4/4 at MAX intensity', () => {
         const numBars = 100;
-        const hits = simulateRockPerformance(numBars, 1.0, true);
+        const hits = simulateRockPerformance(numBars, 1.0);
 
         const backbeatHits = hits.filter((h) => h.step === 4 || h.step === 12).length;
         const nonBackbeatHits = hits.filter((h) => h.step !== 4 && h.step !== 12).length;
@@ -90,9 +89,9 @@ describe('Rock Snare Density Reproduction', () => {
         console.log('Non-Backbeat Step Distribution:', distribution);
     });
 
-    it('should BLOCK snare anticipations (steps 3 and 11) in Rock 4/4 with creativity', () => {
+    it('should BLOCK snare anticipations (steps 3 and 11) in Rock 4/4', () => {
         const numBars = 100;
-        const hits = simulateRockPerformance(numBars, 1.0, true);
+        const hits = simulateRockPerformance(numBars, 1.0);
 
         const step3Hits = hits.filter((h) => h.step === 3).length;
         const step11Hits = hits.filter((h) => h.step === 11).length;

@@ -21,7 +21,6 @@ describe('Acoustic Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Acoustic',
-                creativity: true,
                 lastDrumPreset: 'Acoustic',
                 instruments: [],
             },
@@ -85,7 +84,6 @@ describe('Acoustic Drummer Critique', () => {
             playback: { bandIntensity: intensityValue, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Acoustic',
-                creativity: true,
                 lastDrumPreset: 'Acoustic',
                 instruments: [],
             },
@@ -258,7 +256,7 @@ describe('Acoustic Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.75 },
-            groove: { creativity: true, genreFeel: 'Acoustic' },
+            groove: { genreFeel: 'Acoustic' },
         });
 
         let kickOnOne = 0;

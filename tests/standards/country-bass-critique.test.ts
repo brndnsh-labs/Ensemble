@@ -21,7 +21,6 @@ describe('Country Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 115 },
             groove: {
                 genreFeel: 'Country',
-                creativity: true,
                 lastDrumPreset: 'Country (Two-Step)',
                 instruments: [],
             },

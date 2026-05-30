@@ -477,7 +477,6 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                         state.groove.genreFeel = scene.genreFeel;
                         state.groove.lastSmartGenre =
                             scene.requestedGenre || scene.genre || scene.genreFeel;
-                        state.groove.creativity = scene.creativity ?? true;
                         state.groove.fillActive = false;
                         state.groove.pendingCrash = false;
                         state.groove.lastDrumPreset = scene.drumPreset;

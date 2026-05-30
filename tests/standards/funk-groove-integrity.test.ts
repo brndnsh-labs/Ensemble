@@ -34,7 +34,6 @@ describe('Funk Groove Integrity', () => {
             playback: { bandIntensity: 0.8, bpm: 110, songMode: false },
             groove: {
                 genreFeel: 'Funk',
-                creativity: true,
                 lastDrumPreset: 'Funk',
                 sectionSeedMap: { 1: 0.5 }, // Consistent seed for tests
             },

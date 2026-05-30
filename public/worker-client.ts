@@ -231,7 +231,6 @@ export function syncWorker(action?: string, payload?: any): void {
                 genreFeel: groove.genreFeel,
                 swing: groove.swing,
                 swingSub: groove.swingSub,
-                creativity: groove.creativity,
                 sectionSeedMap: groove.sectionSeedMap,
             };
             break;

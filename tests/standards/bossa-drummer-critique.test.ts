@@ -21,7 +21,6 @@ describe('Bossa Nova Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Bossa Nova',
-                creativity: true,
                 lastDrumPreset: 'Bossa Nova',
                 instruments: [],
             },

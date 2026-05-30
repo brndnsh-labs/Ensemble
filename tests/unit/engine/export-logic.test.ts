@@ -78,7 +78,6 @@ vi.mock('../../../public/state.js', () => {
         groove: {
             genreFeel: 'Rock',
             enabled: true,
-            creativity: false,
             instruments: [
                 {
                     name: 'Kick',
@@ -155,7 +154,6 @@ describe('Export and Resolution Logic Validation', () => {
         arranger.key = 'C';
         arranger.isMinor = false;
         state.groove.genreFeel = 'Rock';
-        state.groove.creativity = false;
         harmony.enabled = true;
         const mockChord = {
             root: 'C',
@@ -369,24 +367,8 @@ describe('Export and Resolution Logic Validation', () => {
             vi.restoreAllMocks();
         });
 
-        it('should NOT include generative ghost notes when creativity is disabled', () => {
+        it('should include generative ghost notes in Rock export', () => {
             const state = getState();
-            state.groove.creativity = false;
-
-            handleExport(getState(), {
-                includedTracks: ['drums'],
-                loopMode: 'once',
-            });
-
-            vi.runAllTimers();
-
-            const snareHits = noteOnEvents.filter((e) => e.midi === 38);
-            expect(snareHits.length).toBe(8); // 2 backbeats * 4 bars
-        });
-
-        it('should include generative ghost notes in Rock export when creativity is enabled', () => {
-            const state = getState();
-            state.groove.creativity = true;
             state.playback.bandIntensity = 0.7; // Ideal range for ghost notes in rock.js
 
             handleExport(getState(), {
@@ -403,7 +385,6 @@ describe('Export and Resolution Logic Validation', () => {
 
         it('should include start-of-section crashes in MIDI export', () => {
             const state = getState();
-            state.groove.creativity = true;
             state.playback.bandIntensity = 0.8;
 
             arranger.sectionMap = [

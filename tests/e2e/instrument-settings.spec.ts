@@ -83,13 +83,11 @@ test.describe('Instrument settings — desktop @ui', () => {
         }
     });
 
-    test('Drum settings popover exposes swing, swing-base, and creativity', async ({ page }) => {
+    test('Drum settings popover exposes swing and swing-base', async ({ page }) => {
         const surface = await openInstrumentSettings(page, 'Drums');
 
         await expect(surface.locator('#swingSlider')).toBeVisible();
         await expect(surface.locator('#swingBaseSelect')).toBeVisible();
-        // Toggle hides the native checkbox; verify via accessibility role.
-        await expect(surface.getByRole('switch', { name: 'Creativity' })).toBeAttached();
 
         await expectWithinViewport(page, surface);
     });

@@ -21,7 +21,6 @@ describe('Metal Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 140, songMode: false },
             groove: {
                 genreFeel: 'Metal',
-                creativity: true,
                 lastDrumPreset: 'Metal (Speed)',
                 instruments: [],
             },
@@ -108,7 +107,7 @@ describe('Metal Drummer Critique', () => {
         // buzz comes from alternation, so we assert disjointness on the blast-pattern bars.
         const performance = simulatePerformance(128, {
             playback: { bandIntensity: 0.95 },
-            groove: { creativity: true, genreFeel: 'Metal' },
+            groove: { genreFeel: 'Metal' },
         });
 
         const DOWNBEAT_EIGHTHS = [0, 4, 8, 12];

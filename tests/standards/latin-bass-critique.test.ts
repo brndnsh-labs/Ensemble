@@ -30,7 +30,6 @@ describe('Latin Bassist Critique (Smart routing → walking-ska)', () => {
             playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 130 },
             groove: {
                 genreFeel: 'Latin',
-                creativity: true,
                 lastDrumPreset: 'Latin/Salsa',
                 instruments: [],
             },

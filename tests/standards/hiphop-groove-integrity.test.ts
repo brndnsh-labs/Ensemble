@@ -20,7 +20,6 @@ describe('Hip Hop Groove Integrity', () => {
         playback: { bandIntensity: 0.85, bpm: 90, songMode: false },
         groove: {
             genreFeel: 'Hip Hop',
-            creativity: true,
             lastDrumPreset: 'Hip Hop',
             instruments: [],
             sectionSeedMap: { 1: 0.75 },

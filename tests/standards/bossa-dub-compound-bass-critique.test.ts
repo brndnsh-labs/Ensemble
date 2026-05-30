@@ -41,7 +41,6 @@ describe('Bossa + Dub compound-meter bass critique (epic-2 S9)', () => {
             playback: { bandIntensity: intensity, complexity: 0.5, bpm: 90 },
             groove: {
                 genreFeel,
-                creativity: true,
                 lastDrumPreset: genreFeel,
                 instruments: [],
                 measures: numBars,

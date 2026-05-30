@@ -383,7 +383,6 @@ export async function bootstrapEnsembleAudit({
     }
 
     state.groove.enabled = includeDrums;
-    state.groove.creativity = creativity;
     state.groove.seedTimelineStartStep = 0;
     state.bass.enabled = includeBass;
     state.chords.enabled = includeChords;

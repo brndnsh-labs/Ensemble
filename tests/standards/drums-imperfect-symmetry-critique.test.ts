@@ -62,7 +62,6 @@ function makeMockState() {
         },
         groove: {
             genreFeel: 'Funk',
-            creativity: true,
             lastDrumPreset: 'Funk',
             instruments: [],
             accentMap: null,

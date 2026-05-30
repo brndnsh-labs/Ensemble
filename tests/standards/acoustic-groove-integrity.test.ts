@@ -20,7 +20,6 @@ describe('Acoustic Groove Integrity', () => {
         playback: { bandIntensity: 0.4, bpm: 100, songMode: false },
         groove: {
             genreFeel: 'Acoustic',
-            creativity: true,
             lastDrumPreset: 'Acoustic',
             instruments: [],
         },

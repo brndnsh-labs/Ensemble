@@ -134,7 +134,6 @@ describe('compound-meter is8th → isEighthBoundary (S2)', () => {
                     playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 110 },
                     groove: {
                         genreFeel: 'Rock',
-                        creativity: true,
                         lastDrumPreset: 'Rock',
                         instruments: [],
                     },

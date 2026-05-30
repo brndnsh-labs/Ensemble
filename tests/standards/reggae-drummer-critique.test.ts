@@ -21,7 +21,6 @@ describe('Reggae Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Reggae',
-                creativity: true,
                 lastDrumPreset: 'Reggae',
                 instruments: [],
             },
@@ -128,13 +127,13 @@ describe('Reggae Drummer Critique', () => {
         // entropy phase used to sprinkle ~4% phantom snare hits, including on
         // beat 1 (the One Drop "hole"). The S3 floor `suppressEntropyBelow: 0.5`
         // in reggae.ts gates the entire entropy block off at and below 0.5,
-        // restoring the genre-defining beat-1 silence. Run 128 bars with
-        // `creativity: true` so the entropy block is engaged in principle, then
-        // assert zero non-strategy snare hits on beat 1 (loopStep 0) and on the
+        // restoring the genre-defining beat-1 silence. Run 128 bars (the entropy
+        // block is always engaged now, so it would fire if the floor didn't gate
+        // it) then assert zero non-strategy snare hits on beat 1 (loopStep 0) and on the
         // "and of 1" (loopStep 2 — a common entropy landing site).
         const performance = simulatePerformance(128, {
             playback: { bandIntensity: 0.5, bpm: 90, songMode: false },
-            groove: { genreFeel: 'Reggae', creativity: true, lastDrumPreset: 'Reggae' },
+            groove: { genreFeel: 'Reggae', lastDrumPreset: 'Reggae' },
         });
 
         // why: target the snare lane specifically — no reggae motif (One Drop /

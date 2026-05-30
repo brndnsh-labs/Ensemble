@@ -21,7 +21,6 @@ describe('Disco Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 124 },
             groove: {
                 genreFeel: 'Disco',
-                creativity: true,
                 lastDrumPreset: 'Disco',
                 instruments: [],
             },

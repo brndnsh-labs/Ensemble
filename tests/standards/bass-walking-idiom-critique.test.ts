@@ -46,7 +46,6 @@ const simulateWalkingSkaOverChord = (
         playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 175 },
         groove: {
             genreFeel: 'Ska',
-            creativity: true,
             lastDrumPreset: 'Ska',
             instruments: [],
         },

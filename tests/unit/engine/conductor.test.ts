@@ -438,9 +438,8 @@ describe('Conductor Logic', () => {
             }
         });
 
-        it('should generate groove seed on transition if creativity is enabled', () => {
+        it('should generate a groove seed on section transition', () => {
             groove.enabled = true;
-            groove.creativity = true;
             groove.sectionSeedMap = {};
             playback.autoIntensity = true;
 
@@ -505,7 +504,6 @@ describe('Conductor Logic', () => {
         // bar-4 phrase boundary is interior, not the section's last bar.
         const setupLongSection = (genreFeel = 'Rock') => {
             groove.enabled = true;
-            groove.creativity = true;
             groove.genreFeel = genreFeel;
             groove.fillActive = false;
             groove.fillMap = null;

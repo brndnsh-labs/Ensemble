@@ -64,7 +64,6 @@ const simulate = (genreFeel, tsKey, intensity, numBars) => {
         playback: { bandIntensity: intensity, complexity: 0.6, bpm: 110, songMode: false },
         groove: {
             genreFeel,
-            creativity: true,
             lastDrumPreset: genreFeel,
             instruments: [],
         },
@@ -271,7 +270,7 @@ describe('Odd-meter Latin/Bossa clave timeline coverage (epic-2 S10)', () => {
         const stepsPerBar = ts.beats * ts.stepsPerBeat;
         const mockState = {
             playback: { bandIntensity: 0.45, complexity: 0.3, bpm: 100, songMode: false },
-            groove: { genreFeel: genre, creativity: true, lastDrumPreset: genre, instruments: [] },
+            groove: { genreFeel: genre, lastDrumPreset: genre, instruments: [] },
             // why: see simulate() — arranger.timeSignature drives the engine's internal
             // stepsPerBar; without it the clave runs on a 4/4 grid. (S10 review P0).
             arranger: { timeSignature: tsKey, totalSteps: numBars * stepsPerBar },

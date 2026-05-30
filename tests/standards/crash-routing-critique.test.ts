@@ -134,7 +134,6 @@ describe('Crash Routing Critique', () => {
                 playback: { bandIntensity: 0.7, bpm: 110, songMode: false },
                 groove: {
                     genreFeel: genre,
-                    creativity: true,
                     lastDrumPreset: genre,
                     instruments: [],
                     accentMap: null,
@@ -186,7 +185,6 @@ describe('Crash Routing Critique', () => {
                 playback: { bandIntensity: 0.3, bpm: 90, songMode: false },
                 groove: {
                     genreFeel: genre,
-                    creativity: true,
                     lastDrumPreset: genre,
                     instruments: [],
                     accentMap: null,
@@ -234,7 +232,6 @@ describe('Crash Routing Critique', () => {
             playback: { bandIntensity: 0.8, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
                 accentMap: {
@@ -273,7 +270,6 @@ describe('Crash Routing Critique', () => {
             playback: { bandIntensity: 0.9, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
                 accentMap: {
@@ -340,7 +336,6 @@ describe('Crash Routing Critique', () => {
             playback: { bandIntensity: 0.8, bpm: 100, songMode: false },
             groove: {
                 genreFeel: 'Funk',
-                creativity: true,
                 lastDrumPreset: 'Funk',
                 instruments: [],
                 accentMap: null,
@@ -396,7 +391,6 @@ describe('Crash Routing Critique', () => {
                 playback: { bandIntensity: 0.75, bpm: 100, songMode: false },
                 groove: {
                     genreFeel: genre,
-                    creativity: true,
                     lastDrumPreset: genre,
                     instruments: [],
                     accentMap: null,

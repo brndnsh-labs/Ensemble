@@ -45,7 +45,6 @@ function buildJazzState(timeSignature: string) {
         playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
         groove: {
             genreFeel: 'Jazz',
-            creativity: true,
             lastDrumPreset: 'Jazz',
             instruments: [],
         },

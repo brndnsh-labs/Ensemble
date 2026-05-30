@@ -21,7 +21,6 @@ describe('Bossa Nova Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 120 },
             groove: {
                 genreFeel: 'Bossa Nova',
-                creativity: true,
                 lastDrumPreset: 'Bossa Nova',
                 instruments: [],
             },

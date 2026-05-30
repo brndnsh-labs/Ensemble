@@ -30,7 +30,7 @@ function createHookSeedState(arrangement) {
             stepMap: arrangement.stepMap,
         },
         playback: { bandIntensity: 0.5, currentLoopCount: 0 },
-        groove: { genreFeel: 'Rock', creativity: false, instruments: [] },
+        groove: { genreFeel: 'Rock', instruments: [] },
     };
 }
 

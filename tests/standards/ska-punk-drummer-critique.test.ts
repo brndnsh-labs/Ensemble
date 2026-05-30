@@ -21,7 +21,6 @@ describe('Ska-Punk Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 175, songMode: false },
             groove: {
                 genreFeel: 'Ska',
-                creativity: true,
                 lastDrumPreset: 'Ska',
                 instruments: [],
             },
@@ -90,7 +89,6 @@ describe('Ska-Punk Drummer Critique', () => {
             playback: { bandIntensity: intensityValue, bpm: 175, songMode: false },
             groove: {
                 genreFeel: 'Ska',
-                creativity: true,
                 lastDrumPreset: 'Ska',
                 instruments: [],
             },

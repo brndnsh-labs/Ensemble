@@ -49,12 +49,7 @@ describe('Groove Reducer', () => {
         expect(result).toBe(false);
     });
 
-    it('should set creativity and countdown', () => {
-        grooveReducer({
-            type: ACTIONS.SET_PARAM,
-            payload: { module: 'groove', param: 'creativity', value: true },
-        });
-        expect(groove.creativity).toBe(true);
+    it('should set genre countdown', () => {
         grooveReducer({ type: ACTIONS.SET_GENRE_COUNTDOWN, payload: 4 });
         expect(groove.genreSwitchCountdown).toBe(4);
 
@@ -121,7 +116,6 @@ describe('Groove Reducer', () => {
                 fillLength: 8,
                 snareMask: 123,
                 pendingCrash: true,
-                creativity: true,
             };
 
             for (const [param, value] of Object.entries(params)) {

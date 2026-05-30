@@ -42,7 +42,6 @@ describe('Snare Placement Discipline', () => {
         playback: { bandIntensity: 0.8, bpm: 90, songMode: false, currentLoopCount: 2 },
         groove: {
             genreFeel: 'Blues',
-            creativity: true,
             lastDrumPreset: 'Blues',
             instruments: [],
             seedTimelineStartStep: 0,

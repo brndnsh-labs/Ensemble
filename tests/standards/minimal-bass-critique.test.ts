@@ -34,7 +34,6 @@ describe('Minimal Bassist Critique (Smart routing → whole)', () => {
             playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 100 },
             groove: {
                 genreFeel: 'Minimal',
-                creativity: true,
                 lastDrumPreset: 'Minimal',
                 instruments: [],
             },

@@ -13,7 +13,6 @@ vi.mock('../../../public/state.js', () => {
     const mockState = {
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         groove: {
-            creativity: false,
             genreFeel: 'Rock',
             lastDrumPreset: 'Basic Rock',
             instruments: [],
@@ -27,10 +26,10 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-describe('Groove Engine - Generative (Creativity) Mode', () => {
+describe('Groove Engine - Generative Mode', () => {
     const ts44 = TIME_SIGNATURES['4/4'];
 
-    const createParams = (step: any, instName: any, creativity = false, intensity = 0.5) => {
+    const createParams = (step: any, instName: any, intensity = 0.5) => {
         const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
         return {
             step,
@@ -38,7 +37,6 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
             stepVal: 0,
             playback: { bandIntensity: intensity, complexity: 0.5 },
             groove: {
-                creativity: creativity,
                 genreFeel: 'Rock',
                 lastDrumPreset: 'Basic Rock',
                 instruments: [],
@@ -55,18 +53,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         };
     };
 
-    it('should NOT generate extra hits when creativity is disabled', () => {
-        const step = 1; // Offbeat
-
-        // Run many times to ensure no random hits
-        for (let i = 0; i < 100; i++) {
-            const params = createParams(step, 'Snare', false);
-            const result = applyGrooveOverrides(getState(), params);
-            expect(result.shouldPlay).toBe(false);
-        }
-    });
-
-    it('should generate extra hits (Entropy) when creativity is enabled', () => {
+    it('should generate extra hits (Entropy) in generative mode', () => {
         // why: Epic 12 S4 — after the Math.random()→scrambleHash migration the entropy
         // gate is deterministic per (barIndex, sectionId, loopStep). Repeating the SAME
         // step 200× now always gives the same hash → always fires or never fires, making
@@ -84,7 +71,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         // non-blocked syncopated step: 7 or 15 → use loopStep=7 (step = bar*16 + 7)
         for (let bar = 0; bar < 200; bar++) {
             const step = bar * 16 + 7; // always loopStep=7 (syncopated, non-blocked in Rock)
-            const params = createParams(step, 'Snare', true, 1.0);
+            const params = createParams(step, 'Snare', 1.0);
             const result = applyGrooveOverrides(getState(), params);
             if (result.shouldPlay) {
                 generatedHits++;
@@ -107,7 +94,7 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         const velocities: number[] = [];
         for (let bar = 0; bar < 400; bar++) {
             const step = bar * 16 + 7; // loopStep=7 (non-blocked syncopated)
-            const params = createParams(step, 'Snare', true, 1.0);
+            const params = createParams(step, 'Snare', 1.0);
             const result = applyGrooveOverrides(getState(), params);
             if (result.shouldPlay && typeof result.velocity === 'number') {
                 velocities.push(result.velocity);
@@ -130,12 +117,12 @@ describe('Groove Engine - Generative (Creativity) Mode', () => {
         expect(max - min).toBeGreaterThan(0.04);
     });
 
-    it('should respect genre boundaries even in creativity mode', () => {
+    it('should respect genre boundaries even in generative mode', () => {
         const step = 0; // Downbeat
 
         let entropyHits = 0;
         for (let i = 0; i < 100; i++) {
-            const params = createParams(step, 'HiHat', true, 1.0);
+            const params = createParams(step, 'HiHat', 1.0);
             const result = applyGrooveOverrides(getState(), params);
             // In Rock, Downbeat HiHat might be forced to play by global logic,
             // but we want to ensure ENTROPY doesn't just fire everywhere.

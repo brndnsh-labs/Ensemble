@@ -21,7 +21,6 @@ describe('Disco Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Disco',
-                creativity: true,
                 lastDrumPreset: 'Disco',
                 instruments: [],
             },
@@ -80,7 +79,7 @@ describe('Disco Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.75 },
-            groove: { creativity: true, genreFeel: 'Disco' },
+            groove: { genreFeel: 'Disco' },
         });
 
         let kickFourOnFloor = 0;

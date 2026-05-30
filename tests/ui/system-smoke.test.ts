@@ -74,7 +74,6 @@ const setupMinimalDOM = () => {
             
             <input id="intensitySlider" value="50" />
             <div id="intensityValue">50%</div>
-            <input id="creativityCheck" type="checkbox" />
             <div id="complexitySlider"></div>
             
             <div id="panel-visualizer" class="collapsed"></div>

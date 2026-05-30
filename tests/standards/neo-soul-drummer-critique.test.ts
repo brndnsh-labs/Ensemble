@@ -21,7 +21,6 @@ describe('Neo-Soul Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Neo-Soul',
-                creativity: true,
                 lastDrumPreset: 'Neo-Soul',
                 instruments: [],
             },
@@ -130,7 +129,7 @@ describe('Neo-Soul Drummer Critique', () => {
     it('should pass ghost note density targets at high intensity', () => {
         const performance = simulatePerformance(128, {
             playback: { bandIntensity: 0.9 },
-            groove: { creativity: true, genreFeel: 'Neo-Soul' },
+            groove: { genreFeel: 'Neo-Soul' },
         });
 
         let snareGhostHits = 0;

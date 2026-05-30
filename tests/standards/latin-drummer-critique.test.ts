@@ -21,7 +21,6 @@ describe('Latin Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Bossa Nova',
-                creativity: true,
                 lastDrumPreset: 'Bossa Nova',
                 instruments: [],
             },
@@ -86,7 +85,7 @@ describe('Latin Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.5 },
-            groove: { creativity: false, genreFeel: 'Bossa Nova' },
+            groove: { genreFeel: 'Bossa Nova' },
         });
 
         let validClaveBars = 0;
@@ -152,7 +151,7 @@ describe('Latin Drummer Critique', () => {
 
         const performance = simulatePerformance(64, {
             playback: { bandIntensity: 0.9 },
-            groove: { creativity: true, genreFeel: 'Bossa Nova' },
+            groove: { genreFeel: 'Bossa Nova' },
         });
 
         let snareOnBackbeat = 0;

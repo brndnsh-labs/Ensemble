@@ -156,7 +156,6 @@ function buildAllBluesState(currentLoopCount: number, sessionSeed: any) {
         },
         groove: {
             genreFeel: 'Jazz',
-            creativity: true,
             lastDrumPreset: 'Jazz',
             instruments: [],
             pocket: 0,

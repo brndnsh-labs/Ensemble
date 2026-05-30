@@ -36,10 +36,10 @@ export const config = {
  * scaleVelocity calls below — never gates which lane fires.
  */
 export function getMotif(seed: number, complexity: number, _intensity = 1.0): number {
-    // why: low-complexity sections still collapse to foundation. complexity is
-    // the user's "creativity" knob (drumComplexity ≈ 0.3 when creativity is
-    // off, 0.8 when on), so this preserves the existing foundation-only path
-    // when the user explicitly wants a minimal pattern.
+    // why: low-complexity sections still collapse to foundation. `complexity`
+    // is the orchestration-driven drum-complexity signal (capped motif / 3, or
+    // the default 0.8 when no orchestration), so a sparse orchestration entry
+    // still routes through the foundation-only path.
     if (complexity < 0.3) {
         return 0;
     }

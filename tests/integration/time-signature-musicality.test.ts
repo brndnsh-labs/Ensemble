@@ -38,7 +38,6 @@ describe('Time Signature Musicality Audit', () => {
             playback: { bandIntensity: 0.5, currentLoopCount: 0 },
             groove: {
                 genreFeel: 'Rock',
-                creativity: false,
                 instruments: [
                     { name: 'Kick' },
                     { name: 'Snare' },

@@ -80,7 +80,6 @@ export function saveCurrentState(): void {
             lastDrumPreset: groove.lastDrumPreset,
             genreFeel: groove.genreFeel,
             lastSmartGenre: groove.lastSmartGenre,
-            creativity: groove.creativity,
             sectionSeedMap: groove.sectionSeedMap,
             pattern: groove.instruments.map((inst) => ({
                 name: inst.name,

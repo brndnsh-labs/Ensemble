@@ -20,7 +20,6 @@ describe('Snare Creativity Integrity', () => {
         playback: { bandIntensity: 0.8, bpm: 90, songMode: false },
         groove: {
             genreFeel: 'Blues',
-            creativity: true,
             lastDrumPreset: 'Blues',
             instruments: [],
         },
@@ -28,7 +27,7 @@ describe('Snare Creativity Integrity', () => {
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
     };
 
-    it('should have a reasonable number of snare hits in Blues even with creativity enabled', () => {
+    it('should have a reasonable number of snare hits in Blues with generative embellishments on', () => {
         getState.mockReturnValue(mockState);
 
         let totalExtraSnareHits = 0;

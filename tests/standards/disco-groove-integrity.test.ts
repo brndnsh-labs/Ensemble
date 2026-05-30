@@ -20,7 +20,6 @@ describe('Disco Groove Integrity', () => {
         playback: { bandIntensity: 0.7, bpm: 120, songMode: false },
         groove: {
             genreFeel: 'Disco',
-            creativity: true,
             lastDrumPreset: 'Disco',
             instruments: [],
         },

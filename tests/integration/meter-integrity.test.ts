@@ -56,7 +56,6 @@ describe('Meter Integrity & Musicality', () => {
 
     const defaultGroove = {
         genreFeel: 'Jazz',
-        creativity: true,
         lastDrumPreset: 'Jazz',
         lastSmartGenre: 'Jazz',
         instruments: [

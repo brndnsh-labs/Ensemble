@@ -20,7 +20,6 @@ describe('Ska-Punk Groove Integrity', () => {
         playback: { bandIntensity: 0.8, bpm: 180, songMode: false },
         groove: {
             genreFeel: 'Ska',
-            creativity: true,
             lastDrumPreset: 'Ska',
             instruments: [],
         },

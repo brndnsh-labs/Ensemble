@@ -20,7 +20,6 @@ describe('Blues Groove Integrity', () => {
         playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
         groove: {
             genreFeel: 'Blues',
-            creativity: true,
             lastDrumPreset: 'Blues',
             instruments: [],
         },

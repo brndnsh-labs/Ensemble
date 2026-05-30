@@ -21,7 +21,6 @@ describe('Metal Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 140 },
             groove: {
                 genreFeel: 'Metal',
-                creativity: true,
                 lastDrumPreset: 'Metal (Speed)',
                 instruments: [],
             },

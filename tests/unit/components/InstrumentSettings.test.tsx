@@ -114,7 +114,6 @@ describe('InstrumentSettings Component', () => {
                     volume: 0.7,
                     reverb: 0.3,
                     humanize: 40,
-                    creativity: false,
                     swing: 30,
                     swingSub: '8th',
                 },
@@ -148,41 +147,5 @@ describe('InstrumentSettings Component', () => {
 
         expect(humanizeSlider.hasAttribute('aria-valuetext')).toBe(true);
         expect(humanizeSlider.getAttribute('aria-valuetext')).toBe('40%');
-    });
-
-    it('should render and dispatch the Creativity toggle for groove module', () => {
-        mockDispatch.mockClear();
-        mockUseEnsembleState.mockImplementation((cb) => {
-            const fullState = {
-                groove: {
-                    volume: 0.7,
-                    reverb: 0.3,
-                    humanize: 40,
-                    creativity: false,
-                    swing: 30,
-                    swingSub: '8th',
-                },
-                playback: {},
-            };
-            return cb(fullState);
-        });
-
-        act(() => {
-            render(<InstrumentSpecificSettings module="groove" />, container);
-        });
-
-        const creativityToggle = container.querySelector('#creativityCheck');
-        expect(creativityToggle).not.toBeNull();
-        expect(creativityToggle.getAttribute('aria-label')).toBe('Creativity');
-
-        act(() => {
-            creativityToggle.click();
-        });
-
-        expect(mockDispatch).toHaveBeenCalledWith('SET_PARAM', {
-            module: 'groove',
-            param: 'creativity',
-            value: true,
-        });
     });
 });

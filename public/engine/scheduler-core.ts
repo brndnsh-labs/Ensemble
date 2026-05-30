@@ -1337,8 +1337,7 @@ export function scheduleGlobalEvent(
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const isTurnaround =
-            groove.creativity && isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
+        const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
 
         scheduleDrums(
             state,

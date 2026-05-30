@@ -8,7 +8,6 @@ const { mockState } = vi.hoisted(() => ({
     mockState: {
         groove: {
             enabled: true,
-            creativity: true,
             sectionSeedMap: {},
             genreFeel: 'Rock',
         },

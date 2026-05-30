@@ -94,7 +94,6 @@ describe('Funk Backbeat Presence at Default Intensity (S8)', () => {
             playback: { bandIntensity, bpm: 100, songMode: false },
             groove: {
                 genreFeel: 'Funk',
-                creativity: true,
                 lastDrumPreset: 'Funk',
                 instruments: [],
                 sectionSeedMap: {},
@@ -294,7 +293,6 @@ function makeAutoIntensityState() {
         groove: {
             enabled: true,
             genreFeel: 'Funk',
-            creativity: false,
             lastDrumPreset: 'Funk',
             instruments: [],
             accentMap: null,
@@ -500,11 +498,10 @@ async function runIntegratedFunkArc(
     const { updateAutoConductor } = await import('../../public/engine/conductor.js');
 
     const mockState = makeAutoIntensityState();
-    // applyGrooveOverrides reads the same live state. creativity:true matches
-    // the PART 1 routing path the >=80% Snare claim is validated against.
+    // applyGrooveOverrides reads the same live state — the generative routing
+    // path the >=80% Snare claim is validated against (always engaged now).
     // bandIntensity stays at the 0.35 default (set by makeAutoIntensityState) —
     // see the opening-window note on splitTrace for why 0.35, not lower.
-    mockState.groove.creativity = true;
     getState.mockReturnValue(mockState);
 
     const dispatch = (type: string, payload: any) => {

@@ -69,7 +69,6 @@ function makeDiscoState(opts: { intensity: number; bpm?: number } = { intensity:
         },
         groove: {
             genreFeel: 'Disco',
-            creativity: true,
             lastDrumPreset: 'Disco',
             instruments: [],
             accentMap: null,
@@ -100,7 +99,6 @@ function makeJazzState(opts: { intensity: number; bpm: number }) {
         },
         groove: {
             genreFeel: 'Jazz',
-            creativity: true,
             lastDrumPreset: 'Jazz',
             instruments: [],
             accentMap: null,

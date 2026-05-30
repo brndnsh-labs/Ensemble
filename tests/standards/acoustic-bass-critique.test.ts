@@ -21,7 +21,6 @@ describe('Acoustic Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 },
             groove: {
                 genreFeel: 'Acoustic',
-                creativity: true,
                 lastDrumPreset: 'Acoustic',
                 instruments: [],
             },

@@ -33,7 +33,7 @@ describe('Rock Groove Integrity', () => {
     describe('Apply Groove Overrides - Rock Motifs', () => {
         const mockState = {
             playback: { bandIntensity: 0.8, bpm: 120, songMode: false },
-            groove: { genreFeel: 'Rock', creativity: true, lastDrumPreset: 'Rock' },
+            groove: { genreFeel: 'Rock', lastDrumPreset: 'Rock' },
             soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
             arranger: { sectionMap: [{ start: 0, end: 64 }] }, // 4 measures
         };

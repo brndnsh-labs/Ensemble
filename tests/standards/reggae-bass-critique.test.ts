@@ -21,7 +21,6 @@ describe('Reggae Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 },
             groove: {
                 genreFeel: 'Reggae',
-                creativity: true,
                 lastDrumPreset: 'Reggae',
                 instruments: [],
                 measures: numBars,

@@ -21,7 +21,6 @@ describe('Blues Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5 },
             groove: {
                 genreFeel: 'Blues',
-                creativity: true,
                 lastDrumPreset: 'Blues Shuffle',
                 instruments: [],
             },

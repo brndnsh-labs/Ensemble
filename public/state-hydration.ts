@@ -264,10 +264,6 @@ export function hydrateState(): void {
                         (k) => GENRE_FEELS[GENRE_NAMES.indexOf(k)] === savedState.groove.genreFeel,
                     ) ||
                     'Rock',
-                creativity:
-                    savedState.groove.creativity !== undefined
-                        ? !!savedState.groove.creativity
-                        : false,
                 sectionSeedMap: savedState.groove.sectionSeedMap || {},
                 currentMeasure: 0,
             });

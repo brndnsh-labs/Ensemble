@@ -266,8 +266,6 @@ export interface GrooveState {
     readonly snareMask: number;
     /** Whether a crash cymbal is queued for the next downbeat. */
     readonly pendingCrash: boolean;
-    /** Whether generative fills/variations are enabled. */
-    readonly creativity: boolean;
     /** Random seeds for each song section. */
     readonly sectionSeedMap: object;
     /** Unified rhythmic pocket configuration. */

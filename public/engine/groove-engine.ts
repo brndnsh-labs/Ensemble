@@ -400,7 +400,10 @@ export function applyGrooveOverrides(
         }
     }
 
-    const drumComplexity = groove.creativity ? 0.8 : 0.3;
+    // Generative complexity is always engaged — the drummer is a live session
+    // player, not a metronome. (Was gated on the removed `groove.creativity`
+    // toggle; 0.8 was the toggle-on value.)
+    const drumComplexity = 0.8;
 
     const barIndex = Math.floor(step / stepsPerBar);
     const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
@@ -423,14 +426,16 @@ export function applyGrooveOverrides(
     const effectiveComplexity = cappedMotif !== undefined ? cappedMotif / 3 : drumComplexity;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
-    const isTurnaround =
-        groove.creativity && isSectionTurnaround(step, arrangerState.sectionMap, stepsPerBar, 1);
+    const isTurnaround = isSectionTurnaround(step, arrangerState.sectionMap, stepsPerBar, 1);
 
     // Check if the PREVIOUS bar was a turnaround to determine if we should crash now
     const prevStep = step - stepsPerBar;
-    const prevWasTurnaround =
-        groove.creativity &&
-        isSectionTurnaround(prevStep, arrangerState.sectionMap, stepsPerBar, 1);
+    const prevWasTurnaround = isSectionTurnaround(
+        prevStep,
+        arrangerState.sectionMap,
+        stepsPerBar,
+        1,
+    );
 
     const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
 
@@ -440,7 +445,8 @@ export function applyGrooveOverrides(
     if (sectionSeed === undefined) {
         // Latin/Bossa requires 2-bar stability for authentic Clave motifs
         const seedBarIndex = config.isLatin ? Math.floor(barIndex / 2) * 2 : barIndex;
-        sectionSeed = ((seedBarIndex * 137 + (groove.creativity ? 42 : 0)) % 256) / 256;
+        // +42 was the creativity-on offset (now always engaged).
+        sectionSeed = ((seedBarIndex * 137 + 42) % 256) / 256;
     }
 
     const context = {
@@ -612,7 +618,6 @@ export function applyGrooveOverrides(
         (_entropySectionHash ^ (barIndex * 0x9e3779b1) ^ (loopStep * 131) ^ _entropyInstHash) | 0;
 
     if (
-        groove.creativity &&
         entropyGateActive &&
         !currentState.shouldPlay &&
         // why: draw 1 (discriminator 1) — the entropy gate itself. scrambleHash gives

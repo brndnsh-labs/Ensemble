@@ -32,7 +32,6 @@ describe('Shred Bassist Critique (Smart routing → metal)', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 140 },
             groove: {
                 genreFeel: 'Shred',
-                creativity: true,
                 lastDrumPreset: 'Metal (Speed)',
                 instruments: [],
             },

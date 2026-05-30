@@ -191,7 +191,6 @@ function makeTickStateIntroVerse() {
             enabled: false,
             measures: 1,
             instruments: [],
-            creativity: false,
             fillActive: false,
             sectionSeedMap: {},
         },
@@ -852,7 +851,6 @@ function makeDrumExemptState() {
         },
         groove: {
             genreFeel: 'Rock',
-            creativity: false,
             lastDrumPreset: 'Rock',
             instruments: [],
             accentMap: null,

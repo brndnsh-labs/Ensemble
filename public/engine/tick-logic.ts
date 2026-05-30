@@ -347,15 +347,8 @@ export function generateNotesForStep(
     const seedIdx =
         groove.sectionSeedMap && sectionId ? (groove.sectionSeedMap as any)[sectionId] || 0 : 0;
 
-    // Use a cached variation lookup if creativity is enabled
-    if (groove.creativity && groove.lastDrumPreset) {
-        // We use a global cache or just handle it synchronously if already loaded
-        // For now, we'll try to find a way to avoid the top-level import.
-    }
-
     // --- Calculate Turnaround State ---
-    const isTurnaround =
-        groove.creativity && isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
+    const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
 
     let fillPlayed = false;
 
@@ -447,8 +440,8 @@ export function generateNotesForStep(
             }
             let stepVal = inst.steps[drumStep];
 
-            // Variation logic: We use pre-computed variations if creativity is high
-            if (groove.creativity && groove.variations) {
+            // Variation logic: use pre-computed variations when present.
+            if (groove.variations) {
                 const varInst = groove.variations[seedIdx]?.[instName];
                 if (varInst) {
                     stepVal = varInst[drumStep];

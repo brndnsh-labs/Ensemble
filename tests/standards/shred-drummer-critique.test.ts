@@ -21,7 +21,6 @@ describe('Shred Drummer Critique', () => {
             playback: { bandIntensity: 0.9, bpm: 180, songMode: false },
             groove: {
                 genreFeel: 'Shred',
-                creativity: true,
                 lastDrumPreset: 'Shred',
                 instruments: [],
             },
@@ -80,7 +79,7 @@ describe('Shred Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.95 },
-            groove: { creativity: true, genreFeel: 'Shred' },
+            groove: { genreFeel: 'Shred' },
         });
 
         const DOWNBEAT_EIGHTHS = [0, 4, 8, 12];

@@ -396,14 +396,14 @@ function simulateDrumLoops({ state, arrangement, loops = 3, seed = DEFAULT_SEED 
                 const fillData = state.groove.fillMap?.[measure.start] || null;
                 const sectionSeed =
                     state.groove.sectionSeedMap?.[measure.sectionId] ??
-                    ((measure.measureIndex * 137 + (state.groove.creativity ? 42 : 0)) % 256) / 256;
+                    ((measure.measureIndex * 137 + 42) % 256) / 256;
                 const row = createMeasureRow({
                     loop,
                     measure,
                     orchestration,
                     fillData,
                     intensity: state.playback.bandIntensity,
-                    creativity: state.groove.creativity,
+                    creativity: true, // generative behavior is always engaged now
                     genre: state.groove.genreFeel,
                     sectionSeed,
                 });

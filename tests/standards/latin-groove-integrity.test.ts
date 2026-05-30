@@ -20,7 +20,6 @@ describe('Latin Groove Integrity', () => {
         playback: { bandIntensity: 0.6, bpm: 140, songMode: false },
         groove: {
             genreFeel: 'Bossa Nova',
-            creativity: true,
             lastDrumPreset: 'Bossa Nova',
             lastSmartGenre: 'Bossa',
             instruments: [],

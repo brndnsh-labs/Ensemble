@@ -21,7 +21,6 @@ describe('Rock Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 120 },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
             },
@@ -197,7 +196,6 @@ describe('Rock Bassist Critique', () => {
             playback: { bandIntensity: 0.7, complexity: 0.5, bpm: 120 },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
             },
@@ -339,7 +337,6 @@ describe('Rock Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 120 },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
             },
@@ -464,7 +461,6 @@ describe('Rock Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 120 },
             groove: {
                 genreFeel: 'Rock',
-                creativity: true,
                 lastDrumPreset: 'Rock',
                 instruments: [],
             },

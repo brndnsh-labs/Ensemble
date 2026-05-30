@@ -69,7 +69,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'hapticCheck',
             'applyPresetSettingsCheck',
             'swingBaseSelect',
-            'creativityCheck',
             'closeSettingsBtn',
         ];
         mockIds.forEach((id) => {

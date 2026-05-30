@@ -21,7 +21,6 @@ describe('Jazz Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Jazz',
-                creativity: true,
                 lastDrumPreset: 'Jazz',
                 instruments: [],
             },
@@ -78,7 +77,7 @@ describe('Jazz Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.7 },
-            groove: { creativity: true, genreFeel: 'Jazz' },
+            groove: { genreFeel: 'Jazz' },
         });
 
         let rideHits = 0;

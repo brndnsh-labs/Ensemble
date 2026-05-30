@@ -21,7 +21,6 @@ describe('Funk Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 100, songMode: false },
             groove: {
                 genreFeel: 'Funk',
-                creativity: true,
                 lastDrumPreset: 'Funk',
                 instruments: [],
             },
@@ -106,7 +105,7 @@ describe('Funk Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.8 },
-            groove: { creativity: true, genreFeel: 'Funk' },
+            groove: { genreFeel: 'Funk' },
         });
 
         let kickOnTheOne = 0;
@@ -216,7 +215,7 @@ describe('Funk Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.8 },
-            groove: { creativity: true, genreFeel: 'Funk' },
+            groove: { genreFeel: 'Funk' },
         });
 
         const allowedSlots = [4, 5, 6, 12, 13, 14];

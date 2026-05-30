@@ -174,8 +174,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }));
     });
 
-    it('should exercise creativity variations in drums', () => {
-        processor.state.groove.creativity = true;
+    it('should exercise drum variations', () => {
         processor.state.groove.sectionSeedMap = { s1: 1 };
 
         processor.processStep(0);

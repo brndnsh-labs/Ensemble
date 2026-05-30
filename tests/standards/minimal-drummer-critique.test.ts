@@ -21,7 +21,6 @@ describe('Minimal Drummer Critique', () => {
             playback: { bandIntensity: 0.3, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Minimal',
-                creativity: true,
                 lastDrumPreset: 'Minimal',
                 instruments: [],
             },
@@ -169,7 +168,6 @@ describe('Minimal Drummer Critique', () => {
             playback: { bandIntensity: intensityValue, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Minimal',
-                creativity: true,
                 lastDrumPreset: 'Minimal',
                 instruments: [],
             },

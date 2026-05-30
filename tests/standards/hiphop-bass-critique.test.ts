@@ -26,7 +26,6 @@ describe('Hip Hop Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 },
             groove: {
                 genreFeel: 'Hip Hop',
-                creativity: true,
                 lastDrumPreset: 'Hip Hop',
                 instruments: [],
             },

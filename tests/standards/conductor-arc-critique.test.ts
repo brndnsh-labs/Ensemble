@@ -129,7 +129,6 @@ function makeMockState(opts: { bandIntensity?: number; songMode?: boolean } = {}
         groove: {
             enabled: true,
             genreFeel: 'Rock',
-            creativity: false,
             lastDrumPreset: 'Rock',
             instruments: [],
             accentMap: null,

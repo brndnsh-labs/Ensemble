@@ -329,7 +329,7 @@ describe('Drum Seeder — fill restraint + defer-to-soloist (drum audit 2026-05-
                     stepMap: arrangement.stepMap,
                 },
                 playback: { bandIntensity: 0.6, currentLoopCount: 0 },
-                groove: { genreFeel: 'Blues', creativity: false, instruments: [] },
+                groove: { genreFeel: 'Blues', instruments: [] },
             };
             const seed = generateSessionSeed(state, state.arranger, 'smart', 0.6, `CAL-${i}`);
             const perBar = new Array(totalBars).fill(0);

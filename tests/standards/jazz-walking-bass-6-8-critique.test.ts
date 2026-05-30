@@ -64,7 +64,6 @@ function buildJazzState(intensity: number, overrides: Record<string, unknown> = 
         },
         groove: {
             genreFeel: 'Jazz',
-            creativity: true,
             lastDrumPreset: 'Jazz',
             instruments: [],
             pocket: 0,

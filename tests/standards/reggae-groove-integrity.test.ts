@@ -20,7 +20,6 @@ describe('Reggae Groove Integrity', () => {
         playback: { bandIntensity: 0.8, bpm: 75, songMode: false },
         groove: {
             genreFeel: 'Reggae',
-            creativity: true,
             lastDrumPreset: 'Reggae',
             instruments: [],
         },

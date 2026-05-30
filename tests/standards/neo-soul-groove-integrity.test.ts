@@ -20,7 +20,6 @@ describe('Neo-Soul Groove Integrity', () => {
         playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
         groove: {
             genreFeel: 'Neo-Soul',
-            creativity: true,
             lastDrumPreset: 'Neo-Soul',
             instruments: [],
             sectionSeedMap: { 1: 0.5 },

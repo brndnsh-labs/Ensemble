@@ -21,7 +21,6 @@ describe('Hip Hop Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Hip Hop',
-                creativity: true,
                 lastDrumPreset: 'Hip Hop',
                 instruments: [],
             },
@@ -80,7 +79,7 @@ describe('Hip Hop Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.8 },
-            groove: { creativity: true, genreFeel: 'Hip Hop' },
+            groove: { genreFeel: 'Hip Hop' },
         });
 
         let backbeatHits = 0;
@@ -156,7 +155,7 @@ describe('Hip Hop Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.85 },
-            groove: { creativity: true, genreFeel: 'Hip Hop' },
+            groove: { genreFeel: 'Hip Hop' },
         });
 
         const RAMP_EPSILON = 0.01; // velocity ramp tolerance for scaleVelocity adjustments

@@ -26,7 +26,6 @@ vi.mock('../../../public/state.js', () => {
         groove: {
             genreFeel: 'Rock',
             enabled: true,
-            creativity: true,
             instruments: [
                 { name: 'Kick', muted: false, steps: new Array(128).fill(0) },
                 { name: 'Snare', muted: false, steps: new Array(128).fill(0) },

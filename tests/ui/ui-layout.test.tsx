@@ -127,7 +127,6 @@ describe('UI Layout Integrity', () => {
             'masterVolume',
             'countInCheck',
             'metronomeCheck',
-            'creativityCheck',
             'visualFlashCheck',
             'hapticCheck',
             'applyPresetSettingsCheck',

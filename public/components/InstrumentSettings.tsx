@@ -322,22 +322,6 @@ function GrooveControls({ state }: GrooveControlsProps) {
                     ariaValueText={`${state.humanize || 0}%`}
                 />
             </SettingRow>
-
-            <SettingRow label="Creativity" id="creativityCheck">
-                <Toggle
-                    id="creativityCheck"
-                    checked={!!state.creativity}
-                    ariaLabel="Creativity"
-                    onChange={(val) => {
-                        dispatch(ACTIONS.SET_PARAM, {
-                            module: 'groove',
-                            param: 'creativity',
-                            value: val,
-                        });
-                        saveCurrentState();
-                    }}
-                />
-            </SettingRow>
         </Fragment>
     );
 }

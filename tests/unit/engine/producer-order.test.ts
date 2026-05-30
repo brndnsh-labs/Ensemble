@@ -143,7 +143,6 @@ function makeState() {
             enabled: false, // drums silent; not needed for this guard
             measures: 1,
             instruments: [],
-            creativity: false,
             fillActive: false,
         },
         playback: {

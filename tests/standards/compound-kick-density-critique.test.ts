@@ -64,7 +64,6 @@ function buildState(genreFeel: string, timeSignature: '6/8' | '4/4', intensity: 
         playback: { bandIntensity: intensity, bpm: 120, songMode: false },
         groove: {
             genreFeel,
-            creativity: true,
             lastDrumPreset: genreFeel,
             instruments: [],
         },

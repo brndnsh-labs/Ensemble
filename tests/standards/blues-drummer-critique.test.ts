@@ -24,7 +24,6 @@ describe('Blues Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
             groove: {
                 genreFeel: 'Blues',
-                creativity: true,
                 lastDrumPreset: 'Blues',
                 instruments: [],
             },
@@ -87,7 +86,7 @@ describe('Blues Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.75 },
-            groove: { creativity: true, genreFeel: 'Blues' },
+            groove: { genreFeel: 'Blues' },
         });
 
         let backbeatHits = 0;
@@ -260,7 +259,7 @@ describe('Blues Drummer Critique', () => {
     it('should implement feathered "Four-on-the-Floor" drive at high intensity', () => {
         const highIntensityPerf = simulatePerformance(32, {
             playback: { bandIntensity: 0.9 },
-            groove: { creativity: true, genreFeel: 'Blues' },
+            groove: { genreFeel: 'Blues' },
         });
 
         let backbeatKickHits = 0; // Kicks on 2 and 4
@@ -314,7 +313,7 @@ describe('Blues Drummer Critique', () => {
         const numBars = 64;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.9 },
-            groove: { creativity: true, genreFeel: 'Blues' },
+            groove: { genreFeel: 'Blues' },
         });
 
         let crashCount = 0;

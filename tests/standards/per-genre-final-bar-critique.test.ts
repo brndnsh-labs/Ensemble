@@ -70,7 +70,6 @@ function makeDrumsMockState(genreFeel: string, lastDrumPreset?: string) {
         },
         groove: {
             genreFeel,
-            creativity: true,
             lastDrumPreset: lastDrumPreset ?? genreFeel,
             instruments: [],
             accentMap: null,

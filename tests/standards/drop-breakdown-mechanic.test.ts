@@ -166,7 +166,6 @@ function makeState(
             genreFeel: opts.genreFeel ?? 'Rock',
             measures: 1,
             instruments: opts.includeDrums ? drumInstruments : [],
-            creativity: false,
             fillActive: false,
             sectionSeedMap: {},
         },

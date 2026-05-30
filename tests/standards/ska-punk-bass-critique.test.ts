@@ -21,7 +21,6 @@ describe('Ska-Punk Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 175 },
             groove: {
                 genreFeel: 'Ska',
-                creativity: true,
                 lastDrumPreset: 'Ska',
                 instruments: [],
             },

@@ -21,7 +21,6 @@ describe('Country Drummer Critique', () => {
             playback: { bandIntensity: 0.6, bpm: 120, songMode: false },
             groove: {
                 genreFeel: 'Country',
-                creativity: true,
                 lastDrumPreset: 'Country',
                 instruments: [],
             },
@@ -78,7 +77,7 @@ describe('Country Drummer Critique', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.8 },
-            groove: { creativity: true, genreFeel: 'Country' },
+            groove: { genreFeel: 'Country' },
         });
 
         let backbeatHits = 0;
@@ -152,7 +151,7 @@ describe('Country Drummer Critique', () => {
         const numBars = 32;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.85 },
-            groove: { creativity: true, genreFeel: 'Country' },
+            groove: { genreFeel: 'Country' },
         });
 
         let openHits = 0;

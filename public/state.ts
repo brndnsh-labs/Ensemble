@@ -129,7 +129,6 @@ export function getSyncState() {
             swingSub: groove.swingSub,
             humanize: groove.humanize,
             pocket: groove.pocket,
-            creativity: groove.creativity,
             sectionSeedMap: groove.sectionSeedMap,
             lastDrumPreset: groove.lastDrumPreset,
             fillActive: groove.fillActive,

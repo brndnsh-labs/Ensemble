@@ -665,7 +665,6 @@ function makeDrumsMockState() {
         },
         groove: {
             genreFeel: 'Funk',
-            creativity: true,
             lastDrumPreset: 'Funk',
             instruments: [],
             accentMap: null,
@@ -893,7 +892,6 @@ function makeTickState(opts: { isEndingPending?: boolean; songMode?: boolean } =
             enabled: false,
             measures: 1,
             instruments: [],
-            creativity: false,
             fillActive: false,
             sectionSeedMap: {},
         },

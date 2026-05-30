@@ -21,7 +21,6 @@ describe('Neo-Soul Bassist Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5, bpm: 90 },
             groove: {
                 genreFeel: 'Neo-Soul',
-                creativity: true,
                 lastDrumPreset: 'Neo-Soul',
                 instruments: [],
             },

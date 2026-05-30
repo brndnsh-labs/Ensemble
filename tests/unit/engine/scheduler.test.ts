@@ -80,7 +80,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         measures: 1,
         enabled: true,
         sectionSeedMap: {},
-        creativity: false,
         buffer: new Map(),
     };
     const mockMidi = { enabled: false };
@@ -213,7 +212,6 @@ describe('Scheduler Core System', () => {
             { name: 'Snare', steps: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
         ];
         groove.pendingGenreFeel = null;
-        groove.creativity = false;
         groove.buffer = new Map();
         bass.buffer = new Map();
         bass.enabled = true;
@@ -490,7 +488,6 @@ describe('Scheduler Core System', () => {
         });
 
         it('should handle turnaround logic (lines 1210-1225)', () => {
-            groove.creativity = true;
             arranger.sectionMap = [
                 { start: 0, end: 32 }, // 2 measures (32 steps in 4/4)
             ];
