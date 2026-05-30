@@ -50,6 +50,31 @@ you'll measure) before running anything long.
    for i in $(seq 1 5); do npx playwright test <path> 2>&1 | tail -3; done
    ```
 
+   **The decisive signal is variance, not a clean pass-count.** A test that
+   passes 10/10 can still be a latent flake sitting one unlucky roll from a
+   bound. For a critique test, capture the *logged statistical values* across
+   runs (the report lines — ghost %, jump counts, ratios) — vitest hides
+   `console.log` on pass, so use `--reporter=verbose`:
+
+   ```bash
+   for i in $(seq 1 8); do
+     npx vitest run <path> --reporter=verbose 2>&1 \
+       | grep -iE "<the metric labels the test logs>" | sed "s/^/[run $i] /"
+   done
+   ```
+
+   - **Values byte-identical across runs → the path is already deterministic
+     (seeded `scrambleHash`/`sectionSeed`). NOT A FLAKE — stop here.** Do not
+     seed it: a deterministic test gains nothing and the change falsely brands
+     it as formerly-flaky. Report "not a flake" (step 3) and exit. This is the
+     common case — the `Math.random`-grep / `installSeededRandom`-absence
+     heuristic over-counts badly, because the *engines* were migrated to seeded
+     hashing, so most "unseeded" tests never actually roll a die on their path.
+   - **Values vary but all passed → latent flake.** Measure how close the
+     varying value gets to its bound. Near the edge → proceed to fix. Wide
+     margin → note it in the tracker as `🟡` (watch) but a fix is optional.
+   - **Values vary and some failed → active flake.** Proceed to classify + fix.
+
    Also run it **inside a multi-file batch** to test for ordering-dependence:
    `npx vitest run tests/standards/` (or `vitest related` against the file it
    shares an engine with). A flake that only appears in the batch is
@@ -59,16 +84,30 @@ you'll measure) before running anything long.
 
    | Observation | Class |
    |---|---|
-   | Fails standalone ~1-in-N; the failing assertion is a statistical bound; the engine path uses raw `Math.random` and the test does NOT call `installSeededRandom` | **unseeded-statistical** |
-   | Passes standalone every time, fails only in a multi-file run | **ordering-dependent** (a prior file leaked a spy / global signal / stale mock) |
+   | Logged values **vary** across standalone runs; the failing assertion is a statistical bound | **unseeded-statistical** (the engine rolls raw `Math.random` on this path) |
+   | Logged values **identical** standalone, fails only in a multi-file run | **ordering-dependent** (a prior file leaked a spy / global signal / stale mock) |
    | Playwright hydration-wait timeout, or whole-run import crash | **e2e-timing** |
 
-   Confirm the engine actually draws `Math.random` on the tested path before
-   calling it statistical — `grep -n "Math.random" <engine-file>`. If the path
-   is fully seeded internally (`scrambleHash`/`sectionSeed`) the flake is
-   something else; widen the investigation, don't force a class.
+   The variance check in step 1 already did the disambiguation: a test whose
+   values are identical standalone is deterministic on its path, so a failure
+   that only appears in-batch must be an *external* perturbation (an ordering
+   leak), not the engine. Don't classify on the `Math.random`-grep or the
+   absence of `installSeededRandom` — both over-count, because the engines were
+   migrated to seeded hashing. Variance across runs is the only reliable tell.
 
-3. **Present the plan.** Format:
+3. **Present the verdict.** If the step-1 variance check showed identical
+   values (deterministic), this is the **not-a-flake exit** — report and stop,
+   no fix, no tracker entry:
+
+   ```
+   ## Not a flake
+
+   **Test:** `<path>`
+   **Evidence:** logged values byte-identical across <N> runs (<the values>) — deterministic on the tested path (seeded scrambleHash/sectionSeed).
+   **Verdict:** no fix. The unseeded-test heuristic over-counted; the engine path never rolls a die.
+   ```
+
+   Otherwise present the fix plan:
 
    ```
    ## Flake diagnosis
@@ -76,7 +115,7 @@ you'll measure) before running anything long.
    **Test:** `<path>` — "<failing assertion>"
    **Fail-rate:** <X>/<N> standalone, <Y>/<M> in-batch
    **Class:** <unseeded-statistical | ordering-dependent | e2e-timing>
-   **Evidence:** <the failing numbers + the Math.random / ordering finding>
+   **Evidence:** <the varying numbers + the Math.random / ordering finding>
 
    **Fix:** <canonical fix for the class — see table below>
    **Validation:** re-run <path> <N>x to confirm determinism + comfortable margin
