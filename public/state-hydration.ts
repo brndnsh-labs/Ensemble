@@ -155,6 +155,7 @@ export function hydrateState(): void {
             metronome: false,
             visualFlash: savedState.visualFlash !== undefined ? savedState.visualFlash : false,
             haptic: savedState.haptic !== undefined ? savedState.haptic : false,
+            qualityColors: savedState.qualityColors !== undefined ? savedState.qualityColors : true,
             countIn: savedState.countIn !== undefined ? savedState.countIn : true,
             sessionTimer: clamp(savedState.sessionTimer, 0, 60, 5),
             songMode: savedState.songMode !== undefined ? !!savedState.songMode : true,

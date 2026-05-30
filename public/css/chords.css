@@ -283,12 +283,29 @@
     padding-bottom: 0.8rem;
 }
 
-.chord-card.minor {
-    color: var(--soloist-color);
+/* Chord-quality colouring — a subtle symbol tint keyed to harmonic character,
+   applied only when "colour chords by quality" is on (.lead-sheet--quality-
+   colors) and only to non-active cards (the active highlight wins). Major
+   stays the neutral text colour so the chart reads calm; the colourful
+   qualities pop. Colour is supplementary to the suffix glyph (m, 7, °, +),
+   never the sole cue. */
+.lead-sheet--quality-colors .chord-card.q-dominant:not(.active) {
+    color: var(--chord-dominant);
 }
-
-.chord-card.aug {
-    color: var(--harmony-color);
+.lead-sheet--quality-colors .chord-card.q-minor:not(.active) {
+    color: var(--chord-minor);
+}
+.lead-sheet--quality-colors .chord-card.q-dim:not(.active) {
+    color: var(--chord-dim);
+}
+.lead-sheet--quality-colors .chord-card.q-halfdim:not(.active) {
+    color: var(--chord-halfdim);
+}
+.lead-sheet--quality-colors .chord-card.q-aug:not(.active) {
+    color: var(--chord-aug);
+}
+.lead-sheet--quality-colors .chord-card.q-sus:not(.active) {
+    color: var(--chord-sus);
 }
 
 .chord-card.active {

@@ -1067,6 +1067,8 @@ export interface GlobalContext {
     readonly visualFlash: boolean;
     /** Whether haptic feedback is enabled. */
     readonly haptic: boolean;
+    /** Whether chord symbols are tinted by harmonic quality on the chart. */
+    readonly qualityColors: boolean;
     /** List of active toast notifications. */
     readonly toasts: Array<{ id: string; message: string; actions?: string[] }>;
     /** Current intensity of the screen flash effect. */

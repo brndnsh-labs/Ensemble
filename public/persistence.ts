@@ -22,6 +22,7 @@ export function saveCurrentState(): void {
         metronome: playback.metronome,
         visualFlash: playback.visualFlash,
         haptic: playback.haptic,
+        qualityColors: playback.qualityColors,
         countIn: playback.countIn,
         applyPresetSettings: playback.applyPresetSettings,
         sessionTimer: playback.sessionTimer,
