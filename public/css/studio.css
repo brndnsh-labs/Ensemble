@@ -44,7 +44,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.3rem 0.6rem;
     font-size: 0.74rem;
     font-weight: 700;
@@ -76,7 +76,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.38rem 0.75rem;
     font-size: 0.75rem;
     font-weight: 700;
@@ -507,7 +507,7 @@
     width: 32px;
     height: 32px;
     flex-shrink: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -801,7 +801,7 @@
 .workspace-studio-surface--settings .button-group-btn {
     min-width: 0;
     max-width: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.28rem 0.62rem;
 }
 

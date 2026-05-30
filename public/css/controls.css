@@ -136,6 +136,13 @@
     min-width: 80px; /* Ensure stable width */
 }
 
+/* Lining, tabular figures so the BPM field and play-timer don't jitter as
+   digits change width. */
+#bpmInput,
+#playBtn {
+    font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 600px) {
     #playBtn {
         width: 7rem;

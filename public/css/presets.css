@@ -100,7 +100,7 @@
     gap: 0.15rem;
     padding: 0;
     border: 1px solid color-mix(in srgb, var(--chip-accent) 35%, transparent);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--chip-accent) 10%, transparent);
     color: var(--text-primary);
     overflow: hidden;
@@ -120,13 +120,13 @@
 .preset-library-chip.active {
     background: var(--chip-accent);
     border-color: var(--chip-accent);
-    color: #000;
+    color: var(--base03);
 }
 
 .preset-library-chip.active .preset-library-chip-name,
 .preset-library-chip.active .preset-library-chip-pin,
 .preset-library-chip.active .preset-library-chip-delete {
-    color: #000;
+    color: var(--base03);
 }
 
 .preset-library-chip-name {
@@ -166,7 +166,7 @@
     font-size: 0.85rem;
     line-height: 1;
     cursor: pointer;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     transition:
         background-color 120ms var(--anim-ease),
         color 120ms var(--anim-ease);

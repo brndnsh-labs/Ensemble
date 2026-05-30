@@ -1,4 +1,14 @@
 import './styles.css';
+// Self-hosted type pairing (latin subset, specific weights) — bundled by Vite
+// to same-origin /assets so the CSP `font-src 'self'` is satisfied. Display =
+// Fraunces, Body/UI = Hanken Grotesk, Mono = Geist Mono. See css/variables.css
+// for the --font-* token wiring.
+import '@fontsource/fraunces/latin-400.css';
+import '@fontsource/fraunces/latin-600.css';
+import '@fontsource/hanken-grotesk/latin-400.css';
+import '@fontsource/hanken-grotesk/latin-500.css';
+import '@fontsource/hanken-grotesk/latin-700.css';
+import '@fontsource/geist-mono/latin-400.css';
 import { applyTheme } from './app-controller.js';
 import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';

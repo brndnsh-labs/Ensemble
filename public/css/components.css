@@ -1,3 +1,11 @@
+/* Inline SVG icons (see components/Icon.tsx). Sized in em so they track the
+   host control's font-size; nudged down a hair for optical centering on text. */
+.icon {
+    display: inline-block;
+    vertical-align: -0.14em;
+    flex: none;
+}
+
 /* Spacing & Dividers */
 .divider-top {
     border-top: 1px solid var(--border-color);
@@ -175,7 +183,7 @@
         background-color var(--anim-fast) var(--anim-ease),
         border-color var(--anim-fast) var(--anim-ease),
         box-shadow var(--anim-fast) var(--anim-ease);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
 }
 
 .toggle-slider:before {

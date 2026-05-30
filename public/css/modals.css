@@ -233,7 +233,7 @@ body.modal-open {
 }
 
 .surprise-me-seed-add:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-color);
 }
 
@@ -257,7 +257,7 @@ body.modal-open {
 .surprise-me-seed-confirm {
     padding: 0.55rem 0.9rem;
     border-radius: 8px;
-    background: var(--accent-color, #6aa3ff);
+    background: var(--accent-color);
     color: #fff;
     border: 0;
     cursor: pointer;
@@ -279,7 +279,7 @@ body.modal-open {
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: rgba(99, 102, 241, 0.15);
     color: var(--text-color);
     font-size: 0.85rem;
@@ -315,7 +315,7 @@ body.modal-open {
 .surprise-me-suggest-chip {
     appearance: none;
     padding: 0.25rem 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-mid, rgba(255, 255, 255, 0.78));
@@ -325,7 +325,7 @@ body.modal-open {
 }
 
 .surprise-me-suggest-chip:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-color);
 }
 
@@ -389,7 +389,7 @@ body.modal-open {
 .surprise-me-pull-item-label {
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--accent-primary, #6aa3ff);
+    color: var(--accent-color);
 }
 
 .surprise-me-pull-item-value {
@@ -468,7 +468,7 @@ body.modal-open {
 }
 
 .surprise-me-value {
-    color: var(--accent-primary, #6aa3ff);
+    color: var(--accent-color);
     font-style: normal;
     font-weight: 600;
     margin-left: 0.4em;
@@ -575,7 +575,7 @@ body.modal-open {
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.55rem 0.9rem;
 }
 
@@ -1098,7 +1098,7 @@ input[type="range"] {
     flex-wrap: wrap;
     padding: 0.18rem;
     border: 1px solid var(--border-color);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--input-bg);
 }
 
@@ -1401,14 +1401,14 @@ input[type="range"] {
 
 .chord-picker__root:hover,
 .chord-picker__quality:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-high, #fff);
 }
 
 .chord-picker__root.is-active,
 .chord-picker__quality.is-active {
-    background: var(--accent-primary, #6aa3ff);
-    border-color: var(--accent-primary, #6aa3ff);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
     color: var(--bg-base, #1a1a1f);
 }
 
@@ -1523,11 +1523,11 @@ input[type="range"] {
 }
 
 .section-actions-menu__btn--danger {
-    color: #d65b5b;
+    color: var(--error-color);
 }
 
 .section-actions-menu__btn--danger:hover {
-    background: color-mix(in srgb, #d65b5b, transparent 90%);
+    background: color-mix(in srgb, var(--error-color), transparent 90%);
 }
 
 /* Card-level drop-target indicator — a thin colored line at the top or bottom
@@ -1585,7 +1585,7 @@ input[type="range"] {
     align-items: center;
     min-height: 28px;
     padding: 0.1rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--accent-color), transparent 86%);
     border: 1px solid color-mix(in srgb, var(--accent-color), transparent 56%);
     color: var(--accent-color);
@@ -1725,7 +1725,7 @@ input[type="range"] {
     align-items: center;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.1rem 0.55rem;
     height: 34px;
 }
@@ -1752,7 +1752,7 @@ input[type="range"] {
     font-size: 0.78rem;
     width: auto;
     min-width: 92px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--input-bg);
     border: 1px solid var(--border-color);
 }
@@ -1979,7 +1979,7 @@ input[type="range"] {
     background: var(--accent-color, #4af);
     color: white;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.9rem 2.6rem;
     font-size: 1.15rem;
     font-weight: 600;

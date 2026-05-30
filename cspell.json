@@ -300,7 +300,17 @@
         "allpass",
         "allpasses",
         "treemap",
-        "brndn"
+        "brndn",
+        "Fraunces",
+        "fraunces",
+        "Hanken",
+        "hanken",
+        "Grotesk",
+        "grotesk",
+        "fontsource",
+        "Geist",
+        "woff",
+        "opsz"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

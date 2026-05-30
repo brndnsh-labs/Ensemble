@@ -31,6 +31,29 @@ body {
         border-color var(--anim-normal) var(--anim-ease);
 }
 
+/* Atmosphere — a lamp-lit brass glow from the top and a whisper of film grain,
+   so surfaces read as warm lit space rather than flat fills. Both layers are
+   fixed, behind everything, and never intercept pointer events. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-background);
+    pointer-events: none;
+    background: var(--app-glow);
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-background);
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+}
+
 #flashOverlay {
     position: fixed;
     inset: 0;
@@ -180,15 +203,27 @@ header {
 
 h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.6rem;
+    letter-spacing: 0.005em;
     display: inline-block;
     width: fit-content;
-    background: linear-gradient(45deg, var(--accent-color), var(--violet));
+    /* Brushed-brass sheen rather than a flat fill */
+    background: linear-gradient(168deg, var(--brass-light), var(--brass) 62%, var(--brass-light));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
     white-space: nowrap; /* Prevent title wrapping */
+}
+
+/* Display face for the headline tier + chart section names — the "engraved
+   lead sheet" voice. Small utility eyebrows (.workspace-kicker) stay grotesk. */
+h2,
+h3,
+.section-label {
+    font-family: var(--font-display);
 }
 
 .main-controls {
@@ -199,7 +234,7 @@ h1 {
 
 .primary-btn {
     background-color: var(--accent-color);
-    color: white;
+    color: var(--base03);
     border: none;
     padding: var(--space-2) var(--space-5);
     border-radius: var(--radius-md);
@@ -207,7 +242,7 @@ h1 {
     cursor: pointer;
     transition: all var(--anim-fast) var(--anim-ease);
     font-size: var(--font-base);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--glow-brass);
     min-width: 100px; /* Prevent width shifting between START/STOP */
     height: 42px; /* Fixed height to prevent vertical jitter */
     display: inline-flex;
@@ -227,7 +262,10 @@ h1 {
 
 .primary-btn.playing {
     background-color: var(--error-color);
-    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+    color: var(--base1);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--error-color), transparent 35%),
+        0 0 22px -6px var(--error-color);
 }
 
 .control-group {
@@ -301,10 +339,12 @@ button:focus-visible {
 
 .header-btn--primary {
     background: var(--accent-color);
-    color: white;
+    /* Dark ink on brass reads like an engraved key — higher contrast than white. */
+    color: var(--base03);
     border-color: var(--accent-color);
     font-weight: 600;
     padding-inline: var(--space-3);
+    box-shadow: var(--glow-brass);
 }
 
 .header-btn--primary:hover {
@@ -316,7 +356,7 @@ button:focus-visible {
     width: 32px;
     min-width: 32px;
     padding: 0;
-    font-size: 1rem;
+    font-size: 1.15rem;
 }
 
 @media (pointer: coarse) {

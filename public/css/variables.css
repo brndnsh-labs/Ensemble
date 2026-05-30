@@ -1,33 +1,52 @@
 :root {
     color-scheme: dark light;
 
-    --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* Type pairing — self-hosted faces declared in fonts.css.
+       Display = Fraunces (engraved lead-sheet feel), Body/UI = Hanken Grotesk,
+       Mono = Geist Mono. Fallbacks keep the app legible before fonts load. */
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-sans:
+        "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-mono:
-        "SFMono-Regular", "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Monaco, Consolas,
-        monospace;
+        "Geist Mono", "SFMono-Regular", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Monaco,
+        Consolas, monospace;
     --font-xs: 0.75rem;
     --font-sm: 0.875rem;
     --font-base: 1rem;
     --font-lg: 1.125rem;
-    --focus-ring-color: color-mix(in srgb, var(--accent-color), transparent 70%);
 
-    /* Solarized Dark (Default) */
-    --base03: #002b36;
-    --base02: #073642;
-    --base01: #586e75;
-    --base00: #657b83;
-    --base0: #839496;
-    --base1: #93a1a1;
-    --base2: #eee8d5;
-    --base3: #fdf6e3;
-    --yellow: #b58900;
-    --orange: #cb4b16;
-    --red: #dc322f;
-    --magenta: #d33682;
-    --violet: #6c71c4;
-    --blue: #268bd2;
-    --cyan: #2aa198;
-    --green: #859900;
+    /* ----------------------------------------------------------------------
+       After-Hours Studio palette.
+       Warm ink-black surfaces, a brass/amber accent, and the five instrument
+       hues retuned to sing on a warm background while keeping their identity
+       (chords=blue, bass=green, soloist=magenta, harmony=violet, drums=taupe).
+       The named hue vars below preserve their *role* from the old Solarized
+       set, so direct `var(--green)` etc. consumers shift coherently.
+       ---------------------------------------------------------------------- */
+
+    /* Warm neutral ramp (dark → light) */
+    --base03: #14110d; /* deepest warm ink — app background */
+    --base02: #1e1813; /* espresso — panels */
+    --base01: #5e5346; /* warm muted — hairlines, de-emphasized text */
+    --base00: #7d7060;
+    --base0: #a2937c; /* secondary text on dark */
+    --base1: #d8cbb2; /* primary text on dark — warm bone */
+    --base2: #ece1cf;
+    --base3: #f6efe1; /* warm paper — light-theme background */
+
+    /* Accent hues (warm-retuned; roles preserved from Solarized) */
+    --yellow: #d9a441; /* brass */
+    --orange: #e07a3c;
+    --red: #e0564f;
+    --magenta: #e0568f; /* soloist */
+    --violet: #8b86d6; /* harmony */
+    --blue: #4a9fd4; /* chords */
+    --cyan: #5fc9bd;
+    --green: #9ab33a; /* bass / success */
+
+    /* Brass — the signature accent */
+    --brass: #d9a441;
+    --brass-light: #f0c674; /* lit brass — hover/active */
 
     --bg-color: var(--base03);
     --panel-color: var(--base02);
@@ -35,33 +54,45 @@
     --text-primary: var(--text-color);
     --text-secondary: var(--base0);
     --text-muted: var(--base01);
-    --accent-color: var(--blue);
-    --accent-hover: var(--cyan);
+    --accent-color: var(--brass);
+    --accent-hover: var(--brass-light);
     --success-color: var(--green);
     --soloist-color: var(--magenta);
     --harmony-color: var(--violet);
     --smart-color: var(--violet);
     --error-color: var(--red);
 
-    /* RGB variants for transparency */
-    --yellow-rgb: 181, 137, 0;
-    --cyan-rgb: 42, 161, 152;
-    --magenta-rgb: 211, 54, 130;
-    --chords-color-rgb: 38, 139, 210; /* blue */
-    --bass-color-rgb: 133, 153, 0; /* green/success */
-    --soloist-color-rgb: 211, 54, 130; /* magenta */
-    --harmony-color-rgb: 108, 113, 196; /* violet */
-    --groove-color-rgb: 147, 161, 161; /* base1 */
+    /* Named instrument colors (UI + visualizer share these) */
+    --chords-color: var(--blue);
+    --bass-color: var(--green);
+    --groove-color: #b8a98a; /* warm taupe — drums */
 
-    --card-bg: #0a404e; /* Slightly lighter than base02 for contrast */
-    --card-bg-hover: var(--base01);
-    --border-color: rgba(147, 161, 161, 0.15);
+    /* RGB variants for transparency */
+    --yellow-rgb: 217, 164, 65;
+    --brass-rgb: 217, 164, 65;
+    --cyan-rgb: 95, 201, 189;
+    --magenta-rgb: 224, 86, 143;
+    --chords-color-rgb: 74, 159, 212; /* blue */
+    --bass-color-rgb: 154, 179, 58; /* green/success */
+    --soloist-color-rgb: 224, 86, 143; /* magenta */
+    --harmony-color-rgb: 139, 134, 214; /* violet */
+    --groove-color-rgb: 184, 169, 138; /* warm taupe */
+
+    --card-bg: #271f18; /* raised surface — one step above panel */
+    --card-bg-hover: #322820;
+    --border-color: rgba(217, 164, 65, 0.12); /* brass hairline */
     --border: var(--border-color);
-    --input-bg: rgba(0, 43, 54, 0.4);
+    --input-bg: rgba(8, 6, 4, 0.35); /* sunken warm well */
     --surface-sunken: var(--input-bg);
-    --select-bg: var(--base03);
-    --select-text: var(--base2);
+    --select-bg: var(--base02);
+    --select-text: var(--base1);
     --select-border: var(--base01);
+
+    /* Alpha scale — one source of truth for overlay/hairline opacities */
+    --alpha-hairline: 0.12;
+    --alpha-hover: 0.08;
+    --alpha-press: 0.16;
+    --alpha-scrim: 0.62; /* modal backdrop */
 
     /* Spacing */
     --space-1: 0.25rem;
@@ -76,18 +107,30 @@
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
+    --radius-pill: 999px;
 
-    /* Shadows */
-    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    /* Shadows — warm-tuned, layered for depth */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6);
+    --glow-brass:
+        0 0 0 1px rgba(var(--brass-rgb), 0.45), 0 0 22px -4px rgba(var(--brass-rgb), 0.55);
+
+    /* Focus ring (brass, derived from accent) */
+    --focus-ring-color: color-mix(in srgb, var(--accent-color), transparent 55%);
+    --focus-ring: 0 0 0 2px var(--focus-ring-color);
+
+    /* Atmosphere — lamp-lit top glow + film grain.
+       Consumed by layout.css on the app background. */
+    --app-glow: radial-gradient(125% 90% at 50% -12%, rgba(var(--brass-rgb), 0.1), transparent 58%);
+    --grain-opacity: 0.035;
 
     /* Sequencer Specific */
-    --step-bg: rgba(147, 161, 161, 0.15);
-    --step-bg-hover: rgba(147, 161, 161, 0.25);
+    --step-bg: rgba(216, 203, 178, 0.1);
+    --step-bg-hover: rgba(216, 203, 178, 0.18);
 
     /* Metronome */
-    --beat-active: var(--yellow);
+    --beat-active: var(--brass);
     --beat-inactive-odd: var(--base02);
     --beat-inactive-even: var(--base01);
     --beat-playing: var(--orange);
@@ -104,11 +147,17 @@
     --z-header: 90;
     --z-mobile-nav: 100;
     --z-floating: 500;
+    --z-popover: 1000;
     --z-overlay: 1000;
     --z-modal: 2000;
     --z-toast: 3000;
     --z-maximized: 10000;
     --z-maximized-header: 10001;
+
+    /* Responsive breakpoints — reference values for the media queries in
+       responsive.css (CSS @media cannot read custom properties, so these
+       document the scale rather than drive it):
+       xs 340 · sm 380 · mobile 540/600 · tablet 700/900 · desktop 1024/1100 */
 
     /* Animation Timing */
     --anim-fast: 0.15s;
@@ -120,42 +169,65 @@
 
 [data-theme="light"] {
     color-scheme: light;
+
+    /* Lead-sheet paper: deepen the hues so they hold contrast on cream. */
+    --yellow: #b07d1f;
+    --orange: #c25a1c;
+    --red: #c0352f;
+    --magenta: #b02468;
+    --violet: #4a3fb0;
+    --blue: #1f6f9e;
+    --cyan: #2a8f86;
+    --green: #5e7d12;
+    --brass: #b07d1f;
+    --brass-light: #946514;
+
     --bg-color: var(--base3);
     --panel-color: var(--base2);
     --text-color: var(--base02);
     --text-primary: var(--text-color);
     --text-secondary: var(--base01);
     --text-muted: var(--base00);
-    --accent-color: var(--blue);
-    --accent-hover: var(--cyan);
+    --accent-color: var(--brass);
+    --accent-hover: var(--brass-light);
     --success-color: var(--green);
     --soloist-color: var(--magenta);
     --harmony-color: var(--violet);
     --error-color: var(--red);
 
-    /* RGB variants for transparency (Light) */
-    --chords-color-rgb: 38, 139, 210; /* blue */
-    --bass-color-rgb: 133, 153, 0; /* green/success */
-    --soloist-color-rgb: 211, 54, 130; /* magenta */
-    --harmony-color-rgb: 108, 113, 196; /* violet */
-    --groove-color-rgb: 7, 54, 66; /* base02 */
+    --groove-color: #6b6157;
+
+    /* RGB variants for transparency (Light, deepened) */
+    --chords-color-rgb: 31, 111, 158; /* blue */
+    --bass-color-rgb: 94, 125, 18; /* green/success */
+    --soloist-color-rgb: 176, 36, 104; /* magenta */
+    --harmony-color-rgb: 74, 63, 176; /* violet */
+    --groove-color-rgb: 107, 97, 87; /* warm taupe */
+    --brass-rgb: 176, 125, 31;
 
     --card-bg: var(--base3);
     --card-bg-hover: var(--base2);
-    --border-color: rgba(7, 54, 66, 0.15);
+    --border-color: rgba(30, 24, 19, 0.12);
     --border: var(--border-color);
-    --input-bg: rgba(238, 232, 213, 0.5);
+    --input-bg: rgba(30, 24, 19, 0.05);
     --surface-sunken: var(--input-bg);
     --select-bg: var(--base3);
     --select-text: var(--base02);
     --select-border: var(--base1);
 
+    --app-glow: radial-gradient(
+        125% 90% at 50% -12%,
+        rgba(var(--brass-rgb), 0.08),
+        transparent 58%
+    );
+    --grain-opacity: 0.02;
+
     /* Sequencer Specific */
-    --step-bg: rgba(7, 54, 66, 0.1);
-    --step-bg-hover: rgba(7, 54, 66, 0.2);
+    --step-bg: rgba(30, 24, 19, 0.08);
+    --step-bg-hover: rgba(30, 24, 19, 0.16);
 
     /* Metronome */
-    --beat-active: var(--yellow);
+    --beat-active: var(--brass);
     --beat-inactive-odd: var(--base2);
     --beat-inactive-even: var(--base3);
 }

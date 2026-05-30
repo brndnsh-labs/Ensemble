@@ -14,15 +14,15 @@
     padding: 0.05rem 0.4rem;
     font-size: 0.65rem;
     line-height: 1.4;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--accent-color, dodgerblue), transparent 70%);
-    color: var(--accent-color, dodgerblue);
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--accent-color), transparent 70%);
+    color: var(--accent-color);
     font-style: italic;
     letter-spacing: 0.02em;
 }
 
 .power-btn.section-override {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, dodgerblue), transparent 60%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color), transparent 60%);
 }
 
 /* Horizontal strip — no header, genre selector, or mixer accordion */
