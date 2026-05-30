@@ -15,8 +15,45 @@
     gap: var(--space-4);
     padding: var(--space-2) var(--space-4);
     border-bottom: 1px solid var(--border-color);
-    background: var(--bg-color);
+    /* A faintly raised console rail rather than a flat strip. */
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panel-color), transparent 18%),
+        var(--bg-color)
+    );
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
     flex-wrap: wrap;
+}
+
+/* Orchestrated entrance: the surface rises into place — topbar, then chart,
+   then rail. Honours reduced-motion; the e2e harness disables animation
+   globally via [data-e2e-mode]. */
+@media (prefers-reduced-motion: no-preference) {
+    .chart-surface__topbar,
+    .chart-surface__chart,
+    .chart-surface__rail {
+        animation: chart-surface-rise var(--anim-slow) var(--anim-ease) both;
+    }
+
+    .chart-surface__chart {
+        animation-delay: 0.06s;
+    }
+
+    .chart-surface__rail {
+        animation-delay: 0.12s;
+    }
+}
+
+@keyframes chart-surface-rise {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 .chart-surface__zone {
@@ -292,7 +329,7 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.25rem 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--accent-color);
     color: white;
     font-size: 0.75rem;

@@ -25,11 +25,11 @@ test.describe('Theme Reproduction Bug', () => {
         // According to the bug report, we expect it to be 'light' but it will probably be 'auto' or 'dark'
         expect(dataTheme).toBe('light');
 
-        // 4. Verify background color matches Solarized Light (--base3: #fdf6e3)
+        // 4. Verify background color matches the light theme's warm paper (--base3: #f6efe1)
         const bgColor = await page.evaluate(() =>
             getComputedStyle(document.documentElement).getPropertyValue('--bg-color').trim(),
         );
-        // --base3 is #fdf6e3. Chromium might resolve var(--base3) to its hex value.
-        expect(bgColor.toLowerCase()).toBe('#fdf6e3');
+        // --base3 is #f6efe1. Chromium resolves var(--base3) to its hex value.
+        expect(bgColor.toLowerCase()).toBe('#f6efe1');
     });
 });

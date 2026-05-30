@@ -151,14 +151,14 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             style.getPropertyValue(prop).trim() || fallback;
 
         const themeCache: Record<string, string | string[]> = {
-            bgColor: resolve('--surface-sunken', isDark ? '#0f172a' : '#f8fafc'),
+            bgColor: resolve('--surface-sunken', isDark ? '#14110d' : '#f6efe1'),
             labelRailBg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(226, 232, 240, 0.92)',
             laneBg: isDark ? 'rgba(255, 255, 255, 0.025)' : 'rgba(255, 255, 255, 0.82)',
             laneAltBg: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(226, 232, 240, 0.72)',
             keyWhite: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ffffff',
             keyBlack: isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(148, 163, 184, 0.42)',
             keySeparator: resolve('--border-color', isDark ? '#334155' : '#e2e8f0'),
-            gridColorMeasure: isDark ? 'rgba(56, 189, 248, 0.4)' : 'rgba(2, 132, 199, 0.3)',
+            gridColorMeasure: isDark ? 'rgba(217, 164, 65, 0.34)' : 'rgba(176, 125, 31, 0.3)',
             gridColorBeat: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             playheadColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
             outlineColor: isDark ? 'rgba(0, 0, 0, 0.85)' : '#ffffff',
@@ -170,14 +170,14 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             laneGuideColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
             separatorColor: resolve('--border-color', isDark ? '#334155' : '#cbd5e1'),
             chordMarkerColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.14)',
-            fillGradientTop: 'rgba(211, 54, 130, 0)',
-            fillGradientMid: isDark ? 'rgba(211, 54, 130, 0.18)' : 'rgba(211, 54, 130, 0.12)',
-            fillGradientBottom: 'rgba(211, 54, 130, 0)',
+            fillGradientTop: 'rgba(224, 86, 143, 0)',
+            fillGradientMid: isDark ? 'rgba(224, 86, 143, 0.18)' : 'rgba(176, 36, 104, 0.12)',
+            fillGradientBottom: 'rgba(224, 86, 143, 0)',
             chordColors: [
-                resolve('--accent-color', '#268bd2'),
-                resolve('--green', '#859900'),
-                resolve('--orange', '#cb4b16'),
-                resolve('--magenta', '#d33682'),
+                resolve('--chords-color', '#4a9fd4'),
+                resolve('--bass-color', '#9ab33a'),
+                resolve('--orange', '#e07a3c'),
+                resolve('--soloist-color', '#e0568f'),
             ],
         };
         viz.setTheme(themeCache);

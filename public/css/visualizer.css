@@ -73,7 +73,7 @@
 }
 
 .swatch-root {
-    background: var(--accent-color);
+    background: var(--chords-color);
 }
 .swatch-third {
     background: var(--green);
@@ -82,19 +82,19 @@
     background: var(--orange);
 }
 .swatch-seventh {
-    background: var(--violet);
+    background: var(--magenta);
 }
 .swatch-bass {
     background: var(--success-color);
 }
 .swatch-chords {
-    background: var(--accent-color);
+    background: var(--chords-color);
 }
 .swatch-harmony {
     background: var(--harmony-color);
 }
 .swatch-drums {
-    background: var(--yellow);
+    background: var(--groove-color);
 }
 .swatch-soloist {
     background: var(--soloist-color);

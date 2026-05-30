@@ -149,10 +149,10 @@ export class VisualizerEngine {
     setTheme(themeCache: Record<string, unknown>): void {
         this.themeCache = themeCache;
         this.categoryColors = (themeCache.chordColors as string[]) || [
-            '#268bd2',
-            '#859900',
-            '#cb4b16',
-            '#d33682',
+            '#4a9fd4',
+            '#9ab33a',
+            '#e07a3c',
+            '#e0568f',
         ];
         this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
             (categoryIndex) => this.categoryColors[categoryIndex],
@@ -241,11 +241,11 @@ export class VisualizerEngine {
         const graphX = this.labelRailWidth;
         const graphW = w - graphX;
 
-        const bgColor = (this.themeCache.bgColor as string) || '#0f172a';
+        const bgColor = (this.themeCache.bgColor as string) || '#14110d';
         const labelRailBg =
             (this.themeCache.labelRailBg as string) ||
             (this.themeCache.keyBlack as string) ||
-            '#111827';
+            '#1e1813';
         const laneBg = (this.themeCache.laneBg as string) || 'rgba(255, 255, 255, 0.025)';
         const laneAltBg = (this.themeCache.laneAltBg as string) || 'rgba(255, 255, 255, 0.05)';
         const laneGuideColor =
@@ -406,7 +406,7 @@ export class VisualizerEngine {
     getEventColor(name: string, event: unknown): string {
         const track = this.tracks[name];
         const baseColor = track?.resolvedColor || track?.color || '#ffffff';
-        const chordColors = this.categoryColors || ['#268bd2', '#859900', '#cb4b16', '#d33682'];
+        const chordColors = this.categoryColors || ['#4a9fd4', '#9ab33a', '#e07a3c', '#e0568f'];
         const ev = event as { noteType?: string };
 
         if (name === MODULES.SOLOIST) {

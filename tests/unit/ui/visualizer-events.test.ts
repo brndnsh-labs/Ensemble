@@ -12,8 +12,11 @@ import {
 describe('visualizer event contract', () => {
     it('uses the Studio-aligned track order and color tokens', () => {
         expect(VISUALIZER_TRACK_ORDER).toEqual(['drums', 'bass', 'chords', 'harmony', 'soloist']);
-        expect(VISUALIZER_TRACKS.drums.cssVar).toBe('--yellow');
-        expect(VISUALIZER_TRACKS.chords.cssVar).toBe('--accent-color');
+        // Each lane binds to its own instrument-color token. Notably chords use
+        // --chords-color (not --accent-color): the app accent is brass, but the
+        // chords lane keeps its blue identity. Drums use --groove-color (taupe).
+        expect(VISUALIZER_TRACKS.drums.cssVar).toBe('--groove-color');
+        expect(VISUALIZER_TRACKS.chords.cssVar).toBe('--chords-color');
         expect(VISUALIZER_TRACKS.soloist.cssVar).toBe('--soloist-color');
         expect(VISUALIZER_TRACKS.bass.midiMin).toBe(23);
         expect(VISUALIZER_TRACKS.soloist.midiMax).toBe(96);

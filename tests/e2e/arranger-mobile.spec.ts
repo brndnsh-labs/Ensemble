@@ -32,7 +32,10 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
         await gotoHydrated(page);
     });
 
-    test('Donna Lee renders cleanly in the mobile arranger viewport', async ({ page }) => {
+    test('Donna Lee renders cleanly in the mobile arranger viewport', async ({
+        page,
+        browserName,
+    }) => {
         await page.setViewportSize({ width: 360, height: 640 });
         await openLibraryFromArranger(page);
 
@@ -78,12 +81,21 @@ test.describe('Arranger Mobile Scaling @mobile @ipad', () => {
                 scrollTop: el.scrollTop,
                 pageScroll: window.scrollY,
             }));
-            const box = await visualizer.boundingBox();
+            if (browserName === 'webkit') {
+                // Mobile WebKit doesn't support Playwright's mouse.wheel, so
+                // drive the visualizer's internal scroll programmatically. We
+                // still assert below that it scrolls without moving the page.
+                await visualizer.evaluate((el) => {
+                    el.scrollBy(0, el.clientHeight * 1.25);
+                });
+            } else {
+                const box = await visualizer.boundingBox();
 
-            expect(box).not.toBeNull();
+                expect(box).not.toBeNull();
 
-            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-            await page.mouse.wheel(0, box.height * 1.25);
+                await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                await page.mouse.wheel(0, box.height * 1.25);
+            }
 
             await expect
                 .poll(async () => visualizer.evaluate((el) => el.scrollTop))
