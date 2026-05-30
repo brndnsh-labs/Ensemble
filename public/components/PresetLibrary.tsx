@@ -10,6 +10,7 @@ import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { decompressSections, generateId, transposeKeyName } from '../utils.js';
+import { Icon } from './Icon.jsx';
 
 const USER_PRESETS_STORAGE_KEY = 'ensemble_userPresets';
 const FAVORITES_STORAGE_KEY = 'ensemble_presetLibraryFavorites';
@@ -214,7 +215,7 @@ function PresetChip({ entry, isActive, onSelect, onToggleFavorite, onDelete }: P
                 title={entry.isFavorite ? 'Unpin' : 'Pin to favorites'}
                 onClick={() => onToggleFavorite(entry.id)}
             >
-                {entry.isFavorite ? '★' : '☆'}
+                <Icon name={entry.isFavorite ? 'star' : 'star-outline'} />
             </button>
             {entry.source === 'user' && onDelete && (
                 <button

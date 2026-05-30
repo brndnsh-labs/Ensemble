@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
+import { Icon } from './Icon.jsx';
 import { InstrumentRail, StudioSurface } from './InstrumentRail.jsx';
 
 interface MobileActionBarProps {
@@ -22,7 +23,7 @@ export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) 
                     onClick={() => setIsMixOpen(true)}
                 >
                     <span class="mobile-action-bar__icon" aria-hidden="true">
-                        🎚️
+                        <Icon name="mixer" />
                     </span>
                     <span class="mobile-action-bar__label">Mix</span>
                 </button>
@@ -33,7 +34,7 @@ export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) 
                     onClick={() => dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'share', open: true })}
                 >
                     <span class="mobile-action-bar__icon" aria-hidden="true">
-                        📤
+                        <Icon name="upload" />
                     </span>
                     <span class="mobile-action-bar__label">Share</span>
                 </button>
@@ -46,7 +47,7 @@ export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) 
                     onClick={onOpenViz}
                 >
                     <span class="mobile-action-bar__icon" aria-hidden="true">
-                        🌈
+                        <Icon name="visualizer" />
                     </span>
                     <span class="mobile-action-bar__label">Visuals</span>
                 </button>

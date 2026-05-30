@@ -7,6 +7,7 @@ import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
+import { Icon } from './Icon.jsx';
 import { SymbolMenu } from './SymbolMenu.jsx';
 
 /**
@@ -401,7 +402,8 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             );
                                         }}
                                     >
-                                        🔗 {section.seamless ? 'Unlink' : 'Link to previous'}
+                                        <Icon name="link" />{' '}
+                                        {section.seamless ? 'Unlink' : 'Link to previous'}
                                     </button>
                                     <button
                                         class="section-actions-menu__btn"
@@ -410,7 +412,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             onSectionDuplicate(section.id);
                                         }}
                                     >
-                                        ⎘ Duplicate
+                                        <Icon name="duplicate" /> Duplicate
                                     </button>
                                     <button
                                         class="section-actions-menu__btn section-actions-menu__btn--danger"
@@ -419,7 +421,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             onSectionDelete(section.id);
                                         }}
                                     >
-                                        🗑️ Delete
+                                        <Icon name="trash" /> Delete
                                     </button>
                                 </div>
                             )}

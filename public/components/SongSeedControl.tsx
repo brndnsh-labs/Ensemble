@@ -2,6 +2,7 @@ import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
+import { Icon } from './Icon.jsx';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 
 function rollHexSeed(): string {
@@ -70,7 +71,7 @@ export function SongSeedControl() {
                             aria-label="Generate Random Seed"
                             onClick={rollSeed}
                         >
-                            🎲
+                            <Icon name="dice" />
                         </button>
                     </div>
                 </div>

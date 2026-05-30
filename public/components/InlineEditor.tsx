@@ -11,6 +11,7 @@ import { arranger, dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { generateId } from '../utils.js';
 import { Arranger } from './Arranger.jsx';
+import { Icon } from './Icon.jsx';
 
 /**
  * Inline section-card editor mounted directly on `ChartSurface` when the
@@ -102,7 +103,9 @@ export function InlineEditor() {
                     title="Add Section"
                     onClick={handleAddSection}
                 >
-                    <span>➕ Add Section</span>
+                    <span>
+                        <Icon name="plus" /> Add Section
+                    </span>
                 </button>
                 <div class="arranger-action-container editor-action-container">
                     {isMenuOpen && (
@@ -123,7 +126,7 @@ export function InlineEditor() {
                     >
                         <span class="editor-action-trigger-label">Tools</span>
                         <span class="editor-action-trigger-icon" aria-hidden="true">
-                            ⋮
+                            <Icon name="more" />
                         </span>
                     </button>
                     <div
@@ -131,7 +134,7 @@ export function InlineEditor() {
                     >
                         <div class="menu-section-header">Structure</div>
                         <button title="Library" onClick={handleSurpriseMe}>
-                            📚 <span>Library</span>
+                            <Icon name="book" /> <span>Library</span>
                         </button>
                         {showConfirmClear ? (
                             <div role="alert" aria-live="polite" class="editor-clear-confirm">
@@ -155,21 +158,21 @@ export function InlineEditor() {
                             </div>
                         ) : (
                             <button title="Clear Progression" onClick={handleClear}>
-                                🗑️ <span>Clear All</span>
+                                <Icon name="trash" /> <span>Clear All</span>
                             </button>
                         )}
                         <div class="menu-divider" />
                         <div class="menu-section-header">Melody & Intelligence</div>
                         <button title="Mutate Progression" onClick={handleMutate}>
-                            ✨ <span>Mutate</span>
+                            <Icon name="sparkle" /> <span>Mutate</span>
                         </button>
                         <div class="menu-divider" />
                         <div class="menu-section-header">Project</div>
                         <button title="Undo Last Change" onClick={handleUndo}>
-                            ↩️ <span>Undo</span>
+                            <Icon name="undo" /> <span>Undo</span>
                         </button>
                         <button title="Save to Library" onClick={handleSave}>
-                            💾 <span>Save</span>
+                            <Icon name="save" /> <span>Save</span>
                         </button>
                     </div>
                 </div>

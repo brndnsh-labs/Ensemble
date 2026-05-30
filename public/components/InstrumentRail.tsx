@@ -10,6 +10,7 @@ import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import type { StyleObject } from '../ui-types.js';
 import { syncWorker } from '../worker-client.js';
+import { Icon, type IconName } from './Icon.jsx';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
@@ -23,7 +24,7 @@ interface StudioInstrumentConfig {
     id: string;
     module: StudioInstrumentModule;
     label: string;
-    icon: string;
+    icon: IconName;
     summary: string;
     accent: string;
 }
@@ -33,7 +34,7 @@ const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
         id: 'panel-grooves',
         module: 'groove',
         label: 'Drums',
-        icon: '🥁',
+        icon: 'drums',
         summary: 'Pocket and dynamics',
         accent: 'groove',
     },
@@ -41,7 +42,7 @@ const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
         id: 'panel-bass',
         module: 'bass',
         label: 'Bass',
-        icon: '🎸',
+        icon: 'bass',
         summary: 'Roots and motion',
         accent: 'bass',
     },
@@ -49,7 +50,7 @@ const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
         id: 'panel-chords',
         module: 'chords',
         label: 'Chords',
-        icon: '🎹',
+        icon: 'chords',
         summary: 'Comping and voicing',
         accent: 'chords',
     },
@@ -57,7 +58,7 @@ const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
         id: 'panel-harmonies',
         module: 'harmony',
         label: 'Harmony',
-        icon: '🎷',
+        icon: 'harmony',
         summary: 'Pads and color',
         accent: 'harmony',
     },
@@ -65,7 +66,7 @@ const STUDIO_INSTRUMENTS: StudioInstrumentConfig[] = [
         id: 'panel-soloist',
         module: 'soloist',
         label: 'Soloist',
-        icon: '🎺',
+        icon: 'soloist',
         summary: 'Lead phrasing',
         accent: 'soloist',
     },
@@ -337,7 +338,7 @@ function StudioBandFeelChooser({
                                             class="workspace-studio-genre-option-mark"
                                             aria-hidden="true"
                                         >
-                                            ✓
+                                            <Icon name="check" />
                                         </span>
                                     )}
                                 </button>
@@ -428,7 +429,7 @@ function StudioMixRow({
         >
             <div class="workspace-studio-mix-row-main">
                 <span class="workspace-studio-mix-row-icon" aria-hidden="true">
-                    {instrument.icon}
+                    <Icon name={instrument.icon} />
                 </span>
                 <div class="workspace-studio-mix-row-copy">
                     <h3>{instrument.label}</h3>
@@ -455,7 +456,7 @@ function StudioMixRow({
                         aria-expanded={isOpen}
                         onClick={onToggleSettings}
                     >
-                        ⚙
+                        <Icon name="gear" />
                     </button>
                 )}
                 <button
@@ -465,7 +466,7 @@ function StudioMixRow({
                     aria-pressed={enabled}
                     onClick={() => togglePower(instrument.module)}
                 >
-                    ⏻
+                    <Icon name="power" />
                 </button>
             </div>
         </div>
@@ -492,7 +493,7 @@ function StudioMixerAccordion({ activeCount }: StudioMixerAccordionProps) {
                     {activeCount}/{STUDIO_INSTRUMENTS.length} on
                 </span>
                 <span class="workspace-studio-mixer-accordion-caret" aria-hidden="true">
-                    ▾
+                    <Icon name="caret" />
                 </span>
             </button>
             {isOpen && (
@@ -502,7 +503,7 @@ function StudioMixerAccordion({ activeCount }: StudioMixerAccordionProps) {
                             <InstrumentMixerStrip
                                 key={instrument.module}
                                 accent={instrument.accent}
-                                icon={instrument.icon}
+                                iconName={instrument.icon}
                                 label={instrument.label}
                                 module={instrument.module}
                             />

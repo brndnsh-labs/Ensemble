@@ -20,6 +20,7 @@ import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { generateId } from '../utils.js';
+import { Icon } from './Icon.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { ButtonGroup } from './UIControls.jsx';
 
@@ -89,7 +90,7 @@ function showRollToast(message: string): void {
         message,
         actions: [
             {
-                label: '🎲 Reroll',
+                label: 'Reroll',
                 onClick: () => {
                     if (!lastRollOptions) {
                         return;
@@ -97,7 +98,7 @@ function showRollToast(message: string): void {
                     try {
                         const next = generateSong(lastRollOptions);
                         applyRoll(next, lastRollApplyMode, !!lastRollOptions.isMinor);
-                        showRollToast('🎲 Rerolled');
+                        showRollToast('Rerolled');
                     } catch (err) {
                         console.error('Reroll failed:', err);
                         showToast('Reroll failed. Check console.');
@@ -105,7 +106,7 @@ function showRollToast(message: string): void {
                 },
             },
             {
-                label: '↶ Undo',
+                label: 'Undo',
                 onClick: () => undo(refreshArrangerUI),
             },
         ],
@@ -196,8 +197,8 @@ export function SurpriseMe() {
                 () =>
                     showRollToast(
                         applyMode === 'append'
-                            ? '🎲 Appended a new arrangement'
-                            : '🎲 Rolled a new arrangement',
+                            ? 'Appended a new arrangement'
+                            : 'Rolled a new arrangement',
                     ),
                 50,
             );
@@ -227,7 +228,7 @@ export function SurpriseMe() {
             });
             clearChordPresetHighlight();
             refreshArrangerUI();
-            setTimeout(() => showToast(`✨ Loaded "${template.name}"`), 50);
+            setTimeout(() => showToast(`Loaded "${template.name}"`), 50);
             close();
         } catch (e) {
             console.error('SurpriseMe.applyTemplate failed:', e);
@@ -370,7 +371,9 @@ export function SurpriseMe() {
                 onClick={(e: MouseEvent) => e.stopPropagation()}
             >
                 <div class="modal-header-shared">
-                    <h2 id="surprise-me-title">📚 Library</h2>
+                    <h2 id="surprise-me-title">
+                        <Icon name="book" /> Library
+                    </h2>
                     <button type="button" class="close-btn" aria-label="Close" onClick={close}>
                         &times;
                     </button>
@@ -379,9 +382,9 @@ export function SurpriseMe() {
                     <ButtonGroup
                         className="surprise-me-mode-group"
                         options={[
-                            { label: '🎵 Library', value: 'library' },
-                            { label: '📚 Templates', value: 'templates' },
-                            { label: '🎲 Roll', value: 'roll' },
+                            { label: 'Library', value: 'library' },
+                            { label: 'Templates', value: 'templates' },
+                            { label: 'Roll', value: 'roll' },
                         ]}
                         value={mode}
                         onChange={(v) => setMode(v as Mode)}
@@ -437,7 +440,7 @@ export function SurpriseMe() {
                                 class="primary-btn surprise-me-dice"
                                 onClick={rollDice}
                             >
-                                🎲 Surprise Me
+                                <Icon name="dice" /> Surprise Me
                             </button>
                             <div class="surprise-me-apply">
                                 <span class="surprise-me-apply-label">Apply to chart:</span>
@@ -519,7 +522,7 @@ export function SurpriseMe() {
                                             aria-label="Edit seed"
                                             onClick={startEditingSeed}
                                         >
-                                            ✏️
+                                            <Icon name="edit" />
                                         </button>
                                         <button
                                             type="button"
@@ -527,7 +530,7 @@ export function SurpriseMe() {
                                             aria-label="Clear seed"
                                             onClick={clearSeed}
                                         >
-                                            ✕
+                                            <Icon name="close" />
                                         </button>
                                     </div>
                                 ) : (
@@ -536,11 +539,13 @@ export function SurpriseMe() {
                                         class="surprise-me-seed-add"
                                         onClick={() => setSeedEditing(true)}
                                     >
-                                        ＋ Add chords…
+                                        <Icon name="plus" /> Add chords…
                                     </button>
                                 )}
                                 <div class="surprise-me-seed-suggest">
-                                    <span class="surprise-me-suggest-label">💡 Try:</span>
+                                    <span class="surprise-me-suggest-label">
+                                        <Icon name="lightbulb" /> Try:
+                                    </span>
                                     {SUGGEST_CHIPS.map((s) => (
                                         <button
                                             key={s.label}
@@ -560,7 +565,7 @@ export function SurpriseMe() {
                                             aria-expanded={pullPickerOpen}
                                             onClick={() => setPullPickerOpen((v) => !v)}
                                         >
-                                            📋 Pull from chart{' '}
+                                            <Icon name="copy" /> Pull from chart{' '}
                                             <span class="surprise-me-pull-count">
                                                 ({sections.length})
                                             </span>{' '}
@@ -643,7 +648,7 @@ export function SurpriseMe() {
                             </label>
 
                             <button type="button" class="surprise-me-reset" onClick={resetAnswers}>
-                                ↺ Reset answers
+                                <Icon name="refresh" /> Reset answers
                             </button>
                         </div>
                     )}

@@ -12,6 +12,7 @@ import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { secondsPerStepFor } from '../utils.js';
+import { Icon } from './Icon.jsx';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
@@ -603,14 +604,14 @@ export function Settings() {
                                     });
                                 }}
                             >
-                                <span>📤</span> Share & Export
+                                <Icon name="upload" /> Share & Export
                             </button>
                             <button
                                 id="installAppBtn"
                                 class="secondary-btn flex-row settings-install-btn"
                                 onClick={handleInstall}
                             >
-                                <span>📲</span> Install App
+                                <Icon name="install" /> Install App
                             </button>
                             {showConfirmReset ? (
                                 <div
@@ -661,7 +662,7 @@ export function Settings() {
                                         }, 50);
                                     }}
                                 >
-                                    <span>🗑️</span> Reset All
+                                    <Icon name="trash" /> Reset All
                                 </button>
                             )}
                             <button
@@ -669,7 +670,7 @@ export function Settings() {
                                 class="secondary-btn flex-row settings-action-center"
                                 onClick={() => window.location.reload()}
                             >
-                                <span>🔄</span> Force Refresh
+                                <Icon name="refresh" /> Force Refresh
                             </button>
                         </div>
                     </SettingGroup>
