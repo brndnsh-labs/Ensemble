@@ -14,16 +14,16 @@ test.describe('Theme Reproduction Bug', () => {
         await page.click('#settingsBtn');
         await page.waitForSelector('#settingsOverlay.active');
 
-        // 2. Set theme to 'auto' (it might already be auto by default, but let's be explicit)
-        await page.selectOption('#themeSelect', 'auto');
+        // 2. Set theme to 'auto' via the Appearance tab's visual theme picker
+        await page.getByRole('tab', { name: 'Appearance' }).click();
+        await page.getByRole('radio', { name: 'Auto' }).click();
 
-        // 3. Verify data-theme attribute
-        // Based on the current bug report, it likely stays 'auto' or 'dark' instead of 'light'
+        // 3. Verify data-theme attribute — 'auto' under a light system resolves
+        //    to the 'lead-sheet' (warm paper) theme.
         const dataTheme = await page.getAttribute('html', 'data-theme');
         console.log('Current data-theme:', dataTheme);
 
-        // According to the bug report, we expect it to be 'light' but it will probably be 'auto' or 'dark'
-        expect(dataTheme).toBe('light');
+        expect(dataTheme).toBe('lead-sheet');
 
         // 4. Verify background color matches the light theme's warm paper (--base3: #f6efe1)
         const bgColor = await page.evaluate(() =>

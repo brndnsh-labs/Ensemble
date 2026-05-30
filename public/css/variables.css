@@ -67,6 +67,21 @@
     --bass-color: var(--green);
     --groove-color: #b8a98a; /* warm taupe — drums */
 
+    /* ----------------------------------------------------------------------
+       Chord-quality colours — chart-symbol tint, keyed to harmonic character
+       and gated by the "colour chords by quality" toggle. Major stays the
+       neutral text colour (calm/resolved) so only the colourful qualities pop.
+       These are a SEPARATE axis from the chords *instrument* colour (blue):
+       this is the symbol on the chart, that is the lane/rail.
+       ---------------------------------------------------------------------- */
+    --chord-major: var(--text-color); /* calm bone — resolved */
+    --chord-dominant: var(--brass); /* brass — tension wanting resolution */
+    --chord-minor: #6db3d8; /* cool sky blue */
+    --chord-dim: #ea6a62; /* crimson — maximum tension */
+    --chord-halfdim: #9a93e6; /* blue-violet — between minor and dim */
+    --chord-aug: #d39be0; /* orchid — augmented/strange */
+    --chord-sus: #6fc2a4; /* open teal-green — unresolved */
+
     /* RGB variants for transparency */
     --brass-rgb: 217, 164, 65;
     --cyan-rgb: 95, 201, 189;
@@ -159,7 +174,7 @@
     --anim-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-[data-theme="light"] {
+[data-theme="lead-sheet"] {
     color-scheme: light;
 
     /* Lead-sheet paper: deepen the hues so they hold contrast on cream. */
@@ -188,6 +203,15 @@
     --error-color: var(--red);
 
     --groove-color: #6b6157;
+
+    /* Chord-quality colours deepened for ink-on-cream legibility */
+    --chord-major: var(--text-color);
+    --chord-dominant: #a9711a;
+    --chord-minor: #1f6f9e;
+    --chord-dim: #b8332c;
+    --chord-halfdim: #5a4fb0;
+    --chord-aug: #9a3fb0;
+    --chord-sus: #2f8a6a;
 
     /* RGB variants for transparency (Light, deepened) */
     --chords-color-rgb: 31, 111, 158; /* blue */
@@ -222,4 +246,121 @@
     --beat-active: var(--brass);
     --beat-inactive-odd: var(--base2);
     --beat-inactive-even: var(--base3);
+}
+
+/* ==========================================================================
+   Midnight — a cool blue-black dark theme (homage to the old Solarized feel),
+   cyan accent instead of brass. Only the base ramp + hues + accent change;
+   the semantic tokens (--bg-color: var(--base03), etc.) follow automatically.
+   ========================================================================== */
+[data-theme="midnight"] {
+    color-scheme: dark;
+
+    /* Cool neutral ramp */
+    --base03: #0c141d; /* deep blue-black bg */
+    --base02: #14202c; /* panel */
+    --base01: #3a4a57; /* hairlines / muted */
+    --base00: #5a6c79;
+    --base0: #8499a6; /* secondary text */
+    --base1: #cdd9e2; /* primary text — cool light */
+    --base2: #dbe6ee;
+
+    /* Cool-bright hues; accent is cyan, not brass */
+    --yellow: #46b4d6;
+    --orange: #e8924a;
+    --red: #ec5b54;
+    --magenta: #e069a4;
+    --violet: #9a8ff0;
+    --blue: #5ab0e8;
+    --cyan: #46b4d6;
+    --green: #6fc06a;
+    --brass: #46b4d6;
+    --brass-light: #74d2ee;
+    --brass-rgb: 70, 180, 214;
+
+    --groove-color: #8b96a3; /* cool gray drums */
+
+    --chords-color-rgb: 90, 176, 232;
+    --bass-color-rgb: 111, 192, 106;
+    --soloist-color-rgb: 224, 105, 164;
+    --harmony-color-rgb: 154, 143, 240;
+    --groove-color-rgb: 139, 150, 163;
+
+    /* Keep dominant warm so the tension cue reads even against a cool accent */
+    --chord-dominant: #e0a94a;
+
+    --card-bg: #1b2a39;
+    --card-bg-hover: #243443;
+    --border-color: rgba(120, 170, 210, 0.14);
+    --input-bg: rgba(0, 0, 0, 0.3);
+    --select-bg: var(--base02);
+    --select-text: var(--base1);
+    --select-border: var(--base01);
+
+    --step-bg: rgba(205, 217, 226, 0.08);
+    --step-bg-hover: rgba(205, 217, 226, 0.16);
+    --beat-inactive-odd: var(--base02);
+    --beat-inactive-even: var(--base01);
+}
+
+/* ==========================================================================
+   High Contrast — accessibility theme. Pure-black ground, white text, bright
+   saturated hues, strong borders; grain/glow stripped for clarity. Also picks
+   up automatically when the OS requests more contrast (see prefers-contrast).
+   ========================================================================== */
+[data-theme="high-contrast"] {
+    color-scheme: dark;
+
+    --base03: #000000;
+    --base02: #121212;
+    --base01: #6a6a6a;
+    --base00: #8a8a8a;
+    --base0: #c8c8c8;
+    --base1: #ffffff;
+    --base2: #f0f0f0;
+
+    --yellow: #ffd24a;
+    --orange: #ff9a3c;
+    --red: #ff5b52;
+    --magenta: #ff6fb0;
+    --violet: #c2a8ff;
+    --blue: #5cc2ff;
+    --cyan: #4fe0d4;
+    --green: #86e23f;
+    --brass: #ffd24a;
+    --brass-light: #ffe28a;
+    --brass-rgb: 255, 210, 74;
+
+    --groove-color: #d6d6d6;
+
+    --chords-color-rgb: 92, 194, 255;
+    --bass-color-rgb: 134, 226, 63;
+    --soloist-color-rgb: 255, 111, 176;
+    --harmony-color-rgb: 194, 168, 255;
+    --groove-color-rgb: 214, 214, 214;
+
+    /* Bright, maximally distinct quality tints */
+    --chord-dominant: #ffd24a;
+    --chord-minor: #5cc2ff;
+    --chord-dim: #ff6b62;
+    --chord-halfdim: #b0a8ff;
+    --chord-aug: #e29bff;
+    --chord-sus: #5fe0b0;
+
+    --card-bg: #1c1c1c;
+    --card-bg-hover: #262626;
+    --border-color: rgba(255, 255, 255, 0.32); /* strong hairlines */
+    --input-bg: rgba(255, 255, 255, 0.06);
+    --select-bg: #121212;
+    --select-text: #ffffff;
+    --select-border: #8a8a8a;
+
+    --focus-ring-color: var(--brass-light);
+    --app-glow: none; /* no atmosphere — maximise legibility */
+    --grain-opacity: 0;
+
+    --step-bg: rgba(255, 255, 255, 0.12);
+    --step-bg-hover: rgba(255, 255, 255, 0.22);
+    --beat-inactive-odd: #2a2a2a;
+    --beat-inactive-even: #3a3a3a;
 }

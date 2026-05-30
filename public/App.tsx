@@ -19,10 +19,28 @@ export function App({ getVisualTime }: AppProps) {
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
+        // Only 'lead-sheet' is a light theme; everything else is dark-ground.
+        const LIGHT_THEMES = new Set(['lead-sheet']);
+
         const updateTheme = () => {
-            const isDark = theme === 'dark' || (theme === 'auto' && mediaQuery.matches);
-            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-            document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            // Resolve the stored preference to a concrete [data-theme] key.
+            // 'auto' follows the OS; 'dark'/'light' are legacy aliases kept so
+            // older saved sessions and share URLs keep working.
+            let resolved: string;
+            if (theme === 'auto') {
+                resolved = mediaQuery.matches ? 'after-hours' : 'lead-sheet';
+            } else if (theme === 'dark') {
+                resolved = 'after-hours';
+            } else if (theme === 'light') {
+                resolved = 'lead-sheet';
+            } else {
+                resolved = theme;
+            }
+
+            document.documentElement.setAttribute('data-theme', resolved);
+            document.documentElement.style.colorScheme = LIGHT_THEMES.has(resolved)
+                ? 'light'
+                : 'dark';
         };
 
         updateTheme();
