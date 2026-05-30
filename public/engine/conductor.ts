@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../form-analysis.js';
 import { debounceSaveState, saveCurrentState } from '../persistence.js';
 import type { EnsembleState } from '../types.js';
@@ -5,7 +6,9 @@ import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
-import { generateProceduralFill } from './fills.js';
+import { generatePhrasePickup, generateProceduralFill } from './fills.js';
+import { getPhraseSeed } from './grooves/utils.js';
+import { stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
 import { effectiveTargetIntensity } from './section-overrides.js';
 
@@ -15,6 +18,27 @@ import { effectiveTargetIntensity } from './section-overrides.js';
  * percussive styles want the groove to stay articulate.
  */
 const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic', 'Minimal']);
+
+/**
+ * Genres whose interior-phrase "breathing" is NOT a driving snare lead-in, so
+ * the within-section phrase pickup (`checkSectionTransition`) stays off for
+ * them. These are the brush / sidestick / clave / sparse-by-design feels:
+ * a jazz drummer breathes on the ride and comping, a reggae One Drop and a
+ * bossa live on the sidestick, and Minimal is deliberately spare — a snare
+ * 16th flurry into the downbeat reads as an out-of-idiom intrusion in all of
+ * them. Everything else (Rock/Funk/Disco/Country/Blues/Metal/Shred/Hip Hop/
+ * Neo-Soul/Ska) is a snare-backbeat genre where the lead-in is idiomatic.
+ * Mirrors the sparse-hat grouping in `groove-engine.ts`, minus Country/Blues
+ * (whose train-beat/shuffle phrasing DOES want the snare pickup).
+ */
+const PICKUP_SUPPRESSED_GENRES = new Set([
+    'Jazz',
+    'Bossa Nova',
+    'Latin',
+    'Reggae',
+    'Acoustic',
+    'Minimal',
+]);
 
 type Dispatch = (action: any, payload?: any) => void;
 
@@ -659,6 +683,88 @@ export function checkSectionTransition(
                 } else if (!groove.creativity && nextSection) {
                     // Reset or force to Standard if creativity is toggled off mid-song
                     dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed: 0.5 });
+                }
+            }
+        }
+
+        // --- THE WITHIN-SECTION PHRASE PICKUP ---
+        // A real drummer breathes every few bars even when the form isn't
+        // changing: a brief snare lead-in on the last beat of a 4-bar phrase,
+        // sitting between the big section-transition fills handled above. The
+        // seeded fillMap / procedural fills only fire at section/loop seams, so
+        // without this the interior of a long section is mechanically even.
+        // Deterministic (seeded per section+bar) so loops stay coherent. Skipped
+        // if a transition fill already fired this measure (it set fillActive),
+        // the section is too quiet to warrant a lead-in, or the genre doesn't
+        // phrase with a driving snare (PICKUP_SNARE_GENRES) — a brush-jazz, a
+        // reggae One Drop or a bossa would never throw snare 16ths into the
+        // downbeat, so we leave their interior bars alone rather than impose a
+        // rock idiom on every style.
+        if (
+            groove.creativity &&
+            !groove.fillActive &&
+            playback.bandIntensity > 0.45 &&
+            !PICKUP_SUPPRESSED_GENRES.has(groove.genreFeel)
+        ) {
+            const sectionEntry = binarySearchMap(arranger.sectionMap || [], modStep);
+            if (sectionEntry) {
+                const barInSection = Math.floor((modStep - sectionEntry.start) / stepsPerMeasure);
+                const PHRASE_BARS = 4; // standard 4-bar phrase hinge
+                const isPhraseEnd = (barInSection + 1) % PHRASE_BARS === 0;
+                // The section's last bar already gets the transition fill above.
+                // Derive it from the SAME signal the transition uses — does the
+                // next bar cross a section/loop boundary — rather than a
+                // round(sectionLen / spm) bar count, which can disagree with the
+                // transition's stepMap-sectionId check on a non-bar-aligned
+                // section and let a pickup stack onto the transition bar.
+                const nextBarStep = modStep + stepsPerMeasure;
+                const nextSectionEntry =
+                    nextBarStep >= total
+                        ? null
+                        : binarySearchMap(arranger.sectionMap || [], nextBarStep);
+                const isSectionEndBar =
+                    !nextSectionEntry || nextSectionEntry.id !== sectionEntry.id;
+
+                if (isPhraseEnd && !isSectionEndBar) {
+                    // Per-section seed so different sections don't pick up in
+                    // lockstep; fall back to a stable hash of the section id
+                    // for sections the creativity-memory block hasn't seeded.
+                    let sectionSeed = (groove.sectionSeedMap as any)?.[sectionEntry.id];
+                    if (typeof sectionSeed !== 'number') {
+                        sectionSeed = (Math.abs(stringHash31(sectionEntry.id)) % 256) / 256;
+                    }
+
+                    // Two independent deterministic draws: fire (salt 0) and
+                    // variant (salt 1). why: floor 0.2 keeps a section just above
+                    // the 0.45 gate breathing only sparingly (~0.45 fire rate) —
+                    // a tasteful player doesn't pick up on every phrase when the
+                    // energy is low — while the 0.55 slope lets a hot section
+                    // approach the 0.8 ceiling (a busy player leans in).
+                    const fireSeed = getPhraseSeed(sectionSeed, barInSection, PHRASE_BARS, 0);
+                    const fireProb = Math.min(0.8, 0.2 + playback.bandIntensity * 0.55);
+                    if (fireSeed < fireProb) {
+                        const variantSeed = getPhraseSeed(
+                            sectionSeed,
+                            barInSection,
+                            PHRASE_BARS,
+                            1,
+                        );
+                        const tsConf =
+                            TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+                        const stepsPerBeat = tsConf.stepsPerBeat;
+                        const pickup = generatePhrasePickup(
+                            stepsPerBeat,
+                            playback.bandIntensity,
+                            variantSeed,
+                        );
+                        dispatch(ACTIONS.TRIGGER_FILL, {
+                            steps: pickup,
+                            // Land the pickup on the bar's final beat.
+                            startStep: currentStep + (stepsPerMeasure - stepsPerBeat),
+                            length: stepsPerBeat,
+                            crash: false,
+                        });
+                    }
                 }
             }
         }

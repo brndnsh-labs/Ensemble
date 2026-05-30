@@ -606,6 +606,64 @@ export function generateProceduralFill(
     return generateDeterministicFill(genre, intensity, stepsPerMeasure, Math.random);
 }
 
+/**
+ * A short, within-section "breathing" pickup — a brief snare lead-in on the
+ * FINAL beat of a phrase (every few bars), distinct from the bigger
+ * section-transition fill. This is what keeps a real drummer's 4-bar phrasing
+ * alive between section changes: a couple of climbing 16ths into the next
+ * downbeat, no crash, no full-bar tom tumble.
+ *
+ * `seed` (0..1, deterministic per section+bar) picks the variant so looped
+ * playback stays coherent rather than re-rolling each pass. Returns fill-steps
+ * keyed RELATIVE to the pickup window (0..stepsPerBeat-1); trigger it with a
+ * `fillStartStep` landing on the bar's last beat and `fillLength = stepsPerBeat`.
+ */
+export function generatePhrasePickup(
+    stepsPerBeat: number,
+    intensity: number,
+    seed: number,
+): Record<number, { name: string; vel: number }[]> {
+    const fill: Record<number, { name: string; vel: number }[]> = {};
+    // Velocity climbs into the downbeat; scaled by band intensity so a quiet
+    // section breathes softly and a hot one pushes harder. Kept below the
+    // backbeat's own crack (≈0.9+) so the pickup leads in, never overpowers.
+    const baseVel = 0.4 + intensity * 0.25; // 0.4..0.65
+
+    if (stepsPerBeat < 2) {
+        // Single-subdivision beat (exotic meter) — one ghosted snare lead-in.
+        fill[Math.max(0, stepsPerBeat - 1)] = [{ name: 'Snare', vel: baseVel }];
+        return fill;
+    }
+
+    // The pickup occupies the final `stepsPerBeat` subdivisions before the
+    // downbeat. In simple meter (stepsPerBeat 4) that's the '&'/'a' of the beat;
+    // in compound meter (stepsPerBeat 2) it's the last two eighths of the final
+    // grouping — either way these are the subdivisions immediately leading into
+    // the next bar's "one", which is what makes it read as a pickup.
+    const last = stepsPerBeat - 1; // final subdivision → straight into the downbeat
+    const penult = stepsPerBeat - 2; // the subdivision before it
+
+    if (seed < 0.55) {
+        // Default: an understated two-note snare hinge — the most common,
+        // tasteful phrase lead-in a session player throws every few bars.
+        fill[penult] = [{ name: 'Snare', vel: baseVel }];
+        fill[last] = [{ name: 'Snare', vel: baseVel + 0.15 }];
+    } else if (seed < 0.85 && stepsPerBeat >= 4) {
+        // Busier 16th snare flurry across the back half of the beat (4/4-ish
+        // only — needs the subdivisions). Reads as a slightly hotter lead-in.
+        fill[stepsPerBeat - 3] = [{ name: 'Snare', vel: baseVel - 0.05 }];
+        fill[penult] = [{ name: 'Snare', vel: baseVel + 0.05 }];
+        fill[last] = [{ name: 'Snare', vel: baseVel + 0.2 }];
+    } else {
+        // Color variant: a small snare→tom turn for a touch of pitch movement
+        // into the downbeat without committing to a full tom run.
+        fill[penult] = [{ name: 'Snare', vel: baseVel }];
+        fill[last] = [{ name: 'Mid Tom', vel: baseVel + 0.1 }];
+    }
+
+    return fill;
+}
+
 export function generateDeterministicFill(
     genre: string,
     intensity: number,

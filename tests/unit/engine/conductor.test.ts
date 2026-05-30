@@ -77,6 +77,7 @@ vi.mock('../../../public/persistence.js', () => ({
 
 vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: vi.fn(() => ({})),
+    generatePhrasePickup: vi.fn(() => ({ 2: [{ name: 'Snare', vel: 0.6 }] })),
 }));
 
 describe('Conductor Logic', () => {
@@ -496,6 +497,84 @@ describe('Conductor Logic', () => {
                     steps: expect.anything(), // Verification of the anticipation fill
                 }),
             );
+        });
+    });
+
+    describe('within-section phrase pickup', () => {
+        // An 8-bar section (one chord/section spanning the whole loop) so the
+        // bar-4 phrase boundary is interior, not the section's last bar.
+        const setupLongSection = (genreFeel = 'Rock') => {
+            groove.enabled = true;
+            groove.creativity = true;
+            groove.genreFeel = genreFeel;
+            groove.fillActive = false;
+            groove.fillMap = null;
+            groove.orchestrationMap = null;
+            playback.bandIntensity = 0.8;
+            arranger.totalSteps = 128;
+            arranger.timeSignature = '4/4';
+            arranger.stepMap = [
+                { start: 0, end: 128, chord: { sectionId: 's1', sectionLabel: 'A' } },
+            ];
+            arranger.sectionMap = [{ id: 's1', start: 0, end: 128, label: 'A' }];
+        };
+
+        const triggerFillCalls = () =>
+            (dispatch as any).mock.calls.filter((c: any[]) => c[0] === 'TRIGGER_FILL');
+
+        it('fires a no-crash last-beat pickup at an interior 4-bar phrase boundary', () => {
+            setupLongSection();
+            // modStep 48 = start of bar 4 (barInSection 3 → phrase end, not section end).
+            checkSectionTransition(getState(), 48, 16, dispatch);
+
+            const fills = triggerFillCalls();
+            expect(fills).toHaveLength(1);
+            const payload = fills[0][1];
+            expect(payload.crash).toBe(false);
+            expect(payload.length).toBe(4); // stepsPerBeat in 4/4
+            expect(payload.startStep).toBe(60); // 48 + (16 - 4): lands on the last beat
+        });
+
+        it('does NOT pick up on a non-phrase-boundary bar', () => {
+            setupLongSection();
+            // modStep 16 = start of bar 2 (barInSection 1 → not a phrase end).
+            checkSectionTransition(getState(), 16, 16, dispatch);
+            expect(triggerFillCalls()).toHaveLength(0);
+        });
+
+        it('does NOT pick up on the section/loop-final bar (transition fill owns it)', () => {
+            setupLongSection();
+            // modStep 112 = start of bar 8, the last bar (barInSection 7 = measuresInSection-1).
+            // The loop-end transition fill fires here (crash:true, full bar); assert the
+            // interior pickup signature (crash:false) is NOT among the dispatched fills.
+            checkSectionTransition(getState(), 112, 16, dispatch);
+            const pickups = triggerFillCalls().filter((c: any[]) => c[1].crash === false);
+            expect(pickups).toHaveLength(0);
+        });
+
+        it('respects the quiet-section intensity floor', () => {
+            setupLongSection();
+            playback.bandIntensity = 0.4; // below the 0.45 pickup floor
+            checkSectionTransition(getState(), 48, 16, dispatch);
+            expect(triggerFillCalls()).toHaveLength(0);
+        });
+
+        it('does NOT pick up in brush/sidestick genres (Jazz, Reggae, Bossa)', () => {
+            for (const genre of ['Jazz', 'Reggae', 'Bossa Nova', 'Minimal']) {
+                vi.clearAllMocks();
+                setupLongSection(genre);
+                checkSectionTransition(getState(), 48, 16, dispatch);
+                expect(triggerFillCalls(), `${genre} should suppress the pickup`).toHaveLength(0);
+            }
+        });
+
+        it('DOES pick up in snare-backbeat genres (Rock, Funk, Country)', () => {
+            for (const genre of ['Rock', 'Funk', 'Country']) {
+                vi.clearAllMocks();
+                setupLongSection(genre);
+                checkSectionTransition(getState(), 48, 16, dispatch);
+                expect(triggerFillCalls(), `${genre} should allow the pickup`).toHaveLength(1);
+            }
         });
     });
 });
