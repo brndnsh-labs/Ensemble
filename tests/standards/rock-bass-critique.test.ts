@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { installSeededRandom } from '../utils/seeded-random.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -12,9 +13,14 @@ vi.mock('../../public/state.js', () => ({
 }));
 
 describe('Rock Bassist Critique', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    // why: the bass engine's chromatic-vs-anticipation push-point choice draws
+    // raw Math.random; with an un-seeded stream the chromatic count varies
+    // run-to-run and occasionally tips the `< anticipationHits * 0.4` bound
+    // (seen at 12 vs 10.4 — tracked in docs/FLAKY_TESTS.md). Seeding mulberry32
+    // (the house pattern, matching CLAUDE.md deterministic-phrasing) collapses
+    // the 192-bar sample to one reproducible draw while still asserting a real
+    // statistical range. Restores the spy in before/afterEach so it never leaks.
+    installSeededRandom();
 
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
