@@ -12,12 +12,7 @@ import type { JSX } from 'preact';
  * stay legible at 1em.
  */
 export type IconName =
-    | 'play'
-    | 'stop'
-    | 'pause'
     | 'lock'
-    | 'unlock'
-    | 'share'
     | 'upload'
     | 'visualizer'
     | 'mixer'
@@ -42,7 +37,6 @@ export type IconName =
     | 'undo'
     | 'install'
     | 'headphones'
-    | 'shield'
     | 'lightbulb'
     | 'note'
     | 'plus'
@@ -53,46 +47,16 @@ export type IconName =
     | 'bass'
     | 'chords'
     | 'harmony'
-    | 'soloist'
-    | 'strings';
+    | 'soloist';
 
 const solid = { fill: 'currentColor', stroke: 'none' } as const;
 
 export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
-    // ---- Transport (solid) ----
-    play: () => (
-        <path
-            {...solid}
-            d="M8 5.6v12.8a1 1 0 0 0 1.5.87l10.2-6.4a1 1 0 0 0 0-1.74L9.5 4.73A1 1 0 0 0 8 5.6Z"
-        />
-    ),
-    stop: () => <rect {...solid} x="6" y="6" width="12" height="12" rx="2.4" />,
-    pause: () => (
-        <>
-            <rect {...solid} x="7" y="5.5" width="3.4" height="13" rx="1.2" />
-            <rect {...solid} x="13.6" y="5.5" width="3.4" height="13" rx="1.2" />
-        </>
-    ),
-
     // ---- Actions (line) ----
     lock: () => (
         <>
             <rect x="4.75" y="10.5" width="14.5" height="9.5" rx="2.3" />
             <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
-        </>
-    ),
-    unlock: () => (
-        <>
-            <rect x="4.75" y="10.5" width="14.5" height="9.5" rx="2.3" />
-            <path d="M8 10.5V8a4 4 0 0 1 7.5-2" />
-        </>
-    ),
-    share: () => (
-        <>
-            <circle cx="6.5" cy="12" r="2.5" />
-            <circle cx="17" cy="6" r="2.5" />
-            <circle cx="17" cy="18" r="2.5" />
-            <path d="m8.7 10.8 6.1-3.4M8.7 13.2l6.1 3.4" />
         </>
     ),
     upload: () => (
@@ -235,12 +199,6 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <rect x="17" y="13" width="3.7" height="6.5" rx="1.8" />
         </>
     ),
-    shield: () => (
-        <>
-            <path d="M12 3 5 6v5.5c0 4.4 2.9 7.6 7 9 4.1-1.4 7-4.6 7-9V6Z" />
-            <path d="m9 11.8 2 2 4-4.2" />
-        </>
-    ),
     lightbulb: () => (
         <>
             <path d="M12 3a6 6 0 0 0-3.8 10.6c.7.6 1.1 1.2 1.2 2.4h5.2c.1-1.2.5-1.8 1.2-2.4A6 6 0 0 0 12 3Z" />
@@ -308,12 +266,6 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <path d="M9.5 16V4.5" />
             <path d="M9.5 4.5c3 .5 5.3 2.3 5.3 5.2" />
             <circle {...solid} cx="6.8" cy="16" r="2.7" />
-        </>
-    ),
-    strings: () => (
-        <>
-            <path d="M12 3.5c-2.2 0-3 1.6-3 3.3 0 1.3.7 2.2.7 3.7 0 2-1.9 2.7-1.9 5.2A4.2 4.2 0 0 0 12 21a4.2 4.2 0 0 0 4.2-4.3c0-2.5-1.9-3.2-1.9-5.2 0-1.5.7-2.4.7-3.7 0-1.7-.8-3.3-3-3.3Z" />
-            <path d="M12 11v6" />
         </>
     ),
 };

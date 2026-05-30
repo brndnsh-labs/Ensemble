@@ -186,7 +186,7 @@
     --studio-row-accent: var(--groove-color);
 }
 .workspace-studio-mix-row--bass {
-    --studio-row-accent: var(--success-color);
+    --studio-row-accent: var(--bass-color);
 }
 .workspace-studio-mix-row--chords {
     /* Chords keep their blue identity — the app accent is brass, not chords'. */
@@ -433,7 +433,7 @@
     --studio-surface-accent: var(--groove-color);
 }
 .workspace-studio-surface--bass {
-    --studio-surface-accent: var(--success-color);
+    --studio-surface-accent: var(--bass-color);
 }
 .workspace-studio-surface--chords {
     --studio-surface-accent: var(--chords-color);
@@ -596,7 +596,7 @@
     --studio-row-accent: var(--groove-color);
 }
 .workspace-studio-mixer-strip--bass {
-    --studio-row-accent: var(--success-color);
+    --studio-row-accent: var(--bass-color);
 }
 .workspace-studio-mixer-strip--chords {
     --studio-row-accent: var(--chords-color);

@@ -8,6 +8,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
 import {
     resolveVisualizerTrack,
+    VISUALIZER_CHORD_SWATCHES,
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
 } from '../visualizer-events.js';
@@ -173,12 +174,9 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             fillGradientTop: 'rgba(224, 86, 143, 0)',
             fillGradientMid: isDark ? 'rgba(224, 86, 143, 0.18)' : 'rgba(176, 36, 104, 0.12)',
             fillGradientBottom: 'rgba(224, 86, 143, 0)',
-            chordColors: [
-                resolve('--chords-color', '#4a9fd4'),
-                resolve('--bass-color', '#9ab33a'),
-                resolve('--orange', '#e07a3c'),
-                resolve('--soloist-color', '#e0568f'),
-            ],
+            // Single source of truth with the legend (VisualizerOverlay reads
+            // the same constant) so renderer + legend can't drift.
+            chordColors: VISUALIZER_CHORD_SWATCHES.map((s) => resolve(s.cssVar, s.fallback)),
         };
         viz.setTheme(themeCache);
     };

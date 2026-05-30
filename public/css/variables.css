@@ -44,8 +44,8 @@
     --cyan: #5fc9bd;
     --green: #9ab33a; /* bass / success */
 
-    /* Brass — the signature accent */
-    --brass: #d9a441;
+    /* Brass — the signature accent (same hue as --yellow; aliased so they can't drift) */
+    --brass: var(--yellow);
     --brass-light: #f0c674; /* lit brass — hover/active */
 
     --bg-color: var(--base03);
@@ -68,7 +68,6 @@
     --groove-color: #b8a98a; /* warm taupe — drums */
 
     /* RGB variants for transparency */
-    --yellow-rgb: 217, 164, 65;
     --brass-rgb: 217, 164, 65;
     --cyan-rgb: 95, 201, 189;
     --magenta-rgb: 224, 86, 143;
@@ -87,12 +86,6 @@
     --select-bg: var(--base02);
     --select-text: var(--base1);
     --select-border: var(--base01);
-
-    /* Alpha scale — one source of truth for overlay/hairline opacities */
-    --alpha-hairline: 0.12;
-    --alpha-hover: 0.08;
-    --alpha-press: 0.16;
-    --alpha-scrim: 0.62; /* modal backdrop */
 
     /* Spacing */
     --space-1: 0.25rem;
@@ -118,7 +111,6 @@
 
     /* Focus ring (brass, derived from accent) */
     --focus-ring-color: color-mix(in srgb, var(--accent-color), transparent 55%);
-    --focus-ring: 0 0 0 2px var(--focus-ring-color);
 
     /* Atmosphere — lamp-lit top glow + film grain.
        Consumed by layout.css on the app background. */
@@ -179,7 +171,7 @@
     --blue: #1f6f9e;
     --cyan: #2a8f86;
     --green: #5e7d12;
-    --brass: #b07d1f;
+    /* --brass aliases --yellow (overridden just above), so it follows automatically */
     --brass-light: #946514;
 
     --bg-color: var(--base3);
