@@ -184,7 +184,18 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     };
 
     useEffect(() => {
+        // The canvas reads its colors through JS (getComputedStyle + the resolved
+        // isDark), so unlike the CSS-driven UI it won't re-theme on its own. Mirror
+        // App.tsx: while mode is 'auto', re-run on OS light/dark flips so an open
+        // overlay re-themes live.
         updateTheme(vizRef.current);
+
+        if (mode === 'auto') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const onChange = () => updateTheme(vizRef.current);
+            mediaQuery.addEventListener('change', onChange);
+            return () => mediaQuery.removeEventListener('change', onChange);
+        }
     }, [palette, mode]);
 
     useEffect(() => {
