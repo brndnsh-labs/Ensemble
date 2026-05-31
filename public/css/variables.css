@@ -89,7 +89,6 @@
     --success-color: var(--green);
     --soloist-color: var(--magenta);
     --harmony-color: var(--violet);
-    --smart-color: var(--violet);
     --error-color: var(--red);
 
     /* Named instrument colors (UI + visualizer share these) */
@@ -118,7 +117,6 @@
     --card-bg: #271f18; /* raised surface — one step above panel */
     --card-bg-hover: #322820;
     --border-color: color-mix(in srgb, var(--brass) 12%, transparent); /* brass hairline */
-    --border: var(--border-color);
     --input-bg: rgba(8, 6, 4, 0.35); /* sunken warm well */
     --surface-sunken: var(--input-bg);
     --select-bg: var(--base02);
@@ -159,16 +157,6 @@
         transparent 58%
     );
     --grain-opacity: 0.035;
-
-    /* Sequencer — ink-derived so it auto-follows the mode (text flips light/dark) */
-    --step-bg: color-mix(in srgb, var(--text-color) 10%, transparent);
-    --step-bg-hover: color-mix(in srgb, var(--text-color) 18%, transparent);
-
-    /* Metronome */
-    --beat-active: var(--brass);
-    --beat-inactive-odd: var(--base02);
-    --beat-inactive-even: var(--base01);
-    --beat-playing: var(--orange);
 
     /* Z-Index Registry */
     --z-background: -1;
@@ -234,11 +222,6 @@
         transparent 58%
     );
     --grain-opacity: 0.02;
-
-    --step-bg: color-mix(in srgb, var(--text-color) 8%, transparent);
-    --step-bg-hover: color-mix(in srgb, var(--text-color) 16%, transparent);
-    --beat-inactive-odd: var(--base2);
-    --beat-inactive-even: var(--base3);
 
     /* Chord-quality tints deepened for ink-on-cream legibility. Dominant stays
        var(--brass) (deepens per palette) and major stays var(--text-color). */
@@ -374,10 +357,6 @@
     --focus-ring-color: var(--brass-light);
     --app-glow: none; /* no atmosphere — maximise legibility */
     --grain-opacity: 0;
-    --step-bg: rgba(255, 255, 255, 0.12);
-    --step-bg-hover: rgba(255, 255, 255, 0.22);
-    --beat-inactive-odd: #2a2a2a;
-    --beat-inactive-even: #3a3a3a;
 }
 
 [data-palette="high-contrast"][data-mode="light"] {
@@ -420,10 +399,6 @@
     --focus-ring-color: var(--accent-color);
     --app-glow: none;
     --grain-opacity: 0;
-    --step-bg: rgba(0, 0, 0, 0.14);
-    --step-bg-hover: rgba(0, 0, 0, 0.24);
-    --beat-inactive-odd: #e0e0e0;
-    --beat-inactive-even: #f4f4f4;
 }
 
 /* ==========================================================================
