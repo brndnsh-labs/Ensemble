@@ -173,7 +173,7 @@ header {
 h1 {
     margin: 0;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: 700;
     font-size: 1.6rem;
     letter-spacing: 0.005em;
     display: inline-block;
@@ -322,7 +322,7 @@ button:focus-visible {
     /* Dark ink on brass reads like an engraved key — higher contrast than white. */
     color: var(--base03);
     border-color: var(--accent-color);
-    font-weight: 600;
+    font-weight: 700;
     padding-inline: var(--space-3);
     box-shadow: var(--glow-brass);
 }

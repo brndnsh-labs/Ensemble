@@ -165,7 +165,7 @@
     background: color-mix(in srgb, var(--accent-color), transparent 88%);
     color: var(--text-color);
     font-size: calc(var(--lead-marker-size) * var(--lead-vertical-type-fill));
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.08em;
     line-height: 1;
     text-transform: uppercase;
@@ -319,7 +319,7 @@
 
 .root {
     display: inline-block;
-    font-weight: 760;
+    font-weight: 700;
 }
 
 .suffix {

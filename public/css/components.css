@@ -247,7 +247,7 @@ input:focus-visible + .toggle-slider {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-color);
-    font-weight: 600;
+    font-weight: 700;
     font-size: var(--font-sm);
     cursor: pointer;
 }
@@ -273,7 +273,7 @@ input:focus-visible + .toggle-slider {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-pill);
     color: var(--text-secondary);
-    font-weight: 600;
+    font-weight: 700;
     font-size: var(--font-sm);
     cursor: pointer;
 }
