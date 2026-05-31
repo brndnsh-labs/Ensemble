@@ -13,8 +13,9 @@ function rollHexSeed(): string {
 }
 
 export function SongSeedControl() {
-    const { seed } = useEnsembleState((s) => ({
+    const { seed, randomizeSeed } = useEnsembleState((s) => ({
         seed: s.arranger.seed,
+        randomizeSeed: s.arranger.randomizeSeed,
     }));
 
     const updateSeed = (val: string) => {
@@ -27,7 +28,20 @@ export function SongSeedControl() {
         saveCurrentState();
     };
 
-    const displayValue = seed || '—';
+    const toggleRandomize = (on: boolean) => {
+        dispatch(ACTIONS.SET_SEED_RANDOMIZE, on);
+        // Locking with no seed yet: roll one so there is a concrete value to
+        // see, edit, and reproduce. (Randomizing leaves the field alone — the
+        // next playback re-rolls it.)
+        if (!on && !seed) {
+            dispatch(ACTIONS.SET_SONG_SEED, rollHexSeed());
+        }
+        saveCurrentState();
+    };
+
+    // When randomizing, the trigger reads "Random" (the seed re-rolls each play);
+    // when locked, it shows the fixed value.
+    const displayValue = randomizeSeed ? 'Random' : seed || '—';
 
     return (
         <ToolbarPopover
@@ -50,18 +64,25 @@ export function SongSeedControl() {
             }
         >
             <div class="workspace-toolbar-panel__section">
-                <label class="workspace-toolbar-panel__label" htmlFor="songSeedInput">
-                    Song seed
+                <label class="workspace-toolbar-panel__check">
+                    <input
+                        id="seedRandomizeToggle"
+                        type="checkbox"
+                        checked={randomizeSeed}
+                        onChange={(e) => toggleRandomize((e.target as HTMLInputElement).checked)}
+                    />
+                    <span>Randomize each playback</span>
                 </label>
                 <div class="workspace-seed-control">
                     <div class="workspace-seed-row">
                         <input
                             id="songSeedInput"
                             type="text"
-                            value={seed || ''}
-                            placeholder="Random"
+                            value={randomizeSeed ? '' : seed || ''}
+                            placeholder={randomizeSeed ? 'Random each play' : 'Set a seed'}
                             class="seed-input"
                             aria-label="Song seed"
+                            disabled={randomizeSeed}
                             onInput={(e) => updateSeed((e.target as HTMLInputElement).value)}
                         />
                         <button
@@ -69,6 +90,7 @@ export function SongSeedControl() {
                             class="icon-btn"
                             title="Generate Random Seed"
                             aria-label="Generate Random Seed"
+                            disabled={randomizeSeed}
                             onClick={rollSeed}
                         >
                             <Icon name="dice" />

@@ -142,39 +142,3 @@
         white-space: nowrap;
     }
 }
-
-/* Badge Button (Micro-interaction) */
-.badge-btn {
-    font-size: 0.65rem;
-    color: var(--accent-color);
-    font-weight: bold;
-    cursor: pointer;
-    padding: 1px var(--space-1);
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    border-radius: var(--radius-sm);
-    min-width: 28px;
-    text-align: center;
-    margin-top: 2px;
-
-    /* Button Resets */
-    font-family: inherit;
-    line-height: inherit;
-    display: inline-block;
-    appearance: none;
-    -webkit-appearance: none;
-    transition:
-        background-color var(--anim-fast) var(--anim-ease),
-        border-color var(--anim-fast) var(--anim-ease),
-        box-shadow var(--anim-fast) var(--anim-ease);
-}
-
-.badge-btn:hover {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(59, 130, 246, 0.4);
-}
-
-.badge-btn:focus-visible {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 1px;
-}

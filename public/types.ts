@@ -170,6 +170,8 @@ export interface ArrangerState {
     readonly grouping: number[] | null;
     /** 6-char hex PRNG seed driving soloist + drum generation for this song. */
     readonly seed: string;
+    /** When true, re-roll the seed on every playback instead of reusing a fixed one. */
+    readonly randomizeSeed: boolean;
 }
 
 export interface ConductorState {
@@ -1392,6 +1394,7 @@ export interface ActionPayloadMap {
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
     SET_SONG_SEED: string;
+    SET_SEED_RANDOMIZE: boolean;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
@@ -1471,6 +1474,7 @@ export const ACTIONS = {
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SONG_SEED: 'SET_SONG_SEED',
+    SET_SEED_RANDOMIZE: 'SET_SEED_RANDOMIZE',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 

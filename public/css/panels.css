@@ -59,32 +59,11 @@
     gap: var(--space-1);
 }
 
-.grouping-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* The class selector outranks the [hidden] UA rule, so re-assert hiding here
- * — without this, 4/4 (and any other TS without grouping options) shows an
- * inert button instead of staying hidden. */
+/* Grouping toggle lives inside the time-signature panel. Its class selector
+ * outranks both the UA [hidden] rule and the panel-section display, so re-assert
+ * hiding here for meters without grouping options. */
 .grouping-toggle[hidden] {
     display: none;
-}
-
-.time-sig-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-}
-
-.time-sig-group select {
-    width: 100%;
-    padding: 0 var(--space-2);
-    height: 32px;
-    font-size: var(--font-sm);
-    border-radius: var(--radius-md);
 }
 
 @media (max-width: 600px) {
@@ -267,6 +246,8 @@ h2 {
     gap: 0.35rem;
     min-width: 0;
     padding-inline: 0.65rem;
+    /* Match the play button + the shape-zone controls on one radius scale. */
+    border-radius: var(--radius-md);
 }
 
 .workspace-toolbar-trigger.is-open {
@@ -425,11 +406,29 @@ h2 {
     flex: 1 1 7rem;
 }
 
+.workspace-arranger-toolbar-trigger--time,
 .workspace-arranger-toolbar-trigger--key,
 .workspace-arranger-toolbar-trigger--seed {
     justify-content: space-between;
     min-width: 0;
     padding-inline: 0.65rem;
+}
+
+/* Seed-style checkbox row inside a toolbar panel. */
+.workspace-toolbar-panel__check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.workspace-toolbar-panel__check input {
+    flex: none;
+    cursor: pointer;
+    accent-color: var(--accent-color);
 }
 
 .workspace-arranger-toolbar-trigger--seed .workspace-toolbar-trigger-value {

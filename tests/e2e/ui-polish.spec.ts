@@ -12,7 +12,7 @@ test.describe('UI polish consistency @ui', () => {
 
     test('shared shell controls use consistent theme radii and spacing', async ({ page }) => {
         const playButton = page.locator('#playBtn');
-        const timeSignature = page.locator('#timeSigSelect');
+        const timeSignature = page.locator('#timeSigBtn');
 
         await expect(playButton).toBeVisible();
         await expect(timeSignature).toBeVisible();
@@ -38,7 +38,7 @@ test.describe('UI polish consistency @ui', () => {
                 space5: Number.parseFloat(root.getPropertyValue('--space-5')) * rootFontSize,
                 fontBase: Number.parseFloat(root.getPropertyValue('--font-base')) * rootFontSize,
                 playButton: read('#playBtn'),
-                timeSignature: read('#timeSigSelect'),
+                timeSignature: read('#timeSigBtn'),
             };
         });
 

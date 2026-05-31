@@ -131,7 +131,7 @@ describe('KeySignatureControls Component', () => {
 
         const keySelect = document.body.querySelector('#keySelect');
         const keyMenuBtn = container.querySelector('#keyMenuBtn');
-        const timeSigSelect = container.querySelector('#timeSigSelect');
+        const timeSigSelect = document.body.querySelector('#timeSigSelect');
         const groupingToggle = document.body.querySelector('#groupingToggle');
 
         expect(keyMenuBtn.textContent).toContain('Key');
@@ -170,7 +170,7 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const timeSigSelect = container.querySelector('#timeSigSelect');
+        const timeSigSelect = document.body.querySelector('#timeSigSelect');
 
         timeSigSelect.value = '3/4';
         act(() => {
@@ -203,7 +203,7 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const timeSigSelect = container.querySelector('#timeSigSelect');
+        const timeSigSelect = document.body.querySelector('#timeSigSelect');
 
         act(() => {
             timeSigSelect.value = '3/4';

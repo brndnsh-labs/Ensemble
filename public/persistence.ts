@@ -17,6 +17,7 @@ export function saveCurrentState(): void {
         notation: arranger.notation,
         lastChordPreset: arranger.lastChordPreset,
         seed: arranger.seed,
+        randomizeSeed: arranger.randomizeSeed,
         palette: playback.palette,
         mode: playback.mode,
         bpm: playback.bpm,

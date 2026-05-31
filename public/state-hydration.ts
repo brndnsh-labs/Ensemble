@@ -177,6 +177,8 @@ export function hydrateState(): void {
                 (typeof savedState.seed === 'string' && savedState.seed) ||
                 (typeof savedState.soloist?.seed === 'string' && savedState.soloist.seed) ||
                 '',
+            randomizeSeed:
+                typeof savedState.randomizeSeed === 'boolean' ? savedState.randomizeSeed : true,
         });
 
         const { palette, mode } = migrateTheme(savedState);

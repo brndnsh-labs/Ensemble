@@ -88,33 +88,62 @@ export function TimeSignatureControl() {
     const canonicalMeters = getCanonicalMeters(genreFeel);
 
     return (
-        <div class="time-sig-group">
-            <select
-                id="timeSigSelect"
-                value={timeSignature}
-                onChange={(event) =>
-                    updateTimeSignature(
-                        (event.target as HTMLSelectElement).value,
-                        lastDrumPreset,
-                        dispatch,
-                    )
-                }
-                aria-label="Time Signature"
-                title={genreFeel ? `★ marks meters idiomatic for ${genreFeel}` : undefined}
+        <ToolbarPopover
+            buttonId="timeSigBtn"
+            panelId="timeSigPanel"
+            triggerAriaLabel="Open time signature controls"
+            panelLabel="Time signature"
+            triggerClassName="workspace-arranger-toolbar-trigger workspace-arranger-toolbar-trigger--time"
+            panelClassName="workspace-toolbar-panel--time"
+            triggerContent={
+                <>
+                    <span class="workspace-toolbar-trigger-copy">
+                        <span class="workspace-toolbar-trigger-label">Time</span>
+                        <span class="workspace-toolbar-trigger-value">{timeSignature}</span>
+                    </span>
+                    <span class="workspace-toolbar-trigger-caret" aria-hidden="true">
+                        ▾
+                    </span>
+                </>
+            }
+        >
+            <div class="workspace-toolbar-panel__section">
+                <label class="workspace-toolbar-panel__label" htmlFor="timeSigSelect">
+                    Meter
+                </label>
+                <select
+                    id="timeSigSelect"
+                    value={timeSignature}
+                    onChange={(event) =>
+                        updateTimeSignature(
+                            (event.target as HTMLSelectElement).value,
+                            lastDrumPreset,
+                            dispatch,
+                        )
+                    }
+                    aria-label="Time Signature"
+                    title={genreFeel ? `★ marks meters idiomatic for ${genreFeel}` : undefined}
+                >
+                    {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => (
+                        <option key={timeSignatureOption} value={timeSignatureOption}>
+                            {canonicalMeters.includes(timeSignatureOption)
+                                ? `${timeSignatureOption} ★`
+                                : timeSignatureOption}
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            <div
+                id="groupingToggle"
+                class="workspace-toolbar-panel__section grouping-toggle"
+                hidden={!supportsGrouping}
             >
-                {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => (
-                    <option key={timeSignatureOption} value={timeSignatureOption}>
-                        {canonicalMeters.includes(timeSignatureOption)
-                            ? `${timeSignatureOption} ★`
-                            : timeSignatureOption}
-                    </option>
-                ))}
-            </select>
-            <div id="groupingToggle" class="grouping-toggle" hidden={!supportsGrouping}>
+                <span class="workspace-toolbar-panel__label">Grouping</span>
                 <button
                     id="groupingLabel"
                     type="button"
-                    class="badge-btn"
+                    class="header-btn workspace-toolbar-panel__button workspace-toolbar-panel__button--wide"
                     title="Click to toggle grouping"
                     aria-label="Toggle rhythmic grouping"
                     onClick={() => cycleGrouping(timeSignature, dispatch)}
@@ -124,7 +153,7 @@ export function TimeSignatureControl() {
                         : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
                 </button>
             </div>
-        </div>
+        </ToolbarPopover>
     );
 }
 

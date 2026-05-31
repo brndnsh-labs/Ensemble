@@ -64,6 +64,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     });
 
     test('Time signature picker highlights genre-idiomatic meters (S10)', async ({ page }) => {
+        // The meter select now lives inside the time-signature popover.
+        await page.locator('#timeSigBtn').click();
+        await expect(page.locator('#timeSigPanel')).toBeVisible();
+
         const select = page.locator('#timeSigSelect');
         // The ★ markers in the option list are the affordance (the prose caption
         // was dropped); a hover title on the select carries the legend.
