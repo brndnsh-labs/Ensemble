@@ -66,7 +66,11 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <path d="m8.2 7.8 3.8-3.8 3.8 3.8" />
         </>
     ),
-    visualizer: () => <path d="M5 14.5v-5M9.3 17.5v-11M13.7 15.5v-7M18 18.5V5.5" />,
+    // Organic waveform centered on the mid-axis — echoes the app icon's
+    // gradient waveform (vertical lines of varying height = a captured signal).
+    visualizer: () => (
+        <path d="M3 7.7v8.6M6 5.6v12.8M9 6.4v11.2M12 5v14M15 6.4v11.2M18 5.6v12.8M21 7.7v8.6" />
+    ),
     mixer: () => (
         <>
             <path d="M6 4v16M12 4v16M18 4v16" />

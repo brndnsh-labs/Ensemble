@@ -1,7 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ensemble">
-  <!-- Ensemble app icon — five instrument voices (bass green, harmony violet,
-       chords blue, soloist magenta, drums taupe) rising from a brass stage,
-       under the After-Hours lamp glow on warm ink. -->
+  <!-- Ensemble icon — an organic waveform of the five instrument hues (chords blue, bass green, soloist magenta, harmony violet, drums taupe) under the After-Hours lamp glow on warm ink. -->
   <defs>
     <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1a1610"/>
@@ -11,15 +9,28 @@
       <stop offset="0" stop-color="#d9a441" stop-opacity="0.20"/>
       <stop offset="0.62" stop-color="#d9a441" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="wave" x1="99" y1="0" x2="414" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ab33a"/>
+      <stop offset="0.27" stop-color="#8b86d6"/>
+      <stop offset="0.5" stop-color="#4a9fd4"/>
+      <stop offset="0.73" stop-color="#e0568f"/>
+      <stop offset="1" stop-color="#b8a98a"/>
+    </linearGradient>
   </defs>
   <rect width="512" height="512" rx="116" fill="url(#ink)"/>
   <rect width="512" height="512" rx="116" fill="url(#lamp)"/>
-  <!-- brass stage -->
-  <rect x="108" y="372" width="296" height="12" rx="6" fill="#d9a441" fill-opacity="0.9"/>
-  <!-- voices -->
-  <rect x="114" y="218" width="44" height="160" rx="22" fill="#9ab33a"/>
-  <rect x="174" y="164" width="44" height="214" rx="22" fill="#8b86d6"/>
-  <rect x="234" y="132" width="44" height="246" rx="22" fill="#4a9fd4"/>
-  <rect x="294" y="168" width="44" height="210" rx="22" fill="#e0568f"/>
-  <rect x="354" y="222" width="44" height="156" rx="22" fill="#b8a98a"/>
+  <!-- waveform: 13 gradient lines, organic envelope, centered on the mid-axis -->
+  <rect x="98.5" y="216" width="15" height="80" rx="7.5" fill="url(#wave)"/>
+  <rect x="123.5" y="194" width="15" height="124" rx="7.5" fill="url(#wave)"/>
+  <rect x="148.5" y="144" width="15" height="224" rx="7.5" fill="url(#wave)"/>
+  <rect x="173.5" y="164" width="15" height="184" rx="7.5" fill="url(#wave)"/>
+  <rect x="198.5" y="118" width="15" height="276" rx="7.5" fill="url(#wave)"/>
+  <rect x="223.5" y="136" width="15" height="240" rx="7.5" fill="url(#wave)"/>
+  <rect x="248.5" y="106" width="15" height="300" rx="7.5" fill="url(#wave)"/>
+  <rect x="273.5" y="136" width="15" height="240" rx="7.5" fill="url(#wave)"/>
+  <rect x="298.5" y="118" width="15" height="276" rx="7.5" fill="url(#wave)"/>
+  <rect x="323.5" y="164" width="15" height="184" rx="7.5" fill="url(#wave)"/>
+  <rect x="348.5" y="144" width="15" height="224" rx="7.5" fill="url(#wave)"/>
+  <rect x="373.5" y="194" width="15" height="124" rx="7.5" fill="url(#wave)"/>
+  <rect x="398.5" y="216" width="15" height="80" rx="7.5" fill="url(#wave)"/>
 </svg>
