@@ -26,12 +26,15 @@
 :root {
     color-scheme: dark light;
 
-    /* Type pairing — self-hosted faces declared in fonts.css.
-       Display = Fraunces (engraved lead-sheet feel), Body/UI = Hanken Grotesk,
-       Mono = Geist Mono. Fallbacks keep the app legible before fonts load. */
-    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    /* Type system — self-hosted faces declared in fonts.css. The UI is
+       single-family sans (Hanken Grotesk) for headings and body alike;
+       hierarchy comes from size/weight, not a contrasting display serif.
+       Geist Mono carries the numeric/code readouts (BPM, seed, version).
+       --font-display stays a distinct token so heading rules read declaratively
+       and a display face could return later without touching every rule. */
     --font-sans:
         "Hanken Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: var(--font-sans);
     --font-mono:
         "Geist Mono", "SFMono-Regular", ui-monospace, "SF Mono", "Cascadia Code", Menlo, Monaco,
         Consolas, monospace;
