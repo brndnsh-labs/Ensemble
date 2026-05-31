@@ -21,121 +21,10 @@
     input[type="range"] {
         height: 24px; /* Easier to grab on touch */
     }
-
-    .panel-header-controls {
-        gap: 0.25rem;
-    }
-}
-
-@media (max-width: 1100px) and (pointer: coarse) {
-    main.app-main-layout.workspace-shell {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.5rem 0.5rem calc(92px + env(safe-area-inset-bottom));
-        min-height: 100dvh;
-        align-items: stretch;
-    }
-
-    main.app-main-layout.workspace-shell .workspace-content {
-        flex: 1 1 auto;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        width: 100%;
-        max-width: none;
-        align-self: stretch;
-    }
-
-    .workspace-nav {
-        position: fixed;
-        left: 0.5rem;
-        right: 0.5rem;
-        bottom: calc(0.5rem + env(safe-area-inset-bottom));
-        top: auto;
-        z-index: var(--z-mobile-nav);
-        padding: 0.6rem;
-        border-radius: 18px;
-        box-shadow: var(--shadow-lg);
-    }
-
-    .workspace-nav-header {
-        display: none;
-    }
-
-    .workspace-nav-list {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0.35rem;
-    }
-
-    .workspace-nav-btn {
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 0.55rem 0.2rem;
-        min-height: 60px;
-        gap: 0.25rem;
-        text-align: center;
-    }
-
-    .workspace-nav-icon {
-        font-size: 1rem;
-    }
-
-    .workspace-nav-label {
-        font-size: 0.72rem;
-        line-height: 1.1;
-    }
-
-    .workspace-view--arranger,
-    .workspace-arranger-layout,
-    .workspace-arranger-main,
-    .workspace-arranger-chords {
-        min-height: 0;
-        width: 100%;
-        max-width: none;
-    }
-
-    .workspace-arranger-layout {
-        height: calc(100dvh - 64px - 92px - 1rem);
-        overflow: visible;
-    }
-
-    .workspace-arranger-main {
-        overflow: visible;
-        gap: 0.6rem;
-    }
-
-    .workspace-arranger-chords {
-        flex: 1;
-        overflow: hidden;
-    }
-
-    .workspace-arranger-chords .display-area {
-        height: 100%;
-        max-height: none;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
 }
 
 /* --- Desktop / Tablet Grid Layout --- */
 @media (min-width: 900px) {
-    .app-main-layout {
-        display: grid;
-        grid-template-columns: 1fr 28rem; /* Main | Fixed Sidebar */
-        grid-template-rows: auto auto 1fr;
-        grid-template-areas:
-            "arranger sidebar"
-            "visualizer sidebar"
-            "empty sidebar";
-        gap: 1rem;
-        align-items: stretch;
-        max-width: 1800px;
-        padding: 1.5rem;
-    }
-
     #panel-arranger {
         grid-area: arranger;
     }
@@ -149,118 +38,7 @@
     }
 }
 
-@media (min-width: 1600px) {
-    .app-main-layout {
-        grid-template-columns: 1fr 32rem; /* Wider sidebar on massive screens */
-    }
-}
-
 @media (max-width: 700px) {
-    .workspace-view--arranger .workspace-arranger-layout {
-        display: flex;
-        flex-direction: column;
-        height: calc(100dvh - 64px - 92px - 0.35rem);
-        overflow: hidden;
-    }
-
-    .workspace-view--arranger .workspace-arranger-main {
-        flex: 1 1 auto;
-        gap: 0.22rem;
-    }
-
-    .workspace-view--arranger #panel-arranger {
-        flex: 1 1 auto;
-        padding: 0.54rem 0.54rem 0.5rem;
-    }
-
-    .workspace-view--arranger #panel-arranger .panel-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.26rem;
-        padding-bottom: 0.18rem;
-    }
-
-    .workspace-view--arranger #panel-arranger .panel-header > div {
-        width: 100%;
-    }
-
-    .workspace-view--arranger #panel-arranger .workspace-kicker {
-        display: none;
-    }
-
-    .workspace-view--arranger #panel-arranger .workspace-arranger-header-title {
-        display: none;
-    }
-
-    .workspace-view--arranger #panel-arranger .panel-header-controls {
-        width: 100%;
-        justify-content: stretch;
-        gap: 0.35rem;
-    }
-
-    .workspace-view--arranger #panel-arranger .workspace-arranger-controls-panel {
-        margin-top: 0.12rem;
-        padding: 0.24rem 0.28rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-controls-panel {
-        gap: 0.34rem;
-        align-items: flex-start;
-    }
-
-    .workspace-view--arranger .workspace-arranger-controls-main,
-    .workspace-view--arranger .workspace-arranger-controls-actions {
-        width: 100%;
-    }
-
-    .workspace-view--arranger .workspace-arranger-controls-actions {
-        justify-content: flex-start;
-        gap: 0.24rem;
-        margin-left: 0;
-    }
-
-    .workspace-view--arranger .workspace-arranger-toolbar-cluster {
-        width: 100%;
-        min-width: 0;
-    }
-
-    .workspace-view--arranger .workspace-arranger-controls-actions .header-btn,
-    .workspace-view--arranger .workspace-arranger-controls-actions .workspace-toolbar-popover {
-        width: auto;
-        min-width: 0;
-    }
-
-    .workspace-view--arranger .workspace-arranger-controls-actions .header-btn,
-    .workspace-view--arranger .workspace-arranger-controls-actions .workspace-toolbar-trigger {
-        height: 32px;
-        gap: 0.2rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-action-btn {
-        padding-inline: 0.28rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-action-btn--primary,
-    .workspace-view--arranger .workspace-arranger-action-btn--edit,
-    .workspace-view--arranger #shareHubBtn {
-        padding-inline: 0.58rem;
-    }
-
-    .workspace-view--arranger .workspace-arranger-toolbar-trigger--key,
-    .workspace-view--arranger .workspace-arranger-toolbar-trigger--seed {
-        justify-content: space-between;
-        min-width: min(10.75rem, 100%);
-    }
-
-    .workspace-view--arranger .workspace-toolbar-trigger-copy {
-        gap: 0.28rem;
-    }
-
-    .workspace-view--arranger .workspace-toolbar-trigger-label,
-    .workspace-view--arranger .workspace-toolbar-trigger-value {
-        font-size: 0.78rem;
-    }
-
     .workspace-toolbar-panel {
         gap: 0.65rem;
         padding: 0.7rem;
@@ -276,129 +54,8 @@
         width: min(100%, 7rem);
     }
 
-    .workspace-view--arranger .workspace-arranger-controls-panel .key-controls {
-        justify-content: flex-start;
-        gap: 0.2rem;
-    }
-
     .workspace-toolbar-panel__button {
         min-height: 32px;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow: hidden;
-    }
-
-    .workspace-view--arranger .workspace-arranger-chords .display-area {
-        height: 100%;
-        max-height: none;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-        scroll-margin-block: 12vh;
-    }
-
-    .workspace-view--studio {
-        gap: 0.75rem;
-    }
-
-    .workspace-view--studio,
-    .workspace-view--studio .workspace-columns,
-    .workspace-view--studio .workspace-stack {
-        width: 100%;
-    }
-
-    .workspace-view--studio .workspace-columns {
-        gap: 0.6rem;
-    }
-
-    .workspace-view--studio .workspace-studio-live-mix {
-        gap: 0.75rem;
-        padding: 0.9rem;
-    }
-
-    .workspace-view--studio .workspace-studio-live-mix-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.55rem;
-    }
-
-    .workspace-view--studio .workspace-studio-live-mix-header h2 {
-        font-size: 0.98rem;
-    }
-
-    .workspace-view--studio .workspace-studio-live-mix-tools {
-        width: 100%;
-        margin-left: 0;
-        justify-content: space-between;
-        gap: 0.5rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mixer-button {
-        align-self: flex-start;
-    }
-
-    .workspace-view--studio .workspace-studio-mixer-button,
-    .workspace-view--studio .workspace-studio-genre-button {
-        width: auto;
-        max-width: 100%;
-        justify-content: space-between;
-        padding-inline: 0.7rem;
-    }
-
-    .workspace-view--studio .workspace-studio-live-mix-rows {
-        gap: 0.6rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row {
-        gap: 0.75rem;
-        padding: 0.8rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-main {
-        gap: 0.75rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-icon {
-        width: 2.3rem;
-        height: 2.3rem;
-        border-radius: 12px;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-heading {
-        gap: 0.4rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-heading h3 {
-        font-size: 0.92rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-copy p {
-        font-size: 0.78rem;
-    }
-
-    .workspace-view--studio .workspace-instrument-state {
-        padding: 0.24rem 0.45rem;
-        font-size: 0.68rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mix-row-actions {
-        gap: 0.35rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mixer-button,
-    .workspace-view--studio .workspace-studio-mix-menu-trigger,
-    .workspace-view--studio .power-btn {
-        height: 30px;
-        font-size: 0.95rem;
-    }
-
-    .workspace-view--studio .workspace-studio-mixer-button,
-    .workspace-view--studio .workspace-studio-mix-menu-trigger {
-        width: auto;
-        padding: 0 0.65rem 0 0.72rem;
     }
 
     .workspace-studio-surface--modal {
@@ -466,11 +123,6 @@
         gap: 0.5rem;
     }
 
-    .workspace-studio-surface--settings .grid-2-col {
-        grid-template-columns: 1fr;
-        gap: 0.55rem;
-    }
-
     .workspace-studio-surface--settings .setting-group,
     .workspace-studio-surface--band-feel .setting-group,
     .workspace-studio-surface-card {
@@ -516,10 +168,6 @@
     .workspace-studio-surface--settings .setting-control input[type="range"],
     .workspace-studio-surface--band-feel .setting-control input[type="range"] {
         width: clamp(92px, 36vw, 156px);
-    }
-
-    .workspace-view--studio .workspace-studio-mix-menu-label {
-        font-size: 0.72rem;
     }
 }
 

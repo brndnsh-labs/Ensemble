@@ -1,7 +1,7 @@
 // @ts-nocheck
 import type { Locator, Page } from '@playwright/test';
 import pkg from '@playwright/test';
-import { gotoHydrated } from './helpers/nav.js';
+import { gotoHydrated, openSettings } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -48,21 +48,44 @@ test.describe('Modals Responsiveness @ui', () => {
     });
 
     test('Settings Modal - Centering and Content', async ({ page }) => {
-        // Open settings modal
-        await page.click('#settingsBtn');
+        // Open settings modal (via the topbar overflow menu)
+        await openSettings(page);
 
         // Wait for modal to be visible
         await page.waitForSelector('#settingsOverlay', { state: 'visible' });
         const settingsModal = page.locator('#settingsOverlay .settings-content');
         await expect(settingsModal).toBeVisible();
 
-        // Verify content
-        await expect(settingsModal).toContainText('Visuals & Interface');
+        // Tabbed settings: the Appearance section hosts the theme picker.
+        await settingsModal.getByRole('tab', { name: 'Appearance' }).click();
         await expect(settingsModal).toContainText('Theme');
+        await expect(settingsModal.locator('.theme-picker')).toBeVisible();
 
         // Close modal
         await page.click('#closeSettingsBtn');
         await page.waitForSelector('#settingsOverlay', { state: 'hidden' });
+    });
+
+    test('Settings panel keeps scroll position when a control updates state', async ({ page }) => {
+        // Regression: changing a setting (e.g. the session-timer stepper) used to
+        // re-run the modal-a11y focus effect and snap the panel back to the top.
+        await openSettings(page);
+        const panel = page.locator('#settingsOverlay .settings-content');
+        await expect(panel).toBeVisible();
+
+        // Scroll to the bottom of the Playback tab, then toggle the last control.
+        await panel.evaluate((el) => {
+            el.scrollTop = el.scrollHeight;
+        });
+        const before = await panel.evaluate((el) => el.scrollTop);
+        expect(before).toBeGreaterThan(0);
+
+        await page.locator('label.toggle-switch[for="applyPresetSettingsCheck"]').click();
+        // Wait past the old 50ms focus-on-open timeout that caused the jump.
+        await page.waitForTimeout(150);
+
+        const after = await panel.evaluate((el) => el.scrollTop);
+        expect(Math.abs(after - before)).toBeLessThan(5);
     });
 
     test('Inline editor — content layout', async ({ page }) => {

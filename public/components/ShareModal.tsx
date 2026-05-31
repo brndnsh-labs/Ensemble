@@ -5,6 +5,7 @@ import { generateShareUrl } from '../sharing.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
+import { Icon } from './Icon.jsx';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
@@ -179,31 +180,41 @@ export function ShareModal() {
                                 <div class="instrument-toggle-container">
                                     <Toggle checked={includeSolo} onChange={setIncludeSolo} />
                                 </div>
-                                <span class="instrument-toggle-label">🎺 Soloist</span>
+                                <span class="instrument-toggle-label">
+                                    <Icon name="soloist" /> Soloist
+                                </span>
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
                                     <Toggle checked={includeBass} onChange={setIncludeBass} />
                                 </div>
-                                <span class="instrument-toggle-label">🎸 Bass</span>
+                                <span class="instrument-toggle-label">
+                                    <Icon name="bass" /> Bass
+                                </span>
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
                                     <Toggle checked={includeChords} onChange={setIncludeChords} />
                                 </div>
-                                <span class="instrument-toggle-label">🎹 Chords</span>
+                                <span class="instrument-toggle-label">
+                                    <Icon name="chords" /> Chords
+                                </span>
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
                                     <Toggle checked={includeHarmony} onChange={setIncludeHarmony} />
                                 </div>
-                                <span class="instrument-toggle-label">🎻 Harmony</span>
+                                <span class="instrument-toggle-label">
+                                    <Icon name="harmony" /> Harmony
+                                </span>
                             </div>
                             <div class="instrument-toggle-row">
                                 <div class="instrument-toggle-container">
                                     <Toggle checked={includeDrums} onChange={setIncludeDrums} />
                                 </div>
-                                <span class="instrument-toggle-label">🥁 Drums</span>
+                                <span class="instrument-toggle-label">
+                                    <Icon name="drums" /> Drums
+                                </span>
                             </div>
                         </div>
 
@@ -237,7 +248,9 @@ export function ShareModal() {
                         <h3>2. Select Destination</h3>
                         <div class="flex-col share-destination-stack">
                             <div class="help-card share-card">
-                                <h4 class="share-card-title">🔗 Cloud Link</h4>
+                                <h4 class="share-card-title">
+                                    <Icon name="link" /> Cloud Link
+                                </h4>
                                 <p class="text-mini-muted share-card-copy">
                                     Generates a unique URL containing your exact mixer levels and
                                     instrument choices.
@@ -254,14 +267,16 @@ export function ShareModal() {
                                             class="secondary-btn share-action-btn"
                                             onClick={handleNativeShare}
                                         >
-                                            📤 Share
+                                            <Icon name="upload" /> Share
                                         </button>
                                     )}
                                 </div>
                             </div>
 
                             <div class="help-card share-card share-card--accent">
-                                <h4 class="share-card-title">🎹 DAW MIDI File</h4>
+                                <h4 class="share-card-title">
+                                    <Icon name="note" /> DAW MIDI File
+                                </h4>
                                 <p class="text-mini-muted share-card-copy">
                                     Download a multi-track MIDI file for use in Logic, Ableton, or
                                     other DAWs.
@@ -289,7 +304,9 @@ export function ShareModal() {
                             </div>
 
                             <div class="help-card share-card share-card--accent">
-                                <h4 class="share-card-title">🎧 Audio File (WAV)</h4>
+                                <h4 class="share-card-title">
+                                    <Icon name="headphones" /> Audio File (WAV)
+                                </h4>
                                 <p class="text-mini-muted share-card-copy">
                                     Render the live arrangement to a stereo WAV — useful for sharing
                                     a take, posting a clip, or feeding into another tool.

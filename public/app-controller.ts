@@ -1,16 +1,46 @@
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
-import type { Mutable } from './types.js';
+import type { Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
 import { getStepsPerMeasure } from './utils.js';
 import { syncWorker } from './worker-client.js';
 
-export function applyTheme(theme: string): void {
-    const { playback } = getState();
-    const currentTheme = playback.theme;
+/** Resolve a light/dark preference to a concrete mode. 'auto' follows the OS. */
+export function resolveMode(mode: ThemeMode): 'light' | 'dark' {
+    if (mode === 'auto') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return mode;
+}
 
-    if (theme !== currentTheme) {
-        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'theme', value: theme });
+/** Write the resolved palette + light/dark mode to `<html>`. Single source of
+ *  truth shared by the pre-mount paint (main.ts), the HYDRATE effect, and the
+ *  reactive App-level effect (which also wires the prefers-color-scheme
+ *  listener while mode === 'auto'). */
+export function applyThemeToDom(palette: Palette, mode: ThemeMode): void {
+    const resolved = resolveMode(mode);
+    const root = document.documentElement;
+    root.setAttribute('data-palette', palette);
+    root.setAttribute('data-mode', resolved);
+    root.style.colorScheme = resolved;
+}
+
+/** Choose the color-palette identity. The App-level resolver picks up the
+ *  state change and rewrites `<html data-palette>`. */
+export function setPalette(palette: Palette): void {
+    const { playback } = getState();
+    if (palette !== playback.palette) {
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'palette', value: palette });
+        saveCurrentState();
+    }
+}
+
+/** Choose the light/dark preference ('auto' follows the OS). The App-level
+ *  resolver picks up the state change and rewrites `<html data-mode>`. */
+export function setMode(mode: ThemeMode): void {
+    const { playback } = getState();
+    if (mode !== playback.mode) {
+        dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'mode', value: mode });
         saveCurrentState();
     }
 }

@@ -8,6 +8,7 @@ const { playback } = getState();
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
+import { Icon, type IconName } from './Icon.jsx';
 import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
@@ -69,14 +70,14 @@ function updateInstrumentAudio(
 interface InstrumentMixerStripProps {
     module: StudioInstrumentModule;
     accent?: string;
-    icon?: string;
+    iconName?: IconName;
     label?: string;
 }
 
 export function InstrumentMixerStrip({
     module,
     accent = '',
-    icon = '',
+    iconName,
     label,
 }: InstrumentMixerStripProps) {
     const state = getInstrumentState(module);
@@ -95,9 +96,9 @@ export function InstrumentMixerStrip({
             class={`workspace-studio-mixer-strip ${accent ? `workspace-studio-mixer-strip--${accent}` : ''}`}
         >
             <div class="workspace-studio-mixer-strip-heading">
-                {icon && (
+                {iconName && (
                     <span class="workspace-studio-mixer-strip-icon" aria-hidden="true">
-                        {icon}
+                        <Icon name={iconName} />
                     </span>
                 )}
                 <h4>{title}</h4>

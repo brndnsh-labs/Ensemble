@@ -17,7 +17,8 @@ export const playback = deepSignal<GlobalContext>({
     isCountingIn: false,
     countInBeat: 0,
     isDrawing: false,
-    theme: 'auto',
+    palette: 'after-hours',
+    mode: 'auto',
     wakeLock: null,
     bandIntensity: 0.35,
     complexity: 0.3,
@@ -52,6 +53,7 @@ export const playback = deepSignal<GlobalContext>({
     countIn: true,
     visualFlash: false,
     haptic: false,
+    qualityColors: true, // color chord symbols by harmonic quality on the chart
     toasts: [] as any[],
     flashIntensity: 0,
     updateAvailable: false,
@@ -75,7 +77,8 @@ export function playbackReducer(action: Action): boolean {
     switch (action.type) {
         case ACTIONS.RESET_STATE:
             p.bpm = 100;
-            p.theme = 'auto';
+            p.palette = 'after-hours';
+            p.mode = 'auto';
             p.bandIntensity = 0.35;
             p.complexity = 0.3;
             p.autoIntensity = true;
@@ -83,6 +86,7 @@ export function playbackReducer(action: Action): boolean {
             p.countIn = true;
             p.visualFlash = false;
             p.haptic = false;
+            p.qualityColors = true;
             p.sessionTimer = 5;
             p.applyPresetSettings = false;
             p.conductorVelocity = 1.0;

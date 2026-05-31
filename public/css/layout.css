@@ -31,6 +31,29 @@ body {
         border-color var(--anim-normal) var(--anim-ease);
 }
 
+/* Atmosphere — a lamp-lit brass glow from the top and a whisper of film grain,
+   so surfaces read as warm lit space rather than flat fills. Both layers are
+   fixed, behind everything, and never intercept pointer events. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-background);
+    pointer-events: none;
+    background: var(--app-glow);
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-background);
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay;
+}
+
 #flashOverlay {
     position: fixed;
     inset: 0;
@@ -76,31 +99,6 @@ header {
     border-bottom: 1px solid var(--border-color);
 }
 
-#settingsBtn {
-    padding: var(--space-2);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 1.2rem;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition:
-        color var(--anim-fast) var(--anim-ease),
-        background-color var(--anim-fast) var(--anim-ease),
-        box-shadow var(--anim-fast) var(--anim-ease);
-}
-
-#settingsBtn:hover {
-    background: color-mix(in srgb, var(--accent-color), transparent 92%);
-}
-
-#settingsBtn:focus-visible {
-    outline: 2px solid var(--focus-ring-color);
-    outline-offset: 2px;
-}
-
 @media (max-width: 600px) {
     header {
         padding: 0.5rem 0.1rem;
@@ -109,12 +107,6 @@ header {
         max-width: 100%;
         overflow: hidden;
         justify-content: space-between;
-    }
-
-    .app-title-group {
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow: hidden;
     }
 
     h1 {
@@ -160,12 +152,6 @@ header {
         display: none;
     }
 
-    #settingsBtn {
-        margin-right: 0; /* Removed negative margin to prevent clipping */
-        padding: 0.4rem 0.2rem;
-        font-size: 1.2rem;
-    }
-
     #tapBtn {
         padding: 0.2rem 0.25rem;
         font-size: 0.65rem;
@@ -180,15 +166,27 @@ header {
 
 h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: 0.005em;
     display: inline-block;
     width: fit-content;
-    background: linear-gradient(45deg, var(--accent-color), var(--violet));
+    /* Brushed-brass sheen rather than a flat fill */
+    background: linear-gradient(168deg, var(--brass-light), var(--brass) 62%, var(--brass-light));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     color: transparent;
     white-space: nowrap; /* Prevent title wrapping */
+}
+
+/* Display face for the headline tier + chart section names — the "engraved
+   lead sheet" voice. Small utility eyebrows (.workspace-kicker) stay grotesk. */
+h2,
+h3,
+.section-label {
+    font-family: var(--font-display);
 }
 
 .main-controls {
@@ -199,7 +197,7 @@ h1 {
 
 .primary-btn {
     background-color: var(--accent-color);
-    color: white;
+    color: var(--base03);
     border: none;
     padding: var(--space-2) var(--space-5);
     border-radius: var(--radius-md);
@@ -207,7 +205,7 @@ h1 {
     cursor: pointer;
     transition: all var(--anim-fast) var(--anim-ease);
     font-size: var(--font-base);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--glow-brass);
     min-width: 100px; /* Prevent width shifting between START/STOP */
     height: 42px; /* Fixed height to prevent vertical jitter */
     display: inline-flex;
@@ -227,7 +225,10 @@ h1 {
 
 .primary-btn.playing {
     background-color: var(--error-color);
-    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+    color: var(--base1);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--error-color), transparent 35%),
+        0 0 22px -6px var(--error-color);
 }
 
 .control-group {
@@ -282,10 +283,15 @@ button:focus-visible {
     border-color: var(--accent-color);
 }
 
-.rel-key-btn {
-    background: rgba(148, 163, 184, 0.1);
-    color: var(--accent-color);
-    border: 1px solid rgba(148, 163, 184, 0.2);
+/* Tactile press: every button dips slightly the instant it's pressed, giving
+   immediate "the app heard you" feedback — even when the click triggers a
+   lazy-loaded chunk (e.g. opening Settings) that takes a beat to render.
+   Buttons with their own :active transform (e.g. .primary-btn) win on
+   specificity and keep their bespoke press. Suppressed under reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+    button:active {
+        transform: scale(0.96);
+    }
 }
 
 .header-btn {
@@ -301,10 +307,12 @@ button:focus-visible {
 
 .header-btn--primary {
     background: var(--accent-color);
-    color: white;
+    /* Dark ink on brass reads like an engraved key — higher contrast than white. */
+    color: var(--base03);
     border-color: var(--accent-color);
-    font-weight: 600;
+    font-weight: 700;
     padding-inline: var(--space-3);
+    box-shadow: var(--glow-brass);
 }
 
 .header-btn--primary:hover {
@@ -316,7 +324,7 @@ button:focus-visible {
     width: 32px;
     min-width: 32px;
     padding: 0;
-    font-size: 1rem;
+    font-size: 1.15rem;
 }
 
 @media (pointer: coarse) {
@@ -332,21 +340,6 @@ button:focus-visible {
 }
 
 /* --- Layout --- */
-.app-main-layout {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-        "arranger sidebar"
-        "visualizer sidebar"
-        "empty sidebar";
-    gap: 1.5rem;
-    padding: 1.5rem;
-    max-width: 1600px;
-    margin: 0 auto;
-    width: 100%;
-    min-height: calc(100vh - 80px);
-}
 
 #panel-arranger {
     grid-area: arranger;
@@ -363,20 +356,7 @@ button:focus-visible {
     min-height: 60px;
 }
 
-@media (max-width: 1100px) {
-    .app-main-layout {
-        grid-template-columns: 1fr 320px;
-    }
-}
-
 @media (max-width: 900px) {
-    .app-main-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        padding: 0.5rem;
-    }
-
     #panel-arranger,
     #panel-visualizer {
         grid-area: auto;
@@ -397,15 +377,6 @@ button:focus-visible {
         order: 4;
         margin-bottom: 2rem;
     }
-}
-
-.library-label {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
-    display: block;
 }
 
 select {
@@ -438,7 +409,6 @@ select:focus {
 }
 
 /* Specific selects that should not be full-width */
-#timeSigSelect,
 #keySelect,
 #drumBarsSelect,
 #swingBaseSelect {
@@ -448,110 +418,7 @@ select:focus {
     height: 32px;
 }
 
-#timeSigSelect {
-    min-width: 60px;
-}
-
 select option {
     background-color: var(--panel-color);
     color: var(--text-color);
-}
-
-.app-title-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-}
-
-.app-subtitle {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.app-main-layout.workspace-shell {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 1.5rem;
-    padding: 1.5rem;
-    max-width: 1600px;
-    margin: 0 auto;
-    width: 100%;
-    min-height: calc(100vh - 80px);
-    align-items: start;
-}
-
-.workspace-content {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.workspace-stage {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    animation: workspaceStageEnter var(--anim-normal) var(--anim-ease);
-}
-
-.workspace-stage--arranger {
-    --workspace-accent: var(--accent-color);
-}
-
-.workspace-stage--studio {
-    --workspace-accent: var(--violet);
-}
-
-.workspace-stage--visuals {
-    --workspace-accent: var(--cyan);
-}
-
-.workspace-view {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    min-width: 0;
-    min-height: 0;
-}
-.workspace-studio-genre-header {
-    flex-direction: column;
-}
-
-.workspace-studio-genre-pills {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: visible;
-    padding-bottom: 0;
-}
-
-.workspace-stats-grid,
-.workspace-shortcut-grid,
-.workspace-launch-grid,
-.workspace-status-grid {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.workspace-action-row {
-    flex-direction: column;
-}
-
-.workspace-action-row > * {
-    width: 100%;
-}
-
-.workspace-visualizer-area {
-    min-height: 260px;
-}
-
-@media (max-width: 600px) {
-    .app-subtitle {
-        display: none;
-    }
 }

@@ -1,5 +1,6 @@
 import { invokeToastAction } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
+import { Icon } from './Icon.jsx';
 
 interface Toast {
     id: string;
@@ -19,8 +20,16 @@ export function NotificationLayer() {
         <div id="notificationLayer" class="notification-layer" role="alert" aria-live="polite">
             {toasts.map((t) => (
                 <div key={t.id} class="notification-box">
-                    <span class="notification-icon">
-                        {t.type === 'error' ? '⚠️' : t.type === 'success' ? '✅' : 'ℹ️'}
+                    <span class="notification-icon" aria-hidden="true">
+                        <Icon
+                            name={
+                                t.type === 'error'
+                                    ? 'warn'
+                                    : t.type === 'success'
+                                      ? 'success'
+                                      : 'info'
+                            }
+                        />
                     </span>
                     <div class="notification-content">
                         <div class="notification-message">{t.message}</div>

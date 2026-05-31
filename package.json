@@ -65,6 +65,8 @@
         "workbox-precaching": "^7.4.1"
     },
     "dependencies": {
+        "@fontsource/geist-mono": "^5.2.8",
+        "@fontsource/hanken-grotesk": "^5.2.8",
         "@preact/signals": "^2.9.0",
         "deepsignal": "^1.6.0",
         "preact": "^10.29.1"

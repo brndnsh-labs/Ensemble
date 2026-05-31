@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTheme, setBpm } from '../../../public/app-controller.js';
+import { applyThemeToDom, setBpm } from '../../../public/app-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { initAudio, restoreGains } from '../../../public/engine/engine.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
@@ -18,7 +18,7 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
 }));
 vi.mock('../../../public/app-controller.js', () => ({
     setBpm: vi.fn(),
-    applyTheme: vi.fn(),
+    applyThemeToDom: vi.fn(),
 }));
 vi.mock('../../../public/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
@@ -87,10 +87,11 @@ describe('State Effects Handler', () => {
     });
 
     it('should apply theme and init MIDI on HYDRATE', () => {
-        stateMap.playback.theme = 'light';
+        stateMap.playback.palette = 'midnight';
+        stateMap.playback.mode = 'light';
         stateMap.midi.enabled = true;
         handleEffects('HYDRATE', {}, stateMap, { dispatch });
-        expect(applyTheme).toHaveBeenCalledWith('light');
+        expect(applyThemeToDom).toHaveBeenCalledWith('midnight', 'light');
         expect(initMIDI).toHaveBeenCalled();
     });
 

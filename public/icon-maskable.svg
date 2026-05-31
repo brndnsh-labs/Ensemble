@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ensemble">
-  <!-- Ensemble icon — an organic waveform of the five instrument hues (chords blue, bass green, soloist magenta, harmony violet, drums taupe) under the After-Hours lamp glow on warm ink. -->
+  <!-- Maskable / apple-touch variant: full-bleed ink ground (no rounded corners) so the launcher applies its own mask; waveform sits inside the 40%-radius safe zone. -->
   <defs>
-    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="inkm" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1a1610"/>
       <stop offset="1" stop-color="#120f0a"/>
     </linearGradient>
-    <radialGradient id="lamp" cx="0.5" cy="0.08" r="0.78">
+    <radialGradient id="lampm" cx="0.5" cy="0.08" r="0.78">
       <stop offset="0" stop-color="#d9a441" stop-opacity="0.20"/>
       <stop offset="0.62" stop-color="#d9a441" stop-opacity="0"/>
     </radialGradient>
@@ -17,8 +17,8 @@
       <stop offset="1" stop-color="#b8a98a"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="116" fill="url(#ink)"/>
-  <rect width="512" height="512" rx="116" fill="url(#lamp)"/>
+  <rect width="512" height="512" fill="url(#inkm)"/>
+  <rect width="512" height="512" fill="url(#lampm)"/>
   <!-- waveform: 13 gradient lines, organic envelope, centered on the mid-axis -->
   <rect x="98.5" y="216" width="15" height="80" rx="7.5" fill="url(#wave)"/>
   <rect x="123.5" y="194" width="15" height="124" rx="7.5" fill="url(#wave)"/>

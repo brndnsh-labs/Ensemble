@@ -100,7 +100,7 @@
     gap: 0.15rem;
     padding: 0;
     border: 1px solid color-mix(in srgb, var(--chip-accent) 35%, transparent);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--chip-accent) 10%, transparent);
     color: var(--text-primary);
     overflow: hidden;
@@ -120,13 +120,13 @@
 .preset-library-chip.active {
     background: var(--chip-accent);
     border-color: var(--chip-accent);
-    color: #000;
+    color: var(--base03);
 }
 
 .preset-library-chip.active .preset-library-chip-name,
 .preset-library-chip.active .preset-library-chip-pin,
 .preset-library-chip.active .preset-library-chip-delete {
-    color: #000;
+    color: var(--base03);
 }
 
 .preset-library-chip-name {
@@ -166,7 +166,7 @@
     font-size: 0.85rem;
     line-height: 1;
     cursor: pointer;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     transition:
         background-color 120ms var(--anim-ease),
         color 120ms var(--anim-ease);
@@ -278,58 +278,6 @@
 }
 
 /* --- Library modal layout: pin the header, scroll only the body. --- */
-.workspace-library-modal {
-    overflow: hidden;
-    padding: 0;
-    /* Lock to a consistent height so the sheet doesn't resize while the user
-       searches and chips collapse out. min() so it fits short viewports. */
-    height: min(85vh, 700px);
-    max-height: min(85vh, 700px);
-}
-
-.workspace-library-header {
-    flex-shrink: 0;
-    padding: 1.25rem 1.5rem 0.85rem;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--panel-color);
-}
-
-.workspace-library-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    /* No padding-top — the sticky toolbar sits flush so scrolled chips can't
-       leak through the gap above it. Bottom + side padding stay. */
-    padding: 0 1.5rem 1.5rem;
-}
-
-.workspace-library-body .preset-library-toolbar {
-    /* Toolbar stretches into the body's side padding so its sticky background
-       fully covers the scroll viewport edge-to-edge. */
-    margin: 0 -1.5rem 0.5rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-    border-left: 0;
-    border-right: 0;
-    border-top: 0;
-    border-radius: 0;
-}
-
-@media (max-width: 720px) {
-    .workspace-library-header {
-        padding: 1rem 1rem 0.7rem;
-    }
-
-    .workspace-library-body {
-        padding: 0 1rem 1.25rem;
-    }
-
-    .workspace-library-body .preset-library-toolbar {
-        margin: 0 -1rem 0.4rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-}
 
 /* --- View transition tuning. ---
    Pinning a chip dispatches into document.startViewTransition so the

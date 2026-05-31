@@ -170,6 +170,8 @@ export interface ArrangerState {
     readonly grouping: number[] | null;
     /** 6-char hex PRNG seed driving soloist + drum generation for this song. */
     readonly seed: string;
+    /** When true, re-roll the seed on every playback instead of reusing a fixed one. */
+    readonly randomizeSeed: boolean;
 }
 
 export interface ConductorState {
@@ -986,6 +988,19 @@ export interface AudioGraph {
     readonly drums: InstrumentBus;
 }
 
+/** Curated color-palette identities. Each has a light + dark variant in
+ *  `public/css/variables.css`, selected via `<html data-palette>`. */
+export type Palette =
+    | 'after-hours'
+    | 'midnight'
+    | 'high-contrast'
+    | 'forest'
+    | 'sunset'
+    | 'synthwave';
+
+/** Light/dark preference. 'auto' resolves against the OS at apply time. */
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 export interface GlobalContext {
     /** The Web Audio API context. */
     readonly audio: AudioContext | null;
@@ -1011,8 +1026,13 @@ export interface GlobalContext {
     readonly countInBeat: number;
     /** Whether the visualizer loop is active. */
     readonly isDrawing: boolean;
-    /** The current UI theme ('auto', 'light', 'dark'). */
-    readonly theme: string;
+    /** The chosen color palette identity (instrument hues + accent). Each
+     *  palette has a light and a dark variant; `mode` selects which. */
+    readonly palette: Palette;
+    /** Light/dark preference. 'auto' follows the OS (prefers-color-scheme);
+     *  'light'/'dark' force a variant. Resolved to a concrete mode at apply
+     *  time and written to `<html data-mode>`. */
+    readonly mode: ThemeMode;
     /** The screen wake lock object. */
     readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */
@@ -1067,6 +1087,8 @@ export interface GlobalContext {
     readonly visualFlash: boolean;
     /** Whether haptic feedback is enabled. */
     readonly haptic: boolean;
+    /** Whether chord symbols are tinted by harmonic quality on the chart. */
+    readonly qualityColors: boolean;
     /** List of active toast notifications. */
     readonly toasts: Array<{ id: string; message: string; actions?: string[] }>;
     /** Current intensity of the screen flash effect. */
@@ -1372,6 +1394,7 @@ export interface ActionPayloadMap {
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
     SET_SONG_SEED: string;
+    SET_SEED_RANDOMIZE: boolean;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
     UPDATE_SB: ActionPayloadUpdateSB;
     SET_SWING: number;
@@ -1451,6 +1474,7 @@ export const ACTIONS = {
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
     SET_SONG_SEED: 'SET_SONG_SEED',
+    SET_SEED_RANDOMIZE: 'SET_SEED_RANDOMIZE',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',
     UPDATE_SB: 'UPDATE_SB',
 

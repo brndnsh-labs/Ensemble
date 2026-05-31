@@ -148,6 +148,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface used by the editor modal and related flows. |
 | **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
 | **Controls** | `public/components/Transport.tsx` | Playback controls and tempo. |
+| **Icons** | `public/components/Icon.tsx` | Inline-SVG icon component (`<Icon name=… />`); tints via `currentColor`, sizes in em. |
+| **Icons** | `public/components/icons.tsx` | The Ensemble icon set — `IconName` union + 24×24 path registry (controls + instrument glyphs). |
 | **Visuals** | `public/components/Visualizer.tsx` | Canvas rendering container. |
 | **Library** | `public/components/PresetLibrary.tsx` | Chord progression library modal. |
 | **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio. |

@@ -1,5 +1,5 @@
 import type { RefObject } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 
 const FOCUSABLE_SELECTOR =
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -15,6 +15,14 @@ export function useModalA11y(
     onClose: () => void,
     ariaLabel?: string,
 ): void {
+    // Hold onClose in a ref so the focus/trap effect can run *once per open*
+    // (deps below) rather than on every render. Consumers pass an inline
+    // closure for onClose, so depending on it directly re-ran this effect on
+    // each re-render — which re-focused the modal's first element and scrolled
+    // the panel back to the top whenever its contents updated (e.g. a stepper).
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
     useEffect(() => {
         if (!isOpen || !ref.current) {
             return;
@@ -31,7 +39,7 @@ export function useModalA11y(
         const handleKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.stopPropagation();
-                onClose();
+                onCloseRef.current();
                 return;
             }
             if (e.key !== 'Tab') {
@@ -74,5 +82,5 @@ export function useModalA11y(
                 opener.focus();
             }
         };
-    }, [isOpen, ref, onClose, ariaLabel]);
+    }, [isOpen, ref, ariaLabel]);
 }

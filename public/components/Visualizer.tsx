@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { resolveMode } from '../app-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { switchMeasure } from '../instrument-controller.js';
 import type { StateMap } from '../state.js';
@@ -8,6 +9,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
 import {
     resolveVisualizerTrack,
+    VISUALIZER_CHORD_SWATCHES,
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
 } from '../visualizer-events.js';
@@ -76,9 +78,10 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     const loopRef = useRef<number | null>(null);
     const prevPlayingRef = useRef(false);
 
-    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState((s) => ({
+    const { isPlaying, palette, mode, bpm, timeSignature } = useEnsembleState((s) => ({
         isPlaying: s.playback.isPlaying,
-        theme: s.playback.theme,
+        palette: s.playback.palette,
+        mode: s.playback.mode,
         bpm: s.playback.bpm,
         timeSignature: s.arranger.timeSignature,
     }));
@@ -146,19 +149,19 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             return;
         }
         const style = getComputedStyle(document.documentElement);
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const isDark = resolveMode(mode) === 'dark';
         const resolve = (prop: string, fallback: string) =>
             style.getPropertyValue(prop).trim() || fallback;
 
         const themeCache: Record<string, string | string[]> = {
-            bgColor: resolve('--surface-sunken', isDark ? '#0f172a' : '#f8fafc'),
+            bgColor: resolve('--surface-sunken', isDark ? '#14110d' : '#f6efe1'),
             labelRailBg: isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(226, 232, 240, 0.92)',
             laneBg: isDark ? 'rgba(255, 255, 255, 0.025)' : 'rgba(255, 255, 255, 0.82)',
             laneAltBg: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(226, 232, 240, 0.72)',
             keyWhite: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ffffff',
             keyBlack: isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(148, 163, 184, 0.42)',
             keySeparator: resolve('--border-color', isDark ? '#334155' : '#e2e8f0'),
-            gridColorMeasure: isDark ? 'rgba(56, 189, 248, 0.4)' : 'rgba(2, 132, 199, 0.3)',
+            gridColorMeasure: isDark ? 'rgba(217, 164, 65, 0.34)' : 'rgba(176, 125, 31, 0.3)',
             gridColorBeat: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             playheadColor: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)',
             outlineColor: isDark ? 'rgba(0, 0, 0, 0.85)' : '#ffffff',
@@ -170,22 +173,30 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             laneGuideColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
             separatorColor: resolve('--border-color', isDark ? '#334155' : '#cbd5e1'),
             chordMarkerColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(15,23,42,0.14)',
-            fillGradientTop: 'rgba(211, 54, 130, 0)',
-            fillGradientMid: isDark ? 'rgba(211, 54, 130, 0.18)' : 'rgba(211, 54, 130, 0.12)',
-            fillGradientBottom: 'rgba(211, 54, 130, 0)',
-            chordColors: [
-                resolve('--accent-color', '#268bd2'),
-                resolve('--green', '#859900'),
-                resolve('--orange', '#cb4b16'),
-                resolve('--magenta', '#d33682'),
-            ],
+            fillGradientTop: 'rgba(224, 86, 143, 0)',
+            fillGradientMid: isDark ? 'rgba(224, 86, 143, 0.18)' : 'rgba(176, 36, 104, 0.12)',
+            fillGradientBottom: 'rgba(224, 86, 143, 0)',
+            // Single source of truth with the legend (VisualizerOverlay reads
+            // the same constant) so renderer + legend can't drift.
+            chordColors: VISUALIZER_CHORD_SWATCHES.map((s) => resolve(s.cssVar, s.fallback)),
         };
         viz.setTheme(themeCache);
     };
 
     useEffect(() => {
+        // The canvas reads its colors through JS (getComputedStyle + the resolved
+        // isDark), so unlike the CSS-driven UI it won't re-theme on its own. Mirror
+        // App.tsx: while mode is 'auto', re-run on OS light/dark flips so an open
+        // overlay re-themes live.
         updateTheme(vizRef.current);
-    }, [theme]);
+
+        if (mode === 'auto') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const onChange = () => updateTheme(vizRef.current);
+            mediaQuery.addEventListener('change', onChange);
+            return () => mediaQuery.removeEventListener('change', onChange);
+        }
+    }, [palette, mode]);
 
     useEffect(() => {
         if (vizRef.current) {

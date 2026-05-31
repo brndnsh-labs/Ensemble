@@ -2,6 +2,13 @@
     "version": "0.2",
     "language": "en",
     "words": [
+        "IDOR",
+        "HSTS",
+        "creds",
+        "unvalidated",
+        "vbscript",
+        "clickjacking",
+        "nosniff",
         "autoplay",
         "Jaccard",
         "hrefs",
@@ -293,7 +300,16 @@
         "allpass",
         "allpasses",
         "treemap",
-        "brndn"
+        "brndn",
+        "Hanken",
+        "hanken",
+        "Grotesk",
+        "grotesk",
+        "fontsource",
+        "Geist",
+        "woff",
+        "opsz",
+        "synthwave"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

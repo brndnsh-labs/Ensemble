@@ -47,7 +47,10 @@ body.modal-open {
     border-radius: 12px;
     width: 95%;
     max-width: 800px;
-    max-height: 85vh;
+    /* Fixed height so the modal stays one stable size regardless of which tab
+       is selected — short tabs (Appearance/About) reserve the same box, taller
+       tabs (Playback/MIDI) scroll within it. */
+    height: min(85vh, 640px);
     overflow-y: auto;
     border: 1px solid var(--border-color);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
@@ -85,8 +88,82 @@ body.modal-open {
     }
 }
 
-.settings-controls {
-    margin-top: 1.5rem;
+/* Tabbed settings: a sticky section rail beside a single scrolling panel.
+   (.settings-content is the scroll container; the rail sticks to its top.) */
+.settings-body {
+    margin-top: 1.25rem;
+    display: flex;
+    gap: var(--space-5);
+    align-items: flex-start;
+}
+
+.settings-tabs {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    flex: 0 0 148px;
+    padding-right: var(--space-3);
+    border-right: 1px solid var(--border-color);
+}
+
+.settings-tab {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: var(--font-sm);
+    cursor: pointer;
+    transition:
+        background var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease),
+        border-color var(--anim-fast) var(--anim-ease);
+}
+
+.settings-tab:hover {
+    background: var(--input-bg);
+    color: var(--text-color);
+}
+
+.settings-tab.is-active {
+    background: color-mix(in srgb, var(--accent-color), transparent 86%);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 60%);
+    color: var(--accent-color);
+}
+
+.settings-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+/* Phone: rail becomes a horizontal, scrollable tab strip above the panel. */
+@media (max-width: 700px) {
+    .settings-body {
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .settings-tabs {
+        flex-direction: row;
+        flex: 0 0 auto;
+        gap: var(--space-2);
+        padding-right: 0;
+        padding-bottom: var(--space-2);
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        overflow-x: auto;
+    }
+
+    .settings-tab {
+        white-space: nowrap;
+    }
 }
 
 /* --- SurpriseMe modal (consolidated dice / templates / library) --- */
@@ -233,7 +310,7 @@ body.modal-open {
 }
 
 .surprise-me-seed-add:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-color);
 }
 
@@ -257,11 +334,11 @@ body.modal-open {
 .surprise-me-seed-confirm {
     padding: 0.55rem 0.9rem;
     border-radius: 8px;
-    background: var(--accent-color, #6aa3ff);
+    background: var(--accent-color);
     color: #fff;
     border: 0;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .surprise-me-seed-chips {
@@ -279,7 +356,7 @@ body.modal-open {
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: rgba(99, 102, 241, 0.15);
     color: var(--text-color);
     font-size: 0.85rem;
@@ -315,7 +392,7 @@ body.modal-open {
 .surprise-me-suggest-chip {
     appearance: none;
     padding: 0.25rem 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-mid, rgba(255, 255, 255, 0.78));
@@ -325,7 +402,7 @@ body.modal-open {
 }
 
 .surprise-me-suggest-chip:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-color);
 }
 
@@ -388,8 +465,8 @@ body.modal-open {
 
 .surprise-me-pull-item-label {
     font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--accent-primary, #6aa3ff);
+    font-weight: 700;
+    color: var(--accent-color);
 }
 
 .surprise-me-pull-item-value {
@@ -468,9 +545,9 @@ body.modal-open {
 }
 
 .surprise-me-value {
-    color: var(--accent-primary, #6aa3ff);
+    color: var(--accent-color);
     font-style: normal;
-    font-weight: 600;
+    font-weight: 700;
     margin-left: 0.4em;
 }
 
@@ -480,32 +557,6 @@ body.modal-open {
 
 .surprise-me-library-mode-group {
     width: 100%;
-}
-
-.generate-mode-toggle-group .button-group-btn {
-    flex: 1;
-    padding: 0.75rem;
-    font-size: 1rem;
-    border-radius: var(--radius-md);
-}
-
-.generate-template-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 1.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--input-bg);
-    color: var(--text-color);
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.2s;
-}
-
-.generate-template-card:hover {
-    border-color: var(--accent-color);
-    transform: translateY(-2px);
 }
 
 .generate-template-card-header {
@@ -527,22 +578,6 @@ body.modal-open {
     color: var(--text-muted);
 }
 
-/* Settings Grid for Desktop */
-@media (min-width: 900px) {
-    .settings-controls {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2rem;
-        align-items: start;
-    }
-
-    /* Make large sections or actions span full width if needed */
-    .settings-section:last-child {
-        grid-column: span 2;
-    }
-}
-
-.modal-header,
 .modal-header-shared {
     display: flex;
     justify-content: space-between;
@@ -553,7 +588,6 @@ body.modal-open {
     flex-shrink: 0;
 }
 
-.modal-header h2,
 .modal-header-shared h2 {
     margin: 0;
     font-size: 0.9rem;
@@ -575,7 +609,7 @@ body.modal-open {
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.55rem 0.9rem;
 }
 
@@ -615,7 +649,7 @@ body.modal-open {
     background: color-mix(in srgb, var(--input-bg), var(--card-bg) 30%);
     border: 1px solid color-mix(in srgb, var(--border-color), white 10%);
     padding: 0.75rem 0.85rem;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.01em;
 }
 
@@ -713,10 +747,10 @@ body.modal-open {
 }
 
 .help-card {
-    background: rgba(var(--accent-color-rgb), 0.1);
+    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
     padding: 1rem;
     border-radius: 8px;
-    border: 1px solid rgba(var(--accent-color-rgb), 0.2);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
 
 .help-card h4 {
@@ -996,10 +1030,6 @@ body.modal-open {
     margin-bottom: 1rem;
 }
 
-.setting-item {
-    margin-bottom: 1rem;
-}
-
 .setting-label {
     display: flex;
     justify-content: space-between;
@@ -1065,10 +1095,6 @@ input[type="range"] {
     }
 }
 
-.animate-in {
-    animation: fade-in-up var(--anim-normal) var(--anim-ease) forwards;
-}
-
 .section-card:hover {
     border-color: color-mix(in srgb, var(--accent-color), transparent 30%);
     box-shadow: 0 16px 32px rgba(2, 6, 23, 0.18);
@@ -1098,7 +1124,7 @@ input[type="range"] {
     flex-wrap: wrap;
     padding: 0.18rem;
     border: 1px solid var(--border-color);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--input-bg);
 }
 
@@ -1170,7 +1196,7 @@ input[type="range"] {
 
 .section-strip__label {
     flex: 0 0 auto;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.78rem;
     color: var(--text-primary);
     letter-spacing: 0.02em;
@@ -1265,6 +1291,10 @@ input[type="range"] {
 }
 
 .section-strip__lane {
+    /* Per-instrument identity color, set by the --<key> modifiers below.
+       Falls back to the brass accent if a lane has no instrument color. */
+    --lane-color: var(--accent-color);
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1274,8 +1304,6 @@ input[type="range"] {
     border: 1px solid var(--border-color);
     background: var(--bg-color);
     color: var(--text-secondary);
-    font-size: 0.65rem;
-    font-weight: 700;
     cursor: pointer;
     transition:
         background 120ms ease,
@@ -1286,32 +1314,76 @@ input[type="range"] {
     line-height: 1;
 }
 
-.section-strip__lane:hover {
-    border-color: var(--accent-color);
-    color: var(--accent-color);
+.section-strip__lane .icon {
+    width: 0.95rem;
+    height: 0.95rem;
 }
 
+/* Instrument identity colors (match the rail + visualizer). */
+.section-strip__lane--groove {
+    --lane-color: var(--groove-color);
+}
+.section-strip__lane--bass {
+    --lane-color: var(--bass-color);
+}
+.section-strip__lane--chords {
+    --lane-color: var(--chords-color);
+}
+.section-strip__lane--harmony {
+    --lane-color: var(--harmony-color);
+}
+.section-strip__lane--soloist {
+    --lane-color: var(--soloist-color);
+}
+
+.section-strip__lane:hover {
+    border-color: var(--lane-color);
+    color: var(--lane-color);
+}
+
+/* Follow global (default): dashed ring tinted to the instrument, glyph in its
+   color — present but "automatic." */
 .section-strip__lane--follow {
     border-style: dashed;
-    color: var(--text-muted);
+    border-color: color-mix(in srgb, var(--lane-color), transparent 55%);
+    background: transparent;
+    color: var(--lane-color);
 }
 
+/* Follow + globally off → dim, so a glance reads "not sounding right now." */
 .section-strip__lane--follow.section-strip__lane--muted {
-    opacity: 0.45;
+    opacity: 0.4;
 }
 
+/* Forced ON: filled with the instrument color, glyph punched out in the bg. */
 .section-strip__lane--on {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
+    background: var(--lane-color);
+    border-style: solid;
+    border-color: var(--lane-color);
     color: var(--bg-color);
 }
 
+/* Forced OFF: neutral muted ring with a diagonal slash across the glyph —
+   the icon-era replacement for the old letter strike-through. */
 .section-strip__lane--off {
     background: transparent;
-    color: var(--text-muted);
+    border-style: solid;
     border-color: var(--text-muted);
-    text-decoration: line-through;
-    text-decoration-thickness: 1.5px;
+    color: var(--text-muted);
+    opacity: 0.65;
+}
+
+.section-strip__lane--off::after {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    top: 50%;
+    height: 1.5px;
+    background: currentColor;
+    transform: rotate(-22deg);
+    transform-origin: center;
+    pointer-events: none;
 }
 
 /* Compact variant for the chord-visualizer (locked) view. */
@@ -1334,7 +1406,11 @@ input[type="range"] {
 .section-strip--compact .section-strip__lane {
     width: 1.35rem;
     height: 1.35rem;
-    font-size: 0.6rem;
+}
+
+.section-strip--compact .section-strip__lane .icon {
+    width: 0.85rem;
+    height: 0.85rem;
 }
 
 .section-strip--compact .section-strip__intensity {
@@ -1389,7 +1465,7 @@ input[type="range"] {
     border-radius: var(--radius-sm, 6px);
     padding: 0.4rem 0.25rem;
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     text-align: center;
     transition:
@@ -1401,14 +1477,14 @@ input[type="range"] {
 
 .chord-picker__root:hover,
 .chord-picker__quality:hover {
-    border-color: var(--accent-primary, #6aa3ff);
+    border-color: var(--accent-color);
     color: var(--text-high, #fff);
 }
 
 .chord-picker__root.is-active,
 .chord-picker__quality.is-active {
-    background: var(--accent-primary, #6aa3ff);
-    border-color: var(--accent-primary, #6aa3ff);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
     color: var(--bg-base, #1a1a1f);
 }
 
@@ -1453,8 +1529,7 @@ input[type="range"] {
     color: var(--text-primary);
 }
 
-.section-drag-handle:active,
-.section-card.is-dragging .section-drag-handle {
+.section-drag-handle:active {
     cursor: grabbing;
 }
 
@@ -1523,11 +1598,11 @@ input[type="range"] {
 }
 
 .section-actions-menu__btn--danger {
-    color: #d65b5b;
+    color: var(--error-color);
 }
 
 .section-actions-menu__btn--danger:hover {
-    background: color-mix(in srgb, #d65b5b, transparent 90%);
+    background: color-mix(in srgb, var(--error-color), transparent 90%);
 }
 
 /* Card-level drop-target indicator — a thin colored line at the top or bottom
@@ -1585,7 +1660,7 @@ input[type="range"] {
     align-items: center;
     min-height: 28px;
     padding: 0.1rem 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--accent-color), transparent 86%);
     border: 1px solid color-mix(in srgb, var(--accent-color), transparent 56%);
     color: var(--accent-color);
@@ -1704,7 +1779,7 @@ input[type="range"] {
     50% {
         border-color: var(--accent-hover);
         box-shadow: 0 0 0 10px transparent;
-        background: rgba(var(--chords-color-rgb), 0.1);
+        background: color-mix(in srgb, var(--chords-color) 10%, transparent);
     }
     100% {
         border-color: var(--border-color);
@@ -1719,13 +1794,12 @@ input[type="range"] {
 
 /* Arrangement Editor: Section Settings */
 
-.section-setting-item,
-.form-control-compact {
+.section-setting-item {
     display: flex;
     align-items: center;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.1rem 0.55rem;
     height: 34px;
 }
@@ -1752,7 +1826,7 @@ input[type="range"] {
     font-size: 0.78rem;
     width: auto;
     min-width: 92px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--input-bg);
     border: 1px solid var(--border-color);
 }
@@ -1860,7 +1934,7 @@ input[type="range"] {
 }
 
 .share-card--accent {
-    border-color: rgba(var(--accent-color-rgb), 0.3);
+    border-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .share-card-title {
@@ -1979,10 +2053,10 @@ input[type="range"] {
     background: var(--accent-color, #4af);
     color: white;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.9rem 2.6rem;
     font-size: 1.15rem;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: transform 0.1s ease;
 }
@@ -2007,4 +2081,124 @@ input[type="range"] {
 
 .audition-dismiss:hover {
     opacity: 1;
+}
+
+/* ── Theme picker (Settings → Appearance) ───────────────────────────────── */
+/* Full-width stacked field (label above), unlike the label|control SettingRow. */
+.settings-field-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) 0;
+}
+
+.theme-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: var(--space-2);
+    width: 100%;
+}
+
+.theme-swatch {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition:
+        border-color var(--anim-fast) var(--anim-ease),
+        box-shadow var(--anim-fast) var(--anim-ease),
+        transform var(--anim-fast) var(--anim-ease);
+}
+
+.theme-swatch:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 40%);
+}
+
+.theme-swatch.is-selected {
+    border-color: var(--accent-color);
+    box-shadow: var(--glow-brass);
+}
+
+.theme-swatch__preview {
+    position: relative;
+    display: block;
+    height: 46px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.theme-swatch__accent {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    height: 6px;
+    border-radius: var(--radius-pill);
+}
+
+.theme-swatch__dots {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.theme-swatch__dots span {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.theme-swatch__label {
+    font-size: var(--font-xs);
+    font-weight: 700;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.theme-swatch.is-selected .theme-swatch__label {
+    color: var(--text-color);
+}
+
+/* Light / dark segmented control — pairs with the palette picker */
+.mode-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 3px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    width: 100%;
+}
+
+.mode-toggle__option {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    font-weight: 700;
+    color: var(--text-secondary);
+    transition:
+        background var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease);
+}
+
+.mode-toggle__option:hover {
+    color: var(--text-color);
+}
+
+.mode-toggle__option.is-selected {
+    background: var(--accent-color);
+    color: var(--bg-color);
 }

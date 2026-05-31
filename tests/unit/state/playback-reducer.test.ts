@@ -84,14 +84,14 @@ describe('Playback Reducer', () => {
     it('should handle generic SET_PARAM action and break for other modules (line 174)', () => {
         playbackReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'playback', param: 'theme', value: 'dark' },
+            payload: { module: 'playback', param: 'palette', value: 'midnight' },
         });
-        expect(playback.theme).toBe('dark');
+        expect(playback.palette).toBe('midnight');
 
         // Other module (hits line 174)
         const result = playbackReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'not_playback', param: 'theme', value: 'light' },
+            payload: { module: 'not_playback', param: 'palette', value: 'forest' },
         });
         expect(result).toBe(false);
     });

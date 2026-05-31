@@ -23,6 +23,7 @@ export const arranger = deepSignal<ArrangerState>({
     mutatedSectionId: null,
     isDirty: false,
     seed: '',
+    randomizeSeed: true,
 });
 
 export function arrangerReducer(action: Action): boolean {
@@ -90,6 +91,9 @@ export function arrangerReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SONG_SEED:
             a.seed = action.payload;
+            return true;
+        case ACTIONS.SET_SEED_RANDOMIZE:
+            a.randomizeSeed = !!action.payload;
             return true;
     }
     return false;

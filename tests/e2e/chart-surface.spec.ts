@@ -105,8 +105,17 @@ test.describe('ChartSurface @ui', () => {
             const panel = page.locator('#songSeedPanel');
             await expect(panel).toBeVisible();
 
+            // Defaults to "Randomize each playback": the seed re-rolls on every
+            // play, so the trigger reads "Random" and the input is disabled.
+            await expect(trigger.locator('.workspace-toolbar-trigger-value')).toHaveText('Random');
+            const randomize = panel.locator('#seedRandomizeToggle');
+            await expect(randomize).toBeChecked();
             const input = panel.locator('#songSeedInput');
-            await expect(input).toBeVisible();
+            await expect(input).toBeDisabled();
+
+            // Unchecking locks the seed and enables the input for a fixed value.
+            await randomize.uncheck();
+            await expect(input).toBeEnabled();
             await input.fill('ABC123');
             await expect(input).toHaveValue('ABC123');
             await expect(trigger.locator('.workspace-toolbar-trigger-value')).toHaveText('ABC123');

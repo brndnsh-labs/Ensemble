@@ -53,10 +53,6 @@ export function Transport() {
         setTimeout(() => setTapActive(false), 100);
     };
 
-    const openSettings = () => {
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
-    };
-
     return (
         <div class="main-controls">
             <button
@@ -92,10 +88,6 @@ export function Transport() {
                     TAP
                 </button>
             </div>
-
-            <button id="settingsBtn" aria-label="Settings" onClick={openSettings}>
-                ⚙️
-            </button>
         </div>
     );
 }

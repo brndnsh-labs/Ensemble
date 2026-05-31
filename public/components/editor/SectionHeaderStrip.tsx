@@ -1,19 +1,24 @@
 import { setSectionInstrumentEnabled, setSectionIntensity } from '../../arranger-controller.js';
 import type { Section, SectionInstrumentKey } from '../../types.js';
 import { useEnsembleState } from '../../ui-bridge.js';
+import { Icon, type IconName } from '../Icon.jsx';
 
 interface Lane {
     key: SectionInstrumentKey;
-    label: string;
+    icon: IconName;
     title: string;
 }
 
+// Each lane carries its instrument glyph; the per-instrument color is applied
+// in CSS via the `section-strip__lane--<key>` modifier so the dot reads as the
+// same identity used in the rail and visualizer (drums taupe, bass green,
+// chords blue, harmony violet, soloist magenta).
 const LANES: Lane[] = [
-    { key: 'groove', label: 'D', title: 'Drums' },
-    { key: 'bass', label: 'B', title: 'Bass' },
-    { key: 'chords', label: 'C', title: 'Chords' },
-    { key: 'harmony', label: 'H', title: 'Harmony' },
-    { key: 'soloist', label: 'S', title: 'Soloist' },
+    { key: 'groove', icon: 'drums', title: 'Drums' },
+    { key: 'bass', icon: 'bass', title: 'Bass' },
+    { key: 'chords', icon: 'chords', title: 'Chords' },
+    { key: 'harmony', icon: 'harmony', title: 'Harmony' },
+    { key: 'soloist', icon: 'soloist', title: 'Soloist' },
 ];
 
 // Tri-state cycle: follow (undefined) → on (true) → off (false) → follow.
@@ -213,7 +218,7 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
                         <button
                             type="button"
                             key={lane.key}
-                            class={`section-strip__lane ${stateClass}${dimClass}`}
+                            class={`section-strip__lane section-strip__lane--${lane.key} ${stateClass}${dimClass}`}
                             title={
                                 isFollow
                                     ? `${lane.title}: follow global (${effective ? 'on' : 'off'})`
@@ -235,7 +240,7 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
                                 )
                             }
                         >
-                            {lane.label}
+                            <Icon name={lane.icon} />
                         </button>
                     );
                 })}

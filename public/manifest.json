@@ -4,8 +4,8 @@
     "id": "/",
     "start_url": "./",
     "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#0f172a",
+    "background_color": "#14110d",
+    "theme_color": "#14110d",
     "icons": [
         {
             "src": "icon-192.png",
@@ -18,6 +18,12 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
+        },
+        {
+            "src": "icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         },
         {
             "src": "icon.svg",

@@ -52,7 +52,14 @@ describe('Settings Accessibility', () => {
         expect(incBtn.getAttribute('aria-label')).toBe('Increase song duration');
     });
 
-    it('should have aria-labels on MIDI Channel and Octave inputs', () => {
+    // MIDI controls live in the MIDI tab of the tabbed settings; activate it first.
+    async function openMidiTab() {
+        document.getElementById('settingsTab-midi')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+
+    it('should have aria-labels on MIDI Channel and Octave inputs', async () => {
+        await openMidiTab();
         const channels = ['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'];
 
         channels.forEach((ch) => {
@@ -67,7 +74,8 @@ describe('Settings Accessibility', () => {
         });
     });
 
-    it('should have aria-valuetext on MIDI sliders', () => {
+    it('should have aria-valuetext on MIDI sliders', async () => {
+        await openMidiTab();
         const latencySlider = document.getElementById('midiLatencySlider');
         const velocitySlider = document.getElementById('midiVelocitySlider');
 

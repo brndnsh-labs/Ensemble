@@ -1,9 +1,20 @@
 import { MODULES } from './constants.js';
-import { VISUALIZER_TRACK_ORDER, VISUALIZER_TRACKS } from './visualizer-events.js';
+import {
+    VISUALIZER_CHORD_SWATCHES,
+    VISUALIZER_TRACK_ORDER,
+    VISUALIZER_TRACKS,
+} from './visualizer-events.js';
 import { INTERVAL_CATEGORY, RingBuffer } from './visualizer-utils.js';
 
 const { PI, abs, max, min } = Math;
 const DEFAULT_TRACK_RANGE = { midiMin: 48, midiMax: 84 };
+
+/**
+ * Chord category colors used when the main-thread theme bridge hasn't supplied
+ * `themeCache.chordColors` (the OffscreenCanvas worker can't read CSS vars).
+ * Derived from the canonical swatch palette so this stays one source of truth.
+ */
+const CHORD_COLOR_FALLBACK: string[] = VISUALIZER_CHORD_SWATCHES.map((s) => s.fallback);
 
 /** Pre-allocated per-lane overlay config list — hoisted out of the 60fps render path. */
 const OVERLAY_CONFIGS: ReadonlyArray<{
@@ -148,12 +159,7 @@ export class VisualizerEngine {
 
     setTheme(themeCache: Record<string, unknown>): void {
         this.themeCache = themeCache;
-        this.categoryColors = (themeCache.chordColors as string[]) || [
-            '#268bd2',
-            '#859900',
-            '#cb4b16',
-            '#d33682',
-        ];
+        this.categoryColors = (themeCache.chordColors as string[]) || CHORD_COLOR_FALLBACK;
         this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
             (categoryIndex) => this.categoryColors[categoryIndex],
         );
@@ -241,11 +247,11 @@ export class VisualizerEngine {
         const graphX = this.labelRailWidth;
         const graphW = w - graphX;
 
-        const bgColor = (this.themeCache.bgColor as string) || '#0f172a';
+        const bgColor = (this.themeCache.bgColor as string) || '#14110d';
         const labelRailBg =
             (this.themeCache.labelRailBg as string) ||
             (this.themeCache.keyBlack as string) ||
-            '#111827';
+            '#1e1813';
         const laneBg = (this.themeCache.laneBg as string) || 'rgba(255, 255, 255, 0.025)';
         const laneAltBg = (this.themeCache.laneAltBg as string) || 'rgba(255, 255, 255, 0.05)';
         const laneGuideColor =
@@ -406,7 +412,7 @@ export class VisualizerEngine {
     getEventColor(name: string, event: unknown): string {
         const track = this.tracks[name];
         const baseColor = track?.resolvedColor || track?.color || '#ffffff';
-        const chordColors = this.categoryColors || ['#268bd2', '#859900', '#cb4b16', '#d33682'];
+        const chordColors = this.categoryColors || CHORD_COLOR_FALLBACK;
         const ev = event as { noteType?: string };
 
         if (name === MODULES.SOLOIST) {

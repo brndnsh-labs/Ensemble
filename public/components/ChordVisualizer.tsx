@@ -12,6 +12,37 @@ import { formatUnicodeSymbols } from '../utils.js';
 import { ChordPicker } from './editor/ChordPicker.jsx';
 import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
 
+/**
+ * Bucket a chord's granular quality string (from chords-engine) into one of the
+ * seven harmonic families the chart colors by. Order matters: the major-7
+ * family (maj…) is matched before the generic minor `m…` prefix.
+ */
+function qualityBucket(quality: string, isMinor: boolean): string {
+    const q = quality || '';
+    if (q === 'dim') {
+        return 'dim';
+    }
+    if (q === 'halfdim') {
+        return 'halfdim';
+    }
+    if (q === 'aug' || q === 'augmaj7') {
+        return 'aug';
+    }
+    if (q === 'sus2' || q === 'sus4') {
+        return 'sus';
+    }
+    if (q.startsWith('maj') || q === 'major' || q === '6' || q === '5' || q === 'add9') {
+        return 'major';
+    }
+    if (q.startsWith('7') || q === '9' || q === '11' || q === '13') {
+        return 'dominant';
+    }
+    if (isMinor || q.startsWith('m')) {
+        return 'minor';
+    }
+    return 'major';
+}
+
 interface ChordCardProps {
     chord: any;
     isActive: boolean;
@@ -70,8 +101,7 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
 
     const classNames = [
         'chord-card',
-        chord.isMinor ? 'minor' : '',
-        chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
+        `q-${qualityBucket(chord.quality, chord.isMinor)}`,
         isActive ? 'active' : '',
     ]
         .filter(Boolean)
@@ -120,6 +150,7 @@ export function ChordVisualizer() {
         chartLocked,
         keyName,
         keyIsMinor,
+        qualityColors,
     } = useEnsembleState((state) => ({
         progression: state.arranger.progression,
         timeSignature: state.arranger.timeSignature,
@@ -129,6 +160,7 @@ export function ChordVisualizer() {
         chartLocked: state.playback?.chartLocked ?? true,
         keyName: state.arranger.key,
         keyIsMinor: state.arranger.isMinor,
+        qualityColors: state.playback?.qualityColors ?? true,
     }));
     const sectionById = useMemo(
         () => new Map((sectionsState || []).map((s: any) => [s.id, s] as const)),
@@ -331,7 +363,7 @@ export function ChordVisualizer() {
     return (
         <>
             <div
-                class={`display-area lead-sheet lead-sheet--${density} lead-sheet--viewport-${layoutProfile.viewport} lead-sheet--scroll-${layoutProfile.scrollMode}`}
+                class={`display-area lead-sheet lead-sheet--${density} lead-sheet--viewport-${layoutProfile.viewport} lead-sheet--scroll-${layoutProfile.scrollMode}${qualityColors ? ' lead-sheet--quality-colors' : ''}`}
                 id="chordVisualizer"
                 ref={containerRef}
                 style={containerStyle}

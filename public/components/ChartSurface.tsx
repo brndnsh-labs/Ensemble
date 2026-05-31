@@ -4,6 +4,7 @@ import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
+import { Icon } from './Icon.jsx';
 import { InlineEditor } from './InlineEditor.jsx';
 import { InstrumentRail } from './InstrumentRail.jsx';
 import { KeySignatureMenuControl, TimeSignatureControl } from './KeySignatureControls.jsx';
@@ -88,7 +89,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                 title="Library — presets, templates, roll the dice"
                                 onClick={() => openModal('surpriseMe')}
                             >
-                                <span aria-hidden="true">📚</span>
+                                <Icon name="book" />
                                 <span class="chart-surface__surprise-label"> Library</span>
                             </button>
                             <button
@@ -103,7 +104,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                 }
                                 onClick={toggleLock}
                             >
-                                <span aria-hidden="true">{chartLocked ? '🔒' : '✏️'}</span>
+                                <Icon name={chartLocked ? 'lock' : 'edit'} />
                                 <span class="chart-surface__lock-label">
                                     {chartLocked ? 'Edit' : 'Lock'}
                                 </span>
@@ -121,7 +122,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                 aria-label="Open visualizer"
                                 onClick={() => setIsVizOpen(true)}
                             >
-                                🌈
+                                <Icon name="visualizer" />
                             </button>
                         </>
                     )}
@@ -130,7 +131,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                         triggerAriaLabel="More options"
                         panelLabel="More options"
                         triggerClassName="header-btn header-btn--icon chart-surface__overflow-btn"
-                        triggerContent="⋯"
+                        triggerContent={<Icon name="more" />}
                     >
                         {({ closePopover }) => (
                             <div class="chart-surface__overflow-menu">
@@ -143,7 +144,8 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                             closePopover();
                                         }}
                                     >
-                                        {chartLocked ? '✏️ Edit' : '🔒 Lock'}
+                                        <Icon name={chartLocked ? 'edit' : 'lock'} />
+                                        {chartLocked ? ' Edit' : ' Lock'}
                                     </button>
                                 )}
                                 <button
@@ -154,7 +156,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                         closePopover();
                                     }}
                                 >
-                                    📚 Library
+                                    <Icon name="book" /> Library
                                 </button>
                                 <button
                                     type="button"
@@ -164,7 +166,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                         closePopover();
                                     }}
                                 >
-                                    Settings
+                                    <Icon name="gear" /> Settings
                                 </button>
                                 <button
                                     type="button"

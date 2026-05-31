@@ -1,4 +1,4 @@
-import { applyTheme, setBpm } from './app-controller.js';
+import { applyThemeToDom, setBpm } from './app-controller.js';
 import { validateProgression } from './engine/chords-engine.js';
 import {
     generateDrumFills,
@@ -99,7 +99,9 @@ export function handleEffects(
                     dispatch(ACTIONS.SET_CHART_LOCKED, true);
                 }
                 let currentSongSeed = arranger.seed;
-                if (!currentSongSeed) {
+                // Randomize-each-playback: re-roll on every start so each take is
+                // fresh. Otherwise the seed is locked — only roll when none is set.
+                if (arranger.randomizeSeed || !currentSongSeed) {
                     currentSongSeed = Math.floor(Math.random() * 0xffffff)
                         .toString(16)
                         .padStart(6, '0')
@@ -184,7 +186,7 @@ export function handleEffects(
             break;
         }
         case 'HYDRATE': {
-            applyTheme(stateMap.playback.theme);
+            applyThemeToDom(stateMap.playback.palette, stateMap.playback.mode);
             if (stateMap.midi.enabled) {
                 initMIDI();
             }

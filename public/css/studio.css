@@ -44,7 +44,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.3rem 0.6rem;
     font-size: 0.74rem;
     font-weight: 700;
@@ -76,7 +76,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.38rem 0.75rem;
     font-size: 0.75rem;
     font-weight: 700;
@@ -183,13 +183,14 @@
 }
 
 .workspace-studio-mix-row--groove {
-    --studio-row-accent: var(--yellow);
+    --studio-row-accent: var(--groove-color);
 }
 .workspace-studio-mix-row--bass {
-    --studio-row-accent: var(--success-color);
+    --studio-row-accent: var(--bass-color);
 }
 .workspace-studio-mix-row--chords {
-    --studio-row-accent: var(--accent-color);
+    /* Chords keep their blue identity — the app accent is brass, not chords'. */
+    --studio-row-accent: var(--chords-color);
 }
 .workspace-studio-mix-row--harmony {
     --studio-row-accent: var(--harmony-color);
@@ -429,13 +430,13 @@
 }
 
 .workspace-studio-surface--groove {
-    --studio-surface-accent: var(--yellow);
+    --studio-surface-accent: var(--groove-color);
 }
 .workspace-studio-surface--bass {
-    --studio-surface-accent: var(--success-color);
+    --studio-surface-accent: var(--bass-color);
 }
 .workspace-studio-surface--chords {
-    --studio-surface-accent: var(--accent-color);
+    --studio-surface-accent: var(--chords-color);
 }
 .workspace-studio-surface--harmony {
     --studio-surface-accent: var(--harmony-color);
@@ -507,7 +508,7 @@
     width: 32px;
     height: 32px;
     flex-shrink: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -592,13 +593,13 @@
 }
 
 .workspace-studio-mixer-strip--groove {
-    --studio-row-accent: var(--yellow);
+    --studio-row-accent: var(--groove-color);
 }
 .workspace-studio-mixer-strip--bass {
-    --studio-row-accent: var(--success-color);
+    --studio-row-accent: var(--bass-color);
 }
 .workspace-studio-mixer-strip--chords {
-    --studio-row-accent: var(--accent-color);
+    --studio-row-accent: var(--chords-color);
 }
 .workspace-studio-mixer-strip--harmony {
     --studio-row-accent: var(--harmony-color);
@@ -670,11 +671,6 @@
 }
 
 /* Settings surface layout */
-.workspace-studio-surface--settings .grid-2-col {
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: 0.65rem;
-    align-items: start;
-}
 
 .workspace-studio-surface--settings .setting-group,
 .workspace-studio-surface--band-feel .setting-group,
@@ -687,7 +683,6 @@
     box-shadow: var(--shadow-sm);
 }
 
-.workspace-studio-surface--settings .grid-2-col > .setting-group:last-child,
 .workspace-studio-surface--band-feel .setting-group:last-child {
     margin: 0;
     padding: 0.72rem;
@@ -760,11 +755,6 @@
     flex: 1 1 10rem;
 }
 
-.workspace-studio-surface--settings .divider-top {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-}
-
 .workspace-studio-surface--settings .instrument-settings-swing-controls {
     width: 100%;
     margin-left: 0;
@@ -801,7 +791,7 @@
 .workspace-studio-surface--settings .button-group-btn {
     min-width: 0;
     max-width: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.28rem 0.62rem;
 }
 
