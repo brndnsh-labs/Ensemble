@@ -1,19 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ensemble">
-  <!-- Ensemble app icon — five instrument voices (bass green, harmony violet,
-       chords blue, soloist magenta, drums taupe) rising from a brass stage,
-       under the After-Hours lamp glow on warm ink. -->
+  <!-- Maskable / apple-touch variant: identical glyph on a full-bleed ink
+       ground (no rounded corners) so the launcher can apply its own mask.
+       The glyph sits inside the 40%-radius safe zone. Also serves as the
+       opaque apple-touch-icon. -->
   <defs>
-    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="inkm" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1a1610"/>
       <stop offset="1" stop-color="#120f0a"/>
     </linearGradient>
-    <radialGradient id="lamp" cx="0.5" cy="0.08" r="0.78">
+    <radialGradient id="lampm" cx="0.5" cy="0.08" r="0.78">
       <stop offset="0" stop-color="#d9a441" stop-opacity="0.20"/>
       <stop offset="0.62" stop-color="#d9a441" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="512" height="512" rx="116" fill="url(#ink)"/>
-  <rect width="512" height="512" rx="116" fill="url(#lamp)"/>
+  <rect width="512" height="512" fill="url(#inkm)"/>
+  <rect width="512" height="512" fill="url(#lampm)"/>
   <!-- brass stage -->
   <rect x="108" y="372" width="296" height="12" rx="6" fill="#d9a441" fill-opacity="0.9"/>
   <!-- voices -->

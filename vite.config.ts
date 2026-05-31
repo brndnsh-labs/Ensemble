@@ -19,7 +19,14 @@ const REV = execSync('git rev-parse --short HEAD').toString().trim();
 // - manifest.json references icons by their unhashed names
 // - icon-512.png is only referenced from manifest.json (not HTML), so Vite would skip it
 // - MANUAL.md is fetched at runtime
-const STATIC_ASSETS = ['manifest.json', 'icon-192.png', 'icon-512.png', 'icon.svg', 'MANUAL.md'];
+const STATIC_ASSETS = [
+    'manifest.json',
+    'icon-192.png',
+    'icon-512.png',
+    'icon-maskable-512.png',
+    'icon.svg',
+    'MANUAL.md',
+];
 
 function copyStaticAssets(): Plugin {
     return {
@@ -49,6 +56,10 @@ function copyStaticAssets(): Plugin {
             if (existsSync(htmlPath)) {
                 const html = readFileSync(htmlPath, 'utf8')
                     .replace(/href="[^"]*manifest[^"]*\.json"/, 'href="/manifest.json"')
+                    .replace(
+                        /href="[^"]*icon-maskable-512[^"]*\.png"/,
+                        'href="/icon-maskable-512.png"',
+                    )
                     .replace(/href="[^"]*icon-192[^"]*\.png"/, 'href="/icon-192.png"')
                     .replace(/href="[^"]*icon[^"]*\.svg"/, 'href="/icon.svg"');
                 writeFileSync(htmlPath, html);
