@@ -671,11 +671,6 @@
 }
 
 /* Settings surface layout */
-.workspace-studio-surface--settings .grid-2-col {
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: 0.65rem;
-    align-items: start;
-}
 
 .workspace-studio-surface--settings .setting-group,
 .workspace-studio-surface--band-feel .setting-group,
@@ -688,7 +683,6 @@
     box-shadow: var(--shadow-sm);
 }
 
-.workspace-studio-surface--settings .grid-2-col > .setting-group:last-child,
 .workspace-studio-surface--band-feel .setting-group:last-child {
     margin: 0;
     padding: 0.72rem;
@@ -759,11 +753,6 @@
     width: 100%;
     min-width: 0;
     flex: 1 1 10rem;
-}
-
-.workspace-studio-surface--settings .divider-top {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
 }
 
 .workspace-studio-surface--settings .instrument-settings-swing-controls {

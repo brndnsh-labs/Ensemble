@@ -109,12 +109,6 @@ header {
         justify-content: space-between;
     }
 
-    .app-title-group {
-        flex: 1 1 auto;
-        min-width: 0;
-        overflow: hidden;
-    }
-
     h1 {
         font-size: 0.75rem;
         letter-spacing: -0.07em;
@@ -300,12 +294,6 @@ button:focus-visible {
     }
 }
 
-.rel-key-btn {
-    background: rgba(148, 163, 184, 0.1);
-    color: var(--accent-color);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
 .header-btn {
     padding: var(--space-2);
     font-size: var(--font-sm);
@@ -352,21 +340,6 @@ button:focus-visible {
 }
 
 /* --- Layout --- */
-.app-main-layout {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-        "arranger sidebar"
-        "visualizer sidebar"
-        "empty sidebar";
-    gap: 1.5rem;
-    padding: 1.5rem;
-    max-width: 1600px;
-    margin: 0 auto;
-    width: 100%;
-    min-height: calc(100vh - 80px);
-}
 
 #panel-arranger {
     grid-area: arranger;
@@ -383,20 +356,7 @@ button:focus-visible {
     min-height: 60px;
 }
 
-@media (max-width: 1100px) {
-    .app-main-layout {
-        grid-template-columns: 1fr 320px;
-    }
-}
-
 @media (max-width: 900px) {
-    .app-main-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        padding: 0.5rem;
-    }
-
     #panel-arranger,
     #panel-visualizer {
         grid-area: auto;
@@ -417,15 +377,6 @@ button:focus-visible {
         order: 4;
         margin-bottom: 2rem;
     }
-}
-
-.library-label {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
-    display: block;
 }
 
 select {
@@ -475,81 +426,4 @@ select:focus {
 select option {
     background-color: var(--panel-color);
     color: var(--text-color);
-}
-
-.app-title-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-}
-
-.app-subtitle {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.app-main-layout.workspace-shell {
-    display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 1.5rem;
-    padding: 1.5rem;
-    max-width: 1600px;
-    margin: 0 auto;
-    width: 100%;
-    min-height: calc(100vh - 80px);
-    align-items: start;
-}
-
-.workspace-content {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.workspace-view {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    min-width: 0;
-    min-height: 0;
-}
-.workspace-studio-genre-header {
-    flex-direction: column;
-}
-
-.workspace-studio-genre-pills {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: visible;
-    padding-bottom: 0;
-}
-
-.workspace-stats-grid,
-.workspace-shortcut-grid,
-.workspace-launch-grid,
-.workspace-status-grid {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.workspace-action-row {
-    flex-direction: column;
-}
-
-.workspace-action-row > * {
-    width: 100%;
-}
-
-.workspace-visualizer-area {
-    min-height: 260px;
-}
-
-@media (max-width: 600px) {
-    .app-subtitle {
-        display: none;
-    }
 }

@@ -559,32 +559,6 @@ body.modal-open {
     width: 100%;
 }
 
-.generate-mode-toggle-group .button-group-btn {
-    flex: 1;
-    padding: 0.75rem;
-    font-size: 1rem;
-    border-radius: var(--radius-md);
-}
-
-.generate-template-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 1.25rem;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--input-bg);
-    color: var(--text-color);
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.2s;
-}
-
-.generate-template-card:hover {
-    border-color: var(--accent-color);
-    transform: translateY(-2px);
-}
-
 .generate-template-card-header {
     display: flex;
     justify-content: space-between;
@@ -604,7 +578,6 @@ body.modal-open {
     color: var(--text-muted);
 }
 
-.modal-header,
 .modal-header-shared {
     display: flex;
     justify-content: space-between;
@@ -615,7 +588,6 @@ body.modal-open {
     flex-shrink: 0;
 }
 
-.modal-header h2,
 .modal-header-shared h2 {
     margin: 0;
     font-size: 0.9rem;
@@ -1058,10 +1030,6 @@ body.modal-open {
     margin-bottom: 1rem;
 }
 
-.setting-item {
-    margin-bottom: 1rem;
-}
-
 .setting-label {
     display: flex;
     justify-content: space-between;
@@ -1125,10 +1093,6 @@ input[type="range"] {
         opacity: 1;
         transform: translateY(0);
     }
-}
-
-.animate-in {
-    animation: fade-in-up var(--anim-normal) var(--anim-ease) forwards;
 }
 
 .section-card:hover {
@@ -1565,8 +1529,7 @@ input[type="range"] {
     color: var(--text-primary);
 }
 
-.section-drag-handle:active,
-.section-card.is-dragging .section-drag-handle {
+.section-drag-handle:active {
     cursor: grabbing;
 }
 
@@ -1831,8 +1794,7 @@ input[type="range"] {
 
 /* Arrangement Editor: Section Settings */
 
-.section-setting-item,
-.form-control-compact {
+.section-setting-item {
     display: flex;
     align-items: center;
     background: var(--input-bg);

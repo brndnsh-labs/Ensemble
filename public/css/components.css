@@ -7,11 +7,6 @@
 }
 
 /* Spacing & Dividers */
-.divider-top {
-    border-top: 1px solid var(--border-color);
-    padding-top: var(--space-4);
-    margin-top: var(--space-4);
-}
 
 /* Power Button Styles (Restored & Enhanced) */
 .power-btn {
@@ -60,21 +55,6 @@
     padding: var(--space-5);
     position: relative;
     overflow: hidden;
-}
-
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--space-5);
-}
-
-.panel-header h2 {
-    margin: 0;
-    font-size: var(--font-lg);
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 /* Visibility Helpers */
@@ -294,15 +274,6 @@ input:focus-visible + .toggle-slider {
 }
 
 /* Shared Utility: Compact Form Controls */
-.form-control-compact {
-    display: flex;
-    align-items: center;
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0 var(--space-2);
-    height: 28px;
-}
 
 /* Shared Utility: Smart Tab Layouts */
 .smart-tab-layout {
@@ -317,12 +288,6 @@ input:focus-visible + .toggle-slider {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-}
-
-.chip-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
 }
 
 /* Notification Box */
@@ -390,12 +355,6 @@ input:focus-visible + .toggle-slider {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-}
-
-.grid-2-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
 }
 
 .w-full {

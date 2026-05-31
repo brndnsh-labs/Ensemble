@@ -359,11 +359,6 @@
     display: none;
 }
 
-.instrument-rail--vertical .workspace-studio-live-mix-tools {
-    margin-left: 0;
-    justify-content: flex-start;
-}
-
 .instrument-rail--vertical .workspace-studio-mix-row-copy p {
     display: none;
 }

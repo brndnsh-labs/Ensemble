@@ -121,10 +121,6 @@
     scroll-margin-block: clamp(1.6rem, 12vh, 6rem);
 }
 
-.lead-sheet-row--with-markers {
-    row-gap: var(--lead-marker-lane-gap);
-}
-
 .lead-sheet-row--active::before {
     content: "";
     position: absolute;
@@ -141,57 +137,6 @@
 .lead-sheet-row--upcoming .measure-box {
     border-color: color-mix(in srgb, var(--accent-color), transparent 78%);
     background: color-mix(in srgb, var(--panel-color), var(--accent-color) 4%);
-}
-
-.lead-sheet-marker-slot {
-    min-width: 0;
-    min-height: calc(var(--lead-marker-reserve) * var(--lead-vertical-gap-fill));
-    display: flex;
-    align-items: flex-end;
-    justify-content: flex-start;
-    padding-left: 0.08rem;
-    position: relative;
-    z-index: 1;
-}
-
-.lead-sheet-row-marker {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.35rem;
-    padding: 0.08rem 0.3rem;
-    border-radius: var(--radius-pill);
-    border: 1px solid color-mix(in srgb, var(--accent-color), transparent 58%);
-    background: color-mix(in srgb, var(--accent-color), transparent 88%);
-    color: var(--text-color);
-    font-size: calc(var(--lead-marker-size) * var(--lead-vertical-type-fill));
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
-    pointer-events: none;
-    transition:
-        border-color var(--anim-fast) var(--anim-ease),
-        background-color var(--anim-fast) var(--anim-ease),
-        box-shadow var(--anim-fast) var(--anim-ease),
-        color var(--anim-fast) var(--anim-ease);
-}
-
-.lead-sheet-marker-slot--section-active .lead-sheet-row-marker {
-    border-color: color-mix(in srgb, var(--accent-color), transparent 48%);
-    background: color-mix(in srgb, var(--accent-color), transparent 80%);
-    box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, white, transparent 88%),
-        0 3px 8px rgba(0, 0, 0, 0.06);
-}
-
-.lead-sheet-marker-slot--row-active .lead-sheet-row-marker {
-    color: white;
-    border-color: color-mix(in srgb, var(--accent-color), transparent 18%);
-    background: color-mix(in srgb, var(--accent-color), white 6%);
-    box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, white, transparent 72%),
-        0 5px 12px color-mix(in srgb, var(--accent-color), transparent 84%);
 }
 
 .measure-box {
@@ -339,30 +284,3 @@
 }
 
 /* --- Optional Melody Sparkline --- */
-.sparkline-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 8px;
-    display: flex;
-    align-items: flex-end;
-    gap: 1px;
-    padding: 0 3px 2px;
-    pointer-events: none;
-    opacity: 0.55;
-    overflow: hidden;
-}
-
-.sparkline-bar {
-    flex-grow: 1;
-    background: var(--soloist-color);
-    border-radius: 1px;
-    min-width: 2px;
-    transition: height var(--anim-fast) var(--anim-ease);
-}
-
-.chord-card.active .sparkline-bar {
-    background: white;
-    opacity: 0.82;
-}
