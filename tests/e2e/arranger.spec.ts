@@ -64,11 +64,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     });
 
     test('Time signature picker highlights genre-idiomatic meters (S10)', async ({ page }) => {
-        const hint = page.locator('[data-testid="time-sig-hint"]');
-        await expect(hint).toBeVisible();
-        await expect(hint).toContainText('idiomatic for');
-
         const select = page.locator('#timeSigSelect');
+        // The ★ markers in the option list are the affordance (the prose caption
+        // was dropped); a hover title on the select carries the legend.
+        await expect(select).toHaveAttribute('title', /idiomatic/);
         // 4/4 is idiomatic for every genre, so it always carries the ★ marker;
         // 5/4 is idiomatic for none, so it never does. (Non-blocking hint —
         // both remain selectable.)

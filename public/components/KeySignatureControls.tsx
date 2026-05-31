@@ -100,6 +100,7 @@ export function TimeSignatureControl() {
                     )
                 }
                 aria-label="Time Signature"
+                title={genreFeel ? `★ marks meters idiomatic for ${genreFeel}` : undefined}
             >
                 {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => (
                     <option key={timeSignatureOption} value={timeSignatureOption}>
@@ -123,11 +124,6 @@ export function TimeSignatureControl() {
                         : TIME_SIGNATURES[timeSignature]?.grouping.join('+') || '3+2'}
                 </button>
             </div>
-            {genreFeel && (
-                <span class="time-sig-hint" data-testid="time-sig-hint">
-                    ★ idiomatic for {genreFeel}
-                </span>
-            )}
         </div>
     );
 }
