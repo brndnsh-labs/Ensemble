@@ -99,31 +99,6 @@ header {
     border-bottom: 1px solid var(--border-color);
 }
 
-#settingsBtn {
-    padding: var(--space-2);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 1.2rem;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition:
-        color var(--anim-fast) var(--anim-ease),
-        background-color var(--anim-fast) var(--anim-ease),
-        box-shadow var(--anim-fast) var(--anim-ease);
-}
-
-#settingsBtn:hover {
-    background: color-mix(in srgb, var(--accent-color), transparent 92%);
-}
-
-#settingsBtn:focus-visible {
-    outline: 2px solid var(--focus-ring-color);
-    outline-offset: 2px;
-}
-
 @media (max-width: 600px) {
     header {
         padding: 0.5rem 0.1rem;
@@ -181,12 +156,6 @@ header {
 
     .control-label {
         display: none;
-    }
-
-    #settingsBtn {
-        margin-right: 0; /* Removed negative margin to prevent clipping */
-        padding: 0.4rem 0.2rem;
-        font-size: 1.2rem;
     }
 
     #tapBtn {
@@ -318,6 +287,17 @@ button:focus-visible {
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
     border-color: var(--accent-color);
+}
+
+/* Tactile press: every button dips slightly the instant it's pressed, giving
+   immediate "the app heard you" feedback — even when the click triggers a
+   lazy-loaded chunk (e.g. opening Settings) that takes a beat to render.
+   Buttons with their own :active transform (e.g. .primary-btn) win on
+   specificity and keep their bespoke press. Suppressed under reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+    button:active {
+        transform: scale(0.96);
+    }
 }
 
 .rel-key-btn {

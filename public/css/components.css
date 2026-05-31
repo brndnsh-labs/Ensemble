@@ -234,6 +234,65 @@ input:focus-visible + .toggle-slider {
     gap: 0.75rem;
 }
 
+/* Shared Utility: Secondary action button (Share/Install/Reset/Refresh, etc.)
+   The neutral counterpart to .primary-btn — sunken well fill, lifts on hover. */
+.secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    min-height: 40px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: var(--font-sm);
+    cursor: pointer;
+}
+
+.secondary-btn:hover {
+    background: var(--card-bg-hover);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 45%);
+    transform: translateY(-1px);
+}
+
+.secondary-btn:active {
+    transform: scale(0.97);
+}
+
+/* Shared Utility: Chip toggle (segmented control, e.g. Timer/Loops). */
+.chip-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-1) var(--space-3);
+    min-height: 32px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: var(--font-sm);
+    cursor: pointer;
+}
+
+.chip-btn:hover {
+    color: var(--text-color);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 50%);
+}
+
+.chip-btn:active {
+    transform: scale(0.96);
+}
+
+.chip-btn.active {
+    background: color-mix(in srgb, var(--accent-color), transparent 84%);
+    border-color: color-mix(in srgb, var(--accent-color), transparent 45%);
+    color: var(--accent-color);
+}
+
 /* Shared Utility: Compact Form Controls */
 .form-control-compact {
     display: flex;
@@ -352,6 +411,13 @@ input:focus-visible + .toggle-slider {
     color: var(--error-color);
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Keep the danger tint on hover (otherwise .secondary-btn:hover repaints it). */
+.danger-btn:hover {
+    color: var(--error-color);
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Update Banner */

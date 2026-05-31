@@ -47,7 +47,10 @@ body.modal-open {
     border-radius: 12px;
     width: 95%;
     max-width: 800px;
-    max-height: 85vh;
+    /* Fixed height so the modal stays one stable size regardless of which tab
+       is selected — short tabs (Appearance/About) reserve the same box, taller
+       tabs (Playback/MIDI) scroll within it. */
+    height: min(85vh, 640px);
     overflow-y: auto;
     border: 1px solid var(--border-color);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
@@ -1324,6 +1327,10 @@ input[type="range"] {
 }
 
 .section-strip__lane {
+    /* Per-instrument identity color, set by the --<key> modifiers below.
+       Falls back to the brass accent if a lane has no instrument color. */
+    --lane-color: var(--accent-color);
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1333,8 +1340,6 @@ input[type="range"] {
     border: 1px solid var(--border-color);
     background: var(--bg-color);
     color: var(--text-secondary);
-    font-size: 0.65rem;
-    font-weight: 700;
     cursor: pointer;
     transition:
         background 120ms ease,
@@ -1345,32 +1350,76 @@ input[type="range"] {
     line-height: 1;
 }
 
-.section-strip__lane:hover {
-    border-color: var(--accent-color);
-    color: var(--accent-color);
+.section-strip__lane .icon {
+    width: 0.95rem;
+    height: 0.95rem;
 }
 
+/* Instrument identity colors (match the rail + visualizer). */
+.section-strip__lane--groove {
+    --lane-color: var(--groove-color);
+}
+.section-strip__lane--bass {
+    --lane-color: var(--bass-color);
+}
+.section-strip__lane--chords {
+    --lane-color: var(--chords-color);
+}
+.section-strip__lane--harmony {
+    --lane-color: var(--harmony-color);
+}
+.section-strip__lane--soloist {
+    --lane-color: var(--soloist-color);
+}
+
+.section-strip__lane:hover {
+    border-color: var(--lane-color);
+    color: var(--lane-color);
+}
+
+/* Follow global (default): dashed ring tinted to the instrument, glyph in its
+   color — present but "automatic." */
 .section-strip__lane--follow {
     border-style: dashed;
-    color: var(--text-muted);
+    border-color: color-mix(in srgb, var(--lane-color), transparent 55%);
+    background: transparent;
+    color: var(--lane-color);
 }
 
+/* Follow + globally off → dim, so a glance reads "not sounding right now." */
 .section-strip__lane--follow.section-strip__lane--muted {
-    opacity: 0.45;
+    opacity: 0.4;
 }
 
+/* Forced ON: filled with the instrument color, glyph punched out in the bg. */
 .section-strip__lane--on {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
+    background: var(--lane-color);
+    border-style: solid;
+    border-color: var(--lane-color);
     color: var(--bg-color);
 }
 
+/* Forced OFF: neutral muted ring with a diagonal slash across the glyph —
+   the icon-era replacement for the old letter strike-through. */
 .section-strip__lane--off {
     background: transparent;
-    color: var(--text-muted);
+    border-style: solid;
     border-color: var(--text-muted);
-    text-decoration: line-through;
-    text-decoration-thickness: 1.5px;
+    color: var(--text-muted);
+    opacity: 0.65;
+}
+
+.section-strip__lane--off::after {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    top: 50%;
+    height: 1.5px;
+    background: currentColor;
+    transform: rotate(-22deg);
+    transform-origin: center;
+    pointer-events: none;
 }
 
 /* Compact variant for the chord-visualizer (locked) view. */
@@ -1393,7 +1442,11 @@ input[type="range"] {
 .section-strip--compact .section-strip__lane {
     width: 1.35rem;
     height: 1.35rem;
-    font-size: 0.6rem;
+}
+
+.section-strip--compact .section-strip__lane .icon {
+    width: 0.85rem;
+    height: 0.85rem;
 }
 
 .section-strip--compact .section-strip__intensity {
