@@ -70,17 +70,19 @@ describe('SectionHeaderStrip', () => {
         expect(setSectionIntensity).toHaveBeenCalledWith('s1', undefined);
     });
 
-    it('renders five instrument dots (D B C H S)', () => {
+    it('renders five instrument dots in order (drums, bass, chords, harmony, soloist)', () => {
         mount({ id: 's1', label: 'Verse', value: 'C' });
         const dots = document.querySelectorAll('.section-strip__lane');
         expect(dots).toHaveLength(5);
-        expect(Array.from(dots).map((d) => d.textContent.trim())).toEqual([
-            'D',
-            'B',
-            'C',
-            'H',
-            'S',
-        ]);
+        // Letters were retired in favor of the instrument icon set + identity
+        // colors — assert each lane carries its key-class and glyph.
+        const keys = ['groove', 'bass', 'chords', 'harmony', 'soloist'];
+        Array.from(dots).forEach((d, i) => {
+            expect(d.classList.contains(`section-strip__lane--${keys[i]}`)).toBe(true);
+            expect(
+                d.querySelector(`.icon--${keys[i] === 'groove' ? 'drums' : keys[i]}`),
+            ).not.toBeNull();
+        });
     });
 
     it('lane in follow state shows global-enabled context: harmony off → muted class', () => {

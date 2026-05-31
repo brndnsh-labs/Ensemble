@@ -1,6 +1,6 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
-import { gotoHydrated } from './helpers/nav.js';
+import { gotoHydrated, openSettings } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
@@ -10,9 +10,8 @@ test.describe('Theme Reproduction Bug', () => {
     test('Auto theme should apply light mode when system is light', async ({ page }) => {
         await gotoHydrated(page);
 
-        // 1. Open settings
-        await page.click('#settingsBtn');
-        await page.waitForSelector('#settingsOverlay.active');
+        // 1. Open settings (via the topbar overflow menu)
+        await openSettings(page);
 
         // 2. Set theme to 'auto' via the Appearance tab's visual theme picker
         await page.getByRole('tab', { name: 'Appearance' }).click();

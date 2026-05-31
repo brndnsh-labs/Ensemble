@@ -3,7 +3,6 @@ import { handleTap } from '../instrument-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { Icon } from './Icon.jsx';
 
 export function Transport() {
     const { isPlaying, bpm, sessionTimer, sessionStartTime, songMode } = useEnsembleState(
@@ -54,10 +53,6 @@ export function Transport() {
         setTimeout(() => setTapActive(false), 100);
     };
 
-    const openSettings = () => {
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
-    };
-
     return (
         <div class="main-controls">
             <button
@@ -93,10 +88,6 @@ export function Transport() {
                     TAP
                 </button>
             </div>
-
-            <button id="settingsBtn" aria-label="Settings" onClick={openSettings}>
-                <Icon name="gear" />
-            </button>
         </div>
     );
 }

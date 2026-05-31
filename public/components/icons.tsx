@@ -251,14 +251,15 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <rect {...solid} x="13.4" y="6.5" width="2.5" height="6" rx="0.6" />
         </>
     ),
-    // Two voices joined by a slur — harmony/blend, distinct from the single
-    // soloist note and the bass waveform.
+    // A stacked triad — three note-heads sharing one stem, i.e. a chord. Reads
+    // as "many pitches at once" = harmony, distinct from the single soloist
+    // note and the bass waveform.
     harmony: () => (
         <>
-            <circle {...solid} cx="7.5" cy="16" r="2.6" />
-            <circle {...solid} cx="15.5" cy="16" r="2.6" />
-            <path d="M9.9 16V9M17.9 16V9" />
-            <path d="M9.9 9q4-4 8 0" />
+            <circle {...solid} cx="11.5" cy="16.8" r="2.4" />
+            <circle {...solid} cx="11.5" cy="13" r="2.4" />
+            <circle {...solid} cx="11.5" cy="9.2" r="2.4" />
+            <path d="M13.7 16.8V5" />
         </>
     ),
     soloist: () => (

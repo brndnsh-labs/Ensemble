@@ -27,3 +27,16 @@ export async function gotoHydrated(page: Page, path = '/'): Promise<void> {
         timeout: HYDRATION_TIMEOUT,
     });
 }
+
+/**
+ * Open the Settings modal via the chart topbar's "More options" (kebab) menu.
+ *
+ * The standalone gear button next to the transport controls was retired — it
+ * duplicated the kebab entry — so Settings now lives only in the overflow menu.
+ * Specs route through here instead of clicking `#settingsBtn`.
+ */
+export async function openSettings(page: Page): Promise<void> {
+    await page.getByRole('button', { name: 'More options' }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.waitForSelector('#settingsOverlay.active');
+}

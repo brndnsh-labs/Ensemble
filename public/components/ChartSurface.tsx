@@ -166,7 +166,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                         closePopover();
                                     }}
                                 >
-                                    Settings
+                                    <Icon name="gear" /> Settings
                                 </button>
                                 <button
                                     type="button"
