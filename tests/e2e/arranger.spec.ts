@@ -64,19 +64,19 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
     });
 
     test('Time signature picker highlights genre-idiomatic meters (S10)', async ({ page }) => {
-        // The meter select now lives inside the time-signature popover.
+        // The meters are one-click chips inside the time-signature popover.
         await page.locator('#timeSigBtn').click();
-        await expect(page.locator('#timeSigPanel')).toBeVisible();
+        const panel = page.locator('#timeSigPanel');
+        await expect(panel).toBeVisible();
 
-        const select = page.locator('#timeSigSelect');
-        // The ★ markers in the option list are the affordance (the prose caption
-        // was dropped); a hover title on the select carries the legend.
-        await expect(select).toHaveAttribute('title', /idiomatic/);
-        // 4/4 is idiomatic for every genre, so it always carries the ★ marker;
-        // 5/4 is idiomatic for none, so it never does. (Non-blocking hint —
-        // both remain selectable.)
-        await expect(select.locator('option[value="4/4"]')).toContainText('★');
-        await expect(select.locator('option[value="5/4"]')).not.toContainText('★');
+        // ★ marks meters idiomatic for the current genre: 4/4 fits every genre,
+        // 5/4 fits none. (Non-blocking hint — both remain selectable.)
+        await expect(panel.locator('[data-meter="4/4"]')).toContainText('★');
+        await expect(panel.locator('[data-meter="5/4"]')).not.toContainText('★');
+
+        // Picking a meter is a single click and updates the trigger.
+        await panel.locator('[data-meter="3/4"]').click();
+        await expect(page.locator('#timeSigBtn')).toContainText('3/4');
     });
 
     test('Chord Visualizer highlights the active chord during playback', async ({ page }) => {

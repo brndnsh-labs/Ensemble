@@ -409,7 +409,6 @@ select:focus {
 }
 
 /* Specific selects that should not be full-width */
-#timeSigSelect,
 #keySelect,
 #drumBarsSelect,
 #swingBaseSelect {
@@ -417,10 +416,6 @@ select:focus {
     padding: 0.3rem 0.5rem;
     font-size: 0.85rem;
     height: 32px;
-}
-
-#timeSigSelect {
-    min-width: 60px;
 }
 
 select option {

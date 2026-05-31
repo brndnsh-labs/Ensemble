@@ -66,6 +66,46 @@
     display: none;
 }
 
+/* Meter picker: one-click chips inside the time-signature panel (replacing a
+ * nested dropdown). ★ marks genre-idiomatic meters; the active meter fills. */
+.meter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+}
+
+.meter-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.12rem;
+    min-height: 34px;
+    padding-inline: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.meter-chip:hover {
+    border-color: var(--accent-color);
+    background: var(--card-bg-hover);
+}
+
+.meter-chip.is-active {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--base03);
+}
+
+.meter-chip__star {
+    font-size: 0.66rem;
+    color: var(--accent-color);
+    line-height: 1;
+}
+
+.meter-chip.is-active .meter-chip__star {
+    color: inherit;
+}
+
 @media (max-width: 600px) {
     /* Move maximize button to the title row on mobile if we stack */
 

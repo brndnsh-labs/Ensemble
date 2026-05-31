@@ -131,13 +131,13 @@ describe('KeySignatureControls Component', () => {
 
         const keySelect = document.body.querySelector('#keySelect');
         const keyMenuBtn = container.querySelector('#keyMenuBtn');
-        const timeSigSelect = document.body.querySelector('#timeSigSelect');
+        const activeMeter = document.body.querySelector('.meter-chip.is-active');
         const groupingToggle = document.body.querySelector('#groupingToggle');
 
         expect(keyMenuBtn.textContent).toContain('Key');
         expect(keyMenuBtn.textContent).toContain('C maj');
         expect(keySelect.value).toBe('C');
-        expect(timeSigSelect.value).toBe('4/4');
+        expect(activeMeter?.getAttribute('data-meter')).toBe('4/4');
         expect((groupingToggle as HTMLElement).hidden).toBe(true);
     });
 
@@ -170,11 +170,10 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const timeSigSelect = document.body.querySelector('#timeSigSelect');
+        const meterChip = document.body.querySelector('[data-meter="3/4"]');
 
-        timeSigSelect.value = '3/4';
         act(() => {
-            timeSigSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            meterChip.dispatchEvent(new Event('click', { bubbles: true }));
         });
 
         await vi.waitFor(
@@ -203,11 +202,10 @@ describe('KeySignatureControls Component', () => {
             render(<KeySignatureControls />, container);
         });
 
-        const timeSigSelect = document.body.querySelector('#timeSigSelect');
+        const meterChip = document.body.querySelector('[data-meter="3/4"]');
 
         act(() => {
-            timeSigSelect.value = '3/4';
-            timeSigSelect.dispatchEvent(new Event('change'));
+            meterChip.dispatchEvent(new Event('click', { bubbles: true }));
         });
 
         await vi.waitFor(

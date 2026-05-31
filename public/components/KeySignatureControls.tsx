@@ -108,30 +108,44 @@ export function TimeSignatureControl() {
             }
         >
             <div class="workspace-toolbar-panel__section">
-                <label class="workspace-toolbar-panel__label" htmlFor="timeSigSelect">
+                <span class="workspace-toolbar-panel__label" id="timeSigLabel">
                     Meter
-                </label>
-                <select
-                    id="timeSigSelect"
-                    value={timeSignature}
-                    onChange={(event) =>
-                        updateTimeSignature(
-                            (event.target as HTMLSelectElement).value,
-                            lastDrumPreset,
-                            dispatch,
-                        )
-                    }
-                    aria-label="Time Signature"
-                    title={genreFeel ? `★ marks meters idiomatic for ${genreFeel}` : undefined}
-                >
-                    {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => (
-                        <option key={timeSignatureOption} value={timeSignatureOption}>
-                            {canonicalMeters.includes(timeSignatureOption)
-                                ? `${timeSignatureOption} ★`
-                                : timeSignatureOption}
-                        </option>
-                    ))}
-                </select>
+                </span>
+                <div class="meter-grid" role="group" aria-labelledby="timeSigLabel">
+                    {TIME_SIGNATURE_OPTIONS.map((timeSignatureOption) => {
+                        const isActive = timeSignatureOption === timeSignature;
+                        // ★ marks the meters idiomatic for the current genre.
+                        const isIdiomatic = canonicalMeters.includes(timeSignatureOption);
+                        return (
+                            <button
+                                key={timeSignatureOption}
+                                type="button"
+                                class={`meter-chip${isActive ? ' is-active' : ''}`}
+                                data-meter={timeSignatureOption}
+                                aria-pressed={isActive}
+                                title={
+                                    isIdiomatic && genreFeel
+                                        ? `Idiomatic for ${genreFeel}`
+                                        : undefined
+                                }
+                                onClick={() =>
+                                    updateTimeSignature(
+                                        timeSignatureOption,
+                                        lastDrumPreset,
+                                        dispatch,
+                                    )
+                                }
+                            >
+                                {timeSignatureOption}
+                                {isIdiomatic ? (
+                                    <span class="meter-chip__star" aria-hidden="true">
+                                        ★
+                                    </span>
+                                ) : null}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             <div
