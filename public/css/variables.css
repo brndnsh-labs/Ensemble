@@ -1,3 +1,28 @@
+/* ==========================================================================
+   Theme tokens — two axes.
+
+   1. PALETTE (color identity): `<html data-palette="…">` — after-hours,
+      midnight, high-contrast, forest, sunset, synthwave.
+   2. MODE (light/dark): `<html data-mode="light|dark">` — resolved from the
+      user's preference (Auto follows the OS) by the App-level resolver.
+
+   Architecture:
+   - `:root` carries the mode-invariant tokens (fonts, spacing, radius, shadows,
+     z-index, animation) AND the DARK semantic mappings AND the *After-Hours
+     dark* ramp/hues as the pre-JS default (so first paint is correct before the
+     resolver runs and when no data-* attributes are present).
+   - `[data-mode="light"]` is ONE shared block that flips the semantic
+     surface/text mappings to the light ends of the ramp and deepens the
+     chord-quality tints for ink-on-paper legibility. It is palette-agnostic —
+     every light palette inherits it and only authors its own ramp + hues.
+   - `[data-palette="X"][data-mode="dark|light"]` blocks author only the raw
+     ramp (`--base03`…`--base3`) + hues + a few per-palette surface/atmosphere
+     tokens. The semantic tokens (`--bg-color: var(--base03)`, etc.) follow.
+
+   Most accent-tinted alphas use `color-mix(… var(--accent)/var(--brass) …)` so
+   they re-tint per palette without hand-maintained rgb triplets.
+   ========================================================================== */
+
 :root {
     color-scheme: dark light;
 
@@ -16,7 +41,7 @@
     --font-lg: 1.125rem;
 
     /* ----------------------------------------------------------------------
-       After-Hours Studio palette.
+       Default palette = After-Hours, dark.
        Warm ink-black surfaces, a brass/amber accent, and the five instrument
        hues retuned to sing on a warm background while keeping their identity
        (chords=blue, bass=green, soloist=magenta, harmony=violet, drums=taupe).
@@ -32,7 +57,7 @@
     --base0: #a2937c; /* secondary text on dark */
     --base1: #d8cbb2; /* primary text on dark — warm bone */
     --base2: #ece1cf;
-    --base3: #f6efe1; /* warm paper — light-theme background */
+    --base3: #f6efe1; /* warm paper — light-variant background */
 
     /* Accent hues (warm-retuned; roles preserved from Solarized) */
     --yellow: #d9a441; /* brass */
@@ -44,10 +69,12 @@
     --cyan: #5fc9bd;
     --green: #9ab33a; /* bass / success */
 
-    /* Brass — the signature accent (same hue as --yellow; aliased so they can't drift) */
+    /* Brass — the signature accent. Aliases --yellow so a palette only needs to
+       set --yellow (+ --brass-light) and the accent follows; they can't drift. */
     --brass: var(--yellow);
     --brass-light: #f0c674; /* lit brass — hover/active */
 
+    /* Semantic surface/text mappings — DARK. `[data-mode="light"]` flips these. */
     --bg-color: var(--base03);
     --panel-color: var(--base02);
     --text-color: var(--base1);
@@ -71,8 +98,10 @@
        Chord-quality colours — chart-symbol tint, keyed to harmonic character
        and gated by the "colour chords by quality" toggle. Major stays the
        neutral text colour (calm/resolved) so only the colourful qualities pop.
-       These are a SEPARATE axis from the chords *instrument* colour (blue):
-       this is the symbol on the chart, that is the lane/rail.
+       Dominant aliases --brass so it follows the accent. These are a SEPARATE
+       axis from the chords *instrument* colour (blue): this is the symbol on
+       the chart, that is the lane/rail. The dark-tuned tints below serve all
+       dark palettes; `[data-mode="light"]` deepens them for paper.
        ---------------------------------------------------------------------- */
     --chord-major: var(--text-color); /* calm bone — resolved */
     --chord-dominant: var(--brass); /* brass — tension wanting resolution */
@@ -82,19 +111,10 @@
     --chord-aug: #d39be0; /* orchid — augmented/strange */
     --chord-sus: #6fc2a4; /* open teal-green — unresolved */
 
-    /* RGB variants for transparency */
-    --brass-rgb: 217, 164, 65;
-    --cyan-rgb: 95, 201, 189;
-    --magenta-rgb: 224, 86, 143;
-    --chords-color-rgb: 74, 159, 212; /* blue */
-    --bass-color-rgb: 154, 179, 58; /* green/success */
-    --soloist-color-rgb: 224, 86, 143; /* magenta */
-    --harmony-color-rgb: 139, 134, 214; /* violet */
-    --groove-color-rgb: 184, 169, 138; /* warm taupe */
-
+    /* Surfaces (After-Hours dark) */
     --card-bg: #271f18; /* raised surface — one step above panel */
     --card-bg-hover: #322820;
-    --border-color: rgba(217, 164, 65, 0.12); /* brass hairline */
+    --border-color: color-mix(in srgb, var(--brass) 12%, transparent); /* brass hairline */
     --border: var(--border-color);
     --input-bg: rgba(8, 6, 4, 0.35); /* sunken warm well */
     --surface-sunken: var(--input-bg);
@@ -122,19 +142,24 @@
     --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6);
     --glow-brass:
-        0 0 0 1px rgba(var(--brass-rgb), 0.45), 0 0 22px -4px rgba(var(--brass-rgb), 0.55);
+        0 0 0 1px color-mix(in srgb, var(--brass) 45%, transparent),
+        0 0 22px -4px color-mix(in srgb, var(--brass) 55%, transparent);
 
-    /* Focus ring (brass, derived from accent) */
+    /* Focus ring (derived from accent) */
     --focus-ring-color: color-mix(in srgb, var(--accent-color), transparent 55%);
 
-    /* Atmosphere — lamp-lit top glow + film grain.
+    /* Atmosphere — lamp-lit top glow + film grain (brass-tinted, auto per palette).
        Consumed by layout.css on the app background. */
-    --app-glow: radial-gradient(125% 90% at 50% -12%, rgba(var(--brass-rgb), 0.1), transparent 58%);
+    --app-glow: radial-gradient(
+        125% 90% at 50% -12%,
+        color-mix(in srgb, var(--brass) 10%, transparent),
+        transparent 58%
+    );
     --grain-opacity: 0.035;
 
-    /* Sequencer Specific */
-    --step-bg: rgba(216, 203, 178, 0.1);
-    --step-bg-hover: rgba(216, 203, 178, 0.18);
+    /* Sequencer — ink-derived so it auto-follows the mode (text flips light/dark) */
+    --step-bg: color-mix(in srgb, var(--text-color) 10%, transparent);
+    --step-bg-hover: color-mix(in srgb, var(--text-color) 18%, transparent);
 
     /* Metronome */
     --beat-active: var(--brass);
@@ -174,10 +199,59 @@
     --anim-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-[data-theme="lead-sheet"] {
+/* ==========================================================================
+   LIGHT MODE — shared semantic remap (palette-agnostic).
+   Flips surface/text to the light ends of whatever ramp the active palette
+   authored, and deepens the chord-quality tints for ink-on-paper legibility.
+   Borders/wells/steps are derived from --text-color via color-mix so they read
+   correctly against any palette's paper. Per-palette light blocks only set the
+   ramp + hues.
+   ========================================================================== */
+[data-mode="light"] {
     color-scheme: light;
 
-    /* Lead-sheet paper: deepen the hues so they hold contrast on cream. */
+    --bg-color: var(--base3);
+    --panel-color: var(--base2);
+    --text-color: var(--base02);
+    --text-secondary: var(--base01);
+    --text-muted: var(--base00);
+
+    --card-bg: var(--base3);
+    --card-bg-hover: var(--base2);
+    --border-color: color-mix(in srgb, var(--text-color) 12%, transparent);
+    --input-bg: color-mix(in srgb, var(--text-color) 5%, transparent);
+    --select-bg: var(--base3);
+    --select-text: var(--base02);
+    --select-border: var(--base1);
+
+    /* Lighter atmosphere on paper */
+    --app-glow: radial-gradient(
+        125% 90% at 50% -12%,
+        color-mix(in srgb, var(--brass) 8%, transparent),
+        transparent 58%
+    );
+    --grain-opacity: 0.02;
+
+    --step-bg: color-mix(in srgb, var(--text-color) 8%, transparent);
+    --step-bg-hover: color-mix(in srgb, var(--text-color) 16%, transparent);
+    --beat-inactive-odd: var(--base2);
+    --beat-inactive-even: var(--base3);
+
+    /* Chord-quality tints deepened for ink-on-cream legibility. Dominant stays
+       var(--brass) (deepens per palette) and major stays var(--text-color). */
+    --chord-minor: #1f6f9e;
+    --chord-dim: #b8332c;
+    --chord-halfdim: #5a4fb0;
+    --chord-aug: #9a3fb0;
+    --chord-sus: #2f8a6a;
+}
+
+/* ==========================================================================
+   AFTER-HOURS — warm ink + brass.
+   Dark variant = the :root default (no block needed). Light variant = warm
+   "lead-sheet" paper with the hues deepened to hold contrast on cream.
+   ========================================================================== */
+[data-palette="after-hours"][data-mode="light"] {
     --yellow: #b07d1f;
     --orange: #c25a1c;
     --red: #c0352f;
@@ -186,87 +260,24 @@
     --blue: #1f6f9e;
     --cyan: #2a8f86;
     --green: #5e7d12;
-    /* --brass aliases --yellow (overridden just above), so it follows automatically */
     --brass-light: #946514;
-
-    --bg-color: var(--base3);
-    --panel-color: var(--base2);
-    --text-color: var(--base02);
-    --text-primary: var(--text-color);
-    --text-secondary: var(--base01);
-    --text-muted: var(--base00);
-    --accent-color: var(--brass);
-    --accent-hover: var(--brass-light);
-    --success-color: var(--green);
-    --soloist-color: var(--magenta);
-    --harmony-color: var(--violet);
-    --error-color: var(--red);
-
     --groove-color: #6b6157;
-
-    /* Chord-quality colours deepened for ink-on-cream legibility */
-    --chord-major: var(--text-color);
-    --chord-dominant: #a9711a;
-    --chord-minor: #1f6f9e;
-    --chord-dim: #b8332c;
-    --chord-halfdim: #5a4fb0;
-    --chord-aug: #9a3fb0;
-    --chord-sus: #2f8a6a;
-
-    /* RGB variants for transparency (Light, deepened) */
-    --chords-color-rgb: 31, 111, 158; /* blue */
-    --bass-color-rgb: 94, 125, 18; /* green/success */
-    --soloist-color-rgb: 176, 36, 104; /* magenta */
-    --harmony-color-rgb: 74, 63, 176; /* violet */
-    --groove-color-rgb: 107, 97, 87; /* warm taupe */
-    --brass-rgb: 176, 125, 31;
-
-    --card-bg: var(--base3);
-    --card-bg-hover: var(--base2);
-    --border-color: rgba(30, 24, 19, 0.12);
-    --border: var(--border-color);
-    --input-bg: rgba(30, 24, 19, 0.05);
-    --surface-sunken: var(--input-bg);
-    --select-bg: var(--base3);
-    --select-text: var(--base02);
-    --select-border: var(--base1);
-
-    --app-glow: radial-gradient(
-        125% 90% at 50% -12%,
-        rgba(var(--brass-rgb), 0.08),
-        transparent 58%
-    );
-    --grain-opacity: 0.02;
-
-    /* Sequencer Specific */
-    --step-bg: rgba(30, 24, 19, 0.08);
-    --step-bg-hover: rgba(30, 24, 19, 0.16);
-
-    /* Metronome */
-    --beat-active: var(--brass);
-    --beat-inactive-odd: var(--base2);
-    --beat-inactive-even: var(--base3);
 }
 
 /* ==========================================================================
-   Midnight — a cool blue-black dark theme (homage to the old Solarized feel),
-   cyan accent instead of brass. Only the base ramp + hues + accent change;
-   the semantic tokens (--bg-color: var(--base03), etc.) follow automatically.
+   MIDNIGHT — cool blue-black, cyan accent (homage to the old Solarized feel).
    ========================================================================== */
-[data-theme="midnight"] {
-    color-scheme: dark;
-
-    /* Cool neutral ramp */
-    --base03: #0c141d; /* deep blue-black bg */
-    --base02: #14202c; /* panel */
-    --base01: #3a4a57; /* hairlines / muted */
+[data-palette="midnight"][data-mode="dark"] {
+    --base03: #0c141d;
+    --base02: #14202c;
+    --base01: #3a4a57;
     --base00: #5a6c79;
-    --base0: #8499a6; /* secondary text */
-    --base1: #cdd9e2; /* primary text — cool light */
+    --base0: #8499a6;
+    --base1: #cdd9e2;
     --base2: #dbe6ee;
+    --base3: #eef2f6;
 
-    /* Cool-bright hues; accent is cyan, not brass */
-    --yellow: #46b4d6;
+    --yellow: #46b4d6; /* accent = cyan, not brass */
     --orange: #e8924a;
     --red: #ec5b54;
     --magenta: #e069a4;
@@ -274,19 +285,11 @@
     --blue: #5ab0e8;
     --cyan: #46b4d6;
     --green: #6fc06a;
-    --brass: #46b4d6;
     --brass-light: #74d2ee;
-    --brass-rgb: 70, 180, 214;
 
     --groove-color: #8b96a3; /* cool gray drums */
 
-    --chords-color-rgb: 90, 176, 232;
-    --bass-color-rgb: 111, 192, 106;
-    --soloist-color-rgb: 224, 105, 164;
-    --harmony-color-rgb: 154, 143, 240;
-    --groove-color-rgb: 139, 150, 163;
-
-    /* Keep dominant warm so the tension cue reads even against a cool accent */
+    /* Keep dominant warm so the tension cue reads against a cool accent */
     --chord-dominant: #e0a94a;
 
     --card-bg: #1b2a39;
@@ -296,21 +299,38 @@
     --select-bg: var(--base02);
     --select-text: var(--base1);
     --select-border: var(--base01);
+}
 
-    --step-bg: rgba(205, 217, 226, 0.08);
-    --step-bg-hover: rgba(205, 217, 226, 0.16);
-    --beat-inactive-odd: var(--base02);
-    --beat-inactive-even: var(--base01);
+[data-palette="midnight"][data-mode="light"] {
+    --base03: #0c141d;
+    --base02: #14202c; /* cool ink — text on paper */
+    --base01: #44535f;
+    --base00: #6a7884;
+    --base0: #8a98a4;
+    --base1: #c3ccd4;
+    --base2: #dde6ee;
+    --base3: #eef2f6; /* cool paper */
+
+    --yellow: #15768f; /* deepened cyan */
+    --orange: #c2701f;
+    --red: #b8332c;
+    --magenta: #b0306f;
+    --violet: #4a3fb0;
+    --blue: #1f6f9e;
+    --cyan: #1f8f86;
+    --green: #3f7d2f;
+    --brass-light: #0f5e72;
+
+    --groove-color: #5a6470;
+
+    --chord-dominant: #a9711a; /* warm tension cue */
 }
 
 /* ==========================================================================
-   High Contrast — accessibility theme. Pure-black ground, white text, bright
-   saturated hues, strong borders; grain/glow stripped for clarity. Also picks
-   up automatically when the OS requests more contrast (see prefers-contrast).
+   HIGH CONTRAST — accessibility palette. Maximal legibility: no glow/grain,
+   strong borders, bright (dark) / deep (light) saturated hues.
    ========================================================================== */
-[data-theme="high-contrast"] {
-    color-scheme: dark;
-
+[data-palette="high-contrast"][data-mode="dark"] {
     --base03: #000000;
     --base02: #121212;
     --base01: #6a6a6a;
@@ -318,6 +338,7 @@
     --base0: #c8c8c8;
     --base1: #ffffff;
     --base2: #f0f0f0;
+    --base3: #ffffff;
 
     --yellow: #ffd24a;
     --orange: #ff9a3c;
@@ -327,17 +348,9 @@
     --blue: #5cc2ff;
     --cyan: #4fe0d4;
     --green: #86e23f;
-    --brass: #ffd24a;
     --brass-light: #ffe28a;
-    --brass-rgb: 255, 210, 74;
 
     --groove-color: #d6d6d6;
-
-    --chords-color-rgb: 92, 194, 255;
-    --bass-color-rgb: 134, 226, 63;
-    --soloist-color-rgb: 255, 111, 176;
-    --harmony-color-rgb: 194, 168, 255;
-    --groove-color-rgb: 214, 214, 214;
 
     /* Bright, maximally distinct quality tints */
     --chord-dominant: #ffd24a;
@@ -358,9 +371,237 @@
     --focus-ring-color: var(--brass-light);
     --app-glow: none; /* no atmosphere — maximise legibility */
     --grain-opacity: 0;
-
     --step-bg: rgba(255, 255, 255, 0.12);
     --step-bg-hover: rgba(255, 255, 255, 0.22);
     --beat-inactive-odd: #2a2a2a;
     --beat-inactive-even: #3a3a3a;
+}
+
+[data-palette="high-contrast"][data-mode="light"] {
+    --base03: #000000;
+    --base02: #000000; /* pure black text */
+    --base01: #2a2a2a;
+    --base00: #4a4a4a;
+    --base0: #6a6a6a;
+    --base1: #8a8a8a;
+    --base2: #f0f0f0;
+    --base3: #ffffff; /* pure white paper */
+
+    --yellow: #9a5a00; /* deep amber */
+    --orange: #b34a00;
+    --red: #c00000;
+    --magenta: #b0006a;
+    --violet: #4a1fb0;
+    --blue: #0050b0;
+    --cyan: #006a64;
+    --green: #1f6b00;
+    --brass-light: #7a4600;
+
+    --groove-color: #333333;
+
+    --chord-dominant: #9a5a00;
+    --chord-minor: #0050b0;
+    --chord-dim: #c00000;
+    --chord-halfdim: #4a1fb0;
+    --chord-aug: #8a0fa0;
+    --chord-sus: #006a4a;
+
+    --card-bg: #ffffff;
+    --card-bg-hover: #f0f0f0;
+    --border-color: rgba(0, 0, 0, 0.45); /* strong hairlines */
+    --input-bg: rgba(0, 0, 0, 0.06);
+    --select-bg: #ffffff;
+    --select-text: #000000;
+    --select-border: #6a6a6a;
+
+    --focus-ring-color: var(--accent-color);
+    --app-glow: none;
+    --grain-opacity: 0;
+    --step-bg: rgba(0, 0, 0, 0.14);
+    --step-bg-hover: rgba(0, 0, 0, 0.24);
+    --beat-inactive-odd: #e0e0e0;
+    --beat-inactive-even: #f4f4f4;
+}
+
+/* ==========================================================================
+   FOREST — cool green/teal. Mossy ink ground, teal accent, leafy instruments.
+   ========================================================================== */
+[data-palette="forest"][data-mode="dark"] {
+    --base03: #0d1512; /* deep forest ink */
+    --base02: #16221d;
+    --base01: #46544c;
+    --base00: #5e6e64;
+    --base0: #88988c;
+    --base1: #ccd8cf;
+    --base2: #dde8df;
+    --base3: #eef4ee;
+
+    --yellow: #3fb59a; /* accent = teal */
+    --orange: #e0944a;
+    --red: #e0635a;
+    --magenta: #e06aa0;
+    --violet: #8fa0d6;
+    --blue: #4aa6c4;
+    --cyan: #3fb59a;
+    --green: #7fc04a;
+    --brass-light: #63d6bb;
+
+    --groove-color: #8a9a86; /* mossy gray drums */
+
+    --chord-dominant: #e0a94a; /* warm tension cue against teal */
+
+    --card-bg: #18261f;
+    --card-bg-hover: #21322a;
+    --border-color: rgba(120, 200, 170, 0.14);
+    --input-bg: rgba(0, 0, 0, 0.28);
+    --select-bg: var(--base02);
+    --select-text: var(--base1);
+    --select-border: var(--base01);
+}
+
+[data-palette="forest"][data-mode="light"] {
+    --base03: #0d1512;
+    --base02: #16221d; /* forest ink — text */
+    --base01: #45544b;
+    --base00: #66756b;
+    --base0: #889488;
+    --base1: #c2cec4;
+    --base2: #dde8df;
+    --base3: #f0f4ee; /* cool green-tinted paper */
+
+    --yellow: #1f7d6a; /* deep teal */
+    --orange: #b3651f;
+    --red: #b8332c;
+    --magenta: #b0346e;
+    --violet: #46498f;
+    --blue: #1f6f8e;
+    --cyan: #1f7d6a;
+    --green: #3f7d12;
+    --brass-light: #166053;
+
+    --groove-color: #566054;
+
+    --chord-dominant: #a9711a;
+}
+
+/* ==========================================================================
+   SUNSET — warm orange/coral. Dusk ground, coral accent, golden instruments.
+   ========================================================================== */
+[data-palette="sunset"][data-mode="dark"] {
+    --base03: #1a1210; /* dusk ink */
+    --base02: #261814;
+    --base01: #5e4a40;
+    --base00: #7c655a;
+    --base0: #a08a7c;
+    --base1: #e8d2c2;
+    --base2: #f0e0d2;
+    --base3: #fbf0e6;
+
+    --yellow: #f0843c; /* accent = coral/orange */
+    --orange: #f0843c;
+    --red: #e85050;
+    --magenta: #e85c7a;
+    --violet: #b87fd0;
+    --blue: #5aa6c4;
+    --cyan: #5fc9bd;
+    --green: #c0b04a;
+    --brass-light: #ffa564;
+
+    --groove-color: #c0a088; /* sandy drums */
+
+    --chord-dominant: #e8b048; /* distinct amber tension vs coral accent */
+
+    --card-bg: #2e1d18;
+    --card-bg-hover: #3a2620;
+    --border-color: rgba(240, 150, 90, 0.16);
+    --input-bg: rgba(0, 0, 0, 0.3);
+    --select-bg: var(--base02);
+    --select-text: var(--base1);
+    --select-border: var(--base01);
+}
+
+[data-palette="sunset"][data-mode="light"] {
+    --base03: #1a1210;
+    --base02: #261814; /* dusk ink — text */
+    --base01: #5e4a40;
+    --base00: #7c655a;
+    --base0: #9a8478;
+    --base1: #e0c8b6;
+    --base2: #f2e2d4;
+    --base3: #fbf0e6; /* warm peach paper */
+
+    --yellow: #c2591f; /* deep coral */
+    --orange: #c2591f;
+    --red: #c0352f;
+    --magenta: #c03050;
+    --violet: #7a3fb0;
+    --blue: #1f6f9e;
+    --cyan: #2a8f86;
+    --green: #7d6512;
+    --brass-light: #a3470f;
+
+    --groove-color: #7a6052;
+
+    --chord-dominant: #b3681a;
+}
+
+/* ==========================================================================
+   SYNTHWAVE — neon purple/magenta over deep indigo.
+   ========================================================================== */
+[data-palette="synthwave"][data-mode="dark"] {
+    --base03: #0e0a1a; /* deep indigo ink */
+    --base02: #181230;
+    --base01: #463c5e;
+    --base00: #5e5278;
+    --base0: #8a7ea6;
+    --base1: #d6cce8;
+    --base2: #e2dcef;
+    --base3: #f3eefb;
+
+    --yellow: #e85cc0; /* accent = neon pink */
+    --orange: #f08a4a;
+    --red: #f0566a;
+    --magenta: #f06cd0;
+    --violet: #a87cf0;
+    --blue: #4ad0e8;
+    --cyan: #4ad0e8;
+    --green: #5ce8a0;
+    --brass-light: #ff7ad8;
+
+    --groove-color: #9080b0; /* dusky purple-gray drums */
+
+    --chord-dominant: #f0a850; /* warm tension cue against neon accent */
+
+    --card-bg: #1f1740;
+    --card-bg-hover: #2a2052;
+    --border-color: rgba(200, 130, 240, 0.18);
+    --input-bg: rgba(0, 0, 0, 0.32);
+    --select-bg: var(--base02);
+    --select-text: var(--base1);
+    --select-border: var(--base01);
+}
+
+[data-palette="synthwave"][data-mode="light"] {
+    --base03: #0e0a1a;
+    --base02: #181230; /* indigo ink — text */
+    --base01: #463c5e;
+    --base00: #685c82;
+    --base0: #8a7ea6;
+    --base1: #cabfe0;
+    --base2: #e4def0;
+    --base3: #f3eefb; /* lavender paper */
+
+    --yellow: #b02890; /* deep magenta */
+    --orange: #b3551f;
+    --red: #c0352f;
+    --magenta: #c0308f;
+    --violet: #6a3fc0;
+    --blue: #1f7f9e;
+    --cyan: #1f8f86;
+    --green: #1f8f5e;
+    --brass-light: #951f78;
+
+    --groove-color: #5e5470;
+
+    --chord-dominant: #a9711a;
 }

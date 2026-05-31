@@ -9,7 +9,7 @@ import '@fontsource/hanken-grotesk/latin-400.css';
 import '@fontsource/hanken-grotesk/latin-500.css';
 import '@fontsource/hanken-grotesk/latin-700.css';
 import '@fontsource/geist-mono/latin-400.css';
-import { applyTheme } from './app-controller.js';
+import { applyThemeToDom } from './app-controller.js';
 import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
@@ -35,7 +35,7 @@ function init() {
 
         installE2EGlobals();
 
-        applyTheme(playback.theme);
+        applyThemeToDom(playback.palette, playback.mode);
 
         validateProgression(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p));
 

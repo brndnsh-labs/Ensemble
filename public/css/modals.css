@@ -775,10 +775,10 @@ body.modal-open {
 }
 
 .help-card {
-    background: rgba(var(--accent-color-rgb), 0.1);
+    background: color-mix(in srgb, var(--accent-color) 10%, transparent);
     padding: 1rem;
     border-radius: 8px;
-    border: 1px solid rgba(var(--accent-color-rgb), 0.2);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
 
 .help-card h4 {
@@ -1816,7 +1816,7 @@ input[type="range"] {
     50% {
         border-color: var(--accent-hover);
         box-shadow: 0 0 0 10px transparent;
-        background: rgba(var(--chords-color-rgb), 0.1);
+        background: color-mix(in srgb, var(--chords-color) 10%, transparent);
     }
     100% {
         border-color: var(--border-color);
@@ -1972,7 +1972,7 @@ input[type="range"] {
 }
 
 .share-card--accent {
-    border-color: rgba(var(--accent-color-rgb), 0.3);
+    border-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 
 .share-card-title {
@@ -2171,15 +2171,6 @@ input[type="range"] {
     overflow: hidden;
 }
 
-.theme-swatch--light .theme-swatch__preview {
-    border-color: rgba(0, 0, 0, 0.12);
-}
-
-/* Auto = half dark / half light, previewing the system-follow behaviour */
-.theme-swatch--auto .theme-swatch__preview {
-    background: linear-gradient(135deg, #14110d 0 50%, #f6efe1 50% 100%);
-}
-
 .theme-swatch__accent {
     position: absolute;
     top: 8px;
@@ -2204,18 +2195,6 @@ input[type="range"] {
     border-radius: 50%;
 }
 
-.theme-swatch__auto-label {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-xs);
-    font-weight: 700;
-    color: #fff;
-    mix-blend-mode: difference;
-}
-
 .theme-swatch__label {
     font-size: var(--font-xs);
     font-weight: 600;
@@ -2225,4 +2204,39 @@ input[type="range"] {
 
 .theme-swatch.is-selected .theme-swatch__label {
     color: var(--text-color);
+}
+
+/* Light / dark segmented control — pairs with the palette picker */
+.mode-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 3px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    width: 100%;
+}
+
+.mode-toggle__option {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font-size: var(--font-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition:
+        background var(--anim-fast) var(--anim-ease),
+        color var(--anim-fast) var(--anim-ease);
+}
+
+.mode-toggle__option:hover {
+    color: var(--text-color);
+}
+
+.mode-toggle__option.is-selected {
+    background: var(--accent-color);
+    color: var(--bg-color);
 }

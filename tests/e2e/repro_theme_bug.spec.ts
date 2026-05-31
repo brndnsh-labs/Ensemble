@@ -7,24 +7,26 @@ const { expect, test } = pkg;
 test.describe('Theme Reproduction Bug', () => {
     test.use({ colorScheme: 'light' });
 
-    test('Auto theme should apply light mode when system is light', async ({ page }) => {
+    test('Auto mode should resolve to light when the system is light', async ({ page }) => {
         await gotoHydrated(page);
 
         // 1. Open settings (via the topbar overflow menu)
         await openSettings(page);
 
-        // 2. Set theme to 'auto' via the Appearance tab's visual theme picker
+        // 2. Set mode to 'Auto' via the Appearance tab's mode toggle.
         await page.getByRole('tab', { name: 'Appearance' }).click();
         await page.getByRole('radio', { name: 'Auto' }).click();
 
-        // 3. Verify data-theme attribute — 'auto' under a light system resolves
-        //    to the 'lead-sheet' (warm paper) theme.
-        const dataTheme = await page.getAttribute('html', 'data-theme');
-        console.log('Current data-theme:', dataTheme);
+        // 3. Verify the resolved attributes — the default palette is after-hours
+        //    and 'auto' under a light system resolves to the light variant.
+        const dataPalette = await page.getAttribute('html', 'data-palette');
+        const dataMode = await page.getAttribute('html', 'data-mode');
+        console.log('Current data-palette / data-mode:', dataPalette, dataMode);
 
-        expect(dataTheme).toBe('lead-sheet');
+        expect(dataPalette).toBe('after-hours');
+        expect(dataMode).toBe('light');
 
-        // 4. Verify background color matches the light theme's warm paper (--base3: #f6efe1)
+        // 4. Verify background color matches the light variant's warm paper (--base3: #f6efe1)
         const bgColor = await page.evaluate(() =>
             getComputedStyle(document.documentElement).getPropertyValue('--bg-color').trim(),
         );

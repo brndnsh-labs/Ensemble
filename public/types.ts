@@ -986,6 +986,19 @@ export interface AudioGraph {
     readonly drums: InstrumentBus;
 }
 
+/** Curated color-palette identities. Each has a light + dark variant in
+ *  `public/css/variables.css`, selected via `<html data-palette>`. */
+export type Palette =
+    | 'after-hours'
+    | 'midnight'
+    | 'high-contrast'
+    | 'forest'
+    | 'sunset'
+    | 'synthwave';
+
+/** Light/dark preference. 'auto' resolves against the OS at apply time. */
+export type ThemeMode = 'auto' | 'light' | 'dark';
+
 export interface GlobalContext {
     /** The Web Audio API context. */
     readonly audio: AudioContext | null;
@@ -1011,8 +1024,13 @@ export interface GlobalContext {
     readonly countInBeat: number;
     /** Whether the visualizer loop is active. */
     readonly isDrawing: boolean;
-    /** The current UI theme ('auto', 'light', 'dark'). */
-    readonly theme: string;
+    /** The chosen color palette identity (instrument hues + accent). Each
+     *  palette has a light and a dark variant; `mode` selects which. */
+    readonly palette: Palette;
+    /** Light/dark preference. 'auto' follows the OS (prefers-color-scheme);
+     *  'light'/'dark' force a variant. Resolved to a concrete mode at apply
+     *  time and written to `<html data-mode>`. */
+    readonly mode: ThemeMode;
     /** The screen wake lock object. */
     readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */

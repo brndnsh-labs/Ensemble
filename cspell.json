@@ -310,7 +310,8 @@
         "fontsource",
         "Geist",
         "woff",
-        "opsz"
+        "opsz",
+        "synthwave"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

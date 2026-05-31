@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { resolveMode } from '../app-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { switchMeasure } from '../instrument-controller.js';
 import type { StateMap } from '../state.js';
@@ -77,9 +78,10 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     const loopRef = useRef<number | null>(null);
     const prevPlayingRef = useRef(false);
 
-    const { isPlaying, theme, bpm, timeSignature } = useEnsembleState((s) => ({
+    const { isPlaying, palette, mode, bpm, timeSignature } = useEnsembleState((s) => ({
         isPlaying: s.playback.isPlaying,
-        theme: s.playback.theme,
+        palette: s.playback.palette,
+        mode: s.playback.mode,
         bpm: s.playback.bpm,
         timeSignature: s.arranger.timeSignature,
     }));
@@ -147,7 +149,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             return;
         }
         const style = getComputedStyle(document.documentElement);
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const isDark = resolveMode(mode) === 'dark';
         const resolve = (prop: string, fallback: string) =>
             style.getPropertyValue(prop).trim() || fallback;
 
@@ -183,7 +185,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
     useEffect(() => {
         updateTheme(vizRef.current);
-    }, [theme]);
+    }, [palette, mode]);
 
     useEffect(() => {
         if (vizRef.current) {

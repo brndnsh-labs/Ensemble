@@ -11,7 +11,7 @@ import { saveCurrentState } from './persistence.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
 
 import { dispatch, getState, storage } from './state.js';
-import type { Mutable } from './types.js';
+import type { Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
 import {
     decompressSections,
@@ -36,6 +36,40 @@ const SUPPORTED_SOLOIST_PRESETS = new Set(['trumpet']);
 
 function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
+}
+
+const VALID_PALETTES = new Set<Palette>([
+    'after-hours',
+    'midnight',
+    'high-contrast',
+    'forest',
+    'sunset',
+    'synthwave',
+]);
+
+// Theme migration (2026-05-31) — the single `theme` value split into two axes:
+// `palette` (color identity) + `mode` (auto/light/dark). Map any legacy `theme`
+// from an older saved session onto the new pair so sessions keep their look.
+const LEGACY_THEME_MAP: Record<string, { palette: Palette; mode: ThemeMode }> = {
+    auto: { palette: 'after-hours', mode: 'auto' },
+    'after-hours': { palette: 'after-hours', mode: 'dark' },
+    dark: { palette: 'after-hours', mode: 'dark' },
+    'lead-sheet': { palette: 'after-hours', mode: 'light' },
+    light: { palette: 'after-hours', mode: 'light' },
+    midnight: { palette: 'midnight', mode: 'dark' },
+    'high-contrast': { palette: 'high-contrast', mode: 'dark' },
+};
+
+function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
+    // Prefer the new two-axis fields when present.
+    if (VALID_PALETTES.has(savedState?.palette)) {
+        const mode: ThemeMode = ['auto', 'light', 'dark'].includes(savedState?.mode)
+            ? savedState.mode
+            : 'auto';
+        return { palette: savedState.palette, mode };
+    }
+    // Fall back to the legacy single `theme` value.
+    return LEGACY_THEME_MAP[savedState?.theme] ?? { palette: 'after-hours', mode: 'auto' };
 }
 
 function decompressBandSettings(str: string): any {
@@ -145,8 +179,10 @@ export function hydrateState(): void {
                 '',
         });
 
+        const { palette, mode } = migrateTheme(savedState);
         Object.assign(playback, {
-            theme: savedState.theme || 'auto',
+            palette,
+            mode,
             bpm: clamp(savedState.bpm, 20, 300, 100),
             bandIntensity: clamp(savedState.bandIntensity, 0, 1, 0.35),
             complexity: clamp(savedState.complexity, 0, 1, 0.3),

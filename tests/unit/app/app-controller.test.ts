@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTheme, setBpm } from '../../../public/app-controller.js';
+import { setBpm, setMode, setPalette } from '../../../public/app-controller.js';
 import { saveCurrentState } from '../../../public/persistence.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { syncWorker } from '../../../public/worker-client.js';
@@ -28,7 +28,8 @@ describe('App Controller', () => {
         vi.clearAllMocks();
         state = {
             playback: {
-                theme: 'dark',
+                palette: 'after-hours',
+                mode: 'dark',
                 bpm: 120,
                 isPlaying: false,
                 audio: { currentTime: 100 },
@@ -58,42 +59,39 @@ describe('App Controller', () => {
         });
     });
 
-    describe('applyTheme', () => {
-        it('should apply a specific theme and dispatch SET_PARAM', () => {
-            applyTheme('light');
+    describe('setPalette', () => {
+        it('should dispatch SET_PARAM for a new palette and persist', () => {
+            setPalette('midnight');
             expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
                 module: 'playback',
-                param: 'theme',
+                param: 'palette',
+                value: 'midnight',
+            });
+            expect(saveCurrentState).toHaveBeenCalled();
+        });
+
+        it('should not dispatch if the palette is unchanged', () => {
+            state.playback.palette = 'after-hours';
+            setPalette('after-hours');
+            expect(dispatch).not.toHaveBeenCalled();
+            expect(saveCurrentState).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('setMode', () => {
+        it('should dispatch SET_PARAM for a new mode and persist', () => {
+            setMode('light');
+            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
+                module: 'playback',
+                param: 'mode',
                 value: 'light',
             });
             expect(saveCurrentState).toHaveBeenCalled();
         });
 
-        it('should apply auto theme based on media query (dark)', () => {
-            window.matchMedia.mockReturnValue({ matches: true });
-            applyTheme('auto');
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'playback',
-                param: 'theme',
-                value: 'auto',
-            });
-            expect(saveCurrentState).toHaveBeenCalled();
-        });
-
-        it('should apply auto theme based on media query (light)', () => {
-            window.matchMedia.mockReturnValue({ matches: false });
-            applyTheme('auto');
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'playback',
-                param: 'theme',
-                value: 'auto',
-            });
-            expect(saveCurrentState).toHaveBeenCalled();
-        });
-
-        it('should not dispatch if theme is unchanged', () => {
-            state.playback.theme = 'dark';
-            applyTheme('dark');
+        it('should not dispatch if the mode is unchanged', () => {
+            state.playback.mode = 'dark';
+            setMode('dark');
             expect(dispatch).not.toHaveBeenCalled();
             expect(saveCurrentState).not.toHaveBeenCalled();
         });

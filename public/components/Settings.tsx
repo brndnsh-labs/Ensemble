@@ -12,7 +12,7 @@ import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { secondsPerStepFor } from '../utils.js';
 import { Icon } from './Icon.jsx';
-import { ThemePicker } from './ThemePicker.jsx';
+import { ModeToggle, PalettePicker } from './ThemePicker.jsx';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
 const SETTINGS_TABS = [
@@ -250,7 +250,12 @@ export function Settings() {
                             <SettingGroup title="Appearance">
                                 <div class="settings-field-stacked" id="themeSelect">
                                     <span class="setting-label">Theme</span>
-                                    <ThemePicker />
+                                    <PalettePicker />
+                                </div>
+
+                                <div class="settings-field-stacked" id="modeSelect">
+                                    <span class="setting-label">Light / dark</span>
+                                    <ModeToggle />
                                 </div>
 
                                 <SettingRow

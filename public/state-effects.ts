@@ -1,4 +1,4 @@
-import { applyTheme, setBpm } from './app-controller.js';
+import { applyThemeToDom, setBpm } from './app-controller.js';
 import { validateProgression } from './engine/chords-engine.js';
 import {
     generateDrumFills,
@@ -184,7 +184,7 @@ export function handleEffects(
             break;
         }
         case 'HYDRATE': {
-            applyTheme(stateMap.playback.theme);
+            applyThemeToDom(stateMap.playback.palette, stateMap.playback.mode);
             if (stateMap.midi.enabled) {
                 initMIDI();
             }
