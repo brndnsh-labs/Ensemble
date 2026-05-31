@@ -167,19 +167,12 @@ describe('Jazz 6/8 Walking-Bass Density (S12)', () => {
         const pulseHits = (onsetsByStep[0] || 0) + (onsetsByStep[6] || 0);
         const pulseShare = totalOnsets > 0 ? pulseHits / totalOnsets : 0;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — LOW INTENSITY ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Bars]              ${numBars}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Total onsets]      ${totalOnsets}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Onsets per bar]    ${onsetsPerBar.toFixed(2)} (Target: ~2)`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Pulse share {0,6}] ${(pulseShare * 100).toFixed(1)}% (Target: ≥ 90%)`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('[Onsets by mStep]', onsetsByStep);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('----------------------------------------------\n');
 
         expect(onsetsPerBar).toBeGreaterThanOrEqual(1.5);
@@ -197,17 +190,11 @@ describe('Jazz 6/8 Walking-Bass Density (S12)', () => {
         const onsetsPerBar = totalOnsets / numBars;
         const approachHits = (onsetsByStep[2] || 0) + (onsetsByStep[8] || 0);
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — MODERATE INTENSITY ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Bars]              ${numBars}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Onsets per bar]    ${onsetsPerBar.toFixed(2)} (Target: ~3, range [2, 5])`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Approach hits {2,8}] ${approachHits} (Target: 0 — silent at this intensity)`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('[Onsets by mStep]', onsetsByStep);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('----------------------------------------------------\n');
 
         expect(onsetsPerBar).toBeGreaterThanOrEqual(2);
@@ -225,19 +212,12 @@ describe('Jazz 6/8 Walking-Bass Density (S12)', () => {
         const pickupHits = (onsetsByStep[4] || 0) + (onsetsByStep[10] || 0);
         const approachHits = (onsetsByStep[2] || 0) + (onsetsByStep[8] || 0);
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — HIGH INTENSITY ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Bars]              ${numBars}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Onsets per bar]    ${onsetsPerBar.toFixed(2)} (Target: ~5, range [3, 7])`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Pickup hits {4,10}] ${pickupHits} (Target: > 0)`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Approach hits {2,8}] ${approachHits} (Target: > 0)`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('[Onsets by mStep]', onsetsByStep);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('-----------------------------------------------\n');
 
         expect(onsetsPerBar).toBeGreaterThanOrEqual(3);

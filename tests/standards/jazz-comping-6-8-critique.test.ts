@@ -402,7 +402,6 @@ describe('Jazz 6/8 Comping Density — chord-change walk (S13 follow-up)', () =>
         }
 
         if (failures.length > 0) {
-            // biome-ignore lint/suspicious/noConsole: critique-test report
             console.log('[Chord-change walk failures]', failures);
         }
         expect(failures).toEqual([]);
@@ -414,7 +413,6 @@ describe('Jazz 6/8 Comping Density — chord-change walk (S13 follow-up)', () =>
         // (nearly) every bar — guards against the anchoring being lost in compound.
         const numBars = 32;
         const result = runJazzCompingSixEight(numBars, 0xdeadbeef, WALK);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Chord-change walk] downbeat hits = ${result.hitsByStep[0]}/${numBars}, hits/bar = ${result.hitsPerBar.toFixed(2)}`,
         );

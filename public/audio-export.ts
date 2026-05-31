@@ -126,7 +126,6 @@ function sanitizeFilename(input: string): string {
 // pitchHistory) and a `ui` slot that the offline-render pipeline still
 // reaches for; those fields are not on the typed EnsembleState. Until that
 // scratch surface is migrated, this helper stays loosely typed.
-// biome-ignore lint/suspicious/noExplicitAny: see comment above
 function cloneStateForRender(liveState: any): any {
     return {
         playback: {

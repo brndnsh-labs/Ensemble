@@ -38,7 +38,6 @@ async function globalSetup(): Promise<void> {
             timeout: HYDRATION_TIMEOUT,
         });
     } catch (err) {
-        // biome-ignore lint/suspicious/noConsole: surfacing a warm-up miss to the test log
         console.warn('[e2e global-setup] warm-up navigation did not complete:', err);
     } finally {
         await browser.close();

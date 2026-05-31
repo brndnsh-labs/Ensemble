@@ -146,23 +146,16 @@ describe('Jazz 6/8 Ride Skip-Beat Position (S11)', () => {
         const clusterRatio = totalRideHits > 0 ? clusterHits / totalRideHits : 0;
         const oldSkipRatio = totalRideHits > 0 ? oldSkipHits / totalRideHits : 0;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 RIDE POSITION CRITIQUE REPORT ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Bars]          ${numBars}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Total Ride Hits] ${totalRideHits}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Cluster {0,4,6,10}] ${clusterHits} hits = ${(clusterRatio * 100).toFixed(1)}% (Target: ≥ 90%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Old skip {5,11}]    ${oldSkipHits} hits = ${(oldSkipRatio * 100).toFixed(1)}% (Target: ≤ 5%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('[Hits by mStep]', hitsByStep);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('-----------------------------------------------\n');
 
         // CRITICAL: canonical spang-a-lang positions dominate
@@ -186,7 +179,6 @@ describe('Jazz 6/8 Ride Skip-Beat Position (S11)', () => {
         );
         const hitsPerBar = totalRideHits / numBars;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Jazz 6/8 Ride Density] ${hitsPerBar.toFixed(2)} hits/bar (Target: ≥ 2.0)`);
 
         expect(hitsPerBar).toBeGreaterThanOrEqual(2.0);
@@ -220,19 +212,14 @@ describe('Jazz 12/8 Ride Skip-Beat Position (S11 follow-up)', () => {
         const clusterRatio = totalRideHits > 0 ? clusterHits / totalRideHits : 0;
         const oldSkipRatio = totalRideHits > 0 ? oldSkipHits / totalRideHits : 0;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 12/8 RIDE POSITION CRITIQUE REPORT ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Cluster] ${clusterHits}/${totalRideHits} = ${(clusterRatio * 100).toFixed(1)}% (Target: ≥ 90%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Old skip {5,11,17,23}] ${oldSkipHits} = ${(oldSkipRatio * 100).toFixed(1)}% (Target: ≤ 5%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('[Hits by mStep]', hitsByStep);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('-----------------------------------------------\n');
 
         expect(clusterRatio).toBeGreaterThanOrEqual(0.9);
@@ -248,7 +235,6 @@ describe('Jazz 12/8 Ride Skip-Beat Position (S11 follow-up)', () => {
             OLD_SKIP_12_8,
         );
         const hitsPerBar = totalRideHits / numBars;
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Jazz 12/8 Ride Density] ${hitsPerBar.toFixed(2)} hits/bar (Target: ≥ 2.0)`);
         expect(hitsPerBar).toBeGreaterThanOrEqual(2.0);
     });

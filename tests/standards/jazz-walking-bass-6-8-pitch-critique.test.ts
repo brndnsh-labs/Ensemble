@@ -209,17 +209,12 @@ describe('Jazz 6/8 Walking-Bass PITCH (S15)', () => {
         ).length;
         const matchShare = matches / pulseOnsets.length;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — PULSE ROOT SHARE (moderate intensity) ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Loops]                ${NUM_LOOPS}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Pulse onsets]         ${pulseOnsets.length}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Pulse root-pc matches] ${matches} (${(matchShare * 100).toFixed(1)}% — target ≥ 90%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('--------------------------------------------------------------------\n');
 
         expect(matchShare).toBeGreaterThanOrEqual(0.9);
@@ -239,15 +234,11 @@ describe('Jazz 6/8 Walking-Bass PITCH (S15)', () => {
         ).length;
         const share = matches / heldBarPulses.length;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — HELD-CHORD PULSE (bar 4 Cmaj7) ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Held-bar pulse onsets] ${heldBarPulses.length}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Root-pc matches]       ${matches} (${(share * 100).toFixed(1)}% — target ≥ 90%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('----------------------------------------------------------------\n');
 
         expect(share).toBeGreaterThanOrEqual(0.9);
@@ -274,15 +265,11 @@ describe('Jazz 6/8 Walking-Bass PITCH (S15)', () => {
         }).length;
         const share = within / pickupOnsets.length;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — PICKUP LEADING-TONE SHARE (high intensity) ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Pickup onsets]      ${pickupOnsets.length}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Within ±2 semitones] ${within} (${(share * 100).toFixed(1)}% — target ≥ 80%)`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             '---------------------------------------------------------------------------\n',
         );
@@ -319,19 +306,13 @@ describe('Jazz 6/8 Walking-Bass PITCH (S15)', () => {
         const classified = below + above;
         const belowShare = below / classified;
 
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log('\n--- JAZZ 6/8 WALKING BASS — PICKUP DIRECTION SPLIT (seeded PRNG probe) ---');
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Pickup onsets]         ${pickupOnsets.length}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Chromatic-below]       ${below}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(`[Chromatic-above]       ${above}`);
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[Below share]           ${(belowShare * 100).toFixed(1)}% (target ∈ [25%, 75%])`,
         );
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             '---------------------------------------------------------------------------\n',
         );

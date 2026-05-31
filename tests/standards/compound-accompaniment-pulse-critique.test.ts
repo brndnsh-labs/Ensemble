@@ -125,7 +125,6 @@ describe('compound-accompaniment: 6/8 pulse density (S3)', () => {
         const silentBarRatio = totalBars > 0 ? silentBars / totalBars : 0;
 
         // Critique Report (visible without re-running probes)
-        // biome-ignore lint/suspicious/noConsole: critique-test report
         console.log(
             `[compound-accompaniment Jazz 6/8] bars=${totalBars} hits=${totalHits} ` +
                 `pulse=${(pulseRatio * 100).toFixed(1)}% ` +
