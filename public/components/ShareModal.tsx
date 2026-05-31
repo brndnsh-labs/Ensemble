@@ -86,7 +86,7 @@ export function ShareModal() {
                     url: url,
                 });
             } catch (err) {
-                console.log('Share failed or cancelled:', err);
+                console.warn('Share failed or cancelled:', err);
             }
         } else {
             handleCopyLink();

@@ -36,7 +36,6 @@ export function initPWA(): void {
         navigator.serviceWorker
             .register('./sw.js', { updateViaCache: 'none' })
             .then((reg) => {
-                console.log('SW registered');
                 reg.update();
 
                 if (reg.waiting) {
@@ -87,7 +86,7 @@ export function initPWA(): void {
                     }
                 });
             })
-            .catch((err) => console.log('SW failed', err));
+            .catch((err) => console.error('SW failed', err));
 
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {

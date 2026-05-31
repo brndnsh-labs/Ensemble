@@ -31,8 +31,6 @@ class ErrorBoundary extends Component<{ children: ComponentChildren }, ErrorBoun
 }
 
 export function mountComponents(getVisualTime: () => number) {
-    console.log('[UI-Root] Mounting Preact Root...');
-
     const root = document.body;
 
     render(

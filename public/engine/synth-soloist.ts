@@ -73,6 +73,7 @@ function playSoloNoteCurrent(
     const playTime = Math.max(time, now);
 
     if (playback.debugSoloist) {
+        // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
         console.log(
             `[Soloist Debug] playSoloNote: freq=${freq.toFixed(2)}, vol=${vol.toFixed(2)}, duration=${duration.toFixed(2)}s, vibrato=${vibrato}, legato=${isLegato}`,
         );

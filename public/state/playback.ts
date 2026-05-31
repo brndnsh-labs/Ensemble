@@ -168,7 +168,7 @@ export function playbackReducer(action: Action): boolean {
                 );
                 setTimeout(() => {
                     p.scheduleAheadTime = 0.2;
-                    console.log('[Performance] Lookahead reset to normal.');
+                    console.warn('[Performance] Lookahead reset to normal.');
                 }, 10000);
             }
             return true;

@@ -975,6 +975,7 @@ export function getSoloistNote(
 
     const logDebug = (msg: string) => {
         if (playback.debugSoloist) {
+            // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
             console.log(`[Soloist Debug] Step ${step} (mStep: ${measureStep}): ${msg}`);
         }
     };

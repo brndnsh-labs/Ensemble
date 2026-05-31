@@ -26,7 +26,6 @@ class AudioHealthMonitor {
             () => this.healthCheck(getPlaybackState()),
             this.checkInterval,
         );
-        console.log('[AudioWatchdog] Monitoring started.');
     }
 
     stop(): void {
@@ -114,7 +113,7 @@ class AudioHealthMonitor {
         this.isRecovering = true;
         this.crashCount++;
 
-        console.log('[AudioWatchdog] Initiating Emergency DSP Reset...');
+        console.warn('[AudioWatchdog] Initiating Emergency DSP Reset...');
 
         // 1. Mute everything immediately to stop the static
         if (playback.audioGraph) {
@@ -136,7 +135,7 @@ class AudioHealthMonitor {
         }
 
         this.isRecovering = false;
-        console.log('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
+        console.warn('[AudioWatchdog] DSP Reset Complete. Audio should be clean.');
     }
 
     triggerFullRestart(playback: GlobalContext): void {

@@ -588,6 +588,15 @@ export function generateSessionSeed(
         return { notes: [], loopLengthSteps: 0 };
     }
 
+    // Seed-generation diagnostics — silent unless the soloist debug flag is on,
+    // matching the runtime gating in soloist.ts / synth-soloist.ts.
+    const logSeed = (msg: string) => {
+        if (state?.playback?.debugSoloist) {
+            // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
+            console.log(msg);
+        }
+    };
+
     const prng = createPRNG(seedStr || generateRandomSeed());
 
     const tsConfig: any = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
@@ -629,7 +638,7 @@ export function generateSessionSeed(
     // ... (rest of logic remains same, but using actualTotalSteps)
 
     // Walk through each section
-    console.log(
+    logSeed(
         `[Seeder Debug] Starting seed generation. Total steps: ${actualTotalSteps}, time signature: ${arranger.timeSignature}`,
     );
 
@@ -641,7 +650,7 @@ export function generateSessionSeed(
         const sectionStartMeasure = Math.floor(sectionRange.start / stepsPerMeasure);
         const sectionEndMeasure = Math.ceil(sectionRange.end / stepsPerMeasure);
 
-        console.log(
+        logSeed(
             `[Seeder Debug] Section ${label}: start measure ${sectionStartMeasure}, end measure ${sectionEndMeasure}. Applying motif.`,
         );
 
@@ -948,7 +957,7 @@ export function generateSessionSeed(
                           ]
                         : ['ASCEND', 'DESCEND', 'ARCH', 'VALLEY', 'STATIC', 'HOOK', 'ARPEGGIATE'];
             const contourType = contourPool[Math.floor(prng() * contourPool.length)];
-            console.log(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
+            logSeed(`[Composer] Assigned contour: ${contourType} to category: ${category}`);
 
             // 1. Generate the initial A cell
             const cellA = generateCell(forceSparse, forceDense, statementDensity);
@@ -1499,7 +1508,7 @@ export function generateSessionSeed(
                     });
 
                     activeMotif = [...pickupNotes, ...activeMotif];
-                    console.log(`[Composer] Injected ${pKey} pickup into section ${label}`);
+                    logSeed(`[Composer] Injected ${pKey} pickup into section ${label}`);
                 }
             }
 
@@ -2147,6 +2156,6 @@ export function generateSessionSeed(
     );
     polishedNotes.sort((a: SeedNote, b: SeedNote) => a.step - b.step);
 
-    console.log(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
+    logSeed(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
     return { notes: polishedNotes, loopLengthSteps: actualTotalSteps };
 }
