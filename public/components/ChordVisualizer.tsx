@@ -101,8 +101,6 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
 
     const classNames = [
         'chord-card',
-        chord.isMinor ? 'minor' : '',
-        chord.quality === 'aug' || chord.quality === 'augmaj7' ? 'aug' : '',
         `q-${qualityBucket(chord.quality, chord.isMinor)}`,
         isActive ? 'active' : '',
     ]

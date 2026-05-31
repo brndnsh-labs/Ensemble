@@ -1,9 +1,20 @@
 import { MODULES } from './constants.js';
-import { VISUALIZER_TRACK_ORDER, VISUALIZER_TRACKS } from './visualizer-events.js';
+import {
+    VISUALIZER_CHORD_SWATCHES,
+    VISUALIZER_TRACK_ORDER,
+    VISUALIZER_TRACKS,
+} from './visualizer-events.js';
 import { INTERVAL_CATEGORY, RingBuffer } from './visualizer-utils.js';
 
 const { PI, abs, max, min } = Math;
 const DEFAULT_TRACK_RANGE = { midiMin: 48, midiMax: 84 };
+
+/**
+ * Chord category colors used when the main-thread theme bridge hasn't supplied
+ * `themeCache.chordColors` (the OffscreenCanvas worker can't read CSS vars).
+ * Derived from the canonical swatch palette so this stays one source of truth.
+ */
+const CHORD_COLOR_FALLBACK: string[] = VISUALIZER_CHORD_SWATCHES.map((s) => s.fallback);
 
 /** Pre-allocated per-lane overlay config list — hoisted out of the 60fps render path. */
 const OVERLAY_CONFIGS: ReadonlyArray<{
@@ -148,12 +159,7 @@ export class VisualizerEngine {
 
     setTheme(themeCache: Record<string, unknown>): void {
         this.themeCache = themeCache;
-        this.categoryColors = (themeCache.chordColors as string[]) || [
-            '#4a9fd4',
-            '#9ab33a',
-            '#e07a3c',
-            '#e0568f',
-        ];
+        this.categoryColors = (themeCache.chordColors as string[]) || CHORD_COLOR_FALLBACK;
         this.intervalColors = Array.from(INTERVAL_CATEGORY).map(
             (categoryIndex) => this.categoryColors[categoryIndex],
         );
@@ -406,7 +412,7 @@ export class VisualizerEngine {
     getEventColor(name: string, event: unknown): string {
         const track = this.tracks[name];
         const baseColor = track?.resolvedColor || track?.color || '#ffffff';
-        const chordColors = this.categoryColors || ['#4a9fd4', '#9ab33a', '#e07a3c', '#e0568f'];
+        const chordColors = this.categoryColors || CHORD_COLOR_FALLBACK;
         const ev = event as { noteType?: string };
 
         if (name === MODULES.SOLOIST) {
