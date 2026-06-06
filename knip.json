@@ -14,5 +14,6 @@
         "interface": true,
         "type": true
     },
-    "ignore": ["public/engine/grooves/*.ts"]
+    "ignore": ["public/engine/grooves/*.ts"],
+    "ignoreBinaries": ["ffmpeg"]
 }
