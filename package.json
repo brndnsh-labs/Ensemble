@@ -4,6 +4,9 @@
     "version": "1.2.2",
     "license": "AGPL-3.0-only",
     "type": "module",
+    "engines": {
+        "node": ">=26"
+    },
     "sideEffects": [
         "*.css"
     ],
