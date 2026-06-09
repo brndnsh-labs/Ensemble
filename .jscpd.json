@@ -1,15 +1,15 @@
 {
     "threshold": 5,
     "reporters": ["console", "html"],
-    "ignore": [
+    "ignorePattern": [
         "node_modules",
         "dist",
         "tests",
         "scripts",
-        "public/data/drum-presets.ts",
-        "public/data/chord-presets.ts",
-        "public/data/smart-genres.ts",
-        "public/engine/soloist-config.ts"
+        "**/drum-presets.ts",
+        "**/chord-presets.ts",
+        "**/smart-genres.ts",
+        "**/soloist-config.ts"
     ],
     "absolute": true,
     "gitignore": true
