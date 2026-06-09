@@ -17,7 +17,7 @@
         "lint:docs": "node scripts/validate-docs.ts",
         "depcheck": "depcruise public --config .dependency-cruiser.cjs",
         "knip": "knip",
-        "jscpd": "jscpd public",
+        "jscpd": "jscpd public --no-tips",
         "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json",
         "typecheck:tests": "tsc -p tsconfig.tests.json",
         "check-mutations": "node scripts/check-mutations.ts \"public/**/*.{ts,tsx}\"",
