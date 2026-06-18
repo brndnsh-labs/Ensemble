@@ -15,5 +15,6 @@
         "type": true
     },
     "ignore": ["public/engine/grooves/*.ts"],
-    "ignoreBinaries": ["ffmpeg"]
+    "ignoreBinaries": ["ffmpeg"],
+    "ignoreUnresolved": ["/engine/reverb.ts"]
 }
