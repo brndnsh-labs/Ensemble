@@ -387,7 +387,11 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
     return (
         <div id="unifiedVizContainer" ref={containerRef}>
-            <canvas ref={canvasRef} />
+            <canvas
+                ref={canvasRef}
+                role="img"
+                aria-label="Live note visualization — see legend below for instrument and chord-tone colors"
+            />
             <canvas ref={staticCanvasRef} hidden />
         </div>
     );
