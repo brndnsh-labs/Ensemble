@@ -6,7 +6,11 @@ import {
     buildLeadSheetRows,
     buildLeadSheetSections,
     getLeadSheetLayoutProfile,
+    type LeadSheetChord,
+    type LeadSheetRow,
+    type LeadSheetRowMeasure,
 } from '../lead-sheet-model.js';
+import type { Section } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
 import { ChordPicker } from './editor/ChordPicker.jsx';
@@ -44,7 +48,7 @@ function qualityBucket(quality: string, isMinor: boolean): string {
 }
 
 interface ChordCardProps {
-    chord: any;
+    chord: LeadSheetChord;
     isActive: boolean;
     notation: string;
     /**
@@ -52,11 +56,13 @@ interface ChordCardProps {
      * rect so the parent can anchor a chord-picker popover. When undefined,
      * falls back to the legacy preview-on-click behavior.
      */
-    onPick?: (chord: any, rect: DOMRect) => void;
+    onPick?: (chord: LeadSheetChord, rect: DOMRect) => void;
 }
 
 const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProps) => {
-    const disp = chord.display ? chord.display[notation] : null;
+    // `notation` is the persisted arranger notation ('roman' | 'name' | 'nns');
+    // it always keys one of the three FormattedChordNames slots at runtime.
+    const disp = chord.display ? chord.display[notation as keyof typeof chord.display] : null;
 
     const cardRef = useRef<HTMLButtonElement | null>(null);
 
@@ -124,6 +130,13 @@ const ChordCardComponent = ({ chord, isActive, notation, onPick }: ChordCardProp
 
 const ChordCard = memo(ChordCardComponent);
 
+/** A contiguous run of rows that share a section — built locally for rendering. */
+interface LeadSheetSectionGroup {
+    id: string;
+    sectionId?: string;
+    rows: LeadSheetRow[];
+}
+
 function getViewportSize(): { width: number; height: number } {
     if (typeof window === 'undefined') {
         return { width: 1280, height: 800 };
@@ -135,7 +148,7 @@ function getViewportSize(): { width: number; height: number } {
     };
 }
 
-function openSectionEditor(sectionId: string) {
+function openSectionEditor(sectionId: string | undefined) {
     const detail = { detail: { sectionId } };
     document.dispatchEvent(new CustomEvent('open-editor', detail));
 }
@@ -163,14 +176,17 @@ export function ChordVisualizer() {
         qualityColors: state.playback?.qualityColors ?? true,
     }));
     const sectionById = useMemo(
-        () => new Map((sectionsState || []).map((s: any) => [s.id, s] as const)),
+        () =>
+            new Map<string | undefined, Section>(
+                (sectionsState || []).map((s: Section) => [s.id, s] as const),
+            ),
         [sectionsState],
     );
     const [openPick, setOpenPick] = useState<{
-        chord: any;
+        chord: LeadSheetChord;
         rect: DOMRect;
     } | null>(null);
-    const handleChordPick = (chord: any, rect: DOMRect) => {
+    const handleChordPick = (chord: LeadSheetChord, rect: DOMRect) => {
         setOpenPick({ chord, rect });
     };
 
@@ -241,7 +257,7 @@ export function ChordVisualizer() {
     const rowIndexById = useMemo(
         () =>
             new Map(
-                leadSheetRows.map((row: any, index: number) => {
+                leadSheetRows.map((row: LeadSheetRow, index: number) => {
                     return [row.id, index];
                 }),
             ),
@@ -249,24 +265,32 @@ export function ChordVisualizer() {
     );
 
     const totalMeasures = useMemo(
-        () => leadSheetRows.reduce((total: number, row: any) => total + row.measures.length, 0),
+        () =>
+            leadSheetRows.reduce(
+                (total: number, row: LeadSheetRow) => total + row.measures.length,
+                0,
+            ),
         [leadSheetRows],
     );
-    const activeRowIndex = leadSheetRows.findIndex((row: any) =>
-        row.measures.some((measure: any) =>
-            measure.chords.some((chord: any) => chord.globalIndex === lastActiveChordIndex),
+    const activeRowIndex = leadSheetRows.findIndex((row: LeadSheetRow) =>
+        row.measures.some((measure: LeadSheetRowMeasure) =>
+            measure.chords.some(
+                (chord: LeadSheetChord) => chord.globalIndex === lastActiveChordIndex,
+            ),
         ),
     );
     const activeSectionId =
-        leadSheetRows.find((row: any) =>
-            row.measures.some((measure: any) =>
-                measure.chords.some((chord: any) => chord.globalIndex === lastActiveChordIndex),
+        leadSheetRows.find((row: LeadSheetRow) =>
+            row.measures.some((measure: LeadSheetRowMeasure) =>
+                measure.chords.some(
+                    (chord: LeadSheetChord) => chord.globalIndex === lastActiveChordIndex,
+                ),
             ),
         )?.sectionId ?? null;
     const leadSheetSectionGroups = useMemo(() => {
-        const groups: any[] = [];
+        const groups: LeadSheetSectionGroup[] = [];
 
-        leadSheetRows.forEach((row: any) => {
+        leadSheetRows.forEach((row: LeadSheetRow) => {
             const lastGroup = groups[groups.length - 1];
             if (lastGroup && lastGroup.sectionId === row.sectionId) {
                 lastGroup.rows.push(row);
@@ -375,7 +399,7 @@ export function ChordVisualizer() {
                 data-viewport={layoutProfile.viewport}
                 data-vertical-fill={layoutProfile.verticalFillMode}
             >
-                {leadSheetSectionGroups.map((sectionGroup: any) => {
+                {leadSheetSectionGroups.map((sectionGroup: LeadSheetSectionGroup) => {
                     const isActiveSection = activeSectionId === sectionGroup.sectionId;
                     const sectionModel = sectionById.get(sectionGroup.sectionId);
 
@@ -390,12 +414,14 @@ export function ChordVisualizer() {
                             {sectionModel && (
                                 <SectionHeaderStrip section={sectionModel} compact={true} />
                             )}
-                            {sectionGroup.rows.map((row: any) => {
+                            {sectionGroup.rows.map((row: LeadSheetRow) => {
                                 const rowIndex = rowIndexById.get(row.id) ?? -1;
-                                const isActiveRow = row.measures.some((measure: any) =>
-                                    measure.chords.some(
-                                        (chord: any) => chord.globalIndex === lastActiveChordIndex,
-                                    ),
+                                const isActiveRow = row.measures.some(
+                                    (measure: LeadSheetRowMeasure) =>
+                                        measure.chords.some(
+                                            (chord: LeadSheetChord) =>
+                                                chord.globalIndex === lastActiveChordIndex,
+                                        ),
                                 );
                                 const isUpcomingRow =
                                     activeRowIndex >= 0 &&
@@ -415,48 +441,55 @@ export function ChordVisualizer() {
                                         data-row-index={rowIndex}
                                         data-section-id={row.sectionId}
                                     >
-                                        {row.measures.map((measure: any, measureIndex: number) => {
-                                            const isActiveMeasure = measure.chords.some(
-                                                (chord: any) =>
-                                                    chord.globalIndex === lastActiveChordIndex,
-                                            );
+                                        {row.measures.map(
+                                            (
+                                                measure: LeadSheetRowMeasure,
+                                                measureIndex: number,
+                                            ) => {
+                                                const isActiveMeasure = measure.chords.some(
+                                                    (chord: LeadSheetChord) =>
+                                                        chord.globalIndex === lastActiveChordIndex,
+                                                );
 
-                                            return (
-                                                <div
-                                                    key={`${row.id}-${measureIndex}`}
-                                                    class={`measure-box${
-                                                        isActiveMeasure
-                                                            ? ' measure-box--active'
-                                                            : ''
-                                                    }`}
-                                                    data-section-id={measure.sectionId}
-                                                    style={{
-                                                        gridColumn: `${measureIndex + 1}`,
-                                                        gridRow: '1',
-                                                    }}
-                                                    onClick={() =>
-                                                        openSectionEditor(measure.sectionId)
-                                                    }
-                                                >
-                                                    {measure.chords.map((chord: any) => (
-                                                        <ChordCard
-                                                            key={chord.globalIndex}
-                                                            chord={chord}
-                                                            isActive={
-                                                                chord.globalIndex ===
-                                                                lastActiveChordIndex
-                                                            }
-                                                            notation={notation}
-                                                            onPick={
-                                                                chartLocked
-                                                                    ? handleChordPick
-                                                                    : undefined
-                                                            }
-                                                        />
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
+                                                return (
+                                                    <div
+                                                        key={`${row.id}-${measureIndex}`}
+                                                        class={`measure-box${
+                                                            isActiveMeasure
+                                                                ? ' measure-box--active'
+                                                                : ''
+                                                        }`}
+                                                        data-section-id={measure.sectionId}
+                                                        style={{
+                                                            gridColumn: `${measureIndex + 1}`,
+                                                            gridRow: '1',
+                                                        }}
+                                                        onClick={() =>
+                                                            openSectionEditor(measure.sectionId)
+                                                        }
+                                                    >
+                                                        {measure.chords.map(
+                                                            (chord: LeadSheetChord) => (
+                                                                <ChordCard
+                                                                    key={chord.globalIndex}
+                                                                    chord={chord}
+                                                                    isActive={
+                                                                        chord.globalIndex ===
+                                                                        lastActiveChordIndex
+                                                                    }
+                                                                    notation={notation}
+                                                                    onPick={
+                                                                        chartLocked
+                                                                            ? handleChordPick
+                                                                            : undefined
+                                                                    }
+                                                                />
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                );
+                                            },
+                                        )}
                                     </div>
                                 );
                             })}
@@ -474,9 +507,13 @@ export function ChordVisualizer() {
                     keyIsMinor={!!keyIsMinor}
                     anchorRect={openPick.rect}
                     onSelect={(newText) => {
+                        // A placed chord always carries section context (tagged on
+                        // by validateProgression), so these are present here even
+                        // though the Chord type marks them optional. Non-null
+                        // assertions keep the prior (any-typed) runtime exactly.
                         replaceChordInSection(
-                            openPick.chord.sectionId,
-                            openPick.chord.localIndex,
+                            openPick.chord.sectionId!,
+                            openPick.chord.localIndex!,
                             newText,
                         );
                     }}
@@ -516,7 +553,7 @@ const QUALITY_TO_ID: Record<string, string> = {
     sus4: 'sus4',
 };
 
-function parseChordToPickerState(chord: any): {
+function parseChordToPickerState(chord: LeadSheetChord): {
     degree: number;
     accidental: '' | 'b' | '#';
     qualityId: string;
