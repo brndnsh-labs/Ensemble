@@ -46,7 +46,7 @@ function fail(msg) {
 // Cached lookups (one process = one invocation, so a module-level cache is plenty).
 let _projectId;
 function projectId() {
-    if (!_projectId)
+    if (!_projectId) {
         _projectId = gh([
             'project',
             'view',
@@ -56,6 +56,7 @@ function projectId() {
             '--format',
             'json',
         ]).id;
+    }
     return _projectId;
 }
 
@@ -64,7 +65,7 @@ function projectId() {
 // drains the GraphQL quota on bulk updates.
 let _items;
 function items() {
-    if (!_items)
+    if (!_items) {
         _items = gh([
             'project',
             'item-list',
@@ -76,12 +77,13 @@ function items() {
             '-L',
             '500',
         ]).items;
+    }
     return _items;
 }
 
 let _fields;
 function fields() {
-    if (!_fields)
+    if (!_fields) {
         _fields = gh([
             'project',
             'field-list',
@@ -93,6 +95,7 @@ function fields() {
             '-L',
             '50',
         ]).fields;
+    }
     return _fields;
 }
 
@@ -103,7 +106,9 @@ function itemIdFor(issueNum) {
 
 function ensureOnBoard(issueNum) {
     const existing = itemIdFor(issueNum);
-    if (existing) return existing;
+    if (existing) {
+        return existing;
+    }
     const url = `https://github.com/${REPO}/issues/${issueNum}`;
     const added = gh([
         'project',
@@ -117,23 +122,27 @@ function ensureOnBoard(issueNum) {
         'json',
     ]);
     // Keep the cache coherent so a later entry in the same batch finds this item.
-    if (_items) _items.push({ id: added.id, content: { type: 'Issue', number: issueNum } });
+    if (_items) {
+        _items.push({ id: added.id, content: { type: 'Issue', number: issueNum } });
+    }
     return added.id;
 }
 
 function fieldAndOption(fieldName, value) {
     const field = fields().find((f) => f.name === fieldName);
-    if (!field)
+    if (!field) {
         throw new Error(
             `no field named "${fieldName}" (have: ${fields()
                 .map((f) => f.name)
                 .join(', ')})`,
         );
+    }
     const opt = (field.options ?? []).find((o) => o.name === value);
-    if (!opt)
+    if (!opt) {
         throw new Error(
             `field "${fieldName}" has no option "${value}" (have: ${(field.options ?? []).map((o) => o.name).join(', ')})`,
         );
+    }
     return { fieldId: field.id, optionId: opt.id };
 }
 
@@ -160,9 +169,13 @@ function setField(issueNum, fieldName, value) {
 
 function clearField(issueNum, fieldName) {
     const id = itemIdFor(issueNum);
-    if (!id) fail(`#${issueNum} is not on the board`);
+    if (!id) {
+        fail(`#${issueNum} is not on the board`);
+    }
     const field = fields().find((f) => f.name === fieldName);
-    if (!field) fail(`no field named "${fieldName}"`);
+    if (!field) {
+        fail(`no field named "${fieldName}"`);
+    }
     gh(
         [
             'project',
@@ -187,7 +200,9 @@ function runBatch(file) {
     } catch (e) {
         fail(`could not read batch file "${file}": ${e.message}`);
     }
-    if (!Array.isArray(queue)) fail('batch file must be a JSON array of { issue, field, value }');
+    if (!Array.isArray(queue)) {
+        fail('batch file must be a JSON array of { issue, field, value }');
+    }
 
     let ok = 0;
     const failures = [];
@@ -236,12 +251,15 @@ function runBatch(file) {
 const [cmd, issueArg, a, b] = process.argv.slice(2);
 
 if (cmd === 'batch') {
-    if (!issueArg) fail('usage: gh-project.mjs batch <file.json>');
+    if (!issueArg) {
+        fail('usage: gh-project.mjs batch <file.json>');
+    }
     runBatch(issueArg); // exits non-zero itself if any entry failed
 } else {
     const issueNum = Number(issueArg);
-    if (cmd !== 'ensure' && (!cmd || Number.isNaN(issueNum)))
+    if (cmd !== 'ensure' && (!cmd || Number.isNaN(issueNum))) {
         fail('usage: gh-project.mjs <status|set-field|clear|ensure|batch> <issue#|file>');
+    }
     try {
         switch (cmd) {
             case 'status':
