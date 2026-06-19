@@ -88,6 +88,13 @@ interface HarmonyNote {
      * a new voice. See epic-harmony-polish.md S1.
      */
     isLegato?: boolean;
+    /**
+     * True for acoustic fingerpick-roll notes (#561). The synth gives these a
+     * plucked envelope — fast attack, ring-down from the peak — instead of the
+     * strings voice's slow pad swell, so each note speaks and the 3-voice cap
+     * culls the (now quietest) oldest voice inaudibly.
+     */
+    isArp?: boolean;
 }
 
 // Internal memory for motif consistency
@@ -930,6 +937,13 @@ function finalizeHarmonyNotes(
         if (isBloom || isLatched) {
             baseVol *= 1.8; // Boost highlights to clear test thresholds
         }
+        if (behavior.type === 'arp') {
+            // The fingerpick is a single decaying voice carrying the whole part,
+            // vs the old held 3-voice pad — lift it toward pad presence (the
+            // plucked fast-attack envelope in synth-harmonies does the main
+            // audibility work). Clamped so the loudest hits can't clip the bus.
+            baseVol = Math.min(1.0, baseVol * 2.0);
+        }
         if (accompanimentCrowding) {
             baseVol *= 0.9;
         }
@@ -975,6 +989,7 @@ function finalizeHarmonyNotes(
             isBloom: !!isBloom,
             isChordStart: true,
             isLegato,
+            isArp: behavior.type === 'arp',
         });
         finalMidisForMemory.push(midi);
     }
