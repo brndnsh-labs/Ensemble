@@ -18,8 +18,9 @@ staging push; prod is the gated awake-only call) and §4 (gates).
   proxies to **nginx**, which serves the app as **static files** out of
   `/var/www/html/`. There is **no app server, no pm2, no DB** — nginx serves the new
   files the instant rsync finishes; nothing to restart.
-- Ops target: rsync over ssh to **`root@ensembletest:/var/www/html/`** (the
-  `--delete` mirrors the build, so stale files are pruned).
+- Ops target: rsync over ssh to the scoped **`ensembletest-admin`** alias (the
+  least-privilege `claude` account, `IdentitiesOnly homelab_nginx`) →
+  `/var/www/html/`; the `--delete` mirrors the build, so stale files are pruned.
 - `scripts/deploy-test.sh` builds (`vite build --mode test`), prints the bundle
   footprint, rsyncs, then moves **`refs/deploys/test`** to HEAD. It does **not**
   verify itself — on test, "the right asset hash is up" is all the check needs to be.
@@ -68,8 +69,8 @@ confirm, and report the SHA. **Prod is never automatic** — see `/deploy-prod`.
   no-cache'`; if still stale, check the Caddy/nginx cache headers on the box.
 - **Edge ≠ 200** → it's the Caddy→nginx edge, not the build (there's no app process to
   crash). Check nginx is serving `/var/www/html` and Caddy is up.
-- **rsync/ssh fails** → the `root@ensembletest` ssh target/key; the build succeeded
-  locally, nothing shipped.
+- **rsync/ssh fails** → the `ensembletest-admin` ssh alias / `claude` key; the build
+  succeeded locally, nothing shipped.
 
 ## Prod is a separate skill
 Prod lives in **`/deploy-prod`** — stricter and gated (full `validate` + clean pushed

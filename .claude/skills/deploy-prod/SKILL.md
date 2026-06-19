@@ -21,8 +21,9 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
   **nginx**, which serves the app as **static files** from `/var/www/html/`. **No app
   server, no pm2, no DB.** nginx serves the new files the instant rsync finishes —
   nothing to restart, no migrations to run.
-- Ops target: rsync over ssh to **`root@ensemble:/var/www/html/`** (`--delete` mirrors
-  the build).
+- Ops target: rsync over ssh to the scoped **`ensemble-admin`** alias (the
+  least-privilege `claude` account, `IdentitiesOnly homelab_nginx`) →
+  `/var/www/html/`; `--delete` mirrors the build.
 - `scripts/deploy-prod.sh` builds (`vite build --mode production`), prints the footprint,
   rsyncs, then moves **`refs/deploys/prod`** to HEAD (best-effort origin push).
 - **Verification is free:** `vite.config.ts` bakes `git rev-parse --short HEAD` (REV)

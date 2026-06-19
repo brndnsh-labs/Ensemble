@@ -330,7 +330,8 @@
         "ensembletest",
         "songsiknow",
         "rsyncs",
-        "whatif"
+        "whatif",
+        "homelab"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
