@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
 import { generateMelodicDevice } from '../../public/engine/soloist-devices.js';
 import { pickByRank } from '../../public/engine/soloist-pitch-engine.js';
 import { getState } from '../../public/state.js';
@@ -185,12 +186,18 @@ describe('Soloist Jazz Critique', () => {
         // Engine ~2.3 semitones. <5 keeps phrases vocal/singable; >5 starts to feel
         // angular (jazz allows wider intervals than blues but should still arc).
         expect(avgInterval).toBeLessThan(5.0);
-        // Engine ~26% chromatic. The previous version logged this metric but never
-        // asserted it — a completely diatonic jazz soloist would have passed. >15%
-        // certifies that the engine reaches outside the major scale for approach
-        // notes, passing tones, and altered dominants (the heart of bebop), with
-        // enough headroom that the assertion doesn't flake on RNG variance.
-        expect(chromaticRatio).toBeGreaterThan(0.15);
+        // Engine measures ~31.6-32.0% chromatic over this 128-bar sample (tight
+        // ±0.2pp band — the soloist path is seeded via scrambleHash). The previous
+        // version logged this metric but never asserted it — a completely diatonic
+        // jazz soloist would have passed — and the original 0.15 floor sat ~17pp
+        // below the engine's real output, so a regression halving the engine's
+        // chromaticism would still have slipped through. 0.25 keeps ~6.6pp headroom
+        // below the observed reliable minimum (no flake) while genuinely guarding
+        // that the engine reaches outside the major scale for approach notes,
+        // passing tones, and altered dominants — the heart of bebop. (Wave-3 audit
+        // finding J-F2; the picker-only S1 ratchet still lives in
+        // soloist-bird-picker-chromatism.test.ts.)
+        expect(chromaticRatio).toBeGreaterThan(0.25);
         // Engine ~7 notes/bar. The previous report claimed 8-16/bar (Kenny Dorham
         // transcription target) but asserted >6.5 — closer to the engine's real
         // output. We update the report to match what the engine actually delivers
@@ -198,6 +205,25 @@ describe('Soloist Jazz Critique', () => {
         // as a future engine task, not papered over with a loose threshold here.
         expect(notesPerBar).toBeGreaterThan(6.0);
         expect(notesPerBar).toBeLessThan(12.0);
+    });
+
+    // why: Wave-3 audit finding J-F3 — smart→genre resolution guard. Everything
+    // else in this file passes 'bird' explicitly, and jazz-soloist-authenticity
+    // exercises the 'jazz' STYLE_CONFIG profile — but the Jazz *genre* never
+    // selects 'jazz'; it resolves smart mode through the genre feel to 'bird'.
+    // Nothing asserted that resolution actually lands on 'bird'. This is the exact
+    // class of gap the reggae dead-profile bug (#570) exploited: a genre whose
+    // smart soloist key silently routes to the wrong (or a generic) profile. This
+    // guard fails loudly if Jazz ever stops resolving to the bebop profile.
+    it('resolves the Jazz genre (smart mode) to the bird profile (J-F3 resolution guard)', () => {
+        // smart mode + Jazz feel must land on 'bird' (Charlie Parker bebop), not
+        // the 'jazz' UI-comp profile and not a generic fallback.
+        expect(resolveSoloistStyle('smart', 'Jazz')).toBe('bird');
+        // an unset style behaves like smart (the production default path).
+        expect(resolveSoloistStyle(undefined, 'Jazz')).toBe('bird');
+        // sanity: an explicit non-smart style is honored verbatim and does NOT
+        // get rewritten by the genre feel.
+        expect(resolveSoloistStyle('jazz', 'Jazz')).toBe('jazz');
     });
 
     // why: epic-soloist-idiom S4. Previously the head-bypass / themed-improv jitter
