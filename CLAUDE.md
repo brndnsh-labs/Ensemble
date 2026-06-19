@@ -5,6 +5,7 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 ## Primary References
 
 - **CLAUDE.md** (this file) — operational rules and architectural overview.
+- **.claude/skills/DOCTRINE.md** — the work-pipeline doctrine (§1–§9): the GitHub-backed tracker, autonomy/merge rules, gates, commit/branch conventions. The work-loop skills (`/next`, `/cycle`, `/implement`, `/review`, `/patch`, `/done`, `/intake`, `/unblock`, `/scout`, `/burndown`, `/nightly`, `/wrap-up`) reference it by section.
 - **AI_MAP.md** — file-by-file navigation index. Every path in it must exist on disk (enforced by `npm run lint:docs`).
 - **docs/README.md** — living documentation index.
 - **docs/VISION.md** — product direction and open work.
@@ -164,7 +165,13 @@ Functional smoke tests only — no pixel snapshots. Three projects: **Desktop Ch
 
 ## Commit & PR Conventions
 
-Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): ...`, `chore(deps): ...`, `refactor(mobile): ...`. Keep commits focused. PRs should include a short summary, test commands run, linked issues if applicable, and screenshots/recordings for UI changes.
+Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): ...`, `chore(deps): ...`, `refactor(mobile): ...`. Keep commits focused. PRs should include a short summary, test commands run, linked issues if applicable, and screenshots/recordings for UI changes. Commit-message and PR-body trailers, branch policy, and `git add`-explicit-paths rules live in **DOCTRINE §8/§9**.
+
+## Work Pipeline (GitHub-backed)
+
+Scheduled work is tracked in **GitHub Project #2** ("Ensemble — Work"), **not** in markdown. A story = an issue (body holds Why/Touches/Acceptance; Project fields hold Track/Status/Model/Size/Agent/Review lens); milestones = epics. The `docs/audit/` and `docs/synth-audit/` trees are a **frozen archive** of the markdown-tracked cycles — historical context, not the live tracker. The full rules are in **`.claude/skills/DOCTRINE.md`**; run the pipeline with the work-loop skills (`/next`, `/cycle`, `/intake`, `/unblock`, `/scout`, `/nightly`, …).
+
+**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via the poll-then-merge guard; never `gh pr merge --auto`) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-or-worker-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` is **not** a prod deploy — `scripts/deploy-prod.sh` is always a manual, awake call.
 
 ## Self-Building Manual
 

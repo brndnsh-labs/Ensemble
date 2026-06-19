@@ -309,7 +309,24 @@
         "Geist",
         "woff",
         "opsz",
-        "synthwave"
+        "synthwave",
+        "brndnsh",
+        "pickable",
+        "actioned",
+        "unconfigured",
+        "refetches",
+        "burndown",
+        "dedup",
+        "dups",
+        "unsanitized",
+        "unpushed",
+        "undeployed",
+        "frontmatter",
+        "pickability",
+        "untriaged",
+        "unreviewed",
+        "unactioned",
+        "fanout"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

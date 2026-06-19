@@ -1,114 +1,60 @@
 ---
 name: patch
-description: Address reviewer findings on the uncommitted diff. Reads the most-recent /review output from conversation context, classifies findings by severity (P0 escalate, P1 auto-fix if mechanical, P2 defer to follow-up), presents a fix plan with file:line citations, then patches inline. No agent spawn — orchestrator does the edits since reviewer findings are usually small and surgical. Use after /review surfaces findings, before /done. Plan-first.
+description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is big; backlog only for genuinely new ideas), presents a fix plan, then patches inline — no agent spawn. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
 
 # /patch — address reviewer findings
 
-Goal: close the review→done seam by sorting /review's findings and applying inline fixes. Plan-first — present the triage and fix plan before doing any edits.
+Goal: close the review→done seam — sort `/review`'s findings and apply inline fixes.
 
-## When to use
-
-- Right after `/review` surfaces findings.
-- Before `/done` — patch first, then commit.
-- NOT for design-level changes — those go back to `/implement` with a fix-focused prompt.
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The triage below
+applies §5 (findings get actioned not parked; `finding` issues trend to empty) and §2 (the `finding`
+vs `backlog` label split); the re-run gates are §4.
 
 ## Workflow
 
-1. **Load findings.** Read the most-recent reviewer output(s) from conversation context. Each finding should have:
-   - Severity (P0 / P1 / P2 — or inferred from the reviewer's language)
-   - File path + line number
-   - Verbatim line quote
-   - Suggested direction
-
-   If findings aren't already in context (e.g., new session), surface that gap — ask the user to re-run `/review` or paste the findings.
-
-2. **Triage.** Classify each finding into one of:
+1. **Load findings** from the most-recent `/review` output in context (severity, `file:line`, verbatim
+   quote, suggested direction). If not in context (new session), ask Brandon to re-run `/review`.
+2. **Triage:**
 
    | Triage | Criteria | Action |
    |---|---|---|
-   | **Fix now** | P0; OR P1 with a clear mechanical fix (threshold tweak, ordering swap, missing comment) | Patch inline this turn |
-   | **Defer to follow-up** | P2 latent issues, P1 issues that need a design decision, or P1s that would expand scope (e.g., "this whole subsystem has the same bug") | Note in commit body or open a follow-up story |
-   | **Escalate to /implement** | Design-level findings: a finding asking "should we go with approach A or B?" | Stop the cycle, surface the question, recommend `/implement <story> --redesign` |
+   | **Fix now (DEFAULT)** | Any finding about the diff under review — P0, P1, **or a bounded P2** (mechanical, or small/localized). The default, not the exception. | patch inline this turn |
+   | **Escalate to Brandon** | A real finding that (a) needs a design call, or (b) is large / cross-cutting / would balloon the diff | stop; surface it; on his nod open a **`finding` issue** (`gh issue create --label finding,area:<x>` + add to the board) and/or recommend `/implement #<n>` with a fix-focused prompt — **never silently shelve a real finding** |
+   | **Backlog** | A genuinely *new* idea/feature surfaced during review — not a flaw in this code | open a **`backlog` issue** (`gh issue create --label backlog,area:<x>`, add to the board) — pipeline, not debt |
 
-   Be conservative on "Fix now" — if a fix touches more than 2-3 lines of engine code and isn't obviously mechanical, defer.
+   **Bias to fix now.** Deferring a real finding to a list is the thing we're eliminating — open
+   `finding` issues should trend to *empty*. A fix genuinely too big to do in-cycle is an
+   **escalation** (a `finding` issue with Brandon's nod), not a silent defer. Only genuinely new ideas
+   become **`backlog` issues**.
+3. **Present the patch plan** (Fix-now / Escalate / Backlog, each with `file:line` + a fix sketch + the
+   validation gates). For a musical change, name the **critique test** that re-validates it. Apply?
+4. **On confirmation, patch inline** with Edit/Write — no spawn (the orchestrator already holds the
+   diff + findings; a subagent would re-derive it). Add a `**Why:**` comment at any non-obvious fix
+   site (CLAUDE.md "Musical intent"). **Re-Read a region before a second Edit** — the format-on-edit
+   hook can reflow lines and stale an `old_string`.
+5. **Re-run gates** (§4): `npm run typecheck`, `npm run lint`, the **critique test** tied to the
+   touched engine (musical) / the relevant test, and re-spawn a specific reviewer if the patch touched
+   their lane (e.g. `state-discipline-reviewer` if it changed coordination shape). If a Fix-now patch
+   fails a gate, stop and surface — don't pile on.
+6. **Report:** a table of patches applied (finding → fix), any **escalated** findings (with the
+   proposed issue) or **backlogged** ideas (with where they landed), and gate status. The default
+   expectation is real findings were *fixed*, not parked — call out anything that wasn't and why. Then
+   suggest `/done` (if green) or `/review` again (if the patches were substantive).
 
-3. **Present the patch plan.** Format:
+## Safety
 
-   ```
-   ## Patch plan
-
-   **Source:** /review findings from <reviewer-name(s)>, <timestamp>
-
-   **Fix now (<N>):**
-   - **P0** | `<file:line>` — <one-line finding> → <fix sketch>
-   - **P1** | `<file:line>` — <one-line finding> → <fix sketch>
-
-   **Defer to follow-up (<N>):**
-   - **P2** | `<file:line>` — <one-line finding> — reason: <why deferring>
-
-   **Escalate (<N>):**
-   - **P0** | `<file:line>` — <one-line finding> — needs decision: <design question>
-
-   **Validation after patches:**
-   - `npx vitest run <relevant critique tests>`
-   - `npm run typecheck`
-
-   Apply the Fix-Now patches?
-   ```
-
-4. **On confirmation, apply patches inline.** Use Edit / Write tools directly — no agent spawn. The orchestrator's context already has the diff and the findings; spawning a subagent would force it to re-derive that. Save the agent budget for the next `/implement` or `/review`.
-
-   Order edits by file to minimize Read churn. Add a `**Why:**` comment line at the patch site for any non-obvious change (per CLAUDE.md "Musical intent").
-
-5. **Run validation.**
-   - The critique test most directly tied to the touched engine
-   - `npm run typecheck`
-   - Any reviewer that flagged a structural concern: re-run that specific reviewer if the patch touched their lane (e.g., state-discipline-reviewer if patch touched coordination shape)
-
-6. **Report.**
-
-   ```
-   ## Patches applied
-
-   | Finding | File | Fix |
-   |---|---|---|
-   | <P0 verbatim> | `<file:line>` | <one-line fix description> |
-   | <P1 verbatim> | `<file:line>` | <one-line fix description> |
-
-   **Deferred (<N>):** <list with one-line reasons>
-
-   **Tests:** <pass/fail counts>
-   **Typecheck:** <green/red>
-
-   ## Next:
-   - `/done` to commit (recommended if validation green)
-   - `/review` again if patches were substantive (touched engine math, not just thresholds)
-   - `/implement <story-id> --redesign` if escalated findings remain
-   ```
-
-## Chain references
-
-- Comes after `/review`.
-- Hands off to `/done` (if clean) or back to `/implement` (if escalated).
-- Composed into `/cycle` automatically; can also run standalone.
-
-## What to put in commit body vs follow-up story
-
-- **Commit body:** Deferred P2s that are notes-for-future, not bugs. Keep it tight — one bullet each, file:line citation, one-line reason.
-- **Follow-up story:** Deferred P1s that warrant their own audit-tree slot. Open as `<area>.md` entries or new epic stories.
-- **Drop entirely:** P2s the reviewer logged that are wrong on reflection (e.g., contradicts a project memory note that overrides the reviewer's heuristic).
+- Never patch a file the most-recent `/review` didn't flag — that's scope creep.
+- Never silently downgrade a P0 to avoid escalation; if you think it's overblown, say so and let
+  Brandon decide.
+- Don't run reviewers here — that's `/review`'s job.
 
 ## Edge cases
 
-- **No findings to patch (reviewer was clean):** report it, suggest `/done` directly. Don't spawn or pretend to fix.
-- **All findings are P0 design decisions:** don't patch any. Surface the design questions, suggest `/implement <story> --redesign` with the questions inline.
-- **A "Fix now" patch fails validation:** stop, surface the failure with the test output, ask whether to revert the patch or chase the failure.
-- **Two findings conflict (e.g., reviewer A says "tighten threshold," reviewer B says "loosen it"):** present both, ask which the user wants — don't auto-pick.
-- **Finding cites a line that has since moved:** the diff was edited between /review and /patch. Re-Read the file, find the new location by content match, note the drift in the patch plan.
-
-## Safety rules
-
-- Never patch a file the most recent /review didn't flag — that's scope creep masquerading as cleanup.
-- Never silently re-classify a P0 finding as P1 or P2 to avoid escalation. If you think a P0 is overblown, name it explicitly in the patch plan and let the user decide.
-- Don't run reviewers as part of /patch — that's /review's job. /patch just applies what /review already found.
+- **No findings:** report; suggest `/done` directly.
+- **All findings are P0 design calls:** patch none; surface the questions; recommend `/implement #<n>`.
+- **Findings conflict** (one says tighten, one says loosen a threshold): present both; ask — don't
+  auto-pick.
+- **Cited line has moved** (diff edited since `/review`): re-Read, relocate by content match, note the
+  drift.
+- **Finding contradicts a project memory note:** memory wins by default — drop the finding and say so.

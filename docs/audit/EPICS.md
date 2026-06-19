@@ -1,5 +1,10 @@
 # Musical Audit Epics — Compound Meter cycle
 
+> **⛔ FROZEN ARCHIVE (2026-06-18).** Work is now tracked in **GitHub Project #2** ("Ensemble — Work"),
+> not here — a story = an issue (Track `musical`). See `.claude/skills/DOCTRINE.md` §1. All cycles below
+> shipped; this file is kept for historical context only. Do **not** read it as the live tracker.
+> The deferred by-ear `FOLLOWUPS.md` cluster lives as one umbrella backlog issue on the board.
+
 ## Previous cycles
 
 - **Musical-audit 2026-05** (12 epics, 80 stories) shipped 2026-05-25; archived at [`docs/archive/musical-audit-2026-05/`](../archive/musical-audit-2026-05/). Reusable engine-pattern recipes at [`docs/guides/musical-engine-patterns.md`](../guides/musical-engine-patterns.md). Earlier Epics 1-8 snapshot at [`docs/archive/MUSICAL_AUDIT.md`](../archive/MUSICAL_AUDIT.md).

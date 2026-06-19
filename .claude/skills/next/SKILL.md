@@ -1,62 +1,78 @@
 ---
 name: next
-description: Pick up the next musical-audit story to work on. Reads docs/audit/EPICS.md, identifies the active phase (Phase 1 sequential → Phase 2 parallel-sonnet → Phase 3 epic-by-epic), and surfaces the next unfinished story. Within Phase 3, orders by epic#, then story# (methodical pass through Epic 2 → 4 → 5 → 6 → 7 → 8) regardless of model tag — opus is normal at this stage. Plan-first — does not invoke any agent, just lays out the work. Use at the start of a session or whenever you need to decide what to pick up.
+description: Pick up the next Ensemble work story from the GitHub Project (issues + Project #2). Finds the highest-priority Ready issue (surfacing but not picking Needs-ear / Needs-decision ones blocked on Brandon), the in-flight work, the backlog/idea pile, and raw `inbox` captures. Lays out enough to choose /implement (one issue) vs /cycle (full loop). Plan-first — read-only, no spawn/edit. Use at session start or whenever deciding what to pick up.
 ---
 
-# /next — surface the next audit story
+# /next — surface the next work story (GitHub-backed)
 
-Goal: tell the user what to work on next, with enough context that they can decide between `/implement <id>` (single story) and `/fan-out <id...>` (parallel batch).
+Goal: tell Brandon what to work on next, with enough context to choose `/implement #<n>` vs
+`/cycle #<n>`.
+
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is
+all §1 (Tracker & readiness — the Status model, the ranking, the idea-pile rule) + §2 (Labels) + §3
+(Track field + fields) + §7 (gh-project mechanics, incl. the "gh unreachable → stop, don't read the
+frozen markdown as current" rule). Don't restate them; apply them.
+
+## Data sources (§7)
+
+- **The board** — `gh project item-list 2 --owner brndnsh --format json`. Each item: `content`
+  (`.number`, `.title`, `.url`, `.body`, `.type`), `status`, `track`, `size`, `model`, `agent`,
+  `review lens` (key has a **space**), `milestone.title`, `labels`. Single-selects flatten to the
+  option name (absent/`None` when unset).
+- **Open set** — `gh issue list --state open --json number,title,labels,milestone,url`. item-list
+  carries no open/closed state, so **intersect on `number`** to keep only open issues (a closed item
+  can linger on the board until archived) — this also catches any open issue **not yet on the board**
+  (esp. `inbox` captures).
+- **gh unauthed/offline:** say so and **stop** (§7) — do not fall back to the frozen `docs/audit/`
+  or `docs/synth-audit/` markdown as if current.
 
 ## Workflow
 
-1. **Read the index.** `docs/audit/EPICS.md`. Note which phase has unfinished stories.
+1. **Pull the board + open set;** join by issue `number`.
+2. **Partition by Status** (§1): Ready (pickable) · Needs-decision/Needs-ear (blocked on Brandon —
+   surface, don't pick) · Blocked (skip, name the blocker) · In progress/In review (note, don't
+   re-pick) · Shipped/closed (ignore) · no-Status + `backlog`/`finding` (the idea pile — count +
+   sample, don't pick).
+3. **Rank the Ready issues** by the §1 rule: milestone (real numbered epic > candidate/none), then
+   Size (S<M<L), then issue number. (Model is *not* a ranking factor.)
+4. **Read the top pick's body** (already in `content.body`) — Why / Touches / Acceptance.
+5. **Check the capture inbox** — `gh issue list --label inbox --state open --json number,title,url`.
+6. **Present** (below).
+7. **Stop.** Read-only — no spawn, no edit, no Status/issue changes.
 
-2. **Identify the active phase.**
-   - If any Phase 1 story (Epic 1 + Epic 3 S1/S2) is unfinished → Phase 1.
-   - Else if any Phase 2 sonnet-tagged story listed in the EPICS.md "Phase 2" rollout table is unfinished AND not blocked on a Phase 3 prerequisite → Phase 2.
-   - Else Phase 3 (remaining stories across Epics 2, 4, 5, 6, 7, 8 — most opus, some sonnet).
-   - **Don't skip Phase 1.** Phase 1 unlocks contract shape that later phases depend on. If a user asks to skip ahead, name the dependency and confirm.
-   - Phase 2 → Phase 3 is not a hard boundary. If Phase 2 is empty (or all its remaining stories are blocked on a Phase 3 prerequisite), surface Phase 3 work without prompting.
+## Presentation
 
-3. **Find candidate stories in the active phase.** Read each epic file. A story is **done** if its body contains a `**Status:** Shipped` line (or equivalent done marker). Otherwise it's unfinished.
+```
+## Next: #<n> — <title>   ( <milestone> · Track: <musical|synth|bundle> )
 
-4. **Rank candidates** by phase:
-   - **Phase 1 / Phase 2:** P0 source findings first, then P1, then P2; smaller effort breaks ties.
-   - **Phase 3:** epic number ascending, then story number ascending. Model tag (opus/sonnet) is **not** a ranking factor — pick the next story in the methodical sweep regardless. The user can override by naming a specific story.
-   - Cross-epic dependencies still apply: if Story X cites "after Story Y lands" in its body and Y is unfinished, skip X and continue. Name the dependency in the surfaced plan.
+**Status:** Ready   **Model:** <sonnet|opus>   **Size:** <S|M|L>
+**Agent:** <per §3>   **Review lens:** <per §3>
 
-5. **Present the plan.** Format:
+**Why / Touches / Acceptance:** <from the issue body>
 
-   ```
-   ## Next: Epic <N> Story S<N> — <title>
+**Suggested next:**
+- `/implement #<n>` — ship it (plan-first)
+- `/cycle #<n>` — full loop (implement → review → patch → done → PR → CI-gated merge / Track-gated)
 
-   **Phase:** <1|2|3>
-   **Model:** <opus|sonnet>
-   **Reviewer:** <music-theory-reviewer | state-discipline-reviewer | none>
-   **Effort:** ~<N>h
-   **Source:** docs/audit/<area>.md P<level> #<n>
+**Blocked on you (not picked):**
+- #<x> — Needs-decision: <what>   ·   #<y> — Needs-ear: <what>
 
-   **Why this one:** <one sentence — why now>
+**In flight:** #<…> (In progress / In review), if any.
 
-   **Acceptance:**
-   <bullet list from the epic file>
+**📥 Inbox (raw captures to triage):** #<n> <title> — `/intake` to shape, or close.
 
-   **Suggested next:**
-   - `/implement <epic-slug>/S<N>` to ship this story solo
-   - `/fan-out <epic-slug>/S<N> <other> <other>` to batch with these disjoint stories: <list 2-3 candidate parallel stories>
-   ```
-
-6. **Stop.** This skill is plan-first only. Do not spawn agents, do not edit files. The user picks the next move.
-
-## Chain references
-
-- After `/next`, the user runs `/implement` or `/fan-out`. Both pick up from where `/next` left off — they read the same epic file you read.
-- If the user wants to skip the current phase, gently flag the dependency and let them override.
+**Backlog / findings (idea pile — not scheduled):** N issues (`finding`=review debt M; `backlog`=
+ideas K). By track/epic: … . Of these, J carry a `needs-ear`/`needs-decision` caveat.
+```
 
 ## Edge cases
 
-- **No unfinished stories in any phase:** congratulate, suggest reading `docs/MUSICAL_AUDIT.md` Shipped table to confirm and consider archiving the audit tree.
-- **All current-phase stories blocked on each other:** name the blocker; suggest the orchestrator make a design decision before continuing.
-- **A sonnet-tagged story sits inside Phase 3** (e.g. Epic 2 S1, S7; Epic 4 S6): treat it as a normal Phase 3 story — surface it in epic#/story# order. The sonnet tag tells `/cycle` and `/implement` which model to spawn; it doesn't bump priority.
-- **Epic just completed:** when the last unfinished story of an epic is about to be surfaced, the plan should note "this is the final story in Epic N — `/cycle --until-blocked` will pause for a retrospective after it ships."
-- **EPICS.md missing or empty:** something went wrong — say so, don't fabricate a story.
+- **No Ready issues, only Needs-ear/Needs-decision:** say so plainly — the queue is blocked on
+  Brandon (his ear / a call), not on more building. List blockers + the backlog count. Suggest
+  `/unblock`.
+- **Candidate-epic milestones with only backlog (no Ready):** name them as **future epics not yet
+  scheduled** (N backlog issues each); to start one, a backlog issue gets scoped + Status `Ready`.
+- **All issues shipped/closed:** congratulate; suggest synthesizing the next epic (promote a cluster
+  into a milestone with `Ready` stories) or a `/scout` sweep to refill the pile.
+- **An open issue not on the board:** surface it (esp. `inbox`); note it should be added during
+  triage (`gh project item-add 2 --owner brndnsh --url <url>`).

@@ -1,92 +1,60 @@
 ---
 name: done
-description: Mark one or more musical-audit stories complete and prepare a commit. Updates each story's epic file (adds a Done marker), increments the tally in docs/audit/EPICS.md, drafts a Conventional-Commit message, and stages + commits on confirmation. Plan-first — presents the proposed commit before doing anything destructive. Usage `/done <story-id-1> [<story-id-2> ...]`. Use after `/review` passes clean.
+description: Ship an Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) merge it once CI is green; a judgment-call story's PR (synth/by-ear/destructive) is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n> [...]`. Use after /review (+ /patch) pass clean.
 ---
 
-# /done <story-ids...> — close out a story or batch
+# /done #<n> — ship a story (GitHub-backed, auto-merge model)
 
-Goal: persist story completion in the audit tree, update EPICS.md tally, and commit the implementation diff with a Conventional-Commit message.
+Goal: commit the reviewed work, push, open a PR that closes the issue, and land it — auto-merging a
+safe story (CI-gated) or leaving a judgment-call PR for Brandon.
+
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill leans
+on §4 Gates (incl. Track DoD), §5 Judgment calls (the safe-vs-brake split — synth/by-ear/destructive),
+§6 Merge guard (the poll-then-merge bash, never `--auto`, set-Shipped-then-sync-main), §8 Commit & PR
+conventions, §9 Branch policy. The procedure below is just the ordering.
+
+**Done = the issue is closed** (§1) — `Closes #<n>` does it on merge; `/done` then sets
+`Status: Shipped` explicitly (no auto-flip is configured — §1/§7). No markdown tracker to touch.
 
 ## Workflow
 
-1. **Parse the story-ids.** Same format as the other skills. Allow multiple if a `/fan-out` batch shipped clean.
-
-2. **For each story, find its block in the epic file.** Append a `**Status:** Shipped <YYYY-MM-DD>` line to the story block (or update an existing Status line). Use today's date.
-
-3. **Update `docs/audit/EPICS.md` tally.** For each affected epic, increment the `Done` column. Example: if Epic 1 was `6 stories / 0 done` and 2 stories are shipping, update to `6 stories / 2 done`.
-
-4. **If a whole epic is now done** (Done == Stories), update its row's `Notes` column to `✅ Shipped <date>` and consider whether to move its summary to `docs/MUSICAL_AUDIT.md` Shipped table as a follow-up. Surface this as a suggestion to the user — don't auto-archive.
-
-5. **Capture new follow-ups.** If `/review` surfaced P2 deferrals that aren't already covered by an existing story, append them to the relevant section of [`docs/audit/FOLLOWUPS.md`](../../docs/audit/FOLLOWUPS.md) in the same pass. Format: `**Location:** what · why deferred · ~size · *Source: <story-id> review*`. Don't bury them in the Status block alone — that hides the work from anyone scanning at the doc level.
-
-6. **Survey the diff.**
-   - `git status` — confirm only expected files changed.
-   - `git diff --stat` — confirm scope is consistent with the stories.
-
-7. **Draft a Conventional-Commit message.**
-   - Single story: scoped to the engine area (e.g., `fix(bass): chromatic approach gated to chord changes only`).
-   - Multi-story batch: pick a higher-level scope (e.g., `refactor(coordination): wire upcomingSectionFirstChord into bass and chords`). Body lists each story.
-   - End with the standard `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` line.
-
-8. **Present the plan.** Format:
-
-   ```
-   ## Plan: commit <N> shipped stories
-
-   **Stories closing:**
-   - `<slug>/S1` — <title>
-   - `<slug>/S3` — <title>
-
-   **Epic file updates:**
-   - `docs/audit/epic-<slug>.md`: +2 Status: Shipped lines
-   - `docs/audit/EPICS.md`: Epic <N> done count <old> → <new>
-
-   **Diff to commit:** <N files, +<n>/-<m> lines>
-
-   **Proposed commit message:**
-   ```
-   <scope>: <subject>
-
-   <body>
-
-   Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
-   ```
-
-   Commit now? Or adjust the message?
-   ```
-
-9. **On confirmation:**
-   - Edit the epic file(s) to add Status: Shipped lines.
-   - Edit `docs/audit/EPICS.md` to update tally.
-   - Stage relevant files: the implementation diff PLUS the audit-tree updates.
-   - Use `git add` with specific paths (never `git add -A` — could pull in secrets).
-   - Commit using a HEREDOC for proper formatting.
-   - Run `git status` after to verify.
-
-10. **Suggest next step.**
-
-   ```
-   ## Done. Next:
-   - `/next` to pick up the next story
-   - or `/fan-out <ids>` if you have another batch in mind
-   ```
-
-## Chain references
-
-- Final step in the loop: `/next` → `/implement|/fan-out` → `/review` → `/done`.
-- Suggests `/next` to restart the loop.
+1. **Parse the issue ref(s)** — `#<n>` (several only if one diff genuinely ships them together; usually
+   one PR = one issue).
+2. **Confirm gates green** (§4) — never `/done` over a red build. Run the full suite + the Track DoD:
+   the **critique test** for a musical story (read its Critique Report), the measured **KB delta** for
+   a bundle story. A **Track `synth`** story additionally needs the **A/B audition** signed off
+   (Needs-ear) — if it hasn't been heard, this is a judgment-call story (step 11).
+3. **Confirm findings were actioned, not parked** (§5) — `/patch` fixed every real finding, or each
+   was an explicit escalation / new-idea issue. Never a silent defer.
+4. **Survey the diff** — `git status` + `git diff --stat`; only expected files; flag drift. A new
+   `public/engine/*.ts` file → confirm its `AI_MAP.md` row exists (the docs-lint pre-commit hook
+   blocks otherwise — §4).
+5. **Branch check** (§9) — must be on a feature branch, not `main`. If on `main`, stop.
+6. **Compose the narrative** — the "what shipped + which findings were actioned + why" summary that
+   becomes the **PR body**.
+7. **Commit** (§8) — Conventional Commit, explicit paths (never `-A`), `Co-Authored-By: Claude Opus 4.8`
+   trailer, HEREDOC.
+8. **Push** — `git push -u origin <branch>`.
+9. **Open the PR** (§8) — `--base main`, narrative body, **`Closes #<n>`**, CC subject as title, the
+   `🤖 Generated with [Claude Code]` footer.
+10. **Post a one-line issue comment** linking the PR.
+11. **Land it — the auto-merge decision (§5 + §6):**
+    - **Safe story** (Track musical/bundle, CI green, none of §5's always-brake classes) → run the
+      **poll-then-merge guard in the background** (§6), then `node scripts/gh-project.mjs status <n>
+      "Shipped"`, sync local main + prune the branch. The issue auto-closes.
+    - **Judgment-call story** (Track `synth` / by-ear / destructive data op / state-or-worker-contract
+      design call, or anything Brandon should *see*) → **leave the PR open**, Status stays In review
+      (or Needs-ear for synth awaiting audition), report "ready for your merge: <url>" + *why* it's
+      gated. Do NOT auto-merge.
+12. **Suggest next:** `scripts/deploy-test.sh` (staging), `/next`, or `/cycle` continues.
 
 ## Edge cases
 
-- **Story marked complete but tests still failing:** STOP. Don't let `/done` paper over an incomplete story. If a test is intentionally skipped or a Status: Engine-finding was logged, name it explicitly in the commit body and confirm with the user before proceeding.
-- **Diff includes uncommitted drift unrelated to the story:** surface it. Ask the user whether to stage selectively or to step back and clean up first.
-- **Multiple stories shipping in one commit:** OK. Make the commit message reflect the bundle, not just one story.
-- **An epic is fully done:** suggest archiving its row in EPICS.md and adding it to `docs/MUSICAL_AUDIT.md` Shipped, but don't do it automatically — that's a bigger restructuring decision.
-- **Push to remote:** never auto-push. The user runs `git push` themselves.
-
-## Safety rules
-
-- Never `git add -A` or `git add .` — always explicit paths.
-- Never `--no-verify` on hooks unless the user explicitly asks.
-- Never amend an earlier commit unless the user explicitly asks.
-- Never force-push.
+- **Gates red / tests skipped / critique test failing:** STOP — don't paper over it.
+- **CI red on the PR:** do NOT merge; surface the failing job (`test` or `e2e`); fix on the branch,
+  push, re-check.
+- **Unrelated drift in the diff:** surface; stage selectively (§8 — never `-A`).
+- **Whole epic (milestone) done:** note it; suggest a VISION/docs shipped note — don't auto-restructure
+  (milestone progress reflects it automatically).
+- **Issue didn't close after merge** (a `Closes #<n>` typo / non-default base): `gh issue close <n>` +
+  `node scripts/gh-project.mjs status <n> "Shipped"`. A **closed issue is "done"** regardless.

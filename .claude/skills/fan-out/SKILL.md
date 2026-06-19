@@ -1,83 +1,64 @@
 ---
 name: fan-out
-description: Implement 3-5 musical-audit stories in parallel. Loads each story's context, verifies file-disjointness (no two stories edit the same file), determines the right agent + model per story, and presents a batch plan before spawning. Plan-first — does not spawn until confirmed. Use for Phase 2 sonnet-tagged batches and Phase 3 opus batches; do NOT use for Phase 1 (sequential). Usage `/fan-out <story-id-1> <story-id-2> <story-id-3>...`.
+description: Implement 3-5 Ensemble work stories in parallel. Loads each issue's context from the board, verifies file-disjointness (no two stories edit the same file), determines the right agent + model per story, sets each Status → In progress, and presents a batch plan before spawning. Plan-first — does not spawn until confirmed. Use for disjoint batches; do NOT use for stories that share a hot file (coordination-engine.ts, tick-logic.ts). Usage `/fan-out #<n1> #<n2> #<n3>...`.
 ---
 
-# /fan-out <story-ids...> — parallel implementation batch
+# /fan-out #<n…> — parallel implementation batch
 
-Goal: take a curated list of disjoint stories from the orchestrator, spawn implementer agents in parallel, await all, then suggest `/review`.
+Goal: take a curated list of disjoint issues, spawn implementer agents in parallel, await all, then
+suggest `/review`.
+
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §1
+(pickability), §3 (Track → executor + model + reviewer; re-verify agent claims), §4 Gates, §9 Branch
+policy, §7 (the **batch** rule for the Status writes). The procedure below is just the ordering.
 
 ## Workflow
 
-1. **Parse the story-ids.** Same format as `/implement` (`<epic-slug>/S<N>`). Require at least 2; warn over 5 (diminishing returns + context pressure).
-
-2. **Load each story's context.** For each id: read its block in the epic file, identify agent (musical-engine vs critique-test), model (opus/sonnet), files-touched (from the fix sketch), and target test.
-
+1. **Parse the issue refs.** `#<n>` each. Require at least 2; warn over 5 (diminishing returns +
+   context pressure + a large post-batch review diff).
+2. **Load each issue's context** (§7 read + `gh issue view`): Why/Touches/Acceptance, Track, Agent,
+   Model, Size, Review lens, files-touched (from Touches). Confirm each is **pickable** (§1).
 3. **Verify file-disjointness.**
-   - Build a set of files-touched per story.
-   - Any file appearing in two stories' sets is a conflict. **Do not proceed.**
-   - Present the conflict and suggest which stories to drop from this batch.
-   - Note: `coordination-engine.ts` and `tick-logic.ts` are particularly likely to conflict — all Phase 1 stories share them. Phase 1 should not be fanned out; flag that explicitly.
-
-4. **Verify phase eligibility.**
-   - All stories in the batch should be in the same phase (mostly).
-   - Mixing Phase 2 + Phase 3 is OK if files are disjoint.
-   - Mixing in any Phase 1 story is NOT OK — stop and explain.
-
-5. **Present the batch plan.** Format:
+   - Build the set of files-touched per story. Any file in two stories' sets is a conflict — **do not
+     proceed**; present it and suggest which to drop.
+   - `coordination-engine.ts`, `tick-logic.ts`, `scheduler-core.ts`, and the worker sync files are
+     particularly likely to collide — stories sharing them must run sequentially, not fanned out.
+4. **Pick agent + model per story** (§3) — from the Agent/Model fields, sanity-checked against Track +
+   Touches. Different models in one batch is fine.
+5. **Set each Status → In progress** in **one batch call** (§7):
+   `node scripts/gh-project.mjs batch /tmp/fanout-status.json` (one `{issue,field:"Status",value:"In
+   progress"}` per story) — never a loop of single writes.
+6. **Branch** (§9) — a shared batch branch is fine for a disjoint set (`git checkout -b <batch-slug>`).
+7. **Present the batch plan:**
 
    ```
    ## Plan: fan-out batch (<N> stories)
-
-   | Story | Agent | Model | Files | Test |
-   | :- | :- | :- | :- | :- |
-   | <slug>/S1 | musical-engine-implementer | sonnet | bass-engine.ts | jazz-bass-critique |
-   | <slug>/S2 | musical-engine-implementer | sonnet | harmonies.ts | jazz-harmony-critique |
-   | <slug>/S3 | critique-test-author | sonnet | metal-piano-critique.test.ts (new) | itself |
-
-   **File-disjointness:** ✅ verified
-   **Phase consistency:** Phase 2 (3 stories, all sonnet-tagged)
-   **Reviewer (after):** music-theory-reviewer + state-discipline-reviewer (S2 touches state)
-
-   Spawn all 3 in parallel? Or adjust the batch?
+   | Issue | Track | Agent | Model | Files | DoD |
+   | :- | :- | :- | :- | :- | :- |
+   | #12 | musical | musical-engine-implementer | sonnet | bass-engine.ts | jazz-bass-critique |
+   | #15 | bundle  | claude | sonnet | viz-overlay.tsx | KB delta |
+   **File-disjointness:** ✅ verified   **Branch:** <batch-slug>
+   **Reviewers (after):** <union per §3 / the combined diff>
+   Spawn all <N> in parallel? Or adjust?
    ```
 
-6. **On confirmation, spawn all in parallel.**
-   - Single message, multiple `Agent` tool calls.
-   - Each agent's prompt is the same shape as `/implement`'s spawn prompt (cite story-id, acceptance, source finding, file ownership, ask for `## Result` block).
-   - Use `run_in_background: false` so the harness tracks completion and notifies on each finish.
-   - Each agent gets explicit file ownership: "You may edit ONLY `<file-list>`. Report Blocked if you need to touch other files."
-
-7. **As each agent reports, capture its `## Result` block.** Don't summarize until all are in (or until the user asks for progress).
-
-8. **When all complete, present a batch report.** Format:
-
-   ```
-   ## Batch result (<N> stories)
-
-   ✅ <slug>/S1 — Shipped (test passes, 30/30 reliability)
-   ✅ <slug>/S2 — Shipped (test passes)
-   ⚠️ <slug>/S3 — Blocked: <reason>
-
-   **Combined diff:** <N files changed, +<n>/-<m>>
-
-   ### Next:
-   - `/review` to run reviewer agents on the combined diff
-   - For blocked stories: decide whether to rescope or escalate
-   ```
-
-9. **Suggest `/review` next.**
-
-## Chain references
-
-- Typically comes after `/next` (which proposed the batch).
-- Hands off to `/review`.
-- Failed/blocked stories within a batch should be picked up individually with `/implement <id>` after rescoping.
+8. **On confirmation, spawn all in parallel** — single message, multiple `Agent` calls,
+   `run_in_background: false`. Each prompt = `/implement`'s spawn shape (cite issue #, acceptance,
+   Track DoD, file ownership "edit ONLY <files>, report Blocked if you need others", ask for `## Result`).
+9. **As each reports, capture its `## Result`.** Don't summarize until all are in.
+10. **Independently re-verify** (§3) — re-run the §4 gates + each story's Track DoD **yourself** on the
+    combined tree; an agent's "green" is a claim.
+11. **Present the batch report:** ✅/⚠️ per story (with the re-verified gate status), combined diff
+    stat, and any Blocked ones. Roll a Blocked story's Status back to `Ready` (§7) so the board doesn't
+    strand it In-progress.
+12. **Suggest `/review`** on the combined diff.
 
 ## Edge cases
 
-- **Two stories edit the same file:** drop one from the batch and run it sequentially after, or merge them into one story brief.
-- **A story is tagged opus but bundled with sonnet stories:** OK — spawn it on opus while the sonnet siblings run in parallel. Different models is fine.
-- **One agent finishes much faster than the others:** wait. Don't review partial state.
-- **An agent reports Blocked:** keep the others running, report the blocker in the final batch summary. Don't kill siblings — their work is independent.
-- **Batch is more than 5 stories:** doable but expect context pressure; warn the orchestrator that the post-batch review will have a large diff.
+- **Two stories edit the same file:** drop one; run it sequentially after via `/implement`.
+- **A story is opus, bundled with sonnet ones:** fine — spawn it on opus alongside.
+- **One agent finishes much faster:** wait. Don't review partial state.
+- **An agent reports Blocked:** keep the others running; report the blocker; roll its Status back to
+  Ready. Don't kill siblings.
+- **Mixed Tracks in one batch:** fine if files are disjoint — the post-batch `/review` unions the
+  Track-appropriate reviewers; a synth story in the batch still hits its listening gate at `/done`.
