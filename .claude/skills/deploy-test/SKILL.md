@@ -21,20 +21,25 @@ staging push; prod is the gated awake-only call) and §4 (gates).
 - Ops target: rsync over ssh to the scoped **`ensembletest-admin`** alias (the
   least-privilege `claude` account, `IdentitiesOnly homelab_nginx`) →
   `/var/www/html/`; the `--delete` mirrors the build, so stale files are pruned.
-- `scripts/deploy-test.sh` builds (`vite build --mode test`), prints the bundle
-  footprint, rsyncs, then moves **`refs/deploys/test`** to HEAD. It does **not**
-  verify itself — on test, "the right asset hash is up" is all the check needs to be.
-- **Verification is free:** `vite.config.ts` bakes `git rev-parse --short HEAD` (REV)
-  into every asset filename (`main.<REV>.js`), so the deployed `index.html` names the
-  exact build. No `/api/version` endpoint needed.
+- `scripts/deploy-test.sh` builds (`vite build --mode test`), prints the **Built REV**
+  + bundle footprint, rsyncs, then moves **`refs/deploys/test`** to HEAD. It does
+  **not** verify itself — on test, "the right asset hash is up" is all the check needs.
+- **Verification is free:** `vite.config.ts` (`computeBuildRev`) bakes the revision into
+  every asset filename (`main.<REV>.js`), so the deployed `index.html` names the exact
+  build. REV is `git rev-parse --short HEAD` for a **clean** tree, and `<head>-<sig>`
+  (short hash of the uncommitted diff) for a **dirty** tree — so a dirty audition build
+  is stamped *honestly* and a redeploy after an edit flips the stamp. The deploy script
+  echoes the exact REV it built (`📌 Built REV: …`); verify against that, not against
+  bare `HEAD` (which only matches a clean tree).
 
 ## Steps (the default — keep it quick)
 
 1. **Quick sanity** from the repo root:
    - `git status -sb` — note the branch + any uncommitted changes. **The build ships
      the working tree**, so dirty edits go to test (fine for iterating — just surface
-     it). Note: REV is baked from `HEAD`, so a dirty tree's asset hash still equals
-     `HEAD`; the hash confirms HEAD landed but can't attest the uncommitted edits.
+     it). A dirty tree stamps `<head>-<sig>`, so the asset hash *does* attest the exact
+     bytes now — no caveat needed. (Prefer a branch over dirty `main` for anything
+     you'll keep, so the deploy ref stays exact.)
    - (Optional) what's shipping since the last test deploy:
      `git fetch -q origin '+refs/deploys/*:refs/deploys/*' 2>/dev/null || true` then
      `git log --oneline refs/deploys/test..HEAD` (or "(no test deploy ref yet)").
@@ -44,17 +49,17 @@ staging push; prod is the gated awake-only call) and §4 (gates).
    syncing; `--quiet` trims log noise — useful when the pipeline calls it.)
 
 3. **Light confirm — the only check the default needs.** Curl the edge and check the
-   deployed asset hash matches HEAD:
+   deployed asset hash matches the **Built REV** the script printed:
    ```sh
-   curl -s https://ensembletest.brndn.zip/ | grep -oE '\.[0-9a-f]{7,}\.js' | head -1
-   #   → should contain ".$(git rev-parse --short HEAD).js"
+   curl -s https://ensembletest.brndn.zip/ | grep -oE '\.[0-9a-f]{7,}(-[0-9a-f]+)?\.js' | head -1
+   #   → should contain ".<Built REV>.js" (the 📌 line from the deploy)
    ```
-   Green when the hash equals `git rev-parse --short HEAD`. That one call proves the
-   build deployed, nginx is serving it over the edge (200), and the bundle is current.
-   A **stale hash** = rsync didn't land or an edge/browser cache is in front — not an
+   Green when the live hash equals the Built REV. That one call proves the build
+   deployed, nginx is serving it over the edge (200), and the bundle is current. A
+   **stale hash** = rsync didn't land or an edge/browser cache is in front — not an
    app issue (there's no app). Done — hand back.
 
-4. **Report** one line: deployed SHA + that the live asset hash matches. Nothing more
+4. **Report** one line: Built REV + that the live asset hash matches. Nothing more
    unless asked.
 
 ## Autonomous use (pipeline)
