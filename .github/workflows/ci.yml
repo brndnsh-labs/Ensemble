@@ -8,7 +8,7 @@ on:
 
 jobs:
   unit-tests:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ensemble]
     steps:
       - uses: actions/checkout@v6
 
@@ -25,7 +25,7 @@ jobs:
         run: npm test
 
   e2e-tests:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ensemble]
     # Needs unit tests to pass first for efficiency, but could be run in parallel
     needs: unit-tests
     steps:
