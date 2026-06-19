@@ -54,6 +54,11 @@ explicit write becomes a harmless no-op.)
   / touch-target fix that CI's headless run can't eyeball). **Not** `needs-ear`: the change's
   *correctness* is knowable from code; only its *side-effects* need an eyeball. `/nightly` runs these
   and lands each on the morning device-verify checklist. Pairs with `burndown` (it's in the safe set).
+- **`verify-by-ear`** — the **musical analogue of `verify-on-device`** (§5): a musical-correctness
+  change whose idiom *is* captured by a critique test, so it builds + auto-merges on green, but its
+  last residual is a **listen pass** to confirm it feels right. Ships with a 🎧 listen checklist
+  (genre/setting to load, what changed, old-vs-new to hear). **Not** `needs-ear` (which is reserved for
+  genuinely-subjective work where no critique test can assert the idiom). Pairs with `burndown`.
 - **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock` can surface last
   night's finds freshest-first.
 - **`area:*`** — surface tags inferring the executor when Agent is unset: `area:soloist`,
@@ -67,7 +72,9 @@ explicit write becomes a harmless no-op.)
 - **Track** — `musical` | `synth` | `bundle`. **The load-bearing routing field** — it picks the
   Definition of Done and the reviewer set (below). The three tracks differ on their DoD:
   - **musical** → gated by a **critique test** in `tests/standards/` (statistical ranges, an
-    automated oracle). Most musical stories are fully auto-mergeable on green.
+    automated oracle). Most musical stories are fully auto-mergeable on green; when the change is
+    audible, ship it `verify-by-ear` (auto-merge on green + a 🎧 listen checklist — §5). Only
+    genuinely-subjective feel (no test can assert the idiom) is a `Needs-ear` hard stop.
   - **synth** → gated by a **human A/B audition** through the audition harness
     (`scripts/audition-link.ts`); there is no automated oracle. A synth story is **`Needs-ear`**
     at the merge gate (§5) — build + PR, but **never auto-merge unheard**.
@@ -149,9 +156,11 @@ result. **Tier does not gate autonomy** — it only picks the executor's model. 
 is a **judgment call**.
 
 **Stop and surface — the always-brake set:**
-- **Track `synth`** (and any musical story whose acceptance is **by-ear**, not critique-test):
-  the A/B audition / listen pass is a **`Needs-ear`** human stop. Build + open the PR, but
-  **leave it for Brandon's ear + merge** — never auto-merge unheard.
+- **Track `synth`** and **genuinely-subjective** musical work (timbre / feel with **no idiom a
+  critique test can assert**): the A/B audition / listen pass is a **`Needs-ear`** human stop.
+  Build + open the PR, but **leave it for Brandon's ear + merge** — never auto-merge unheard.
+  This is **not** the same as musical work whose idiom *is* theory-specifiable + critique-testable —
+  that is `verify-by-ear`, see below.
 - A diff is a **destructive data op** (drops/rewrites persisted sessions, share-URL schema,
   preset data, or a state-slice migration that breaks saved state) — Brandon wants to *see* these
   even if the cycle could proceed; offer a human `/code-review`.
@@ -168,14 +177,31 @@ surface it. **Findings get actioned, not parked:** `/patch` fix-now is the defau
 (P0/P1/bounded-P2); too-big = *escalate* to a `finding` issue with Brandon's nod, never a silent
 defer.
 
+**`verify-by-ear` — musical correctness is not a work-blocker.** Most "by-ear" musical work is
+*not* subjective: its idiom is a music-theory **fact** (rock harmony = harmonized 3rds/6ths; ska
+soloist favors the offbeats; blues b3 landing-tone rate sits in an idiomatic band). When the claim
+is expressible as a **critique test that asserts the idiom** (not merely "a weight moved"), it is
+gate-verifiable: implement with a music-theory/correctness lens → critique test + `music-theory-reviewer`
+→ **auto-merge on green** (Brandon's standing call 2026-06-19), deploy to test, and attach a **🎧 listen
+checklist** (tag `verify-by-ear`): genre/setting to load, what changed, old-vs-new to hear. The test
+is the correctness gate; Brandon's ear is *confirmation* — a follow-up tweak if it feels off, never a
+rollback (musical diffs are reversible). **The hard guardrail (no programmer's math):** if you cannot
+write a test that captures the musical claim, that is the signal the change isn't understood well
+enough to ship unheard — **stop and surface.** Mirrors `verify-on-device`: correctness knowable from
+code/test, only a real-world sensory glance remains. (Track `synth` and genuinely-subjective feel
+stay the `Needs-ear` hard stop above — no oracle exists for "does it *sound* good.")
+
 **The autonomous safe set (`/burndown` / `/nightly`).** The unattended grinders operate on the
 **negation of the always-brake set**: an item is `burndown`-safe only if it is *none* of the classes
 above AND is well-specified, S/M, single-area, and **gate/CI-verifiable** (provable by §4, not by ear
 or a device). `verify-on-device` is the one bright-line exception — build + auto-merge it, but it must
 land on `/nightly`'s morning device-verify checklist (correctness is knowable from code; only a
-real-device visual glance remains). Track `synth` and any by-ear musical work are **never**
-`burndown`-safe (their DoD is a human listen → `Needs-ear`). When unsure, **exclude and surface** — a
-mis-graded autonomous merge costs trust; a skipped-safe item only costs throughput.
+real-device visual glance remains). **`verify-by-ear`** is the musical sibling: theory-provable
+musical correctness **is** in the autonomous set — its critique test is the §4 gate, it merges on
+green, and only a confirming listen remains. Track `synth` and **genuinely-subjective** musical work
+(no critique-test oracle for the idiom) are **never** `burndown`-safe (their DoD is a human listen →
+`Needs-ear`). When unsure, **exclude and surface** — a mis-graded autonomous merge costs trust; a
+skipped-safe item only costs throughput.
 
 ## §6 Merge guard
 
