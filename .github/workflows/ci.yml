@@ -53,13 +53,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-
 
+      # Browser binaries only — no `--with-deps`. The host system libraries are
+      # pre-installed on the self-hosted runner (one-time `sudo playwright
+      # install-deps`), so CI never needs sudo. Binaries land in ~/.cache as the
+      # runner user; on a self-hosted box that cache persists across runs.
       - name: Install Playwright Browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
-
-      - name: Install Playwright Dependencies (Ubuntu)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+        run: npx playwright install
 
       - name: Run Playwright tests
         run: npm run test:e2e
