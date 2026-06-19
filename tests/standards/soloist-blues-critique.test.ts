@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
 import { makeSoloistMock } from '../utils/mock-soloist.js';
 
 // Mock state.js
@@ -92,6 +93,18 @@ describe('Soloist Blues Critique', () => {
                     64,
                     'blues',
                     step,
+                    // Thread coordination + a real stepInfo so the critique measures the
+                    // PRODUCTION path. Without stepInfo the engine falls back to
+                    // isBackbeat=false hardcoded (soloist.ts) and a measureStep-derived
+                    // pulse; in 4/4 that fallback is mathematically close but it silences
+                    // any backbeat-aware phrasing lane. (Wave-3 audit finding B-F4.)
+                    {},
+                    getStepInfo(bar * 16 + step, {
+                        beats: 4,
+                        stepsPerBeat: 4,
+                        grouping: [4],
+                        backbeat: [1, 3],
+                    }),
                 );
                 if (note) {
                     const primary = Array.isArray(note) ? note[0] : note;
@@ -119,6 +132,7 @@ describe('Soloist Blues Critique', () => {
         let totalIntervals = 0;
         let sumIntervals = 0;
         let blueNotes = 0; // b3 or b5
+        let flatThirds = 0; // b3 specifically — the +500-reward-driven blues signal
         let chordTones = 0; // 1, 3, 5, 7
         let bendsOnBlueNotes = 0;
 
@@ -133,6 +147,9 @@ describe('Soloist Blues Critique', () => {
             }
             if (relativePitch === 3 || relativePitch === 6) {
                 blueNotes++;
+                if (relativePitch === 3) {
+                    flatThirds++;
+                }
                 if (n.bend !== 0) {
                     bendsOnBlueNotes++;
                 }
@@ -166,13 +183,17 @@ describe('Soloist Blues Critique', () => {
         const avgInterval = sumIntervals / (totalIntervals || 1);
         const chordToneRatio = chordTones / notes.length;
         const blueNoteRatio = blueNotes / notes.length;
+        const flatThirdRatio = flatThirds / notes.length;
         const blueNoteBendRatio = bendsOnBlueNotes / (blueNotes || 1);
         const notesPerBar = notes.length / numBars;
 
         console.log('\n--- BLUES SOLOIST CRITIQUE REPORT ---');
         console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <5.0)`);
         console.log(`[Chord Tone Ratio]      ${(chordToneRatio * 100).toFixed(1)}% (Target: >45%)`);
-        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >15%)`);
+        console.log(`[Blue Note Presence]    ${(blueNoteRatio * 100).toFixed(1)}% (Target: >18%)`);
+        console.log(
+            `[Flat-Third Emphasis]   ${(flatThirdRatio * 100).toFixed(1)}% b3 (Target: >13%)`,
+        );
         console.log(
             `[Blue Note Inflection]  ${(blueNoteBendRatio * 100).toFixed(1)}% bends (Target: >50%)`,
         );
@@ -190,10 +211,26 @@ describe('Soloist Blues Critique', () => {
         // Chord Tones: engine ~55%. Random pitch over blues scale (7 notes, 3 are chord tones)
         // gives ~43% baseline. >45% guards "engine has chord-tone bias on top of scale shape."
         expect(chordToneRatio).toBeGreaterThan(0.45);
-        // Blue Notes (b3 + b5): engine ~27%. Uniform-random over 12 chromatic semitones gives
-        // 2/12 ≈ 17%. >15% certifies the engine still picks blues-scale tones (not a flat-7
-        // jazz line) without being so tight it flakes on RNG runs.
-        expect(blueNoteRatio).toBeGreaterThan(0.15);
+        // Blue Notes (b3 + b5) — production path: engine delivers ~23.9% (deterministic;
+        // seed inputs are pinned). The OLD comment justified >0.15 against "uniform over
+        // 12 chromatic semitones ≈ 17%" — a fictional baseline (Wave-3 audit finding B-F1,
+        // smell-b). The engine never selects uniformly over 12 PCs: it picks from the dom7
+        // blues candidate set ({0,2,3,4,5,(6),7,9,10} ≈ 9 reachable PCs, 2 of them blue),
+        // AND it has a strong chord-tone bias (chordTone ~59%) that further shrinks the
+        // non-chord-tone share. The realistic neutral baseline for the combined b3+b5 ratio
+        // is therefore ~0.18-0.22, so the old 0.15 floor sat AT or BELOW baseline and proved
+        // nothing. The combined ratio is a weak discriminator here; it stays only as a loose
+        // "blues-scale shape didn't collapse to a flat-7 jazz line" sanity floor at >0.18
+        // (engine 0.239 → ~5.9pp headroom).
+        expect(blueNoteRatio).toBeGreaterThan(0.18);
+        // The REAL blues signal is the b3 emphasis, which `applyBluesBends` + the +500 b3
+        // reward (soloist-pitch-engine.ts) actively drive. Production b3 ratio ~16.2%
+        // (deterministic) vs a neutral b3 share of ~0.08-0.11 (b3 is 1 of ~9 candidate PCs,
+        // suppressed further by chord-tone bias) — a genuine ~5pp separation. >0.13 guards
+        // that the b3-reward path is actually firing: a regression that removed the reward
+        // would drop b3 toward its neutral share and trip this, where the combined-blue
+        // floor would not. This is the assertion the smell-b finding asked for.
+        expect(flatThirdRatio).toBeGreaterThan(0.13);
         // Bend coverage: engine ~100% bends on blue notes (`applyBluesBends` in utils.ts).
         // The report claim ">30%" was already implied by the engine design. >50% leaves
         // headroom but guards a real regression if the bend path stops firing.
