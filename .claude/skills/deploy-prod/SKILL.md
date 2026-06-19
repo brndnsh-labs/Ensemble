@@ -26,9 +26,11 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
   `/var/www/html/`; `--delete` mirrors the build.
 - `scripts/deploy-prod.sh` builds (`vite build --mode production`), prints the footprint,
   rsyncs, then moves **`refs/deploys/prod`** to HEAD (best-effort origin push).
-- **Verification is free:** `vite.config.ts` bakes `git rev-parse --short HEAD` (REV)
-  into every asset filename (`main.<REV>.js`), so the live `index.html` names the exact
-  build — the Ensemble equivalent of an `/api/version` SHA.
+- **Verification is free:** `vite.config.ts` (`computeBuildRev`) bakes the revision into
+  every asset filename (`main.<REV>.js`), so the live `index.html` names the exact build
+  — the Ensemble equivalent of an `/api/version` SHA. Prod gates on a clean tree, so REV
+  is the bare commit short SHA; the deploy script also echoes it (`📌 Built REV: …`).
+  (A dirty tree would stamp `<head>-<sig>` — but prod refuses to ship dirty.)
 
 ## Steps
 
@@ -62,8 +64,9 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
    ```sh
    # (a) edge is serving:
    curl -s -o /dev/null -w '%{http_code}' https://ensemble.brndn.zip/        # expect 200
-   # (b) the RIGHT build is live — asset hash must equal HEAD's short SHA:
-   curl -s https://ensemble.brndn.zip/ | grep -oE '\.[0-9a-f]{7,}\.js' | head -1
+   # (b) the RIGHT build is live — asset hash must equal the Built REV (clean tree
+   #     ⇒ HEAD's short SHA; the deploy printed it on the 📌 line):
+   curl -s https://ensemble.brndn.zip/ | grep -oE '\.[0-9a-f]{7,}(-[0-9a-f]+)?\.js' | head -1
    #     → must contain ".$(git rev-parse --short HEAD).js"
    ```
    Then a **changed-surface spot-check**: if the release touched a visible surface,

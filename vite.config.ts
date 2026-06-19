@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
     copyFileSync,
     existsSync,
@@ -13,7 +14,34 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const REV = execSync('git rev-parse --short HEAD').toString().trim();
+/**
+ * Build revision baked into every hashed asset filename (`main.<REV>.js`) so a
+ * deployed `index.html` names the exact build.
+ *
+ * The build ships the *working tree*, not `HEAD` — so the commit hash alone
+ * misrepresents what's deployed whenever the tree is dirty (the by-ear
+ * audition loop deploys uncommitted work to the private test box on purpose).
+ * When dirty, append a short hash of the uncommitted diff so the stamp reads
+ * `<head>-<sig>`: the deploy verification can attest the exact bytes, and a
+ * redeploy after an edit visibly flips the stamp (so "did my redeploy land?"
+ * is answerable even mid-audition). A clean tree — CI, prod, any committed
+ * build — stamps the bare commit hash exactly as before.
+ */
+function computeBuildRev(): string {
+    const head = execSync('git rev-parse --short HEAD').toString().trim();
+    const dirty = execSync('git status --porcelain').toString().trim();
+    if (!dirty) {
+        return head;
+    }
+    // Signature over the tracked diff plus the porcelain list (the latter moves
+    // the hash when untracked files appear/disappear, which `git diff HEAD`
+    // alone would miss). Hex + hyphen — safe in both filenames and the REV regex.
+    const diff = execSync('git diff HEAD').toString();
+    const sig = createHash('sha1').update(diff).update(dirty).digest('hex').slice(0, 4);
+    return `${head}-${sig}`;
+}
+
+const REV = computeBuildRev();
 
 // Files that must ship to dist/ verbatim (no hashing, no transformation):
 // - manifest.json references icons by their unhashed names
