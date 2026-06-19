@@ -57,8 +57,19 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         }
 
         console.log(`[Blues Audit] Calls: ${callCount}, Responses: ${responseCount}`);
-        expect(callCount).toBeGreaterThan(0);
-        expect(responseCount).toBeGreaterThan(0);
+        // Wave-3 audit finding B-F4 (smell-c, mislabel): this test is named "should
+        // alternate between Call and Response roles" but previously only asserted that
+        // each role appeared at least once — a degenerate engine emitting 999 calls and
+        // 1 response would have passed. Real blues call-and-response is roughly even, so
+        // we assert a balance BAND, not mere presence. Engine is deterministic here:
+        // 31 calls / 32 responses (~49%/51%) over 63 phrases. Require a meaningful
+        // sample, then bound each role to 35-65% of phrases — wide enough never to flake
+        // on the balanced engine, tight enough to fail a lopsided (non-alternating) one.
+        const totalPhrases = callCount + responseCount;
+        expect(totalPhrases).toBeGreaterThan(20);
+        const callShare = callCount / totalPhrases;
+        expect(callShare).toBeGreaterThan(0.35);
+        expect(callShare).toBeLessThan(0.65);
     });
 
     it('should end Response phrases on resolution tones more often than Call phrases', () => {
