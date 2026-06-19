@@ -16,7 +16,7 @@ import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { initPWA } from './pwa.js';
-import { getState, subscribe } from './state.js';
+import { dispatch, getState, subscribe } from './state.js';
 import { handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
 import type { Mutable } from './types.js';
@@ -31,18 +31,25 @@ function init() {
         hydrateState();
         loadFromUrl();
 
-        installE2EGlobals();
+        // E2E helpers attach engine internals to `window.ensemble` for Playwright
+        // tooling only — gated to e2e runs (Playwright sets `data-e2e-mode` via an
+        // init script before page scripts load). Prod dispatches go through the
+        // imported `dispatch` directly (below), so this global is never on the
+        // production dispatch path.
+        if (document.documentElement.dataset.e2eMode === 'true') {
+            installE2EGlobals();
+        }
 
         applyThemeToDom(playback.palette, playback.mode);
 
-        validateProgression(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p));
+        validateProgression(getState(), (a: any, p: any) => dispatch(a, p));
 
         // --- ASSEMBLE UI ---
         mountComponents(() => getVisualTime(getState()));
 
         // --- WORKER INIT ---
         initWorker(
-            () => scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p)),
+            () => scheduler(getState(), (a: any, p: any) => dispatch(a, p)),
             (
                 notes: any[],
                 requestTimestamp: number,
@@ -109,13 +116,13 @@ function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p));
+                    scheduler(getState(), (a: any, p: any) => dispatch(a, p));
                 }
             },
         );
 
         setInstrumentControllerRefs(() =>
-            scheduler(getState(), (a: any, p: any) => window.ensemble?.dispatch(a, p)),
+            scheduler(getState(), (a: any, p: any) => dispatch(a, p)),
         );
 
         const hasDrumPattern = groove.instruments.some((inst: any) =>
