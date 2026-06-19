@@ -255,15 +255,15 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <rect {...solid} x="13.4" y="6.5" width="2.5" height="6" rx="0.6" />
         </>
     ),
-    // A stacked triad — three note-heads sharing one stem, i.e. a chord. Reads
-    // as "many pitches at once" = harmony, distinct from the single soloist
-    // note and the bass waveform.
+    // Two note-heads a third apart, each with its own upward stem, the stems
+    // parallel — a harmonized line (the engine's parallel 3rds/6ths over the
+    // melody). Distinct from the soloist's single flagged note, the `note`
+    // glyph's two beam-joined heads, and the chords keyboard.
     harmony: () => (
         <>
-            <circle {...solid} cx="11.5" cy="16.8" r="2.4" />
-            <circle {...solid} cx="11.5" cy="13" r="2.4" />
-            <circle {...solid} cx="11.5" cy="9.2" r="2.4" />
-            <path d="M13.7 16.8V5" />
+            <circle {...solid} cx="7" cy="17" r="2.5" />
+            <circle {...solid} cx="13.5" cy="12.5" r="2.5" />
+            <path d="M9.3 17V7.5M15.8 12.5V3" />
         </>
     ),
     soloist: () => (
