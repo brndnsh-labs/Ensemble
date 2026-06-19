@@ -50,6 +50,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
 | `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
+| `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles (style/rhythm/voicing). | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile` |
 | `public/engine/soloist-config.ts` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
 | `public/engine/soloist-devices.ts` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
 | `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |

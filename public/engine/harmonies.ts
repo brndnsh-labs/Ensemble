@@ -3,6 +3,7 @@ import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
+import { type HarmonyPatternKey, resolveHarmonyProfile } from './harmony-styles.js';
 import { scrambleHash } from './hash-utils.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
@@ -214,10 +215,13 @@ function selectTensionSupportIntervals(intervals: number[], includeRoot: boolean
 }
 
 /**
- * Procedural Rhythmic Patterns.
+ * Procedural Rhythmic Patterns. Renders one of the named onset templates
+ * (HarmonyPatternKey) into a 2-bar tag array. The genre → patternKey routing
+ * lives in HARMONY_GENRE_PROFILES (harmony-styles.ts), so this function stays a
+ * pure renderer and a genre can be repointed without touching it.
  */
 export function generateCompingPattern(
-    feel: string,
+    patternKey: HarmonyPatternKey,
     seed: number,
     tsConfig?: TimeSignatureConfig,
     activeStyle?: string,
@@ -234,7 +238,7 @@ export function generateCompingPattern(
     const getBeatStep = (bar: number, beatIdx: number, offsetSteps = 0): number =>
         bar * spm + beatIdx * ts.stepsPerBeat + offsetSteps;
 
-    if (feel === 'Jazz') {
+    if (patternKey === 'jazz') {
         // Bar 1: Charleston
         pattern[getBeatStep(0, 0)] = 1;
         pattern[getBeatStep(0, 1, Math.floor(ts.stepsPerBeat * 0.75))] = 1;
@@ -246,7 +250,7 @@ export function generateCompingPattern(
             pattern[getBeatStep(0, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3;
             pattern[getBeatStep(1, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3;
         }
-    } else if (feel === 'Bossa Nova') {
+    } else if (patternKey === 'bossa') {
         // Authentic Bossa Nova Pattern (Bar 1: 0, 6, 12; Bar 2: 18, 24, 30)
         pattern[0] = 1;
         pattern[6] = 1;
@@ -254,7 +258,7 @@ export function generateCompingPattern(
         pattern[18] = 1;
         pattern[24] = 1;
         pattern[30] = 1;
-    } else if (feel === 'Funk' || feel === 'Disco' || feel === 'Afrobeat') {
+    } else if (patternKey === 'funk16') {
         pattern[getBeatStep(0, 0, 0)] = 1;
         pattern[getBeatStep(0, 0, 3)] = 3; // Added: 'a' of 1
         pattern[getBeatStep(0, 1, 2)] = 2;
@@ -266,7 +270,7 @@ export function generateCompingPattern(
         pattern[getBeatStep(1, 2, 1)] = 2; // Added: 'e' of 3
         pattern[getBeatStep(1, 2, 2)] = 3;
         pattern[getBeatStep(1, 3, 0)] = 2;
-    } else if (feel === 'Reggae' || feel === 'Ska') {
+    } else if (patternKey === 'reggae') {
         // why: Reggae organ-bubble vs harmony-channel skank (epic-
         // coordination-consistency S1.b). On Reggae the chord channel
         // (accompaniment.ts) plays the keyboardist's skank on beats 2 & 4;
@@ -290,7 +294,7 @@ export function generateCompingPattern(
         // original backbeat skank — that's the keyboardist's idiom when
         // the harmony channel is acting as a horn-stab layer, not an
         // organ-bubble layer.
-        if (feel === 'Reggae' && activeStyle === 'organ') {
+        if (activeStyle === 'organ') {
             // Bar 1: offbeat-eighths
             pattern[getBeatStep(0, 0, 2)] = 1; // step 2
             pattern[getBeatStep(0, 1, 2)] = 1; // step 6
@@ -319,21 +323,25 @@ export function generateCompingPattern(
                 pattern[getBeatStep(1, 1, 2)] = 4;
             }
         }
-    } else if (feel === 'Neo-Soul') {
+    } else if (patternKey === 'neosoul') {
         pattern[getBeatStep(0, 0, 1)] = 1;
         pattern[getBeatStep(0, 1, 3)] = 2;
         pattern[getBeatStep(0, 2, 1)] = 3;
         pattern[getBeatStep(1, 0, 1)] = 1;
         pattern[getBeatStep(1, 3, 3)] = 2;
-    } else if (feel === 'Ska-Punk') {
-        pattern[getBeatStep(0, 0, 2)] = 1;
-        pattern[getBeatStep(0, 1, 2)] = 1;
-        pattern[getBeatStep(0, 2, 2)] = 1;
-        pattern[getBeatStep(0, 3, 2)] = 1;
-        pattern[getBeatStep(1, 0, 2)] = 1;
-        pattern[getBeatStep(1, 1, 2)] = 1;
-        pattern[getBeatStep(1, 2, 2)] = 1;
-        pattern[getBeatStep(1, 3, 2)] = 1;
+    } else if (patternKey === 'ska') {
+        // why: ska horn-section stabs lock with the guitar/organ chop on the
+        // OFFBEATS — but the chord channel (accompaniment.ts:837) already chops
+        // every offbeat upstroke, so the horn layer punctuates SPARSELY above it
+        // (the &-of-2 and &-of-4 punch) rather than doubling the full chop into
+        // mud. This replaces the old beats-2&4 backbeat (which read as the
+        // opposite of the skank) and revives the rhythmic intent of the dead
+        // 'Ska-Punk' offbeat branch — production genreFeel is 'Ska', which never
+        // reached that key. Tag 1 → short stab in playComperMode. #562.
+        pattern[getBeatStep(0, 1, 2)] = 1; // &-of-2 (step 6)
+        pattern[getBeatStep(0, 3, 2)] = 1; // &-of-4 (step 14)
+        pattern[getBeatStep(1, 1, 2)] = 1; // bar 2 &-of-2 (step 22)
+        pattern[getBeatStep(1, 3, 2)] = 1; // bar 2 &-of-4 (step 30)
     } else {
         pattern[getBeatStep(0, 0, 0)] = 1;
         pattern[getBeatStep(0, 2, 0)] = 2;
@@ -551,6 +559,7 @@ function finalizeHarmonyNotes(
     let intervals: number[] =
         chord.intervals && chord.intervals.length > 0 ? chord.intervals : [0, 4, 7];
     const feel = groove.genreFeel;
+    const profile = resolveHarmonyProfile(feel);
 
     const isSoloistBusy =
         // why: soloistResting and soloistNotesInPhrase are published via coordination
@@ -648,12 +657,58 @@ function finalizeHarmonyNotes(
     // bassMidi is 0/undefined (bass not running or producer order has not yet fired).
     const safetyFloor = Math.max(52, (coordination.bassMidi || 0) + 7);
 
+    // --- ROCK: harmonized twin-guitar 3rds/6ths (#557) ---
+    // why: rock harmony is a parallel 2-voice line tracking the chord — the
+    // Thin Lizzy / Maiden / Allmans harmonized-guitar signature — not a triadic
+    // pad. Diatonic 3rds (3rd+5th) and 6ths (3rd+upper-root) alternate per bar
+    // (seeded → reproducible) for the singable twin-guitar weave; at high band
+    // intensity it thickens to a power-5th double (+ octave on the biggest
+    // hits) for the wall-of-guitar push. Applied at the final voicing stage so
+    // the comping taste-rules above don't dissolve the parallel-harmony intent.
+    // Bloom/latch tutti highlights keep their fuller stack (they're deliberate
+    // accents, not the steady harmonized line).
+    // Tension chords keep their guide-tone voicing — a bare power-5th / 3rd-dyad
+    // would erase the 3rd/7th/alterations that define a 7b9-type color.
+    if (profile.voicing?.harmonizedThirds && !isBloom && !isLatched && !isTensionChord) {
+        const harmonizedThird = (chord.intervals || []).includes(3) ? 3 : 4;
+        if (profile.voicing.powerDoubling && playback.bandIntensity > 0.7) {
+            intervals = playback.bandIntensity > 0.85 ? [0, 7, 12] : [0, 7];
+        } else {
+            const useSixth = scrambleHash(chord.rootMidi * 100 + Math.floor(step / 16)) < 0.45;
+            intervals = useSixth ? [harmonizedThird, 12] : [harmonizedThird, 7];
+        }
+    }
+
+    // --- COUNTRY: pedal-steel 6/9 color (#560) ---
+    // why: country harmony already plays a sustained string pad (Sea mode), so
+    // the audit's "1&3 stabs" premise was stale — what's missing is the
+    // pedal-steel CHARACTER. The steel's signature sweetener is the added major
+    // 6th (an add6 / 6-9 voicing); voice major chords as root–3rd–6th so the
+    // pad reads as pedal steel rather than a generic triad. The slow volume-
+    // pedal swell envelope itself is a synth-track follow-up; this is the pitch
+    // color only. Minor/other qualities keep their triad (a m6 reads jazzy, not
+    // country).
+    const pedalSteel =
+        !!profile.voicing?.pedalSteelSwell && !isBloom && !isLatched && !isTensionChord;
+    if (pedalSteel) {
+        const ci = chord.intervals || [];
+        // Only a plain major triad (no minor 3rd, no 7th) takes the add6 — a 7th
+        // chord keeps its b7/maj7 color rather than losing it to the 6th.
+        const isPlainMajor =
+            ci.includes(4) && !ci.includes(3) && !ci.includes(10) && !ci.includes(11);
+        if (isPlainMajor) {
+            intervals = [0, 4, 9];
+        }
+    }
+
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
     const baseDensity = isBloom ? Math.max(styleConfig.density || 2, 3) : styleConfig.density || 2;
     const maxDensity = groundingRequired
         ? Math.max(baseDensity, Math.min(4, intervals.length))
-        : baseDensity;
+        : pedalSteel
+          ? Math.max(baseDensity, 3)
+          : baseDensity;
     const tensionDensityCap =
         isTensionChord && !groundingRequired && !isBloom
             ? coordination.accompanimentHit && isSoloistBusy
@@ -936,20 +991,15 @@ export function getHarmonyNotes(
     const isTensionChord = isTensionChordQuality(chord.quality);
 
     // 1. STYLE SELECTION
+    // Per-genre routing lives in HARMONY_GENRE_PROFILES (harmony-styles.ts);
+    // the smartStyle is applied only when the user's style is 'smart'.
+    const profile = resolveHarmonyProfile(feel);
     let activeStyle = style;
     if (style === 'smart') {
-        if (feel === 'Blues' || feel === 'Reggae' || feel === 'Neo-Soul') {
-            activeStyle = 'organ';
-        } else if (feel === 'Jazz' || feel === 'Bossa Nova') {
-            activeStyle = 'strings';
-        } else if (feel === 'Disco' || feel === 'Hip Hop') {
-            activeStyle = 'plucks';
-        } else if (['Funk', 'Metal', 'Afrobeat', 'Ska', 'Ska-Punk'].includes(feel)) {
-            activeStyle = 'horns';
-        } else {
-            activeStyle = 'strings';
-        }
+        activeStyle = profile.smartStyle;
     }
+    // Genre rule independent of smart vs explicit: Jazz/Funk never play string
+    // pads — if the user forces 'strings' on them, drop to organ comping.
     if ((feel === 'Jazz' || feel === 'Funk') && activeStyle === 'strings') {
         activeStyle = 'organ';
     }
@@ -983,13 +1033,6 @@ export function getHarmonyNotes(
             velocity: 0.7,
             octaveOffset: 12,
         },
-        disco: {
-            density: 2,
-            rhythmicStyle: 'stabs',
-            timingJitter: 0.005,
-            velocity: 0.75,
-            octaveOffset: 12,
-        },
         counter: {
             density: 1,
             rhythmicStyle: 'pads',
@@ -1010,11 +1053,19 @@ export function getHarmonyNotes(
         ...(STYLE_CONFIGS[activeStyle] || STYLE_CONFIGS.smart),
         activeStyle,
     };
-    if (config.rhythmicStyle === 'auto') {
-        config.rhythmicStyle = feel === 'Rock' || feel === 'Acoustic' ? 'pads' : 'stabs';
-    }
-    if (['Jazz', 'Funk', 'Bossa Nova', 'Neo-Soul', 'Reggae', 'Ska'].includes(feel)) {
-        config.rhythmicStyle = 'stabs';
+    if (style === 'smart') {
+        // Smart path: the resolved pads-vs-stabs decision is the profile's.
+        config.rhythmicStyle = profile.rhythmicStyle;
+    } else {
+        // Explicit-style path: keep the legacy resolution. 'auto' falls to pads
+        // for the sustained-genre feels; the comping feels always force stabs
+        // (Jazz/Funk/Bossa/Neo-Soul/Reggae/Ska never read as held pads).
+        if (config.rhythmicStyle === 'auto') {
+            config.rhythmicStyle = feel === 'Rock' || feel === 'Acoustic' ? 'pads' : 'stabs';
+        }
+        if (['Jazz', 'Funk', 'Bossa Nova', 'Neo-Soul', 'Reggae', 'Ska'].includes(feel)) {
+            config.rhythmicStyle = 'stabs';
+        }
     }
 
     // 2. CONTEXT OBJECT
@@ -1038,7 +1089,7 @@ export function getHarmonyNotes(
                 ?.split('')
                 .reduce((a: number, b: string) => (a << 5) - a + b.charCodeAt(0), 0) || 0,
         );
-        const pattern = generateCompingPattern(feel, seed, ts, activeStyle);
+        const pattern = generateCompingPattern(profile.patternKey, seed, ts, activeStyle);
 
         // Calculate a broad rhythmic mask for UI/Consistency based on "Base" hits only
         let rhythmicMask = 0;

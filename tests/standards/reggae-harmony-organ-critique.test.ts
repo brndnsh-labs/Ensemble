@@ -62,7 +62,7 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
         // mask a missing bubble step.
         const ts = { beats: 4, stepsPerBeat: 4 };
         for (let s = 0; s < 30; s++) {
-            const pattern = generateCompingPattern('Reggae', s * 7919 + 1, ts, 'organ');
+            const pattern = generateCompingPattern('reggae', s * 7919 + 1, ts, 'organ');
             expect(pattern.length).toBe(32);
             // Every bubble step should fire (tag 1 base, occasionally upgraded
             // to tag 2 dyad — either way the slot is non-zero).
@@ -84,7 +84,7 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
         // is the right idiom there — this guard prevents the bubble from
         // accidentally taking over every Reggae harmony route.
         const ts = { beats: 4, stepsPerBeat: 4 };
-        const pattern = generateCompingPattern('Reggae', 12345, ts);
+        const pattern = generateCompingPattern('reggae', 12345, ts);
         // Falls into the else branch — backbeats present.
         expect(pattern[4]).toBe(1);
         expect(pattern[12]).toBe(1);
