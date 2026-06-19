@@ -29,13 +29,15 @@ interface MotifCacheEntry {
 }
 
 interface HarmonyBehavior {
-    type: 'reinforce' | 'comp' | 'pad';
+    type: 'reinforce' | 'comp' | 'pad' | 'arp';
     duration: number;
     isLatched?: boolean;
     isBloom?: boolean;
     isResponse?: boolean;
     isGhost?: boolean;
     anchorMidi?: number;
+    /** Position in the per-bar arpeggio roll (acoustic fingerpick), 0-based. */
+    arpStep?: number;
 }
 
 interface StyleConfig {
@@ -533,6 +535,20 @@ function playSeaMode(context: HarmonyContext): HarmonyBehavior | null {
     return null;
 }
 
+// Gently rolling fingerpicked counter-line (acoustic, #561). Instead of a held
+// pad, emit ONE chord tone per eighth-note, rolling up over the chord (+9th
+// color) and back down across the bar — the singer-songwriter fingerpick. Each
+// note rings ~1.5 eighths into the next so the line stays legato, not staccato.
+function playArpeggioMode(context: HarmonyContext): HarmonyBehavior | null {
+    const { measureStep, ts } = context;
+    const stepsPerEighth = Math.max(1, Math.round(ts.stepsPerBeat / 2));
+    if (measureStep % stepsPerEighth !== 0) {
+        return null;
+    }
+    const arpStep = Math.round(measureStep / stepsPerEighth);
+    return { type: 'arp', duration: stepsPerEighth + 1, arpStep };
+}
+
 /**
  * Final Note Generation logic (Voicing, Transposition, Offset).
  */
@@ -701,12 +717,36 @@ function finalizeHarmonyNotes(
         }
     }
 
+    // --- METAL: power-chord + octave doubling (#558) ---
+    // why: metal harmony is the chugging power chord — root, 5th, octave, no 3rd
+    // — heavy at every intensity (unlike rock, which only reaches a power-5th at
+    // high intensity and is otherwise a harmonized-3rd line). Dropping the 3rd
+    // is the point: the power chord is quality-neutral, which is exactly the
+    // metal sound over both major and minor roots. Tension chords keep their
+    // guide tones rather than collapsing to a bare 5th.
+    const powerChord = !!profile.voicing?.powerChord && !isBloom && !isLatched && !isTensionChord;
+    if (powerChord) {
+        intervals = [0, 7, 12];
+    }
+
+    // --- ACOUSTIC: fingerpick roll (#561) ---
+    // why: the arpeggio behavior emits ONE chord tone per eighth — reduce the
+    // voicing to the single rolling tone for this position. The roll climbs
+    // root → 3rd → 5th → octave → 9th and back down; the 9th peak is the open
+    // add9 color folk fingerpicking leans on. Bloom/latch accents are left as
+    // their fuller stack (a deliberate swell over the picked line).
+    if (behavior.type === 'arp' && !isBloom && !isLatched) {
+        const arpThird = (chord.intervals || []).includes(3) ? 3 : 4;
+        const roll = [0, arpThird, 7, 12, 14, 12, 7, arpThird];
+        intervals = [roll[(behavior.arpStep ?? 0) % roll.length]];
+    }
+
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
     const baseDensity = isBloom ? Math.max(styleConfig.density || 2, 3) : styleConfig.density || 2;
     const maxDensity = groundingRequired
         ? Math.max(baseDensity, Math.min(4, intervals.length))
-        : pedalSteel
+        : pedalSteel || powerChord
           ? Math.max(baseDensity, 3)
           : baseDensity;
     const tensionDensityCap =
@@ -813,7 +853,7 @@ function finalizeHarmonyNotes(
         targetOctave += 12;
     }
 
-    const currentMidis = getBestInversion(
+    let currentMidis = getBestInversion(
         activeState,
         chord.rootMidi,
         targetIntervals,
@@ -825,6 +865,22 @@ function finalizeHarmonyNotes(
             style: styleConfig.rhythmicStyle,
         },
     );
+
+    // Power chord: build root-5th-octave directly, anchored low in the harmony
+    // slot. getBestInversion voice-leads octave-equivalent tones (0 and 12)
+    // toward the anchor and collapses the octave onto the root; a metal power
+    // chord needs the real low-root + octave spread, so bypass it here. (#558)
+    if (powerChord) {
+        const rootPc = ((chord.rootMidi % 12) + 12) % 12;
+        let root = 48 + rootPc; // C3–B3 region: chunky but inside the slot
+        while (root < safetyFloor) {
+            root += 12;
+        }
+        while (root + 12 > 84) {
+            root -= 12;
+        }
+        currentMidis = [root, root + 7, root + 12];
+    }
 
     if (currentMidis.length === 0) {
         return [];
@@ -1150,7 +1206,14 @@ export function getHarmonyNotes(
     // plays sparse organ swells"). At >= HARMONY_PAD_CEILING the comp/sea
     // split is driven by the configured rhythmic style.
     if (!behavior) {
-        if (config.rhythmicStyle === 'pads' || playback.bandIntensity < HARMONY_PAD_CEILING) {
+        if (profile.voicing?.arpeggiate) {
+            // Acoustic fingerpick replaces the held pad with a rolling
+            // counter-line at every intensity (above the mute floor). #561.
+            behavior = playArpeggioMode(context);
+        } else if (
+            config.rhythmicStyle === 'pads' ||
+            playback.bandIntensity < HARMONY_PAD_CEILING
+        ) {
             behavior = playSeaMode(context);
         } else {
             behavior = playComperMode(context);

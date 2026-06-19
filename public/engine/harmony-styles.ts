@@ -40,16 +40,16 @@ export type HarmonyPatternKey =
 
 /** Per-genre voicing character. Populated incrementally by the child stories. */
 export interface HarmonyVoicing {
-    /** Harmonized diatonic 3rd-above / 6th-below lead line (rock, metal). */
+    /** Harmonized diatonic 3rd-above / 6th-below lead line (rock). */
     harmonizedThirds?: boolean;
-    /** Octave / power-5th doubling at high intensity (metal). */
+    /** Power-5th double (+ octave) at high intensity, paired with harmonizedThirds (rock). */
     powerDoubling?: boolean;
-    /** Open/spread voicing rather than close cluster (acoustic). */
-    openVoicing?: boolean;
-    /** Add9/sus2 color tone on plain major (acoustic). */
-    addColorTone?: boolean;
-    /** Long chord-tone swells with a 6th/9th upper voice (country pedal-steel). */
+    /** Root-5th-octave power chord at every intensity, no 3rd (metal). */
+    powerChord?: boolean;
+    /** Long chord-tone swells with an added major-6th / 6-9 color (country pedal-steel). */
     pedalSteelSwell?: boolean;
+    /** Replace the held pad with a gently rolling fingerpicked counter-line (acoustic). */
+    arpeggiate?: boolean;
 }
 
 export interface HarmonyGenreProfile {
@@ -88,7 +88,12 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
     Blues: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'default' },
     'Neo-Soul': { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'neosoul' },
     Reggae: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'reggae' },
-    Acoustic: { smartStyle: 'strings', rhythmicStyle: 'pads', patternKey: 'default' },
+    Acoustic: {
+        smartStyle: 'strings',
+        rhythmicStyle: 'pads',
+        patternKey: 'default',
+        voicing: { arpeggiate: true },
+    },
     'Bossa Nova': { smartStyle: 'strings', rhythmicStyle: 'stabs', patternKey: 'bossa' },
     Country: {
         smartStyle: 'strings',
@@ -96,7 +101,12 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         patternKey: 'default',
         voicing: { pedalSteelSwell: true },
     },
-    Metal: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'default' },
+    Metal: {
+        smartStyle: 'horns',
+        rhythmicStyle: 'stabs',
+        patternKey: 'default',
+        voicing: { powerChord: true },
+    },
     Ska: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'ska' },
     Afrobeat: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
 };
