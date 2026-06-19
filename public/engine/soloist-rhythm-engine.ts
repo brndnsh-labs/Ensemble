@@ -80,8 +80,9 @@ function getStepStrength(
 // why: epic-1-compound-meter S6 — precompute the set of measure-step indices
 // where a compound meter's backbeat fires, derived from `tsConfig.grouping`
 // (eighth-counts per pulse group) and `tsConfig.backbeat` (which group indices
-// are backbeats). Mirrors `getStepInfo`'s compound branch (`utils.ts:683-693`):
-// groupStart i is at `sum(grouping[0..i-1]) * stepsPerBeat`, and backbeat fires
+// are backbeats). Mirrors `getStepInfo`'s compound branch (its `if (isCompound)`
+// block in `public/utils.ts`): groupStart i is at
+// `sum(grouping[0..i-1]) * stepsPerBeat`, and backbeat fires
 // when groupIndex ∈ backbeatArray. Returns `null` for simple meters so callers
 // can fall through to the 4/4-shaped backbeat logic.
 function computeCompoundBackbeatSteps(

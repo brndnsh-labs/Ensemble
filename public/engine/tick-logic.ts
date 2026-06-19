@@ -300,7 +300,7 @@ export function generateNotesForStep(
         //
         // Source labels live on `chord.sectionLabel` (unroller sets this at
         // arranger-utils.ts:161). Substring match — same vocabulary the
-        // soloist already uses at `soloist.ts:102` for `isOutro`.
+        // soloist already uses in `soloist.ts`'s `isOutro` check.
         //
         // Both fields default to -1 (sentinel "not in intro/outro section"),
         // so engines can gate cleanly:

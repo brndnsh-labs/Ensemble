@@ -102,8 +102,9 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
     // actually hears as the gesture's voice) would land on a unison PC. Keeps
     // the device shape — 3-note approach into selectedMidi — but routes the
     // approach around the chord stab. selectedMidi itself has already been
-    // biased away from unison PCs by the picker (final-stage 0.05× at
-    // soloist-pitch-engine.ts:1154); this floor closes the device-system gap.
+    // biased away from unison PCs by the picker (the final-stage 0.05×
+    // Accompaniment Unison Avoidance multiplier in `soloist-pitch-engine.ts`);
+    // this floor closes the device-system gap.
     //
     // KNOWN STRUCTURAL LIMIT — 23.1pp mean absolute unison-drop ceiling:
     // Only `run` and `enclosure` devices are covered here. The other devices
