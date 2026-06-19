@@ -10,7 +10,7 @@
  * start (intro) and bars-until-section-end (outro). The tick-logic chord-data
  * preamble publishes `coordination.introBarsElapsed` / `outroBarsRemaining` from
  * the current `chord.sectionLabel` (substring match on "intro" / "outro" / "end",
- * lowercased, same way `soloist.ts:102` derives `isOutro`); each engine reads
+ * lowercased, same way `soloist.ts`'s `isOutro` check derives it); each engine reads
  * its entry/exit from `INTRO_MUTES` / `OUTRO_MUTES` and gates its first
  * note-emission accordingly.
  *
@@ -92,7 +92,7 @@ export const OUTRO_MUTES: Readonly<Record<string, number>> = {
 
 /**
  * True iff a section label (already-lowercased OK) indicates an Intro section.
- * Substring match — mirrors `soloist.ts:102` (`label.includes('outro')`) and
+ * Substring match — mirrors `soloist.ts`'s `isOutro` (`label.includes('outro')`) and
  * `arranger-utils.ts:131-133` (`roleLabel = 'Intro'`).
  */
 export function isIntroSectionLabel(label: string | undefined | null): boolean {
@@ -104,7 +104,7 @@ export function isIntroSectionLabel(label: string | undefined | null): boolean {
 
 /**
  * True iff a section label indicates an Outro section. Matches "outro" or "end"
- * (the same vocabulary `soloist.ts:102`'s `isOutro` check accepts).
+ * (the same vocabulary `soloist.ts`'s `isOutro` check accepts).
  */
 export function isOutroSectionLabel(label: string | undefined | null): boolean {
     if (!label) {
