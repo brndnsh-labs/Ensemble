@@ -16,7 +16,7 @@ vi.mock('../../public/state.js', () => ({
  * when common tones present."
  *
  * Test design:
- *   - Run a "Rock" + "strings" pad sequence across a progression with abundant
+ *   - Run a default (unmapped-feel) "strings" pad sequence across a progression with abundant
  *     common tones (Cmaj7 / Am7 / Dm7 / G7) — these share G, C, E, D, A pitch
  *     classes pairwise — and count emitted notes with `isLegato === true`.
  *   - Compare against a chromatic progression with NO shared pitch classes
@@ -36,9 +36,14 @@ function buildState() {
     return {
         playback: { bandIntensity: 0.55, complexity: 0.5 },
         groove: {
-            // Rock is NOT in the comping-genre override list, so strings style
-            // resolves to rhythmicStyle='pads' (playSeaMode dispatch).
-            genreFeel: 'Rock',
+            // An unmapped feel resolves to DEFAULT_HARMONY_PROFILE — a plain
+            // triadic strings pad (rhythmicStyle 'pads' → playSeaMode) with NO
+            // per-genre voicing override — so this mechanism test exercises the
+            // legato carry on a stable voicing. Every mapped pad genre now
+            // carries a voicing identity (Rock harmonized-3rds, Country pedal-
+            // steel, Acoustic arpeggio) that changes the emitted MIDIs, so the
+            // genre-agnostic default is the honest home for the legato mechanism.
+            genreFeel: 'PadDefault',
             pocket: {
                 globalDrive: 0,
                 tightness: 1,

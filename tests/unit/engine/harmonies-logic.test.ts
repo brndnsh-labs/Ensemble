@@ -225,13 +225,13 @@ describe('Harmony Engine Logic', () => {
 
     describe('Rhythmic Comping', () => {
         it('should generate patterns for Jazz', () => {
-            const pattern = generateCompingPattern('Jazz', 12345);
+            const pattern = generateCompingPattern('jazz', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
         });
 
         it('should generate patterns for Funk', () => {
-            const pattern = generateCompingPattern('Funk', 12345);
+            const pattern = generateCompingPattern('funk16', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern[0]).toBe(1);
             const hasDynamics = pattern.some((v) => v > 1);
@@ -239,7 +239,7 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should return 32-step pattern for Reggae', () => {
-            const pattern = generateCompingPattern('Reggae', 12345);
+            const pattern = generateCompingPattern('reggae', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern[4]).toBe(1);
             expect(pattern[12]).toBe(1);

@@ -331,7 +331,13 @@
         "songsiknow",
         "rsyncs",
         "whatif",
-        "homelab"
+        "homelab",
+        "neosoul",
+        "repointed",
+        "misrouted",
+        "MFSB",
+        "Salsoul",
+        "Allmans"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }
