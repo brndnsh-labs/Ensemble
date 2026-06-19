@@ -31,12 +31,14 @@ function init() {
         hydrateState();
         loadFromUrl();
 
-        // E2E helpers attach engine internals to `window.ensemble` for Playwright
-        // tooling only — gated to e2e runs (Playwright sets `data-e2e-mode` via an
-        // init script before page scripts load). Prod dispatches go through the
-        // imported `dispatch` directly (below), so this global is never on the
-        // production dispatch path.
-        if (document.documentElement.dataset.e2eMode === 'true') {
+        // E2E/dev helpers attach engine internals to `window.ensemble` for
+        // Playwright tooling (and local-dev debugging). Gated to the Vite dev
+        // server via `import.meta.env.DEV`: the e2e suite runs against `npm run
+        // dev` (DEV === true), while prod ships via `vite build`, where this is a
+        // static `false` and the whole branch — install call + `e2e-tools` import
+        // — is tree-shaken out. Prod dispatches go through the imported `dispatch`
+        // directly (below), so this global is never on the production dispatch path.
+        if (import.meta.env.DEV) {
             installE2EGlobals();
         }
 
