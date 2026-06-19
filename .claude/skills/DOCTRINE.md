@@ -197,8 +197,24 @@ gh pr checks <pr> --watch --fail-fast && gh pr merge <pr> --squash --delete-bran
 ```
 After a safe merge: **set `Status: Shipped`** (`node scripts/gh-project.mjs status <n> "Shipped"`),
 then **sync local main** (`git checkout main && git fetch origin && git reset --hard origin/main`)
-and prune the branch. **Prod deploy is always Brandon's** (`scripts/deploy-prod.sh`); a merge to
-`main` is **not** prod — it ships nothing on its own. `scripts/deploy-test.sh` is the staging push.
+and prune the branch.
+
+**Deploy (static-file app).** Ensemble ships as **static files on nginx behind Caddy** —
+`vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app server, no DB,
+no migrations, no restart; nginx serves the new files the instant rsync finishes. Two skills
+wrap the scripts:
+- **`/deploy-test`** (`scripts/deploy-test.sh` → `ensembletest.brndn.zip`) — low ceremony, the
+  staging push. **May run unattended from the pipeline after a merge to `main`** (private box,
+  non-destructive static rsync). Confirms the live asset hash matches HEAD.
+- **`/deploy-prod`** (`scripts/deploy-prod.sh` → `ensemble.brndn.zip`) — **gated, awake-only,
+  never automatic** (§5 always-brake). Full `validate` + clean pushed `main` → one explicit
+  "go" → deploy → verify the public origin. **A merge to `main` is NOT a prod deploy — it ships
+  nothing on its own.**
+
+Both scripts move a **`refs/deploys/{test,prod}`** ref to the deployed HEAD on success, so
+`git log refs/deploys/<env>..HEAD` is the pending set. **Verification needs no `/api/version`:**
+`vite.config.ts` bakes `git rev-parse --short HEAD` into every asset filename, so the live
+`index.html` names the exact build — curl it and match the hash to HEAD.
 
 ## §7 gh-project mechanics
 

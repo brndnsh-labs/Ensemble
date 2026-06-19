@@ -45,8 +45,9 @@ never `--auto`) are load-bearing — the standing go below removes the *checkpoi
      `/unblock` later. Discovery and consumption compound over nights.
 
 3. **Ship to test + build the eyeball list.** If the run **merged anything**, deploy what shipped so
-   Brandon can see it over coffee. Low-ceremony: `./scripts/deploy-test.sh`, then confirm the deployed
-   build matches `git rev-parse --short HEAD`. Then assemble a **smoke-test checklist from the night's
+   Brandon can see it over coffee — run the **`/deploy-test`** skill (the single source of truth for
+   the staging push: `scripts/deploy-test.sh` + the live-asset-hash confirm against
+   `git rev-parse --short HEAD`). Then assemble a **smoke-test checklist from the night's
    diff**, grouped the way a human checks:
    - **Lead with the highest-value / riskiest *visible* change** — the one thing most worth a look.
    - **New visible features/fixes**, one line each: what to do + where to click + the issue #.

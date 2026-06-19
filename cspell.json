@@ -326,7 +326,11 @@
         "untriaged",
         "unreviewed",
         "unactioned",
-        "fanout"
+        "fanout",
+        "ensembletest",
+        "songsiknow",
+        "rsyncs",
+        "whatif"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
 }

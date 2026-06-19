@@ -43,5 +43,11 @@ else
     echo "🚚 Syncing to ensembletest..."
     rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/
     rm -rf dist
+    # Track what's live on test: move the deploy ref to HEAD (best-effort push to
+    # origin so it survives a fresh clone). `git log refs/deploys/test..HEAD` is then
+    # the pending set. Asset hashes are baked from HEAD's short SHA (vite.config.ts),
+    # so the ref matches the deployed bundle's hash even from a dirty tree.
+    git update-ref refs/deploys/test HEAD
+    git push -q origin refs/deploys/test 2>/dev/null || true
     echo "✅ Deployment complete!"
 fi
