@@ -1,3 +1,5 @@
+import type { Chord, Section } from './types.js';
+
 const LEAD_SHEET_MEASURES_PER_ROW = 4;
 
 // Tolerance for the per-bar beat accumulator. Per-chord beats are
@@ -260,14 +262,71 @@ function getLeadSheetGuidedSizing({
     };
 }
 
+/**
+ * A chord as placed on the lead sheet: the canonical {@link Chord} plus the
+ * positional fields the builder tags on (`globalIndex` is the chord's index in
+ * the flat progression; `start`/`end` are step offsets within the chart).
+ */
+export interface LeadSheetChord extends Chord {
+    globalIndex: number;
+    start: number;
+    end: number;
+}
+
+/**
+ * One measure (bar) of the lead sheet — the chords that fall inside it plus the
+ * section context carried down from the owning block.
+ */
+export interface LeadSheetMeasure {
+    chords: LeadSheetChord[];
+    sectionId?: string;
+    sectionLabel?: string;
+    startsSection: boolean;
+    isSeamlessStart: boolean;
+}
+
+/**
+ * A contiguous run of measures belonging to one section. `lastSectionId` tracks
+ * the section the block currently extends (seamless sections fold into the
+ * previous block, so it can differ from `id`).
+ */
+export interface LeadSheetSectionBlock {
+    id?: string;
+    label?: string;
+    measures: LeadSheetMeasure[];
+    lastSectionId?: string;
+}
+
+/**
+ * One rendered row of the lead sheet — up to `measuresPerRow` measures, with the
+ * row-resolved section context (`measure.sectionId || block.id`; both sources are
+ * optional, so the resolved value can still be undefined).
+ */
+export interface LeadSheetRow {
+    id: string;
+    /** Resolved from the measure, falling back to the block id (which is itself optional). */
+    sectionId?: string;
+    sectionLabel?: string;
+    isSectionStart: boolean;
+    measures: LeadSheetRowMeasure[];
+}
+
+/**
+ * A measure as placed in a row — a {@link LeadSheetMeasure} with the row-resolved
+ * section context re-stamped on and an `isSectionStart` flag.
+ */
+export interface LeadSheetRowMeasure extends LeadSheetMeasure {
+    isSectionStart: boolean;
+}
+
 export function buildLeadSheetSections(
-    progression: any[],
-    sectionsState: any[],
+    progression: Chord[],
+    sectionsState: Section[],
     timeSignatureConfig: { beats: number; stepsPerBeat: number },
-): any[] {
-    const blocks: any[] = [];
-    let currentBlock: any = null;
-    let currentMeasure: any = null;
+): LeadSheetSectionBlock[] {
+    const blocks: LeadSheetSectionBlock[] = [];
+    let currentBlock: LeadSheetSectionBlock | null = null;
+    let currentMeasure: LeadSheetMeasure | null = null;
     let currentMeasureBeats = 0;
     let currentStep = 0;
 
@@ -295,6 +354,14 @@ export function buildLeadSheetSections(
         if (isNewSection && currentMeasureBeats > 0) {
             currentMeasure = null;
             currentMeasureBeats = 0;
+        }
+
+        // By here a block always exists: when `isNewSection` is false, the
+        // truthiness check at line ~327 proves `currentBlock` was already set;
+        // when true, the branch above assigned one. tsc can't narrow across the
+        // `forEach` closure, so capture it into a non-null local.
+        if (!currentBlock) {
+            return;
         }
 
         if (
@@ -327,15 +394,15 @@ export function buildLeadSheetSections(
 }
 
 export function buildLeadSheetRows(
-    sectionBlocks: any[],
+    sectionBlocks: LeadSheetSectionBlock[],
     measuresPerRow = LEAD_SHEET_MEASURES_PER_ROW,
-): any[] {
-    const rows: any[] = [];
-    let currentRow: any = null;
+): LeadSheetRow[] {
+    const rows: LeadSheetRow[] = [];
+    let currentRow: LeadSheetRow | null = null;
     let rowCount = 0;
 
     sectionBlocks.forEach((sectionBlock) => {
-        sectionBlock.measures.forEach((measure: any) => {
+        sectionBlock.measures.forEach((measure) => {
             const startsSection = Boolean(measure.startsSection);
             const isSeamlessStart = Boolean(measure.isSeamlessStart);
             const sectionId = measure.sectionId || sectionBlock.id;
@@ -356,6 +423,13 @@ export function buildLeadSheetRows(
                 };
                 rows.push(currentRow);
                 rowCount += 1;
+            }
+
+            // A row always exists here: `shouldStartNewRow` is true whenever
+            // `currentRow` is null (and assigns one), so the else path can only
+            // run with a row already set. tsc can't narrow across the closure.
+            if (!currentRow) {
+                return;
             }
 
             currentRow.measures.push({
