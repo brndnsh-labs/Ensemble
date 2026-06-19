@@ -16,5 +16,5 @@
     },
     "ignore": ["public/engine/grooves/*.ts"],
     "ignoreBinaries": ["ffmpeg"],
-    "ignoreUnresolved": ["/engine/reverb.ts"]
+    "ignoreUnresolved": ["/engine/reverb.ts", "/engine/synth-harmonies.ts"]
 }

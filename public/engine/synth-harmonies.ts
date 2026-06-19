@@ -127,7 +127,9 @@ function extendLegatoHarmonyVoice(
  * layer, which has no benign zero-crossings). This kill uses
  * `linearRampToValueAtTime`, which reaches *exactly* 0 at `time + fadeTime`,
  * and stops the nodes only after that — so every node hard-stops into genuine
- * silence. Local to the rebuilt voice; the shared helper is left untouched so
+ * silence. Shared by *both* harmony voices' cull/steal retirement (#601 — the
+ * Current voice's `killActiveVoices`-based cull/steal was the residual click
+ * the #561 fingerpick exposed). The synth-utils helper is left untouched so
  * the other instruments are unaffected.
  */
 function killHarmonyVoice(
@@ -988,7 +990,10 @@ function playHarmonyNoteCurrent(
         const existing = harmony.activeVoices.find((v: { midi: number | null }) => v.midi === midi);
         if (existing) {
             retriggerProfile = getHarmonyRetriggerProfile(style);
-            killActiveVoices([existing], playTime, retriggerProfile.fadeTime);
+            // #601: linear-ramp-to-true-zero retirement (was `killActiveVoices`,
+            // whose exponential fade hard-stops the nodes at ~3% gain → the
+            // "suck" + click the #561 fingerpick exposed on same-MIDI revisits).
+            killHarmonyVoice(existing, playTime, retriggerProfile.fadeTime);
             const existingIndex = harmony.activeVoices.indexOf(existing);
             if (existingIndex !== -1) {
                 harmony.activeVoices.splice(existingIndex, 1); // @worker-mutation
@@ -1000,7 +1005,9 @@ function playHarmonyNoteCurrent(
     if (harmony.activeVoices.length >= 3) {
         const oldest = harmony.activeVoices.shift();
         if (oldest) {
-            killActiveVoices([oldest], playTime, HARMONY_VOICE_LIMIT_FADE);
+            // #601: true-zero retirement so a still-audible culled voice fades
+            // out cleanly instead of clicking when the cap evicts it.
+            killHarmonyVoice(oldest, playTime, HARMONY_VOICE_LIMIT_FADE);
         }
     }
 
@@ -1355,7 +1362,14 @@ function playHarmonyNoteCurrent(
     gain.gain.linearRampToValueAtTime(finalVol, playTime + attack);
     // Arp plucks ring down from the attack peak; pads/stabs release near the
     // end of their note duration.
-    const releaseStart = isArp ? playTime + attack : playTime + duration - release;
+    // #601: floor the non-arp release start at the attack peak. For a short
+    // note `playTime + duration - release` lands *before* the attack finishes,
+    // so the release decay starts from t=0 and the note never reaches level
+    // (quiet + warble — artifact source #1). The `max` guarantees attack always
+    // completes first; the New voice guards this the same way.
+    const releaseStart = isArp
+        ? playTime + attack
+        : Math.max(playTime + attack, playTime + duration - release);
     gain.gain.setTargetAtTime(0, releaseStart, release);
 
     // Routing

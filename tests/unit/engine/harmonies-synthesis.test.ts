@@ -158,79 +158,57 @@ describe('Harmony Synthesis', () => {
             expect(harmony.activeVoices[0].midi).toBeNull();
         });
 
+        // #601: same-MIDI retrigger now retires the prior voice with a
+        // linear ramp to *true* zero (`killHarmonyVoice`), not the old
+        // `killActiveVoices` exponential that hard-stops the nodes at ~3% gain
+        // (the "suck" + click the #561 fingerpick exposed). The fade window is
+        // the style's retrigger-profile `fadeTime`; the ramp lands at
+        // `time + fadeTime`.
+        const killVoiceMock = () => ({
+            value: 0.4,
+            cancelScheduledValues: vi.fn(),
+            setValueAtTime: vi.fn(),
+            linearRampToValueAtTime: vi.fn(),
+        });
+
         it('should crossfade same-MIDI retriggers for sustained harmony styles', () => {
-            const cancelSpy = vi.fn();
-            const setTargetSpy = vi.fn();
-            harmony.activeVoices = [
-                {
-                    time: 9,
-                    duration: 2,
-                    midi: 60,
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
-                },
-            ];
+            const inner = killVoiceMock();
+            harmony.activeVoices = [{ time: 9, duration: 2, midi: 60, gain: { gain: inner } }];
 
             playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'horns', 60);
 
-            expect(cancelSpy).toHaveBeenCalledWith(10);
-            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.03);
+            // 'horns' falls to the default retrigger profile → 0.03 s fade.
+            expect(inner.cancelScheduledValues).toHaveBeenCalledWith(10);
+            expect(inner.linearRampToValueAtTime).toHaveBeenCalledWith(0, 10.03);
             expect(harmony.activeVoices.length).toBe(1);
         });
 
         it('should keep fast harmony retriggers musical without a hard 5ms choke', () => {
-            const cancelSpy = vi.fn();
-            const setTargetSpy = vi.fn();
-            harmony.activeVoices = [
-                {
-                    time: 9,
-                    duration: 2,
-                    midi: 60,
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
-                },
-            ];
+            const inner = killVoiceMock();
+            harmony.activeVoices = [{ time: 9, duration: 2, midi: 60, gain: { gain: inner } }];
 
             playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'stabs', 60);
 
-            expect(cancelSpy).toHaveBeenCalledWith(10);
-            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.02);
+            // 'stabs' retrigger profile → 0.02 s fade.
+            expect(inner.cancelScheduledValues).toHaveBeenCalledWith(10);
+            expect(inner.linearRampToValueAtTime).toHaveBeenCalledWith(0, 10.02);
             expect(harmony.activeVoices.length).toBe(1);
         });
 
         it('should enforce polyphonic limit of 3', () => {
-            const cancelSpy = vi.fn();
-            const setTargetSpy = vi.fn();
+            const oldest = killVoiceMock();
             harmony.activeVoices = [
-                {
-                    time: 9.7,
-                    duration: 1,
-                    midi: 60,
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
-                },
-                {
-                    time: 9.8,
-                    duration: 1,
-                    midi: 62,
-                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
-                },
-                {
-                    time: 9.9,
-                    duration: 1,
-                    midi: 64,
-                    gain: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
-                },
+                { time: 9.7, duration: 1, midi: 60, gain: { gain: oldest } },
+                { time: 9.8, duration: 1, midi: 62, gain: { gain: killVoiceMock() } },
+                { time: 9.9, duration: 1, midi: 64, gain: { gain: killVoiceMock() } },
             ];
 
             playHarmonyNote(getState(), 440, 10, 1.0);
 
             expect(harmony.activeVoices.length).toBe(3);
-            expect(cancelSpy).toHaveBeenCalledWith(10);
-            expect(setTargetSpy).toHaveBeenCalledWith(0, 10, 0.02);
+            // The evicted oldest voice fades to true zero over HARMONY_VOICE_LIMIT_FADE (0.02).
+            expect(oldest.cancelScheduledValues).toHaveBeenCalledWith(10);
+            expect(oldest.linearRampToValueAtTime).toHaveBeenCalledWith(0, 10.02);
         });
     });
 
