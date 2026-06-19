@@ -14,6 +14,7 @@ import { dispatch, getState, storage } from './state.js';
 import type { Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
 import {
+    decodeBase64Unicode,
     decompressSections,
     escapeHTML,
     generateId,
@@ -74,9 +75,7 @@ function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
 
 function decompressBandSettings(str: string): any {
     try {
-        const binString = atob(str);
-        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
-        const json = new TextDecoder().decode(bytes);
+        const json = decodeBase64Unicode(str);
         return JSON.parse(json);
     } catch (e) {
         console.error('Failed to decompress band settings', e);

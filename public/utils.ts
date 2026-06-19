@@ -310,6 +310,26 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
 }
 
 /**
+ * Unicode-safe Base64 encode: JSON string → UTF-8 bytes → binary string → btoa.
+ * Shared by the share-URL payloads (sections + band settings).
+ */
+export function encodeBase64Unicode(json: string): string {
+    const bytes = new TextEncoder().encode(json);
+    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
+    return btoa(binString);
+}
+
+/**
+ * Unicode-safe Base64 decode: atob → binary string → UTF-8 bytes → JSON string.
+ * The inverse of {@link encodeBase64Unicode}. Callers own size guards and JSON.parse.
+ */
+export function decodeBase64Unicode(str: string): string {
+    const binString = atob(str);
+    const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
+    return new TextDecoder().decode(bytes);
+}
+
+/**
  * Compresses the sections array into a Base64 string, handling Unicode.
  */
 export function compressSections(sections: Section[]): string {
@@ -347,9 +367,7 @@ export function compressSections(sections: Section[]): string {
         return m;
     });
     const json = JSON.stringify(minified);
-    const bytes = new TextEncoder().encode(json);
-    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
-    return btoa(binString);
+    return encodeBase64Unicode(json);
 }
 
 /**
@@ -365,9 +383,7 @@ export function decompressSections(str: string): Section[] {
             throw new Error('Payload too large');
         }
 
-        const binString = atob(str);
-        const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
-        const json = new TextDecoder().decode(bytes);
+        const json = decodeBase64Unicode(str);
         const minified = JSON.parse(json);
 
         if (!Array.isArray(minified)) {
