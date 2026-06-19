@@ -1,7 +1,7 @@
 import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
 import { getState } from './state.js';
 import { showToast } from './ui.js';
-import { compressSections } from './utils.js';
+import { compressSections, encodeBase64Unicode } from './utils.js';
 
 export interface ShareOptions {
     includeSolo?: boolean;
@@ -70,9 +70,7 @@ function compressBandSettings(options: ShareOptions = {}): string {
     };
 
     const json = JSON.stringify(band);
-    const bytes = new TextEncoder().encode(json);
-    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
-    return btoa(binString);
+    return encodeBase64Unicode(json);
 }
 
 export function generateShareUrl(options: ShareOptions = {}): string {

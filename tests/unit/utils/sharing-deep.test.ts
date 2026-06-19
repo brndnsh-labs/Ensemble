@@ -20,6 +20,7 @@ vi.mock('../../../public/ui.js', () => ({
 
 vi.mock('../../../public/utils.js', () => ({
     compressSections: vi.fn(() => 'compressed-sections'),
+    encodeBase64Unicode: vi.fn(() => 'encoded-band'),
 }));
 
 describe('Sharing Deep Dive', () => {
