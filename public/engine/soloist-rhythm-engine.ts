@@ -779,6 +779,69 @@ export function generateRhythmPlan(
                 }
             }
 
+            // --- Ska Offbeat Pump (the defining ska HORN-LINE feel) ---
+            // why: #593 — STYLE_CONFIG.ska.syncopationLikelihood (0.8) was consumed
+            // only by the seeder, never by the live per-step attackProb, so the ska
+            // soloist played ON-BEAT (step-0 ~44% of attacks, offbeat share ~0.56 —
+            // BELOW the 0.75 uniform baseline). Ska's signature is the upbeat: the
+            // line LEADS with the "&" and displaces phrases onto the offbeats.
+            // BUT a ska soloist is a HORN LINE, not the skank COMP: it still LANDS
+            // on-beats — especially the backbeats (2 & 4) — for phrase heads and
+            // resolutions. So we pump the "&" hardest, lift the e/a skank
+            // subdivisions LIGHTLY, and damp the DOWNBEAT (beat 1) the most while
+            // leaving the backbeats near baseline (landing tones must stay
+            // reachable). The earlier tune modeled the comp (on-beat ~20% = the
+            // RAREST position, e/&/a all flat ~26%); this keeps the on-beat PRESENT
+            // (~0.22-0.27, not the rarest) and the "&" CLEARLY leading.
+            // Applied as a FINAL-STAGE `attackProb *=` multiplier (not an additive
+            // bump on baseAttackProb) because the stacked additive boosts (seed
+            // +0.4, downbeat +0.2, kick/snare +0.2) wash out any additive offbeat
+            // term — canonical weight-tuning-multiplier-placement (project memory).
+            // Gated to the 'ska' STYLE_CONFIG profile ONLY (the Ska/Ska-Punk genre +
+            // ska-horns alias all resolve to 'ska' via resolveSoloistStyle), so
+            // rock/country/acoustic/jazz/blues/funk are untouched. The literal
+            // multipliers below are written plainly (not dressed as `sync`-scaled):
+            // no profile other than 'ska' reaches this branch, so `sync` is a
+            // constant 0.8 here — a plain musical WHY is more honest than a
+            // pseudo-parametric expression.
+            if (style === 'ska') {
+                if (isDownbeat) {
+                    // Beat 1 — the strong "one". Damp HARDEST: a ska line pulls off
+                    // the downbeat onto the upbeat. ×0.30. Applied UNCONDITIONALLY
+                    // (it can only reduce, and the downbeat attackProb is already
+                    // saturated past 1.0 by the downbeat/seed additive boosts, so a
+                    // `<1.0` gate would skip the damp entirely). Re-clamped below.
+                    attackProb *= 0.3;
+                } else if (isBackbeat) {
+                    // Beats 2 & 4 — the backbeats. Only GENTLY damped (×0.62) so they
+                    // stay reachable as phrase-head / resolution landing tones — a
+                    // horn line resolves to the backbeat, the comp never lands here.
+                    // Unconditional for the same saturation reason as the downbeat.
+                    attackProb *= 0.62;
+                } else if (isBeatStart) {
+                    // Beat 3 — the remaining on-beat (neither downbeat nor backbeat).
+                    // Moderately damped (×0.5): de-emphasized like the downbeat but
+                    // not stripped, keeping the on-beat present across the bar.
+                    attackProb *= 0.5;
+                } else if (isOffbeatEighth) {
+                    // The "&" is the heart of the skank — pump it HARDEST so it
+                    // clearly leads every other sub-position. ×2.1. Only below the
+                    // 1.0 saturation ceiling so forced landmarks stay exact and an
+                    // already-saturated step isn't double-pumped.
+                    if (attackProb < 1.0) {
+                        attackProb *= 2.1;
+                    }
+                } else if (isSixteenthSubdivision) {
+                    // The 'e'/'a' skank subdivisions get a LIGHT lift (×1.25) so the
+                    // upbeat texture fills in WITHOUT competing with the "&" — the
+                    // earlier ×1.56 flattened e/&/a into a uniform offbeat smear.
+                    // Gated below saturation for the same reason as the "&".
+                    if (attackProb < 1.0) {
+                        attackProb *= 1.25;
+                    }
+                }
+            }
+
             if (coordination.bypassRhythm) {
                 attackProb = 1.0;
             }
