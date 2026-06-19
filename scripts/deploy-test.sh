@@ -36,12 +36,12 @@ fi
 
 if [ "$DRY_RUN" = true ]; then
     if [ "$QUIET" = false ]; then
-        echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/"
+        echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ ensembletest-admin:/var/www/html/"
         echo "✅ Dry run complete."
     fi
 else
-    echo "🚚 Syncing to ensembletest..."
-    rsync -avz --delete -e ssh dist/ root@ensembletest:/var/www/html/
+    echo "🚚 Syncing to ensembletest (scoped 'claude' account)..."
+    rsync -avz --delete -e ssh dist/ ensembletest-admin:/var/www/html/
     rm -rf dist
     # Track what's live on test: move the deploy ref to HEAD (best-effort push to
     # origin so it survives a fresh clone). `git log refs/deploys/test..HEAD` is then

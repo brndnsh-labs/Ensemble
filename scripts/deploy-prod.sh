@@ -18,11 +18,11 @@ echo "📊 Final Bundle Footprint (Excluding Sourcemaps):"
 find dist -type f -not -name "*.map" -exec du -ch {} + | grep total$
 
 if [ "$DRY_RUN" = true ]; then
-    echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ root@ensemble:/var/www/html/"
+    echo "🔍 (Simulated) rsync -avz --delete -e ssh dist/ ensemble-admin:/var/www/html/"
     echo "✅ Dry run complete."
 else
-    echo "🚚 Syncing to ensemble..."
-    rsync -avz --delete -e ssh dist/ root@ensemble:/var/www/html/
+    echo "🚚 Syncing to ensemble (scoped 'claude' account)..."
+    rsync -avz --delete -e ssh dist/ ensemble-admin:/var/www/html/
     rm -rf dist
     # Track what's live on prod: move the deploy ref to HEAD (best-effort push to
     # origin). `git log refs/deploys/prod..HEAD` is the pending set going forward.
