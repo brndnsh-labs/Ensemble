@@ -220,9 +220,9 @@ export function createCoordinationContext(
         // final measure of the form (`playback.isEndingPending && modStep +
         // stepsPerMeasure >= arranger.totalSteps`). Bass holds tonic, chords play
         // a root-position cadence voicing, drums fire a Crash + sustained cymbal.
-        // Currently only the soloist senses the form's end (`soloist.ts:1257`'s
-        // per-section `isFinalMeasure`); this flag lets the rest of the band end
-        // together.
+        // Currently only the soloist senses the form's end (its per-section
+        // `isLastSectionMeasure`, see soloist.ts); this flag lets the rest of the
+        // band end together.
         //
         // Precedence: when true, this OVERRIDES Imperfect Symmetry on the final
         // bar — bass/chords/drums each early-out to the resolution gesture rather
