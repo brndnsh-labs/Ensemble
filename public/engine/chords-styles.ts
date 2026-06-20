@@ -263,6 +263,33 @@ export function getIntervals(
         intervals.push(14); // add9 color
     }
 
+    // 3a-disco. DISCO LUSH 6/9 + m9 COLOR (#552, genre-audit Wave 1 — Disco/Piano)
+    // why: disco comping (Chic, MFSB) lives on lush 6/9 and m9 stabs, not bare
+    // triads. Disco is excluded from the add9 block above and only reached a
+    // 7th/9th at the >=0.6 block below, so its mid-dynamic offbeat stabs comped as
+    // BARE TRIADS — missing the color central to the idiom. Give it a color lane
+    // from the same mid floor (loudness-independent): a plain major triad -> 6/9
+    // (add the 6th and 9th), a plain minor triad -> m9 (add the b7 and 9th). The
+    // >=0.6 block already colors disco at high intensity; rhythm (offbeat stabs,
+    // staccato) is unchanged.
+    if (intensity >= 0.35 && intensity < 0.6 && genre === 'Disco' && !is7th && !isAltered5) {
+        if (quality === 'major') {
+            if (!intervals.includes(9)) {
+                intervals.push(9); // 6th -> 6/9
+            }
+            if (!intervals.includes(14)) {
+                intervals.push(14); // 9th
+            }
+        } else if (quality === 'minor') {
+            if (!intervals.includes(10)) {
+                intervals.push(10); // b7 -> m9
+            }
+            if (!intervals.includes(14)) {
+                intervals.push(14); // 9th
+            }
+        }
+    }
+
     // 3. INTENSITY-BASED EXTENSIONS
     // 0.6 - 0.7: Add 7ths/9ths (Targeting Pop/Rock/Acoustic)
     if (
