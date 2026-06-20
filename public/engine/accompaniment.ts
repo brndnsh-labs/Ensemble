@@ -81,7 +81,10 @@ const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bos
 //      cell as last bar" result is the desired locked-cell / phrase-stable
 //      behavior, not stochastic collision to be re-rolled. Stochastic genres
 //      (Rock, Country, Pop default) still benefit from the retry.
-const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blues']);
+//      Hip Hop (#554) is also a deterministic picker — its stab cell is keyed
+//      off phraseIndex, so two consecutive bars landing on the same stab cell
+//      is intentional (sparse loop coherence), not a collision to re-roll.
+const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blues', 'Hip Hop']);
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
@@ -1179,6 +1182,75 @@ export function generateCompingPattern(
             hit(getBeatStep(firstBackbeat, latePushStep));
         }
 
+        return pattern;
+    }
+
+    if (genre === 'Hip Hop') {
+        // why: #554 — Hip Hop piano (sampled-soul Rhodes, boom-bap) is a SPARSE,
+        //      behind-the-beat stab idiom, not a downbeat pulse. The chord lands
+        //      1-2 times per bar OFF the One — on the "and"s and pushed 16ths —
+        //      so it floats over the kick/snare instead of marking every beat.
+        //      Deterministic cell bank keyed by `(sectionId, phraseIndex)` per the
+        //      "Deterministic phrasing" rule: looped playback and critique tests
+        //      must produce the same shape on the same bar (NO Math.random here —
+        //      the surrounding Rock/Neo-Soul branches use it, but that's the old
+        //      pattern; this new branch is seeded).
+        //
+        //      Cells are expressed in 16th steps (4/4, spb=4): beat-N at 4*(N-1);
+        //      e=+1, &=+2, a=+3. Every hit is off step 0 and off every quarter
+        //      pulse (steps 4, 8, 12) — the genre's whole point is to dodge the
+        //      downbeat. spb-relative helpers (`offbeatStep`, `latePushStep`,
+        //      `getBeatStep`) keep the gestures musical under non-4/4 meters.
+        const and = offbeatStep; // the "&" of a beat (spb/2)
+        const push = latePushStep; // the late 16th "a" (spb*0.75)
+        // why: a small bank of distinct sparse stab cells. Each is 1-2 hits, all
+        //      behind the beat. Rotated by `phraseIndex` (+ section hash) so the
+        //      pattern evolves across the form rather than looping one shape, but
+        //      stays deterministic for loop-comparison.
+        //   0: "& of 2"               — single lazy stab in the bar's back half.
+        //   1: "& of 2" + "& of 3"    — call/answer pair straddling the middle.
+        //   2: "a of 1" + "& of 3"    — pushed front + answer; classic boom-bap lean.
+        //   3: "& of 4"               — anticipation stab pulling into the next bar.
+        const HIPHOP_STAB_CELLS: number[][] = [
+            [getBeatStep(1, and)],
+            [getBeatStep(1, and), getBeatStep(2, and)],
+            [getBeatStep(0, push), getBeatStep(2, and)],
+            [getBeatStep(Math.max(0, ts.beats - 1), and)],
+        ];
+        const sectionHash = hashSectionId(sectionId);
+        const cellIndex =
+            (((sectionHash * 17 + phraseIndex * 31) % HIPHOP_STAB_CELLS.length) +
+                HIPHOP_STAB_CELLS.length) %
+            HIPHOP_STAB_CELLS.length;
+        const cell = HIPHOP_STAB_CELLS[cellIndex];
+
+        // why: `sparse` vibe (soloist busy / low intensity) keeps only the LATEST
+        //      hit so the comper drops to a single anticipation stab — maximum
+        //      room, still off the beat. Preserves the behind-beat identity.
+        if (vibe === 'sparse') {
+            hit(cell[cell.length - 1]);
+            return pattern;
+        }
+
+        for (let i = 0; i < cell.length; i++) {
+            hit(cell[i]);
+        }
+
+        // why: only at high energy (`active` vibe or intensity > 0.7) does boom-bap
+        //      add ONE more 16th — and even then it lands on the "a of 3" (a pushed
+        //      offbeat), never on a downbeat, and only if the cell didn't already
+        //      cover it. Caps the bar at <=2-3 hits so the idiom stays sparse; the
+        //      ornament is phrase-gated so it doesn't fire every active bar.
+        if (
+            (vibe === 'active' || intensity > 0.7) &&
+            (sectionHash + phraseIndex) % 2 === 0 &&
+            cell.length < 2
+        ) {
+            const ornamentStep = getBeatStep(middleBeat, push); // late "a" of the middle beat
+            if (pattern[ornamentStep] !== 1) {
+                hit(ornamentStep);
+            }
+        }
         return pattern;
     }
 
@@ -2602,7 +2674,18 @@ export function getAccompanimentNotes(
     // Force hit on "One" if empty — the downbeat is the chord-change landmark.
     // why: anchor it near-deterministically in compound (0.97) so the 6/8 waltz
     // spine is reliably present and the band locks; simple meters keep ~80%.
-    if (measureStep === 0 && !isHit && compDraw(5) < (ts.isCompound ? 0.97 : 0.8)) {
+    // why (#554): Hip Hop is EXEMPT. Its whole idiom is sparse behind-the-beat
+    // stabs that dodge the One — backfilling the downbeat here would overwrite
+    // the genre's deterministic off-pulse cell and re-create the generic pulse
+    // this story removed. (Mirrors how Neo-Soul/Reggae/Funk return early via
+    // their own lanes before reaching this overlay; Hip Hop stays in the
+    // standard path because its subtractive coordination yields are desirable.)
+    if (
+        genre !== 'Hip Hop' &&
+        measureStep === 0 &&
+        !isHit &&
+        compDraw(5) < (ts.isCompound ? 0.97 : 0.8)
+    ) {
         isHit = true;
     }
     // why: group starts are the felt pulses. In compound (6/8 {0,6}, 12/8
@@ -2610,7 +2693,10 @@ export function getAccompanimentNotes(
     // (0.95) so the waltz locks onto a stable pulse rather than a coin-flip;
     // the cell's identity then expresses through the ornament steps. Simple
     // meters keep the lighter intensity-scaled add.
-    if (stepInfo?.isGroupStart && !isHit) {
+    // why (#554): Hip Hop is EXEMPT here too — group starts (the felt pulses,
+    // incl. the One) are exactly what the sparse stab idiom avoids; anchoring
+    // them would reintroduce the downbeat/pulse the cell deliberately skips.
+    if (genre !== 'Hip Hop' && stepInfo?.isGroupStart && !isHit) {
         const groupAddProb = ts.isCompound ? 0.95 : 0.4 + intensity * 0.4;
         if (compDraw(6) < groupAddProb) {
             isHit = true;
