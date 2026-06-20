@@ -41,9 +41,10 @@ describe('Soloist Rock Critique', () => {
 
         soloistState = makeSoloistMock({
             enabled: true,
-            // Explicit 'rock' STYLE_CONFIG profile. (The Rock *genre* in smart
-            // mode resolves to 'shred' — see the resolution guard below; the
-            // 'rock' profile is reached by an explicit UI style.)
+            // Explicit 'rock' STYLE_CONFIG profile. Since #592 this is ALSO what
+            // the Rock *genre* plays in smart mode (SMART_GENRES.Rock.soloist =
+            // 'rock') — see the resolution guard below. 'shred' is now the
+            // explicit fast-lead voice only.
             style: 'rock',
             mode: 'guitar',
             octave: 64,
@@ -248,18 +249,17 @@ describe('Soloist Rock Critique', () => {
 
     // why: style-resolution guard (the reggae dead-profile class of bug, #570).
     // This documents the CANONICAL routing so a future change can't silently
-    // reroute it. The Rock GENRE in smart mode resolves to 'shred'
-    // (SMART_GENRES.Rock.soloist = 'shred'), NOT 'rock'. The 'rock' STYLE_CONFIG
-    // profile this critique exercises is reached by an explicit UI style and by
-    // the genre fallback (GENRE_STYLE_MAPPING.Rock = 'rock') only when a genre
-    // is absent from SMART_GENRES. If either edge ever flips, this guard fails
-    // loudly instead of quietly testing the wrong profile.
+    // reroute it. Since #592 the Rock GENRE in smart mode resolves to 'rock'
+    // (SMART_GENRES.Rock.soloist = 'rock') — the tailored bluesy profile this
+    // critique exercises is now what users actually hear. 'shred' is the
+    // explicit fast-lead voice, reached only by the UI style or Shred genre.
+    // (The full cross-genre table lives in soloist-routing-guard.test.ts.)
     it('resolves Rock genre/style to the canonical soloist profiles', () => {
-        // Smart mode + Rock feel → 'shred' (the SMART_GENRES routing).
-        expect(resolveSoloistStyle('smart', 'Rock')).toBe('shred');
-        expect(resolveSoloistStyle(undefined, 'Rock')).toBe('shred');
-        // An explicit 'rock' UI style is honored verbatim (the profile this
-        // critique measures) and is NOT rewritten by the genre feel.
+        // Smart mode + Rock feel → 'rock' (the SMART_GENRES routing — the
+        // profile a user actually hears for the Rock genre, post-#592).
+        expect(resolveSoloistStyle('smart', 'Rock')).toBe('rock');
+        expect(resolveSoloistStyle(undefined, 'Rock')).toBe('rock');
+        // An explicit 'rock' UI style is honored verbatim.
         expect(resolveSoloistStyle('rock', 'Rock')).toBe('rock');
         // 'rock' and 'shred' are distinct profiles, not aliases of each other.
         expect(resolveSoloistStyle('shred', 'Rock')).toBe('shred');

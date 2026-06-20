@@ -83,12 +83,21 @@ describe('Soloist Motivic Response', () => {
         expect(blues.aggregate.laterLoopTripletCarryShare).toBeGreaterThanOrEqual(0.45);
         expect(blues.aggregate.laterLoopFormResponseShare).toBeGreaterThanOrEqual(0.08);
 
-        expect(rock.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.67);
-        expect(rock.aggregate.loop1ContourEchoShare).toBeGreaterThanOrEqual(0.35);
-        expect(rock.aggregate.laterLoopAnchorExactRate).toBeGreaterThanOrEqual(0.82);
+        // why (#592 re-baseline): the Rock GENRE in smart mode now resolves to the
+        // tailored 'rock' profile (bends/double-stops/pentatonic), not 'shred'.
+        // Different device bodies consume different `Math.random()` draw counts, so
+        // these FIXED-seed motivic metrics realign — same class as the S7a note
+        // above. The recognizability property STRENGTHENS (laterLoopAnchorExactRate
+        // measures a perfect 1.0); the 'rock' profile simply paraphrases its rhythm
+        // more freely in loop 1 (the Conversational loop). Floors lowered to the
+        // measured 'rock'-profile values. NOTE: the loop-1 rhythm-reuse drop
+        // (0.67→0.41) is a genuine character shift flagged for the Rock listen.
+        expect(rock.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.38); // measured 0.408
+        expect(rock.aggregate.loop1ContourEchoShare).toBeGreaterThanOrEqual(0.17); // measured 0.186
+        expect(rock.aggregate.laterLoopAnchorExactRate).toBeGreaterThanOrEqual(0.95); // measured 1.0
         expect(rock.aggregate.laterLoopTripletCarryShare).toBe(0);
-        expect(rock.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.78);
-        expect(rock.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.84);
+        expect(rock.aggregate.loop1SectionRhythmRecallShare).toBeGreaterThanOrEqual(0.78); // measured 0.906
+        expect(rock.aggregate.laterLoopSectionRhythmRecallShare).toBeGreaterThanOrEqual(0.62); // measured 0.675
         expect(rock.aggregate.laterLoopFormResponseShare).toBe(0);
 
         expect(neo.aggregate.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.35);
@@ -134,7 +143,9 @@ describe('Soloist Motivic Response', () => {
         expect(blues?.laterLoopTripletCarryShare).toBeGreaterThanOrEqual(0.8);
 
         expect(rock?.loop1AnchorExactRate).toBeGreaterThanOrEqual(0.95);
-        expect(rock?.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.5);
+        // #592 re-baseline (see aggregate block above): smart Rock → 'rock'
+        // profile paraphrases loop-1 rhythm more freely. Measured 0.315.
+        expect(rock?.loop1RhythmReuseShare).toBeGreaterThanOrEqual(0.28);
         expect(rock?.laterLoopTripletCarryShare).toBe(0);
     }, 30_000);
 });
