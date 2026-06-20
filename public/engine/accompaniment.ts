@@ -2,6 +2,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
+import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import {
     getBassSpaceFloor,
@@ -111,7 +112,8 @@ const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11'
 // Use ALTERED_DOMINANT_QUALITIES for structural concerns (inversion routing, shell
 // reduction); use ALTERED_HOOK_QUALITIES for soloist hook-pitch reward and comper
 // tension-resolution breath. Source: Epic 9 S3 P1 finding (music-theory review).
-export const ALTERED_HOOK_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13']);
+// #542: hoisted to the dependency-free chord-quality-sets.ts leaf so the soloist's
+// import of it no longer drags this whole module into the main bundle chunk.
 
 /**
  * Funk comping cell bank.

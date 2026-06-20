@@ -1,7 +1,7 @@
 import type { GlobalContext } from '../state/playback.js';
 import type { EnsembleState } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
-import { ALTERED_HOOK_QUALITIES } from './accompaniment.js';
+import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
 import { scrambleHash } from './hash-utils.js';
 import type { SoloistIntent } from './soloist-config.js';
 import { getSoloistRegisterProfile, STYLE_CONFIG } from './soloist-config.js';

@@ -28,6 +28,7 @@ import {
     syncWorker,
 } from '../worker-client.js';
 import { checkSectionTransition, updateAutoConductor } from './conductor.js';
+import { generateDrumsForStep } from './drums-tick.js';
 import {
     initAudio,
     killAllNotes,
@@ -59,11 +60,9 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
-import { isInstrumentActiveAtStep } from './section-overrides.js';
 import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed, killActiveVoices } from './synth-utils.js';
-import { generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
 type Dispatch = (action: any, payload?: any) => void;
@@ -634,21 +633,10 @@ function scheduleDrums(
     // Evaluate fills and standard groove patterns via our unified tick logic
     // This maintains 1:1 playback/export parity.
     const sectionIndex = findSectionIndexFromCursor(arranger.sectionMap, absoluteStep);
-    const tickResult = generateNotesForStep(
-        state,
-        absoluteStep,
-        {
-            mainCursor: { index: 0, sectionIndex: Math.max(0, sectionIndex) },
-            lookaheadCursor: { index: 0, sectionIndex: 0 },
-        },
-        {
-            includeDrums: isInstrumentActiveAtStep(state, 'groove', absoluteStep),
-            includeBass: false,
-            includeChords: false,
-            includeHarmony: false,
-            includeSoloist: false,
-        },
-    );
+    const tickResult = generateDrumsForStep(state, absoluteStep, {
+        mainCursor: { index: 0, sectionIndex: Math.max(0, sectionIndex) },
+        lookaheadCursor: { index: 0, sectionIndex: 0 },
+    });
 
     // Handle fill state cleanup
     if (groove.fillActive) {

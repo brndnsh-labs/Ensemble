@@ -68,6 +68,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Patterns |
 | :--- | :--- | :--- |
 | `public/engine/bass-styles.ts` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
+| `public/engine/chord-quality-sets.ts` | Dependency-free leaf of shared chord-quality classification Sets (keeps cross-engine const imports from dragging heavy lanes into a chunk). | `ALTERED_HOOK_QUALITIES` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
 | `public/engine/soloist-devices.ts` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
@@ -95,6 +96,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
 | `public/engine/tick-logic.ts` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
+| `public/engine/drums-tick.ts` | Lane-free drum preamble + drum-block tick (keeps heavy lane generators off the main chunk; real-time scheduler imports this). | `runDrumTick`, `generateDrumsForStep` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
 | `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
