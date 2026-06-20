@@ -28,7 +28,7 @@ describe('soloist genre→profile routing guard (#592)', () => {
         Jazz: { feel: 'Jazz', profile: 'bird' },
         Funk: { feel: 'Funk', profile: 'funk' },
         Disco: { feel: 'Disco', profile: 'disco' },
-        'Hip Hop': { feel: 'Hip Hop', profile: 'neo' }, // #555 owns reviving 'hiphop'
+        'Hip Hop': { feel: 'Hip Hop', profile: 'hiphop' }, // #555: flipped from 'neo' — revived the dedicated hook-lane profile
         Blues: { feel: 'Blues', profile: 'blues' },
         'Neo-Soul': { feel: 'Neo-Soul', profile: 'neo' },
         Reggae: { feel: 'Reggae', profile: 'reggae' }, // #570: activated the tailored skank profile (was 'minimal')

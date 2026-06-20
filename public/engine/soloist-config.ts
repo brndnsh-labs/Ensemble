@@ -61,6 +61,12 @@ export interface StyleConfig {
     chromaticism: number;
     seedTriplets: SeedTriplets;
     motivicResponse: MotivicResponse;
+    // #555 — hook-lane opt-in. When `hookLoop` is true the soloist captures a
+    // short window of the head (`hookBars` bars, default 2) and replays it
+    // near-verbatim every bar (Hip Hop). Absent/false on every other profile, so
+    // the hook short-circuit in getSoloistNote is a no-op for them.
+    hookLoop?: boolean;
+    hookBars?: number;
 }
 
 const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
@@ -284,6 +290,10 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.6,
         syncopationLikelihood: 0.7,
         chromaticism: 0.2,
+        // #555 — hip-hop melody is a looped 1–2 bar hook, not a through-composed
+        // solo. Capture the head's strongest 2-bar window and replay it verbatim.
+        hookLoop: true,
+        hookBars: 2,
     },
     minimal: {
         restBase: 0.3,

@@ -396,6 +396,20 @@ export interface SoloistSessionSeed {
 }
 
 /**
+ * #555 — the verbatim HOOK LANE. A short (1–2 bar) motif derived from the head
+ * (`SoloistSessionSeed`) and replayed near-EXACTLY every bar for hook-driven
+ * genres (Hip Hop). Distinct from the SRDC seed replay (which is phrase-level and
+ * deliberately drifts) and from probabilistic `motivicResponse` reuse. Captured
+ * main-thread next to the seed and synced read-only to the worker, exactly like
+ * `SoloistSessionSeed`. `loopLengthSteps` is the hook window length (the replay
+ * period), NOT the full head length.
+ */
+export interface SoloistHookLane {
+    notes: SeedNote[];
+    loopLengthSteps: number;
+}
+
+/**
  * One note inside a `MotifSignature`. Captures pitch, position relative to the
  * phrase start, and the cues the response engine needs to paraphrase it.
  */
@@ -729,6 +743,8 @@ export interface SoloistContour {
 export interface SoloistSession {
     /** Seed melody for the current session (the SRDC "Head" set once per playback). */
     readonly seed: SoloistSessionSeed | null;
+    /** #555 — verbatim hook lane (derived from the head) for hook-driven genres; null when the active profile isn't a hook style. */
+    readonly hook: SoloistHookLane | null;
     /** Total steps played in the current session. */
     readonly sessionSteps: number;
     /** Total phrases played. */
@@ -1328,6 +1344,7 @@ export type ActionPayloadUpdateSB = Partial<{
     motifTracking: boolean;
     pinnedProfile: string | null;
     sessionSeed: SoloistSessionSeed | null;
+    soloistHook: SoloistHookLane | null;
     sessionSteps: number;
     phraseCount: number;
     tension: number;

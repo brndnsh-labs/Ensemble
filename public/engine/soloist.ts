@@ -932,6 +932,32 @@ function preparePhraseResponseContext(
 }
 
 /**
+ * #555 — snap a MIDI note to the nearest pitch in a pitch-class set, preserving
+ * register (searches outward ±1..6 semitones, down-first on ties). Used by the
+ * hook lane to make a captured hook note FOLLOW the current chord: anchors snap
+ * to the chord-tone set, passing notes to the chord's scale set, so the hook's
+ * contour outlines the changes instead of freezing. Returns the input unchanged
+ * if it's already in the set (or the set is empty).
+ */
+function snapMidiToPitchClasses(midi: number, pcSet: Set<number>): number {
+    if (pcSet.size === 0) {
+        return midi;
+    }
+    if (pcSet.has(((midi % 12) + 12) % 12)) {
+        return midi;
+    }
+    for (let d = 1; d <= 6; d++) {
+        if (pcSet.has((((midi - d) % 12) + 12) % 12)) {
+            return midi - d;
+        }
+        if (pcSet.has((((midi + d) % 12) + 12) % 12)) {
+            return midi + d;
+        }
+    }
+    return midi;
+}
+
+/**
  * Simplified soloist engine.
  * Focuses on lively, probabilistic phrasing with form and meter awareness.
  * Uses a two-phase Rhythm and Pitch engine.
@@ -1205,6 +1231,130 @@ export function getSoloistNote(
         applyBluesBends(primary, activeStyle, currentChord, () => scrambleHash(callSeedBase + 12));
         return res;
     };
+
+    // --- 0. HOOK LANE (#555) — a LIVING hook, not a copy-paste loop ---
+    // why: hook-driven profiles (Hip Hop, config.hookLoop) center on a recurring
+    // 1–2 bar hook carved from the head (session.hook). A LITERAL verbatim loop
+    // reads as copy-paste and ignores the chords (caught by ear). So the hook
+    // recurs RECOGNIZABLY (its rhythm/contour skeleton repeats) while it BREATHES:
+    //   (a) FOLLOWS THE CHORD — anchors snap to the current chord's tones, passing
+    //       notes to its scale, so the hook OUTLINES the progression bar to bar;
+    //   (b) ORNAMENT GROWS over loops — seeded low-velocity ghost notes fill the
+    //       gaps from loop 1 on, so later passes get busier without losing the hook;
+    //   (c) PERIODIC FILLS — every HOOK_FILL_EVERY-th statement falls through to a
+    //       generated bar for contrast.
+    // Hook statements own every step (note / ghost / rest — never fall through to
+    // the free generative line that washes the hook out); only fill statements
+    // fall through. Runs before the device/busy/head-bypass/budget paths.
+    const hookLane = soloist.session.hook;
+    if (config.hookLoop && hookLane && hookLane.notes.length > 0 && hookLane.loopLengthSteps > 0) {
+        const hookLen = hookLane.loopLengthSteps;
+        const stepInHook = normalizeLoopStep(step, hookLen);
+        // `statementIndex` is the session-cumulative hook count (step is the
+        // absolute timeline step). NOTE: fills land at a fixed FORM position only
+        // when the form length is a multiple of the hook length; on an odd-bar form
+        // (e.g. a 2-bar hook over a 7-bar phrase) the fill bar precesses through the
+        // form across choruses — acceptable as drifting variation, but if a fill
+        // ever needs to pin to a turnaround, key the cadence to the form length.
+        const statementIndex = Math.floor(step / hookLen);
+        const HOOK_FILL_EVERY = 4;
+        const isFillStatement =
+            statementIndex > 0 && statementIndex % HOOK_FILL_EVERY === HOOK_FILL_EVERY - 1;
+        if (!isFillStatement) {
+            // Chord-following pitch targets for THIS chord, computed once and shared
+            // by the hook notes AND the grace/ghost ornaments below: anchors → chord
+            // tones, passing notes → the chord's scale (so the hook stays in key as
+            // the harmony moves). Same scale source the rest of the engine uses.
+            const hookScaleIntervals = getScaleForChord(
+                state,
+                currentChord,
+                nextChord,
+                activeStyle,
+            );
+            const hookRootPc = ((currentChord.rootMidi % 12) + 12) % 12;
+            const scalePcSet = new Set<number>(
+                hookScaleIntervals.map((i: number) => (((hookRootPc + i) % 12) + 12) % 12),
+            );
+            const chordPcSet = new Set<number>(
+                (currentChord.intervals || [0, 4, 7]).map(
+                    (i: number) => (((hookRootPc + i) % 12) + 12) % 12,
+                ),
+            );
+            // Ornament intensity GROWS per loop (capped): loop 0 states the hook
+            // clean, later passes add soft graces/ghosts. discriminator 61 — seeded
+            // per step/loop (deterministic, no Math.random).
+            const ornamentProb = loopCount >= 1 ? Math.min(0.4, 0.1 * loopCount) : 0;
+            const ornamentRoll = scrambleHash(callSeedBase + 61);
+            const ornamentAnchorMidi = soloist.audio.lastMidiPlayed || currentChord.rootMidi + 12;
+
+            // Hold a multi-step hook note. While it sustains, OVERLAY a soft grace on
+            // later loops (the "builds over loops" feel — a quiet upper-neighbor over
+            // the held note, an idiomatic hip-hop ornament) with the growing
+            // probability; otherwise rest so the hook note rings. busySteps counts
+            // the sustain down either way (the grace is brief, doesn't extend it).
+            if ((soloist.session.phrasing.busySteps || 0) > 0) {
+                phr.busySteps = (soloist.session.phrasing.busySteps || 0) - 1; // @worker-mutation
+                if (ornamentRoll < ornamentProb) {
+                    phr.isResting = false; // @worker-mutation
+                    return finalizeNote({
+                        midi: snapMidiToPitchClasses(ornamentAnchorMidi + 2, scalePcSet),
+                        durationSteps: 1,
+                        velocity: 0.3, // soft grace over the sustain
+                        isAnchor: false,
+                    });
+                }
+                return null;
+            }
+            const hookHits = hookLane.notes.filter(
+                (n) => normalizeLoopStep(n.step, hookLen) === stepInHook,
+            );
+            if (hookHits.length > 0) {
+                phr.isResting = false; // @worker-mutation
+                phr.state = 'active'; // @worker-mutation
+                const emitted = hookHits.map((n) => {
+                    // Keep the hook's register/contour, but move the pitch onto the
+                    // chord under it — the move that makes the hook OUTLINE the
+                    // changes instead of freezing. Velocity micro-var (±0.05 abs,
+                    // seeded discriminator 60); rhythm/contour are what stay
+                    // recognizable, not the literal pitch.
+                    const targetMidi = snapMidiToPitchClasses(
+                        n.midi,
+                        n.isAnchor ? chordPcSet : scalePcSet,
+                    );
+                    const vJitter = (scrambleHash(callSeedBase + 60) - 0.5) * 0.1;
+                    return {
+                        midi: targetMidi,
+                        durationSteps: n.durationSteps,
+                        velocity: Math.max(0.1, Math.min(1, (n.velocity || 0.7) + vJitter)),
+                        isAnchor: n.isAnchor,
+                        // Preserve the head's baked per-note micro-timing (swing/drag)
+                        // on top of finalizeNote's pocket — keeps the carved hook's
+                        // feel, not just its step positions.
+                        ...(n.timingOffset !== undefined ? { timingOffset: n.timingOffset } : {}),
+                        ...(n.tripletPlacement ? { tripletPlacement: n.tripletPlacement } : {}),
+                    };
+                });
+                const primaryHook = emitted[emitted.length - 1];
+                phr.busySteps = Math.max(0, (primaryHook.durationSteps || 1) - 1); // @worker-mutation
+                return finalizeNote(emitted.length === 1 ? emitted[0] : emitted);
+            }
+            // Free gap step (sparse hooks): the same growing ornament as a GHOST note
+            // — a soft scale tone near the recent line. Loop 0 clean; no fall-through
+            // (a non-ornamented gap rests, keeping the hook sparse).
+            if (ornamentRoll < ornamentProb) {
+                phr.isResting = false; // @worker-mutation
+                phr.state = 'active'; // @worker-mutation
+                return finalizeNote({
+                    midi: snapMidiToPitchClasses(ornamentAnchorMidi, scalePcSet),
+                    durationSteps: 1,
+                    velocity: 0.35,
+                    isAnchor: false,
+                });
+            }
+            return null;
+        }
+        // fill statement → fall through to the generative path for a contrasting bar.
+    }
 
     // --- 1. Busy/Device Handling ---
     // why: a cadential device (e.g. bluesTurnaround, a 16-step deviceBuffer) fired

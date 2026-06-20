@@ -108,6 +108,9 @@ export function getSyncState() {
             session: {
                 sessionSteps: soloist.session.sessionSteps,
                 seed: soloist.session.seed,
+                // #555 — verbatim hook lane: read-only replay state captured
+                // main-thread next to `seed`; crosses to the worker exactly like it.
+                hook: soloist.session.hook,
             },
             audio: {
                 lastFreq: soloist.audio.lastFreq,

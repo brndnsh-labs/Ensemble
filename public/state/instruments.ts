@@ -87,6 +87,7 @@ export const soloist = deepSignal<SoloistState>({
     // === Engine runtime ===
     session: {
         seed: null,
+        hook: null,
         sessionSteps: 0,
         phraseCount: 0,
         tension: 0,
@@ -212,6 +213,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
+    soloistHook: { kind: 'session', key: 'hook' },
     sessionSteps: { kind: 'session', key: 'sessionSteps' },
     phraseCount: { kind: 'session', key: 'phraseCount' },
     tension: { kind: 'session', key: 'tension' },
@@ -385,6 +387,7 @@ export function instrumentReducer(action: Action): boolean {
             const rhy = session.rhythm as Mutable<typeof session.rhythm>;
             const con = session.contour as Mutable<typeof session.contour>;
             session.seed = null;
+            session.hook = null;
             session.sessionSteps = 0;
             session.phraseCount = 0;
             session.tension = 0;
