@@ -11,13 +11,19 @@
  *      (caught by ear). The fix is a LIVING hook: the rhythm/contour skeleton
  *      recurs (recognizable), but the hook FOLLOWS THE CHORD (anchors snap to the
  *      current chord's tones, passing notes to its scale), ORNAMENT grows over
- *      loops, and every 4th statement is a fill.
+ *      loops (soft graces over the sustains), and every 4th statement is a fill.
  *
- * So the metric is a WINDOW, not a ceiling: the hook must OUTLINE the changes
- * (anchors are chord tones) and must NOT be a verbatim loop (period pitch
- * repetition well below the old 1.0) while staying recognizable (not random).
+ * The metrics are honest discriminators, NOT the engine's own predicates:
+ *  - chord-following is proven by the LIFT it provides — emitted (snapped) anchor
+ *    chord-tone rate vs the RAW carved hook's rate over the same moving chords.
+ *    (Asserting "snapped anchors are chord tones" alone would be a tautology — the
+ *    snap guarantees it.)
+ *  - "not copy-paste" is a repetition WINDOW (well below the old verbatim 1.0, but
+ *    not random).
+ *  - "builds over loops" is proven by note growth + graces appearing only from
+ *    loop 1 on (the ornament path is otherwise dead on a dense hook).
  * The audit arrangement has moving chords (Cmaj7→G7→Am7→Fmaj7), so chord-following
- * is observable.
+ * and the lift are observable.
  */
 import { describe, expect, it } from 'vitest';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
@@ -26,6 +32,8 @@ import {
     buildHookAuditArrangement,
     simulateSoloistLoops,
 } from '../../scripts/soloist-analysis-utils.js';
+
+const pc = (m) => ((m % 12) + 12) % 12;
 
 function hookProfile() {
     const arrangement = buildHookAuditArrangement('4/4');
@@ -39,33 +47,52 @@ function hookProfile() {
         seed: 'HEAD_AUDIT',
     });
     const cap = simulateSoloistLoops({ state: boot.state, arrangement, loops: 4, style: 'smart' });
-    const hookLen = boot.state.soloist.session.hook?.loopLengthSteps || 0;
+    const hook = boot.state.soloist.session.hook;
+    const hookLen = hook?.loopLengthSteps || 0;
+    // raw carved hook note by its step-in-hook position (pre-snap baseline source)
+    const rawAt = new Map();
+    for (const n of hook?.notes || []) {
+        rawAt.set(((n.step % hookLen) + hookLen) % hookLen, n);
+    }
 
-    let anchorNotes = 0;
-    let anchorOnChord = 0;
+    let emitAnchor = 0;
+    let emitAnchorOnChord = 0;
+    let rawAnchor = 0;
+    let rawAnchorOnChord = 0;
     let allNotes = 0;
     let allOnChord = 0;
     const byStep = new Map();
+    const loopNotes = {};
+    const loopGhosts = {};
     for (const e of cap.events) {
         if (e.absoluteStep < 0) {
             continue;
         }
         byStep.set(e.absoluteStep, e.note.midi);
-        const ch = e.chord;
-        if (!ch?.intervals) {
+        loopNotes[e.loop] = (loopNotes[e.loop] || 0) + 1;
+        if (e.note.velocity <= 0.36) {
+            loopGhosts[e.loop] = (loopGhosts[e.loop] || 0) + 1;
+        }
+        if (!e.chord?.intervals) {
             continue;
         }
-        const rootPc = ((ch.rootMidi % 12) + 12) % 12;
-        const chordPcs = new Set(ch.intervals.map((i) => (((rootPc + i) % 12) + 12) % 12));
-        const pc = ((e.note.midi % 12) + 12) % 12;
+        const rootPc = pc(e.chord.rootMidi);
+        const chordPcs = new Set(e.chord.intervals.map((i) => pc(rootPc + i)));
         allNotes++;
-        if (chordPcs.has(pc)) {
+        if (chordPcs.has(pc(e.note.midi))) {
             allOnChord++;
         }
         if (e.note.isAnchor) {
-            anchorNotes++;
-            if (chordPcs.has(pc)) {
-                anchorOnChord++;
+            emitAnchor++;
+            if (chordPcs.has(pc(e.note.midi))) {
+                emitAnchorOnChord++;
+            }
+            const raw = rawAt.get(((e.stepInLoop % hookLen) + hookLen) % hookLen);
+            if (raw) {
+                rawAnchor++;
+                if (chordPcs.has(pc(raw.midi))) {
+                    rawAnchorOnChord++;
+                }
             }
         }
     }
@@ -84,9 +111,12 @@ function hookProfile() {
         hookLen,
         noteCount: byStep.size,
         measures: arrangement.measuresPerLoop * 4,
-        anchorChordToneRate: anchorNotes ? anchorOnChord / anchorNotes : 0,
+        emitAnchorChordRate: emitAnchor ? emitAnchorOnChord / emitAnchor : 0,
+        rawAnchorChordRate: rawAnchor ? rawAnchorOnChord / rawAnchor : 0,
         allChordToneRate: allNotes ? allOnChord / allNotes : 0,
         periodPitchRep: pTot ? pHits / pTot : 0,
+        loopNotes,
+        loopGhosts,
     };
 }
 
@@ -99,12 +129,12 @@ describe('Hip Hop Soloist Critique', () => {
         expect(resolveSoloistStyle('smart', 'Hip Hop')).not.toBe('neo');
     });
 
-    it('outlines the chord changes — the hook follows the harmony', () => {
+    it('outlines the chord changes — chord-following lifts harmonic alignment', () => {
         const p = hookProfile();
         console.log('\n--- HIP HOP LIVING-HOOK REPORT ---');
         console.log(`[hook length]          ${p.hookLen} (2 bars × 16)`);
         console.log(
-            `[anchor chord-tone]    ${(p.anchorChordToneRate * 100).toFixed(1)}% (Target: >0.85)`,
+            `[anchor chord-tone]    snapped ${(p.emitAnchorChordRate * 100).toFixed(1)}%  vs  raw ${(p.rawAnchorChordRate * 100).toFixed(1)}%  (Target: lift >0.05)`,
         );
         console.log(
             `[all chord-tone]       ${(p.allChordToneRate * 100).toFixed(1)}% (Target: >0.55)`,
@@ -112,26 +142,38 @@ describe('Hip Hop Soloist Critique', () => {
         console.log(
             `[period pitch rep]     ${(p.periodPitchRep * 100).toFixed(1)}% (Target: 0.40–0.90; was 1.0 verbatim)`,
         );
-        console.log(`[notes over 4 loops]   ${p.noteCount}`);
+        console.log(`[notes/loop]           ${JSON.stringify(p.loopNotes)}`);
+        console.log(`[ghosts/loop]          ${JSON.stringify(p.loopGhosts)}`);
         console.log('----------------------------------\n');
 
         expect(p.hookLen).toBe(32);
-        // (2) CHORD-FOLLOWING — the headline fix. The hook's structural notes land
-        // on the chord under them, so it outlines the progression instead of
-        // freezing. Engine: ~1.0. A static verbatim hook over moving chords would
-        // score far lower (its fixed pitches clash with most chords).
-        expect(p.anchorChordToneRate).toBeGreaterThan(0.85);
+        // (2) CHORD-FOLLOWING, proven by LIFT (not the snap's own tautology): the
+        // snapped anchors align to the chord under them MORE than the raw carved
+        // hook would over these moving chords. A static verbatim hook = zero lift.
+        expect(p.emitAnchorChordRate).toBeGreaterThan(p.rawAnchorChordRate + 0.05);
+        expect(p.emitAnchorChordRate).toBeGreaterThan(0.9);
         // The whole line stays harmonic (chord + scale tones), not just anchors.
+        // Random-floor over a 4-note chord set is ~0.33.
         expect(p.allChordToneRate).toBeGreaterThan(0.55);
     });
 
     it('breathes — recognizable but NOT a verbatim copy-paste loop', () => {
         const p = hookProfile();
-        // (3) THE WINDOW. period pitch repetition must be BELOW the old verbatim 1.0
-        // (it varies as the chords move + ornament grows) yet not collapse to random
-        // (the rhythm/contour skeleton still recurs). Engine: ~0.76.
-        expect(p.periodPitchRep).toBeLessThan(0.9); // broke copy-paste
-        expect(p.periodPitchRep).toBeGreaterThan(0.4); // still a recognizable hook
+        // (3) THE WINDOW. period pitch repetition BELOW the old verbatim 1.0 (it
+        // varies as chords move + ornament grows) yet not collapsed to random (the
+        // rhythm/contour skeleton still recurs). Engine: ~0.76.
+        expect(p.periodPitchRep).toBeLessThan(0.9);
+        expect(p.periodPitchRep).toBeGreaterThan(0.4);
+    });
+
+    it('builds over loops — ornament grows, loop 0 stays clean', () => {
+        const p = hookProfile();
+        // (4) GUARDS THE ORNAMENT PATH (which is dead unless graces ride the
+        // sustains). Loop 0 states the hook clean (no ghosts); later loops add soft
+        // graces, so note density grows. Engine: notes 89→125, ghosts 0→15→23→33.
+        expect(p.loopGhosts[0] || 0).toBe(0); // loop 0 clean
+        expect(p.loopGhosts[3] || 0).toBeGreaterThan(p.loopGhosts[1] || 0); // graces grow
+        expect(p.loopNotes[3] || 0).toBeGreaterThan(p.loopNotes[0] || 0); // busier later
     });
 
     it('stays a coherent, non-empty melodic line (regression guard)', () => {

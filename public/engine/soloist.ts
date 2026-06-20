@@ -1250,20 +1250,21 @@ export function getSoloistNote(
     if (config.hookLoop && hookLane && hookLane.notes.length > 0 && hookLane.loopLengthSteps > 0) {
         const hookLen = hookLane.loopLengthSteps;
         const stepInHook = normalizeLoopStep(step, hookLen);
+        // `statementIndex` is the session-cumulative hook count (step is the
+        // absolute timeline step). NOTE: fills land at a fixed FORM position only
+        // when the form length is a multiple of the hook length; on an odd-bar form
+        // (e.g. a 2-bar hook over a 7-bar phrase) the fill bar precesses through the
+        // form across choruses — acceptable as drifting variation, but if a fill
+        // ever needs to pin to a turnaround, key the cadence to the form length.
         const statementIndex = Math.floor(step / hookLen);
         const HOOK_FILL_EVERY = 4;
         const isFillStatement =
             statementIndex > 0 && statementIndex % HOOK_FILL_EVERY === HOOK_FILL_EVERY - 1;
         if (!isFillStatement) {
-            // Hold a multi-step hook note: while busy, rest (don't re-attack or
-            // ornament over the sustain).
-            if ((soloist.session.phrasing.busySteps || 0) > 0) {
-                phr.busySteps = (soloist.session.phrasing.busySteps || 0) - 1; // @worker-mutation
-                return null;
-            }
-            // Chord-following pitch targets for THIS chord: anchors → chord tones,
-            // passing notes → the chord's scale (so the hook stays in key as the
-            // harmony moves). Same scale source the rest of the engine uses.
+            // Chord-following pitch targets for THIS chord, computed once and shared
+            // by the hook notes AND the grace/ghost ornaments below: anchors → chord
+            // tones, passing notes → the chord's scale (so the hook stays in key as
+            // the harmony moves). Same scale source the rest of the engine uses.
             const hookScaleIntervals = getScaleForChord(
                 state,
                 currentChord,
@@ -1279,6 +1280,31 @@ export function getSoloistNote(
                     (i: number) => (((hookRootPc + i) % 12) + 12) % 12,
                 ),
             );
+            // Ornament intensity GROWS per loop (capped): loop 0 states the hook
+            // clean, later passes add soft graces/ghosts. discriminator 61 — seeded
+            // per step/loop (deterministic, no Math.random).
+            const ornamentProb = loopCount >= 1 ? Math.min(0.4, 0.1 * loopCount) : 0;
+            const ornamentRoll = scrambleHash(callSeedBase + 61);
+            const ornamentAnchorMidi = soloist.audio.lastMidiPlayed || currentChord.rootMidi + 12;
+
+            // Hold a multi-step hook note. While it sustains, OVERLAY a soft grace on
+            // later loops (the "builds over loops" feel — a quiet upper-neighbor over
+            // the held note, an idiomatic hip-hop ornament) with the growing
+            // probability; otherwise rest so the hook note rings. busySteps counts
+            // the sustain down either way (the grace is brief, doesn't extend it).
+            if ((soloist.session.phrasing.busySteps || 0) > 0) {
+                phr.busySteps = (soloist.session.phrasing.busySteps || 0) - 1; // @worker-mutation
+                if (ornamentRoll < ornamentProb) {
+                    phr.isResting = false; // @worker-mutation
+                    return finalizeNote({
+                        midi: snapMidiToPitchClasses(ornamentAnchorMidi + 2, scalePcSet),
+                        durationSteps: 1,
+                        velocity: 0.3, // soft grace over the sustain
+                        isAnchor: false,
+                    });
+                }
+                return null;
+            }
             const hookHits = hookLane.notes.filter(
                 (n) => normalizeLoopStep(n.step, hookLen) === stepInHook,
             );
@@ -1301,6 +1327,10 @@ export function getSoloistNote(
                         durationSteps: n.durationSteps,
                         velocity: Math.max(0.1, Math.min(1, (n.velocity || 0.7) + vJitter)),
                         isAnchor: n.isAnchor,
+                        // Preserve the head's baked per-note micro-timing (swing/drag)
+                        // on top of finalizeNote's pocket — keeps the carved hook's
+                        // feel, not just its step positions.
+                        ...(n.timingOffset !== undefined ? { timingOffset: n.timingOffset } : {}),
                         ...(n.tripletPlacement ? { tripletPlacement: n.tripletPlacement } : {}),
                     };
                 });
@@ -1308,24 +1338,18 @@ export function getSoloistNote(
                 phr.busySteps = Math.max(0, (primaryHook.durationSteps || 1) - 1); // @worker-mutation
                 return finalizeNote(emitted.length === 1 ? emitted[0] : emitted);
             }
-            // Gap step inside a hook statement: from loop 1 on, with probability
-            // growing per loop (capped), drop a low-velocity GHOST ornament — a
-            // scale tone near the recent line — so later passes get busier. Loop 0
-            // states the hook clean. No fall-through (a non-ornamented gap rests).
-            if (loopCount >= 1) {
-                const ornamentProb = Math.min(0.5, 0.12 * loopCount);
-                // discriminator 61 — seeded ornament gate, deterministic per step/loop.
-                if (scrambleHash(callSeedBase + 61) < ornamentProb) {
-                    const anchorMidi = soloist.audio.lastMidiPlayed || currentChord.rootMidi + 12;
-                    phr.isResting = false; // @worker-mutation
-                    phr.state = 'active'; // @worker-mutation
-                    return finalizeNote({
-                        midi: snapMidiToPitchClasses(anchorMidi, scalePcSet),
-                        durationSteps: 1,
-                        velocity: 0.35,
-                        isAnchor: false,
-                    });
-                }
+            // Free gap step (sparse hooks): the same growing ornament as a GHOST note
+            // — a soft scale tone near the recent line. Loop 0 clean; no fall-through
+            // (a non-ornamented gap rests, keeping the hook sparse).
+            if (ornamentRoll < ornamentProb) {
+                phr.isResting = false; // @worker-mutation
+                phr.state = 'active'; // @worker-mutation
+                return finalizeNote({
+                    midi: snapMidiToPitchClasses(ornamentAnchorMidi, scalePcSet),
+                    durationSteps: 1,
+                    velocity: 0.35,
+                    isAnchor: false,
+                });
             }
             return null;
         }
