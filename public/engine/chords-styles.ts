@@ -335,12 +335,13 @@ export function getIntervals(
         // major (or minor) triad manufactures a dom7 the chart never asked for and
         // kills power-triad clarity: AC/DC/Stones rhythm parts stay triadic/power
         // at full energy; the b7 belongs to dominant/blues charts (spelled
-        // explicitly). Mirrors the :284 guard. (Common maj7-family qualities are
-        // excluded — their 7th is the natural 11, not a b7. NOTE: augmaj7 also
-        // carries a natural 7 and ideally belongs here too — tracked as a separate
-        // pre-existing follow-up, out of scope for this plain-triad fix.)
-        const isDominantSeventh =
-            is7th && !['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11'].includes(quality);
+        // explicitly). Mirrors the :284 guard. Any quality whose voicing already
+        // carries the natural 7 (pc 11) is excluded — the maj7 family AND augmaj7
+        // ([0,4,8,11]) — because slamming a b7 (10) onto a chord that already has
+        // the maj7 manufactures a 10+11 semitone rub the chart never asked for.
+        // Testing the interval set (not a hardcoded name list) catches both and
+        // can't false-exclude a genuine dominant chart (a dom7 carries 10, not 11).
+        const isDominantSeventh = is7th && !intervals.includes(11);
         if (genre === 'Rock' && isDominantSeventh && !intervals.includes(10)) {
             intervals.push(10);
         }
