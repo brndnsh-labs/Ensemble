@@ -209,6 +209,19 @@ export function getScaleForChord(
             return [0, 2, 3, 4, 5, 7, 9, 10].sort((a, b) => a - b);
         }
 
+        // #564: funk over plain dominants (the most common funk chord is a dom9
+        // vamp). Previously funk fell through to plain MIXOLYDIAN — no b3, no b5,
+        // a clean diatonic line over a chord the band voices bluesy. The SRV/
+        // Hendrix/Maceo funk vocabulary lives on the b3 and b5 as *grit grace*
+        // notes layered over the major-3 Mixolydian body. Give funk a dominant
+        // blues scale: Mixolydian (natural 3 + 9, funk's major-3 prominence) PLUS
+        // the blue notes b3 (3) and b5 (6). The picker's blue-note reward (tempered
+        // for funk — grace, not landing) biases toward the grit; this just puts it
+        // in reach. Sorted ascending to match the other scale returns.
+        if (style === 'funk') {
+            return [0, 2, 3, 4, 5, 6, 7, 9, 10];
+        }
+
         if (style === 'metal' || style === 'shred') {
             // Shred shares metal's phrygian-dominant color over dominant chords;
             // without this it fell through to generic MIXOLYDIAN (generic-rock lead).
