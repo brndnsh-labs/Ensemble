@@ -31,7 +31,7 @@ describe('soloist genre→profile routing guard (#592)', () => {
         'Hip Hop': { feel: 'Hip Hop', profile: 'neo' }, // #555 owns reviving 'hiphop'
         Blues: { feel: 'Blues', profile: 'blues' },
         'Neo-Soul': { feel: 'Neo-Soul', profile: 'neo' },
-        Reggae: { feel: 'Reggae', profile: 'minimal' }, // #570 owns a tailored reggae
+        Reggae: { feel: 'Reggae', profile: 'reggae' }, // #570: activated the tailored skank profile (was 'minimal')
         Acoustic: { feel: 'Acoustic', profile: 'acoustic' }, // #592: flipped from 'minimal'
         Bossa: { feel: 'Bossa Nova', profile: 'bossa' }, // feel≠name → GENRE_STYLE_MAPPING
         Country: { feel: 'Country', profile: 'country' },

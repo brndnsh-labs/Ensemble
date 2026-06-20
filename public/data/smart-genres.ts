@@ -84,7 +84,11 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         drum: 'Reggae',
         feel: 'Reggae',
         bass: 'dub',
-        soloist: 'minimal',
+        // #570: activate the tailored 'reggae' soloist profile (skank/offbeat:
+        // syncopationLikelihood 0.9, targetExtensions [2,6,9]) — it was fully
+        // orphaned behind the generic 'minimal', which lands square on the
+        // downbeats reggae deliberately leaves to bass + skank.
+        soloist: 'reggae',
     },
     Acoustic: {
         swing: 15,
