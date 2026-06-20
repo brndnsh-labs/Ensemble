@@ -209,7 +209,9 @@ export function getScaleForChord(
             return [0, 2, 3, 4, 5, 7, 9, 10].sort((a, b) => a - b);
         }
 
-        if (style === 'metal') {
+        if (style === 'metal' || style === 'shred') {
+            // Shred shares metal's phrygian-dominant color over dominant chords;
+            // without this it fell through to generic MIXOLYDIAN (generic-rock lead).
             return SCALE_INTERVALS.PHRYGIAN_DOMINANT;
         }
 
