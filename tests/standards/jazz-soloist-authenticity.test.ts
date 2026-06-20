@@ -1,6 +1,8 @@
 // @ts-nocheck
 // tests/standards/jazz-soloist-authenticity.test.js
+
 import { getSoloistNote } from '../../public/engine/soloist.js';
+import { STYLE_CONFIG } from '../../public/engine/soloist-config.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
@@ -89,6 +91,63 @@ describe('Jazz Soloist Authenticity Benchmark', () => {
         expect(profilesSeen.has('evans')).toBe(true);
         expect(profilesSeen.has('coltrane')).toBe(true);
         expect(profilesSeen.has('miles')).toBe(true);
+    });
+
+    // #573 — the Jazz GENRE runs the `bird` STYLE (SMART_GENRES.Jazz.soloist), so
+    // the line-323 `activeStyle === 'jazz'` bebopScale gate (the user-selectable
+    // "Jazz Comp" path) never fired for it. The built-and-wanted bebopScale device
+    // was unreachable from the genre. Fix: bebopScale added to bird.allowedDevices
+    // at the lowest pickByRank weight. These two tests guard that it's reachable
+    // AND stays subordinate to Parker's enclosure/approach-tone lean.
+    it('exposes bebopScale in the bird palette at the lowest device weight', () => {
+        const devices = STYLE_CONFIG.bird.allowedDevices;
+        expect(devices).toContain('bebopScale'); // was absent pre-#573
+        // pickByRank weights by position (first = heaviest). Lowest weight = last.
+        expect(devices[devices.length - 1]).toBe('bebopScale');
+    });
+
+    it('lets the Jazz-genre (bird) soloist actually play bebopScale, but rarely', () => {
+        // Drive the genre path: style 'bird' resolves activeStyle to 'bird'
+        // (SMART_GENRES.Jazz.soloist), NOT the literal 'jazz' style that trips the
+        // line-323 gate — so this exercises the genuine genre route the fix targets.
+        const Dm7 = { rootMidi: 62, quality: 'm7', intervals: [0, 3, 7, 10], beats: 4 };
+        const G7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
+        const Cmaj7 = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
+        const prog = [Dm7, G7, Cmaj7, Cmaj7];
+
+        const counts = {};
+        const numBars = 2000;
+        for (let bar = 0; bar < numBars; bar++) {
+            const chord = prog[bar % 4];
+            for (let step = 0; step < 16; step++) {
+                const note = getSoloistNote(
+                    getState(),
+                    chord,
+                    chord,
+                    bar * 16 + step,
+                    0,
+                    64,
+                    'bird',
+                    step,
+                );
+                if (note) {
+                    const primary = Array.isArray(note) ? note[0] : note;
+                    const device = primary?.device || 'none';
+                    counts[device] = (counts[device] || 0) + 1;
+                }
+            }
+        }
+
+        const bebop = counts.bebopScale || 0;
+        const lead = (counts.enclosure || 0) + (counts.run || 0);
+        console.log(`[Jazz genre/bird devices] ${JSON.stringify(counts)}`);
+        // Reachable now (structurally 0 before the fix). Deterministic ~20 firings
+        // over 2000 bars; assert a floor with headroom against run-to-run drift.
+        expect(bebop).toBeGreaterThan(4);
+        // Stays subordinate: the bird idiom leads on enclosures/approach tones, so
+        // bebopScale must not dominate them (low-weight intent). Guards a future
+        // re-ordering that would over-promote it.
+        expect(bebop).toBeLessThan(lead);
     });
 
     it('Bill Evans profile should target upper extensions', () => {

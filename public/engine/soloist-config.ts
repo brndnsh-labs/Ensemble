@@ -369,7 +369,20 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // S6: was [2, 5, 6, 9]; dropped 5 (P4 avoid note on most qualities).
         targetExtensions: [2, 6, 9],
         deviceProb: 0.4,
-        allowedDevices: ['enclosure', 'run', 'birdFlurry', 'guitarDouble', 'chromaticFall'],
+        // #573: the Jazz genre runs the `bird` profile (SMART_GENRES.Jazz.soloist),
+        // so the line-323 `activeStyle === 'jazz'` bebopScale gate never fired for
+        // it — the built-and-wanted bebopScale device was unreachable from the
+        // genre. Add it here at the LOWEST pickByRank weight (last position → rank
+        // 1 of N) so the genre CAN play it without overwhelming Parker's
+        // enclosure/approach-tone lean (the bird idiom leads on those).
+        allowedDevices: [
+            'enclosure',
+            'run',
+            'birdFlurry',
+            'guitarDouble',
+            'chromaticFall',
+            'bebopScale',
+        ],
         commonToneWeight: 150,
         // Bird phrases stay line-forward, but bebop needs enough surface motion
         // to stay comfortably above the critique's notes-per-bar floor.
