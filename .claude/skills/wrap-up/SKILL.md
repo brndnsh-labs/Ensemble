@@ -49,8 +49,9 @@ write something, that's the smell — stop and re-check the gate.
    bloat), **not candor**. Say something real, or "nothing notable this time." Never soften a genuine
    concern to seem agreeable — a wind-down is the moment to voice it.
 
-4. **Memory pass (restraint-first).** For each *lesson* candidate, apply the gate — it must be **all
-   three**:
+4. **Memory pass — write AND retire (restraint-first).** Two symmetric halves: write the lessons
+   worth keeping, then retire the ones whose job is done. For each *lesson* candidate, apply the
+   write gate — it must be **all three**:
    - **Durable** — useful in a *future* session, not just this conversation.
    - **Non-obvious** — a future-you wouldn't re-derive it for free.
    - **Not already recorded** — not in code, git history, CLAUDE.md, the board, or an existing memory.
@@ -66,6 +67,18 @@ write something, that's the smell — stop and re-check the gate.
    Genuinely unsure (borderline durable/obvious, or might duplicate) → **don't write silently;
    surface it** and let Brandon call it. Always **report what you saved/updated**.
 
+   **Then the retire half.** `MEMORY.md` loads *wholesale* every session (no ranked retrieval) → the
+   index is per-session **retrieval budget, not storage**; a stale line is taxed every session, and a
+   write-gate without a retire-gate is the ADD-only bloat trap. After writing:
+   - **Epic/milestone closed this session?** Once its reusable rules are in `docs/guides/` or the
+     code, its `project_*` status memory's job is done — move the file to `../archived-memory/` and
+     drop its `MEMORY.md` line. Retire only the "epic shipped" record; keep the per-incident
+     `feedback_*` lessons. Live `project_*` facts (pending epics, infra, product gaps) stay.
+   - **`MEMORY.md` near its limit (> ~22 KB)?** Archive any completed-status logs, and merge only
+     *true* same-lesson-different-trigger duplicates — don't over-merge distinct lessons (a precise
+     index hook beats the bytes). Re-verify links resolve + no orphans after.
+   - Full rationale + mechanics: [[feedback-memory-lifecycle-retire-gate]].
+
 5. **Loose-ends handoff.** A short, scannable report:
    - **Unpushed / undeployed:** N commits ahead of origin; anything on `main` not yet on test/prod.
      (Surface — do NOT push or deploy as part of wrap-up; Brandon's calls.)
@@ -80,6 +93,7 @@ write something, that's the smell — stop and re-check the gate.
 **Shipped:** <issue #s / one-line>      **State:** <where the project is, one line>
 **My read:** <honest first-person take — what surprised you, a risk you're carrying, a recommendation; or "nothing notable this time">
 **Saved to memory:** <files written/updated, or "nothing — already covered">
+**Retired/merged:** <archived status logs + merged duplicates, or "none"> · index <N entries / KB>
 **Flagged for your call:** <borderline memory candidates, or none>
 **Loose ends:** unpushed <N> · undeployed <…> · blocked-on-you <#…> · open findings <#…>
 **Next:** <what /next would pick>
@@ -97,5 +111,7 @@ write something, that's the smell — stop and re-check the gate.
 
 - Read-and-propose for anything outside memory. **Never push, merge, or deploy** as part of
   wind-down — surface them as loose ends.
-- Don't let `MEMORY.md` grow with low-value lines; a swelling index is the bloat smell.
+- Don't let `MEMORY.md` grow with low-value lines; a swelling index is the bloat smell — the retire
+  half of step 4 is the cure (archive to `../archived-memory/`, drop the line). Archiving preserves
+  the file; it never deletes knowledge, just removes it from the always-loaded set.
 - When unsure whether something clears the memory gate, it probably doesn't — flag it instead.
