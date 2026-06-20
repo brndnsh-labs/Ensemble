@@ -1,6 +1,18 @@
 import type { EnsembleState } from '../types.js';
 
-const BASS_SPACE_FEELS = new Set(['Swing', 'Jazz', 'Neo-Soul', 'Funk', 'Blues', 'Bossa Nova']);
+const BASS_SPACE_FEELS = new Set([
+    'Swing',
+    'Jazz',
+    'Neo-Soul',
+    'Funk',
+    'Blues',
+    'Bossa Nova',
+    // why: #554 — Hip Hop comping is sampled-soul Rhodes stabs (rootless, jazzy
+    //      extensions), so it should leave the bottom of the chord to the bass
+    //      and synth-bass line rather than doubling roots. Joins the other
+    //      rootless-voicing idioms.
+    'Hip Hop',
+]);
 const PRACTICE_GROUNDING_QUALITIES = new Set([
     'halfdim',
     'dim',
