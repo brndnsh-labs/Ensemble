@@ -127,6 +127,20 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     }, []);
 
     useEffect(() => {
+        // #540 — honor prefers-reduced-motion in the canvas pipeline. CSS gates UI
+        // animation but cannot pause the OffscreenCanvas rAF loop, so a reduced-motion
+        // user opening the 🌈 overlay would still get continuous scrolling (the
+        // vestibular trigger). Like the prefers-color-scheme listener, push the
+        // preference into the worker (event-stepped render) and re-respond live when
+        // the OS toggle flips. Decision (/unblock 2026-06-18): event-stepped.
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        vizRef.current?.setReducedMotion(mediaQuery.matches);
+        const onChange = (e: MediaQueryListEvent) => vizRef.current?.setReducedMotion(e.matches);
+        mediaQuery.addEventListener('change', onChange);
+        return () => mediaQuery.removeEventListener('change', onChange);
+    }, []);
+
+    useEffect(() => {
         if (!containerRef.current || !vizRef.current) {
             return;
         }

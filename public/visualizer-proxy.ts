@@ -115,6 +115,15 @@ export class UnifiedVisualizer {
         }
     }
 
+    // #540 — relay the OS prefers-reduced-motion preference into the canvas
+    // worker, which CSS cannot reach. On `true` the worker renders event-stepped
+    // (quantized to step boundaries, no smooth scroll).
+    setReducedMotion(reducedMotion: boolean): void {
+        if (this.worker) {
+            this.worker.postMessage({ type: 'SET_REDUCED_MOTION', reducedMotion }, []);
+        }
+    }
+
     pushNote(name: string, event: any): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_NOTE', name, event: this.toRaw(event) }, []);
