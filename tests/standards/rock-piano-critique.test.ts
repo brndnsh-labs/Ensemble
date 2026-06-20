@@ -89,6 +89,19 @@ describe('Rock Piano Critique', () => {
         expect(pcs.has(10)).toBe(true);
     });
 
+    // (e) #611 — augmaj7 carries its OWN natural 7 (pc 11). The high-intensity
+    // grit-b7 add must skip it (as it skips the maj7 family) or the voicing rubs
+    // a b7 (10) against the maj7 (11) — a 10+11 semitone clash the chart never
+    // asked for. Pins: the natural 7 stays, no b7 is added, and 10+11 never
+    // sound together. Sibling-confirms the robust `!intervals.includes(11)` gate.
+    it('voices augmaj7 with its natural 7 and no b7 clash at high intensity', () => {
+        const pcs = voicePitchClasses('augmaj7', true, 0.95);
+        console.log(`\n[Rock augmaj7 @0.95] pcs={${[...pcs].sort((a, b) => a - b).join(',')}}\n`);
+        expect(pcs.has(11)).toBe(true); // natural maj7 preserved
+        expect(pcs.has(10)).toBe(false); // no grit b7 slammed on top
+        expect(pcs.has(10) && pcs.has(11)).toBe(false); // no 10+11 rub
+    });
+
     // (d) DRIVING-COMP RHYTHM PIN. The live Rock comp (getAccompanimentNotes, the
     // per-tick chord part tick-logic plays) is a driving comp, not a sparse pad: it
     // fires on multiple steps per bar at high intensity. Pins a floor so a future
