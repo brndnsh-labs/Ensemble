@@ -182,6 +182,7 @@ export const SMART_SCALE_STYLE_MAP = {
     Country: 'country',
     Metal: 'metal',
     'Rock/Metal': 'metal',
+    Shred: 'shred',
     'Ska-Punk': 'rock',
     Ska: 'rock',
 };
