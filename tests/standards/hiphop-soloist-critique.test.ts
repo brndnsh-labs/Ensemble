@@ -1,22 +1,23 @@
 // @ts-nocheck
 /**
- * Hip Hop Soloist Critique — VERBATIM HOOK LANE (#555, genre-audit Wave 1)
+ * Hip Hop Soloist Critique — LIVING HOOK LANE (#555, genre-audit Wave 1)
  *
  * Two defects, one fix:
  *  (1) Wiring — `smart-genres.ts` set Hip Hop's soloist to `'neo'`, and the smart
  *      key out-prioritizes GENRE_STYLE_MAPPING, so Hip Hop played Neo-Soul and the
  *      hand-tuned `hiphop` profile was DEAD. Flipped to `'hiphop'`.
- *  (2) Idiom — hip-hop melody is a sparse 1–2 bar HOOK looped, not a through-
- *      composed solo. A surgical retune ("make it sparse") was disproved (the
- *      sparse line was *less* repetitive than the neo it replaced — motivicResponse
- *      is washed out by SRDC head-replay). The fix is a dedicated VERBATIM hook
- *      lane: carve the strongest 2-bar window of the head and replay it exactly
- *      every bar (`hookLoop` profile flag → short-circuit in getSoloistNote).
+ *  (2) Idiom — hip-hop melody centers on a recurring 1–2 bar HOOK. A first cut
+ *      replayed it VERBATIM, which read as copy-paste and ignored the chords
+ *      (caught by ear). The fix is a LIVING hook: the rhythm/contour skeleton
+ *      recurs (recognizable), but the hook FOLLOWS THE CHORD (anchors snap to the
+ *      current chord's tones, passing notes to its scale), ORNAMENT grows over
+ *      loops, and every 4th statement is a fill.
  *
- * The repetition metric below is the one the sparse retune FAILED: exact pitch
- * repetition across the hook period and across loops. With the verbatim lane it
- * lands at ~1.0; Neo-Soul (the dead routing, no hook) sits far lower — the clean
- * discriminator that proves the lane works, not just that notes got sparser.
+ * So the metric is a WINDOW, not a ceiling: the hook must OUTLINE the changes
+ * (anchors are chord tones) and must NOT be a verbatim loop (period pitch
+ * repetition well below the old 1.0) while staying recognizable (not random).
+ * The audit arrangement has moving chords (Cmaj7→G7→Am7→Fmaj7), so chord-following
+ * is observable.
  */
 import { describe, expect, it } from 'vitest';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
@@ -26,102 +27,117 @@ import {
     simulateSoloistLoops,
 } from '../../scripts/soloist-analysis-utils.js';
 
-// Exact-pitch repetition of the emitted line at a given step lag. lag = hook
-// length → "does the 2-bar hook repeat verbatim"; lag = loop length → "is every
-// loop identical". Keyed on absoluteStep→midi so it measures the real output.
-function repetitionProfile(genre, style = 'smart') {
+function hookProfile() {
     const arrangement = buildHookAuditArrangement('4/4');
     const boot = bootstrapSoloistAudit({
         arrangement,
-        genre,
+        genre: 'Hip Hop',
         bpm: 90,
         intensity: 0.5,
         timeSignature: '4/4',
-        style,
+        style: 'smart',
         seed: 'HEAD_AUDIT',
     });
-    const cap = simulateSoloistLoops({ state: boot.state, arrangement, loops: 4, style });
+    const cap = simulateSoloistLoops({ state: boot.state, arrangement, loops: 4, style: 'smart' });
     const hookLen = boot.state.soloist.session.hook?.loopLengthSteps || 0;
+
+    let anchorNotes = 0;
+    let anchorOnChord = 0;
+    let allNotes = 0;
+    let allOnChord = 0;
     const byStep = new Map();
     for (const e of cap.events) {
-        if (e.absoluteStep >= 0) {
-            byStep.set(e.absoluteStep, e.note.midi);
+        if (e.absoluteStep < 0) {
+            continue;
         }
-    }
-    const lagRep = (lag) => {
-        if (lag <= 0) {
-            return 0;
+        byStep.set(e.absoluteStep, e.note.midi);
+        const ch = e.chord;
+        if (!ch?.intervals) {
+            continue;
         }
-        let hits = 0;
-        let total = 0;
-        for (const [s, midi] of byStep) {
-            const other = byStep.get(s + lag);
-            if (other !== undefined) {
-                total++;
-                if (other === midi) {
-                    hits++;
-                }
+        const rootPc = ((ch.rootMidi % 12) + 12) % 12;
+        const chordPcs = new Set(ch.intervals.map((i) => (((rootPc + i) % 12) + 12) % 12));
+        const pc = ((e.note.midi % 12) + 12) % 12;
+        allNotes++;
+        if (chordPcs.has(pc)) {
+            allOnChord++;
+        }
+        if (e.note.isAnchor) {
+            anchorNotes++;
+            if (chordPcs.has(pc)) {
+                anchorOnChord++;
             }
         }
-        return total ? hits / total : 0;
-    };
+    }
+    let pHits = 0;
+    let pTot = 0;
+    for (const [s, m] of byStep) {
+        const o = byStep.get(s + hookLen);
+        if (o !== undefined) {
+            pTot++;
+            if (o === m) {
+                pHits++;
+            }
+        }
+    }
     return {
         hookLen,
         noteCount: byStep.size,
         measures: arrangement.measuresPerLoop * 4,
-        periodRep: lagRep(hookLen),
-        loopOverLoop: lagRep(arrangement.totalSteps),
+        anchorChordToneRate: anchorNotes ? anchorOnChord / anchorNotes : 0,
+        allChordToneRate: allNotes ? allOnChord / allNotes : 0,
+        periodPitchRep: pTot ? pHits / pTot : 0,
     };
 }
 
 describe('Hip Hop Soloist Critique', () => {
-    // (1) DEAD-KEY ROUTING GUARD. The whole bug started here: the smart key must
-    // resolve to the dedicated hiphop profile, not neo. Pins it both ways.
+    // (1) DEAD-KEY ROUTING GUARD — the bug started here: the smart key must resolve
+    // to the dedicated hiphop profile, not neo.
     it('routes Hip Hop (smart) to the dedicated hiphop profile, not neo', () => {
         expect(resolveSoloistStyle('smart', 'Hip Hop')).toBe('hiphop');
-        // explicit style honored too
         expect(resolveSoloistStyle('hiphop', 'Hip Hop')).toBe('hiphop');
-        // regression: must NOT fall back to neo
         expect(resolveSoloistStyle('smart', 'Hip Hop')).not.toBe('neo');
     });
 
-    it('plays a verbatim looping hook — measurably more repetitive than neo', () => {
-        const hip = repetitionProfile('Hip Hop');
-        const neo = repetitionProfile('Neo-Soul');
-
-        console.log('\n--- HIP HOP SOLOIST CRITIQUE REPORT ---');
-        console.log(`[hook length steps]   ${hip.hookLen} (2 bars × 16 = 32)`);
-        console.log(`[period repetition]   ${(hip.periodRep * 100).toFixed(1)}% (Target: >0.90)`);
+    it('outlines the chord changes — the hook follows the harmony', () => {
+        const p = hookProfile();
+        console.log('\n--- HIP HOP LIVING-HOOK REPORT ---');
+        console.log(`[hook length]          ${p.hookLen} (2 bars × 16)`);
         console.log(
-            `[loop-over-loop]      hiphop ${(hip.loopOverLoop * 100).toFixed(1)}%  vs  neo ${(neo.loopOverLoop * 100).toFixed(1)}%`,
+            `[anchor chord-tone]    ${(p.anchorChordToneRate * 100).toFixed(1)}% (Target: >0.85)`,
         );
-        console.log(`[notes over 4 loops]  hiphop ${hip.noteCount}  neo ${neo.noteCount}`);
-        console.log('---------------------------------------\n');
+        console.log(
+            `[all chord-tone]       ${(p.allChordToneRate * 100).toFixed(1)}% (Target: >0.55)`,
+        );
+        console.log(
+            `[period pitch rep]     ${(p.periodPitchRep * 100).toFixed(1)}% (Target: 0.40–0.90; was 1.0 verbatim)`,
+        );
+        console.log(`[notes over 4 loops]   ${p.noteCount}`);
+        console.log('----------------------------------\n');
 
-        // (2) THE HOOK IS CAPTURED. 2 bars × 16 steps/bar = 32.
-        expect(hip.hookLen).toBe(32);
+        expect(p.hookLen).toBe(32);
+        // (2) CHORD-FOLLOWING — the headline fix. The hook's structural notes land
+        // on the chord under them, so it outlines the progression instead of
+        // freezing. Engine: ~1.0. A static verbatim hook over moving chords would
+        // score far lower (its fixed pitches clash with most chords).
+        expect(p.anchorChordToneRate).toBeGreaterThan(0.85);
+        // The whole line stays harmonic (chord + scale tones), not just anchors.
+        expect(p.allChordToneRate).toBeGreaterThan(0.55);
+    });
 
-        // (3) VERBATIM REPETITION — the feature. The emitted line repeats exactly
-        // at the hook period: the same pitch recurs 2 bars later across the whole
-        // performance. Engine: ~1.0; >0.90 leaves headroom for any future
-        // micro-variation that rides velocity/timing (never pitch).
-        expect(hip.periodRep).toBeGreaterThan(0.9);
-
-        // (4) MEASURABLY MORE REPETITIVE THAN NEO — the metric the sparse retune
-        // FAILED. Loop-over-loop exact pitch: hiphop ~1.0 (every loop identical),
-        // neo ~0.18 (regenerates). Assert the wide separation, not just "hiphop
-        // high", so a regression that weakens the lane is caught.
-        expect(hip.loopOverLoop).toBeGreaterThan(0.85);
-        expect(neo.loopOverLoop).toBeLessThan(0.45);
-        expect(hip.loopOverLoop - neo.loopOverLoop).toBeGreaterThan(0.4);
+    it('breathes — recognizable but NOT a verbatim copy-paste loop', () => {
+        const p = hookProfile();
+        // (3) THE WINDOW. period pitch repetition must be BELOW the old verbatim 1.0
+        // (it varies as the chords move + ornament grows) yet not collapse to random
+        // (the rhythm/contour skeleton still recurs). Engine: ~0.76.
+        expect(p.periodPitchRep).toBeLessThan(0.9); // broke copy-paste
+        expect(p.periodPitchRep).toBeGreaterThan(0.4); // still a recognizable hook
     });
 
     it('stays a coherent, non-empty melodic line (regression guard)', () => {
-        const hip = repetitionProfile('Hip Hop');
-        // The hook must actually produce notes (not silence the soloist) and not
-        // spray every step. notesPerMeasure across the 4-loop performance.
-        const notesPerMeasure = hip.noteCount / Math.max(1, hip.measures);
-        expect(hip.noteCount).toBeGreaterThan(0);
+        const p = hookProfile();
+        const notesPerMeasure = p.noteCount / Math.max(1, p.measures);
+        expect(p.noteCount).toBeGreaterThan(0);
         expect(notesPerMeasure).toBeGreaterThan(1);
         expect(notesPerMeasure).toBeLessThan(16);
     });
