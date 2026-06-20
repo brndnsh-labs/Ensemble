@@ -34,6 +34,7 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     // shape; tests overwrite specific leaves via the flat input below.
     const session: any = {
         seed: null,
+        hook: null,
         sessionSteps: 0,
         phraseCount: 0,
         tension: 0,
@@ -104,6 +105,9 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     const ROUTES: Record<string, (v: unknown) => void> = {
         sessionSeed: (v) => {
             session.seed = v;
+        },
+        soloistHook: (v) => {
+            session.hook = v;
         },
         sessionSteps: (v) => {
             session.sessionSteps = v;

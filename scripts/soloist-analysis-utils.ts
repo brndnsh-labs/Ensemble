@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
 import { getSoloistNote } from '../public/engine/soloist.js';
-import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
-import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
+import { resolveSoloistStyle, STYLE_CONFIG } from '../public/engine/soloist-config.js';
+import { deriveSoloistHook, generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
 import { createPRNG, getStepInfo, midiToNote } from '../public/utils.js';
@@ -999,12 +999,26 @@ export function bootstrapSoloistAudit({
 
     state.soloist.session.seed = sessionSeed;
 
+    // #555 — mirror production (state-effects.regenerateSessionSeeds): capture the
+    // verbatim hook for hook-driven profiles so the harness exercises the replay
+    // short-circuit. The harness builds the seed directly (bypassing state-effects),
+    // so the capture must be replicated here against the same deriveSoloistHook.
+    const profile = STYLE_CONFIG[seedStyle];
+    let sessionHook = null;
+    if (profile?.hookLoop) {
+        const tsCfg = TIME_SIGNATURES[arrangement.ts] || TIME_SIGNATURES['4/4'];
+        const stepsPerMeasure = tsCfg.beats * tsCfg.stepsPerBeat;
+        sessionHook = deriveSoloistHook(sessionSeed, profile.hookBars ?? 2, stepsPerMeasure);
+    }
+    state.soloist.session.hook = sessionHook;
+
     return {
         state,
         arrangement,
         seedStyle,
         ts: arrangement.ts,
         sessionSeed,
+        sessionHook,
     };
 }
 

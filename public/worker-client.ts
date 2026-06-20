@@ -190,6 +190,10 @@ export function syncWorker(action?: string, payload?: any): void {
             data.harmony = payload;
             break;
         case 'UPDATE_SB':
+            // NOTE: this delta forwards the flat payload as-is; nested session
+            // fields (`session.seed`, `session.hook` — #555) are NOT re-routed here
+            // and ride the full snapshot/flush (getSyncState) at play-start instead,
+            // not this delta. See getSyncState() + recursiveSafeSync.
             data.soloist = payload;
             break;
         case 'UPDATE_GB':

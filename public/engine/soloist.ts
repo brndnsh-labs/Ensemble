@@ -1206,6 +1206,50 @@ export function getSoloistNote(
         return res;
     };
 
+    // --- 0. HOOK LANE (#555) ---
+    // why: hook-driven profiles (Hip Hop, config.hookLoop) loop a short verbatim
+    // 1–2 bar motif instead of a through-composed solo. Replay the captured hook
+    // (session.hook, carved from the head main-thread) BEFORE every other path —
+    // device/embellishment drains, busySteps silence, the head-bypass (SRDC, which
+    // deliberately DRIFTS), and the budget-forced rest below — because a hook note
+    // owns its step outright (same "structural note wins, drain nothing on top"
+    // stance as the loop-1 anchor guard). On steps with no hook note we FALL
+    // THROUGH so gaps rest or gap-fill via the normal machinery.
+    const hookLane = soloist.session.hook;
+    if (config.hookLoop && hookLane && hookLane.notes.length > 0 && hookLane.loopLengthSteps > 0) {
+        const stepInHook = normalizeLoopStep(step, hookLane.loopLengthSteps);
+        const hookHits = hookLane.notes.filter(
+            (n) => normalizeLoopStep(n.step, hookLane.loopLengthSteps) === stepInHook,
+        );
+        if (hookHits.length > 0) {
+            // Mirror the head-bypass: we ARE actively phrasing, so don't let the
+            // orchestrator hand the solo away.
+            phr.isResting = false; // @worker-mutation
+            phr.state = 'active'; // @worker-mutation
+            const emitted = hookHits.map((n) => {
+                // Micro-variation rides VELOCITY only (seeded ±0.05 absolute
+                // velocity, discriminator 60) — never the pitch. Verbatim midi IS
+                // the repetition guarantee; finalizeNote adds the same deterministic
+                // timing jitter every path gets (the laid-back hip-hop feel),
+                // invisible to the pitch metric.
+                const vJitter = (scrambleHash(callSeedBase + 60) - 0.5) * 0.1;
+                return {
+                    midi: n.midi,
+                    durationSteps: n.durationSteps,
+                    velocity: Math.max(0.1, Math.min(1, (n.velocity || 0.7) + vJitter)),
+                    isAnchor: n.isAnchor,
+                    ...(n.timingOffset !== undefined ? { timingOffset: n.timingOffset } : {}),
+                    ...(n.tripletPlacement ? { tripletPlacement: n.tripletPlacement } : {}),
+                };
+            });
+            // Hold a multi-step hook note across its duration (mirrors the device /
+            // head paths so the next steps don't double-attack).
+            const primaryHook = emitted[emitted.length - 1];
+            phr.busySteps = Math.max(0, (primaryHook.durationSteps || 1) - 1); // @worker-mutation
+            return finalizeNote(emitted.length === 1 ? emitted[0] : emitted);
+        }
+    }
+
     // --- 1. Busy/Device Handling ---
     // why: a cadential device (e.g. bluesTurnaround, a 16-step deviceBuffer) fired
     // near the end of loop 0 can still have queued tail steps when loop 1 begins.

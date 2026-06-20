@@ -58,7 +58,11 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         drum: 'Hip Hop',
         feel: 'Hip Hop',
         bass: 'hiphop',
-        soloist: 'neo',
+        // #555: was 'neo' — the smart key out-prioritized GENRE_STYLE_MAPPING's
+        // 'hiphop', so Hip Hop played Neo-Soul and the hand-tuned hiphop profile
+        // was dead. Flip to the dedicated hook-lane profile (resolution guarded in
+        // soloist-routing-guard.test.ts).
+        soloist: 'hiphop',
     },
     Blues: {
         swing: 90,
