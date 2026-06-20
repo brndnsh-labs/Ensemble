@@ -59,14 +59,11 @@ describe('Soloist Acoustic Critique', () => {
             // Explicit 'acoustic' STYLE_CONFIG profile (soloist-config.ts:489 —
             // restBase 0.15, maxNotesPerPhrase 12, allowedDevices ['slide','run']).
             //
-            // IMPORTANT routing note (see the resolution-guard test below): the
-            // Acoustic *genre* in smart mode does NOT play this profile. It
-            // resolves to 'minimal' (SMART_GENRES.Acoustic.soloist = 'minimal').
-            // The 'acoustic' profile is reached only by an explicit UI style, or
-            // by the GENRE_STYLE_MAPPING fallback for a genre absent from
-            // SMART_GENRES. This critique exercises the 'acoustic' PROFILE itself
-            // (#547) — same posture as the Rock critique testing 'rock' while the
-            // Rock genre actually plays 'shred'.
+            // Routing note (see the resolution-guard test below): since #592 the
+            // Acoustic *genre* in smart mode plays exactly this profile
+            // (SMART_GENRES.Acoustic.soloist = 'acoustic') — it used to fall
+            // through to the generic 'minimal'. So this critique now guards what
+            // a user actually hears for the Acoustic genre.
             style: 'acoustic',
             mode: 'guitar',
             octave: 64,
@@ -331,20 +328,18 @@ describe('Soloist Acoustic Critique', () => {
     });
 
     // why: style-resolution guard (the reggae dead-profile / Rock->shred class
-    // of bug). This pins the SURPRISING routing so a future change can't silently
-    // make this critique test the wrong thing. The Acoustic GENRE in smart mode
-    // resolves to the 'minimal' soloist profile (SMART_GENRES.Acoustic.soloist =
-    // 'minimal'), NOT 'acoustic'. The 'acoustic' STYLE_CONFIG profile this
-    // critique exercises is reached only by an explicit UI style (and by the
-    // GENRE_STYLE_MAPPING fallback for genres absent from SMART_GENRES). If
-    // either edge flips, this guard fails loudly.
+    // of bug). This pins the routing so a future change can't silently make this
+    // critique test the wrong thing. Since #592 the Acoustic GENRE in smart mode
+    // resolves to the 'acoustic' soloist profile (SMART_GENRES.Acoustic.soloist =
+    // 'acoustic') — the tailored profile this critique exercises is now what a
+    // user actually hears. If that edge flips, this guard fails loudly.
+    // (The full cross-genre table lives in soloist-routing-guard.test.ts.)
     it('resolves Acoustic genre/style to the documented soloist profiles', () => {
-        // Smart mode + Acoustic feel -> 'minimal' (the SMART_GENRES routing — the
-        // profile a user actually hears for the Acoustic genre).
-        expect(resolveSoloistStyle('smart', 'Acoustic')).toBe('minimal');
-        expect(resolveSoloistStyle(undefined, 'Acoustic')).toBe('minimal');
-        // An explicit 'acoustic' UI style is honored verbatim (the profile this
-        // critique measures) and is NOT rewritten by the genre feel.
+        // Smart mode + Acoustic feel -> 'acoustic' (the SMART_GENRES routing — the
+        // profile a user actually hears for the Acoustic genre, post-#592).
+        expect(resolveSoloistStyle('smart', 'Acoustic')).toBe('acoustic');
+        expect(resolveSoloistStyle(undefined, 'Acoustic')).toBe('acoustic');
+        // An explicit 'acoustic' UI style is honored verbatim.
         expect(resolveSoloistStyle('acoustic', 'Acoustic')).toBe('acoustic');
         expect(resolveSoloistStyle('acoustic', undefined)).toBe('acoustic');
         // 'acoustic' and 'minimal' are distinct profiles, not aliases.

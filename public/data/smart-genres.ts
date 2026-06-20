@@ -22,7 +22,10 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         drum: 'Basic Rock',
         feel: 'Rock',
         bass: 'rock',
-        soloist: 'shred',
+        // #592: the Rock genre plays its tailored 'rock' profile (bluesy
+        // bends/double-stops/pentatonic) — the idiomatic default. 'shred' stays
+        // the explicit fast-lead voice, reached by the UI style or Shred genre.
+        soloist: 'rock',
     },
     Jazz: {
         swing: 60,
@@ -90,7 +93,10 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         feel: 'Acoustic',
         chord: 'pad',
         bass: 'acoustic',
-        soloist: 'minimal',
+        // #592: the Acoustic genre plays its hand-tuned 'acoustic' profile
+        // (space-over-flash: restBase 0.15, slide/run devices) rather than the
+        // generic 'minimal' it used to fall through to.
+        soloist: 'acoustic',
         harmony: 'strings',
         meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
