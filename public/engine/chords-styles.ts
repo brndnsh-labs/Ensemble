@@ -303,11 +303,19 @@ export function getIntervals(
         if (!isAltered5 && !isAug && !intervals.includes(7)) {
             intervals.push(7);
         }
-        // For Rock, if high intensity, also add the 7th for more "grit"
-        if (genre === 'Rock' && !intervals.includes(10) && quality !== 'maj7') {
-            if (!intervals.includes(10)) {
-                intervals.push(10);
-            }
+        // For Rock at high intensity, add a b7 for "grit" — but ONLY to chords
+        // that already carry dominant/7th function. Slamming a b7 onto a plain
+        // major (or minor) triad manufactures a dom7 the chart never asked for and
+        // kills power-triad clarity: AC/DC/Stones rhythm parts stay triadic/power
+        // at full energy; the b7 belongs to dominant/blues charts (spelled
+        // explicitly). Mirrors the :284 guard. (Common maj7-family qualities are
+        // excluded — their 7th is the natural 11, not a b7. NOTE: augmaj7 also
+        // carries a natural 7 and ideally belongs here too — tracked as a separate
+        // pre-existing follow-up, out of scope for this plain-triad fix.)
+        const isDominantSeventh =
+            is7th && !['maj7', 'maj9', 'maj11', 'maj13', 'maj7#11'].includes(quality);
+        if (genre === 'Rock' && isDominantSeventh && !intervals.includes(10)) {
+            intervals.push(10);
         }
     }
 
