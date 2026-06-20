@@ -164,6 +164,30 @@ describe('Soloist Melodic Devices Deep Dive', () => {
             expect(notes.every((note) => note.device === 'quartal')).toBe(true);
         });
 
+        // #566: neo's quartal device must voice a PERFECT FOURTH (5 semitones),
+        // not a major third — a quartal voicing IS fourths (D'Angelo/Glasper).
+        // Previously the style ternary was inverted and neo got a major third.
+        it('voices neo quartal as a perfect fourth, not a major third', () => {
+            ctx.activeStyle = 'neo';
+            const device = generateMelodicDevice('quartal', ctx);
+            const stack = device[0]; // polyphonic double-stop sub-array
+            expect(Array.isArray(stack)).toBe(true);
+            const midis = stack.map((n) => n.midi).sort((a, b) => a - b);
+            expect(midis.length).toBe(2);
+            expect(midis[1] - midis[0]).toBe(5); // perfect fourth, not 4 (major third)
+        });
+
+        // #566 regression guard: blues/scalar double-stops stay major thirds (4) —
+        // the idiomatic blues guitar double-stop (Chuck Berry), so the swap that
+        // fixed neo can't have silently flipped blues to a fourth.
+        it('keeps blues double-stops a major third', () => {
+            ctx.activeStyle = 'blues';
+            const device = generateMelodicDevice('quartal', ctx);
+            const stack = device[0];
+            const midis = stack.map((n) => n.midi).sort((a, b) => a - b);
+            expect(midis[1] - midis[0]).toBe(4); // major third
+        });
+
         it('should handle quartalStack', () => {
             const device = generateMelodicDevice('quartalStack', ctx);
             expect(Array.isArray(device[0])).toBe(true);
