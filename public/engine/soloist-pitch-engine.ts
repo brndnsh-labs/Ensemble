@@ -628,6 +628,17 @@ export function selectPitchAndDevices(
 
     // Optimization: Pre-compute stylistic boolean checks and common tone arrays to avoid allocating inside the hot loop
     const isBluesOrJazz = activeStyle === 'blues' || activeStyle === 'jazz';
+    // #564: funk shares the b3/b5 blue-note grit over dominants (and the existing
+    // b7 color), but uses the b3 as a passing GRACE into the major 3, not a
+    // sustained landing tone. So funk is admitted to blue-note recognition here,
+    // then given a tempered reward below (the base color bonus, but NOT the blues
+    // +500 b3-landing fixation — that would over-sit on the b3, the opposite of
+    // funk). Recognition also (intentionally) excludes funk's blue notes from the
+    // bebop chromatic-neighbor resolution lane (via `!lastWasBlueNote` at the
+    // `lastWasChromaticNeighbor` calc below), so a funk b3 resolves by grace, not
+    // by the ×12 Parker chord-tone snap — the musically-correct behavior for funk.
+    const isFunk = activeStyle === 'funk';
+    const recognizesBlueNotes = isBluesOrJazz || isFunk;
     const isGreatsProfileEnabled =
         activeStyle === 'blues' ||
         activeStyle === 'jazz' ||
@@ -794,7 +805,7 @@ export function selectPitchAndDevices(
     const lastInterval = (lastPC - (rootMidi % 12) + 12) % 12;
     const lastWasScaleTone = ((scaleMask >> lastInterval) & 1) === 1;
     const lastWasBlueNote =
-        isBluesOrJazz && (lastInterval === 3 || lastInterval === 6 || lastInterval === 10);
+        recognizesBlueNotes && (lastInterval === 3 || lastInterval === 6 || lastInterval === 10);
     const lastWasChromaticNeighbor =
         chromaticNeighborsActive &&
         !lastWasScaleTone &&
@@ -822,7 +833,7 @@ export function selectPitchAndDevices(
         const isScaleTone = (scaleMask >> interval) & 1;
         const isChordTone = (chordMask >> interval) & 1;
         let isBlueNote = false;
-        if (isBluesOrJazz && (interval === 3 || interval === 6 || interval === 10)) {
+        if (recognizesBlueNotes && (interval === 3 || interval === 6 || interval === 10)) {
             isBlueNote = true;
         }
         // Chromatic neighbor: ±1 semitone from a chord-tone PC, not already a
@@ -1273,7 +1284,11 @@ export function selectPitchAndDevices(
 
         if (isBlueNote) {
             weight += 80;
-            if (interval === 3) {
+            // #564: funk takes only the base blue-note color (+80) on the b3 — it
+            // uses the b3 as a passing grace into the major 3, so the blues
+            // b3-landing fixation below would over-sit on it. The b5/b7 grit still
+            // reads through the base bonus. Blues/jazz keep the strong b3 landing.
+            if (interval === 3 && !isFunk) {
                 // Temper the minor 3rd during responses to allow for clearer resolution to Root/5th
                 if (soloistState.session.currentPhrase.context?.role === 'response') {
                     weight += 100;
