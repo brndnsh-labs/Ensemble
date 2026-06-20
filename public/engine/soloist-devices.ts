@@ -1,3 +1,4 @@
+import { scrambleHash } from './hash-utils.js';
 import { isSoloistGuitarMode, resolveSoloistMode } from './soloist-mode-policy.js';
 import { getScaleForChord } from './theory-scales.js';
 
@@ -90,6 +91,7 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         responseEntryTarget = false,
         responseCadenceTarget = false,
         accompanimentMidis,
+        pickerSeedBase = 0,
     } = ctx;
 
     const devBaseVel = 0.5 + effectiveIntensity * 0.6;
@@ -227,7 +229,11 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             deviceBuffer = lick.map((n, idx) => ({
                 ...n,
                 midi: Math.max(minMidi, Math.min(maxMidi, n.midi + octaveShift)),
-                velocity: devBaseVel * (idx === 0 ? 1.15 : 0.9 + Math.random() * 0.15),
+                // #568: seeded velocity humanization (was Math.random) — offset
+                // >=40 keeps this clear of the picker's +1..14 draw range.
+                velocity:
+                    devBaseVel *
+                    (idx === 0 ? 1.15 : 0.9 + scrambleHash(pickerSeedBase + 40 + idx) * 0.15),
                 style: activeStyle,
             }));
         }
@@ -670,7 +676,9 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             deviceBuffer.push({
                 midi: startMidi + interval + octaveShift,
                 durationSteps: 0.5, // 32nd notes
-                velocity: devBaseVel * (0.7 + Math.random() * 0.3),
+                // #568: seeded velocity humanization (was Math.random) — offset
+                // >=50 keeps this clear of the picker's +1..14 and the bluesLick +40 range.
+                velocity: devBaseVel * (0.7 + scrambleHash(pickerSeedBase + 50 + i) * 0.3),
                 style: activeStyle,
             });
         }

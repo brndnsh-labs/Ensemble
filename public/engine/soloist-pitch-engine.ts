@@ -1611,6 +1611,12 @@ export function selectPitchAndDevices(
         responseDirection,
         responseEntryTarget: isResponseEntryTarget,
         responseCadenceTarget: isResponseCadenceTarget,
+        // why: #568 — the device generator's velocity humanization was raw
+        // Math.random (loop-incoherent, critique-unreliable). Forward the picker's
+        // per-call seed so device velocity reads from the same deterministic
+        // `scrambleHash(pickerSeedBase + N)` stream as the rest of the picker.
+        // The device uses offsets >=40, clear of the picker's +1..14 draws.
+        pickerSeedBase,
         // why: epic-coordination-consistency S5.b — the device generator emits
         // neighbor/approach pitches around `selectedMidi` (enclosure ±1, run
         // ±motifApproach × {1,2}). The picker has already biased selectedMidi
