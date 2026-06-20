@@ -33,6 +33,14 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix:** `installSeededRandom()` at the `describe` level (commit on 2026-05-30). With the default mulberry32 seed the sample is now `chromatic=3, anticipation=28` (`3 < 11.2`, comfortable margin) every run — deterministic, still a representative statistical draw.
 - **Last seen:** 2026-05-30 (pre-commit hook, since fixed).
 
+### 🟢 `tests/standards/hiphop-bass-critique.test.ts` — "chord-boundary slides at high intensity (frequent chord changes)"
+
+- **Class:** unseeded-statistical
+- **Symptom:** `expect(slideRate).toBeGreaterThan(0.3)` failed at `0.2903 > 0.3` (9/31 boundaries slid). Passed 5/5 standalone locally; surfaced on a post-merge CI run on `main`.
+- **Root cause:** the 808-slide gate fires `Math.random() < 0.55` independently per chord boundary (n=31 trials at intensity 0.75). The slide-rate is therefore an unseeded binomial centered ~0.5 that ranged 32–65% across 8 standalone runs — wide enough to occasionally dip below the deliberately-low 0.30 floor. Not an ordering leak; pure unlucky roll. (`BASS_SPACE_FEELS` / #554 ruled out — it doesn't reach the bass engine.)
+- **Fix:** `installSeededRandom()` at the `describe` level (replaces the redundant `beforeEach(vi.restoreAllMocks)`; 2026-06-20). With the default mulberry32 seed the draw is now `20/31 = 64.5%` every run (margin 0.345 above the floor, 0.205 below the 0.85 ceiling) — deterministic, still a representative draw. Full file 7/7 and the `standards/` batch 968/968 green.
+- **Last seen:** 2026-06-20 (post-merge CI on main, since fixed).
+
 ### 🟢 e2e hydration-wait timeouts (dev-server cold compile)
 
 - **Class:** e2e-timing

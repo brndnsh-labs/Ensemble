@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { installSeededRandom } from '../utils/seeded-random.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -12,9 +13,13 @@ vi.mock('../../public/state.js', () => ({
 }));
 
 describe('Hip Hop Bassist Critique', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
+    // why: the 808-slide gate rolls raw `Math.random() < 0.55` per chord boundary
+    // (n=31 trials), so the slide-rate is an unseeded binomial that occasionally
+    // dips below the 0.30 floor (CI saw 9/31 = 29%). A mulberry32-seeded spy
+    // collapses it to one deterministic run with comfortable margin. Restores
+    // mocks in before+after, so it subsumes the old `vi.restoreAllMocks()`
+    // beforeEach. See docs/FLAKY_TESTS.md (unseeded-statistical class).
+    installSeededRandom();
 
     /**
      * Hip-hop bass simulator. Accepts an optional chord sequence (one entry per bar)
