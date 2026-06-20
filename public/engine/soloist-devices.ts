@@ -683,7 +683,13 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             });
         }
     } else if ((deviceType === 'quartal' || deviceType === 'guitarDouble') && isPolyphonic) {
-        const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 5 : 4;
+        // #566: interval below the top voice (selectedMidi). "quartal" means a
+        // perfect FOURTH (5) — the defining neo-soul/jazz double-stop color
+        // (D'Angelo, Glasper). Blues/scalar guitar double-stops are idiomatically
+        // major THIRDS (4) (Chuck Berry-style), not fourths. The ternary was
+        // inverted: neo (the genre that most needs the quartal sound) was getting
+        // a major third, the opposite of quartal. Swap restores both idioms.
+        const dsInt = activeStyle === 'blues' || activeStyle === 'scalar' ? 4 : 5;
         deviceBuffer = [
             [
                 {
