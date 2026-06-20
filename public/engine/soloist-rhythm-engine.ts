@@ -843,6 +843,54 @@ export function generateRhythmPlan(
                 }
             }
 
+            // --- Reggae Offbeat Float (the laid-back one-drop lead feel) ---
+            // why: #570 — same dead-knob class as ska pre-#593: the 'reggae'
+            // STYLE_CONFIG profile's syncopationLikelihood (0.9) was consumed only
+            // by the seeder, never the live per-step attackProb, so routing the
+            // Reggae genre to the tailored 'reggae' profile still played downbeat-
+            // locked (measured ~60% downbeat / ~10% offbeat — MORE square than the
+            // 'minimal' it replaced). Reggae's signature is the OPPOSITE: the
+            // one-drop leaves beat 1 open and the lead floats on the offbeats /
+            // the "&". Unlike ska's DRIVING horn pump, reggae is laid-back and
+            // sparse, so the offbeat lift is GENTLER (×1.9 vs ska's ×2.1) and the
+            // on-beats are damped toward space rather than a hard horn-line attack.
+            // Final-stage `attackProb *=` (not an additive bump on baseAttackProb)
+            // for the same reason as ska — the stacked additive boosts (seed +0.4,
+            // downbeat +0.2, kick/snare +0.2) wash out any additive offbeat term
+            // (project memory: weight-tuning-multiplier-placement). Gated to the
+            // 'reggae' STYLE_CONFIG profile ONLY; every other style is untouched.
+            if (style === 'reggae') {
+                if (isDownbeat) {
+                    // Beat 1 — "the one." Damp HARDEST: the one-drop leaves it open,
+                    // the lead pulls off it onto the upbeat. ×0.32. Unconditional
+                    // (the downbeat additive boosts already saturate past 1.0, so a
+                    // `<1.0` gate would skip the damp). Re-clamped below.
+                    attackProb *= 0.32;
+                } else if (isBackbeat) {
+                    // Beats 2 & 4 — present but de-emphasized landing tones (×0.62),
+                    // so phrase heads/resolutions stay reachable without the lead
+                    // sitting on the backbeat.
+                    attackProb *= 0.62;
+                } else if (isBeatStart) {
+                    // Beat 3 — where the one-drop kick+snare land; the LEAD leaves
+                    // that to the rhythm section. Damped ×0.5 like the downbeat.
+                    attackProb *= 0.5;
+                } else if (isOffbeatEighth) {
+                    // The "&" — the heart of the reggae bubble; pump it so it leads.
+                    // ×1.9, gentler than ska's ×2.1 (laid-back, not driving). Below
+                    // the 1.0 saturation ceiling so forced landmarks stay exact.
+                    if (attackProb < 1.0) {
+                        attackProb *= 1.9;
+                    }
+                } else if (isSixteenthSubdivision) {
+                    // The 'e'/'a' skank subdivisions get a LIGHT lift (×1.2) so the
+                    // offbeat texture fills without competing with the "&".
+                    if (attackProb < 1.0) {
+                        attackProb *= 1.2;
+                    }
+                }
+            }
+
             if (coordination.bypassRhythm) {
                 attackProb = 1.0;
             }
