@@ -439,6 +439,17 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.64,
         syncopationLikelihood: 0.8,
         chromaticism: 0.5,
+        // #572 — bossa's hallmark is LYRICAL RESTRAINT: singable, held color tones (the
+        // 6/9 it targets) with space between phrases, not a flowing bebop line. Bossa's
+        // sparse density (rhythmicDensity 0.64 + restBase 0.12) already gives the space
+        // (~29% fewer notes than jazz); the generic default (sustainProb 0.15) gave no
+        // lyrical-sustain bias. This lifts the mean note duration. NOTE: the additive
+        // sustain stack (rhythm engine) absorbs much of it, so it nudges the MEAN rather
+        // than spawning many whole-note holds — a stronger long-hold lever would be a
+        // bossa-specific boost in that block, deferred as by-ear. Exact value is a by-ear
+        // tuning item (verify-by-ear).
+        sustainProb: 0.42,
+        maxSustainSteps: 16,
         motivicResponse: {
             enabled: true,
             rhythmReuse: 0.66,
