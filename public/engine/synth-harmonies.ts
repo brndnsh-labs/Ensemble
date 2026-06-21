@@ -1,5 +1,6 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
+import { resolveInstrumentSource } from './instrument-registry.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
@@ -267,10 +268,23 @@ export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05) {
     killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
 }
 
-// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
-// instrument's `voice` setting; `*New` is a placeholder until Epic 1 fills it in.
-export function playHarmonyNote(...args: Parameters<typeof playHarmonyNoteCurrent>): void {
+// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
+// `voice` setting between the Current and (Epic 1) New synthesized voices.
+function dispatchHarmonySynth(...args: Parameters<typeof playHarmonyNoteCurrent>): void {
     (args[0].harmony.voice === 'new' ? playHarmonyNoteNew : playHarmonyNoteCurrent)(...args);
+}
+
+// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
+// to a sample source once its buffers load (S3); S5 routes that case to
+// `playSampledNote` (string ensemble — `harmony.md` §4). Until then, and
+// whenever a pack buffer is unavailable, we fall back to the synth voice —
+// bit-identical with no packs installed.
+export function playHarmonyNote(...args: Parameters<typeof playHarmonyNoteCurrent>): void {
+    if (resolveInstrumentSource(args[0].harmony.voice).kind === 'sample') {
+        dispatchHarmonySynth(...args); // S5: → playSampledNote(packId, …)
+        return;
+    }
+    dispatchHarmonySynth(...args);
 }
 
 /**

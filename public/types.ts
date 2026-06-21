@@ -217,7 +217,7 @@ export interface PocketState {
  * settings toggle switches between them for A/B audition. Extended by
  * synth-audit Epic 6 with `pack:<id>` values for sample packs.
  */
-export type InstrumentVoice = 'current' | 'new';
+export type InstrumentVoice = 'current' | 'new' | `pack:${string}`;
 
 export interface GrooveState {
     /** Whether the drum engine is active. */

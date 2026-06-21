@@ -6,6 +6,7 @@ import {
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
 import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
+import { hydrateVoice } from './engine/instrument-registry.js';
 import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
 import { saveCurrentState } from './persistence.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
@@ -210,7 +211,7 @@ export function hydrateState(): void {
         if (savedState.chords) {
             Object.assign(chords, {
                 enabled: savedState.chords.enabled !== undefined ? savedState.chords.enabled : true,
-                voice: savedState.chords.voice === 'new' ? 'new' : 'current',
+                voice: hydrateVoice(savedState.chords.voice),
                 style: savedState.chords.style || 'smart',
                 instrument: 'Piano',
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
@@ -224,7 +225,7 @@ export function hydrateState(): void {
         if (savedState.bass) {
             Object.assign(bass, {
                 enabled: savedState.bass.enabled !== undefined ? savedState.bass.enabled : true,
-                voice: savedState.bass.voice === 'new' ? 'new' : 'current',
+                voice: hydrateVoice(savedState.bass.voice),
                 style: savedState.bass.style || 'smart',
                 octave: clamp(savedState.bass.octave, 0, 127, 36),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.bass.volume, 0, 1, 1.0),
@@ -237,7 +238,7 @@ export function hydrateState(): void {
             Object.assign(soloist, {
                 enabled:
                     savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
-                voice: savedState.soloist.voice === 'new' ? 'new' : 'current',
+                voice: hydrateVoice(savedState.soloist.voice),
                 style: savedState.soloist.style || 'smart',
                 preset: normalizeSoloistPreset(savedState.soloist.preset, 'trumpet'),
                 octave:
@@ -263,7 +264,7 @@ export function hydrateState(): void {
             Object.assign(harmony, {
                 enabled:
                     savedState.harmony.enabled !== undefined ? savedState.harmony.enabled : false,
-                voice: savedState.harmony.voice === 'new' ? 'new' : 'current',
+                voice: hydrateVoice(savedState.harmony.voice),
                 style: savedState.harmony.style || 'smart',
                 octave: clamp(savedState.harmony.octave, 0, 127, 60),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.harmony.volume, 0, 1, 1.0),
@@ -276,7 +277,7 @@ export function hydrateState(): void {
         if (savedState.groove) {
             Object.assign(groove, {
                 enabled: savedState.groove.enabled !== undefined ? savedState.groove.enabled : true,
-                voice: savedState.groove.voice === 'new' ? 'new' : 'current',
+                voice: hydrateVoice(savedState.groove.voice),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.groove.volume, 0, 1, 1.0),
                 reverb: shouldResetMixer
                     ? INSTRUMENT_REVERB_DEFAULTS.groove

@@ -1,5 +1,6 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
+import { resolveInstrumentSource } from './instrument-registry.js';
 import {
     createSimplePanner,
     HUMANIZE_PROFILES,
@@ -134,10 +135,22 @@ interface PlayNoteOptions {
     numVoices?: number;
 }
 
-// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
-// instrument's `voice` setting; `*New` is a placeholder until Epic 2 fills it in.
-export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
+// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
+// `voice` setting between the Current and (Epic 2) New synthesized voices.
+function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): void {
     (args[0].chords.voice === 'new' ? playNoteNew : playNoteCurrent)(...args);
+}
+
+// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
+// to a sample source once its buffers load (S3); S5 routes that case to
+// `playSampledNote`. Until then, and whenever a pack buffer is unavailable, we
+// fall back to the synth voice — bit-identical with no packs installed.
+export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
+    if (resolveInstrumentSource(args[0].chords.voice).kind === 'sample') {
+        dispatchChordSynth(...args); // S5: → playSampledNote(packId, …)
+        return;
+    }
+    dispatchChordSynth(...args);
 }
 
 // synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received

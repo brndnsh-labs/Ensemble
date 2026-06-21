@@ -1,6 +1,7 @@
 import type { GrooveState } from '../state/groove.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
+import { resolveInstrumentSource } from './instrument-registry.js';
 import {
     createSimplePanner,
     duckGain,
@@ -979,8 +980,9 @@ const HAT_ARTICULATION_FALLBACK: Record<string, string> = {
     HiHatPedal: 'HiHat',
 };
 
-export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
-    const [state, name, time, velocity] = args;
+// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the groove's `voice`
+// setting between the Current and New synthesized drum voices.
+function dispatchDrumSynth(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
     if (state.groove.voice === 'new') {
         playDrumSoundNew(state, name, time, velocity);
         return;
@@ -989,6 +991,20 @@ export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>):
     // voice it knows. A no-op for every existing soundName.
     const currentName = HAT_ARTICULATION_FALLBACK[name] ?? name;
     playDrumSoundCurrent(state, currentName, time, velocity);
+}
+
+// synth-audit Epic 6 S1 — instrument-source seam. A drum pack (e.g.
+// `pack:cymbals` — `drums.md` §4) resolves to a sample source once its buffers
+// load (S3); S5 routes sampled strikes through `playPercussiveStrike`. Until
+// then, and whenever a pack buffer is unavailable, we fall back to the synth
+// voice — bit-identical with no packs installed.
+export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
+    const [state, name, time, velocity] = args;
+    if (resolveInstrumentSource(state.groove.voice).kind === 'sample') {
+        dispatchDrumSynth(state, name, time, velocity); // S5: → sampled strike
+        return;
+    }
+    dispatchDrumSynth(state, name, time, velocity);
 }
 
 function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
