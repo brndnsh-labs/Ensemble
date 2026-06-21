@@ -10,6 +10,12 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
     feel?: string;
     bass?: string;
     soloist?: string;
+    // #567 — per-genre default soloist phrasing mode, applied on genre selection.
+    // Neo-Soul defaults to 'guitar' (2-voice) so its signature quartal/double-stop
+    // color is live; in the default 'monophonic' mode those devices are polyphony-
+    // gated and dead. Omitted = leave the user's current mode untouched. The user
+    // can still switch modes after selecting the genre.
+    soloistMode?: 'monophonic' | 'guitar';
     // Time signatures idiomatic for this genre — used to softly highlight
     // canonical meters in the time-signature picker (S10). Omitted = ['4/4'].
     // Non-blocking hint only: any genre × meter pairing still plays.
@@ -81,6 +87,9 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         feel: 'Neo-Soul',
         bass: 'neo',
         soloist: 'neo',
+        // #567 — neo's quartal/guitarDouble color is polyphony-gated; default to
+        // guitar (2-voice) so the signature double-stops are live in normal playback.
+        soloistMode: 'guitar',
         harmony: 'strings',
     },
     Reggae: {
