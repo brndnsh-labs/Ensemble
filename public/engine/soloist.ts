@@ -1227,8 +1227,14 @@ export function getSoloistNote(
             (soloist.audio as Mutable<typeof soloist.audio>).lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        // why: discriminator 12 — seeded source for the blues bend direction.
-        applyBluesBends(primary, activeStyle, currentChord, () => scrambleHash(callSeedBase + 12));
+        // why: discriminator 12 — seeded STREAM for the bend draws (gate + direction).
+        // Must be a stream, not a single-shot: the neo path draws twice (gate, then
+        // direction) and they must be independent. Blues draws once → its value is
+        // scrambleHash(callSeedBase + 12), unchanged.
+        let bendDraw12 = 0;
+        applyBluesBends(primary, activeStyle, currentChord, () =>
+            scrambleHash(callSeedBase + 12 + bendDraw12++),
+        );
         return res;
     };
 

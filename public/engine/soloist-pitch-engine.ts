@@ -592,9 +592,13 @@ export function selectPitchAndDevices(
             soloistState.audio.lastFreq = getFrequency(primary.midi); // @worker-mutation
         }
 
-        // why: discriminator 14 — seeded source for the blues bend direction.
+        // why: discriminator 14 — seeded STREAM for the bend draws (gate + direction).
+        // Must be a stream, not a single-shot: the neo path draws twice (gate, then
+        // direction) and they must be independent. Blues draws once → its value is
+        // scrambleHash(pickerSeedBase + 14), unchanged.
+        let bendDraw14 = 0;
         applyBluesBends(primary, activeStyle, currentChord, () =>
-            scrambleHash(pickerSeedBase + 14),
+            scrambleHash(pickerSeedBase + 14 + bendDraw14++),
         );
 
         return res;
