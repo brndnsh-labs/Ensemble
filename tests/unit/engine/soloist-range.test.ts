@@ -55,7 +55,7 @@ vi.mock('../../../public/config.js', () => {
             restBase: 0,
             restGrowth: 0,
             doubleStopProb: 0,
-            maxNotesPerPhrase: 100,
+            phraseActiveBeats: 100,
         },
     };
     return {

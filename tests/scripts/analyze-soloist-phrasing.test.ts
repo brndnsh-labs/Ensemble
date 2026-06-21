@@ -60,7 +60,7 @@ vi.mock('../../public/soloist-config.js', () => {
     const BLUES_CONFIG = {
         restBase: 0.15,
         restGrowth: 0.15,
-        maxNotesPerPhrase: 24,
+        phraseActiveBeats: 24,
         minNotesPerPhrase: 2,
         doubleStopProb: 0.35,
         anticipationProb: 0.3,
@@ -76,11 +76,11 @@ vi.mock('../../public/soloist-config.js', () => {
     return {
         STYLE_CONFIG: {
             blues: BLUES_CONFIG,
-            bird: { restBase: 0.05, restGrowth: 0.01, maxNotesPerPhrase: 48, minNotesPerPhrase: 4 },
+            bird: { restBase: 0.05, restGrowth: 0.01, phraseActiveBeats: 48, minNotesPerPhrase: 4 },
             scalar: {
                 restBase: 0.1,
                 restGrowth: 0.07,
-                maxNotesPerPhrase: 24,
+                phraseActiveBeats: 24,
                 minNotesPerPhrase: 2,
             },
         },

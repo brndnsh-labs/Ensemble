@@ -18,7 +18,7 @@ vi.mock('../../../public/soloist-config.js', () => ({
     STYLE_CONFIG: {
         funk: {
             restBase: 0.5,
-            maxNotesPerPhrase: 16,
+            phraseActiveBeats: 16,
             minNotesPerPhrase: 2,
             anticipationProb: 0.1,
         },
