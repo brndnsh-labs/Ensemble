@@ -72,6 +72,9 @@
         "@fontsource/hanken-grotesk": "^5.2.8",
         "@preact/signals": "^2.9.0",
         "deepsignal": "^1.6.0",
-        "preact": "^10.29.1"
+        "preact": "^10.29.1",
+        "workbox-cacheable-response": "^7.4.1",
+        "workbox-routing": "^7.4.1",
+        "workbox-strategies": "^7.4.1"
     }
 }

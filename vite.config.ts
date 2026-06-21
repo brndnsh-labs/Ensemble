@@ -138,6 +138,9 @@ export default defineConfig({
             manifest: false,
             injectManifest: {
                 globPatterns: ['**/*.{js,css,html,svg,png,json,md}'],
+                // Epic 6 S4 — sample packs are large, lazy-loaded, and runtime-
+                // cached by sw.ts; keep them out of the precached <1 MB core.
+                globIgnores: ['**/packs/**'],
             },
             devOptions: {
                 enabled: false,
