@@ -252,7 +252,14 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // S6: was [9, 13]; dropped 13 (normalized to 1=b9, Phrygian color rare in funk).
         targetExtensions: [9],
         deviceProb: 0.2,
-        allowedDevices: ['slide', 'run'],
+        // #565 — funk articulation. Funk's vocabulary is short percussive stabs and
+        // curls, NOT scalar flurries: `run` (the least funk-idiomatic device) is
+        // dropped from the base palette in favor of `bluesCurl` (half-step blue-note curl)
+        // and `graceNote` (the ghosted grace 'pop' into the note). The high-intensity
+        // head-bypass thematic path (soloist-pitch-engine) still re-adds `run` above
+        // intensity 0.7, so funk keeps the *occasional* energetic run — it's just no
+        // longer base vocabulary.
+        allowedDevices: ['slide', 'bluesCurl', 'graceNote'],
         commonToneWeight: 300,
         stationaryProb: 0.1,
         rhythmicDensity: 0.8,
