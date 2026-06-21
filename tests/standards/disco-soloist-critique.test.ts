@@ -298,17 +298,16 @@ describe('Soloist Disco Critique', () => {
         expect(octaveLeapDevice).toBeGreaterThan(20);
         expect(octaveIntervals).toBeGreaterThan(0);
 
-        // (3) 6/9 PRESENCE. The 9th/6th colors must be present in the line (a
-        // regression that flattened disco to pure chord tones would drop this to
-        // ~0). Measured ~16.9% over major bars. NOTE: this is a presence floor,
-        // NOT a "strongly brighter than chance" claim — at ~baseline the profile
-        // only mildly favors 6/9 over the chord-tone-heavy line. Whether disco
-        // wants MORE audible 6/9 sparkle is a by-ear call (the targetExtensions
-        // nudge is one bias among many and washes out); if the audition asks for
-        // it, strengthen the expression and tighten this above SIX_NINE_BASELINE.
-        // The intent is pinned by the config guard in the resolution test below.
-        expect(sixNineShare).toBeGreaterThan(0.13);
-        void SIX_NINE_BASELINE; // reported for context; see note above
+        // (3) 6/9 BRIGHTNESS. Disco upper lines sparkle on the 6th/9th. The
+        // disco-gated final-stage multiplier (soloist-pitch-engine.ts, weight*2.6
+        // on the profile's 6/9 PCs) lifts the realized share to ~32% over major
+        // bars — roughly DOUBLE the 16.7% uniform baseline, so the engine clearly
+        // FAVORS these colors rather than landing on them by chance. The explicit
+        // `> baseline` assertion prevents a sub-baseline pass (smell-b); the 0.25
+        // floor (below the measured 32% with ~7pp headroom) guards the brightness
+        // against a regression that weakened the multiplier back toward baseline.
+        expect(sixNineShare).toBeGreaterThan(SIX_NINE_BASELINE);
+        expect(sixNineShare).toBeGreaterThan(0.25);
 
         // (4) LOW CHROMATICISM. Bright major idiom — out-of-scale share well below
         // the uniform baseline.
