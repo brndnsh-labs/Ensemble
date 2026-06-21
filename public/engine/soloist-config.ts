@@ -258,6 +258,28 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.9,
         chromaticism: 0.3,
+        // #563 — funk call-and-response. The answer ECHOES THE RHYTHMIC FIGURE (the
+        // horn-stab groove) but NOT the pitches — it's a sparse, percussive reply, not
+        // a bebop melodic restatement. So: high rhythmReuse, LOW pitchReuse, HIGH
+        // spaceBias (leave air in the answer), few notes. tripletCarry low (funk is
+        // sixteenth-based, not triplet). Exact weights are a by-ear tuning item (#563
+        // Notes) — these are funk-shaped starting values.
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.82,
+            pitchReuse: 0.28,
+            contourReuse: 0.3,
+            cadenceWeight: 0.5,
+            tripletCarry: 0.2,
+            deviceDamp: 0.74,
+            delayBias: 0.18,
+            echoBias: 0.16,
+            compressionBias: 0.12,
+            sectionRecall: 0.7,
+            formArcRecall: 0.48,
+            maxResponseNotes: 5,
+            spaceBias: 0.34,
+        },
     },
     hiphop: {
         genreGravityOffset: 0.015,

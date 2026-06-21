@@ -7,6 +7,11 @@ import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 import { getStepInfo } from '../../public/utils.js';
+import {
+    bootstrapSoloistAudit,
+    buildHookAuditArrangement,
+    simulateSoloistLoops,
+} from '../../scripts/soloist-analysis-utils.js';
 
 // #564 — Funk's signature b3/b5 grit (the SRV/Hendrix/Maceo vocabulary the funk
 // profile claims) was structurally out of reach: over a plain dom9 vamp funk got
@@ -54,6 +59,85 @@ describe('Funk Soloist Authenticity Benchmark', () => {
     // can't pass tautologically.
     it('Funk genre routes its soloist to the funk style', () => {
         expect(SMART_GENRES.Funk.soloist).toBe('funk');
+    });
+
+    // #563 — Call-and-response (the horn-stab-and-answer dialogue) is THE defining
+    // funk/soul soloing gesture, and the funk soloist never produced it: 'funk' was
+    // absent from MOTIVIC_RESPONSE_STYLES, so nextRole was pinned to 'call' for the
+    // whole session (100% call, ZERO role transitions). The fix admits funk to that
+    // set + gives it a sparse/rhythmic motivicResponse block.
+    //
+    // Measured against the FIXED engine over a real session (the production path —
+    // call/response needs the dynamic head seed that playback always establishes, so
+    // we drive it through the audit harness, not the lower-level loop above which has
+    // no seed). Two honest discriminators of the fix:
+    //   (1) BALANCE — both roles get substantial airtime (note-role share). The role
+    //       roll is an asymmetric Markov chain (soloist.ts: enter-response 0.88/0.7 vs
+    //       stay-in-response 0.28/0.24), so 'call' is the deliberate home state and a
+    //       call-MAJORITY is correct (you make more statements than answers). Engine is
+    //       deterministic: ~60/40 call across seeds (731/486). The band is NOT centered
+    //       on 50 — it brackets the real ~0.60 with retuning headroom on both sides,
+    //       and the upper bound still fails the pre-fix 100%-call engine by a wide margin.
+    //   (2) ALTERNATION — the role actually changes within a session (transitions > 0).
+    //       This is the part note-share alone can't prove; the pre-fix engine had ZERO
+    //       transitions, so any real alternation kills it. Deterministic ~7 across the
+    //       4 seeds; floor of 3 gives headroom without flaking.
+    it('plays call-and-response — both roles in balance, and the role alternates', () => {
+        let call = 0;
+        let response = 0;
+        let transitions = 0;
+        for (const seed of ['A', 'B', 'C', 'D']) {
+            const arrangement = buildHookAuditArrangement('4/4');
+            const boot = bootstrapSoloistAudit({
+                arrangement,
+                genre: 'Funk',
+                bpm: 96,
+                intensity: 0.6,
+                timeSignature: '4/4',
+                style: 'smart',
+                seed,
+            });
+            const cap = simulateSoloistLoops({
+                state: boot.state,
+                arrangement,
+                loops: 4,
+                style: 'smart',
+            });
+            let prevRole = null;
+            for (const e of cap.events) {
+                if (e.role !== 'call' && e.role !== 'response') {
+                    continue;
+                }
+                if (e.role === 'call') {
+                    call++;
+                } else {
+                    response++;
+                }
+                if (prevRole !== null && e.role !== prevRole) {
+                    transitions++;
+                }
+                prevRole = e.role;
+            }
+        }
+
+        const total = call + response;
+        const callShare = call / (total || 1);
+        console.log('\n--- FUNK SOLOIST: call-and-response ---');
+        console.log(
+            `  call=${call}  response=${response}  call-share=${(callShare * 100).toFixed(1)}%  (Target band 45–72%)`,
+        );
+        console.log(`  role transitions=${transitions}  (Target: >=3; pre-fix was 0)`);
+        console.log('---------------------------------------\n');
+
+        // Real sample of role-tagged events.
+        expect(total).toBeGreaterThan(100);
+        // (1) BALANCE — both roles substantially present. Band brackets the real ~0.60
+        // call-majority (the asymmetric chain's intended home state) with headroom for
+        // weight retuning; upper bound still fails the pre-fix 100%-call engine.
+        expect(callShare).toBeGreaterThan(0.45);
+        expect(callShare).toBeLessThan(0.72);
+        // (2) ALTERNATION — the role genuinely changes during sessions. Pre-fix = 0.
+        expect(transitions).toBeGreaterThanOrEqual(3);
     });
 
     // Statistical pin: over a dom9 vamp, funk's emitted line carries meaningful

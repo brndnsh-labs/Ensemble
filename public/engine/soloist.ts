@@ -72,6 +72,11 @@ const MOTIVIC_RESPONSE_STYLES = new Set([
     'scalar',
     'neo',
     'bossa',
+    // #563 — call-and-response (the horn-stab-and-answer dialogue) is *the* defining
+    // funk/soul soloing gesture; funk was pinned to 'call' for the whole session
+    // because it was absent here. Its motivicResponse block (soloist-config) is tuned
+    // sparse/rhythmic (high spaceBias, low pitchReuse), not a bebop paraphrase.
+    'funk',
 ]);
 
 /**
