@@ -956,8 +956,15 @@ export function generateRhythmPlan(
                     stepVelocity *= 1.05;
                 }
 
-                // Jazz Ghosting
-                if ((style === 'jazz' || style === 'bird') && !isBeatStart && rng() < 0.4) {
+                // Off-beat ghosting. Jazz/bird ghost their swung off-beats; #565 — funk's
+                // percussive ghosted-16th "scratch" is at least as central to its feel, so
+                // funk's off-beats get the same soft-ghost treatment (was full-velocity,
+                // which read as stiff/clean rather than gritty-and-popping).
+                if (
+                    (style === 'jazz' || style === 'bird' || style === 'funk') &&
+                    !isBeatStart &&
+                    rng() < 0.4
+                ) {
                     stepVelocity *= 0.6; // Soft ghost note
                 }
 

@@ -140,6 +140,103 @@ describe('Funk Soloist Authenticity Benchmark', () => {
         expect(transitions).toBeGreaterThanOrEqual(3);
     });
 
+    // #565 — Funk ARTICULATION. Two gaps made funk read stiff/clean rather than
+    // gritty-and-popping: (a) the device palette favored `run` (a scalar flurry — the
+    // LEAST funk-idiomatic device) over funk's percussive curls/grace; (b) off-beats
+    // played full-velocity (the soft-ghost gate was jazz/bird only). Fix: palette →
+    // [slide, bluesCurl, graceNote] (run dropped, per the design call); the soft-ghost
+    // off-beat gate now includes funk.
+    //
+    // Two honest discriminators against the FIXED engine (production harness, real
+    // session). Both were structurally ~0 pre-fix:
+    //   (1) GHOSTED OFF-BEATS — using the engine's own ghost definition (velocity < 0.7,
+    //       soloist-pitch-engine.ts:569): off-beat ghost-share is high (~0.47, ≈ the 0.40
+    //       gate probability) while on-beat ghost-share is near-zero (~0.003, on-beats get
+    //       velocity BOOSTS). Pre-fix funk had no ghost gate → off-beat ghost-share ≈ 0.
+    //   (2) PERCUSSIVE PALETTE — bluesCurl (the half-step blue-note funk curl) appears in
+    //       quantity; it was structurally impossible pre-fix (not in the palette nor the
+    //       head-bypass thematic path). `run` is all but gone (only the high-intensity
+    //       head-bypass path leaks a handful), so the percussive vocab dominates it.
+    it('plays funk articulation — ghosted off-beats + percussive device palette', () => {
+        let onBeats = 0;
+        let onGhost = 0;
+        let offBeats = 0;
+        let offGhost = 0;
+        let bluesCurl = 0;
+        let graceNote = 0;
+        let run = 0;
+        for (const seed of ['A', 'B', 'C', 'D', 'E', 'F']) {
+            const arrangement = buildHookAuditArrangement('4/4');
+            const boot = bootstrapSoloistAudit({
+                arrangement,
+                genre: 'Funk',
+                bpm: 96,
+                intensity: 0.6,
+                timeSignature: '4/4',
+                style: 'smart',
+                seed,
+            });
+            const cap = simulateSoloistLoops({
+                state: boot.state,
+                arrangement,
+                loops: 4,
+                style: 'smart',
+            });
+            for (const e of cap.events) {
+                if (e.note?.device === 'bluesCurl') {
+                    bluesCurl++;
+                } else if (e.note?.device === 'graceNote') {
+                    graceNote++;
+                } else if (e.note?.device === 'run') {
+                    run++;
+                }
+                // Ghost metric is on the picker (non-device) notes whose velocity the
+                // rhythm engine's ghost gate sets; device notes carry their own velocity.
+                if (typeof e.note?.velocity !== 'number' || e.note.device) {
+                    continue;
+                }
+                const isGhost = e.note.velocity < 0.7; // engine's own ghost threshold
+                if (e.stepInMeasure % 4 === 0) {
+                    onBeats++;
+                    if (isGhost) {
+                        onGhost++;
+                    }
+                } else {
+                    offBeats++;
+                    if (isGhost) {
+                        offGhost++;
+                    }
+                }
+            }
+        }
+
+        const offGhostShare = offGhost / (offBeats || 1);
+        const onGhostShare = onGhost / (onBeats || 1);
+        console.log('\n--- FUNK SOLOIST: articulation ---');
+        console.log(
+            `  off-beat ghost-share=${(offGhostShare * 100).toFixed(1)}%  on-beat=${(onGhostShare * 100).toFixed(1)}%  (Target: off>>on)`,
+        );
+        console.log(
+            `  devices: bluesCurl=${bluesCurl}  graceNote=${graceNote}  run=${run}  (Target: curl present, run minimal)`,
+        );
+        console.log('----------------------------------\n');
+
+        expect(offBeats).toBeGreaterThan(50); // real sample
+
+        // (1) GHOSTED OFF-BEATS. ~0.40 gate prob → ~0.47 measured; floor 0.25 has wide
+        // headroom. On-beats are boosted, not ghosted (~0.003) — bound it well below the
+        // off-beat rate so the assertion proves the gate is OFF-BEAT-SELECTIVE, not a
+        // blanket velocity drop.
+        expect(offGhostShare).toBeGreaterThan(0.25);
+        expect(onGhostShare).toBeLessThan(0.1);
+        expect(offGhostShare).toBeGreaterThan(onGhostShare + 0.2);
+
+        // (2) PERCUSSIVE PALETTE. bluesCurl present in quantity (structurally 0 pre-fix);
+        // the percussive vocab dominates the de-emphasized `run` (head-bypass leakage only).
+        expect(bluesCurl).toBeGreaterThan(20);
+        expect(bluesCurl).toBeGreaterThan(run);
+    });
+
     // Statistical pin: over a dom9 vamp, funk's emitted line carries meaningful
     // b3+b5 grit, well above the ~0 Mixolydian baseline.
     it('plays b3/b5 grit over a dom9 vamp, above the Mixolydian baseline', () => {
