@@ -23,7 +23,10 @@
  * Brandon's ear sets the exact value.
  */
 import { describe, expect, it } from 'vitest';
+import { SMART_GENRES } from '../../public/data/smart-genres.js';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
+import { dispatch } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 import {
     bootstrapSoloistAudit,
     buildHookAuditArrangement,
@@ -121,5 +124,87 @@ describe('Neo-Soul Soloist Critique', () => {
         expect(neo.up).toBeGreaterThan(0);
         expect(neo.down).toBeGreaterThan(0);
         expect(dirShare).toBeLessThan(0.8);
+    });
+
+    // #567 — Neo-soul's signature is its quartal 4ths and double-stops. Those devices
+    // (`quartal`, `guitarDouble`) and the double-stop emission path are all polyphony-
+    // gated, so in the DEFAULT 'monophonic' mode neo's palette collapsed to `slide` only
+    // — thin and un-neo. No preset/UI path auto-promoted neo to a polyphonic mode. Fix:
+    // Neo-Soul carries a per-genre default `soloistMode: 'guitar'` (2-voice), applied on
+    // genre selection, so the color is live in normal playback.
+    it('routes Neo-Soul to guitar mode by default (the genre carries the mode)', () => {
+        // Config pin (resolution-guard style): the default that makes guitar the live
+        // mode when the Neo-Soul genre is selected.
+        expect(SMART_GENRES['Neo-Soul'].soloistMode).toBe('guitar');
+    });
+
+    it('produces quartal/double-stop color in guitar mode (dead in mono)', () => {
+        // Drive both modes through the production harness. The acceptance is that neo's
+        // signature color is live in its DEFAULT mode (guitar, per the genre); the mono
+        // run is the control proving the polyphony gate is real and that the guitar
+        // default is what unlocks the color (not some always-on path) — a LIFT, not a
+        // bare "> 0".
+        const measure = (mode) => {
+            let quartal = 0;
+            let guitarDouble = 0;
+            let doubleStop = 0;
+            for (const seed of ['A', 'B', 'C', 'D']) {
+                const arrangement = buildHookAuditArrangement('4/4');
+                const boot = bootstrapSoloistAudit({
+                    arrangement,
+                    genre: 'Neo-Soul',
+                    bpm: 84,
+                    intensity: 0.6,
+                    timeSignature: '4/4',
+                    style: 'smart',
+                    seed,
+                });
+                // Mirror genre selection applying the mode (SET_SOLOIST_MODE), then put it
+                // on the simulated state object the harness drives.
+                dispatch(ACTIONS.SET_SOLOIST_MODE, mode);
+                boot.state.soloist.mode = mode;
+                const cap = simulateSoloistLoops({
+                    state: boot.state,
+                    arrangement,
+                    loops: 4,
+                    style: 'smart',
+                });
+                for (const e of cap.events) {
+                    if (e.note?.device === 'quartal') {
+                        quartal++;
+                    }
+                    if (e.note?.device === 'guitarDouble') {
+                        guitarDouble++;
+                    }
+                    if (e.note?.isDoubleStop) {
+                        doubleStop++;
+                    }
+                }
+            }
+            return {
+                quartal,
+                guitarDouble,
+                doubleStop,
+                color: quartal + guitarDouble + doubleStop,
+            };
+        };
+
+        const guitar = measure('guitar');
+        const mono = measure('monophonic');
+        console.log('\n--- NEO-SOUL: quartal/double-stop color ---');
+        console.log(
+            `  guitar: quartal=${guitar.quartal} guitarDouble=${guitar.guitarDouble} doubleStop=${guitar.doubleStop}`,
+        );
+        console.log(
+            `  mono:   quartal=${mono.quartal} guitarDouble=${mono.guitarDouble} doubleStop=${mono.doubleStop}  (control — gated off)`,
+        );
+        console.log('-------------------------------------------\n');
+
+        // In guitar (the default mode) neo emits its signature color in quantity.
+        expect(guitar.quartal).toBeGreaterThan(20);
+        expect(guitar.doubleStop).toBeGreaterThan(20);
+        // The control: in mono ALL of it is polyphony-gated off — proves the color is
+        // genuinely mode-unlocked, and the guitar default is what delivers the acceptance.
+        expect(mono.color).toBe(0);
     });
 });
