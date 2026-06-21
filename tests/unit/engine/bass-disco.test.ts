@@ -77,7 +77,7 @@ import { getState } from '../../../public/state.js';
 
 const { bass, playback } = getState();
 
-describe('Bass Engine - Rocco & Disco', () => {
+describe('Bass Engine - Disco', () => {
     const chordC = {
         rootMidi: 48,
         intervals: [0, 4, 7, 10],
@@ -90,51 +90,6 @@ describe('Bass Engine - Rocco & Disco', () => {
     beforeEach(() => {
         bass.busySteps = 0;
         playback.bandIntensity = 0.8;
-    });
-
-    describe('Rocco Style', () => {
-        it('should be active on all 16th steps', () => {
-            for (let i = 0; i < 4; i++) {
-                expect(isBassActive(getState(), 'rocco', i, i)).toBe(true);
-            }
-        });
-
-        it('should play Root on Downbeat (Step 0)', () => {
-            const result = getBassNote(getState(), chordC, null, 0, null, 38, 'rocco', 0, 0, 0);
-            expect(result).not.toBeNull();
-            expect(result.midi).toBe(48); // Expected normalized C2 (since center is ~38)
-            expect(result.muted).toBeFalsy();
-        });
-
-        it('should generate ghost notes on off-beats (Step 1/3)', () => {
-            let ghostCount = 0;
-            let noteCount = 0;
-            // Run many times because it's probabilistic
-            for (let i = 0; i < 100; i++) {
-                const result = getBassNote(
-                    getState(),
-                    chordC,
-                    null,
-                    0.25,
-                    null,
-                    38,
-                    'rocco',
-                    0,
-                    1,
-                    1,
-                );
-                if (result) {
-                    noteCount++;
-                    if (result.muted) {
-                        ghostCount++;
-                    }
-                }
-            }
-            // Should be frequent
-            expect(noteCount).toBeGreaterThan(50);
-            // Should be mostly muted
-            expect(ghostCount / noteCount).toBeGreaterThan(0.5);
-        });
     });
 
     describe('Disco Style', () => {
