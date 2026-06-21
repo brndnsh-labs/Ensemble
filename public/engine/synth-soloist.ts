@@ -1,6 +1,7 @@
 import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
+import { resolveInstrumentSource } from './instrument-registry.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
@@ -33,10 +34,23 @@ export function killSoloistNote(state: EnsembleState): void {
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
  */
-// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
-// instrument's `voice` setting; `*New` is a placeholder until Epic 3 fills it in.
-export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): void {
+// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
+// `voice` setting between the Current and (Epic 3) New synthesized voices.
+function dispatchSoloSynth(...args: Parameters<typeof playSoloNoteCurrent>): void {
     (args[0].soloist.voice === 'new' ? playSoloNoteNew : playSoloNoteCurrent)(...args);
+}
+
+// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
+// to a sample source once its buffers load (S3); S5 routes that case to
+// `playSampledNote` (trumpet/sax for acoustic presets — `soloist.md` §4). Until
+// then, and whenever a pack buffer is unavailable, we fall back to the synth
+// voice — bit-identical with no packs installed.
+export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): void {
+    if (resolveInstrumentSource(args[0].soloist.voice).kind === 'sample') {
+        dispatchSoloSynth(...args); // S5: → playSampledNote(packId, …)
+        return;
+    }
+    dispatchSoloSynth(...args);
 }
 
 function playSoloNoteNew(...args: Parameters<typeof playSoloNoteCurrent>): void {

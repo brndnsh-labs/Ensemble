@@ -1,5 +1,6 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
+import { resolveInstrumentSource } from './instrument-registry.js';
 import {
     playPercussiveStrike,
     rampGain,
@@ -37,10 +38,27 @@ const SUB_BASS_STYLES = new Set<string>(['hiphop', 'dub']);
 /**
  * P-Bass Synthesis: Layered physical model
  */
-// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
-// instrument's `voice` setting; `*New` is a placeholder until Epic 5 fills it in.
-export function playBassNote(...args: Parameters<typeof playBassNoteCurrent>): void {
+// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
+// `voice` setting between the Current and (Epic 5) New synthesized voices.
+function dispatchBassSynth(...args: Parameters<typeof playBassNoteCurrent>): void {
     (args[0].bass.voice === 'new' ? playBassNoteNew : playBassNoteCurrent)(...args);
+}
+
+/**
+ * P-Bass Synthesis: Layered physical model
+ */
+// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
+// to a sample source once its buffers load (S3); S5 routes that case to
+// `playSampledNote`. Until then, and whenever a pack buffer is unavailable, we
+// fall back to the synth voice — bit-identical with no packs installed. (Per
+// `bass.md` §4 the bass has no planned pack — continuous bends/mute morph would
+// regress — but it routes through the registry uniformly with every voice.)
+export function playBassNote(...args: Parameters<typeof playBassNoteCurrent>): void {
+    if (resolveInstrumentSource(args[0].bass.voice).kind === 'sample') {
+        dispatchBassSynth(...args); // S5: → playSampledNote(packId, …)
+        return;
+    }
+    dispatchBassSynth(...args);
 }
 
 // synth-audit Epic 0 S7 — worked example for the shared `velocityTimbre`
