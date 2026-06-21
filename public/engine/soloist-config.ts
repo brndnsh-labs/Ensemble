@@ -423,15 +423,51 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         },
     },
     disco: {
+        // #553: enriched from a 9-field stub to a full phrasing identity. Disco
+        // upper lines (Chic / MFSB strings, EW&F horns) are bright, diatonic-major,
+        // tightly-timed, syncopated, and HOOK-driven — a recurring figure that
+        // returns each section rather than a through-composed bebop line.
+        restBase: 0.12,
+        // Disco is metronomic four-on-the-floor — keep the line tightly gridded.
+        timingJitter: 6,
+        phraseActiveBeats: 24,
         minNotesPerPhrase: 3,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.2,
-        deviceProb: 0.1,
-        allowedDevices: ['run'],
+        // String sections double the line (octaves/3rds) — more than the old 0.05.
+        doubleStopProb: 0.2,
+        anticipationProb: 0.3,
+        // 6/9 brightness: 2 = the 9th, 9 = the added 6th. Disco harmony is major-6/9
+        // rich, not lydian — no #11, no chromatic upper structures.
+        targetExtensions: [2, 9],
+        deviceProb: 0.28,
+        // run (rapid string runs) leads; octaveLeap (the signature octave hook) is
+        // prominent but second so runs keep the string character; slide (string
+        // glissando) and graceNote (horn grace 'pop') fill out the palette.
+        allowedDevices: ['run', 'octaveLeap', 'slide', 'graceNote'],
+        // Hooks pedal/recur over the changes — reward common tones across chords.
+        commonToneWeight: 300,
         stationaryProb: 0.1,
-        rhythmicDensity: 0.7,
-        syncopationLikelihood: 0.6,
+        rhythmicDensity: 0.8,
+        syncopationLikelihood: 0.7,
         chromaticism: 0.2,
+        // Hook recall — disco is riff-driven: the syncopated figure recurs nearly
+        // verbatim and returns each section. Higher pitchReuse than funk's
+        // pitch-shy percussive reply; tripletCarry near zero (disco is 16th-based).
+        motivicResponse: {
+            enabled: true,
+            rhythmReuse: 0.85,
+            pitchReuse: 0.5,
+            contourReuse: 0.5,
+            cadenceWeight: 0.5,
+            tripletCarry: 0.1,
+            deviceDamp: 0.6,
+            delayBias: 0.16,
+            echoBias: 0.18,
+            compressionBias: 0.14,
+            sectionRecall: 0.8,
+            formArcRecall: 0.6,
+            maxResponseNotes: 6,
+            spaceBias: 0.22,
+        },
     },
     bossa: {
         restBase: 0.12,
