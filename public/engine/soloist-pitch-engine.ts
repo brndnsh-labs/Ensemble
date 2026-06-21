@@ -1295,6 +1295,21 @@ export function selectPitchAndDevices(
                 // Temper the minor 3rd during responses to allow for clearer resolution to Root/5th
                 if (soloistState.session.currentPhrase.context?.role === 'response') {
                     weight += 100;
+                } else if (activeStyle === 'blues') {
+                    // #577: bias the BLUES b3 blue-note reward toward SHORT durations.
+                    // Blues idiom treats b3 as a grace/slur into the major 3rd or a
+                    // curled attack — not a sustained resting tone. A flat +500 made
+                    // b3 over-sit (~42% of b3 occurrences sustained >=3 steps),
+                    // reading as minor-key noodling rather than blues. Keep the full
+                    // reward on grace/passing slots (<=2 steps) so the blue-note
+                    // identity stays live, but temper it on long slots so chord tones
+                    // win the landings the listener hears as resting tones.
+                    //
+                    // Scoped to blues only: in jazz the same `interval === 3` is the
+                    // m7 chord's *minor third* (a chord tone), where the full +500
+                    // suppression keeps Evans-style b5 avoidance honest — tempering it
+                    // there raised b5-on-m7 above its critique bound.
+                    weight += durationSteps <= 2 ? 500 : 250;
                 } else {
                     weight += 500;
                 }
