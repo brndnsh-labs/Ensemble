@@ -30,6 +30,7 @@ export const DEVICE_SPAN_STEPS: Record<string, number> = {
     slide: 2,
     graceSlide: 2,
     graceNote: 3,
+    octaveLeap: 3,
     run: 3,
     enclosure: 3,
     // Medium (4-5 steps): borderline. Allowed to bury at most one planned attack
@@ -267,6 +268,27 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
                 durationSteps: carriesTripletMemory && prefersCompactAnswer ? 1 : 2,
                 style: activeStyle,
             },
+        ];
+    } else if (deviceType === 'octaveLeap') {
+        // #553: disco octave-leap hook. The bright octave jump is the signature of
+        // disco upper lines — Chic / EW&F strings and horns leap an octave to a
+        // punchy accent, then lean off the top back toward the line. Leap UP by
+        // default; if the octave-up would breach the soloist register ceiling, leap
+        // DOWN instead so the gesture always lands in range (octave figures read
+        // both directions in disco). The lean note steps back toward the origin.
+        const canLeapUp = selectedMidi + 12 <= maxMidi;
+        const top = canLeapUp ? selectedMidi + 12 : Math.max(minMidi, selectedMidi - 12);
+        const lean = Math.max(minMidi, Math.min(maxMidi, top + (canLeapUp ? -2 : 2)));
+        deviceBuffer = [
+            {
+                midi: selectedMidi,
+                velocity: devBaseVel * 0.95,
+                durationSteps: 1,
+                style: activeStyle,
+            },
+            // the leap target is the accent — the octave "pop"
+            { midi: top, velocity: devBaseVel * 1.25, durationSteps: 2, style: activeStyle },
+            { midi: lean, velocity: devBaseVel * 0.9, durationSteps: 1, style: activeStyle },
         ];
     } else if (deviceType === 'banjoRoll') {
         const root = targetChord.rootMidi;
