@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getSoloistNote } from '../../public/engine/soloist.js';
 import { dispatch, getState } from '../../public/state.js';
@@ -430,9 +430,9 @@ describe('Blues Soloist Authenticity Benchmark', () => {
         soloist.session.rhythm.embellishmentBuffer = [];
         soloist.session.rhythm.deviceBuffer = [];
 
-        // Force high probability for device triggering
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
-
+        // #617: device triggering and the device buffer are fully seeded via
+        // scrambleHash(pickerSeedBase + N) — there is no Math.random left in this
+        // path to stub. The seeded defaults already produce embellishments here.
         getSoloistNote(
             getState(),
             chord,
@@ -450,7 +450,5 @@ describe('Blues Soloist Authenticity Benchmark', () => {
             `[Blues Audit] Embellishment Buffer Size: ${soloist.session.rhythm.embellishmentBuffer.length}`,
         );
         expect(soloist.session.rhythm.embellishmentBuffer.length).toBeGreaterThan(0);
-
-        randomSpy.mockRestore();
     });
 });

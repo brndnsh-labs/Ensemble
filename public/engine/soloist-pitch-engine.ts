@@ -1915,6 +1915,7 @@ export function selectPitchAndDevices(
             seedNote,
             supportRole,
             sustainBias,
+            pickerSeedBase,
         });
         if (extra && extra.length > 0) {
             // Optimization: Replace spread and map with pre-allocated loop to avoid closure overhead and intermediate arrays

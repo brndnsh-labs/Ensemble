@@ -168,7 +168,9 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         const duration = 2; // 8th notes
 
         if (relInt === 0) {
-            if (Math.random() < 0.5) {
+            // #617: seeded bluesLick variant pick (was Math.random). Offset band
+            // >=60 stays clear of the picker's +1..14 and the velocity +40..57.
+            if (scrambleHash(pickerSeedBase + 60) < 0.5) {
                 lick = [
                     { midi: selectedMidi, durationSteps: duration },
                     { midi: selectedMidi + 3, durationSteps: duration },
@@ -184,7 +186,8 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
                 ];
             }
         } else if (relInt === 3) {
-            if (Math.random() < 0.5) {
+            // #617: seeded bluesLick variant pick (was Math.random).
+            if (scrambleHash(pickerSeedBase + 61) < 0.5) {
                 lick = [
                     { midi: selectedMidi + 1, durationSteps: duration, bendStartInterval: 1 },
                     { midi: selectedMidi + 4, durationSteps: duration },
@@ -238,7 +241,8 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             }));
         }
     } else if (deviceType === 'chromaticFall') {
-        const steps = Math.floor(Math.random() * 3) + 3;
+        // #617: seeded chromaticFall step count (was Math.random) — {3,4,5}.
+        const steps = Math.floor(scrambleHash(pickerSeedBase + 62) * 3) + 3;
         const duration = 1;
         for (let i = 0; i < steps; i++) {
             deviceBuffer.push({
@@ -310,7 +314,8 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             ],
         ];
     } else if (deviceType === 'chickenPick') {
-        const dsInt = Math.random() < 0.5 ? 3 : 4;
+        // #617: seeded chickenPick double-stop interval (was Math.random).
+        const dsInt = scrambleHash(pickerSeedBase + 63) < 0.5 ? 3 : 4;
         deviceBuffer = [
             [
                 {
@@ -330,7 +335,8 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             ],
         ];
     } else if (deviceType === 'birdFlurry') {
-        if (playback.bpm > 180 && Math.random() < 0.8) {
+        // #617: seeded birdFlurry skip gate at fast tempos (was Math.random).
+        if (playback.bpm > 180 && scrambleHash(pickerSeedBase + 64) < 0.8) {
             return null;
         }
         const rootMidi = targetChord.rootMidi;
@@ -450,8 +456,9 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
         const dir =
             motifSlideDirection !== 0
                 ? motifSlideDirection
-                : (isSoloistGuitarMode(soloist.mode) || activeStyle === 'bird') &&
-                    Math.random() < 0.3
+                : // #617: seeded slide-direction gate (was Math.random).
+                  (isSoloistGuitarMode(soloist.mode) || activeStyle === 'bird') &&
+                    scrambleHash(pickerSeedBase + 65) < 0.3
                   ? 1
                   : -1;
         deviceBuffer = [
@@ -950,7 +957,15 @@ function selectGuitarSupportMidi(options: GuitarSupportMidiOptions): number {
  * Generates additional notes for double stops based on style and mode.
  */
 export function generateExtraNotes(ctx: any) {
-    const { soloist, currentChord, activeStyle, effectiveIntensity, selectedMidi, seedNote } = ctx;
+    const {
+        soloist,
+        currentChord,
+        activeStyle,
+        effectiveIntensity,
+        selectedMidi,
+        seedNote,
+        pickerSeedBase = 0,
+    } = ctx;
     const extraNotes = [];
     const soloistMode = resolveSoloistMode(soloist.mode);
     const supportHint = seedNote?.supportHints?.guitar;
@@ -968,7 +983,8 @@ export function generateExtraNotes(ctx: any) {
         } else if (supportRole === 'sustain') {
             supportDurationScale = 0.76 + sustainBias * 0.12;
         }
-        const dsInt = [8, 9][Math.floor(Math.random() * 2)];
+        // #617: seeded double-stop interval pick (was Math.random).
+        const dsInt = [8, 9][Math.floor(scrambleHash(pickerSeedBase + 66) * 2)];
         extraNotes.push({
             midi: selectedMidi + dsInt,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
@@ -1026,7 +1042,8 @@ export function generateExtraNotes(ctx: any) {
             durationScale: Math.min(0.95, supportDurationScale),
         });
     } else {
-        const dsInt = [5, 7, 9, 12][Math.floor(Math.random() * 4)];
+        // #617: seeded double-stop interval pick (was Math.random).
+        const dsInt = [5, 7, 9, 12][Math.floor(scrambleHash(pickerSeedBase + 67) * 4)];
         extraNotes.push({
             midi: selectedMidi + dsInt,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
