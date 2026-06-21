@@ -30,7 +30,14 @@ export interface StyleConfig {
     genreGravityOffset: number;
     restBase: number;
     timingJitter: number;
-    maxNotesPerPhrase: number;
+    // #591: the base *duration* (in beats) a phrase stays active, NOT a note
+    // count. Read at soloist.ts as `baseLength = phraseActiveBeats * (0.3 +
+    // intensity*0.7)`, then `baseLength * stepsPerBeat * roll` → active-window
+    // steps. Renamed from `maxNotesPerPhrase` (which read like a per-phrase note
+    // ceiling but never capped note count — the acoustic profile runs ~13.6
+    // notes/phrase against an old value of 12). Contrast `minNotesPerPhrase`
+    // below, which IS a genuine note-count floor (soloist-rhythm-engine.ts).
+    phraseActiveBeats: number;
     minNotesPerPhrase: number;
     doubleStopProb: number;
     anticipationProb: number;
@@ -99,7 +106,7 @@ const DEFAULT_STYLE_CONFIG: StyleConfig = {
     genreGravityOffset: 0,
     restBase: 0.1,
     timingJitter: 8,
-    maxNotesPerPhrase: 24,
+    phraseActiveBeats: 24,
     minNotesPerPhrase: 2,
     doubleStopProb: 0.25,
     anticipationProb: 0.1,
@@ -245,7 +252,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     funk: {
         genreGravityOffset: -0.005,
         timingJitter: 5,
-        maxNotesPerPhrase: 32,
+        phraseActiveBeats: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.15,
         anticipationProb: 0.2,
@@ -292,7 +299,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         genreGravityOffset: 0.015,
         restBase: 0.15,
         timingJitter: 20,
-        maxNotesPerPhrase: 16,
+        phraseActiveBeats: 16,
         doubleStopProb: 0.1,
         anticipationProb: 0.3,
         targetExtensions: [2, 9, 11],
@@ -311,7 +318,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     jazz: {
         restBase: 0.08,
         timingJitter: 15,
-        maxNotesPerPhrase: 32,
+        phraseActiveBeats: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.35,
         anticipationProb: 0.6,
@@ -360,7 +367,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     bird: {
         restBase: 0.05,
         timingJitter: 12,
-        maxNotesPerPhrase: 48,
+        phraseActiveBeats: 48,
         minNotesPerPhrase: 4,
         doubleStopProb: 0.15,
         anticipationProb: 0.8,
@@ -470,7 +477,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     country: {
         restBase: 0.08,
         timingJitter: 4,
-        maxNotesPerPhrase: 32,
+        phraseActiveBeats: 32,
         minNotesPerPhrase: 3,
         doubleStopProb: 0.5,
         anticipationProb: 0.2,
@@ -491,7 +498,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
     metal: {
         timingJitter: 2,
-        maxNotesPerPhrase: 32,
+        phraseActiveBeats: 32,
         minNotesPerPhrase: 6,
         doubleStopProb: 0.05,
         anticipationProb: 0.05,
@@ -508,7 +515,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     reggae: {
         restBase: 0.12,
         timingJitter: 20,
-        maxNotesPerPhrase: 16,
+        phraseActiveBeats: 16,
         doubleStopProb: 0.2,
         targetExtensions: [2, 6, 9],
         deviceProb: 0.15,
@@ -521,7 +528,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     acoustic: {
         restBase: 0.15,
         timingJitter: 15,
-        maxNotesPerPhrase: 12,
+        phraseActiveBeats: 12,
         doubleStopProb: 0.1,
         anticipationProb: 0.15,
         deviceProb: 0.1,
@@ -534,7 +541,7 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     ska: {
         genreGravityOffset: -0.005,
         timingJitter: 5,
-        maxNotesPerPhrase: 32,
+        phraseActiveBeats: 32,
         minNotesPerPhrase: 4,
         doubleStopProb: 0.2,
         anticipationProb: 0.3,

@@ -2003,7 +2003,7 @@ export function getSoloistNote(
                 phr.state = 'active'; // @worker-mutation
                 mSession.phraseCount = (soloist.session.phraseCount || 0) + 1; // @worker-mutation
 
-                const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
+                const baseLength = config.phraseActiveBeats * (0.3 + effectiveIntensity * 0.7);
                 // why: discriminator 51 — phrase active-length roll.
                 // NB (epic-1-compound-meter S14 follow-up): `* stepsPerBeat` converts the
                 // beat-denominated baseLength into *steps*; it intentionally does NOT divide
@@ -2175,7 +2175,7 @@ export function getSoloistNote(
     ) {
         // If plan is uninitialized or exhausted but test forces active state, generate it
         if (!soloist.session.phrasing.isResting) {
-            const baseLength = config.maxNotesPerPhrase * (0.3 + effectiveIntensity * 0.7);
+            const baseLength = config.phraseActiveBeats * (0.3 + effectiveIntensity * 0.7);
             // why: discriminator 53 — fallback plan-length roll (test-forced
             // active state with no prior activeSteps). Same step-vs-bar note as the
             // discriminator-51 site above: `* stepsPerBeat` yields steps, not bars,

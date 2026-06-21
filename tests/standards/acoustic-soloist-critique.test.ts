@@ -57,7 +57,7 @@ describe('Soloist Acoustic Critique', () => {
         soloistState = makeSoloistMock({
             enabled: true,
             // Explicit 'acoustic' STYLE_CONFIG profile (soloist-config.ts:489 —
-            // restBase 0.15, maxNotesPerPhrase 12, allowedDevices ['slide','run']).
+            // restBase 0.15, phraseActiveBeats 12, allowedDevices ['slide','run']).
             //
             // Routing note (see the resolution-guard test below): since #592 the
             // Acoustic *genre* in smart mode plays exactly this profile
@@ -289,7 +289,7 @@ describe('Soloist Acoustic Critique', () => {
         // per phrase"; the engine never produces a phrase longer than 7, so the
         // <=12 ceiling holds with 5-note headroom and ZERO phrases exceed 12.
         // NB: this uses the audible-phrase definition deliberately — see the
-        // maxNotesPerPhrase finding documented in the report. maxNotesPerPhrase
+        // phraseActiveBeats finding documented in the report. phraseActiveBeats
         // 12 is a beat-scaled active-DURATION seed, not a hard note cap.
         expect(maxPhrase).toBeLessThanOrEqual(12);
         expect(phrasesOver12).toBe(0);
