@@ -116,6 +116,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility |
 | :--- | :--- |
 | `public/engine/instrument-registry.ts` | Instrument-source indirection: resolves each voice to a synth function or an installed sample-pack buffer (synth-fallback when no pack is loaded). |
+| `public/engine/sample-loader.ts` | Lazy fetch + `decodeAudioData` + cache of sample-pack buffers into the instrument registry (atomic, deduped, fail-loud). |
 | `public/engine/synth-bass.ts` | Sub-bass and Growl synthesis. |
 | `public/engine/synth-chords.ts` | Polyphonic piano/pad synthesis. |
 | `public/engine/synth-drums.ts` | Procedural percussion synthesis. |
