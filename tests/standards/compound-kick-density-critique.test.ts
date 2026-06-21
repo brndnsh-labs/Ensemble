@@ -56,7 +56,9 @@ const GENRES = [
     { label: 'Funk', genreFeel: 'Funk' },
     { label: 'Hip Hop', genreFeel: 'Hip Hop' },
     { label: 'Neo-Soul', genreFeel: 'Neo-Soul' },
-    { label: 'Latin', genreFeel: 'Latin' },
+    // #628: the Latin/Afro-Cuban groove is reached via the live Bossa genre
+    // (genreFeel 'Bossa Nova' → latin strategy); the generic 'Latin' feel is gone.
+    { label: 'Latin', genreFeel: 'Bossa Nova' },
 ];
 
 function buildState(genreFeel: string, timeSignature: '6/8' | '4/4', intensity: number) {

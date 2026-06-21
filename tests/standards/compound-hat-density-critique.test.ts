@@ -59,7 +59,9 @@ const GENRES = [
     { label: 'Blues', genreFeel: 'Blues', profile: 'sparse' as const },
     { label: 'Acoustic', genreFeel: 'Acoustic', profile: 'sparse' as const },
     { label: 'Reggae', genreFeel: 'Reggae', profile: 'sparse' as const },
-    { label: 'Latin', genreFeel: 'Latin', profile: 'sparse' as const },
+    // #628: the Latin/Afro-Cuban groove is reached via the live Bossa genre
+    // (genreFeel 'Bossa Nova' → latin strategy); the generic 'Latin' feel is gone.
+    { label: 'Latin', genreFeel: 'Bossa Nova', profile: 'sparse' as const },
     { label: 'Funk', genreFeel: 'Funk', profile: 'shimmer' as const },
     { label: 'Hip Hop', genreFeel: 'Hip Hop', profile: 'shimmer' as const },
     { label: 'Neo-Soul', genreFeel: 'Neo-Soul', profile: 'shimmer' as const },

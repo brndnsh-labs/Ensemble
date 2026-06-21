@@ -17,28 +17,20 @@ import { effectiveTargetIntensity } from './section-overrides.js';
  * room. Slow, open, harmonically rich styles want a long tail — punchy,
  * percussive styles want the groove to stay articulate.
  */
-const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic', 'Minimal']);
+const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic']);
 
 /**
  * Genres whose interior-phrase "breathing" is NOT a driving snare lead-in, so
  * the within-section phrase pickup (`checkSectionTransition`) stays off for
  * them. These are the brush / sidestick / clave / sparse-by-design feels:
- * a jazz drummer breathes on the ride and comping, a reggae One Drop and a
- * bossa live on the sidestick, and Minimal is deliberately spare — a snare
- * 16th flurry into the downbeat reads as an out-of-idiom intrusion in all of
- * them. Everything else (Rock/Funk/Disco/Country/Blues/Metal/Shred/Hip Hop/
- * Neo-Soul/Ska) is a snare-backbeat genre where the lead-in is idiomatic.
- * Mirrors the sparse-hat grouping in `groove-engine.ts`, minus Country/Blues
- * (whose train-beat/shuffle phrasing DOES want the snare pickup).
+ * a jazz drummer breathes on the ride and comping, and a reggae One Drop and a
+ * bossa live on the sidestick — a snare 16th flurry into the downbeat reads as
+ * an out-of-idiom intrusion in all of them. Everything else (Rock/Funk/Disco/
+ * Country/Blues/Metal/Hip Hop/Neo-Soul/Ska) is a snare-backbeat genre where the
+ * lead-in is idiomatic. Mirrors the sparse-hat grouping in `groove-engine.ts`,
+ * minus Country/Blues (whose train-beat/shuffle phrasing DOES want the pickup).
  */
-const PICKUP_SUPPRESSED_GENRES = new Set([
-    'Jazz',
-    'Bossa Nova',
-    'Latin',
-    'Reggae',
-    'Acoustic',
-    'Minimal',
-]);
+const PICKUP_SUPPRESSED_GENRES = new Set(['Jazz', 'Bossa Nova', 'Reggae', 'Acoustic']);
 
 type Dispatch = (action: any, payload?: any) => void;
 

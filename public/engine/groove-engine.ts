@@ -15,11 +15,9 @@ import * as hiphop from './grooves/hiphop.js';
 import * as jazz from './grooves/jazz.js';
 import * as latin from './grooves/latin.js';
 import * as metal from './grooves/metal.js';
-import * as minimal from './grooves/minimal.js';
 import * as neoSoul from './grooves/neo-soul.js';
 import * as reggae from './grooves/reggae.js';
 import * as rock from './grooves/rock.js';
-import * as shred from './grooves/shred.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
@@ -35,25 +33,20 @@ const strategies: Record<string, any> = {
     Acoustic: acoustic,
     Disco: disco,
     Reggae: reggae,
-    // why (dormant-by-design, verified 2026-05-29): of the Latin family, only
-    // `Bossa` is a selectable smart-genre (smart-genres.ts → feel 'Bossa Nova',
-    // drum 'Bossa Nova'), so `'Bossa Nova'` is the only key the UI ever reaches.
-    // The generic `Latin` key and the `Latin/Salsa` / `Afro-Cuban 6/8` / `Samba`
-    // World/Latin drum presets are intentional curation — built and correct, but
-    // not surfaced in any genre or drum-preset picker (owner call: Bossa is the
-    // deliberate single Latin-family genre). They are NOT dead code to delete;
-    // they stay ready for if/when the World/Latin bank is exposed. Reachable in
-    // production today only via a Bossa selection forced to a compound meter.
+    // why: Bossa is the single selectable Latin-family genre (smart-genres.ts →
+    // feel 'Bossa Nova'); the `latin` groove strategy powers it, including the
+    // compound-meter Bembé bell timeline when Bossa is set to 6/8 or 12/8. #628
+    // retired the unreachable generic `Latin` feel and the dormant World/Latin
+    // drum bank (Latin/Salsa, Afro-Cuban 6/8, Samba, Afrobeat); `latin.ts` itself
+    // stays because it IS the Bossa engine. See git history if World/Latin is ever
+    // surfaced as real genres — it deserves a fresh, fully-wired story.
     'Bossa Nova': latin,
-    Latin: latin,
     // why: the Ska-Punk smart-genre sets genreFeel='Ska' (smart-genres.ts), so
     // the strategy table must be keyed 'Ska'. Was 'Ska-Punk' (the preset name) —
     // a dead key that fell through to DEFAULT_CONFIG in production. Epic 2 S1.
     Ska: skaPunk,
     Country: country,
     Metal: metal,
-    Minimal: minimal,
-    Shred: shred,
 };
 
 // why (Epic 12 S6 B6): genres whose hat is part of the foundational spine —
@@ -70,7 +63,7 @@ const strategies: Record<string, any> = {
 //   - Disco (8th hat + 4-on-the-floor)
 //   - Funk (16th ghosting)
 //   - Rock (driving 8ths)
-//   - Metal / Shred (8th-note rides)
+//   - Metal (8th-note rides)
 //   - Ska-Punk (offbeat-only skank — the hat IS the only timekeeper at
 //     low intensity, so its absence is even more conspicuous than a ticker
 //     dropping out; "spine" rather than "dense" is the accurate framing)
@@ -80,16 +73,15 @@ const strategies: Record<string, any> = {
 //     ticking 16ths; reviewer-flagged borderline case but the cadence-
 //     intensity correlation tips it into the set)
 //
-// For sparser-hat genres (Jazz/Bossa/Acoustic/Country/Blues/Reggae/Latin/
-// Minimal) the original universal suppression remains correct — the hat
-// wasn't part of the spine to begin with, so silencing it on the final
-// bar reads as the intended "let the swell breathe" gesture.
+// For sparser-hat genres (Jazz/Bossa/Acoustic/Country/Blues/Reggae) the
+// original universal suppression remains correct — the hat wasn't part of the
+// spine to begin with, so silencing it on the final bar reads as the intended
+// "let the swell breathe" gesture.
 const HAT_SPINE_GENRES = new Set([
     'Disco',
     'Funk',
     'Rock',
     'Metal',
-    'Shred',
     // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts), not the
     // preset name 'Ska-Punk' this set used before — the dead key meant Ska-Punk's
     // offbeat skank (its sole low-intensity timekeeper) got suppressed on the
@@ -109,11 +101,11 @@ const HAT_SPINE_GENRES = new Set([
 // below names the per-genre overrides on top of the universal gesture:
 //   - openSound       — which sample fires on the Open lane on beat 1
 //                       (default 'Crash'; Jazz/Bossa/Blues → 'Ride';
-//                        Metal/Shred → 'China')
+//                        Metal → 'China')
 //   - snareSound      — which sample fires on the Snare lane on beat 1
 //                       (default 'Snare'; Jazz/Bossa/Blues/Reggae → 'Sidestick')
 //   - kickVelocity    — beat-1 Kick reinforcement (default 1.3; Hip Hop /
-//                       Metal / Shred → 1.4 for trap/double-kick weight)
+//                       Metal → 1.4 for trap/double-kick weight)
 //   - openVelocity    — beat-1 Open lane velocity (default 1.25;
 //                       Jazz/Bossa/Blues lowered to 1.20 — a swell, not a stab;
 //                       Hip Hop raised to 1.30 — heavier trap-style sustain)
@@ -122,7 +114,7 @@ const HAT_SPINE_GENRES = new Set([
 //                       4/8/12) for the rolling-tag country idiom.
 //
 // Genres not listed (Funk, Disco, Rock, Neo-Soul, Ska-Punk, Hip Hop's
-// flourish, Minimal, …) fall through to the universal defaults.
+// flourish, …) fall through to the universal defaults.
 //
 // Source: docs/audit/epic-followup-drain.md S11.
 type FinalBarTreatment = {
@@ -195,7 +187,6 @@ const PER_GENRE_FINAL_BAR: Record<string, FinalBarTreatment> = {
         kickVelocity: 1.3,
         openVelocity: 1.2,
     },
-    Latin: { openSound: 'Ride', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.2 },
     // why: Country — universal Crash+Kick+Snare on beat 1 PLUS a sidestick
     // flourish on beats 2/3/4 for the rolling-tag idiom. Country endings are
     // busy, not minimal — the band lands hard then ornaments through the bar.
@@ -239,9 +230,6 @@ const PER_GENRE_FINAL_BAR: Record<string, FinalBarTreatment> = {
     // lanes. Future-work: if multi-sample lane dispatch lands, layer Crash
     // under China here for the full audit spec.
     Metal: { openSound: 'China', snareSound: 'Snare', kickVelocity: 1.4, openVelocity: 1.25 },
-    // why: Shred — same metal-China idiom (Shred shares Metal's accent-
-    // cymbal config and is in the same family).
-    Shred: { openSound: 'China', snareSound: 'Snare', kickVelocity: 1.4, openVelocity: 1.25 },
     // why: Reggae — dub aesthetic loves the rim, not the snare crack. The
     // cadence inversion: reggae skips beat-1 kick in the groove, but the
     // FINAL bar IS the cadence arrival so we keep the reinforced Kick; the
@@ -250,23 +238,11 @@ const PER_GENRE_FINAL_BAR: Record<string, FinalBarTreatment> = {
     Reggae: { openSound: 'Crash', snareSound: 'Sidestick', kickVelocity: 1.3, openVelocity: 1.25 },
 };
 
-// why: Latin/Salsa/Samba/Afro-Cuban 6/8 are reached via `groove.lastDrumPreset`,
-// not via `groove.genreFeel` (mirror of `getStrategy`'s dispatch at line ~228).
-// Without this set, the `Latin` row of PER_GENRE_FINAL_BAR would be dead code
-// because `genreFeel` is never assigned `'Latin'` in production. Reviewer P1,
-// Epic 12 S11.
-const LATIN_PRESETS = new Set(['Latin/Salsa', 'Afro-Cuban 6/8', 'Samba', 'Bossa Nova']);
-
-function getFinalBarTreatment(
-    genreFeel: string | undefined,
-    lastDrumPreset?: string,
-): FinalBarTreatment {
-    // why: Latin preset dispatch first — if the user picked a Latin drum preset
-    // we honor that idiom regardless of what genreFeel was set to (e.g., a Jazz
-    // standard with Bossa Nova drums should still close on a Latin ride swell).
-    if (lastDrumPreset && LATIN_PRESETS.has(lastDrumPreset)) {
-        return PER_GENRE_FINAL_BAR.Latin ?? UNIVERSAL_FINAL_BAR;
-    }
+function getFinalBarTreatment(genreFeel: string | undefined): FinalBarTreatment {
+    // why (#628): Bossa is the one Latin-family genre and always sets
+    // genreFeel='Bossa Nova', so the standard genreFeel lookup covers it — the
+    // old LATIN_PRESETS indirection (for the now-retired World/Latin drum bank)
+    // is gone.
     if (!genreFeel) {
         return UNIVERSAL_FINAL_BAR;
     }
@@ -274,10 +250,10 @@ function getFinalBarTreatment(
 }
 
 function getStrategy(groove: any): any {
-    const isLatinStyle =
-        groove.genreFeel === 'Bossa Nova' ||
-        ['Bossa Nova', 'Latin/Salsa', 'Afro-Cuban 6/8', 'Samba'].includes(groove.lastDrumPreset) ||
-        groove.lastSmartGenre === 'Bossa';
+    // why (#628): Bossa is the single selectable Latin-family genre; it sets
+    // genreFeel='Bossa Nova' (lastSmartGenre='Bossa'). The `latin` strategy
+    // powers it. The retired World/Latin drum presets are no longer checked.
+    const isLatinStyle = groove.genreFeel === 'Bossa Nova' || groove.lastSmartGenre === 'Bossa';
     if (isLatinStyle) {
         return latin;
     }
@@ -803,13 +779,13 @@ export function applyGrooveOverrides(
         // why (Epic 12 S11): per-genre treatment selected once, then applied
         // to whichever lane this tick is voicing. Universal fallback shape
         // is preserved for any genre not in the table.
-        const treatment = getFinalBarTreatment(groove.genreFeel, groove.lastDrumPreset);
+        const treatment = getFinalBarTreatment(groove.genreFeel);
         if (isDownbeat) {
             // Beat 1 of the final bar: fire the resolution gesture per-lane.
             if (inst.name === 'Open') {
                 // why: Open lane carries the per-genre accent — universal
-                // 'Crash', Jazz/Bossa/Blues 'Ride' (refined swell), Metal/
-                // Shred 'China' (signature metal trash accent). Velocity
+                // 'Crash', Jazz/Bossa/Blues 'Ride' (refined swell), Metal
+                // 'China' (signature metal trash accent). Velocity
                 // sourced from the treatment so Jazz lands softer (1.20)
                 // and Hip Hop lands heavier (1.30), with universal default
                 // 1.25 — all kept below the synth ceiling 1.4 so they

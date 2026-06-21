@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getDrumMotif } from '../../public/engine/groove-engine.js';
 
 describe('Expansion Genres Groove Integrity', () => {
-    const genres = ['Country', 'Hip Hop', 'Metal', 'Minimal', 'Shred'];
+    const genres = ['Country', 'Hip Hop', 'Metal'];
 
     genres.forEach((genre) => {
         describe(`${genre} Groove Motif Assignment`, () => {
@@ -23,10 +23,8 @@ describe('Expansion Genres Groove Integrity', () => {
                 // Expect at least 2 distinct motifs for high intensity (baseline + at least one active pattern)
                 expect(motifs.size).toBeGreaterThanOrEqual(2);
 
-                // Specifically for Minimal, the max motif is 2, for others it goes up to 3 or 4.
-                if (genre !== 'Minimal') {
-                    expect(motifs.has(1)).toBe(true);
-                }
+                // These genres explore up to motif 3-4; motif 1 must appear.
+                expect(motifs.has(1)).toBe(true);
             });
         });
     });

@@ -16,7 +16,7 @@
 // Treatment table (also documented in groove-engine.ts PER_GENRE_FINAL_BAR):
 //   - Jazz / Blues   → Open lane fires 'Ride' (not 'Crash'); Snare beat-1 →
 //                      'Sidestick'; Open velocity 1.20 (softer swell).
-//   - Bossa / Latin  → Same as Jazz — refined ride + sidestick.
+//   - Bossa          → Same as Jazz — refined ride + sidestick.
 //   - Country / Acoustic → Universal Crash+Kick+Snare on beat 1, PLUS a
 //                      Sidestick rim flourish on beat 3 (loopStep 8) at
 //                      velocity 0.85 — the rolling-tag idiom. Beat 3 only
@@ -25,7 +25,7 @@
 //                      hits a country drummer makes on the final bar.
 //   - Hip Hop        → Heavier Kick (vel 1.4) and heavier Open Crash
 //                      (vel 1.30) — trap-stinger arrival.
-//   - Metal / Shred  → Open lane fires 'China' (signature metal accent);
+//   - Metal          → Open lane fires 'China' (signature metal accent);
 //                      Kick velocity bumped to 1.4 for double-kick weight.
 //   - Reggae         → Snare beat-1 routes to 'Sidestick' (dub rim
 //                      aesthetic); Open Crash kept (reggae endings DO crash).
@@ -320,56 +320,6 @@ describe('Per-genre final-bar — Acoustic rolling-tag flourish', () => {
     });
 });
 
-// --- Latin preset dispatch via lastDrumPreset -------------------------------
-
-describe('Per-genre final-bar — Latin preset dispatch (lastDrumPreset)', () => {
-    installSeededRandom();
-
-    it('routes Latin/Salsa preset to the Latin treatment regardless of genreFeel', () => {
-        // why (reviewer P1, Epic 12 S11): `groove.genreFeel` is never set to
-        // 'Latin' in production — Latin/Salsa/Samba/Afro-Cuban 6/8 are reached
-        // via `groove.lastDrumPreset` (mirror of `getStrategy()`'s dispatch).
-        // The dispatch must consult `lastDrumPreset` so Latin presets land on
-        // the refined ride treatment regardless of which genreFeel the user
-        // had selected. Here we set genreFeel='Funk' (universal-fallback) but
-        // lastDrumPreset='Latin/Salsa' (Latin preset) — Latin treatment wins.
-        const state = makeDrumsMockState('Funk', 'Latin/Salsa');
-        getState.mockReturnValue(state);
-
-        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        const openParams = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        const snareParams = buildDrumParams(finalDownbeat, 'Snare', 0, state, true);
-
-        const openResult = applyGrooveOverrides(state, openParams);
-        const snareResult = applyGrooveOverrides(state, snareParams);
-
-        expect(openResult.soundName).toBe('Ride');
-        expect(snareResult.soundName).toBe('Sidestick');
-    });
-
-    it('routes Afro-Cuban 6/8 preset to the Latin treatment', () => {
-        const state = makeDrumsMockState('Funk', 'Afro-Cuban 6/8');
-        getState.mockReturnValue(state);
-
-        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        const result = applyGrooveOverrides(state, params);
-
-        expect(result.soundName).toBe('Ride');
-    });
-
-    it('routes Samba preset to the Latin treatment', () => {
-        const state = makeDrumsMockState('Funk', 'Samba');
-        getState.mockReturnValue(state);
-
-        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        const result = applyGrooveOverrides(state, params);
-
-        expect(result.soundName).toBe('Ride');
-    });
-});
-
 // --- Hip Hop: trap-stinger arrival ------------------------------------------
 
 describe('Per-genre final-bar — Hip Hop trap stinger', () => {
@@ -423,7 +373,7 @@ describe('Per-genre final-bar — Hip Hop trap stinger', () => {
     });
 });
 
-// --- Metal / Shred: China cymbal accent + double-kick weight ---------------
+// --- Metal: China cymbal accent + double-kick weight -----------------------
 
 describe('Per-genre final-bar — Metal China accent', () => {
     installSeededRandom();
@@ -468,20 +418,6 @@ describe('Per-genre final-bar — Metal China accent', () => {
         const funkResult = applyGrooveOverrides(stateFunk, paramsFunk);
 
         expect(metalResult.velocity).toBeGreaterThan(funkResult.velocity);
-    });
-
-    it('Shred shares the Metal China accent', () => {
-        // why: Shred is in the same family as Metal — same accentCymbal:
-        // 'China' in its config. Verify the per-genre table aliases it.
-        const state = makeDrumsMockState('Shred');
-        getState.mockReturnValue(state);
-
-        const finalDownbeat = FORM_STEPS - STEPS_PER_BAR;
-        const params = buildDrumParams(finalDownbeat, 'Open', 0, state, true);
-        const result = applyGrooveOverrides(state, params);
-
-        expect(result.shouldPlay).toBe(true);
-        expect(result.soundName).toBe('China');
     });
 });
 

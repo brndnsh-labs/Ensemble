@@ -64,15 +64,16 @@ describe('soloist genre→profile routing guard (#592)', () => {
     });
 
     it('pins the two #592 flips against their previous (now-rejected) routing', () => {
-        // Rock: was 'shred', now 'rock' (idiomatic bluesy default; 'shred' stays
-        // the explicit fast-lead voice).
+        // Rock: was 'shred', now 'rock' (idiomatic bluesy default).
         expect(SMART_GENRES.Rock.soloist).toBe('rock');
         expect(resolveSoloistStyle('smart', 'Rock')).not.toBe('shred');
         // Acoustic: was the generic 'minimal', now the hand-tuned 'acoustic'.
         expect(SMART_GENRES.Acoustic.soloist).toBe('acoustic');
         expect(resolveSoloistStyle('smart', 'Acoustic')).not.toBe('minimal');
-        // 'rock'/'shred' and 'acoustic'/'minimal' stay distinct profiles.
-        expect(resolveSoloistStyle('shred', 'Rock')).toBe('shred');
-        expect(resolveSoloistStyle('minimal', 'Acoustic')).toBe('minimal');
+        // #628: the `shred`/`minimal` phantom profiles are retired. An explicit
+        // request for either now gracefully degrades to the genre's own live
+        // profile (no dedicated phantom to resolve to).
+        expect(resolveSoloistStyle('shred', 'Rock')).toBe('rock');
+        expect(resolveSoloistStyle('minimal', 'Acoustic')).toBe('acoustic');
     });
 });

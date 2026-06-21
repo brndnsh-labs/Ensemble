@@ -206,7 +206,7 @@ describe('Compound-meter Reggae + Latin (S16c)', () => {
         // All on the AgogoHigh (gankoguí/agogô) voice. The two PRINCIPAL strokes —
         // beat 1 (bar-1 step 0) and beat 4 (bar-2 step 6, eighth-pulse 9) — are
         // accented above the syncopated in-between strokes.
-        getState.mockReturnValue(buildState('Latin', '6/8', 0.9));
+        getState.mockReturnValue(buildState('Bossa Nova', '6/8', 0.9));
         const { evenBarSteps, oddBarSteps, hitsByBar } = simulateHits('Snare', '6/8', NUM_BARS);
 
         const BAR1 = [0, 4, 8, 10];
@@ -270,7 +270,7 @@ describe('Compound-meter Reggae + Latin (S16c)', () => {
         // In 12/8 the 12-eighth-pulse timeline fits ONE bar, so every bar carries
         // the full standard pattern (eighth-pulses 0,2,4,5,7,9,11): steps
         // 0,4,8,10,14,18,22 on AgogoHigh.
-        getState.mockReturnValue(buildState('Latin', '12/8', 0.9));
+        getState.mockReturnValue(buildState('Bossa Nova', '12/8', 0.9));
         const { evenBarSteps, oddBarSteps, hitsByBar } = simulateHits('Snare', '12/8', NUM_BARS);
 
         const PATTERN = [0, 4, 8, 10, 14, 18, 22];
@@ -314,7 +314,7 @@ describe('Compound-meter Reggae + Latin (S16c)', () => {
         // must be EXACTLY as before: the son-clave / Samba / Partido-Alto motifs on
         // Sidestick (+ Snare body at high intensity), and NEVER the AgogoHigh bell.
         for (const intensity of [0.3, 0.6, 0.9]) {
-            getState.mockReturnValue(buildState('Latin', '4/4', intensity));
+            getState.mockReturnValue(buildState('Bossa Nova', '4/4', intensity));
             const { totalHits, evenBarSteps, oddBarSteps } = simulateHits('Snare', '4/4', 16);
             const hitsPerBar = totalHits / 16;
             console.log(`--- LATIN 4/4 SNARE @${intensity}: ${hitsPerBar.toFixed(2)} hits/bar ---`);
@@ -351,7 +351,7 @@ describe('Compound-meter Reggae + Latin (S16c)', () => {
         // signature of the standard African/Bembé bell. A pattern with the right
         // stroke count but wrong arrangement (e.g. the off-by-character 2-1-2-1-2-2-2
         // that tracks beats 1/2/3 instead of 1/4) would fail this.
-        getState.mockReturnValue(buildState('Latin', '6/8', 0.9));
+        getState.mockReturnValue(buildState('Bossa Nova', '6/8', 0.9));
         const { evenBarSteps, oddBarSteps } = simulateHits('Snare', '6/8', NUM_BARS);
 
         const bellStepsEven = Object.entries(evenBarSteps)

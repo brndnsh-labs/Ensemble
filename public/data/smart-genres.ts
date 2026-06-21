@@ -23,8 +23,8 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         feel: 'Rock',
         bass: 'rock',
         // #592: the Rock genre plays its tailored 'rock' profile (bluesy
-        // bends/double-stops/pentatonic) — the idiomatic default. 'shred' stays
-        // the explicit fast-lead voice, reached by the UI style or Shred genre.
+        // bends/double-stops/pentatonic) — the idiomatic default. (#628 retired
+        // the old 'shred' fast-lead profile; Rock owns the Rock/Metal lead voice.)
         soloist: 'rock',
     },
     Jazz: {
