@@ -268,11 +268,11 @@ describe('Soloist Country Critique', () => {
         console.log('---------------------------------------\n');
 
         // The soloist path is fully seeded (scrambleHash over step/section/loop).
-        // The only non-seeded jitter is chickenPick's internal 3-vs-4 double-stop
-        // interval (soloist-devices.ts:306, Math.random); since both 3 and 4 are
-        // 3rds inside THIRD_SIXTH, that jitter never moves the 3rd/6th metric, and
-        // it only perturbs the major-pent share by <0.4pp (measured 0.919-0.922
-        // across runs). Thresholds carry fixed headroom well clear of that band.
+        // Post-#617 there is no remaining non-seeded jitter: chickenPick's 3-vs-4
+        // double-stop interval (the last Math.random in the device path) is now
+        // scrambleHash(pickerSeedBase + 63), so this critique is bit-deterministic
+        // across runs (measured 92.5% major-pent share, fixed). Thresholds carry
+        // fixed headroom well clear of that value.
 
         // (a) MAJOR-PENTATONIC SHARE ON MAJOR CHORDS. Engine delivers ~92.1%.
         // Uniform-chromatic baseline is 0.417 (5/12 PCs); >0.80 sits ~38pp above

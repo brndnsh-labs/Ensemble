@@ -31,36 +31,41 @@ describe('Soloist Melodic Devices Deep Dive', () => {
     });
 
     describe('generateMelodicDevice - bluesLick intervals', () => {
+        // #617: variant selection migrated from Math.random to
+        // scrambleHash(pickerSeedBase + 60/61). Seeds chosen so each test
+        // exercises its intended branch deterministically.
         it('should handle root (relInt 0) variant A', () => {
             ctx.selectedMidi = 60;
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            ctx.pickerSeedBase = 0; // scrambleHash(60)=0.313 < 0.5 → variant A
             const device = generateMelodicDevice('bluesLick', ctx);
             expect(device.length).toBe(5);
-            randomSpy.mockRestore();
         });
 
         it('should handle root (relInt 0) variant B', () => {
             ctx.selectedMidi = 60;
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+            ctx.pickerSeedBase = 1; // scrambleHash(61)=0.548 >= 0.5 → variant B
             const device = generateMelodicDevice('bluesLick', ctx);
             expect(device.length).toBe(3);
-            randomSpy.mockRestore();
         });
 
         it('should handle minor 3rd (relInt 3) variant A', () => {
             ctx.selectedMidi = 63;
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            ctx.pickerSeedBase = 2; // scrambleHash(63)=0.240 < 0.5 → variant A
             const device = generateMelodicDevice('bluesLick', ctx);
             expect(device.length).toBe(4);
-            randomSpy.mockRestore();
+            // variant A approaches from selectedMidi+1 with a bend; distinguishes it from B
+            expect(device[0].midi).toBe(64);
+            expect(device[0].bendStartInterval).toBe(1);
         });
 
         it('should handle minor 3rd (relInt 3) variant B', () => {
             ctx.selectedMidi = 63;
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9);
+            ctx.pickerSeedBase = 3; // scrambleHash(64)=0.846 >= 0.5 → variant B
             const device = generateMelodicDevice('bluesLick', ctx);
             expect(device.length).toBe(4);
-            randomSpy.mockRestore();
+            // variant B starts on selectedMidi (no bend) — the distinguishing note
+            expect(device[0].midi).toBe(63);
+            expect(device[0].bendStartInterval).toBeUndefined();
         });
 
         it('should handle 4th (relInt 5)', () => {
@@ -85,10 +90,10 @@ describe('Soloist Melodic Devices Deep Dive', () => {
     describe('generateMelodicDevice - other devices', () => {
         it('should handle birdFlurry at high BPM', () => {
             ctx.playback.bpm = 200;
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+            // #617: skip gate migrated to scrambleHash(pickerSeedBase + 64).
+            ctx.pickerSeedBase = 1; // scrambleHash(65)=0.108 < 0.8 → skip (null)
             const device = generateMelodicDevice('birdFlurry', ctx);
             expect(device).toBeNull();
-            randomSpy.mockRestore();
         });
 
         it('should handle birdFlurry at low BPM and exercise scale mask loop', () => {
