@@ -247,9 +247,11 @@ Both scripts move a **`refs/deploys/{test,prod}`** ref to the deployed HEAD on s
 
 ## §7 gh-project mechanics
 
-- **Read the board:** `gh project item-list 2 --owner brndnsh --format json` (each item:
+- **Read the board:** `gh project item-list 2 --owner brndnsh --limit 600 --format json` (each item:
   `content.{number,title,body,url,type}`, `status`, `track`, `size`, `model`, `agent`,
-  `review lens`, `milestone.title`, `labels`). Single-selects flatten to the option name
+  `review lens`, `milestone.title`, `labels`). **Always pass `--limit` (board has ~57 items, default
+  cap is 30)** — without it, recent issues silently fall off the result and read as "not on board".
+  Single-selects flatten to the option name
   (absent/`None` when unset). Intersect with `gh issue list --state open` on `number` to keep only
   open issues (a closed item can linger on the board until archived; this also catches an open
   issue **not yet on the board**, e.g. an `inbox` capture).
