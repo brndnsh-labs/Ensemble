@@ -1,5 +1,6 @@
 import type { SoloistState } from '../state/instruments.js';
 import type { SkeletonNode, StepInfo } from '../types.js';
+import { isBossaOffbeatCellStep } from './clave.js';
 import { makeSeededStream } from './hash-utils.js';
 import { STYLE_CONFIG } from './soloist-config.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
@@ -917,6 +918,33 @@ export function generateRhythmPlan(
             // the multiplier can't saturate further beyond a guaranteed hit.
             if (loopForRhythm > 0 && attackProb < 1.0) {
                 attackProb *= 1 + loopForRhythm * 0.15;
+            }
+
+            // #571 — Bossa clave lock (FINAL-STAGE, after the additive boosts at +0.4
+            // seed / +0.2 downbeat / +0.2 kick / +0.2 snare — placed here so those don't
+            // wash the shaping; the weight-tuning-multiplier-placement rule). Bossa lead
+            // phrasing locks its OFFBEATS to the clave cells (&-of-2/3/4 — the partido-alto
+            // "fingers answer on every offbeat" the comp plays), not random offbeats. The
+            // son clave itself is 4/5 on-beats and so makes no useful soloist accent target
+            // (see clave.ts); we instead boost the offbeat cells and thin the OTHER
+            // offbeats (the &-of-1 and the e/a sixteenths), leaving the on-beats to their
+            // own logic. Gated `attackProb < 1.0` so forced landmarks (=1.0) stay
+            // guaranteed; off the 4/4 grid the cell test is false → generic fallback.
+            // SCOPE: this is the free-phrasing path only. Response/paraphrase phrases
+            // (the earlier branch) place notes at the CALL's positions — a response
+            // mirrors the call, which is correct SRDC behavior, not a missed clave lock.
+            if (
+                style === 'bossa' &&
+                stepsPerBeat === 4 &&
+                stepsPerMeasure === 16 &&
+                attackProb < 1.0 &&
+                !isBeatStart
+            ) {
+                if (isBossaOffbeatCellStep(step, stepsPerBeat, stepsPerMeasure)) {
+                    attackProb *= 1.7;
+                } else {
+                    attackProb *= 0.55;
+                }
             }
 
             // why: epic-form-arrangement S6 — attack-jitter grows +5%/loop.

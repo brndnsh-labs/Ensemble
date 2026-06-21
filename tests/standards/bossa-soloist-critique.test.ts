@@ -28,6 +28,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+    BOSSA_CLAVE_STEPS_4_4,
+    BOSSA_OFFBEAT_CELL_STEPS_4_4,
+    isBossaClaveStep,
+} from '../../public/engine/clave.js';
+import {
     bootstrapSoloistAudit,
     buildHookAuditArrangement,
     simulateSoloistLoops,
@@ -114,5 +119,84 @@ describe('Bossa Soloist Critique', () => {
 
         // (3) COLOR — bossa lands the 6/9 more than jazz (its targetExtensions [2,6,9]).
         expect(bossa.color69Share).toBeGreaterThan(jazz.color69Share);
+    });
+
+    // #571 — Bossa CLAVE-AWARE phrasing. Before this, bossa note placement was generic
+    // positional probability (offbeat-eighth boost, sixteenth boost, a sine syncopation
+    // arc) with ZERO clave awareness — syncopation that was statistically present but
+    // rhythmically rootless. The fix locks the lead's OFFBEATS to the clave cells
+    // (&-of-2/3/4, the partido-alto answer the comp plays — see public/engine/clave.ts).
+    //
+    // Note the canonical son clave (the documented spine) is 4/5 ON-beats, so accenting it
+    // is indistinguishable from beat-playing — which is WHY the lead targets the offbeat
+    // cells instead. This guard pins both: the spine constant's shape, and that bossa's
+    // offbeats genuinely cluster on the cells above a uniform baseline AND above jazz.
+    it('documents the son-clave spine and its single syncopated stroke', () => {
+        // The 3-2 son clave spine: positions 0,6,12 (bar 0) + 20,24 (bar 1).
+        expect([...BOSSA_CLAVE_STEPS_4_4]).toEqual([0, 6, 12, 20, 24]);
+        // Only the &-of-2 (step 6) is off-beat; the rest sit on beats — hence it's a poor
+        // soloist accent target on its own, and the lead uses the offbeat cells.
+        const offBeatStrokes = BOSSA_CLAVE_STEPS_4_4.filter(
+            (s) => s % 4 !== 0 && isBossaClaveStep(s, 4, 16),
+        );
+        expect(offBeatStrokes).toEqual([6]);
+        // The lead's actual accent cells are the &-of-2/3/4.
+        expect([...BOSSA_OFFBEAT_CELL_STEPS_4_4]).toEqual([6, 10, 14]);
+    });
+
+    it("locks the lead's offbeats to the clave cells — above uniform and above jazz", () => {
+        const cell = new Set(BOSSA_OFFBEAT_CELL_STEPS_4_4);
+        // Of a style's OFF-beat attacks (the only ones the clave lock shapes), what share
+        // land on a clave cell (&-of-2/3/4)? Uniform baseline = 3 cells / 12 offbeat
+        // positions per bar = 0.25.
+        const offbeatCellShare = (genre) => {
+            let offbeat = 0;
+            let onCell = 0;
+            for (const seed of SEEDS) {
+                const arrangement = buildHookAuditArrangement('4/4');
+                const boot = bootstrapSoloistAudit({
+                    arrangement,
+                    genre,
+                    bpm: 120,
+                    intensity: 0.55,
+                    timeSignature: '4/4',
+                    style: 'smart',
+                    seed,
+                });
+                const cap = simulateSoloistLoops({
+                    state: boot.state,
+                    arrangement,
+                    loops: 4,
+                    style: 'smart',
+                });
+                for (const e of cap.events) {
+                    const stepInBar = ((e.absoluteStep % 16) + 16) % 16;
+                    if (stepInBar % 4 !== 0) {
+                        offbeat++;
+                        if (cell.has(stepInBar)) {
+                            onCell++;
+                        }
+                    }
+                }
+            }
+            return { offbeat, share: onCell / (offbeat || 1) };
+        };
+
+        const bossa = offbeatCellShare('Bossa');
+        const jazz = offbeatCellShare('Jazz');
+        const UNIFORM = 3 / 12; // 0.25
+        console.log('\n--- BOSSA SOLOIST: clave-cell lock ---');
+        console.log(
+            `  offbeat→cell share: bossa ${(bossa.share * 100).toFixed(1)}%  jazz ${(jazz.share * 100).toFixed(1)}%  uniform ${(UNIFORM * 100).toFixed(0)}%`,
+        );
+        console.log('--------------------------------------\n');
+
+        expect(bossa.offbeat).toBeGreaterThan(100); // real sample of offbeat attacks
+        // (1) ABOVE UNIFORM — bossa's offbeats cluster on the clave cells far above the
+        // 25% you'd get from uniform offbeat placement (measured ~0.67).
+        expect(bossa.share).toBeGreaterThan(0.55);
+        // (2) ABOVE JAZZ — the clave LOCK, not just the generic offbeat-eighth boost jazz
+        // also gets (jazz ~0.47). The gap is the clave-awareness this story adds.
+        expect(bossa.share).toBeGreaterThan(jazz.share + 0.1);
     });
 });
