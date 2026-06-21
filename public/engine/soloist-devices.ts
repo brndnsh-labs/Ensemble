@@ -4,7 +4,7 @@ import { getScaleForChord } from './theory-scales.js';
 
 const JAZZ_GUITAR_STYLES = new Set(['jazz', 'bird', 'bossa']);
 const GROOVE_GUITAR_STYLES = new Set(['funk', 'reggae', 'ska']);
-const HIGH_ENERGY_GUITAR_STYLES = new Set(['metal', 'shred', 'scalar']);
+const HIGH_ENERGY_GUITAR_STYLES = new Set(['metal', 'scalar']);
 
 /**
  * Soloist Melodic Devices Module

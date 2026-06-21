@@ -329,8 +329,9 @@ function applySoloistEnvelope(
  * fixed `currentCents` detune on osc2. The New voice starts osc2 ~20c wider
  * and ramps inward to `newCents` over ~50 ms, so the two-oscillator unison
  * "locks in" on the attack instead of sitting statically chorused. `newCents`
- * also lets a preset tighten its detune for the New voice (shred: +12 → +6,
- * where +12 is a sour near-quarter-tone). The ramp is scheduled automation on
+ * also lets a preset tighten its detune for the New voice (e.g. a wide +12,
+ * a sour near-quarter-tone, ramped inward to a tighter target). The ramp is
+ * scheduled automation on
  * `osc2.detune`; any LFO connected to that param (neo) simply sums on top.
  */
 function applyDetuneSettle(
@@ -593,8 +594,6 @@ function createVibrato(
         vibSpeed -= 0.5;
     } else if (style === 'neo') {
         vibSpeed -= 0.8;
-    } else if (style === 'shred') {
-        vibSpeed += 1.2;
     }
 
     let depthFactor = 0.008;
@@ -602,8 +601,6 @@ function createVibrato(
         depthFactor = 0.012;
     } else if (style === 'neo') {
         depthFactor = 0.015;
-    } else if (style === 'shred') {
-        depthFactor = 0.004;
     }
 
     const profile = soloist.session.currentPhrase.context?.profile;

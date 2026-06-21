@@ -38,7 +38,6 @@
 const DROP_FRIENDLY_GENRES: readonly string[] = [
     'rock',
     'metal',
-    'shred',
     'hip-hop',
     'hiphop',
     'disco',

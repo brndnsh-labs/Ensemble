@@ -290,7 +290,7 @@ function buildMotifDevicePriorities(options: MotifDevicePrioritiesOptions): stri
         seedNote,
     } = options;
     const priorities: string[] = [];
-    if (activeStyle === 'rock' || activeStyle === 'shred') {
+    if (activeStyle === 'rock') {
         return priorities;
     }
     const isLongArcRecall = responseSource === 'section' || responseSource === 'form';
@@ -650,8 +650,7 @@ export function selectPitchAndDevices(
         activeStyle === 'jazz' || activeStyle === 'bird' || activeStyle === 'bossa';
     const isGrooveGuitarStyle =
         activeStyle === 'funk' || activeStyle === 'reggae' || activeStyle === 'ska';
-    const isHighEnergyGuitarStyle =
-        activeStyle === 'metal' || activeStyle === 'shred' || activeStyle === 'scalar';
+    const isHighEnergyGuitarStyle = activeStyle === 'metal' || activeStyle === 'scalar';
     const stationaryScale = intent?.stationaryScale ?? 0.5;
     const prefersStationaryHook = stationaryScale > 0.7;
     const isJazzHookStyle = activeStyle === 'jazz' || activeStyle === 'bird';
@@ -1571,11 +1570,7 @@ export function selectPitchAndDevices(
     if (seedNote?.isAnchor) {
         deviceBaseProb *= 0.35;
     }
-    if (
-        (activeStyle === 'rock' || activeStyle === 'shred') &&
-        loopCount > 0 &&
-        seedNote?.isAnchor
-    ) {
+    if (activeStyle === 'rock' && loopCount > 0 && seedNote?.isAnchor) {
         deviceBaseProb = 0;
     }
     if (isResponseGuidedPhrase) {
