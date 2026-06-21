@@ -34,11 +34,12 @@ status-less.
 **Ranking Ready** (`/next`): milestone (a real numbered epic > a "candidate epic" / no
 milestone), then Size (S < M < L), then issue number. Model is *not* a ranking factor.
 
-**No board auto-flip configured.** GitHub's built-in "Item closed → Status" workflow is UI-only
-(not CLI/API-configurable), so the pipeline **sets `Status: Shipped` explicitly** after a merge
-via the helper (§7) — it does not rely on an auto-flip. A **closed issue is the source-of-truth
-"done"** regardless of the board field. (If the optional UI workflows get enabled — see §7 — the
-explicit write becomes a harmless no-op.)
+**Board auto-flip IS configured** (confirmed firing 2026-06-20 via #631). GitHub's built-in
+**"Item closed → Status: Shipped"** workflow is enabled in the Project (UI-only, not
+CLI/API-configurable), so closing an issue — which `Closes #<n>` does on merge — **auto-sets
+`Status: Shipped`**. The pipeline no longer writes Shipped itself; the workflow owns that field.
+A **closed issue is the source-of-truth "done"** regardless of the board field, so even if the
+workflow is ever toggled off, nothing downstream breaks (the board just lags reality).
 
 ## §2 Labels
 
@@ -221,9 +222,11 @@ until [ "$(gh pr view <pr> --json statusCheckRollup --jq '.statusCheckRollup | l
 #    checks (test + e2e), NOT --required (there are none server-side). The && is the guard.
 gh pr checks <pr> --watch --fail-fast && gh pr merge <pr> --squash --delete-branch
 ```
-After a safe merge: **set `Status: Shipped`** (`node scripts/gh-project.mjs status <n> "Shipped"`),
-then **sync local main** (`git checkout main && git fetch origin && git reset --hard origin/main`)
-and prune the branch.
+After a safe merge: the **"Item closed → Status: Shipped"** Project workflow flips the board field
+automatically (§1) — no explicit status write needed. Just **sync local main** (`git checkout main
+&& git fetch origin && git reset --hard origin/main`) and prune the branch. (If you ever spot a
+merged-but-not-Shipped item, the workflow was toggled off — `node scripts/gh-project.mjs status <n>
+"Shipped"` is the manual fallback.)
 
 **Deploy (static-file app).** Ensemble ships as **static files on nginx behind Caddy** —
 `vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app server, no DB,
@@ -258,10 +261,10 @@ Both scripts move a **`refs/deploys/{test,prod}`** ref to the deployed HEAD on s
   are fine per-item.
 - **Add an off-board issue:** `gh project item-add 2 --owner brndnsh --url <url>` (or the helper's
   `ensure <n>`).
-- **Optional UI workflows (not required; not CLI-configurable):** in the Project's ⚙ → Workflows
-  you may enable **"Item added to project → Status: Ready"** restricted as you like, and **"Item
-  closed → Status: Shipped"**. The skills don't depend on either (they `ensure` on-board and set
-  Shipped explicitly), so enabling them only saves a redundant write.
+- **UI workflows (not CLI-configurable):** **"Item closed → Status: Shipped"** is **enabled** and
+  owns the Shipped field (§1/§6 — confirmed 2026-06-20). Do NOT also enable "Item added → Status:
+  Ready": Status is for *scheduled* work, and auto-Ready-on-add would mis-mark raw `inbox`/`backlog`
+  captures (let `/intake` set Ready deliberately).
 - **gh offline/unauthed:** say so and stop — don't fall back to the frozen markdown as current.
 
 ## §8 Commit & PR conventions

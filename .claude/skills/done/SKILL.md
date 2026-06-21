@@ -13,8 +13,9 @@ on §4 Gates (incl. Track DoD), §5 Judgment calls (the safe-vs-brake split — 
 §6 Merge guard (the poll-then-merge bash, never `--auto`, set-Shipped-then-sync-main), §8 Commit & PR
 conventions, §9 Branch policy. The procedure below is just the ordering.
 
-**Done = the issue is closed** (§1) — `Closes #<n>` does it on merge; `/done` then sets
-`Status: Shipped` explicitly (no auto-flip is configured — §1/§7). No markdown tracker to touch.
+**Done = the issue is closed** (§1) — `Closes #<n>` does it on merge, and the enabled "Item
+closed → Status: Shipped" Project workflow flips the board field automatically (§1/§6/§7). No
+explicit status write, no markdown tracker to touch.
 
 ## Workflow
 
@@ -56,5 +57,5 @@ conventions, §9 Branch policy. The procedure below is just the ordering.
 - **Unrelated drift in the diff:** surface; stage selectively (§8 — never `-A`).
 - **Whole epic (milestone) done:** note it; suggest a VISION/docs shipped note — don't auto-restructure
   (milestone progress reflects it automatically).
-- **Issue didn't close after merge** (a `Closes #<n>` typo / non-default base): `gh issue close <n>` +
-  `node scripts/gh-project.mjs status <n> "Shipped"`. A **closed issue is "done"** regardless.
+- **Issue didn't close after merge** (a `Closes #<n>` typo / non-default base): `gh issue close <n>`
+  (the "Item closed → Shipped" workflow then flips the board). A **closed issue is "done"** regardless.
