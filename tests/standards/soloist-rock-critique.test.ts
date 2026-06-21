@@ -261,7 +261,8 @@ describe('Soloist Rock Critique', () => {
         expect(resolveSoloistStyle(undefined, 'Rock')).toBe('rock');
         // An explicit 'rock' UI style is honored verbatim.
         expect(resolveSoloistStyle('rock', 'Rock')).toBe('rock');
-        // 'rock' and 'shred' are distinct profiles, not aliases of each other.
-        expect(resolveSoloistStyle('shred', 'Rock')).toBe('shred');
+        // #628: the `shred` phantom profile is retired; an explicit 'shred' style
+        // now gracefully degrades to the genre's own 'rock' profile.
+        expect(resolveSoloistStyle('shred', 'Rock')).toBe('rock');
     });
 });

@@ -185,19 +185,6 @@ describe('Soloist Reggae Critique', () => {
         // (1) SPARSE — reggae lead leaves space for bass + skank.
         const restRatio = 1 - notes.length / totalSteps;
 
-        // (2) CONTRAST vs the generic 'minimal' it used to play — minimal is
-        // square (syncopationLikelihood 0.3), so it leans harder on downbeats.
-        // Re-run the same harness on 'minimal' to confirm 'reggae' is more
-        // offbeat-weighted (directly guards the dead-profile fix's intent).
-        const min = simulatePerformance(numBars, 0.6, 'minimal');
-        let minOff = 0;
-        for (const n of min.notes) {
-            if (OFFBEAT_8THS.has(n.stepInBar)) {
-                minOff++;
-            }
-        }
-        const minOffShare = minOff / min.notes.length;
-
         // (3) REGISTER sanity.
         const midis = notes.map((n) => n.primaryMidi);
         const minMidi = Math.min(...midis);
@@ -208,9 +195,6 @@ describe('Soloist Reggae Critique', () => {
         console.log(`[Rest / Space Ratio]   ${(restRatio * 100).toFixed(1)}% (Target: sparse)`);
         console.log(
             `[Offbeat-8th share]    ${(offbeat8thShare * 100).toFixed(1)}% vs downbeat ${(downbeatShare * 100).toFixed(1)}%`,
-        );
-        console.log(
-            `[vs minimal offbeat]   reggae ${(offbeat8thShare * 100).toFixed(1)}% vs minimal ${(minOffShare * 100).toFixed(1)}% (Target: reggae more offbeat)`,
         );
         console.log(
             `[Register min/avg/max] ${minMidi} / ${avgMidi.toFixed(1)} / ${maxMidi} (Target: floor>=52, ceil<=90)`,
@@ -225,15 +209,13 @@ describe('Soloist Reggae Critique', () => {
         // Engine delivers ~85% rest; >0.70 sits well clear of a busy line.
         expect(restRatio).toBeGreaterThan(0.7);
 
-        // (2) OFFBEAT FLOAT — the discriminating claim. The '&' (offbeat 8th)
-        // carries notably more of the line than under the square 'minimal' it
-        // replaced: engine delivers offbeat 27.2% vs minimal's 13.0% — a 2.1×
-        // elevation. The >minOffShare*1.6 assertion guards "meaningfully more
-        // offbeat than minimal" with headroom (1.6×13.0% = 20.8% < 27.2%); the
-        // absolute >0.20 floor confirms the '&' is well above the 25%-uniform
-        // floor it would sit at without the live offbeat pump.
-        expect(offbeat8thShare).toBeGreaterThan(minOffShare * 1.6);
-        expect(offbeat8thShare).toBeGreaterThan(0.2);
+        // (2) OFFBEAT FLOAT — the discriminating claim. OFFBEAT_8THS is 4 of the
+        // 16 grid steps, so a line with no offbeat bias sits at the 25% uniform
+        // floor. The #570 live offbeat pump lifts the reggae line to ~27.2%, so a
+        // >0.25 floor genuinely asserts "more offbeat-weighted than uniform" with
+        // measured headroom. (#628: the old contrast against the retired 'minimal'
+        // profile was dropped; this absolute, above-uniform floor replaces it.)
+        expect(offbeat8thShare).toBeGreaterThan(0.25);
 
         // (3) DOWNBEAT NOT LOCKED — the dead-route bug played this profile
         // downbeat-locked (~60% on beats 1/3 because syncopationLikelihood never
@@ -258,7 +240,8 @@ describe('Soloist Reggae Critique', () => {
         expect(resolveSoloistStyle(undefined, 'Reggae')).toBe('reggae');
         // An explicit 'reggae' UI style is honored verbatim.
         expect(resolveSoloistStyle('reggae', 'Reggae')).toBe('reggae');
-        // 'reggae' and 'minimal' are distinct profiles, not aliases.
-        expect(resolveSoloistStyle('minimal', 'Reggae')).toBe('minimal');
+        // #628: the `minimal` phantom profile is retired; an explicit 'minimal'
+        // style now gracefully degrades to the genre's own 'reggae' profile.
+        expect(resolveSoloistStyle('minimal', 'Reggae')).toBe('reggae');
     });
 });

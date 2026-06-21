@@ -19,7 +19,7 @@ import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { checkBassActiveStyle, getBassNoteStyle, isChordChangeApproach } from './bass-styles.js';
 
 // why: Genres where bass-doubles-kick is the musical intent. Other styles
-// (jazz/dub/country/blues/bossa/acoustic/neo/walking-ska/hiphop/whole/half/arp)
+// (jazz/dub/country/blues/bossa/acoustic/neo/walking-ska/hiphop)
 // phrase against the kick and choose their own active lane. Hip-hop is independent
 // — 808 sub-bass sustains across the kick pattern rather than re-articulating with
 // every hi-hat-locked kick burst.
@@ -536,9 +536,7 @@ export function getBassNote(
         if (durationMultiplier !== null) {
             durationSteps = durationMultiplier;
         } else {
-            if (style === 'whole') {
-                durationSteps = chord.beats * ts.stepsPerBeat;
-            } else if (style === 'rock') {
+            if (style === 'rock') {
                 durationSteps = ts.stepsPerBeat * 0.45;
             } else if (style === 'funk') {
                 durationSteps = 0.8;
@@ -574,7 +572,7 @@ export function getBassNote(
 
         const intensityFactor = 0.6 + intensity * 0.7;
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
-        const isLongStyle = ['acoustic', 'whole'].includes(style);
+        const isLongStyle = ['acoustic'].includes(style);
         const maxSafeDuration =
             style === 'quarter'
                 ? ts.stepsPerBeat * 0.45
@@ -760,8 +758,8 @@ export function getBassNote(
     //   1. coordination.upcomingSectionFirstChord is published (last measure of section).
     //   2. We're at exactly sectionEnd - stepsPerBeat/2 (the "and-of-4" of the last beat).
     //   3. Style is in the melodic-walk set (jazz/walking/funk/rock/blues/bossa/neo/disco).
-    //      Dub, minimal, whole, half, and country are excluded: these styles favor
-    //      root-hold or sparse patterns where a chromatic tail would feel forced.
+    //      Dub and country are excluded: these styles favor root-hold or sparse
+    //      patterns where a chromatic tail would feel forced.
     //
     // This is a direct pitch override (gate), not a weight multiplier — the
     // anticipation must fire deterministically at the correct step so the listener
@@ -923,7 +921,7 @@ export function getBassNote(
         }
     }
 
-    const isStraightStyle = ['rock', 'whole', 'quarter', 'disco', 'neo'].includes(style);
+    const isStraightStyle = ['rock', 'quarter', 'disco', 'neo'].includes(style);
     if (
         stepInChord === 0 &&
         (isStraightStyle || style === 'funk') &&

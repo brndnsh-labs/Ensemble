@@ -162,22 +162,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
             spaceBias: 0.14,
         },
     },
-    shred: {
-        restBase: 0.05,
-        timingJitter: 4,
-        maxNotesPerPhrase: 64,
-        minNotesPerPhrase: 8,
-        doubleStopProb: 0.05,
-        anticipationProb: 0.05,
-        targetExtensions: [2],
-        deviceProb: 0.4,
-        allowedDevices: ['run', 'guitarDouble'],
-        commonToneWeight: 100,
-        stationaryProb: 0.02,
-        rhythmicDensity: 0.9,
-        syncopationLikelihood: 0.4,
-        chromaticism: 0.5,
-    },
     blues: {
         restBase: 0.09,
         timingJitter: 25,
@@ -294,21 +278,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // solo. Capture the head's strongest 2-bar window and replay it verbatim.
         hookLoop: true,
         hookBars: 2,
-    },
-    minimal: {
-        restBase: 0.3,
-        timingJitter: 35,
-        maxNotesPerPhrase: 8,
-        minNotesPerPhrase: 1,
-        doubleStopProb: 0,
-        anticipationProb: 0.25,
-        targetExtensions: [2, 9, 11],
-        deviceProb: 0.15,
-        allowedDevices: ['slide', 'enclosure'],
-        commonToneWeight: 600,
-        stationaryProb: 0.4,
-        rhythmicDensity: 0.3,
-        syncopationLikelihood: 0.3,
     },
     jazz: {
         restBase: 0.08,
@@ -571,15 +540,12 @@ const GENRE_STYLE_MAPPING: Record<string, string> = {
     Disco: 'disco',
     Bossa: 'bossa',
     'Bossa Nova': 'bossa',
-    Afrobeat: 'funk',
     Acoustic: 'acoustic',
     Reggae: 'reggae',
     Country: 'country',
     'Ska-Punk': 'ska',
     Ska: 'ska',
     Metal: 'metal',
-    Minimal: 'minimal',
-    Shred: 'shred',
 };
 
 /**
@@ -593,7 +559,6 @@ export const INFLUENCE_POOLS: Record<string, string[]> = {
     blues: ['srv', 'monk', 'armstrong', 'miles'],
     neo: ['miles', 'srv'], // Cross-genre influences
     funk: ['srv', 'slash'],
-    shred: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
 };
 
 export interface SoloistIntent {
@@ -770,18 +735,6 @@ const SOLOIST_REGISTER_PROFILES: Record<string, Partial<RegisterProfile>> = {
         liveCeiling: 92,
         liveLoopLift: 3,
     },
-    minimal: {
-        seedFloor: 60,
-        seedCenter: 64,
-        seedCeiling: 80,
-        seedIntroDrop: 2,
-        seedChorusLift: 2,
-        seedDepartureLift: 2,
-        liveFloor: 60,
-        liveCenter: 65,
-        liveCeiling: 84,
-        liveLoopLift: 1,
-    },
     neo: {
         seedFloor: 60,
         seedCenter: 65,
@@ -818,18 +771,6 @@ const SOLOIST_REGISTER_PROFILES: Record<string, Partial<RegisterProfile>> = {
         liveCeiling: 90,
         liveLoopLift: 2,
     },
-    shred: {
-        seedFloor: 62,
-        seedCenter: 69,
-        seedCeiling: 90,
-        seedIntroDrop: 1,
-        seedChorusLift: 5,
-        seedDepartureLift: 6,
-        liveFloor: 62,
-        liveCenter: 73,
-        liveCeiling: 94,
-        liveLoopLift: 3,
-    },
     ska: {
         seedFloor: 60,
         seedCenter: 66,
@@ -849,7 +790,9 @@ const REGISTER_PROFILE_ALIASES: Record<string, string> = {
     beck: 'rock',
     coltrane: 'bird',
     evans: 'jazz',
-    evh: 'shred',
+    // why (#628): `evh` aliased to the retired `shred` register profile; now
+    // points to `rock` (Shred was always a Metal/Rock-family alias, never live).
+    evh: 'rock',
     gilmour: 'rock',
     hendrix: 'rock',
     miles: 'jazz',

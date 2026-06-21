@@ -108,7 +108,6 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         voicing: { powerChord: true },
     },
     Ska: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'ska' },
-    Afrobeat: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
 };
 
 /** Look up a genre's harmony profile, falling back to the generic default. */

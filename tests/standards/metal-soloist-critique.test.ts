@@ -39,10 +39,9 @@ interface CapturedNote {
 // extends the metal scale branch to cover shred; this test pins BOTH.
 const STYLES: Array<{ style: string; genreFeel: string }> = [
     { style: 'metal', genreFeel: 'Metal' },
-    { style: 'shred', genreFeel: 'Shred' },
 ];
 
-describe('Soloist Metal/Shred Critique', () => {
+describe('Soloist Metal Critique', () => {
     let soloistState: any;
 
     const makeState = (genreFeel: string, bandIntensity: number) => ({
@@ -279,20 +278,18 @@ describe('Soloist Metal/Shred Critique', () => {
     // cause was a profile reached only by an alias path. This pins every route to
     // the shred/metal profiles so a future re-route can't silently make this
     // critique test exercise the wrong scale.
-    it('resolves Metal/Shred genres + aliases to their canonical soloist profiles', () => {
+    it('resolves Metal genre + aliases to the canonical metal soloist profile', () => {
         // Metal genre (smart) → 'metal' (SMART_GENRES.Metal.soloist).
         expect(resolveSoloistStyle('smart', 'Metal')).toBe('metal');
         expect(resolveSoloistStyle('metal', 'Metal')).toBe('metal');
-        // Shred is reached three ways, all → 'shred':
-        //  - the Shred genre (GENRE_STYLE_MAPPING; not in SMART_GENRES),
-        expect(resolveSoloistStyle('smart', 'Shred')).toBe('shred');
-        //  - the explicit 'shred' UI style (STYLE_CONFIG),
-        expect(resolveSoloistStyle('shred', undefined)).toBe('shred');
-        //  - and the legacy 'evh' alias (SOLOIST_STYLE_ALIASES).
-        expect(resolveSoloistStyle('evh', undefined)).toBe('shred');
+        // #628: the `shred` phantom profile is retired (Shred was never a live
+        // genre). Its former routes now gracefully degrade — the legacy 'evh'
+        // alias re-points to 'rock', and the unknown 'Shred' feel maps to the
+        // neutral 'scalar' fallback rather than a dedicated phantom profile.
+        expect(resolveSoloistStyle('evh', undefined)).toBe('rock');
+        expect(resolveSoloistStyle('smart', 'Shred')).toBe('scalar');
         // NEGATIVE guard: the Rock genre deliberately keeps its own bluesy 'rock'
-        // profile (#592) — it must NOT drift onto shred and inherit phrygian
-        // dominant. This is the regression that would silently re-break Rock.
+        // profile (#592) — it must NOT drift onto metal/phrygian dominant.
         expect(resolveSoloistStyle('smart', 'Rock')).toBe('rock');
     });
 });

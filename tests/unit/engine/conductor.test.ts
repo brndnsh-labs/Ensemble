@@ -558,7 +558,7 @@ describe('Conductor Logic', () => {
         });
 
         it('does NOT pick up in brush/sidestick genres (Jazz, Reggae, Bossa)', () => {
-            for (const genre of ['Jazz', 'Reggae', 'Bossa Nova', 'Minimal']) {
+            for (const genre of ['Jazz', 'Reggae', 'Bossa Nova']) {
                 vi.clearAllMocks();
                 setupLongSection(genre);
                 checkSectionTransition(getState(), 48, 16, dispatch);

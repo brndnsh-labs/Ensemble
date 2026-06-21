@@ -1378,7 +1378,6 @@ function updateRhythmicIntent(
 
     if (chords.style === 'smart') {
         const smartMapping: any = {
-            Afrobeat: 'Funk',
             Country: 'Rock',
         };
         if (smartMapping[genre]) {

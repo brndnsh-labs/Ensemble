@@ -41,7 +41,6 @@ const EXPECTED_PROFILE: Record<string, Omit<HarmonyGenreProfile, 'voicing'>> = {
     Country: { smartStyle: 'strings', rhythmicStyle: 'pads', patternKey: 'default' },
     Metal: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'default' },
     Ska: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'ska' },
-    Afrobeat: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
 };
 
 // Pre-refactor generateCompingPattern output, captured at seed 12345 / 4-4.
@@ -82,7 +81,6 @@ const GOLDEN_PATTERN: Record<string, number[]> = {
         0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1,
         0,
     ],
-    Afrobeat: FUNK16_PATTERN,
 };
 
 describe('Harmony genre routing (characterization)', () => {

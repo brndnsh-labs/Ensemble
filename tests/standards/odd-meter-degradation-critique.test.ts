@@ -40,11 +40,9 @@ const GENRES = [
     'Disco',
     'Reggae',
     'Bossa Nova',
-    'Latin',
     'Ska',
     'Country',
     'Metal',
-    'Minimal',
 ];
 const ODD_METERS = ['5/4', '7/4', '7/8'];
 const CORE_LANES = ['Kick', 'Snare', 'HiHat'];
@@ -316,7 +314,7 @@ describe('Odd-meter Latin/Bossa clave timeline coverage (epic-2 S10)', () => {
         return bars;
     };
 
-    for (const genre of ['Latin', 'Bossa Nova']) {
+    for (const genre of ['Bossa Nova']) {
         for (const tsKey of ODD_METERS) {
             it(`${genre} son-clave spans EVERY bar in ${tsKey} (no 2-side tail dropout)`, () => {
                 const ts = TIME_SIGNATURES[tsKey];

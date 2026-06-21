@@ -54,9 +54,6 @@ export function checkBassActiveStyle(
     // gate keep the streams independent. Epic 2 S4.
     const bassRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
     const bassDraw = (n: number) => scrambleHash((bassRandSeed + n) | 0);
-    if (style === 'whole') {
-        return stepInChord === 0;
-    }
     if (style === 'rock') {
         return isEighthBoundary;
     }
@@ -473,9 +470,6 @@ export function getBassNoteStyle(
     barsUntilSectionChange?: number,
 ) {
     const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange } = context;
-    if (style === 'whole') {
-        return result(getFrequency(withOctaveJump(baseRoot)));
-    }
 
     // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
     if (style === 'country') {

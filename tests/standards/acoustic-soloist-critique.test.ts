@@ -342,7 +342,8 @@ describe('Soloist Acoustic Critique', () => {
         // An explicit 'acoustic' UI style is honored verbatim.
         expect(resolveSoloistStyle('acoustic', 'Acoustic')).toBe('acoustic');
         expect(resolveSoloistStyle('acoustic', undefined)).toBe('acoustic');
-        // 'acoustic' and 'minimal' are distinct profiles, not aliases.
-        expect(resolveSoloistStyle('minimal', 'Acoustic')).toBe('minimal');
+        // #628: the `minimal` phantom profile is retired; an explicit 'minimal'
+        // style now gracefully degrades to the genre's own 'acoustic' profile.
+        expect(resolveSoloistStyle('minimal', 'Acoustic')).toBe('acoustic');
     });
 });

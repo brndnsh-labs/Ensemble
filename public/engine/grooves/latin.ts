@@ -70,8 +70,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
         // why: epic-1-compound-meter S16b F1 — the `!isBackbeat` foundation
         // above excludes the second-pulse position in default 6/8. Compound
-        // Latin (when not routed through the 'Afro-Cuban 6/8' preset's clave
-        // logic) needs the surdo heartbeat on both dotted-quarter pulses to
+        // Latin needs the surdo heartbeat on both dotted-quarter pulses to
         // anchor the bar.
         if (isCompound && isPulseStart && !shouldPlay) {
             shouldPlay = true;
@@ -103,13 +102,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         const stepInBar = step % context.stepsPerBar;
 
         if (isCompound) {
-            // why: epic-3-followup S10 — the generic Latin feel has NO clave/bell
+            // why: epic-3-followup S10 — the latin feel has NO clave/bell
             // spine in compound meters (all the son-clave / Samba / Partido-Alto
             // motif branches below are `!isCompound`-gated, correctly, because they
-            // are 4/4-idiomatic). Without the dedicated 'Afro-Cuban 6/8' drum preset
-            // the timeline lane was silent. Author the standard 7-stroke Bembé bell
-            // (the canonical 12/8 Afro-Cuban gankoguí/agogô timeline) onto the Snare
-            // lane so any 6/8 + Latin pairing grooves on its own. The bell rides the
+            // are 4/4-idiomatic), so the timeline lane would otherwise be silent.
+            // Author the standard 7-stroke Bembé bell — the canonical 12/8
+            // Afro-Cuban gankoguí/agogô timeline — onto the Snare lane so Bossa in
+            // 6/8 or 12/8 grooves on its own (this IS the compound-Latin timeline
+            // now; #628 retired the never-surfaced 'Afro-Cuban 6/8' drum preset).
+            // The bell rides the
             // agogô voice (the synth dispatches by soundName, so a bell name on the
             // Snare inst routes to playAgogoPercNew). This supersedes the motif
             // sub-branches in compound — the bell IS the structural timeline, not an
@@ -184,8 +185,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // why: these step indices (0, 6, 12 / 4, 8) are 4/4 16th-note positions.
             // In 6/8 (stepsPerBar=12) step 12 is the start of the NEXT measure and
             // never fires; the spacing also doesn't match a 6/8 son clave (3+3+2 in
-            // eighths). Gate compound out entirely and rely on the explicit
-            // 'Afro-Cuban 6/8' drum preset for compound-meter latin patterns.
+            // eighths). Gate compound out entirely — the compound-meter timeline
+            // is the Bembé bell authored in the `isCompound` branch above.
             const ts = context.tsConfig;
             const stepsPerBeat = ts?.stepsPerBeat ?? 4;
             const meterBeats = (ts?.grouping ?? []).reduce((a, b) => a + b, 0);
@@ -239,11 +240,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // Samba (Busy cross-stick) — 4/4-idiomatic.
             // why: epic-1-compound-meter S16b — `isBeatStart || isOffbeat` fires
             // every step in 6/8 → 12 cross-stick hits/bar at 70% probability.
-            // Samba is a 4/4 Brazilian pattern; 6/8 Latin should default to
-            // Afro-Cuban 6/8 bell patterns via the 'Afro-Cuban 6/8' drum
-            // preset (which routes through the clave block above). Gate Samba
-            // motif to simple meters; compound latin falls back to motif 0/1
-            // (clave-driven, which is correctly compound-gated at line 99).
+            // Samba is a 4/4 Brazilian pattern; 6/8 Latin defaults to the
+            // Afro-Cuban Bembé bell timeline authored in the `isCompound` branch
+            // above. Gate Samba motif to simple meters; compound latin falls back
+            // to motif 0/1 (clave-driven, which is correctly compound-gated).
             if (isBeatStart || isOffbeat) {
                 if (roll(0.7, intensity)) {
                     shouldPlay = true;
@@ -262,7 +262,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // to 4/4 only. In 6/8 it produced a 7-hits-vs-1-hit bar split (bar-1's
             // offbeats {1,3,5,7,9,11}+pulse vs bar-2's lone downbeat). Gate to simple
             // meters, consistent with the Samba decision above; compound latin's
-            // snare/clave comes from the 'Afro-Cuban 6/8' drum preset. Gating the
+            // snare/clave comes from the Bembé bell timeline above. Gating the
             // final `else` here also closes the S16b fall-through where Samba
             // (motif 2) in compound dropped into this Partido Alto block.
             if (isBar1) {
