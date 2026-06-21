@@ -23,7 +23,7 @@ import { checkBassActiveStyle, getBassNoteStyle, isChordChangeApproach } from '.
 // phrase against the kick and choose their own active lane. Hip-hop is independent
 // — 808 sub-bass sustains across the kick pattern rather than re-articulating with
 // every hi-hat-locked kick burst.
-const KICK_LOCK_STYLES = new Set(['rock', 'funk', 'rocco', 'metal', 'disco']);
+const KICK_LOCK_STYLES = new Set(['rock', 'funk', 'metal', 'disco']);
 
 // why: section-transition anticipation gate. The chromatic-approach branch inside
 // getBassNote (~line 407) fires at step `sectionEnd - stepsPerBeat/2`, but tick-logic
@@ -40,7 +40,7 @@ const KICK_LOCK_STYLES = new Set(['rock', 'funk', 'rocco', 'metal', 'disco']);
 // pending a `country-walking` style key (boom-chick country shouldn't anticipate;
 // bluegrass walking should).
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
-const ANTICIPATION_STYLES = new Set(['jazz', 'walking', 'funk', 'blues', 'bossa', 'rocco', 'neo']);
+const ANTICIPATION_STYLES = new Set(['jazz', 'walking', 'funk', 'blues', 'bossa', 'neo']);
 
 /**
  * Resets the internal generative state of the bass.
@@ -226,8 +226,6 @@ export function getBassNote(
         safeCenterMidi = 32;
     } else if (style === 'disco' || (groove.genreFeel || '') === 'Disco') {
         safeCenterMidi = 36;
-    } else if (style === 'rocco') {
-        safeCenterMidi = 45; // Prefer A/D strings area
     } else if (style === 'neo' || (groove.genreFeel || '') === 'Neo-Soul') {
         safeCenterMidi = 24; // Deep Neo-Soul register
     }
@@ -540,17 +538,12 @@ export function getBassNote(
         } else {
             if (style === 'whole') {
                 durationSteps = chord.beats * ts.stepsPerBeat;
-            } else if (style === 'half') {
-                durationSteps = stepsPerMeasure / 2;
-            } else if (style === 'arp') {
-                durationSteps = ts.stepsPerBeat;
             } else if (style === 'rock') {
                 durationSteps = ts.stepsPerBeat * 0.45;
             } else if (style === 'funk') {
                 durationSteps = 0.8;
             } else if (
                 (style as any) === 'disco' ||
-                style === 'rocco' ||
                 style === 'metal' ||
                 style === 'neo' ||
                 style === 'walking-ska' ||
@@ -581,7 +574,7 @@ export function getBassNote(
 
         const intensityFactor = 0.6 + intensity * 0.7;
         const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
-        const isLongStyle = ['acoustic', 'whole', 'half'].includes(style);
+        const isLongStyle = ['acoustic', 'whole'].includes(style);
         const maxSafeDuration =
             style === 'quarter'
                 ? ts.stepsPerBeat * 0.45
@@ -766,7 +759,7 @@ export function getBassNote(
     // Gate conditions (all must hold):
     //   1. coordination.upcomingSectionFirstChord is published (last measure of section).
     //   2. We're at exactly sectionEnd - stepsPerBeat/2 (the "and-of-4" of the last beat).
-    //   3. Style is in the melodic-walk set (jazz/walking/funk/rock/blues/bossa/rocco/neo/disco).
+    //   3. Style is in the melodic-walk set (jazz/walking/funk/rock/blues/bossa/neo/disco).
     //      Dub, minimal, whole, half, and country are excluded: these styles favor
     //      root-hold or sparse patterns where a chromatic tail would feel forced.
     //
@@ -930,9 +923,7 @@ export function getBassNote(
         }
     }
 
-    const isStraightStyle = ['rock', 'half', 'whole', 'arp', 'quarter', 'disco', 'neo'].includes(
-        style,
-    );
+    const isStraightStyle = ['rock', 'whole', 'quarter', 'disco', 'neo'].includes(style);
     if (
         stepInChord === 0 &&
         (isStraightStyle || style === 'funk') &&

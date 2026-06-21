@@ -57,12 +57,6 @@ export function checkBassActiveStyle(
     if (style === 'whole') {
         return stepInChord === 0;
     }
-    if (style === 'half') {
-        return stepInChord % (ts.stepsPerBeat * 2) === 0;
-    }
-    if (style === 'arp') {
-        return stepInChord % ts.stepsPerBeat === 0;
-    }
     if (style === 'rock') {
         return isEighthBoundary;
     }
@@ -252,9 +246,6 @@ export function checkBassActiveStyle(
             return true;
         }
         return false;
-    }
-    if (style === 'rocco') {
-        return true;
     }
     if (style === 'disco') {
         return true;
@@ -476,7 +467,7 @@ export function getBassNoteStyle(
         ghost?: number,
         bend?: number,
     ) => { timingOffset: number; [key: string]: unknown },
-    isGroupStart: boolean,
+    _isGroupStart: boolean,
     hasKickTrigger: boolean,
     kickInst: { steps: number[] } | null,
     barsUntilSectionChange?: number,
@@ -484,37 +475,6 @@ export function getBassNoteStyle(
     const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange } = context;
     if (style === 'whole') {
         return result(getFrequency(withOctaveJump(baseRoot)));
-    }
-
-    // --- HALF NOTE STYLE ---
-    if (style === 'half') {
-        const halfStep = Math.floor(stepsPerMeasure / 2);
-        if (stepInChord % halfStep === 0) {
-            if (stepInChord === 0) {
-                return result(getFrequency(withOctaveJump(baseRoot)));
-            }
-            const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
-            const hasSharp5 = chord.quality === 'aug' || chord.quality === 'augmaj7';
-            const fifth = baseRoot + (hasFlat5 ? 6 : hasSharp5 ? 8 : 7);
-            return result(getFrequency(clampAndNormalize(withOctaveJump(fifth))));
-        }
-        return null;
-    }
-
-    // --- ARP STYLE ---
-    if (style === 'arp') {
-        if (!isDownbeat) {
-            return null;
-        }
-        const beatInMeasureInside = Math.floor(stepInMeasure / ts.stepsPerBeat);
-        const beatInPattern = beatInMeasureInside % 4;
-        if (beatInPattern === 0 || isGroupStart) {
-            return result(getFrequency(withOctaveJump(baseRoot)));
-        }
-        const intervals = chord.intervals;
-        const targetInterval =
-            beatInPattern === 1 || beatInPattern === 3 ? intervals[1] || 4 : intervals[2] || 7;
-        return result(getFrequency(clampAndNormalize(withOctaveJump(baseRoot + targetInterval))));
     }
 
     // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
@@ -1153,74 +1113,6 @@ export function getBassNoteStyle(
             return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.1);
         }
 
-        return null;
-    }
-
-    // --- ROCCO STYLE (Machine-Gun 16ths) ---
-    if (style === 'rocco') {
-        const stepInBeat = step % ts.stepsPerBeat;
-        // Rocco Prestia style: Staccato 16th notes, mostly Root, heavily muted (ghosts).
-        // Driving, percussive, disciplined.
-
-        // 1. The "One" is always strong.
-        if (stepInChord === 0) {
-            return result(getFrequency(baseRoot), 0.7, 1.2);
-        }
-
-        // 2. Downbeats
-        if (isBeatStart) {
-            // Almost always play the root, tight.
-            return result(getFrequency(baseRoot), 0.7, 1.15);
-        }
-
-        // 3. The "And" (8th notes) - Often Root or Octave or 5th
-        if (stepInBeat === Math.floor(ts.stepsPerBeat / 2)) {
-            // 60% chance of playing
-            if (Math.random() < 0.4 + intensity * 0.4) {
-                // Occasional octave jump or 5th for flavor, but mostly root
-                let note = baseRoot;
-                const rnd = Math.random();
-                if (rnd < 0.15) {
-                    note += 12; // Octave pop
-                } else if (rnd < 0.25) {
-                    note += 7; // 5th
-                }
-
-                // Manual clamping to preserve interval direction where possible
-                if (note > absMax) {
-                    note -= 12;
-                }
-                if (note < absMin) {
-                    note += 12;
-                }
-                if (note > absMax || note < absMin) {
-                    note = baseRoot;
-                }
-
-                return result(getFrequency(note), 0.7, 1.1);
-            }
-            // If not playing a tone, play a ghost note
-            return result(getFrequency(baseRoot), 0.6, 0.7, 1);
-        }
-
-        // 4. The "e" and "a" (16th notes) - The chug engine
-        if (stepInBeat % 2 !== 0) {
-            // High probability of ghost notes to propel groove
-            // Probability increases with intensity, but base is high (Rocco is busy)
-            let ghostProb = 0.6 + intensity * 0.3;
-
-            // High BPM Safety
-            if (playback.bpm > 150) {
-                ghostProb *= 0.6;
-            }
-
-            if (Math.random() < ghostProb) {
-                // Mostly muted/ghosts
-                // At very high intensity, some might become short staccato tones
-                const isTone = intensity > 0.8 && Math.random() < 0.3;
-                return result(getFrequency(baseRoot), 0.5, isTone ? 0.9 : 0.6, isTone ? 0 : 1);
-            }
-        }
         return null;
     }
 

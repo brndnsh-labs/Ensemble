@@ -134,6 +134,7 @@ Source of truth: `public/engine/coordination-engine.ts`. Always pass `Coordinati
 
 ### Naming / Canonicalization
 
+- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`InstrumentRail.tsx`) and Surprise Me render straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** Phantom routing keys (`Minimal`, `Shred`, `Latin`, `Afrobeat`, `Soul`) still linger in some engine routing maps but are **not** canonical genres and are being retired — never treat them as supported.
 - One canonical internal name per concept. UI labels can be friendlier, but state keys, config keys, persisted payloads, and code paths normalize to the canonical form.
 - Aliases live near the data/config that owns the concept — don't scatter alias checks across components, tests, docs, and controllers.
 - Before any rename: grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
