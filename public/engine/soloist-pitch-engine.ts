@@ -1370,6 +1370,20 @@ export function selectPitchAndDevices(
             weight *= 2.0;
         }
 
+        // --- Disco 6/9 Brightness Bias (final-stage multiplier) ---
+        // why: disco upper lines (Chic / MFSB strings, EW&F horns) sparkle on the
+        // 6th and 9th. The shared `targetExtensions` nudge (+40 additive, ~line
+        // 1158) is too weak to register against the chord-tone (+150) and
+        // strong-beat (+300) anchors — disco's realized 6/9 share measured only at
+        // ~baseline. A disco-gated final-stage multiplier on the profile's own
+        // extension PCs (disco targetExtensions = [2,9] → 9th + major 6th) lifts
+        // the audible brightness without touching the shared additive path or any
+        // other genre's extension balance. Reuses `targetExtensionsMask` so it
+        // tracks the config. Per CLAUDE.md "final-stage multipliers win".
+        if (activeStyle === 'disco' && ((targetExtensionsMask >> interval) & 1) === 1) {
+            weight *= 2.6;
+        }
+
         // --- Bebop Resolution Bias (final-stage multiplier) ---
         // why: when the previous attack landed on a chromatic neighbor of the
         // current chord's chord-tone PCs, push HARD toward a chord-tone landing
