@@ -1,0 +1,47 @@
+{
+    "id": "horns-section",
+    "name": "Horn Section",
+    "attribution": "VSCO-2 Community Edition — Trumpet (staccato) by Versilian Studios — CC0 1.0 (public domain)",
+    "samples": [
+        {
+            "key": "45",
+            "rootMidi": 45,
+            "url": "/packs/horns-section/45.m4a"
+        },
+        {
+            "key": "48",
+            "rootMidi": 48,
+            "url": "/packs/horns-section/48.m4a"
+        },
+        {
+            "key": "53",
+            "rootMidi": 53,
+            "url": "/packs/horns-section/53.m4a"
+        },
+        {
+            "key": "58",
+            "rootMidi": 58,
+            "url": "/packs/horns-section/58.m4a"
+        },
+        {
+            "key": "62",
+            "rootMidi": 62,
+            "url": "/packs/horns-section/62.m4a"
+        },
+        {
+            "key": "65",
+            "rootMidi": 65,
+            "url": "/packs/horns-section/65.m4a"
+        },
+        {
+            "key": "69",
+            "rootMidi": 69,
+            "url": "/packs/horns-section/69.m4a"
+        },
+        {
+            "key": "72",
+            "rootMidi": 72,
+            "url": "/packs/horns-section/72.m4a"
+        }
+    ]
+}
