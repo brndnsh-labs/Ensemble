@@ -81,6 +81,21 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // master limiter catches stacked-voice peaks. Confirm/adjust by ear.
         gain: 5,
     },
+    {
+        id: 'horns-section',
+        name: 'Horn Section',
+        description: 'Sampled trumpet stabs — a punchy brass section for the harmony.',
+        attribution:
+            'VSCO-2 Community Edition (Trumpet, staccato) by Versilian Studios — CC0 1.0 (public domain)',
+        approxSizeMB: 0.2,
+        instruments: ['harmony'],
+        // Calibrated 2026-06-22 (#661) via `mix-report --calibrate-pack=harmony:horns-section`:
+        // RMS-match to the synth harmony is 1.67× (stabs are hot/punchy, so far less
+        // lift than the strings pad). Seated at 1.5× — a touch under the match since
+        // the brass is brighter (+701 Hz) and transient (peak energy reads louder
+        // than RMS); on funk it already sits at/over the synth. Confirm by ear.
+        gain: 1.5,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */
