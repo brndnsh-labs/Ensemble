@@ -11,6 +11,7 @@ import { ensurePackLoaded, getPackZones } from '../engine/pack-runtime.js';
 import { pickZone, playSampledNote } from '../engine/sample-voice.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
+import { resolveAutoVoices } from '../state-effects.js';
 import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
 import { Icon } from './Icon.jsx';
 import { SettingGroup } from './UIControls.jsx';
@@ -144,10 +145,19 @@ export function PacksSettings() {
         return ok;
     };
 
+    // #683 — after installing, upgrade the *current* genre's Auto lanes right
+    // away (don't wait for the next genre change). Pinned lanes are untouched;
+    // a now-installed mapping flips Auto chords/harmony to the pack in the moment.
+    const reResolveAuto = () => {
+        const state = getState();
+        resolveAutoVoices(state, state.groove.lastSmartGenre, dispatch);
+    };
+
     const install = async (pack: SoundPack) => {
         const audio = ensureAudio();
         if (audio) {
             await loadAndMark(audio, pack);
+            reResolveAuto();
         }
     };
 
@@ -162,6 +172,7 @@ export function PacksSettings() {
                 await loadAndMark(audio, pack);
             }
         }
+        reResolveAuto();
     };
 
     // Remove a pack: drop any instrument sourcing it back to synth, free the

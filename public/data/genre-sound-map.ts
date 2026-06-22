@@ -12,7 +12,7 @@
  * (or any genre not listed) resolves to `synth` — the safe, always-present
  * fallback — as does a mapped pack that isn't installed.
  *
- * Today only the **harmony** lane has packs to map; chords/soloist/groove
+ * The **harmony** and **chords** lanes have packs to map; soloist/groove
  * generalize here as their packs' auto-mappings are chosen by ear.
  */
 
@@ -23,21 +23,33 @@ import type { InstrumentModule, InstrumentVoice } from '../types.js';
 export const GENRE_SOUND_MAP: Readonly<
     Record<string, Partial<Record<InstrumentModule, InstrumentVoice>>>
 > = {
-    // Brass stabs — punchy genres where a horn section is the idiom (Blues &
-    // Reggae included: both lean on a tight horn-section answer to the changes).
-    Funk: { harmony: 'pack:horns-section' },
+    // Each genre's two lanes are chosen to pair coherently (#682, decided w/
+    // Brandon 2026-06-22): a chords keyboard + a harmony section that share the
+    // idiom rather than fight it.
+    //
+    // chords — the keyboard playing the changes:
+    //   • grand    → acoustic-piano genres (jazz comping, singer-songwriter,
+    //                bossa, country, the disco/neo-soul Rhodes-ish seat, rock piano)
+    //   • hammond  → tonewheel-organ genres (reggae bubble, blues/gospel, the
+    //                2-tone ska skank that pairs with the horns)
+    //   • clavinet → funk's percussive plucked comp
+    //   • synth    → Hip Hop / Metal (no acoustic-keys idiom → keep the synth)
+    // harmony — the section answering the changes (horns vs. string pad vs. synth).
+    Funk: { chords: 'pack:clavinet', harmony: 'pack:horns-section' },
     Metal: { harmony: 'pack:horns-section' },
-    'Ska-Punk': { harmony: 'pack:horns-section' },
-    Jazz: { harmony: 'pack:horns-section' },
-    Blues: { harmony: 'pack:horns-section' },
-    Reggae: { harmony: 'pack:horns-section' },
+    'Ska-Punk': { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
+    Jazz: { chords: 'pack:grand', harmony: 'pack:horns-section' },
+    Blues: { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
+    Reggae: { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
     // Sustained string pad — genres that want a lush bed under the changes.
-    Rock: { harmony: 'pack:strings-ensemble' },
-    Disco: { harmony: 'pack:strings-ensemble' },
-    Country: { harmony: 'pack:strings-ensemble' },
-    Acoustic: { harmony: 'pack:strings-ensemble' },
-    Bossa: { harmony: 'pack:strings-ensemble' },
-    // Hip Hop · Neo-Soul — no clear pack fit yet → synth pad.
+    Rock: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    Disco: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    Country: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    Acoustic: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    Bossa: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    // Neo-Soul — grand on the keys; no harmony pack fit yet → synth pad.
+    'Neo-Soul': { chords: 'pack:grand' },
+    // Hip Hop · Metal chords — no acoustic-keys idiom yet → synth pad.
 };
 
 /**

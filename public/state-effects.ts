@@ -25,6 +25,39 @@ interface HandleEffectsContext {
     oldBpm?: number;
 }
 
+/** Lanes that follow the genre when in Auto mode (#675). */
+const AUTO_FOLLOW_MODULES: InstrumentModule[] = ['chords', 'bass', 'soloist', 'harmony', 'groove'];
+
+/**
+ * Resolve every Auto-mode lane's voice to what `genre` maps to right now, and
+ * dispatch the changes (#675/#683). Pinned lanes (`autoSound:false`) are left
+ * alone; an uninstalled mapping resolves to synth (`autoVoiceForGenre` gates on
+ * the registry's installed-set — auto-follow never auto-downloads). No-op writes
+ * are skipped so non-mapped lanes don't churn dispatch.
+ *
+ * Two callers, one rule so they can't drift: the genre-change effect
+ * (`SET_GENRE_FEEL`) and the pack-install path (`PacksSettings`), so installing a
+ * pack upgrades the *current* genre's Auto lanes immediately rather than waiting
+ * for the next genre change ("install → instantly better").
+ */
+export function resolveAutoVoices(
+    stateMap: EnsembleState,
+    genre: string | undefined,
+    dispatch: HandleEffectsContext['dispatch'],
+): void {
+    for (const module of AUTO_FOLLOW_MODULES) {
+        const inst = stateMap[module] as { autoSound?: boolean; voice: InstrumentVoice };
+        if (!inst?.autoSound) {
+            continue;
+        }
+        const next = autoVoiceForGenre(genre, module, isPackInstalled);
+        if (next !== inst.voice) {
+            // The SET_INSTRUMENT_VOICE effect lazily loads the pack + re-sends reverb.
+            dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: next, auto: true });
+        }
+    }
+}
+
 /**
  * Re-seed the soloist (and, optionally, the drum orchestration / fills /
  * accents bag) from the current state. Shared by the play-start path and the
@@ -184,30 +217,8 @@ export function handleEffects(
             if (payload.drum && !playback.isPlaying) {
                 loadDrumPreset(payload.drum);
             }
-            // #675 — auto-follow: an instrument in Auto mode tracks the genre's
-            // mapped sound. Pinned lanes (autoSound:false) are left alone; an
-            // uninstalled mapping resolves to synth (autoVoiceForGenre gates on
-            // the registry's installed-set — auto-follow never auto-downloads).
-            // Skip no-op writes so non-mapped lanes don't churn dispatch on every
-            // genre change. The SET_INSTRUMENT_VOICE effect lazily loads the pack.
-            const genre = payload.genreName;
-            const AUTO_FOLLOW_MODULES: InstrumentModule[] = [
-                'chords',
-                'bass',
-                'soloist',
-                'harmony',
-                'groove',
-            ];
-            for (const module of AUTO_FOLLOW_MODULES) {
-                const inst = stateMap[module] as { autoSound?: boolean; voice: InstrumentVoice };
-                if (!inst?.autoSound) {
-                    continue;
-                }
-                const next = autoVoiceForGenre(genre, module, isPackInstalled);
-                if (next !== inst.voice) {
-                    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: next, auto: true });
-                }
-            }
+            // #675 — auto-follow: Auto-mode lanes track the genre's mapped sound.
+            resolveAutoVoices(stateMap, payload.genreName, dispatch);
             break;
         }
         case ACTIONS.SHOW_TOAST: {
