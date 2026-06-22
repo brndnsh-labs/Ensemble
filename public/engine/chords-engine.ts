@@ -213,6 +213,17 @@ interface InversionOptions {
     enableVoiceLeading?: boolean;
 }
 
+/** True if any two voices in the set sit a minor 2nd (1 semitone) apart. */
+function hasMinorSecondCluster(midis: number[]): boolean {
+    const sorted = [...midis].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] - sorted[i - 1] === 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function getBestInversion(
     state: any,
     rootMidi: number,
@@ -368,7 +379,25 @@ export function getBestInversion(
         }
         const refinedCentroid = refinedSum / refined.length;
         const refinedAnchorDrift = Math.abs(refinedCentroid - homeAnchor);
-        if (refinedCost < baselineCost && refinedAnchorDrift <= MAX_REFINED_CENTROID_DRIFT) {
+        // why: #702 — the nearest-PC snap can pull an upper extension down a full
+        // octave onto a common-tone position a half-step from a chord tone that
+        // stayed put (the F7 13th D snapping to D4, a minor 2nd from the b7 Eb),
+        // manufacturing an internal m2 cluster in the comp at a chord change — the
+        // "wrong note from the organ on the IV7" report. The clean baseline spread
+        // keeps the 13 an octave up, so reject any refinement that INTRODUCES a
+        // minor 2nd the baseline didn't have and keep the baseline.
+        //
+        // Presence-based (not count-based): assumes the baseline spread is itself
+        // cluster-free, which holds for every VL-genre quality (the register-
+        // centroid spread always separates a chord's m2 pitch-class pairs by an
+        // octave). If the baseline ever carried a cluster, a refinement adding a
+        // *second, different* one could slip through — not reachable in practice.
+        const introducesCluster = hasMinorSecondCluster(refined) && !hasMinorSecondCluster(result);
+        if (
+            refinedCost < baselineCost &&
+            refinedAnchorDrift <= MAX_REFINED_CENTROID_DRIFT &&
+            !introducesCluster
+        ) {
             voiceLedResult = refined;
         }
     }
