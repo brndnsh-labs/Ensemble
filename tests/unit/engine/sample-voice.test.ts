@@ -211,6 +211,37 @@ describe('sample-voice — playSampledNote', () => {
         expect(onEnded).toHaveBeenCalledTimes(1);
         expect(ctx.createBufferSource).not.toHaveBeenCalled();
     });
+
+    it('returns a release handle that cuts the voice early (chord-change #691)', () => {
+        const { ctx, gain, source } = makeCtx();
+        // Hold for 2s from t=10 (so naturalEnd ≈ 12.09); a long sustained note.
+        const handle = playSampledNote(ctx, zone(60), {} as AudioNode, 60, 10, { duration: 2 });
+        expect(handle).not.toBeNull();
+        source.stop.mockClear();
+        gain.gain.calls.length = 0;
+
+        // Release at t=11 (mid-hold) over a 50ms fade.
+        handle?.release(11, 0.05);
+        // Smooth ramp toward 0 anchored at the release time (not a hard cut).
+        const target = gain.gain.calls.find((c: any) => c.op === 'target');
+        expect(target).toBeDefined();
+        expect(target.value).toBe(0);
+        expect(target.time).toBe(11);
+        // Source stop is rescheduled earlier than the natural end (frees promptly).
+        expect(source.stop).toHaveBeenCalled();
+        const stopAt = source.stop.mock.calls.at(-1)[0];
+        expect(stopAt).toBeGreaterThan(11);
+        expect(stopAt).toBeLessThan(12.1);
+    });
+
+    it('release is no-op-safe after the voice ended (stale handle)', () => {
+        const { ctx, source } = makeCtx();
+        const handle = playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, { duration: 0.5 });
+        source.stop.mockImplementation(() => {
+            throw new Error('already stopped');
+        });
+        expect(() => handle?.release(0.6, 0.05)).not.toThrow();
+    });
 });
 
 describe('sample-voice — playSampledStrike (sampled drums #662)', () => {

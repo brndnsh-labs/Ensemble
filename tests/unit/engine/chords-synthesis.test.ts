@@ -195,6 +195,21 @@ describe('Chord Synthesis', () => {
         expect(playback.heldNotes.size).toBe(0);
     });
 
+    it('releases + clears tracked sampled chord voices on kill (#691)', () => {
+        // Sampled chord voices live in `activeChordVoices` (not `heldNotes`);
+        // killAllPianoNotes must release them too — previously they had no kill
+        // path and rang out their full duration on stop/pause/voice-switch.
+        const release = vi.fn();
+        playback.activeChordVoices = [{ release }, { release }];
+        playback.lastChordKey = 'C7';
+
+        killAllPianoNotes(getState());
+
+        expect(release).toHaveBeenCalledTimes(2);
+        expect(playback.activeChordVoices).toHaveLength(0);
+        expect(playback.lastChordKey).toBeNull();
+    });
+
     // RETIRED (#649): the reworked Piano voice has no WaveShaper analog. The
     // legacy `current` voice ran its body through a per-note WaveShaper; the new
     // additive-body voice (playAdditiveBody) replaces the single-oscillator +

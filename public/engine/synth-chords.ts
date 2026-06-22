@@ -3,7 +3,7 @@ import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
-import { pickZone, playSampledNote } from './sample-voice.js';
+import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
 import {
     createSimplePanner,
     HUMANIZE_PROFILES,
@@ -127,7 +127,18 @@ export function killAllPianoNotes(state: EnsembleState): void {
         });
         playback.heldNotes.clear();
     }
-    (playback as Mutable<typeof playback>).sustainActive = false; // @direct-mutation
+    // #691 — sampled chord voices aren't in `heldNotes`; release + clear their
+    // own active list so a stop/pause/voice-switch silences them too (previously
+    // they had no kill path and rang out their full duration).
+    const mutPlayback = playback as Mutable<typeof playback>;
+    if (mutPlayback.activeChordVoices?.length) {
+        for (const handle of mutPlayback.activeChordVoices) {
+            handle.release(now, 0.01); // @direct-mutation
+        }
+    }
+    mutPlayback.activeChordVoices = []; // @direct-mutation
+    mutPlayback.lastChordKey = null; // @direct-mutation
+    mutPlayback.sustainActive = false; // @direct-mutation
 }
 
 interface PlayNoteOptions {
@@ -163,18 +174,18 @@ function playSampledChord(
     time: number,
     duration: number,
     opts: PlayNoteOptions | undefined,
-): boolean {
+): SampledNoteHandle | null {
     const { playback } = state;
     const audio = playback.audio;
     const dest = playback.audioGraph?.chords?.gain;
     const zones = getPackZones(packId);
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
-        return false;
+        return null;
     }
     const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
-        return false;
+        return null;
     }
     const numVoices = Math.max(1, opts?.numVoices ?? 1);
     const vol = Number.isFinite(opts?.vol) ? (opts?.vol as number) : 0.1;
@@ -184,25 +195,29 @@ function playSampledChord(
     // against the synth baseline via `mix-report --calibrate-pack` and paired with
     // the SYNTH_CHORD_LEVEL trim. The bus limiter catches peaks on dense chords.
     const velocity = Math.min(1, (vol / Math.sqrt(numVoices)) * gainForPack(packId));
-    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+    // Return the voice handle so the scheduler can release this voicing when the
+    // harmony changes (#691) — sustained packs hold flat and would otherwise ring
+    // into the next chord.
+    return playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
     });
-    return true;
 }
 
 // synth-audit Epic 6 S1/S6 — instrument-source seam. A `pack:<id>` voice plays
 // from the sample pack once its zones are loaded; until then (or if a note is
 // out of range) it falls back to the synth voice — bit-identical with no packs.
-export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
+export function playNote(...args: Parameters<typeof playNoteCurrent>): SampledNoteHandle | null {
     const source = resolveInstrumentSource(args[0].chords.voice);
     if (source.kind === 'sample') {
         const [state, freq, time, duration, opts] = args;
-        if (playSampledChord(state, source.packId, freq, time, duration, opts)) {
-            return;
+        const handle = playSampledChord(state, source.packId, freq, time, duration, opts);
+        if (handle) {
+            return handle;
         }
     }
     dispatchChordSynth(...args);
+    return null;
 }
 
 // synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received

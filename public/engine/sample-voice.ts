@@ -45,6 +45,21 @@ export interface SampleVoiceHandle {
     choke(when: number): void;
 }
 
+/**
+ * Handle returned by {@link playSampledNote} so a caller can release the voice
+ * early — used by the chords seam (#691) to clear the previous voicing when the
+ * harmony changes, so a sustained pack (e.g. the Drawbar Organ, which holds flat
+ * at full level for its whole duration) doesn't ring into the next chord.
+ */
+export interface SampledNoteHandle {
+    /**
+     * Begin releasing the voice to silence at `when`, over ~`fade` seconds.
+     * Cancels the remaining envelope; the natural `onended` cleanup still fires
+     * once. No-op-safe if the voice has already ended.
+     */
+    release(when: number, fade: number): void;
+}
+
 /** Time constant for the choke ramp — ~3·tc ≈ 12 ms to inaudible, click-free. */
 const CHOKE_TC = 0.004;
 
@@ -241,10 +256,10 @@ export function playSampledNote(
         duration = 0.5,
         onEnded,
     }: SampledNoteOptions = {},
-): void {
+): SampledNoteHandle | null {
     if (!audio || !zone?.buffer || !destination) {
         onEnded?.();
-        return;
+        return null;
     }
 
     try {
@@ -292,9 +307,31 @@ export function playSampledNote(
         source.start(startTime);
         // Stop just past the release tail so the source frees itself; never cut
         // the envelope short.
-        source.stop(releaseStart + release + 0.01);
+        const naturalEnd = releaseStart + release + 0.01;
+        source.stop(naturalEnd);
+
+        return {
+            release(when: number, fade: number): void {
+                try {
+                    const at = Number.isFinite(when)
+                        ? Math.max(startTime, Math.min(when, naturalEnd))
+                        : audio.currentTime;
+                    // setTargetAtTime decays from wherever the envelope currently
+                    // sits (no anchor read needed); tc ≈ fade/4 → ~inaudible by
+                    // `at + fade`. Reschedule the source stop earlier so the voice
+                    // frees promptly; never push it past its natural end.
+                    const tc = Math.max(0.004, (Number.isFinite(fade) ? fade : 0.05) / 4);
+                    gain.gain.cancelScheduledValues(at);
+                    gain.gain.setTargetAtTime(0, at, tc);
+                    source.stop(Math.min(naturalEnd, at + tc * 8));
+                } catch {
+                    /* already stopped / closed context — release is a no-op */
+                }
+            },
+        };
     } catch {
         /* ignore audio errors (e.g. a closed context) */
         onEnded?.();
+        return null;
     }
 }
