@@ -1,5 +1,6 @@
 import { applyThemeToDom, setBpm } from './app-controller.js';
 import { TIME_SIGNATURES } from './config.js';
+import { autoVoiceForGenre } from './data/genre-sound-map.js';
 import { validateProgression } from './engine/chords-engine.js';
 import {
     generateDrumFills,
@@ -7,14 +8,14 @@ import {
     generateSoloistAccents,
 } from './engine/drum-seeder.js';
 import { initAudio, restoreGains } from './engine/engine.js';
-import { packIdFromVoice } from './engine/instrument-registry.js';
+import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.js';
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { resolveSoloistStyle, STYLE_CONFIG } from './engine/soloist-config.js';
 import { deriveSoloistHook, generateSessionSeed } from './engine/soloist-seeder.js';
 import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
-import type { EnsembleState } from './types.js';
+import type { EnsembleState, InstrumentModule, InstrumentVoice } from './types.js';
 import { ACTIONS } from './types.js';
 import { clearToastActions } from './ui.js';
 
@@ -176,6 +177,30 @@ export function handleEffects(
             const { playback } = stateMap;
             if (payload.drum && !playback.isPlaying) {
                 loadDrumPreset(payload.drum);
+            }
+            // #675 — auto-follow: an instrument in Auto mode tracks the genre's
+            // mapped sound. Pinned lanes (autoSound:false) are left alone; an
+            // uninstalled mapping resolves to synth (autoVoiceForGenre gates on
+            // the registry's installed-set — auto-follow never auto-downloads).
+            // Skip no-op writes so non-mapped lanes don't churn dispatch on every
+            // genre change. The SET_INSTRUMENT_VOICE effect lazily loads the pack.
+            const genre = payload.genreName;
+            const AUTO_FOLLOW_MODULES: InstrumentModule[] = [
+                'chords',
+                'bass',
+                'soloist',
+                'harmony',
+                'groove',
+            ];
+            for (const module of AUTO_FOLLOW_MODULES) {
+                const inst = stateMap[module] as { autoSound?: boolean; voice: InstrumentVoice };
+                if (!inst?.autoSound) {
+                    continue;
+                }
+                const next = autoVoiceForGenre(genre, module, isPackInstalled);
+                if (next !== inst.voice) {
+                    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: next, auto: true });
+                }
             }
             break;
         }

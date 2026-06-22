@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyThemeToDom, setBpm } from '../../../public/app-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { initAudio, restoreGains } from '../../../public/engine/engine.js';
+import {
+    __resetPackCacheForTest,
+    markPackInstalled,
+} from '../../../public/engine/instrument-registry.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
 import { loadDrumPreset } from '../../../public/instrument-controller.js';
 import { initMIDI } from '../../../public/midi-controller.js';
@@ -74,6 +78,61 @@ describe('State Effects Handler', () => {
         stateMap.playback.isPlaying = true;
         handleEffects(ACTIONS.SET_GENRE_FEEL, payload, stateMap, { dispatch });
         expect(loadDrumPreset).not.toHaveBeenCalled();
+    });
+
+    describe('genre auto-follow on SET_GENRE_FEEL (#675)', () => {
+        beforeEach(() => {
+            __resetPackCacheForTest();
+            // Harmony in Auto mode, currently on synth; other lanes absent (skipped).
+            stateMap.harmony = { autoSound: true, voice: 'synth' };
+        });
+
+        it('switches an Auto lane to the genre-mapped pack when installed', () => {
+            markPackInstalled('horns-section', true);
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module: 'harmony',
+                voice: 'pack:horns-section',
+                auto: true,
+            });
+        });
+
+        it('leaves a pinned lane (autoSound:false) untouched', () => {
+            stateMap.harmony = { autoSound: false, voice: 'synth' };
+            markPackInstalled('horns-section', true);
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            expect(dispatch).not.toHaveBeenCalled();
+        });
+
+        it('does not write when the mapped sound already matches (no churn)', () => {
+            markPackInstalled('horns-section', true);
+            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            expect(dispatch).not.toHaveBeenCalled();
+        });
+
+        it('falls back to synth (no auto-download) when the mapped pack is not installed', () => {
+            // Auto lane currently pinned-by-prior-state to the horns pack, but it
+            // is no longer installed → auto-follow recovers it to synth.
+            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module: 'harmony',
+                voice: 'synth',
+                auto: true,
+            });
+        });
+
+        it('uses synth for a genre with no harmony mapping', () => {
+            markPackInstalled('horns-section', true);
+            stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Hip Hop' }, stateMap, { dispatch });
+            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module: 'harmony',
+                voice: 'synth',
+                auto: true,
+            });
+        });
     });
 
     it('should call restoreGains on RESTORE_GAINS action', () => {

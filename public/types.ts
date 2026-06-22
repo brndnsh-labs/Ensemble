@@ -229,6 +229,8 @@ export interface GrooveState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
+    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
+    readonly autoSound: boolean;
     /** List of drum instruments. */
     readonly instruments: Instrument[];
     /** Volume level. */
@@ -302,6 +304,8 @@ export interface ChordState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
+    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
+    readonly autoSound: boolean;
     /** The comping style ('smart', 'pad', etc). */
     readonly style: string;
     /** Output gain multiplier. */
@@ -329,6 +333,8 @@ export interface BassState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
+    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
+    readonly autoSound: boolean;
     /** Volume level. */
     readonly volume: number;
     /** Reverb level. */
@@ -803,6 +809,8 @@ export interface SoloistState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
+    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
+    readonly autoSound: boolean;
     /** The synth sound profile. Consolidated to 'trumpet' (2026-05-23 mix-pass);
      *  field retained as a string for save/share compat with legacy values. */
     readonly preset: string;
@@ -862,6 +870,8 @@ export interface HarmonyState {
     readonly enabled: boolean;
     /** Which synthesis voice this instrument uses (synth-audit A/B). */
     readonly voice: InstrumentVoice;
+    /** Sound-source mode: Auto (follow genre) vs pinned to `voice` (#675). */
+    readonly autoSound: boolean;
     /** Volume level. */
     readonly volume: number;
     /** Reverb level. */
@@ -1221,6 +1231,12 @@ export interface ActionPayloadSetReverb {
 export interface ActionPayloadSetInstrumentVoice {
     module: InstrumentModule;
     voice: InstrumentVoice;
+    /**
+     * Sound-source mode (#675). `true` = Auto (voice follows the genre map);
+     * `false` = pinned to this explicit voice. Omitted → `autoSound` unchanged
+     * (a bare voice set, e.g. pack eviction reset, doesn't flip the mode).
+     */
+    auto?: boolean;
 }
 
 export interface ActionPayloadSetModalOpen {

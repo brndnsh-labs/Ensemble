@@ -137,6 +137,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/data/instrument-styles.ts` | UI menu definitions for instruments. | `CHORD_STYLES`, `BASS_STYLES` |
 | `public/data/shortcut-config.ts` | Centralized keyboard shortcuts. | `SHORTCUT_CONFIG` |
 | `public/data/sound-packs.ts` | Catalog of installable sample packs surfaced in the Sounds settings section. | `SOUND_PACKS`, `packsForInstrument` |
+| `public/data/genre-sound-map.ts` | Genre → instrument sound defaults consumed by Auto-follow mode (#675). | `GENRE_SOUND_MAP`, `autoVoiceForGenre` |
 
 ## UI Components (Preact)
 

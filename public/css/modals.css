@@ -2214,6 +2214,28 @@ input[type="range"] {
     margin-top: var(--space-4);
 }
 
+/* #674 — the gear's Packs tab: an intro + "Install all" header above the flat
+   pack list. (Per-instrument source assignment lives in the rail, #675.) */
+.sound-pack-library-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.sound-pack-library-header .sounds-intro {
+    margin: 0;
+}
+
+.sound-pack-library-header .secondary-btn {
+    flex-shrink: 0;
+}
+
+.sound-source-row + .sound-source-row {
+    margin-top: var(--space-1);
+}
+
 .sound-instrument-title {
     margin: 0 0 var(--space-2);
     font-size: 0.82rem;

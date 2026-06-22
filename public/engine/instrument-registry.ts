@@ -119,14 +119,51 @@ export function getPackBufferVariants(packId: string, key: string): readonly Aud
     return packCache.get(packId)?.get(key) ?? null;
 }
 
+/**
+ * Pack ids known to be **installed** — their files are in the SW `/packs/` cache
+ * (the persistent source of truth survives reloads; decoded buffers do not).
+ * A *sync* mirror of that cache so the genre auto-follow effect (#675) can gate
+ * "is this pack installed?" without async Cache API I/O on every genre change.
+ * Seeded once at bootstrap from the real cache via {@link seedInstalledPacks},
+ * and kept in step by the Sounds UI on install/remove ({@link markPackInstalled}).
+ */
+const installedPacks = new Set<string>();
+
+/**
+ * Whether `packId` is installed (cached) and thus eligible for auto-follow. True
+ * if the bootstrap cache-seed or an install marked it, OR its buffers are loaded
+ * this session (a just-installed pack is loaded before the async seed runs).
+ */
+export function isPackInstalled(packId: string): boolean {
+    return installedPacks.has(packId) || isPackLoaded(packId);
+}
+
+/** Mark a pack installed/uninstalled — the Sounds UI calls this on install/remove. */
+export function markPackInstalled(packId: string, installed: boolean): void {
+    if (installed) {
+        installedPacks.add(packId);
+    } else {
+        installedPacks.delete(packId);
+    }
+}
+
+/** Replace the installed-set wholesale — the bootstrap cache-seed (#675). */
+export function seedInstalledPacks(packIds: readonly string[]): void {
+    installedPacks.clear();
+    for (const id of packIds) {
+        installedPacks.add(id);
+    }
+}
+
 /** Drop a pack's buffers (eviction / test reset). */
 export function clearPack(packId: string): void {
     packCache.delete(packId);
 }
 
-/** Test helper: wipe the entire pack cache between cases. */
+/** Test helper: wipe the entire pack cache (and installed-set) between cases. */
 export function __resetPackCacheForTest(): void {
     packCache.clear();
+    installedPacks.clear();
 }
 
 /**

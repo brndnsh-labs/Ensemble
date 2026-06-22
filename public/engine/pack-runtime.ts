@@ -1,5 +1,6 @@
+import { SOUND_PACKS } from '../data/sound-packs.js';
 import type { InstrumentVoice } from '../types.js';
-import { getPackBuffer, packIdFromVoice } from './instrument-registry.js';
+import { getPackBuffer, packIdFromVoice, seedInstalledPacks } from './instrument-registry.js';
 import { loadPack, type PackManifest } from './sample-loader.js';
 import type { SampleZone } from './sample-voice.js';
 
@@ -101,6 +102,32 @@ export function ensurePacksForVoices(
             void ensurePackLoaded(audio, packId);
         }
     }
+}
+
+/**
+ * Scan the SW `/packs/` cache and seed the registry's installed-set (#675) so
+ * genre auto-follow knows which mapped packs are available — synchronously,
+ * without async cache I/O per genre change. Called once at bootstrap; the
+ * Sounds UI keeps the set in step thereafter (install/remove). A pack's cached
+ * `manifest.json` is the install marker (written last-ish by a good install).
+ */
+export async function detectInstalledPacks(): Promise<void> {
+    if (typeof caches === 'undefined') {
+        return;
+    }
+    const cacheNames = (await caches.keys()).filter((name) => name.includes('packs'));
+    const found: string[] = [];
+    for (const pack of SOUND_PACKS) {
+        const manifestUrl = `/packs/${pack.id}/manifest.json`;
+        for (const name of cacheNames) {
+            const cache = await caches.open(name);
+            if (await cache.match(manifestUrl)) {
+                found.push(pack.id);
+                break;
+            }
+        }
+    }
+    seedInstalledPacks(found);
 }
 
 /** Test helper: clear built zones + in-flight bookkeeping between cases. */
