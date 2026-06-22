@@ -24,9 +24,10 @@ describe('sound-packs catalog', () => {
     });
 
     it('gainForPack returns the calibrated grand lift and 1 for unknown/uncalibrated ids', () => {
-        // Behavior-preserving (#656): the grand's 3.5× lift moved from a code
-        // constant in synth-chords.ts to this catalog field — same value.
-        expect(gainForPack('grand')).toBeCloseTo(3.5, 5);
+        // The grand's lift lives in the catalog `gain` field (#656); ear-locked
+        // at 8× to seat the pack against the full band (was 3.5×, which the
+        // calibration tool measured ~13 dB under the rhythm section).
+        expect(gainForPack('grand')).toBeCloseTo(8, 5);
         // Unknown id → no lift (a freshly-added pack plays raw until calibrated).
         expect(gainForPack('does-not-exist')).toBe(1);
     });

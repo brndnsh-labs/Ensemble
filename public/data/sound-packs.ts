@@ -45,10 +45,11 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         attribution: 'Salamander Grand Piano (Yamaha C5) by Alexander Holm — CC-BY 3.0',
         approxSizeMB: 1.3,
         instruments: ['chords'],
-        // Ear-locked 2026-06-21 (#533); now catalog-owned (#656). Paired with
-        // the synth chords' `SYNTH_CHORD_LEVEL 0.85×` trim so the sampled grand
-        // and the (slightly tamed) synth chords sit balanced in the A/B.
-        gain: 3.5,
+        // Ear-locked 2026-06-22 (#656): grand at 8× seats it against the full band.
+        // mix-report had the old 3.5× sitting ~13 dB under bass/drums/soloist
+        // (buried); Brandon A/B'd 8× on ensembletest — present under the lead, not
+        // poking. Paired with the synth chords' SYNTH_CHORD_LEVEL 0.85× trim.
+        gain: 8,
     },
 ];
 
