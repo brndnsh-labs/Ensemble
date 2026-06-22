@@ -35,7 +35,7 @@ export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
 
 export const chords = deepSignal<ChordState>({
     enabled: true,
-    voice: 'current',
+    voice: 'synth',
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
@@ -50,7 +50,7 @@ export const chords = deepSignal<ChordState>({
 
 export const bass = deepSignal<BassState>({
     enabled: true,
-    voice: 'current',
+    voice: 'synth',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
     lastFreq: null,
@@ -66,7 +66,7 @@ export const bass = deepSignal<BassState>({
 export const soloist = deepSignal<SoloistState>({
     // === Configuration (persisted) ===
     enabled: false,
-    voice: 'current',
+    voice: 'synth',
     preset: 'trumpet',
     mode: 'monophonic',
     style: 'smart',
@@ -163,7 +163,7 @@ export const soloist = deepSignal<SoloistState>({
 
 export const harmony = deepSignal<HarmonyState>({
     enabled: false,
-    voice: 'current',
+    voice: 'synth',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
     buffer: new Map(),
@@ -354,17 +354,17 @@ export function instrumentReducer(action: Action): boolean {
             c.instrument = 'Clean';
             c.octave = 65;
             c.density = 'standard';
-            c.voice = 'current';
+            c.voice = 'synth';
 
             b.enabled = true;
             b.volume = 1.0;
             b.reverb = INSTRUMENT_REVERB_DEFAULTS.bass;
             b.octave = 38;
             b.style = 'smart';
-            b.voice = 'current';
+            b.voice = 'synth';
 
             s.enabled = false;
-            s.voice = 'current';
+            s.voice = 'synth';
             s.preset = 'trumpet';
             s.volume = 1.0;
             s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
@@ -453,7 +453,7 @@ export function instrumentReducer(action: Action): boolean {
             h.octave = 60;
             h.style = 'smart';
             h.complexity = 0.5;
-            h.voice = 'current';
+            h.voice = 'synth';
             return true;
         }
         case ACTIONS.SET_STYLE:

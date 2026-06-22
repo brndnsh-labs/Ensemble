@@ -9,7 +9,7 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
-import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
+import { Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
 
 type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 type InstrumentAudioControl = 'volume' | 'reverb';
@@ -160,22 +160,6 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
 
     return (
         <SettingGroup title={getInstrumentSpecificTitle(module)}>
-            {/* synth-audit Epic 0 S1 — A/B voice toggle, present for every instrument. */}
-            <SettingRow label="New Sound" id={`${getModuleName(module)}VoiceToggle`}>
-                <Toggle
-                    id={`${getModuleName(module)}VoiceToggle`}
-                    checked={state.voice === 'new'}
-                    ariaLabel={`${getModuleName(module)} new sound`}
-                    onChange={(val) => {
-                        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
-                            module,
-                            voice: val ? 'new' : 'current',
-                        });
-                        saveCurrentState();
-                    }}
-                />
-            </SettingRow>
-
             {module === 'chords' && (
                 <SettingRow label="Density" id="densitySelect">
                     <Select

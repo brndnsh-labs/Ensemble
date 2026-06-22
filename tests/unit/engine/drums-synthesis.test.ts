@@ -60,6 +60,7 @@ vi.mock('../../../public/state.js', () => {
     };
     const mockGroove = {
         humanize: 20,
+        voice: 'synth',
         audioBuffers: { noise: {} },
         lastHatGain: null,
         lastRideGain: null,
@@ -157,10 +158,23 @@ describe('Drum Synthesis', () => {
         playDrumSound(getState(), 'Ride', 10.2, 1.0);
         playDrumSound(getState(), 'Crash', 10.3, 1.0);
 
-        expect(groove.audioBuffers.hihatMetal).toBeDefined();
-        expect(groove.audioBuffers.openHatMetal).toBeDefined();
-        expect(groove.audioBuffers.rideMetal).toBeDefined();
+        // The reworked ('new') drum voice rebuilt the closed/open/ride hats onto
+        // getVariedCymbalBuffer (synth-drums.ts §"Epic 4 S4"), which caches a POOL
+        // of independently-synthesized buffers under a `<key>#pool` array key — one
+        // distinct dedicated pool per cymbal voice. Crash is not in playDrumSoundNew's
+        // switch, so it falls through to playDrumSoundCurrent → ensureCymbalBuffer,
+        // which still caches a single buffer under the bare `crashMetal` key.
+        expect(groove.audioBuffers['hihatMetal#pool']).toBeDefined();
+        expect(groove.audioBuffers['openHatMetal#pool']).toBeDefined();
+        expect(groove.audioBuffers['rideMetal#pool']).toBeDefined();
         expect(groove.audioBuffers.crashMetal).toBeDefined();
+
+        // Each hat pool is its own dedicated array of cached metallic buffers
+        // (one synthesized per hit while filling), keyed separately per voice.
+        expect(Array.isArray(groove.audioBuffers['hihatMetal#pool'])).toBe(true);
+        expect(groove.audioBuffers['hihatMetal#pool'].length).toBeGreaterThan(0);
+        expect(groove.audioBuffers['openHatMetal#pool'].length).toBeGreaterThan(0);
+        expect(groove.audioBuffers['rideMetal#pool'].length).toBeGreaterThan(0);
     });
 
     it('should implement choking logic when a new HiHat starts', () => {

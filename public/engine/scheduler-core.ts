@@ -1003,23 +1003,20 @@ function scheduleChords(
             }
         }
 
-        // synth-audit Epic 2 S1 — strum index. The `new` chords voice rolls
-        // the chord low→high; rank each non-muted note by ascending pitch and
-        // pass that rank as `index`. The `current` voice keeps `index: 0`
-        // (mechanically simultaneous, bit-identical) so the A/B stays honest.
-        let strumRank: number[] | null = null;
-        if (chords.voice === 'new') {
-            const playable: number[] = [];
-            for (let i = 0; i < notes.length; i++) {
-                if (!notes[i].muted && notes[i].freq) {
-                    playable.push(i);
-                }
+        // synth-audit Epic 2 S1 — strum index. The synth chord voice rolls the
+        // chord low→high; rank each non-muted note by ascending pitch and pass
+        // that rank as `index` (the strum stagger). (Was A/B-gated on the `new`
+        // voice; #649 made the reworked voice the only one, so always compute.)
+        const playable: number[] = [];
+        for (let i = 0; i < notes.length; i++) {
+            if (!notes[i].muted && notes[i].freq) {
+                playable.push(i);
             }
-            playable.sort((a, b) => notes[a].freq - notes[b].freq);
-            strumRank = new Array(notes.length).fill(0);
-            for (let r = 0; r < playable.length; r++) {
-                strumRank[playable[r]] = r;
-            }
+        }
+        playable.sort((a, b) => notes[a].freq - notes[b].freq);
+        const strumRank: number[] = new Array(notes.length).fill(0);
+        for (let r = 0; r < playable.length; r++) {
+            strumRank[playable[r]] = r;
         }
 
         for (let ni = 0; ni < notes.length; ni++) {
@@ -1064,7 +1061,7 @@ function scheduleChords(
                 const { name, octave } = midiToNote(midiNum);
                 playNote(state, freq, playTime, duration, {
                     vol: safeVelocity,
-                    index: strumRank ? strumRank[ni] : 0,
+                    index: strumRank[ni],
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
                 });

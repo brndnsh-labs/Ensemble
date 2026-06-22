@@ -34,10 +34,12 @@ export function killSoloistNote(state: EnsembleState): void {
  * Main entry point for playing a soloist note.
  * Orchestrates voice management, preset selection, and common DSP.
  */
-// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
-// `voice` setting between the Current and (Epic 3) New synthesized voices.
+// The synth soloist voice (the trumpet). `playSoloNoteCurrent` is the reworked
+// synth-audit voice — the only one since #649 retired the Current/New A/B (the
+// soloist's `new` was always a no-op wrapper; the reworked behavior lived in
+// the voice body and is now unconditional).
 function dispatchSoloSynth(...args: Parameters<typeof playSoloNoteCurrent>): void {
-    (args[0].soloist.voice === 'new' ? playSoloNoteNew : playSoloNoteCurrent)(...args);
+    playSoloNoteCurrent(...args);
 }
 
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
@@ -51,10 +53,6 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
         return;
     }
     dispatchSoloSynth(...args);
-}
-
-function playSoloNoteNew(...args: Parameters<typeof playSoloNoteCurrent>): void {
-    playSoloNoteCurrent(...args);
 }
 
 function playSoloNoteCurrent(
@@ -115,12 +113,8 @@ function playSoloNoteCurrent(
     const prevFreq = soloist.audio.lastRenderedFreq || freq;
     (soloist.audio as Mutable<typeof soloist.audio>).lastRenderedFreq = freq; // @direct-mutation
 
-    // Per-note timbral humanization (epic-3-soloist S5) — New voice only; the
-    // neutral object keeps the Current voice bit-identical.
-    const timbre =
-        soloist.voice === 'new'
-            ? soloistTimbreJitter(noteSeed, (state.groove?.humanize ?? 0) / 100)
-            : NO_TIMBRE_JITTER;
+    // Per-note timbral humanization (epic-3-soloist S5).
+    const timbre = soloistTimbreJitter(noteSeed, (state.groove?.humanize ?? 0) / 100);
 
     playTrumpet(
         state,
@@ -339,29 +333,17 @@ function applySoloistEnvelope(
 }
 
 /**
- * Attack-time unison settle (epic-3-soloist S6). The Current voice keeps a
- * fixed `currentCents` detune on osc2. The New voice starts osc2 ~20c wider
- * and ramps inward to `newCents` over ~50 ms, so the two-oscillator unison
- * "locks in" on the attack instead of sitting statically chorused. `newCents`
- * also lets a preset tighten its detune for the New voice (e.g. a wide +12,
- * a sour near-quarter-tone, ramped inward to a tighter target). The ramp is
- * scheduled automation on
+ * Attack-time unison settle (epic-3-soloist S6). osc2 starts ~20c wider than
+ * `targetCents` and ramps inward over ~50 ms, so the two-oscillator unison
+ * "locks in" on the attack instead of sitting statically chorused. `targetCents`
+ * also lets a preset tighten its detune (e.g. a wide +12, a sour near-quarter-
+ * tone, ramped inward to a tighter target). The ramp is scheduled automation on
  * `osc2.detune`; any LFO connected to that param (neo) simply sums on top.
  */
-function applyDetuneSettle(
-    osc2: OscillatorNode,
-    currentCents: number,
-    newCents: number,
-    playTime: number,
-    isNew: boolean,
-): void {
-    if (!isNew) {
-        osc2.detune.value = currentCents;
-        return;
-    }
-    const wide = newCents + (newCents >= 0 ? 20 : -20);
+function applyDetuneSettle(osc2: OscillatorNode, targetCents: number, playTime: number): void {
+    const wide = targetCents + (targetCents >= 0 ? 20 : -20);
     osc2.detune.setValueAtTime(wide, playTime);
-    osc2.detune.linearRampToValueAtTime(newCents, playTime + 0.05);
+    osc2.detune.linearRampToValueAtTime(targetCents, playTime + 0.05);
 }
 
 /**
@@ -420,15 +402,13 @@ function playTrumpet(
     vibratoFlag: boolean,
     timbre: TimbreJitter,
 ): void {
-    const { soloist } = state;
-
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
     osc1.detune.value = timbre.detuneCents;
 
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
-    applyDetuneSettle(osc2, 5, 5, playTime, soloist.voice === 'new');
+    applyDetuneSettle(osc2, 5, playTime);
 
     voiceObj.nodes.push(osc1, osc2);
 
@@ -445,15 +425,13 @@ function playTrumpet(
         prevFreq,
     );
 
-    // Velocity + intensity → brightness (epic-3-soloist S2): on the New voice
-    // a harder note opens the lowpass and lifts the bell formant, and the
-    // whole-band intensity sets the brightness floor. Current voice keeps the
-    // freq-only cutoffs.
-    const isNewVoice = soloist.voice === 'new';
+    // Velocity + intensity → brightness (epic-3-soloist S2): a harder note opens
+    // the lowpass and lifts the bell formant, and the whole-band intensity sets
+    // the brightness floor.
     const drive = soloistBrightnessDrive(state, vol);
     // × timbre.cutoffJit folds in the S5 per-note ±8% cutoff humanization.
-    const cutoffMult = (isNewVoice ? 0.75 + drive * 0.6 : 1) * timbre.cutoffJit;
-    const bellMult = isNewVoice ? 0.85 + drive * 0.35 : 1;
+    const cutoffMult = (0.75 + drive * 0.6) * timbre.cutoffJit;
+    const bellMult = 0.85 + drive * 0.35;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -485,8 +463,8 @@ function playTrumpet(
 
     voiceObj.nodes.push(filter, bellFilter, smoother);
 
-    // Sustained-note breathing (epic-3-soloist S3) — New voice, long notes only.
-    if (isNewVoice && duration > 0.5) {
+    // Sustained-note breathing (epic-3-soloist S3) — long notes only.
+    if (duration > 0.5) {
         attachCutoffLfo(ctx, filter.frequency, sustainCutoff * 0.13, playTime, duration, voiceObj);
     }
 
@@ -519,15 +497,8 @@ function playTrumpet(
     // with a hard 5 ms transient; separated notes keep the crisp 0.02 onset.
     const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
-    if (isNewVoice) {
-        // ADSR with articulation-aware release (epic-3-soloist S7).
-        applySoloistEnvelope(outputGain, vol * 1.2, playTime, duration, attack, isLegato);
-    } else {
-        outputGain.gain.setValueAtTime(0, playTime);
-        outputGain.gain.setTargetAtTime(vol * 1.2, playTime, attack);
-        outputGain.gain.setTargetAtTime(vol * 0.9, playTime + 0.1, 0.05);
-        outputGain.gain.setTargetAtTime(0, playTime + duration * 0.85, 0.1);
-    }
+    // ADSR with articulation-aware release (epic-3-soloist S7).
+    applySoloistEnvelope(outputGain, vol * 1.2, playTime, duration, attack, isLegato);
 
     osc1.start(playTime);
     osc2.start(playTime);

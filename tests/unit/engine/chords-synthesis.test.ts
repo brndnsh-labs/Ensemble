@@ -13,7 +13,11 @@ vi.mock('../../../public/state.js', () => {
             currentTime: 0,
             createOscillator: vi.fn(() => ({
                 type: '',
-                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+                frequency: {
+                    setValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                },
                 detune: { setValueAtTime: vi.fn() },
                 setPeriodicWave: vi.fn(),
                 connect: vi.fn(),
@@ -26,6 +30,8 @@ vi.mock('../../../public/state.js', () => {
                     value: 1,
                     setValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
+                    linearRampToValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
                     cancelScheduledValues: vi.fn(),
                 },
                 connect: vi.fn(),
@@ -50,11 +56,15 @@ vi.mock('../../../public/state.js', () => {
             })),
         },
         audioGraph: { chords: { gain: { connect: vi.fn() } } },
+        bandIntensity: 0.5,
         sustainActive: false,
         heldNotes: new Set(),
     };
     const mockGroove = { audioBuffers: { noise: {} } };
-    const mockChords = { activeTab: 'smart' };
+    // voice: 'synth' — the reworked synth voice is the only chord voice since
+    // #649 retired the Current/New A/B. `playNote` resolves this through the
+    // instrument-registry seam → the (additive-body) synth path.
+    const mockChords = { activeTab: 'smart', voice: 'synth' };
     const mockHarmony = { enabled: false };
 
     const mockStateMap = {
@@ -102,10 +112,18 @@ describe('Chord Synthesis', () => {
     });
 
     it('should use a PeriodicWave for the "Piano" instrument', () => {
+        // The reworked Piano voice no longer drives its body through a single
+        // PeriodicWave oscillator. The PeriodicWave now lives in the velocity
+        // "bright" layer (createBrightWave): at this velocity the bright layer
+        // blooms in, so a PeriodicWave is created and applied to one of the
+        // voice's oscillators (additive-body partials use plain sines).
         playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
 
-        const osc = playback.audio.createOscillator.mock.results[0].value;
-        expect(osc.setPeriodicWave).toHaveBeenCalled();
+        expect(playback.audio.createPeriodicWave).toHaveBeenCalled();
+        const oscsWithWave = playback.audio.createOscillator.mock.results.filter(
+            (r) => r.value.setPeriodicWave.mock.calls.length > 0,
+        );
+        expect(oscsWithWave.length).toBe(1);
     });
 
     it('should apply a randomized strum offset based on index', () => {
@@ -177,16 +195,25 @@ describe('Chord Synthesis', () => {
         expect(playback.heldNotes.size).toBe(0);
     });
 
-    it('should always apply wave shaping on non-muted notes', () => {
+    // RETIRED (#649): the reworked Piano voice has no WaveShaper analog. The
+    // legacy `current` voice ran its body through a per-note WaveShaper; the new
+    // additive-body voice (playAdditiveBody) replaces the single-oscillator +
+    // shaper body with per-partial sine synthesis and never creates a
+    // WaveShaper. The intent ("non-muted Piano notes get the body voice; muted
+    // notes take a stripped path") is now covered by the additive-body
+    // partial-oscillator assertion below.
+    it('should build a per-partial additive body on non-muted Piano notes', () => {
+        // No WaveShaper in the reworked voice at all.
         playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
-        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(1);
+        expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
 
-        playback.bandIntensity = 0.9;
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
-        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(2);
-
-        // Muted notes skip the shaper
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano', muted: true });
-        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(2);
+        // The additive body builds several sine partial oscillators. Beyond the
+        // pitched-click + bright layer (2 oscillators), the body adds its
+        // partial bank — so a non-muted Piano note creates more oscillators than
+        // those two onset layers alone.
+        const sinePartials = playback.audio.createOscillator.mock.results.filter(
+            (r) => r.value.type === 'sine',
+        );
+        expect(sinePartials.length).toBeGreaterThan(1);
     });
 });

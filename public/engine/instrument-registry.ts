@@ -7,8 +7,8 @@ import type { InstrumentVoice } from '../types.js';
  *   - `synth`  — the in-process synthesized voice (the permanent fallback)
  *   - `sample` — a decoded buffer from an installed sample pack
  *
- * The `InstrumentVoice` field ranges over `'current' | 'new' | 'pack:<id>'`.
- * `current`/`new` are the synth-audit A/B voices; a `pack:<id>` value names an
+ * The `InstrumentVoice` field ranges over `'synth' | 'pack:<id>'`.
+ * `synth` is the in-process synthesized voice; a `pack:<id>` value names an
  * installed sample pack. {@link resolveInstrumentSource} returns `sample` ONLY
  * when the named pack is actually loaded — so with no packs installed (and
  * whenever a pack's buffers are missing) every voice resolves to `synth` and
@@ -39,10 +39,10 @@ type PackBuffers = Map<string, AudioBuffer>;
 const packCache = new Map<string, PackBuffers>();
 
 /**
- * The pack id named by a voice, or `null` for the `current`/`new` synth voices.
- * Tolerant of a missing/non-string voice (partial state, older saved sessions):
- * anything that isn't a well-formed `pack:<id>` string resolves to `null` →
- * the synth path, matching the pre-Epic-6 `voice === 'new' ? … : …` ternary.
+ * The pack id named by a voice, or `null` for the `synth` voice.
+ * Tolerant of a missing/non-string voice (partial state, older saved sessions,
+ * legacy `current`/`new` values): anything that isn't a well-formed `pack:<id>`
+ * string resolves to `null` → the synth path.
  */
 export function packIdFromVoice(voice: InstrumentVoice): string | null {
     return typeof voice === 'string' &&
@@ -99,19 +99,18 @@ export function __resetPackCacheForTest(): void {
 
 /**
  * Normalize a persisted/hydrated voice value to a valid `InstrumentVoice`.
- * Preserves a `pack:<id>` selection across reloads; anything else collapses to
- * the synth A/B voices (`'new'` stays `'new'`, all else → `'current'`) — exactly
- * the behavior of the pre-Epic-6 hydration narrowing, so existing saved sessions
- * (which only ever hold `current`/`new`) hydrate identically.
+ * Preserves a `pack:<id>` selection across reloads; everything else — including
+ * the retired `current`/`new` A/B voices (#649) and any garbage — collapses to
+ * `synth`. So a saved session that still holds `current`/`new` keeps working and
+ * just sounds like the (only) reworked synth voice.
  */
 export function hydrateVoice(saved: unknown): InstrumentVoice {
-    if (typeof saved === 'string') {
-        if (saved === 'new') {
-            return 'new';
-        }
-        if (saved.startsWith(PACK_PREFIX) && saved.length > PACK_PREFIX.length) {
-            return saved as InstrumentVoice;
-        }
+    if (
+        typeof saved === 'string' &&
+        saved.startsWith(PACK_PREFIX) &&
+        saved.length > PACK_PREFIX.length
+    ) {
+        return saved as InstrumentVoice;
     }
-    return 'current';
+    return 'synth';
 }

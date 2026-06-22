@@ -5,11 +5,11 @@ const { expect, test } = pkg;
 
 /**
  * Click-free retirement guard for the production harmony voice
- * (`playHarmonyNoteCurrent` in `public/engine/synth-harmonies.ts`) — #601.
+ * (`playHarmonyNoteNew` in `public/engine/synth-harmonies.ts`) — #601.
  *
  * The harmony voice retires sounding voices in three places: the same-MIDI
  * retrigger ("steal"), the 3-voice polyphony cap ("cull"), and the per-note
- * release. The original Current voice used `killActiveVoices`, whose
+ * release. The pre-fix voice used `killActiveVoices`, whose
  * `setTargetAtTime` fade never reaches 0 and then hard-stops the oscillators at
  * ~3% of peak — an audible click + "suck", which the #561 acoustic fingerpick
  * (≥1 same-MIDI retrigger per bar) exposed once the other parts were muted.
@@ -27,7 +27,7 @@ const { expect, test } = pkg;
  * with no fade). The fine-grained click-free retirement *mechanism* — a linear
  * ramp to true zero before `osc.stop()` — is asserted deterministically at the
  * unit level in `tests/unit/engine/harmonies-synthesis.test.ts` (Voice
- * Management). The by-ear A/B audition remains the owner's hard listening gate.
+ * Management). The by-ear audition remains the owner's hard listening gate.
  *
  * Runs against the Vite dev server (it serves the `.ts` module directly), so it
  * is `@diagnostic`-tagged — a fast offline render, not a UI smoke test.
@@ -56,7 +56,7 @@ test('@diagnostic harmony voice retires same-MIDI retriggers + cap culls click-f
                 bandIntensity: 0.6,
                 audioGraph: { harmonies: { gain: busGain } },
             },
-            harmony: { voice: 'current', activeVoices: [] },
+            harmony: { voice: 'synth', activeVoices: [] },
             groove: { genreFeel: '', audioBuffers: {} },
         };
 

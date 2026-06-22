@@ -39,6 +39,9 @@ vi.mock('../../../public/state.js', () => {
                     linearRampToValueAtTime: vi.fn(),
                 },
                 Q: { setValueAtTime: vi.fn() },
+                // The synth harmony voice's formant "bell" is a peaking filter,
+                // which drives a `gain` AudioParam.
+                gain: { setValueAtTime: vi.fn() },
                 connect: vi.fn(),
             })),
             createStereoPanner: vi.fn(() => ({
@@ -54,7 +57,7 @@ vi.mock('../../../public/state.js', () => {
         bandIntensity: 0.5,
     };
     const mockGroove = { genreFeel: 'Jazz' };
-    const mockHarmony = { activeVoices: [] };
+    const mockHarmony = { voice: 'synth', activeVoices: [] };
 
     const mockStateMap = {
         playback: mockPlayback,
@@ -175,9 +178,11 @@ describe('Harmony Synthesis', () => {
             const inner = killVoiceMock();
             harmony.activeVoices = [{ time: 9, duration: 2, midi: 60, gain: { gain: inner } }];
 
-            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'horns', 60);
+            playHarmonyNote(getState(), 440, 10, 1.0, 0.4, 'strings', 60);
 
-            // 'horns' falls to the default retrigger profile → 0.03 s fade.
+            // 'strings' (a sustained style) falls to the default retrigger
+            // profile → 0.03 s fade. ('horns' now maps to the snappy 'stabs'
+            // profile, asserted by the next test's 0.02 fade.)
             expect(inner.cancelScheduledValues).toHaveBeenCalledWith(10);
             expect(inner.linearRampToValueAtTime).toHaveBeenCalledWith(0, 10.03);
             expect(harmony.activeVoices.length).toBe(1);
