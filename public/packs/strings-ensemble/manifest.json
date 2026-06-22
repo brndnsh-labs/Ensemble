@@ -1,0 +1,52 @@
+{
+    "id": "strings-ensemble",
+    "name": "String Ensemble",
+    "attribution": "VSCO-2 Community Edition — Violin Ensemble (sustain, vibrato) by Versilian Studios — CC0 1.0 (public domain)",
+    "samples": [
+        {
+            "key": "45",
+            "rootMidi": 45,
+            "url": "/packs/strings-ensemble/45.m4a"
+        },
+        {
+            "key": "50",
+            "rootMidi": 50,
+            "url": "/packs/strings-ensemble/50.m4a"
+        },
+        {
+            "key": "54",
+            "rootMidi": 54,
+            "url": "/packs/strings-ensemble/54.m4a"
+        },
+        {
+            "key": "57",
+            "rootMidi": 57,
+            "url": "/packs/strings-ensemble/57.m4a"
+        },
+        {
+            "key": "60",
+            "rootMidi": 60,
+            "url": "/packs/strings-ensemble/60.m4a"
+        },
+        {
+            "key": "64",
+            "rootMidi": 64,
+            "url": "/packs/strings-ensemble/64.m4a"
+        },
+        {
+            "key": "67",
+            "rootMidi": 67,
+            "url": "/packs/strings-ensemble/67.m4a"
+        },
+        {
+            "key": "71",
+            "rootMidi": 71,
+            "url": "/packs/strings-ensemble/71.m4a"
+        },
+        {
+            "key": "74",
+            "rootMidi": 74,
+            "url": "/packs/strings-ensemble/74.m4a"
+        }
+    ]
+}

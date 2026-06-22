@@ -64,6 +64,23 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // seated a touch under at 3.0×. Starting point — confirm by ear on ensembletest.
         gain: 3,
     },
+    {
+        id: 'strings-ensemble',
+        name: 'String Ensemble',
+        description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',
+        attribution:
+            'VSCO-2 Community Edition (Violin Ensemble, sustain) by Versilian Studios — CC0 1.0 (public domain)',
+        approxSizeMB: 0.5,
+        instruments: ['harmony'],
+        // Calibrated 2026-06-22 (#660) via `mix-report --calibrate-pack=harmony:strings-ensemble`:
+        // RMS-match to the synth pad is 5.7×. The ensemble is markedly brighter than
+        // the synth pad (+1029 Hz mean centroid — reads louder than its RMS), so
+        // seated a touch under the match at 5× (the tool flags "trust the listen
+        // pass" for cross-timbre balance). Plays above unity — the seam passes this
+        // straight to playSampledNote, which bounds it at MAX_SAMPLE_PEAK and the
+        // master limiter catches stacked-voice peaks. Confirm/adjust by ear.
+        gain: 5,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */

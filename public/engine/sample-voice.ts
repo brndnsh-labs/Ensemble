@@ -17,6 +17,13 @@
 import { safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 
+/**
+ * Sanity ceiling on the envelope peak (see `playSampledNote`). Lets a loudness-
+ * calibrated pad play above unity while bounding a config-typo blast; the real
+ * catalog gains (grand ~0.5×, sax ≤1×, strings ~4–5×) sit below it.
+ */
+const MAX_SAMPLE_PEAK = 8;
+
 /** A pitched sample zone: a decoded buffer recorded at a known root pitch. */
 export interface SampleZone {
     /** MIDI note the buffer was sampled at (playbackRate 1.0 plays in tune here). */
@@ -118,10 +125,19 @@ export function playSampledNote(
     try {
         // Sanitize the scheduling inputs so a stray non-finite value (e.g. an
         // undefined upstream state field) can't push NaN into an AudioParam.
-        // `Math.min(1, NaN)` is NaN, so velocity needs an explicit finite check.
+        // `Math.min(…, NaN)` is NaN, so velocity needs an explicit finite check.
         const startTime = Number.isFinite(time) ? time : audio.currentTime;
         const hold = Number.isFinite(duration) && duration > 0 ? duration : 0;
-        const peak = Number.isFinite(velocity) ? Math.max(0, Math.min(1, velocity)) : 1;
+        // The envelope peak may exceed unity: callers fold a pack's loudness gain
+        // (`gainForPack`) into `velocity`, and a quietly-recorded pad (the #660
+        // string ensemble) must play *above* 1.0 to sit at the synth voice's seat.
+        // Over-unity envelope gain is normal for a loudness-calibrated sampler; the
+        // instrument bus limiter catches peaks. `MAX_SAMPLE_PEAK` is a sanity
+        // ceiling (a config typo can't blast) well above any real catalog gain —
+        // the grand (~0.5×) and sax (≤1×) sit far below it, so they're unaffected.
+        const peak = Number.isFinite(velocity)
+            ? Math.max(0, Math.min(MAX_SAMPLE_PEAK, velocity))
+            : 1;
 
         const source = audio.createBufferSource();
         source.buffer = zone.buffer;
