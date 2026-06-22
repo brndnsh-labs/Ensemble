@@ -96,6 +96,17 @@ const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blue
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
 
+// why: genres whose comp is sparse enough that the final beat before a *within-
+// section* chord change should become an idiomatic horn pickup — a single
+// staccato stab of the INCOMING chord on the &-of-the-last-beat, with the rest
+// of the final beat resting — instead of stabbing the outgoing chord into the
+// change (#719, the blues "quick C7 before the F7"). Scoped to Jazz/Blues: dense-
+// comp genres (Funk, Neo-Soul) keep their 16th grid through changes, and Bossa's
+// own anticipation idiom — those need a per-genre pass (tracked for #712),
+// not this fall-through. Distinct from CHORD_ANTICIPATION_GENRES (which gates the
+// SECTION-boundary stab above).
+const WITHIN_SECTION_ANTICIPATION_GENRES = new Set(['Jazz', 'Blues']);
+
 // B2 (#707) — headroom (in steps) the comp leaves before the next chord's onset
 // when clamping a voicing to its chord length. ~a 16th-note of silence so the
 // voice has released before the change, eliminating the chord-to-chord overlap.
@@ -2044,6 +2055,67 @@ export function getAccompanimentNotes(
         }));
 
         return sectionTransitionNotes.filter((n: any) => n.midi > 0);
+    }
+
+    // Within-section chord-change anticipation (#719) — the horn-section pickup.
+    // The section block above only anticipates SECTION boundaries; a chord change
+    // *within* a section (every bar of a 12-bar blues) had none, so the comp kept
+    // stabbing the OUTGOING chord on the final beat right before the change —
+    // heard as the "quick C7 before the F7". Here the final beat before a
+    // within-section change is reshaped into the idiomatic pickup: a single
+    // staccato stab of the INCOMING chord on the &-of-the-last-beat, with the rest
+    // of the final beat resting so the outgoing chord doesn't ring into the
+    // change. Mirrors the section stab; scoped to WITHIN_SECTION_ANTICIPATION_GENRES.
+    const withinSectionNext =
+        chordIndex >= 0 && arranger.progression
+            ? arranger.progression[chordIndex + 1] || null
+            : null;
+    const chordSpanSteps = chord.beats * ts.stepsPerBeat;
+    const stepsLeftInChord = chordSpanSteps - stepInChord;
+    const anticipationAnchorStepsLeft = Math.floor(ts.stepsPerBeat / 2); // the &-of-the-last-beat
+    if (
+        chords.style === 'smart' &&
+        WITHIN_SECTION_ANTICIPATION_GENRES.has(genre) &&
+        withinSectionNext &&
+        withinSectionNext.absName !== chord.absName &&
+        (withinSectionNext.freqs?.length ?? 0) > 0 &&
+        chord.beats >= 2 &&
+        !isSoloistBusy &&
+        stepsLeftInChord > 0 &&
+        stepsLeftInChord <= ts.stepsPerBeat // final beat of the outgoing chord
+    ) {
+        if (stepsLeftInChord === anticipationAnchorStepsLeft) {
+            // The &-of-the-last-beat horn pickup: one staccato stab of the incoming
+            // chord, softer + slightly pushed (same shape as the section stab).
+            const incomingFull: number[] = [...withinSectionNext.freqs];
+            const incoming = incomingFull.length > 3 ? incomingFull.slice(0, 3) : incomingFull;
+            const pickup = incoming.map((f: number, i: number) => ({
+                midi: getMidi(f),
+                velocity: (0.32 + intensity * 0.3) * (0.9 + i * 0.05),
+                durationSteps: 1,
+                ccEvents: i === 0 ? ccEvents : [],
+                timingOffset: i * 0.006 - 0.01, // slight push (anticipation feel)
+                instrument: 'Piano',
+                muted: false,
+            }));
+            return pickup.filter((n: any) => n.midi > 0);
+        }
+        // Rest of the final beat: lay out so the outgoing chord doesn't stab into
+        // the change. Preserve any sustain-pedal CC as a muted sentinel note.
+        if (ccEvents.length > 0) {
+            return [
+                {
+                    midi: 0,
+                    velocity: 0,
+                    durationSteps: 0,
+                    ccEvents,
+                    timingOffset: 0,
+                    instrument: 'Piano',
+                    muted: true,
+                },
+            ];
+        }
+        return [];
     }
 
     // --- GENRE LANES ---
