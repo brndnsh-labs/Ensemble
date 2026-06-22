@@ -3,6 +3,7 @@ import { autoVoiceForGenre, GENRE_SOUND_MAP } from '../../../public/data/genre-s
 import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
 import { SOUND_PACKS } from '../../../public/data/sound-packs.js';
 import { packIdFromVoice } from '../../../public/engine/instrument-registry.js';
+import type { InstrumentVoice } from '../../../public/types.js';
 
 const allInstalled = () => true;
 const noneInstalled = () => false;
@@ -31,6 +32,47 @@ describe('genre → sound map (#675)', () => {
                     );
                 }
             }
+        });
+    });
+
+    describe('chords lane — per-genre keyboard (#682)', () => {
+        // The table decided with Brandon 2026-06-22. Locked here so a stray edit
+        // to GENRE_SOUND_MAP that re-points a genre's keyboard fails loudly.
+        const CHORDS_TABLE: Record<string, InstrumentVoice> = {
+            Jazz: 'pack:grand',
+            Acoustic: 'pack:grand',
+            Bossa: 'pack:grand',
+            Country: 'pack:grand',
+            Disco: 'pack:grand',
+            'Neo-Soul': 'pack:grand',
+            Rock: 'pack:grand',
+            Reggae: 'pack:hammond-organ',
+            Blues: 'pack:hammond-organ',
+            'Ska-Punk': 'pack:hammond-organ',
+            Funk: 'pack:clavinet',
+            // Hip Hop / Metal keep the synth keyboard (no acoustic-keys idiom).
+            'Hip Hop': 'synth',
+            Metal: 'synth',
+        };
+
+        it('maps every canonical genre to its decided chords voice (installed)', () => {
+            for (const genre of GENRE_NAMES) {
+                expect(
+                    autoVoiceForGenre(genre, 'chords', allInstalled),
+                    `${genre} chords voice drifted from the locked table`,
+                ).toBe(CHORDS_TABLE[genre]);
+            }
+        });
+
+        it('covers all 13 canonical genres (no genre left unspecified)', () => {
+            expect(Object.keys(CHORDS_TABLE).sort()).toEqual([...GENRE_NAMES].sort());
+        });
+
+        it('falls back to synth for a pack-mapped genre when that pack is NOT installed', () => {
+            // Auto-follow never auto-downloads — an uninstalled mapping plays synth.
+            expect(autoVoiceForGenre('Jazz', 'chords', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Funk', 'chords', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Reggae', 'chords', noneInstalled)).toBe('synth');
         });
     });
 
