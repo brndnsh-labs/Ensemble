@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
     copyFileSync,
+    cpSync,
     existsSync,
     readdirSync,
     readFileSync,
@@ -79,6 +80,13 @@ function copyStaticAssets(): Plugin {
                 if (existsSync(src)) {
                     copyFileSync(src, dest);
                 }
+            }
+            // Epic 6 — ship sample packs verbatim to dist/packs so they serve at
+            // /packs/* (runtime-cached by sw.ts, excluded from the precache glob).
+            // publicDir is disabled, so this recursive copy is how packs reach dist.
+            const packsSrc = resolve('public', 'packs');
+            if (existsSync(packsSrc)) {
+                cpSync(packsSrc, resolve('dist', 'packs'), { recursive: true });
             }
             const htmlPath = resolve('dist', 'index.html');
             if (existsSync(htmlPath)) {

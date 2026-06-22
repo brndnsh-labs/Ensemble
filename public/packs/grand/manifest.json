@@ -1,0 +1,112 @@
+{
+    "id": "grand",
+    "name": "Acoustic Grand Piano",
+    "attribution": "Salamander Grand Piano (Yamaha C5) by Alexander Holm — CC-BY 3.0",
+    "samples": [
+        {
+            "key": "36",
+            "rootMidi": 36,
+            "url": "/packs/grand/36.m4a"
+        },
+        {
+            "key": "39",
+            "rootMidi": 39,
+            "url": "/packs/grand/39.m4a"
+        },
+        {
+            "key": "42",
+            "rootMidi": 42,
+            "url": "/packs/grand/42.m4a"
+        },
+        {
+            "key": "45",
+            "rootMidi": 45,
+            "url": "/packs/grand/45.m4a"
+        },
+        {
+            "key": "48",
+            "rootMidi": 48,
+            "url": "/packs/grand/48.m4a"
+        },
+        {
+            "key": "51",
+            "rootMidi": 51,
+            "url": "/packs/grand/51.m4a"
+        },
+        {
+            "key": "54",
+            "rootMidi": 54,
+            "url": "/packs/grand/54.m4a"
+        },
+        {
+            "key": "57",
+            "rootMidi": 57,
+            "url": "/packs/grand/57.m4a"
+        },
+        {
+            "key": "60",
+            "rootMidi": 60,
+            "url": "/packs/grand/60.m4a"
+        },
+        {
+            "key": "63",
+            "rootMidi": 63,
+            "url": "/packs/grand/63.m4a"
+        },
+        {
+            "key": "66",
+            "rootMidi": 66,
+            "url": "/packs/grand/66.m4a"
+        },
+        {
+            "key": "69",
+            "rootMidi": 69,
+            "url": "/packs/grand/69.m4a"
+        },
+        {
+            "key": "72",
+            "rootMidi": 72,
+            "url": "/packs/grand/72.m4a"
+        },
+        {
+            "key": "75",
+            "rootMidi": 75,
+            "url": "/packs/grand/75.m4a"
+        },
+        {
+            "key": "78",
+            "rootMidi": 78,
+            "url": "/packs/grand/78.m4a"
+        },
+        {
+            "key": "81",
+            "rootMidi": 81,
+            "url": "/packs/grand/81.m4a"
+        },
+        {
+            "key": "84",
+            "rootMidi": 84,
+            "url": "/packs/grand/84.m4a"
+        },
+        {
+            "key": "87",
+            "rootMidi": 87,
+            "url": "/packs/grand/87.m4a"
+        },
+        {
+            "key": "90",
+            "rootMidi": 90,
+            "url": "/packs/grand/90.m4a"
+        },
+        {
+            "key": "93",
+            "rootMidi": 93,
+            "url": "/packs/grand/93.m4a"
+        },
+        {
+            "key": "96",
+            "rootMidi": 96,
+            "url": "/packs/grand/96.m4a"
+        }
+    ]
+}

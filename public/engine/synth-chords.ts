@@ -1,6 +1,8 @@
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { getPackZones } from './pack-runtime.js';
+import { pickZone, playSampledNote } from './sample-voice.js';
 import {
     createSimplePanner,
     HUMANIZE_PROFILES,
@@ -135,6 +137,12 @@ interface PlayNoteOptions {
     numVoices?: number;
 }
 
+// Trim on the synth chord voice (#649/Epic 6). Brings the synth chords down a
+// touch so they sit balanced against the sampled grand in the A/B — and Brandon
+// wanted the synth chords a little quieter regardless. Ear-locked 2026-06-21,
+// paired with the sampled-grand 3.5× lift in `playSampledChord`.
+const SYNTH_CHORD_LEVEL = 0.85;
+
 // The synth chord voice. `playNoteNew` is the reworked synth-audit voice (the
 // only one since #649 retired the Current/New A/B); it internally layers a
 // strum-staggered fundamental rendered by `playNoteCurrent`.
@@ -142,14 +150,56 @@ function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): void {
     playNoteNew(...args);
 }
 
-// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
-// to a sample source once its buffers load (S3); S5 routes that case to
-// `playSampledNote`. Until then, and whenever a pack buffer is unavailable, we
-// fall back to the synth voice — bit-identical with no packs installed.
+// synth-audit Epic 6 S6 — play one chord note from a sample pack. Converts the
+// scheduled frequency to a MIDI target, picks the nearest loaded zone, and
+// plays it through the chords gain bus (inheriting EQ/reverb/limiting). Returns
+// false — so the caller falls back to the synth voice — when the pack's zones
+// aren't loaded yet or the note is otherwise unplayable.
+function playSampledChord(
+    state: EnsembleState,
+    packId: string,
+    freq: number,
+    time: number,
+    duration: number,
+    opts: PlayNoteOptions | undefined,
+): boolean {
+    const { playback } = state;
+    const audio = playback.audio;
+    const dest = playback.audioGraph?.chords?.gain;
+    const zones = getPackZones(packId);
+    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
+        return false;
+    }
+    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    const zone = pickZone(zones, targetMidi);
+    if (!zone) {
+        return false;
+    }
+    const numVoices = Math.max(1, opts?.numVoices ?? 1);
+    const vol = Number.isFinite(opts?.vol) ? (opts?.vol as number) : 0.1;
+    // Level: mirror the synth's polyphony compensation, then lift so a normalized
+    // piano sample sits at a comparable loudness to the synth voice. Ear-locked
+    // 2026-06-21 at 3.5× — paired with the SYNTH_CHORD_LEVEL trim, the sampled
+    // grand and the (slightly tamed) synth chords sit balanced. The bus limiter
+    // catches peaks on dense chords.
+    const velocity = Math.min(1, (vol / Math.sqrt(numVoices)) * 3.5);
+    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+        velocity,
+        duration,
+    });
+    return true;
+}
+
+// synth-audit Epic 6 S1/S6 — instrument-source seam. A `pack:<id>` voice plays
+// from the sample pack once its zones are loaded; until then (or if a note is
+// out of range) it falls back to the synth voice — bit-identical with no packs.
 export function playNote(...args: Parameters<typeof playNoteCurrent>): void {
-    if (resolveInstrumentSource(args[0].chords.voice).kind === 'sample') {
-        dispatchChordSynth(...args); // S5: → playSampledNote(packId, …)
-        return;
+    const source = resolveInstrumentSource(args[0].chords.voice);
+    if (source.kind === 'sample') {
+        const [state, freq, time, duration, opts] = args;
+        if (playSampledChord(state, source.packId, freq, time, duration, opts)) {
+            return;
+        }
     }
     dispatchChordSynth(...args);
 }
@@ -213,7 +263,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     // The gentler `numVoices^-0.3` lifts a 4-note chord to 0.66× per voice
     // (6-note → 0.58×): still some attenuation to guard against clipping on
     // dense chords, but a full chord no longer sits below a sparse one.
-    const finalVol = vol / Math.max(1, numVoices) ** 0.3;
+    const finalVol = (vol / Math.max(1, numVoices) ** 0.3) * SYNTH_CHORD_LEVEL;
 
     // synth-audit Epic 2 S2 — real attack transient. `playNoteCurrent`'s only
     // onset cue is a quiet (`finalVol*0.15`), diffuse noise blip — nothing for
@@ -469,7 +519,7 @@ function playNoteCurrent(
     }
 
     const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
-    const finalVol = vol * polyphonyComp;
+    const finalVol = vol * polyphonyComp * SYNTH_CHORD_LEVEL;
 
     if (!playback.heldNotes) {
         (playback as Mutable<typeof playback>).heldNotes = new Set(); // @direct-mutation
