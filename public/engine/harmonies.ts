@@ -139,6 +139,24 @@ export function clearHarmonyMemory(state: EnsembleState | null): void {
 }
 
 /**
+ * True when the chord's THIRD is minor — it carries a b3 (pitch class 3) and NOT
+ * a natural 3 (pitch class 4). Used to pick the harmonized/arp third (`? 3 : 4`).
+ * why: two bugs in the old `intervals.includes(3)` test —
+ *  (1) the Rock spread-10th voicing (getIntervals) encodes the b3 an octave up —
+ *      Rock vi (Am) = [0, 7, 15, 19], so the b3 is interval 15, not 3 — and a bare
+ *      `includes(3)` missed it, defaulting harmony to a MAJOR 3rd over a minor
+ *      chord (the vi cross-relation, #701). Fold to pitch class to catch any octave.
+ *  (2) require the natural 3 to be ABSENT so a dominant that carries BOTH (e.g.
+ *      7#9 = [0,4,7,10,15], whose #9 folds to pc 3) keeps its defining major 3rd
+ *      instead of being forced to a b3. Only tension dominants (7#9/7alt) carry
+ *      both; for them the major 3rd is the chord tone, the pc-3 is a tension.
+ */
+export function chordThirdIsMinor(chord: Chord): boolean {
+    const pcs = (chord.intervals || []).map((i) => ((i % 12) + 12) % 12);
+    return pcs.includes(3) && !pcs.includes(4);
+}
+
+/**
  * Extracts 3rds and 7ths (Guide Tones).
  */
 export function getGuideTones(intervals: number[]): number[] {
@@ -693,7 +711,7 @@ function finalizeHarmonyNotes(
     // Tension chords keep their guide-tone voicing — a bare power-5th / 3rd-dyad
     // would erase the 3rd/7th/alterations that define a 7b9-type color.
     if (profile.voicing?.harmonizedThirds && !isBloom && !isLatched && !isTensionChord) {
-        const harmonizedThird = (chord.intervals || []).includes(3) ? 3 : 4;
+        const harmonizedThird = chordThirdIsMinor(chord) ? 3 : 4;
         if (profile.voicing.powerDoubling && playback.bandIntensity > 0.7) {
             intervals = playback.bandIntensity > 0.85 ? [0, 7, 12] : [0, 7];
         } else {
@@ -743,7 +761,7 @@ function finalizeHarmonyNotes(
     // add9 color folk fingerpicking leans on. Bloom/latch accents are left as
     // their fuller stack (a deliberate swell over the picked line).
     if (behavior.type === 'arp' && !isBloom && !isLatched) {
-        const arpThird = (chord.intervals || []).includes(3) ? 3 : 4;
+        const arpThird = chordThirdIsMinor(chord) ? 3 : 4;
         const roll = [0, arpThird, 7, 12, 14, 12, 7, arpThird];
         intervals = [roll[(behavior.arpStep ?? 0) % roll.length]];
     }
