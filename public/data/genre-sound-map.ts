@@ -23,9 +23,9 @@ import type { InstrumentModule, InstrumentVoice } from '../types.js';
 export const GENRE_SOUND_MAP: Readonly<
     Record<string, Partial<Record<InstrumentModule, InstrumentVoice>>>
 > = {
-    // Each genre's two lanes are chosen to pair coherently (#682, decided w/
-    // Brandon 2026-06-22): a chords keyboard + a harmony section that share the
-    // idiom rather than fight it.
+    // Each genre's lanes are chosen to pair coherently rather than fight: a
+    // chords keyboard, a harmony section, a soloist lead, and a drum kit that
+    // share the idiom. (#682 chords/harmony · #694 soloist · #695 drums.)
     //
     // chords — the keyboard playing the changes:
     //   • grand    → acoustic-piano genres (jazz comping, singer-songwriter,
@@ -35,20 +35,64 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • clavinet → funk's percussive plucked comp
     //   • synth    → Hip Hop / Metal (no acoustic-keys idiom → keep the synth)
     // harmony — the section answering the changes (horns vs. string pad vs. synth).
-    Funk: { chords: 'pack:clavinet', harmony: 'pack:horns-section' },
+    // soloist — sax (#694): a real horn lead only where it's idiomatic (jazz/blues
+    //   blowing, funk hits, bossa cool); everything else keeps the synth lead — one
+    //   alto voice on every genre would wear thin.
+    // groove — acoustic kit (#695): a live drummer is the better default for most
+    //   genres (Brandon's ear 2026-06-22), so the kit is the default and synth is
+    //   the exception. Synth kit only where the drums are programmed/triggered:
+    //   Hip Hop (beats) and Metal (our natural kit reads too soft for triggered
+    //   metal aggression — the synth kit's tighter transient is closer).
+    Funk: {
+        chords: 'pack:clavinet',
+        harmony: 'pack:horns-section',
+        soloist: 'pack:sax-alto',
+        groove: 'pack:acoustic-kit',
+    },
     Metal: { harmony: 'pack:horns-section' },
-    'Ska-Punk': { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
-    Jazz: { chords: 'pack:grand', harmony: 'pack:horns-section' },
-    Blues: { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
-    Reggae: { chords: 'pack:hammond-organ', harmony: 'pack:horns-section' },
+    'Ska-Punk': {
+        chords: 'pack:hammond-organ',
+        harmony: 'pack:horns-section',
+        groove: 'pack:acoustic-kit',
+    },
+    Jazz: {
+        chords: 'pack:grand',
+        harmony: 'pack:horns-section',
+        soloist: 'pack:sax-alto',
+        groove: 'pack:acoustic-kit',
+    },
+    Blues: {
+        chords: 'pack:hammond-organ',
+        harmony: 'pack:horns-section',
+        soloist: 'pack:sax-alto',
+        groove: 'pack:acoustic-kit',
+    },
+    Reggae: {
+        chords: 'pack:hammond-organ',
+        harmony: 'pack:horns-section',
+        groove: 'pack:acoustic-kit',
+    },
     // Sustained string pad — genres that want a lush bed under the changes.
-    Rock: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
-    Disco: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
-    Country: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
-    Acoustic: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
-    Bossa: { chords: 'pack:grand', harmony: 'pack:strings-ensemble' },
+    Rock: { chords: 'pack:grand', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
+    Disco: { chords: 'pack:grand', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
+    Country: {
+        chords: 'pack:grand',
+        harmony: 'pack:strings-ensemble',
+        groove: 'pack:acoustic-kit',
+    },
+    Acoustic: {
+        chords: 'pack:grand',
+        harmony: 'pack:strings-ensemble',
+        groove: 'pack:acoustic-kit',
+    },
+    Bossa: {
+        chords: 'pack:grand',
+        harmony: 'pack:strings-ensemble',
+        soloist: 'pack:sax-alto',
+        groove: 'pack:acoustic-kit',
+    },
     // Neo-Soul — grand on the keys; no harmony pack fit yet → synth pad.
-    'Neo-Soul': { chords: 'pack:grand' },
+    'Neo-Soul': { chords: 'pack:grand', groove: 'pack:acoustic-kit' },
     // Hip Hop · Metal chords — no acoustic-keys idiom yet → synth pad.
 };
 

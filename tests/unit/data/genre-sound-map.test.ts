@@ -76,6 +76,48 @@ describe('genre → sound map (#675)', () => {
         });
     });
 
+    describe('soloist lane — per-genre lead (#694)', () => {
+        // Sax only where a horn lead is idiomatic; everything else keeps synth.
+        const SAX_GENRES = ['Jazz', 'Blues', 'Funk', 'Bossa'];
+
+        it('maps every canonical genre to its decided soloist voice (installed)', () => {
+            for (const genre of GENRE_NAMES) {
+                const expected = SAX_GENRES.includes(genre) ? 'pack:sax-alto' : 'synth';
+                expect(
+                    autoVoiceForGenre(genre, 'soloist', allInstalled),
+                    `${genre} soloist voice drifted from the locked table`,
+                ).toBe(expected);
+            }
+        });
+
+        it('falls back to synth when the sax pack is NOT installed', () => {
+            expect(autoVoiceForGenre('Jazz', 'soloist', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Funk', 'soloist', noneInstalled)).toBe('synth');
+        });
+    });
+
+    describe('drums lane — per-genre kit (#695)', () => {
+        // Acoustic kit is the DEFAULT (live drummer fits most genres, Brandon's
+        // ear 2026-06-22); synth kit is the exception for programmed/triggered
+        // drums only — Hip Hop (beats) and Metal (too soft on the natural kit).
+        const SYNTH_KIT_GENRES = ['Hip Hop', 'Metal'];
+
+        it('maps every canonical genre to its decided groove voice (installed)', () => {
+            for (const genre of GENRE_NAMES) {
+                const expected = SYNTH_KIT_GENRES.includes(genre) ? 'synth' : 'pack:acoustic-kit';
+                expect(
+                    autoVoiceForGenre(genre, 'groove', allInstalled),
+                    `${genre} groove voice drifted from the locked table`,
+                ).toBe(expected);
+            }
+        });
+
+        it('falls back to synth when the acoustic-kit pack is NOT installed', () => {
+            expect(autoVoiceForGenre('Jazz', 'groove', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Acoustic', 'groove', noneInstalled)).toBe('synth');
+        });
+    });
+
     describe('autoVoiceForGenre', () => {
         it('returns the mapped pack voice when installed', () => {
             // Funk → horns on the harmony lane (a known map entry).
