@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { packsForInstrument, SOUND_PACKS, type SoundPack } from '../data/sound-packs.js';
 import { clearPack, isPackLoaded } from '../engine/instrument-registry.js';
 import { ensurePackLoaded, getPackZones } from '../engine/pack-runtime.js';
@@ -47,6 +47,29 @@ function ensureAudio(): AudioContext | null {
     return audio ?? null;
 }
 
+/**
+ * Whether a pack's files live in the SW `/packs/` cache — the persistent source
+ * of truth for "installed". Survives reloads (the decoded-buffer cache does
+ * not), so a pack installed once stays installed until removed. Checks the
+ * manifest, written last-ish by a successful install.
+ */
+async function isPackCached(packId: string): Promise<boolean> {
+    if (typeof caches === 'undefined') {
+        return false;
+    }
+    const manifestUrl = `/packs/${packId}/manifest.json`;
+    for (const name of await caches.keys()) {
+        if (!name.includes('packs')) {
+            continue;
+        }
+        const cache = await caches.open(name);
+        if (await cache.match(manifestUrl)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** Evict a pack's cached audio files from Cache Storage (the SW `/packs/` cache). */
 async function evictPackCache(packId: string): Promise<void> {
     if (typeof caches === 'undefined') {
@@ -77,11 +100,43 @@ export function SoundsSettings() {
         groove: s.groove.voice,
     })) as Record<InstrumentModule, InstrumentVoice>;
 
-    // `isPackLoaded` is a plain module-cache read, not a signal — bump this after
-    // install/remove to re-render install state across the groups.
-    const [, setRev] = useState(0);
-    const refresh = () => setRev((r) => r + 1);
+    // Persistent install state: packs whose files are in the SW cache, plus any
+    // loaded this session. Seeded from the cache on mount so a pack installed in
+    // an earlier session shows Installed without re-downloading.
+    const [installed, setInstalled] = useState<Set<string>>(
+        () => new Set(SOUND_PACKS.filter((p) => isPackLoaded(p.id)).map((p) => p.id)),
+    );
     const [busy, setBusy] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            const cached = await Promise.all(
+                SOUND_PACKS.map(async (p) => ((await isPackCached(p.id)) ? p.id : null)),
+            );
+            if (!alive) {
+                return;
+            }
+            const ids = cached.filter((id): id is string => id !== null);
+            if (ids.length > 0) {
+                setInstalled((prev) => new Set([...prev, ...ids]));
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    const markInstalled = (packId: string, value: boolean) =>
+        setInstalled((prev) => {
+            const next = new Set(prev);
+            if (value) {
+                next.add(packId);
+            } else {
+                next.delete(packId);
+            }
+            return next;
+        });
     const setPackBusy = (packId: string, value: boolean) =>
         setBusy((prev) => ({ ...prev, [packId]: value }));
 
@@ -90,23 +145,32 @@ export function SoundsSettings() {
         saveCurrentState();
     };
 
+    // Fetch+decode a pack (populating the SW cache as a side effect) and mark it
+    // installed. Returns whether it's now playable.
+    const loadAndMark = async (audio: AudioContext, pack: SoundPack): Promise<boolean> => {
+        setPackBusy(pack.id, true);
+        await ensurePackLoaded(audio, pack.id);
+        setPackBusy(pack.id, false);
+        // The fetch routed through the SW cache; treat a successful decode as
+        // installed (and reconcile against the real cache too).
+        const ok = isPackLoaded(pack.id) || (await isPackCached(pack.id));
+        markInstalled(pack.id, ok);
+        return ok;
+    };
+
     // Install a pack and select it as `module`'s source (you install it to use it).
     const install = async (module: InstrumentModule, pack: SoundPack) => {
         const audio = ensureAudio();
         if (!audio) {
             return;
         }
-        setPackBusy(pack.id, true);
-        await ensurePackLoaded(audio, pack.id);
-        setPackBusy(pack.id, false);
-        refresh();
-        if (isPackLoaded(pack.id)) {
+        if (await loadAndMark(audio, pack)) {
             selectSource(module, `pack:${pack.id}`);
         }
     };
 
     // Remove a pack: drop any instrument sourcing it back to synth, free the
-    // decoded buffers, and evict the cached audio files.
+    // decoded buffers, and evict the cached audio files (it's no longer installed).
     const remove = async (pack: SoundPack) => {
         const state = getState();
         for (const module of pack.instruments) {
@@ -116,7 +180,7 @@ export function SoundsSettings() {
         }
         clearPack(pack.id);
         await evictPackCache(pack.id);
-        refresh();
+        markInstalled(pack.id, false);
     };
 
     const preview = async (module: InstrumentModule, pack: SoundPack) => {
@@ -125,10 +189,7 @@ export function SoundsSettings() {
             return;
         }
         if (!isPackLoaded(pack.id)) {
-            setPackBusy(pack.id, true);
-            await ensurePackLoaded(audio, pack.id);
-            setPackBusy(pack.id, false);
-            refresh();
+            await loadAndMark(audio, pack);
         }
         const zones = getPackZones(pack.id);
         if (!zones) {
@@ -155,8 +216,9 @@ export function SoundsSettings() {
     return (
         <SettingGroup title="Instrument Sounds">
             <p class="text-mini-muted sounds-intro">
-                Pick a synth or a sample pack for each instrument. Packs download on demand and are
-                cached for offline use — the app stays small until you install one.
+                Pick a synth or a sample pack for each instrument. Packs download once and stay
+                installed (cached for offline use) until you remove them — the app stays small until
+                you install one.
             </p>
 
             {sourceModules.map((module) => {
@@ -182,7 +244,7 @@ export function SoundsSettings() {
                             </button>
 
                             {packsForInstrument(module).map((pack) => {
-                                const loaded = isPackLoaded(pack.id);
+                                const isInstalled = installed.has(pack.id);
                                 const isBusy = busy[pack.id] ?? false;
                                 const active = voice === `pack:${pack.id}`;
                                 return (
@@ -194,10 +256,10 @@ export function SoundsSettings() {
                                             type="button"
                                             role="radio"
                                             aria-checked={active}
-                                            disabled={!loaded || isBusy}
+                                            disabled={!isInstalled || isBusy}
                                             class="sound-source-select"
                                             title={
-                                                loaded
+                                                isInstalled
                                                     ? `Use ${pack.name}`
                                                     : `Install ${pack.name} to use it`
                                             }
@@ -208,7 +270,7 @@ export function SoundsSettings() {
                                             <span class="sound-source-meta">
                                                 {isBusy
                                                     ? 'Downloading…'
-                                                    : loaded
+                                                    : isInstalled
                                                       ? 'Installed'
                                                       : `${pack.approxSizeMB} MB`}
                                             </span>
@@ -223,7 +285,7 @@ export function SoundsSettings() {
                                             >
                                                 <Icon name="headphones" />
                                             </button>
-                                            {loaded ? (
+                                            {isInstalled ? (
                                                 <button
                                                     type="button"
                                                     class="icon-btn danger-btn"
