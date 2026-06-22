@@ -1,7 +1,10 @@
+import { gainForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { getPackZones } from './pack-runtime.js';
+import { pickZone, playSampledNote } from './sample-voice.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
@@ -42,15 +45,55 @@ function dispatchSoloSynth(...args: Parameters<typeof playSoloNoteCurrent>): voi
     playSoloNoteCurrent(...args);
 }
 
+// Epic 7 #658 — play one soloist note from a sample pack (mirrors the chords'
+// `playSampledChord`). Converts the scheduled frequency to a MIDI target, picks
+// the nearest loaded zone, and plays it through the soloist gain bus (inheriting
+// EQ/reverb/limiting). Returns false — so the caller falls back to the synth
+// voice — when zones aren't loaded yet or the note is otherwise unplayable.
+// The soloist is monophonic, but `playSampledNote` is duration-bounded (it stops
+// each note past its release tail), so successive lead notes don't pile up; a
+// hard previous-note cutoff can follow if auditioning shows overlap.
+function playSampledSolo(
+    state: EnsembleState,
+    packId: string,
+    freq: number,
+    time: number,
+    duration: number,
+    vol: number,
+): boolean {
+    const { playback } = state;
+    const audio = playback.audio;
+    const dest = playback.audioGraph?.soloist?.gain;
+    const zones = getPackZones(packId);
+    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
+        return false;
+    }
+    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    const zone = pickZone(zones, targetMidi);
+    if (!zone) {
+        return false;
+    }
+    const velocity = Math.min(1, (Number.isFinite(vol) ? vol : 0.5) * gainForPack(packId));
+    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+        velocity,
+        duration,
+    });
+    return true;
+}
+
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
-// to a sample source once its buffers load (S3); S5 routes that case to
-// `playSampledNote` (trumpet/sax for acoustic presets — `soloist.md` §4). Until
-// then, and whenever a pack buffer is unavailable, we fall back to the synth
-// voice — bit-identical with no packs installed.
+// to a sample source once its buffers load (S3); #658 routes that case to
+// `playSampledSolo` (sax/nylon etc. on the soloist lane). Until then, and
+// whenever a pack buffer is unavailable, we fall back to the synth voice —
+// bit-identical with no packs installed.
 export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): void {
-    if (resolveInstrumentSource(args[0].soloist.voice).kind === 'sample') {
-        dispatchSoloSynth(...args); // S5: → playSampledNote(packId, …)
-        return;
+    const state = args[0];
+    const source = resolveInstrumentSource(state.soloist.voice);
+    if (source.kind === 'sample') {
+        const [, freq, time, duration, vol] = args;
+        if (playSampledSolo(state, source.packId, freq, time, duration, vol)) {
+            return;
+        }
     }
     dispatchSoloSynth(...args);
 }
