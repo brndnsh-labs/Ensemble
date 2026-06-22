@@ -1,0 +1,87 @@
+{
+    "id": "hammond-organ",
+    "name": "Drawbar Organ",
+    "attribution": "FreePats Drawbar Organ Emulation (setBfree) — CC0 1.0 (public domain)",
+    "samples": [
+        {
+            "key": "36",
+            "rootMidi": 36,
+            "url": "/packs/hammond-organ/36.m4a"
+        },
+        {
+            "key": "40",
+            "rootMidi": 40,
+            "url": "/packs/hammond-organ/40.m4a"
+        },
+        {
+            "key": "44",
+            "rootMidi": 44,
+            "url": "/packs/hammond-organ/44.m4a"
+        },
+        {
+            "key": "48",
+            "rootMidi": 48,
+            "url": "/packs/hammond-organ/48.m4a"
+        },
+        {
+            "key": "52",
+            "rootMidi": 52,
+            "url": "/packs/hammond-organ/52.m4a"
+        },
+        {
+            "key": "56",
+            "rootMidi": 56,
+            "url": "/packs/hammond-organ/56.m4a"
+        },
+        {
+            "key": "60",
+            "rootMidi": 60,
+            "url": "/packs/hammond-organ/60.m4a"
+        },
+        {
+            "key": "64",
+            "rootMidi": 64,
+            "url": "/packs/hammond-organ/64.m4a"
+        },
+        {
+            "key": "68",
+            "rootMidi": 68,
+            "url": "/packs/hammond-organ/68.m4a"
+        },
+        {
+            "key": "72",
+            "rootMidi": 72,
+            "url": "/packs/hammond-organ/72.m4a"
+        },
+        {
+            "key": "76",
+            "rootMidi": 76,
+            "url": "/packs/hammond-organ/76.m4a"
+        },
+        {
+            "key": "80",
+            "rootMidi": 80,
+            "url": "/packs/hammond-organ/80.m4a"
+        },
+        {
+            "key": "84",
+            "rootMidi": 84,
+            "url": "/packs/hammond-organ/84.m4a"
+        },
+        {
+            "key": "88",
+            "rootMidi": 88,
+            "url": "/packs/hammond-organ/88.m4a"
+        },
+        {
+            "key": "92",
+            "rootMidi": 92,
+            "url": "/packs/hammond-organ/92.m4a"
+        },
+        {
+            "key": "96",
+            "rootMidi": 96,
+            "url": "/packs/hammond-organ/96.m4a"
+        }
+    ]
+}
