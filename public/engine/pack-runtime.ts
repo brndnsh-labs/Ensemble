@@ -1,6 +1,11 @@
 import { SOUND_PACKS } from '../data/sound-packs.js';
 import type { InstrumentVoice } from '../types.js';
-import { getPackBuffer, packIdFromVoice, seedInstalledPacks } from './instrument-registry.js';
+import {
+    getPackBuffer,
+    isPackLoaded,
+    packIdFromVoice,
+    seedInstalledPacks,
+} from './instrument-registry.js';
 import { loadPack, type PackManifest } from './sample-loader.js';
 import type { SampleZone } from './sample-voice.js';
 
@@ -44,7 +49,10 @@ async function fetchManifest(packId: string): Promise<PackManifest> {
  * falls back to its synth voice (the registry's graceful-fallback contract).
  */
 export function ensurePackLoaded(audio: BaseAudioContext, packId: string): Promise<void> {
-    if (zoneCache.has(packId)) {
+    // A percussion pack (#662) registers buffers but builds no pitched zones, so
+    // `zoneCache` stays empty for it; `isPackLoaded` is the registry-level "done"
+    // that keeps a loaded drum kit from re-fetching its manifest every play-start.
+    if (zoneCache.has(packId) || isPackLoaded(packId)) {
         return Promise.resolve();
     }
     const existing = ensuring.get(packId);

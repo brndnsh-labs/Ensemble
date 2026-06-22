@@ -1,7 +1,14 @@
+import { gainForPack } from '../data/sound-packs.js';
 import type { GrooveState } from '../state/groove.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
-import { resolveInstrumentSource } from './instrument-registry.js';
+import { scrambleHash } from './hash-utils.js';
+import {
+    getPackBufferVariants,
+    packIdFromVoice,
+    resolveInstrumentSource,
+} from './instrument-registry.js';
+import { pickRoundRobin, playSampledStrike } from './sample-voice.js';
 import {
     createSimplePanner,
     duckGain,
@@ -971,18 +978,138 @@ function dispatchDrumSynth(state: EnsembleState, name: string, time: number, vel
     playDrumSoundNew(state, name, time, velocity);
 }
 
-// synth-audit Epic 6 S1 — instrument-source seam. A drum pack (e.g.
-// `pack:cymbals` — `drums.md` §4) resolves to a sample source once its buffers
-// load (S3); S5 routes sampled strikes through `playPercussiveStrike`. Until
-// then, and whenever a pack buffer is unavailable, we fall back to the synth
-// voice — bit-identical with no packs installed.
+// synth-audit Epic 6 S1 / Epic 7 #662 — instrument-source seam. When the groove
+// voice is a `pack:<id>` whose buffers have loaded, route each strike to the
+// sampled kit; a hit the pack doesn't cover (china/brush — no CC0 source — or a
+// not-yet-loaded buffer) falls through to the synth voice for that one hit, so a
+// sampled kit and the synth voice coexist seamlessly. With no pack installed the
+// `sample` branch is never taken and the synth path is bit-identical.
 export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
     const [state, name, time, velocity] = args;
     if (resolveInstrumentSource(state.groove.voice).kind === 'sample') {
-        dispatchDrumSynth(state, name, time, velocity); // S5: → sampled strike
-        return;
+        if (tryPlaySampledDrum(state, name, time, velocity)) {
+            return;
+        }
+        // articulation not in the pack (or buffer unavailable) → synth this hit
     }
     dispatchDrumSynth(state, name, time, velocity);
+}
+
+/**
+ * Map a groove-engine drum `name` to its pack manifest key (#662). A `null`
+ * means the kit has no sample for it (china/brush have no clean CC0 source) — the
+ * caller then plays the synth voice for that hit. Hi-hat openness collapses onto
+ * the three sampled VCSL articulations (closed / loose-semi / open); the cowbell
+ * and agogo high/low folds, and the tom map, mirror the synth voice's own naming.
+ */
+export function drumArticulationKey(name: string): string | null {
+    switch (name) {
+        case 'Kick':
+            return 'kick';
+        case 'Snare':
+            return 'snare';
+        case 'Sidestick':
+            return 'sidestick';
+        case 'HiHat':
+            return 'hihat-closed';
+        case 'HiHatQuarter':
+        case 'HiHatHalf':
+            return 'hihat-loose'; // semi-open — between the closed and open samples
+        case 'Open':
+            return 'hihat-open';
+        case 'HiHatPedal':
+            return 'hihat-pedal';
+        case 'Ride':
+            return 'ride';
+        case 'RideBell':
+            return 'ride-bell';
+        case 'Crash':
+            return 'crash';
+        case 'Cowbell':
+        case 'CowbellHigh':
+        case 'CowbellLow':
+            return 'cowbell';
+        case 'Agogo':
+        case 'AgogoHigh':
+            return 'agogo-high';
+        case 'AgogoLow':
+            return 'agogo-low';
+        case 'Shaker':
+            return 'shaker';
+        default:
+            // Tom names arrive space-formed (`High Tom`/`Mid Tom`/`Low Tom`); the
+            // kit carries two tom samples, so mid folds onto the high rack tom.
+            if (name.includes('Tom')) {
+                return name.includes('Low') ? 'tom-low' : 'tom-high';
+            }
+            return null; // China, Brush, Clave, Guiro, Conga*, Bongo*, Perc → synth
+    }
+}
+
+/**
+ * The static stereo seat for a sampled drum hit — mirrors the synth path's
+ * `panValue` logic (hi-hats/ride right, snare/sidestick left, toms spread) so the
+ * sampled kit images the same as the synth kit. The tom spread is seeded off the
+ * scheduling time (deterministic phrasing — never `Math.random`, which would also
+ * desync the synth path's PRNG stream if this hit later fell back).
+ */
+function drumPanValue(name: string, time: number): number {
+    if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
+        return 0.35;
+    }
+    if (name === 'Snare' || name === 'Sidestick' || name === 'Brush') {
+        return -0.2;
+    }
+    if (name.includes('Tom') || name.includes('Conga') || name.includes('Bongo')) {
+        return (scrambleHash(Math.round(time * 1000)) * 2 - 1) * 0.25;
+    }
+    return 0;
+}
+
+/**
+ * Play one drum hit from the installed groove pack, or return `false` so the
+ * caller falls back to the synth voice. Resolves the articulation → manifest key
+ * → the zone's round-robin take set (#657), picks a take deterministically from
+ * the scheduling time (so repeated hits don't machine-gun, and an offline render
+ * is reproducible), and strikes it through the shared per-hit drum panner — the
+ * identical bus (EQ / reverb / ducking / limiting) the synth voice uses. The
+ * pack's calibrated `gainForPack` folds into the strike velocity.
+ */
+function tryPlaySampledDrum(
+    state: EnsembleState,
+    name: string,
+    time: number,
+    velocity = 1.0,
+): boolean {
+    const packId = packIdFromVoice(state.groove.voice);
+    if (!packId) {
+        return false;
+    }
+    const key = drumArticulationKey(name);
+    if (!key) {
+        return false;
+    }
+    const takes = getPackBufferVariants(packId, key);
+    if (!takes || takes.length === 0) {
+        return false; // pack lacks this articulation, or its buffers haven't loaded yet
+    }
+    const buffer = pickRoundRobin(takes, Math.round(time * 1000));
+    if (!buffer) {
+        return false;
+    }
+    // setupNewPercHit allocates the per-hit panner, so resolve the buffer FIRST —
+    // a bail after this point would orphan that panner (it frees only via the
+    // strike's onEnded → releasePanner below). setupNewPercHit returns null only
+    // when there's no audio context, before it allocates anything.
+    const ctx = setupNewPercHit(state, time, velocity, drumPanValue(name, time));
+    if (!ctx) {
+        return false;
+    }
+    playSampledStrike(ctx.audio, buffer, ctx.panner, ctx.playTime, {
+        velocity: ctx.masterVol * gainForPack(packId),
+        onEnded: ctx.releasePanner,
+    });
+    return true;
 }
 
 function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {

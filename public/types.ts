@@ -1589,6 +1589,7 @@ declare global {
             loopArcMultiplier: (loopCount: number, loopLimit: number) => number;
             ensurePackLoaded: (audio: BaseAudioContext, packId: string) => Promise<void>;
             getPackZones: (packId: string) => unknown[] | null;
+            isPackLoaded: (packId: string) => boolean;
         };
         previewChord?: (index: number) => void;
     }

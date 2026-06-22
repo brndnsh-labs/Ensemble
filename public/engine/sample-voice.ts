@@ -95,6 +95,86 @@ export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
 }
 
 /**
+ * Play a finished percussion recording through the drum bus — the sampled-drum
+ * primitive (#662). Unlike {@link playSampledNote} it does *not* pitch-shift
+ * (a kick/snare/cymbal plays at its recorded pitch) and unlike
+ * `playPercussiveStrike` it does *not* bandpass-filter or noise-shape the
+ * source — that helper sculpts synth white-noise into a drum; here the buffer
+ * is already a real drum hit, so we let it through uncolored, the whole
+ * recording, behind only a click-suppressing attack/release ramp. Connects to
+ * `destination` (the per-hit drum panner → `drums.gain` bus) so it inherits the
+ * bus's EQ, reverb send, ducking, and limiting — the identical downstream path
+ * the synth drum voice uses.
+ *
+ * `duration` defaults to the buffer's full length so the natural decay tail
+ * rings out; callers fold the pack's calibrated `gainForPack` into `velocity`.
+ * Bails (firing `onEnded`) on a missing context/buffer/destination — the same
+ * graceful-fallback contract as `playSampledNote`.
+ */
+export function playSampledStrike(
+    audio: AudioContext,
+    buffer: AudioBuffer | null,
+    destination: AudioNode,
+    time: number,
+    {
+        attack = 0.002,
+        release = 0.01,
+        velocity = 1,
+        duration,
+        onEnded,
+    }: Omit<SampledNoteOptions, 'duration'> & { duration?: number } = {},
+): void {
+    if (!audio || !buffer || !destination) {
+        onEnded?.();
+        return;
+    }
+
+    try {
+        const startTime = Number.isFinite(time) ? time : audio.currentTime;
+        // Hold the whole recording by default — a real cymbal/snare carries its
+        // own decay, so cutting it short (the way the synth strike's envelope
+        // does) would amputate the tail. A caller can pass a shorter `duration`
+        // to choke a hit (e.g. a closed hat).
+        const hold =
+            Number.isFinite(duration) && (duration as number) > 0
+                ? (duration as number)
+                : buffer.duration;
+        // Same over-unity ceiling as playSampledNote: a loudness-calibrated kit
+        // folds gainForPack into velocity and may sit above 1.0; the bus limiter
+        // catches stacked peaks, MAX_SAMPLE_PEAK bounds a config typo.
+        const peak = Number.isFinite(velocity)
+            ? Math.max(0, Math.min(MAX_SAMPLE_PEAK, velocity))
+            : 1;
+
+        const source = audio.createBufferSource();
+        source.buffer = buffer;
+
+        const gain = audio.createGain();
+        // Click-free: quick linear attack to peak, hold across the recording,
+        // short release so the source can free itself without a tail click.
+        const releaseStart = Math.max(startTime + attack, startTime + hold);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(peak, startTime + attack);
+        gain.gain.setValueAtTime(peak, releaseStart);
+        gain.gain.linearRampToValueAtTime(0, releaseStart + release);
+
+        source.connect(gain);
+        gain.connect(destination);
+
+        source.onended = () => {
+            safeDisconnect([source, gain]);
+            onEnded?.();
+        };
+
+        source.start(startTime);
+        source.stop(releaseStart + release + 0.01);
+    } catch {
+        /* ignore audio errors (e.g. a closed context) */
+        onEnded?.();
+    }
+}
+
+/**
  * Play a pitched sample through an instrument bus. Pitch-shifts the given zone
  * to `targetMidi` via `playbackRate`, applies a click-free attack/hold/release
  * gain envelope, and connects to `destination` (the instrument's `[name]Gain`
