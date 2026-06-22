@@ -2202,3 +2202,84 @@ input[type="range"] {
     background: var(--accent-color);
     color: var(--bg-color);
 }
+
+/* Sounds section (Epic 6 — sample packs) */
+.sounds-intro {
+    margin: 0 0 var(--space-3);
+    line-height: 1.4;
+}
+
+.sound-pack-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--input-bg, rgba(255, 255, 255, 0.04));
+}
+
+.sound-pack-card + .sound-pack-card {
+    margin-top: var(--space-2);
+}
+
+.sound-pack-card-info {
+    min-width: 0;
+}
+
+.sound-pack-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.sound-pack-card-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.sound-pack-status {
+    font-size: 0.78rem;
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.sound-pack-status.is-installed {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.sound-pack-card-desc {
+    margin: var(--space-1) 0 0;
+    font-size: 0.85rem;
+    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+}
+
+.sound-pack-card-credit {
+    margin: var(--space-1) 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted, rgba(255, 255, 255, 0.45));
+}
+
+.sound-pack-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    flex-shrink: 0;
+}
+
+.sound-pack-card-actions button {
+    white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+    .sound-pack-card {
+        flex-direction: column;
+    }
+
+    .sound-pack-card-actions {
+        flex-direction: row;
+        align-self: stretch;
+    }
+}
