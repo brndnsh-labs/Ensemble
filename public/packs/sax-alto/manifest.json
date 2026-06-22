@@ -1,0 +1,18 @@
+{
+    "id": "sax-alto",
+    "name": "Alto Saxophone",
+    "attribution": "Karoryfer Weresax (alto sax) — CC0 1.0 (public domain)",
+    "samples": [
+        { "key": "49", "rootMidi": 49, "url": "/packs/sax-alto/49.m4a" },
+        { "key": "52", "rootMidi": 52, "url": "/packs/sax-alto/52.m4a" },
+        { "key": "55", "rootMidi": 55, "url": "/packs/sax-alto/55.m4a" },
+        { "key": "58", "rootMidi": 58, "url": "/packs/sax-alto/58.m4a" },
+        { "key": "61", "rootMidi": 61, "url": "/packs/sax-alto/61.m4a" },
+        { "key": "64", "rootMidi": 64, "url": "/packs/sax-alto/64.m4a" },
+        { "key": "67", "rootMidi": 67, "url": "/packs/sax-alto/67.m4a" },
+        { "key": "70", "rootMidi": 70, "url": "/packs/sax-alto/70.m4a" },
+        { "key": "73", "rootMidi": 73, "url": "/packs/sax-alto/73.m4a" },
+        { "key": "76", "rootMidi": 76, "url": "/packs/sax-alto/76.m4a" },
+        { "key": "79", "rootMidi": 79, "url": "/packs/sax-alto/79.m4a" }
+    ]
+}

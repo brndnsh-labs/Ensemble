@@ -51,6 +51,19 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // poking. Paired with the synth chords' SYNTH_CHORD_LEVEL 0.85× trim.
         gain: 8,
     },
+    {
+        id: 'sax-alto',
+        name: 'Alto Saxophone',
+        description: 'A sampled alto sax — a real horn lead for the soloist.',
+        attribution: 'Karoryfer Weresax (alto sax) — CC0 1.0 (public domain)',
+        approxSizeMB: 0.7,
+        instruments: ['soloist'],
+        // Calibrated 2026-06-22 (#658) via `mix-report --calibrate-pack=soloist:sax-alto`:
+        // RMS-match to the synth soloist (the lead seat) was 3.43×, but the sax is
+        // ~677 Hz brighter than the synth trumpet (reads louder than its RMS), so
+        // seated a touch under at 3.0×. Starting point — confirm by ear on ensembletest.
+        gain: 3,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */
