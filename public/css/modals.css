@@ -2214,27 +2214,25 @@ input[type="range"] {
     margin-top: var(--space-4);
 }
 
-/* #675/#674 — the Sounds tab stacks a per-instrument source control
-   (Auto/synth/pack) above the pack library (install/remove/preview). */
-.sound-pack-library {
-    margin-top: var(--space-5);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border-color);
-}
-
+/* #674 — the gear's Packs tab: an intro + "Install all" header above the flat
+   pack list. (Per-instrument source assignment lives in the rail, #675.) */
 .sound-pack-library-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
-.sound-pack-library-header .sound-instrument-title {
+.sound-pack-library-header .sounds-intro {
     margin: 0;
 }
 
-.sound-pack-library .sound-source-row + .sound-source-row {
+.sound-pack-library-header .secondary-btn {
+    flex-shrink: 0;
+}
+
+.sound-source-row + .sound-source-row {
     margin-top: var(--space-1);
 }
 

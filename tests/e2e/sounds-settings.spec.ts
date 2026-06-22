@@ -1,62 +1,71 @@
+import type { Page } from '@playwright/test';
 import pkg from '@playwright/test';
 import { gotoHydrated, openSettings } from './helpers/nav.js';
 
 const { expect, test } = pkg;
 
 /** Read an instrument's sound-source state via the e2e bridge. */
-async function readSource(page: pkg.Page, module: string) {
+async function readSource(page: Page, module: string) {
     return page.evaluate((m) => {
         const inst = (window as any).ensemble.getState()[m];
         return { voice: inst.voice, autoSound: inst.autoSound };
     }, module);
 }
 
-test.describe('Sounds settings section @ui', () => {
+/** Open an instrument's settings popover from the rail. */
+async function openInstrumentSettings(page: Page, label: string) {
+    await page
+        .getByRole('button', { name: `${label} settings` })
+        .first()
+        .click();
+    const surface = page.locator('.workspace-studio-surface--settings.is-open');
+    await expect(surface).toBeVisible();
+    return surface;
+}
+
+test.describe('Sounds: pack library (gear) @ui', () => {
     test.beforeEach(async ({ page }) => {
         await gotoHydrated(page);
     });
 
-    test('Sounds tab shows per-instrument source controls (Auto default) and the pack library', async ({
+    test('the Packs tab is pure library management — no per-instrument source pickers', async ({
         page,
     }) => {
         await openSettings(page);
         const modal = page.locator('#settingsOverlay .settings-content');
         await expect(modal).toBeVisible();
-        await modal.getByRole('tab', { name: 'Sounds' }).click();
+        await modal.getByRole('tab', { name: 'Packs' }).click();
 
-        // The Harmony lane (the one with a genre→sound map) exposes a source
-        // radiogroup with Auto selected by default, plus Synth and its packs.
-        const harmonyGroup = modal.getByRole('radiogroup', { name: /Harmony sound source/i });
-        await expect(harmonyGroup).toBeVisible();
-
-        const auto = harmonyGroup.getByRole('radio', { name: /^Auto/ });
-        await expect(auto).toBeVisible();
-        await expect(auto).toHaveAttribute('aria-checked', 'true');
-        await expect(harmonyGroup.getByRole('radio', { name: /^Synth/ })).toBeVisible();
-        // Packs appear as sources, disabled until installed.
-        await expect(harmonyGroup).toContainText('String Ensemble');
-
-        // The pack library (management) carries an "Install all packs" action and
-        // per-pack Install buttons — separate from the source control.
+        // Install-all + per-pack install/preview/remove are here.
         await expect(modal.getByRole('button', { name: /Install all packs/i })).toBeVisible();
+        await expect(modal).toContainText('Acoustic Grand Piano');
         await expect(
             modal.getByRole('button', { name: /^Install Acoustic Grand Piano/i }),
         ).toBeVisible();
+
+        // Source assignment has moved to the rail — no source radio groups in the gear.
+        await expect(modal.getByRole('radiogroup', { name: /sound source/i })).toHaveCount(0);
+    });
+});
+
+test.describe('Sounds: per-instrument source control (rail) @ui', () => {
+    test.beforeEach(async ({ page }) => {
+        await gotoHydrated(page);
     });
 
-    test('pinning a source suppresses genre auto-follow; choosing Auto re-enables it', async ({
+    test('Harmony settings expose a Source control; pinning suppresses genre auto-follow', async ({
         page,
     }) => {
-        await openSettings(page);
-        const modal = page.locator('#settingsOverlay .settings-content');
-        await modal.getByRole('tab', { name: 'Sounds' }).click();
-        const harmonyGroup = modal.getByRole('radiogroup', { name: /Harmony sound source/i });
+        const surface = await openInstrumentSettings(page, 'Harmony');
+        const source = surface.locator('#harmonySoundSource');
+        await expect(source).toBeVisible();
 
         // Default: Auto.
+        await expect(source).toHaveValue('auto');
         expect((await readSource(page, 'harmony')).autoSound).toBe(true);
 
         // Pin Synth — the lane is now manual.
-        await harmonyGroup.getByRole('radio', { name: /^Synth/ }).click();
+        await source.selectOption('synth');
         const pinned = await readSource(page, 'harmony');
         expect(pinned.autoSound).toBe(false);
         expect(pinned.voice).toBe('synth');
@@ -70,7 +79,7 @@ test.describe('Sounds settings section @ui', () => {
         expect(afterGenre.voice).toBe('synth');
 
         // Choosing Auto re-enables follow-the-genre.
-        await harmonyGroup.getByRole('radio', { name: /^Auto/ }).click();
+        await source.selectOption('auto');
         expect((await readSource(page, 'harmony')).autoSound).toBe(true);
     });
 });
