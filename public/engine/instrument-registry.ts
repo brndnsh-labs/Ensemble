@@ -1,4 +1,21 @@
-import type { InstrumentVoice } from '../types.js';
+import type { InstrumentModule, InstrumentVoice } from '../types.js';
+
+/**
+ * Instrument module → its `audioGraph` mix-bus key. The names diverge: the
+ * `harmony` slice routes through the `harmonies` bus and `groove` through
+ * `drums`; the rest are identity. Shared by everything that has to reach a
+ * lane's bus from its module name (bus preview, per-pack reverb send #686).
+ */
+export const MODULE_BUS_KEY: Record<
+    InstrumentModule,
+    'chords' | 'bass' | 'soloist' | 'harmonies' | 'drums'
+> = {
+    chords: 'chords',
+    bass: 'bass',
+    soloist: 'soloist',
+    harmony: 'harmonies',
+    groove: 'drums',
+};
 
 /**
  * synth-audit Epic 6 (Packs) — instrument-source indirection registry.

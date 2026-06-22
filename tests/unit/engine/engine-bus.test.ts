@@ -2,6 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { reverbSendForPack } from '../../../public/data/sound-packs.js';
 import {
     killAllNotes,
     killBassBus,
@@ -10,6 +11,7 @@ import {
     killHarmonyBus,
     killSoloistBus,
     restoreGains,
+    syncBusReverbSend,
 } from '../../../public/engine/engine.js';
 
 const { makeSoloistMock } = await vi.hoisted(
@@ -55,7 +57,15 @@ describe('Engine Bus Management', () => {
             },
         };
 
-        const bus = () => ({ gain: mockGain, reverb: {}, eq: {}, panner: null, sidechain: null });
+        // Each bus gets its own reverb-send gain mock so #686 assertions can read
+        // the per-lane send independently.
+        const bus = () => ({
+            gain: mockGain,
+            reverb: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+            eq: {},
+            panner: null,
+            sidechain: null,
+        });
         state = {
             playback: {
                 audio: { currentTime: 10.0 },
@@ -69,11 +79,11 @@ describe('Engine Bus Management', () => {
                 },
                 modals: {},
             },
-            chords: { enabled: true, volume: 1.0 },
-            bass: { enabled: true, volume: 1.0 },
-            soloist: makeSoloistMock({ enabled: true, volume: 1.0 }),
-            harmony: { enabled: true, volume: 1.0 },
-            groove: { enabled: true, volume: 1.0 },
+            chords: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
+            bass: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
+            soloist: makeSoloistMock({ enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' }),
+            harmony: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
+            groove: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             midi: { enabled: false, muteLocal: false },
         };
     });
@@ -136,6 +146,42 @@ describe('Engine Bus Management', () => {
             state.midi.muteLocal = true;
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
+        });
+    });
+
+    describe('syncBusReverbSend (#686)', () => {
+        it('scales the lane send by the active pack multiplier', () => {
+            state.chords.voice = 'pack:clavinet';
+            syncBusReverbSend(state, 'chords');
+            const send = state.playback.audioGraph.chords.reverb.gain;
+            // reverb (0.2) × reverbSendForPack('clavinet') (>1, dry → more hall).
+            const expected = 0.2 * reverbSendForPack('clavinet');
+            expect(send.cancelScheduledValues).toHaveBeenCalledWith(10.0);
+            expect(send.setTargetAtTime).toHaveBeenCalledWith(expected, 10.0, 0.04);
+            expect(expected).toBeGreaterThan(0.2); // genuinely lifted
+        });
+
+        it('leaves the send at the raw reverb value for the synth voice (×1)', () => {
+            state.chords.voice = 'synth';
+            syncBusReverbSend(state, 'chords');
+            expect(
+                state.playback.audioGraph.chords.reverb.gain.setTargetAtTime,
+            ).toHaveBeenCalledWith(0.2, 10.0, 0.04);
+        });
+
+        it('maps the harmony module to the harmonies bus and cuts a roomy pack send', () => {
+            state.harmony.voice = 'pack:strings-ensemble';
+            syncBusReverbSend(state, 'harmony');
+            const expected = 0.2 * reverbSendForPack('strings-ensemble');
+            expect(
+                state.playback.audioGraph.harmonies.reverb.gain.setTargetAtTime,
+            ).toHaveBeenCalledWith(expected, 10.0, 0.04);
+            expect(expected).toBeLessThan(0.2); // baked room → pulled back
+        });
+
+        it('no-ops before the audio graph exists', () => {
+            state.playback.audioGraph = undefined;
+            expect(() => syncBusReverbSend(state, 'chords')).not.toThrow();
         });
     });
 });

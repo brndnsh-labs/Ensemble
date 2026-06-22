@@ -35,6 +35,17 @@ export interface SoundPack {
      * (RMS-match + a confirming listen). Defaults to `1` when omitted.
      */
     readonly gain?: number;
+    /**
+     * Multiplier on the lane's bus **reverb send** when this pack is the active
+     * voice (#686). The send is otherwise a single per-instrument value identical
+     * for synth and every pack — but the sources live in different rooms, so a
+     * DI-dry pack (clavinet/Hammond) needs *more* hall to share the space and a
+     * pack with baked-in ambience (the string ensemble, the drum kit) needs
+     * *less* so it doesn't stack room-on-hall. `1` (or omitted) = the synth send,
+     * unchanged. Multiplies the lane's reverb value (applied at init and on each
+     * voice change via `syncBusReverbSend`). By-ear.
+     */
+    readonly reverbSend?: number;
 }
 
 export const SOUND_PACKS: readonly SoundPack[] = [
@@ -67,6 +78,9 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // seated at the match: 6.6×. Confirm/nudge by ear on ensembletest (reggae
         // bubble / blues / gospel). Paired with SYNTH_CHORD_LEVEL.
         gain: 6.6,
+        // DI-dry tonewheel emulation (no recorded room) — push the send up so it
+        // shares the band's space instead of sitting flat up front. #686 start.
+        reverbSend: 1.5,
     },
     {
         id: 'clavinet',
@@ -86,6 +100,9 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // peak-to-RMS → reads louder than its RMS), so seated under the match: 4.5×.
         // Confirm/nudge by ear on ensembletest (funk). Paired with SYNTH_CHORD_LEVEL.
         gain: 4.5,
+        // Bone-dry DI pluck — the driest pack; lift the send most so it doesn't
+        // read pasted-on-top of the band. #686 start.
+        reverbSend: 1.6,
     },
     {
         id: 'sax-alto',
@@ -99,6 +116,8 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // ~677 Hz brighter than the synth trumpet (reads louder than its RMS), so
         // seated a touch under at 3.0×. Starting point — confirm by ear on ensembletest.
         gain: 3,
+        // Close-mic'd horn, fairly dry — a small lift to seat the lead in the room. #686 start.
+        reverbSend: 1.2,
     },
     {
         id: 'strings-ensemble',
@@ -116,6 +135,9 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // straight to playSampledNote, which bounds it at MAX_SAMPLE_PEAK and the
         // master limiter catches stacked-voice peaks. Confirm/adjust by ear.
         gain: 5,
+        // VSCO ensemble carries its own hall — pull the send back so we don't
+        // stack the algorithmic hall on the recorded room (mud). #686 start.
+        reverbSend: 0.7,
     },
     {
         id: 'horns-section',
@@ -131,6 +153,8 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // the brass is brighter (+701 Hz) and transient (peak energy reads louder
         // than RMS); on funk it already sits at/over the synth. Confirm by ear.
         gain: 1.5,
+        // Some recorded room on the stabs — a slight pull-back. #686 start.
+        reverbSend: 0.9,
     },
     {
         id: 'acoustic-kit',
@@ -154,6 +178,9 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // which was buried under the band → 8×), so seated at the match: 1.6×.
         // Confirm by ear on ensembletest across rock/funk/jazz/blues.
         gain: 1.6,
+        // Kit carries overhead/room — pull the send back so the drums stay tight
+        // and don't wash the pocket with hall-on-room. #686 start.
+        reverbSend: 0.7,
     },
 ];
 
@@ -170,4 +197,18 @@ export function packsForInstrument(module: InstrumentModule): readonly SoundPack
 export function gainForPack(packId: string): number {
     const pack = SOUND_PACKS.find((entry) => entry.id === packId);
     return pack?.gain ?? 1;
+}
+
+/**
+ * The reverb-send multiplier for a pack id (#686) — scales the lane's bus reverb
+ * send so a DI-dry pack gets more hall and a baked-ambience pack gets less, all
+ * sitting in one shared room. `null`/unknown id (i.e. the synth voice) → `1`, so
+ * the synth send is unchanged and a freshly-added pack defaults to no change.
+ */
+export function reverbSendForPack(packId: string | null): number {
+    if (!packId) {
+        return 1;
+    }
+    const pack = SOUND_PACKS.find((entry) => entry.id === packId);
+    return pack?.reverbSend ?? 1;
 }
