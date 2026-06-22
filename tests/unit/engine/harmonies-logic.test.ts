@@ -245,6 +245,26 @@ describe('Harmony Engine Logic', () => {
             expect(pattern[12]).toBe(1);
             expect(pattern[0]).toBe(0);
         });
+
+        // #711 (B12) — the Bossa branch used raw indices (0,6,12,18,24,30) valid
+        // only for a 4/4 (spm*2=32) array; in 3/4 (spm*2=24) the [24]/[30] writes
+        // grew the array and broke every `step % length`. Now expressed in beat
+        // terms with bounds guards.
+        it('Bossa reproduces the authentic 4/4 figure', () => {
+            const pattern = generateCompingPattern('bossa', 1, { beats: 4, stepsPerBeat: 4 });
+            expect(pattern.length).toBe(32);
+            const onsets = pattern.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+            expect(onsets).toEqual([0, 6, 12, 18, 24, 30]);
+        });
+
+        it('Bossa does not overrun its array in 3/4 (B12)', () => {
+            const pattern = generateCompingPattern('bossa', 1, { beats: 3, stepsPerBeat: 4 });
+            // spm = 3*4 = 12; the array is spm*2 = 24 and must NOT grow.
+            expect(pattern.length).toBe(24);
+            const onsets = pattern.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
+            expect(onsets.length).toBeGreaterThan(0);
+            expect(onsets.every((i) => i >= 0 && i < 24)).toBe(true);
+        });
     });
 
     describe('Dynamic Intensity', () => {

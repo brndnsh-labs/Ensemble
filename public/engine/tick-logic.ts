@@ -265,9 +265,12 @@ export function generateNotesForStep(
                 // Enforce Contract: Register Slotting
                 n.midi = enforceRegisterSlotting('harmony', n.midi, coordination);
 
-                if (!n.freq) {
-                    n.freq = getFrequency(n.midi);
-                }
+                // B8 (#709) — recompute freq from the CLAMPED midi, always. The
+                // harmony engine computes freq pre-clamp (getBestInversion max:100),
+                // then this slotting can shift the midi down to ≤84; a stale
+                // pre-clamp freq would sound an octave too high and desync the
+                // visualizer. (Was gated on `!n.freq`, so the stale freq survived.)
+                n.freq = getFrequency(n.midi);
                 notesToMain.push({ ...n, step, module: 'harmony' });
             }
         }

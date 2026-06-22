@@ -82,7 +82,9 @@ vi.mock('../../../public/engine/groove-engine.js', () => ({
 }));
 
 // ── imports (after mocks) ────────────────────────────────────────────────────
+import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
 import { generateNotesForStep } from '../../../public/engine/tick-logic.js';
+import { getFrequency } from '../../../public/utils.js';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 const CHORD_C = {
@@ -209,5 +211,37 @@ describe('Producer order guard', () => {
         expect(harmonyCoordinationArg).not.toBeNull();
         // Soloist was skipped — soloistMidi must remain 0
         expect(harmonyCoordinationArg.soloistMidi).toBe(0);
+    });
+
+    it('#709 (B8) — harmony freq is recomputed from the register-clamped midi', () => {
+        // The harmony engine voices freq pre-clamp (getBestInversion max:100); the
+        // tick's enforceRegisterSlotting then pulls a too-high midi down to ≤84.
+        // freq must follow the clamped midi, or the pad sounds an octave high and
+        // the visualizer falls out of sync. Return a deliberately out-of-slot
+        // voice (95) to force the clamp.
+        vi.mocked(getHarmonyNotes).mockReturnValueOnce([
+            { midi: 95, freq: getFrequency(95), velocity: 0.5, durationSteps: 1 } as any,
+        ]);
+        const state = makeState();
+        const cursors = {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+
+        const { notes } = generateNotesForStep(state, 0, cursors, {
+            includeSoloist: false,
+            includeHarmony: true,
+            includeBass: false,
+            includeChords: false,
+            includeDrums: false,
+        });
+
+        const harm = notes.find((n: any) => n.module === 'harmony');
+        expect(harm).toBeDefined();
+        // Clamped into the harmony slot...
+        expect(harm.midi).toBeLessThanOrEqual(84);
+        // ...and freq recomputed to match (was stale at the pre-clamp pitch).
+        expect(harm.freq).toBeCloseTo(getFrequency(harm.midi), 6);
+        expect(harm.freq).not.toBeCloseTo(getFrequency(95), 6);
     });
 });
