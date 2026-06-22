@@ -24,8 +24,12 @@ export const GENRE_SOUND_MAP: Readonly<
     Record<string, Partial<Record<InstrumentModule, InstrumentVoice>>>
 > = {
     // Each genre's lanes are chosen to pair coherently rather than fight: a
-    // chords keyboard, a harmony section, a soloist lead, and a drum kit that
-    // share the idiom. (#682 chords/harmony · #694 soloist · #695 drums.)
+    // chords keyboard, a harmony section, a soloist lead, a bass, and a drum kit
+    // that share the idiom. (#682 chords/harmony · #694 soloist · #695 drums ·
+    // #697 bass.)
+    // bass — upright (#697): a pizzicato double bass for the acoustic combo
+    //   (jazz/bossa/blues walking, singer-songwriter, country); everything else
+    //   keeps the synth electric (the only electric-bass voice we have).
     //
     // chords — the keyboard playing the changes:
     //   • grand    → acoustic-piano genres (jazz comping, singer-songwriter,
@@ -59,12 +63,14 @@ export const GENRE_SOUND_MAP: Readonly<
         chords: 'pack:grand',
         harmony: 'pack:horns-section',
         soloist: 'pack:sax-alto',
+        bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Blues: {
         chords: 'pack:hammond-organ',
         harmony: 'pack:horns-section',
         soloist: 'pack:sax-alto',
+        bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Reggae: {
@@ -78,17 +84,20 @@ export const GENRE_SOUND_MAP: Readonly<
     Country: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
+        bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Acoustic: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
+        bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Bossa: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
         soloist: 'pack:sax-alto',
+        bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     // Neo-Soul — grand on the keys; no harmony pack fit yet → synth pad.

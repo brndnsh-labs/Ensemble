@@ -1,0 +1,15 @@
+{
+    "id": "upright-bass",
+    "name": "Upright Bass",
+    "attribution": "VSCO-2 Community Edition — Solo Contrabass (pizzicato) by Versilian Studios — CC0 1.0 (public domain)",
+    "samples": [
+        { "key": "28", "rootMidi": 28, "url": "/packs/upright-bass/28.m4a" },
+        { "key": "31", "rootMidi": 31, "url": "/packs/upright-bass/31.m4a" },
+        { "key": "34", "rootMidi": 34, "url": "/packs/upright-bass/34.m4a" },
+        { "key": "38", "rootMidi": 38, "url": "/packs/upright-bass/38.m4a" },
+        { "key": "42", "rootMidi": 42, "url": "/packs/upright-bass/42.m4a" },
+        { "key": "45", "rootMidi": 45, "url": "/packs/upright-bass/45.m4a" },
+        { "key": "49", "rootMidi": 49, "url": "/packs/upright-bass/49.m4a" },
+        { "key": "52", "rootMidi": 52, "url": "/packs/upright-bass/52.m4a" }
+    ]
+}

@@ -57,7 +57,11 @@ describe('sound-packs catalog', () => {
         for (const pack of chordPacks) {
             expect(pack.instruments).toContain('chords');
         }
-        // No pack targets bass yet, so the filter is empty (not all packs).
-        expect(packsForInstrument('bass')).toHaveLength(0);
+        // The upright-bass pack (#697) is the only bass-lane pack so far.
+        const bassPacks = packsForInstrument('bass');
+        expect(bassPacks.map((p) => p.id)).toContain('upright-bass');
+        for (const pack of bassPacks) {
+            expect(pack.instruments).toContain('bass');
+        }
     });
 });

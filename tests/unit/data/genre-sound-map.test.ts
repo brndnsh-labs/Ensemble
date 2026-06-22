@@ -118,6 +118,27 @@ describe('genre → sound map (#675)', () => {
         });
     });
 
+    describe('bass lane — per-genre bass (#697)', () => {
+        // Upright pizzicato for the acoustic combo; everything else keeps the
+        // synth electric (the only electric-bass voice we have).
+        const UPRIGHT_GENRES = ['Jazz', 'Blues', 'Bossa', 'Acoustic', 'Country'];
+
+        it('maps every canonical genre to its decided bass voice (installed)', () => {
+            for (const genre of GENRE_NAMES) {
+                const expected = UPRIGHT_GENRES.includes(genre) ? 'pack:upright-bass' : 'synth';
+                expect(
+                    autoVoiceForGenre(genre, 'bass', allInstalled),
+                    `${genre} bass voice drifted from the locked table`,
+                ).toBe(expected);
+            }
+        });
+
+        it('falls back to synth when the upright-bass pack is NOT installed', () => {
+            expect(autoVoiceForGenre('Jazz', 'bass', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Bossa', 'bass', noneInstalled)).toBe('synth');
+        });
+    });
+
     describe('autoVoiceForGenre', () => {
         it('returns the mapped pack voice when installed', () => {
             // Funk → horns on the harmony lane (a known map entry).
