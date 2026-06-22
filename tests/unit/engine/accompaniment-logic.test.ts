@@ -424,4 +424,80 @@ describe('Accompaniment Engine Logic', () => {
             expect(pianoMidis[0]).toBeGreaterThanOrEqual(bassMidi + 12);
         });
     });
+
+    // B2 (#707) — a comp voicing must never ring past the chord it belongs to.
+    // The structural ceiling clamps durationSteps to the steps left in the chord
+    // (minus a release margin), so successive chords stop overlapping — the
+    // "previous measure is still playing" overlap the owner heard.
+    describe('#707 B2 — duration clamped to chord length (no ring-over)', () => {
+        const shortChord = {
+            rootMidi: 60,
+            freqs: [261.63, 329.63, 392.0],
+            quality: 'maj',
+            is7th: false,
+            beats: 1, // 1 beat = 4 steps
+        };
+
+        it('clamps a default-2-beat comp on a 1-beat chord to within the chord', () => {
+            // 'Country' is not special-cased in the duration chain, so it takes
+            // the flat 2-beat (8-step) default — pre-#707 that rang two full beats
+            // into the next chord. On a 1-beat chord the note must now fit in
+            // 4 steps minus the 0.25 release margin = 3.75.
+            groove.genreFeel = 'Country';
+            playback.bandIntensity = 0.5;
+            const notes = getAccompanimentNotes(getState(), shortChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((n) => n.midi > 0);
+            expect(notes.length).toBeGreaterThan(0);
+            for (const n of notes) {
+                expect(n.durationSteps).toBeLessThanOrEqual(3.75);
+            }
+        });
+
+        it('never exceeds the steps remaining in the chord, across genres/positions', () => {
+            // The invariant: durationSteps <= chord.beats*stepsPerBeat - stepInChord
+            // for every produced note, at any strike position in any genre.
+            const longChord = { ...shortChord, beats: 4 };
+            for (const genre of ['Rock', 'Acoustic', 'Jazz', 'Blues', 'Country']) {
+                groove.genreFeel = genre;
+                for (const [step, stepInChord] of [
+                    [0, 0],
+                    [8, 8],
+                    [12, 12],
+                ]) {
+                    const notes = getAccompanimentNotes(
+                        getState(),
+                        longChord,
+                        step,
+                        stepInChord,
+                        step,
+                        {
+                            isBeatStart: true,
+                            isGroupStart: stepInChord === 0,
+                        },
+                    ).filter((n) => n.midi > 0);
+                    const stepsToChordEnd = longChord.beats * 4 - stepInChord;
+                    for (const n of notes) {
+                        expect(n.durationSteps).toBeLessThanOrEqual(stepsToChordEnd);
+                    }
+                }
+            }
+        });
+
+        it('leaves a downbeat voicing on a long chord at its full genre duration', () => {
+            // The clamp is a ceiling, not a fixed cut: a 4-beat chord struck on
+            // its One keeps the genre's natural comp length (well under 15.75).
+            groove.genreFeel = 'Rock';
+            playback.bandIntensity = 0.5;
+            const longChord = { ...shortChord, beats: 4 };
+            const notes = getAccompanimentNotes(getState(), longChord, 0, 0, 0, {
+                isBeatStart: true,
+                isGroupStart: true,
+            }).filter((n) => n.midi > 0);
+            expect(notes.length).toBeGreaterThan(0);
+            expect(notes[0].durationSteps).toBeGreaterThan(1);
+            expect(notes[0].durationSteps).toBeLessThanOrEqual(15.75);
+        });
+    });
 });

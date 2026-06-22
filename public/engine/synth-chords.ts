@@ -155,11 +155,17 @@ interface PlayNoteOptions {
 // paired with the sampled-grand 3.5× lift in `playSampledChord`.
 const SYNTH_CHORD_LEVEL = 0.85;
 
+// #707/#691 — the release contract shared by the sampled and synth chord
+// voices. The scheduler calls `release(when, fade)` on the previous voicing
+// when the harmony changes; this matches `EnsembleState.activeChordVoices` and
+// is structurally satisfied by the sampled `SampledNoteHandle`.
+type ChordVoiceHandle = { release(when: number, fade: number): void };
+
 // The synth chord voice. `playNoteNew` is the reworked synth-audit voice (the
 // only one since #649 retired the Current/New A/B); it internally layers a
 // strum-staggered fundamental rendered by `playNoteCurrent`.
-function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): void {
-    playNoteNew(...args);
+function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
+    return playNoteNew(...args);
 }
 
 // synth-audit Epic 6 S6 — play one chord note from a sample pack. Converts the
@@ -207,7 +213,7 @@ function playSampledChord(
 // synth-audit Epic 6 S1/S6 — instrument-source seam. A `pack:<id>` voice plays
 // from the sample pack once its zones are loaded; until then (or if a note is
 // out of range) it falls back to the synth voice — bit-identical with no packs.
-export function playNote(...args: Parameters<typeof playNoteCurrent>): SampledNoteHandle | null {
+export function playNote(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
     const source = resolveInstrumentSource(args[0].chords.voice);
     if (source.kind === 'sample') {
         const [state, freq, time, duration, opts] = args;
@@ -216,8 +222,10 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): SampledNo
             return handle;
         }
     }
-    dispatchChordSynth(...args);
-    return null;
+    // #707 — the synth path now returns a release handle too, so the scheduler
+    // can cut a ringing synth voicing on a chord change exactly as it cuts a
+    // sampled one (was: returned null, so synth chords rang across the change).
+    return dispatchChordSynth(...args);
 }
 
 // synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received
@@ -233,7 +241,7 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): SampledNo
 const CHORD_STRUM_STEP = 0.004; // seconds of roll per chord-voice index
 const CHORD_STRUM_JITTER = 0.15; // humanize scale — keeps jitter well under one step
 
-function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
+function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
     const { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = opts;
     const { playback, groove } = state;
@@ -241,8 +249,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     // Bail to the delegate's own guard if the context is unusable — never
     // schedule a transient for a note `playNoteCurrent` will reject.
     if (!playback.audio || !Number.isFinite(freq)) {
-        playNoteCurrent(state, freq, time, duration, { ...opts, index: 0 });
-        return;
+        return playNoteCurrent(state, freq, time, duration, { ...opts, index: 0 });
     }
 
     // Strum offset (Epic 2 S1) — 0 for the lowest note (index 0), ascending
@@ -265,8 +272,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
             ? instrument
             : 'Piano';
     if (resolvedInstrument !== 'Piano') {
-        playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
-        return;
+        return playNoteCurrent(state, freq, time + strum, duration, { ...opts, index: 0 });
     }
 
     // --- The `new` Piano voice ---------------------------------------------
@@ -356,9 +362,10 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): void {
     // throw here would abort every later note in the chord, not just this
     // one. `playNoteCurrent` has the equivalent guard around its own body.
     try {
-        playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
     } catch (err) {
         console.error('playNote (new) additive-body error:', err);
+        return null;
     }
 }
 
@@ -377,10 +384,10 @@ function playAdditiveBody(
     duration: number,
     finalVol: number,
     muted: boolean,
-): void {
+): ChordVoiceHandle | null {
     const { playback } = state;
     if (!playback.audio || !playback.audioGraph) {
-        return;
+        return null;
     }
     const audio = playback.audio;
     const preset = INSTRUMENT_PRESETS.Piano;
@@ -467,7 +474,7 @@ function playAdditiveBody(
         // Defensive — unreachable for any real chord pitch, but never leave
         // the mix chain dangling without a source to drive `onended`.
         safeDisconnect([bodyGain, hpf, panner]);
-        return;
+        return null;
     }
 
     // Start every partial *before* any stop is scheduled — calling `stop()`
@@ -494,6 +501,11 @@ function playAdditiveBody(
         }
     };
 
+    // No-pedal natural end — hoisted so the release handle below can clamp its
+    // early stop into the voice's live window (never push the stop later).
+    const effectiveDuration = muted ? 0.015 : duration;
+    const naturalStop = startTime + effectiveDuration + 0.6;
+
     if (playback.sustainActive && !muted) {
         // Pedal down: the note rings on the per-partial decay, bounded only
         // by pedal-up or the 64-note cap — exactly the legacy behavior.
@@ -507,13 +519,40 @@ function playAdditiveBody(
     } else {
         // No pedal: the damper falls at note-end — release, then stop the
         // oscillators with enough tail for the release ramp to reach silence.
-        const effectiveDuration = muted ? 0.015 : duration;
         rampGain(bodyGain.gain, 0, startTime + effectiveDuration, 0.03);
-        const stopAt = startTime + effectiveDuration + 0.6;
         for (const o of oscs) {
-            o.stop(stopAt);
+            o.stop(naturalStop);
         }
     }
+
+    // #707/#691 — release handle so the scheduler can cut this synth voicing on
+    // a chord change, exactly as it already cuts sampled voices. Mirrors the
+    // sampled voice's `choke`: ease the body to silence from its live value
+    // (after cancelling the pending decay → no click) and pull the partials'
+    // stop in — never later than the natural end. A release arriving after the
+    // natural stop has fired throws InvalidState, swallowed by the try/catch.
+    const releaseHandle: ChordVoiceHandle = {
+        release(when: number, fade: number): void {
+            try {
+                const tc = Math.max(0.005, Number.isFinite(fade) ? fade : 0.05);
+                const at = Number.isFinite(when)
+                    ? Math.max(startTime, Math.min(when, naturalStop))
+                    : audio.currentTime;
+                bodyGain.gain.cancelScheduledValues(at);
+                bodyGain.gain.setTargetAtTime(0, at, tc);
+                for (const o of oscs) {
+                    try {
+                        o.stop(Math.min(naturalStop, at + tc * 8));
+                    } catch {
+                        /* already stopped */
+                    }
+                }
+            } catch {
+                /* closed context / already stopped */
+            }
+        },
+    };
+    return releaseHandle;
 }
 
 function playNoteCurrent(
@@ -528,10 +567,10 @@ function playNoteCurrent(
         muted = false,
         numVoices = 1,
     }: PlayNoteOptions = {},
-): void {
+): ChordVoiceHandle | null {
     const { playback, groove } = state;
     if (!playback.audio || !Number.isFinite(freq)) {
-        return;
+        return null;
     }
 
     const polyphonyComp = 1 / Math.sqrt(Math.max(1, numVoices));
@@ -706,11 +745,13 @@ function playNoteCurrent(
         if (unisonOsc) {
             unisonOsc.start(startTime);
         }
+        // No-pedal natural end — hoisted so the release handle can clamp its
+        // early stop into the live window (never push the stop later).
+        const naturalStop = startTime + (muted ? 0.1 : duration + 1.0);
         if (!playback.sustainActive || muted) {
-            const stopAt = startTime + (muted ? 0.1 : duration + 1.0);
-            osc.stop(stopAt);
+            osc.stop(naturalStop);
             if (unisonOsc) {
-                unisonOsc.stop(stopAt);
+                unisonOsc.stop(naturalStop);
             }
         }
 
@@ -724,8 +765,43 @@ function playNoteCurrent(
                 ...(unisonOsc && unisonGain ? [unisonOsc, unisonGain] : []),
                 ...(shaper ? [shaper] : []),
             ]);
+
+        // #707/#691 — release handle for the legacy (Warm/PowerMetal) chord
+        // body, symmetric with the additive voice: ease `mainGain` to silence
+        // from its live value and pull the oscillators' stop in. Lets the
+        // scheduler cut this voicing on a chord change instead of letting it
+        // ring its full duration into the next chord.
+        const releaseHandle: ChordVoiceHandle = {
+            release(when: number, fade: number): void {
+                try {
+                    const tc = Math.max(0.005, Number.isFinite(fade) ? fade : 0.05);
+                    const at = Number.isFinite(when)
+                        ? Math.max(startTime, Math.min(when, naturalStop))
+                        : now;
+                    mainGain.gain.cancelScheduledValues(at);
+                    mainGain.gain.setTargetAtTime(0, at, tc);
+                    const stopAt = Math.min(naturalStop, at + tc * 8);
+                    try {
+                        osc.stop(stopAt);
+                    } catch {
+                        /* already stopped */
+                    }
+                    if (unisonOsc) {
+                        try {
+                            unisonOsc.stop(stopAt);
+                        } catch {
+                            /* already stopped */
+                        }
+                    }
+                } catch {
+                    /* closed context / already stopped */
+                }
+            },
+        };
+        return releaseHandle;
     } catch (err) {
         console.error('playNote error:', err);
+        return null;
     }
 }
 
