@@ -1,0 +1,128 @@
+{
+    "id": "acoustic-kit",
+    "name": "Acoustic Drum Kit",
+    "attribution": "VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0",
+    "samples": [
+        {
+            "key": "agogo-high",
+            "url": "/packs/acoustic-kit/agogo-high_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/agogo-high_01.m4a",
+                "/packs/acoustic-kit/agogo-high_02.m4a"
+            ]
+        },
+        {
+            "key": "agogo-low",
+            "url": "/packs/acoustic-kit/agogo-low_00.m4a",
+            "variants": ["/packs/acoustic-kit/agogo-low_01.m4a"]
+        },
+        {
+            "key": "cowbell",
+            "url": "/packs/acoustic-kit/cowbell_00.m4a",
+            "variants": ["/packs/acoustic-kit/cowbell_01.m4a"]
+        },
+        {
+            "key": "crash",
+            "url": "/packs/acoustic-kit/crash_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/crash_01.m4a",
+                "/packs/acoustic-kit/crash_02.m4a",
+                "/packs/acoustic-kit/crash_03.m4a"
+            ]
+        },
+        {
+            "key": "hihat-closed",
+            "url": "/packs/acoustic-kit/hihat-closed_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/hihat-closed_01.m4a",
+                "/packs/acoustic-kit/hihat-closed_02.m4a",
+                "/packs/acoustic-kit/hihat-closed_03.m4a"
+            ]
+        },
+        {
+            "key": "hihat-loose",
+            "url": "/packs/acoustic-kit/hihat-loose_00.m4a",
+            "variants": ["/packs/acoustic-kit/hihat-loose_01.m4a"]
+        },
+        {
+            "key": "hihat-open",
+            "url": "/packs/acoustic-kit/hihat-open_00.m4a",
+            "variants": ["/packs/acoustic-kit/hihat-open_01.m4a"]
+        },
+        {
+            "key": "hihat-pedal",
+            "url": "/packs/acoustic-kit/hihat-pedal_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/hihat-pedal_01.m4a",
+                "/packs/acoustic-kit/hihat-pedal_02.m4a",
+                "/packs/acoustic-kit/hihat-pedal_03.m4a"
+            ]
+        },
+        {
+            "key": "kick",
+            "url": "/packs/acoustic-kit/kick_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/kick_01.m4a",
+                "/packs/acoustic-kit/kick_02.m4a",
+                "/packs/acoustic-kit/kick_03.m4a"
+            ]
+        },
+        {
+            "key": "ride",
+            "url": "/packs/acoustic-kit/ride_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/ride_01.m4a",
+                "/packs/acoustic-kit/ride_02.m4a",
+                "/packs/acoustic-kit/ride_03.m4a"
+            ]
+        },
+        {
+            "key": "ride-bell",
+            "url": "/packs/acoustic-kit/ride-bell_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/ride-bell_01.m4a",
+                "/packs/acoustic-kit/ride-bell_02.m4a"
+            ]
+        },
+        {
+            "key": "shaker",
+            "url": "/packs/acoustic-kit/shaker_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/shaker_01.m4a",
+                "/packs/acoustic-kit/shaker_02.m4a",
+                "/packs/acoustic-kit/shaker_03.m4a"
+            ]
+        },
+        {
+            "key": "sidestick",
+            "url": "/packs/acoustic-kit/sidestick_00.m4a",
+            "variants": ["/packs/acoustic-kit/sidestick_01.m4a"]
+        },
+        {
+            "key": "snare",
+            "url": "/packs/acoustic-kit/snare_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/snare_01.m4a",
+                "/packs/acoustic-kit/snare_02.m4a",
+                "/packs/acoustic-kit/snare_03.m4a"
+            ]
+        },
+        {
+            "key": "tom-high",
+            "url": "/packs/acoustic-kit/tom-high_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/tom-high_01.m4a",
+                "/packs/acoustic-kit/tom-high_02.m4a"
+            ]
+        },
+        {
+            "key": "tom-low",
+            "url": "/packs/acoustic-kit/tom-low_00.m4a",
+            "variants": [
+                "/packs/acoustic-kit/tom-low_01.m4a",
+                "/packs/acoustic-kit/tom-low_02.m4a",
+                "/packs/acoustic-kit/tom-low_03.m4a"
+            ]
+        }
+    ]
+}

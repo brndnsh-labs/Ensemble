@@ -3,6 +3,7 @@ import {
     pickZone,
     pitchRatio,
     playSampledNote,
+    playSampledStrike,
     type SampleZone,
 } from '../../../public/engine/sample-voice.js';
 
@@ -20,8 +21,8 @@ function fakeParam() {
     };
 }
 
-function fakeBuffer(): AudioBuffer {
-    return {} as AudioBuffer;
+function fakeBuffer(duration = 1): AudioBuffer {
+    return { duration } as AudioBuffer;
 }
 
 // Minimal AudioContext recording the nodes it creates + their connections.
@@ -201,6 +202,73 @@ describe('sample-voice — playSampledNote', () => {
                 onEnded,
             },
         );
+        expect(onEnded).toHaveBeenCalledTimes(1);
+        expect(ctx.createBufferSource).not.toHaveBeenCalled();
+    });
+});
+
+describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
+    it('plays the buffer at native rate (no pitch-shift — a real drum plays as recorded)', () => {
+        const { ctx, source } = makeCtx();
+        playSampledStrike(ctx, fakeBuffer(), {} as AudioNode, 1.0);
+        expect(source.buffer).not.toBeNull();
+        // Unlike playSampledNote, the strike never touches playbackRate.
+        expect(source.playbackRate.setValueAtTime).not.toHaveBeenCalled();
+    });
+
+    it('routes source → envelope gain → the drum bus (inherits EQ/reverb/limiting)', () => {
+        const { ctx, source, gain } = makeCtx();
+        const bus = { tag: 'drumsPanner' } as unknown as AudioNode;
+        playSampledStrike(ctx, fakeBuffer(), bus, 0);
+        expect(source.connect).toHaveBeenCalledWith(gain);
+        expect(gain.connect).toHaveBeenCalledWith(bus);
+    });
+
+    it('holds the whole recording by default (rings out the natural tail)', () => {
+        const { ctx, gain, source } = makeCtx();
+        // 2 s buffer, struck at t=3 with a 0.002 attack / 0.01 release.
+        playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 3, { velocity: 0.7 });
+        const c = gain.gain.calls;
+        expect(c[0]).toEqual({ op: 'set', value: 0, time: 3 }); // silent
+        expect(c[1]).toEqual({ op: 'ramp', value: 0.7, time: 3.002 }); // attack to peak
+        expect(c[2]).toEqual({ op: 'set', value: 0.7, time: 5 }); // hold across full 2 s buffer
+        expect(c[3]).toEqual({ op: 'ramp', value: 0, time: 5.01 }); // release after the tail
+        expect(source.stop).toHaveBeenCalledWith(5.01 + 0.01);
+    });
+
+    it('honors an explicit shorter duration (choke a hit)', () => {
+        const { ctx, gain } = makeCtx();
+        playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 0, { duration: 0.1 });
+        // releaseStart = max(0.002, 0.1) = 0.1, not the 2 s buffer length.
+        const hold = gain.gain.calls.find((x: any) => x.op === 'set' && x.value > 0);
+        expect(hold.time).toBe(0.1);
+    });
+
+    it('allows over-unity velocity (calibrated gain) up to the sanity ceiling', () => {
+        const { ctx, gain } = makeCtx();
+        playSampledStrike(ctx, fakeBuffer(), {} as AudioNode, 0, { velocity: 5 });
+        expect(gain.gain.calls.find((x: any) => x.op === 'ramp' && x.value > 0).value).toBe(5);
+
+        const over = makeCtx();
+        playSampledStrike(over.ctx, fakeBuffer(), {} as AudioNode, 0, { velocity: 999 });
+        expect(over.gain.gain.calls.find((x: any) => x.op === 'ramp' && x.value > 0).value).toBe(8);
+    });
+
+    it('disconnects its chain on end, then fires onEnded (no per-hit leak)', () => {
+        const { ctx, source, gain } = makeCtx();
+        const onEnded = vi.fn();
+        playSampledStrike(ctx, fakeBuffer(), {} as AudioNode, 0, { onEnded });
+        expect(typeof source.onended).toBe('function');
+        source.onended();
+        expect(source.disconnect).toHaveBeenCalled();
+        expect(gain.disconnect).toHaveBeenCalled();
+        expect(onEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it('bails and fires onEnded on a missing buffer/destination (graceful synth fallback)', () => {
+        const { ctx } = makeCtx();
+        const onEnded = vi.fn();
+        playSampledStrike(ctx, null, {} as AudioNode, 0, { onEnded });
         expect(onEnded).toHaveBeenCalledTimes(1);
         expect(ctx.createBufferSource).not.toHaveBeenCalled();
     });

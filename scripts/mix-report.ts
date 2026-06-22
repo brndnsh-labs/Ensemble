@@ -1108,11 +1108,18 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                             const loadCtx = new OfflineAudioContext(1, sampleRate, sampleRate);
                             await ensemble.ensurePackLoaded(loadCtx, packId);
                             const zones = ensemble.getPackZones(packId);
-                            if (!zones || zones.length === 0) {
+                            // A pitched pack proves it loaded via built zones; a
+                            // percussion pack (#662) builds no zones (it keys by
+                            // articulation, not pitch) — its load proof is that its
+                            // buffers registered. Either way the stem render below
+                            // drives the real engine seam, not the zones directly.
+                            const loaded =
+                                (zones && zones.length > 0) || ensemble.isPackLoaded(packId);
+                            if (!loaded) {
                                 calibration = {
                                     module,
                                     packId,
-                                    error: `pack "${packId}" produced no playable zones (dist/packs/${packId} present? built?)`,
+                                    error: `pack "${packId}" failed to load (dist/packs/${packId} present? built?)`,
                                 };
                             } else {
                                 const rows = [];

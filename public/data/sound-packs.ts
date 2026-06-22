@@ -96,6 +96,29 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // than RMS); on funk it already sits at/over the synth. Confirm by ear.
         gain: 1.5,
     },
+    {
+        id: 'acoustic-kit',
+        name: 'Acoustic Drum Kit',
+        description:
+            'A full sampled acoustic kit — real kick/snare/hats/cymbals + aux perc for the groove.',
+        attribution:
+            'VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0',
+        approxSizeMB: 1.8,
+        instruments: ['groove'],
+        // First sampled *percussion* pack — keys by articulation, not pitch, and
+        // plays each hit at native rate through `playSampledStrike` (#662). The kit
+        // covers kick/snare/sidestick, the hi-hat family (closed/loose/open/pedal),
+        // ride+bell/crash, toms, and aux perc (cowbell/agogo/shaker); china + snare
+        // brushes have no clean CC0 source, so those hits fall back to the synth
+        // voice. Deterministic round-robin (#657) over each articulation's takes
+        // keeps repeated hits from machine-gunning. Calibrated 2026-06-22 (#662)
+        // via `mix-report --calibrate-pack=groove:acoustic-kit`: pack sat ~4 dB
+        // under the synth drum stem (RMS-match = 1.59×). Drums are the rhythmic
+        // foundation and the synth stem is the right reference (unlike the grand,
+        // which was buried under the band → 8×), so seated at the match: 1.6×.
+        // Confirm by ear on ensembletest across rock/funk/jazz/blues.
+        gain: 1.6,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */
