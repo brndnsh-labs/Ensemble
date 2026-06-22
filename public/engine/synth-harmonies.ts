@@ -1,6 +1,9 @@
+import { gainForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { getPackZones } from './pack-runtime.js';
+import { pickZone, playSampledNote } from './sample-voice.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
@@ -274,15 +277,60 @@ function dispatchHarmonySynth(...args: Parameters<typeof playHarmonyNoteNew>): v
     playHarmonyNoteNew(...args);
 }
 
-// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
-// to a sample source once its buffers load (S3); S5 routes that case to
-// `playSampledNote` (string ensemble — `harmony.md` §4). Until then, and
-// whenever a pack buffer is unavailable, we fall back to the synth voice —
-// bit-identical with no packs installed.
+// synth-audit Epic 6 — play one harmony voice from a sample pack (#660, the
+// String Ensemble pad). Converts the scheduled frequency to a MIDI target,
+// picks the nearest loaded zone, and plays it through the harmonies gain bus
+// (inheriting the bus EQ/reverb/limiting). Returns false — so the caller falls
+// back to the synth voice — when the pack's zones aren't loaded yet or the note
+// is otherwise unplayable. Sustained-pad samples suit the harmony lane's ≤3
+// held voices; the per-note envelope (attack + release) shapes each held note.
+function playSampledHarmony(
+    state: EnsembleState,
+    packId: string,
+    freq: number,
+    time: number,
+    duration: number,
+    vol: number,
+): boolean {
+    const { playback } = state;
+    const audio = playback.audio;
+    const dest = playback.audioGraph?.harmonies?.gain;
+    const zones = getPackZones(packId);
+    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
+        return false;
+    }
+    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    const zone = pickZone(zones, targetMidi);
+    if (!zone) {
+        return false;
+    }
+    // Lift the loudness-normalized sample to the synth harmony seat via the
+    // pack's catalog-owned gain (`gainForPack`, #656 — calibrated against the
+    // synth baseline by `mix-report --calibrate-pack`). NOT clamped to ≤1 here:
+    // a quiet pad must play above unity to reach the synth pad's level, so the
+    // over-unity value passes through to `playSampledNote`, which bounds it at
+    // MAX_SAMPLE_PEAK and the master limiter catches peaks when 3 voices stack.
+    // A slower attack/release than the default reads as a bowed pad, not a pluck.
+    const velocity = (Number.isFinite(vol) ? vol : 0.4) * gainForPack(packId);
+    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+        velocity,
+        duration,
+        attack: 0.06,
+        release: 0.3,
+    });
+    return true;
+}
+
+// synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice plays
+// from the sample pack once its zones are loaded; until then (or if a note is
+// out of range) it falls back to the synth voice — bit-identical with no packs.
 export function playHarmonyNote(...args: Parameters<typeof playHarmonyNoteNew>): void {
-    if (resolveInstrumentSource(args[0].harmony.voice).kind === 'sample') {
-        dispatchHarmonySynth(...args); // S5: → playSampledNote(packId, …)
-        return;
+    const source = resolveInstrumentSource(args[0].harmony.voice);
+    if (source.kind === 'sample') {
+        const [state, freq, time, duration, vol = 0.4] = args;
+        if (playSampledHarmony(state, source.packId, freq, time, duration, vol)) {
+            return;
+        }
     }
     dispatchHarmonySynth(...args);
 }

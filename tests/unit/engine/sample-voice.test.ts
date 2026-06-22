@@ -155,13 +155,21 @@ describe('sample-voice — playSampledNote', () => {
         expect(onEnded).toHaveBeenCalledTimes(1);
     });
 
-    it('clamps velocity to [0,1] and defaults a non-finite velocity to full', () => {
+    it('allows over-unity velocity up to the sanity ceiling, defaults non-finite to full', () => {
+        // Loudness-calibrated packs (the #660 string pad) fold a >1 gain into
+        // velocity, so the envelope peak may exceed unity — passed through rather
+        // than clamped at 1. A finite velocity within the ceiling is preserved.
         const { ctx, gain } = makeCtx();
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, { velocity: 5 });
-        expect(gain.gain.calls.find((x: any) => x.op === 'ramp' && x.value > 0).value).toBe(1);
+        expect(gain.gain.calls.find((x: any) => x.op === 'ramp' && x.value > 0).value).toBe(5);
+
+        // Above the ceiling is clamped (a config typo can't blast the bus).
+        const over = makeCtx();
+        playSampledNote(over.ctx, zone(60), {} as AudioNode, 60, 0, { velocity: 999 });
+        expect(over.gain.gain.calls.find((x: any) => x.op === 'ramp' && x.value > 0).value).toBe(8);
 
         const second = makeCtx();
-        // Math.min(1, NaN) is NaN — the explicit finite guard must catch it so no
+        // Math.min(…, NaN) is NaN — the explicit finite guard must catch it so no
         // NaN reaches the gain AudioParam.
         playSampledNote(second.ctx, zone(60), {} as AudioNode, 60, 0, {
             velocity: Number.NaN,
