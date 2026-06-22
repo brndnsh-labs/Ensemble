@@ -134,6 +134,11 @@ function cloneStateForRender(liveState: any): any {
             drawQueue: [],
             audio: null,
             audioGraph: null,
+            // #691 — these hold live-context sampled-voice handles; null them so
+            // the offline render doesn't poke live nodes on its first chord change
+            // (the lastSampledHatVoice clone-parity lesson, on the playback slice).
+            activeChordVoices: [],
+            lastChordKey: null,
             isPlaying: false,
             isScheduling: false,
             nextNoteTime: 0,

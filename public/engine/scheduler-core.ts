@@ -978,12 +978,41 @@ export function scheduleChordVisuals(
 }
 
 /**
+ * #691 — fade time for releasing the previous chord voicing when the harmony
+ * changes. ~50 ms: a clean handoff (Brandon's pick) that isn't clicky.
+ */
+const CHORD_CHANGE_FADE = 0.05;
+
+/**
+ * #691 — decide whether to release the previous chord's (sampled) voicing.
+ * Release only on a real harmony change: a different chord identity (`absName`),
+ * not the first chord (`prevKey` null), not a re-strike / arpeggio of the same
+ * chord (keys equal → keep ringing), not under the sustain pedal (it owns the
+ * ring), and only when something is actually ringing. Pure, so it's unit-testable
+ * without driving the whole scheduler.
+ */
+export function shouldReleasePriorVoicing(
+    prevKey: string | null,
+    newKey: string | null,
+    sustainActive: boolean,
+    activeVoiceCount: number,
+): boolean {
+    return (
+        !sustainActive &&
+        newKey !== null &&
+        prevKey !== null &&
+        newKey !== prevKey &&
+        activeVoiceCount > 0
+    );
+}
+
+/**
  * Schedules chord notes from the worker buffer.
  * Handles sustain pedal events (MIDI CC 64).
  */
 function scheduleChords(
     state: EnsembleState,
-    _chordData: ChordAtStep,
+    chordData: ChordAtStep,
     step: number,
     time: number,
 ): void {
@@ -992,6 +1021,37 @@ function scheduleChords(
     chords.buffer.delete(step);
 
     if (notes && notes.length > 0) {
+        // #691 — release the previous voicing when the harmony changes so a
+        // sustained pack (e.g. the Drawbar Organ, which holds flat at full level
+        // for its whole duration) doesn't ring into the new chord. Keyed on the
+        // chord's identity (`absName`), so a re-strike or arpeggio of the *same*
+        // chord keeps ringing — only a real change cuts. Synth voices already
+        // decay to silence; only sampled voices are tracked/cut here. Pedal down
+        // leaves the ring to the sustain path.
+        const mutPlayback = playback as Mutable<typeof playback>;
+        // Defensive: a partially-built state (some unit-test mocks) may omit the
+        // runtime field; the real slice inits it in `state/playback.ts`.
+        if (!Array.isArray(mutPlayback.activeChordVoices)) {
+            mutPlayback.activeChordVoices = []; // @direct-mutation
+        }
+        const chordKey = chordData?.chord?.absName ?? null;
+        if (
+            shouldReleasePriorVoicing(
+                mutPlayback.lastChordKey,
+                chordKey,
+                Boolean(playback.sustainActive),
+                mutPlayback.activeChordVoices.length,
+            )
+        ) {
+            for (const handle of mutPlayback.activeChordVoices) {
+                handle.release(time, CHORD_CHANGE_FADE);
+            }
+            mutPlayback.activeChordVoices = []; // @direct-mutation
+        }
+        if (chordKey !== null) {
+            mutPlayback.lastChordKey = chordKey; // @direct-mutation
+        }
+
         // step → seconds via the canonical step duration so chord-comp note
         // lengths match their `durationSteps` count.
         const stepSecChords = secondsPerStepFor(playback.bpm);
@@ -1059,12 +1119,24 @@ function scheduleChords(
                 }
                 const midiNum = getMidi(freq) || 0;
                 const { name, octave } = midiToNote(midiNum);
-                playNote(state, freq, playTime, duration, {
+                const voiceHandle = playNote(state, freq, playTime, duration, {
                     vol: safeVelocity,
                     index: strumRank[ni],
                     instrument: instrument || 'Piano',
                     numVoices: numVoices,
                 });
+                // #691 — track sampled chord voices so the next harmony change can
+                // release this voicing. Skip under the pedal (it owns the ring).
+                // Bounded like `heldNotes`: a long same-chord vamp re-strikes into
+                // the list, but each voice self-frees, so drop the oldest (ended)
+                // handle past the cap.
+                if (voiceHandle && !playback.sustainActive) {
+                    const acv = (playback as Mutable<typeof playback>).activeChordVoices;
+                    acv.push(voiceHandle); // @direct-mutation
+                    if (acv.length > 64) {
+                        acv.shift(); // @direct-mutation
+                    }
+                }
                 dispatchMidiChordNote(state, freq, safeVelocity, playTime, duration);
                 if (vizState.enabled) {
                     queueVisualizerNoteEvent(playback, {

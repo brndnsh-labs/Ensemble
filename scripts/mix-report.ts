@@ -375,6 +375,10 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 drawQueue: [],
                                 audio: null,
                                 audioGraph: null,
+                                // #691 — null the live-context sampled-voice handles
+                                // (clone-parity, same as audio-export.ts).
+                                activeChordVoices: [],
+                                lastChordKey: null,
                             },
                             arranger: {
                                 ...liveState.arranger,

@@ -1106,6 +1106,15 @@ export interface GlobalContext {
     readonly lastActiveDrumElements: HTMLElement[] | null;
     /** Currently sustaining piano notes. */
     readonly heldNotes: Set<any>;
+    /**
+     * Sampled chord voices ringing since the last harmony change (#691). The
+     * chords scheduler releases these when the chord changes so a sustained pack
+     * (e.g. the Drawbar Organ) doesn't ring into the next chord. Structural
+     * handle type keeps `types.ts` import-free (mirrors `SampledNoteHandle`).
+     */
+    readonly activeChordVoices: Array<{ release(when: number, fade: number): void }>;
+    /** absName of the last chord struck on the chords lane — change detection for the above (#691). */
+    readonly lastChordKey: string | null;
     /** The last step index processed by the UI loop. */
     readonly lastPlayingStep: number;
     /** Whether to log messages from the audio worker. */

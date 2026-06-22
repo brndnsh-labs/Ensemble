@@ -43,6 +43,8 @@ export const playback = deepSignal<GlobalContext>({
     },
     lastActiveDrumElements: null,
     heldNotes: new Set(),
+    activeChordVoices: [],
+    lastChordKey: null,
     lastPlayingStep: -1,
     workerLogging: false,
     suspendTimeout: null,
