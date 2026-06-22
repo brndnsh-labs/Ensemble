@@ -212,12 +212,14 @@ export interface PocketState {
 }
 
 /**
- * Which synthesis implementation an instrument uses. `current` is the
- * original voice; `new` is the synth-audit reworked voice. The per-instrument
- * settings toggle switches between them for A/B audition. Extended by
- * synth-audit Epic 6 with `pack:<id>` values for sample packs.
+ * Which audio source an instrument uses. `synth` is the in-process synthesized
+ * voice (the reworked synth-audit voice — the permanent fallback); a
+ * `pack:<id>` value names an installed sample pack (synth-audit Epic 6). The
+ * legacy `current`/`new` A/B voices were retired in #649 — the reworked voice
+ * is now the only synth voice, and persisted `current`/`new` values migrate to
+ * `synth` on hydrate (see `hydrateVoice`).
  */
-export type InstrumentVoice = 'current' | 'new' | `pack:${string}`;
+export type InstrumentVoice = 'synth' | `pack:${string}`;
 
 export interface GrooveState {
     /** Whether the drum engine is active. */

@@ -135,10 +135,11 @@ interface PlayNoteOptions {
     numVoices?: number;
 }
 
-// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the instrument's
-// `voice` setting between the Current and (Epic 2) New synthesized voices.
+// The synth chord voice. `playNoteNew` is the reworked synth-audit voice (the
+// only one since #649 retired the Current/New A/B); it internally layers a
+// strum-staggered fundamental rendered by `playNoteCurrent`.
 function dispatchChordSynth(...args: Parameters<typeof playNoteCurrent>): void {
-    (args[0].chords.voice === 'new' ? playNoteNew : playNoteCurrent)(...args);
+    playNoteNew(...args);
 }
 
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves

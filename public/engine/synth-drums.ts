@@ -185,8 +185,7 @@ const KNOWN_SOUND_NAMES = new Set<string>([
     'Sidestick',
     'HiHat',
     'Open',
-    // Hi-hat articulations rendered by the `new` voice (Epic 4 S3); the
-    // `current` voice degrades them via HAT_ARTICULATION_FALLBACK.
+    // Hi-hat articulations rendered by the synth drum voice (Epic 4 S3).
     'HiHatQuarter',
     'HiHatHalf',
     'HiHatPedal',
@@ -964,33 +963,12 @@ const mixState: DrumMixState = {
  * @param time - Start time in seconds.
  * @param velocity - Note velocity (0.0 - 1.0).
  */
-// synth-audit Epic 0 S1 — A/B voice seam. The exported entry dispatches on the
-// drum module's `voice` setting; `*New` is a placeholder until Epic 4 fills it in.
-/**
- * Hi-hat articulations introduced by the `new` voice (synth-audit Epic 4 S3)
- * that `playDrumSoundCurrent` has no branch for. The `current` voice degrades
- * each to its nearest classic voice so it never goes silent — quarter-open and
- * the foot-pedal chick read closest to a closed hat, half-open to a full open
- * hat. The `new` voice renders them properly (see `playDrumSoundNew`). Existing
- * names are absent from this map, so `current` stays bit-identical for them.
- */
-const HAT_ARTICULATION_FALLBACK: Record<string, string> = {
-    HiHatQuarter: 'HiHat',
-    HiHatHalf: 'Open',
-    HiHatPedal: 'HiHat',
-};
-
-// synth-audit Epic 0 S1 — A/B voice seam. Dispatches on the groove's `voice`
-// setting between the Current and New synthesized drum voices.
+// The synth drum voice. `playDrumSoundNew` is the reworked synth-audit voice —
+// the only one since #649 retired the Current/New A/B. It renders the hi-hat
+// articulations (quarter-open, half-open, foot-pedal chick) natively and falls
+// through to `playDrumSoundCurrent` for every other sound.
 function dispatchDrumSynth(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
-    if (state.groove.voice === 'new') {
-        playDrumSoundNew(state, name, time, velocity);
-        return;
-    }
-    // `current` voice: collapse any `new`-only hat articulation to a classic
-    // voice it knows. A no-op for every existing soundName.
-    const currentName = HAT_ARTICULATION_FALLBACK[name] ?? name;
-    playDrumSoundCurrent(state, currentName, time, velocity);
+    playDrumSoundNew(state, name, time, velocity);
 }
 
 // synth-audit Epic 6 S1 — instrument-source seam. A drum pack (e.g.

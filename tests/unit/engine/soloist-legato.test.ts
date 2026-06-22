@@ -26,11 +26,21 @@ vi.mock('../../../public/state.js', () => {
             frequency: {
                 value: 440,
                 setValueAtTime: vi.fn(),
+                linearRampToValueAtTime: vi.fn(),
                 exponentialRampToValueAtTime: vi.fn(),
                 setTargetAtTime: vi.fn(),
                 cancelScheduledValues: vi.fn(),
             },
-            detune: { value: 0, setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+            // The reworked soloist voice (#649) ramps osc2.detune via
+            // applyDetuneSettle, so detune needs linearRampToValueAtTime.
+            detune: {
+                value: 0,
+                setValueAtTime: vi.fn(),
+                linearRampToValueAtTime: vi.fn(),
+                exponentialRampToValueAtTime: vi.fn(),
+                setTargetAtTime: vi.fn(),
+                cancelScheduledValues: vi.fn(),
+            },
             type: 'sine',
             connect: vi.fn(),
             start: vi.fn(),
@@ -67,6 +77,7 @@ vi.mock('../../../public/state.js', () => {
             activeVoices: [],
             preset: 'neo',
             mode: 'monophonic',
+            voice: 'synth',
             lastRenderedFreq: null, // New property
         }),
     };

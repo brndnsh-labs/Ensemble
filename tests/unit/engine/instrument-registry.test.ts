@@ -20,9 +20,11 @@ afterEach(() => {
 });
 
 describe('instrument-registry — packIdFromVoice', () => {
-    it('returns null for the synth A/B voices', () => {
-        expect(packIdFromVoice('current')).toBeNull();
-        expect(packIdFromVoice('new')).toBeNull();
+    it('returns null for the synth voice (and legacy A/B values)', () => {
+        expect(packIdFromVoice('synth')).toBeNull();
+        // Retired #649, but a stale persisted value can still reach here.
+        expect(packIdFromVoice('current' as InstrumentVoice)).toBeNull();
+        expect(packIdFromVoice('new' as InstrumentVoice)).toBeNull();
     });
 
     it('extracts the id from a pack voice', () => {
@@ -45,9 +47,8 @@ describe('instrument-registry — packIdFromVoice', () => {
 });
 
 describe('instrument-registry — resolveInstrumentSource (bit-identical fallback)', () => {
-    it('resolves synth voices to the synth source', () => {
-        expect(resolveInstrumentSource('current')).toEqual({ kind: 'synth' });
-        expect(resolveInstrumentSource('new')).toEqual({ kind: 'synth' });
+    it('resolves the synth voice to the synth source', () => {
+        expect(resolveInstrumentSource('synth')).toEqual({ kind: 'synth' });
     });
 
     it('falls back to synth for a pack voice whose buffers are NOT loaded', () => {
@@ -61,10 +62,9 @@ describe('instrument-registry — resolveInstrumentSource (bit-identical fallbac
         expect(resolveInstrumentSource('pack:grand')).toEqual({ kind: 'sample', packId: 'grand' });
     });
 
-    it('keeps a synth voice on synth even while some other pack is loaded', () => {
+    it('keeps the synth voice on synth even while some other pack is loaded', () => {
         registerPackBuffer('grand', 'A4', fakeBuffer());
-        expect(resolveInstrumentSource('current')).toEqual({ kind: 'synth' });
-        expect(resolveInstrumentSource('new')).toEqual({ kind: 'synth' });
+        expect(resolveInstrumentSource('synth')).toEqual({ kind: 'synth' });
     });
 });
 
@@ -93,20 +93,26 @@ describe('instrument-registry — pack buffer cache', () => {
 });
 
 describe('instrument-registry — hydrateVoice', () => {
-    it('keeps the synth A/B voices as-is', () => {
-        expect(hydrateVoice('new')).toBe('new');
-        expect(hydrateVoice('current')).toBe('current');
+    it('keeps the synth voice as-is', () => {
+        expect(hydrateVoice('synth')).toBe('synth');
+    });
+
+    it('migrates the retired A/B voices (#649) to synth', () => {
+        // A saved session from before the A/B retirement keeps working and just
+        // sounds like the (only) reworked synth voice.
+        expect(hydrateVoice('new')).toBe('synth');
+        expect(hydrateVoice('current')).toBe('synth');
     });
 
     it('preserves a pack selection across reloads', () => {
         expect(hydrateVoice('pack:grand')).toBe('pack:grand');
     });
 
-    it('collapses an empty/garbage pack value and non-strings to current', () => {
-        expect(hydrateVoice('pack:')).toBe('current');
-        expect(hydrateVoice('bogus')).toBe('current');
-        expect(hydrateVoice(undefined)).toBe('current');
-        expect(hydrateVoice(null)).toBe('current');
-        expect(hydrateVoice(42)).toBe('current');
+    it('collapses an empty/garbage pack value and non-strings to synth', () => {
+        expect(hydrateVoice('pack:')).toBe('synth');
+        expect(hydrateVoice('bogus')).toBe('synth');
+        expect(hydrateVoice(undefined)).toBe('synth');
+        expect(hydrateVoice(null)).toBe('synth');
+        expect(hydrateVoice(42)).toBe('synth');
     });
 });

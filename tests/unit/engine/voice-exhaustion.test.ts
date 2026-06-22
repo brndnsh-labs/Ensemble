@@ -12,14 +12,23 @@ vi.mock('../../../public/state.js', () => {
                 start: vi.fn(),
                 stop: vi.fn(),
                 setPeriodicWave: vi.fn(),
-                frequency: { setValueAtTime: vi.fn() },
+                onended: null,
+                type: '',
+                frequency: {
+                    setValueAtTime: vi.fn(),
+                    setTargetAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
+                },
                 detune: { setValueAtTime: vi.fn() },
             })),
             createGain: vi.fn(() => ({
                 connect: vi.fn(),
                 gain: {
+                    value: 1,
                     setValueAtTime: vi.fn(),
                     setTargetAtTime: vi.fn(),
+                    linearRampToValueAtTime: vi.fn(),
+                    exponentialRampToValueAtTime: vi.fn(),
                     cancelScheduledValues: vi.fn(),
                 },
             })),
@@ -31,20 +40,28 @@ vi.mock('../../../public/state.js', () => {
                 type: 'lowpass',
             })),
             createPeriodicWave: vi.fn(() => ({})),
+            createWaveShaper: vi.fn(() => ({ connect: vi.fn() })),
             createBufferSource: vi.fn(() => ({
                 connect: vi.fn(),
                 start: vi.fn(),
                 stop: vi.fn(),
+                onended: null,
                 buffer: null,
             })),
         },
         bandIntensity: 0.5,
         sustainActive: true,
-        chordsGain: {},
+        // The reworked additive-body voice registers held notes only when
+        // `playback.audioGraph.chords.gain` exists — without it playAdditiveBody
+        // early-returns before touching heldNotes. Mirror the real graph shape.
+        audioGraph: { chords: { gain: { connect: vi.fn() } } },
+        heldNotes: new Set(),
         audioBuffers: { noise: {} },
     };
     const mockGroove = { audioBuffers: { noise: {} } };
-    const mockChords = {};
+    // voice: 'synth' — the only chord voice since #649; routes to the additive
+    // synth path through the instrument-registry seam.
+    const mockChords = { voice: 'synth' };
 
     const mockStateMap = {
         playback: mockPlayback,
