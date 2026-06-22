@@ -231,4 +231,49 @@ describe('Chord Synthesis', () => {
         );
         expect(sinePartials.length).toBeGreaterThan(1);
     });
+
+    // #707 B1 — the synth chord voice used to return null, so the scheduler's
+    // chord-change release (#691) only ever cut sampled voices and a synth
+    // voicing rang across the change. It now returns a release handle, exactly
+    // like the sampled path, so the scheduler can track + cut it.
+    describe('#707 B1 — synth chord voice release handle', () => {
+        it('returns a handle with release() for the (no-pedal) synth Piano voice', () => {
+            playback.sustainActive = false;
+            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+            expect(handle).not.toBeNull();
+            expect(typeof handle.release).toBe('function');
+        });
+
+        it('release() eases the body to silence and pulls in the oscillator stop', () => {
+            playback.sustainActive = false;
+            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+            const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
+            const gains = playback.audio.createGain.mock.results.map((r) => r.value);
+            const stopsBefore = oscs.reduce((s, o) => s + o.stop.mock.calls.length, 0);
+            const cancelsBefore = gains.reduce(
+                (s, g) => s + g.gain.cancelScheduledValues.mock.calls.length,
+                0,
+            );
+
+            // A chord change at t=11 releases the prior voicing.
+            handle.release(11, 0.05);
+
+            const stopsAfter = oscs.reduce((s, o) => s + o.stop.mock.calls.length, 0);
+            const cancelsAfter = gains.reduce(
+                (s, g) => s + g.gain.cancelScheduledValues.mock.calls.length,
+                0,
+            );
+            // Release schedules an earlier stop on the partials and cancels the
+            // pending body envelope before easing it to 0 — both observable here.
+            expect(stopsAfter).toBeGreaterThan(stopsBefore);
+            expect(cancelsAfter).toBeGreaterThan(cancelsBefore);
+        });
+
+        it('returns a release handle for the legacy Warm voice too', () => {
+            playback.sustainActive = false;
+            const handle = playNote(getState(), 440, 10, 1.0, { instrument: 'Warm' });
+            expect(handle).not.toBeNull();
+            expect(typeof handle.release).toBe('function');
+        });
+    });
 });

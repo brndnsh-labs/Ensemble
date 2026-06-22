@@ -96,6 +96,11 @@ const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blue
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
 
+// B2 (#707) — headroom (in steps) the comp leaves before the next chord's onset
+// when clamping a voicing to its chord length. ~a 16th-note of silence so the
+// voice has released before the change, eliminating the chord-to-chord overlap.
+const CHORD_END_RELEASE_MARGIN_STEPS = 0.25;
+
 // why: all altered-dominant qualities share one comping idiom — guide tones (3, b7)
 // plus 1–2 altered colors. The resolving-voicing path (buildResolvingAlteredVoicing)
 // and the high-intensity shell-reduction path both apply equally to 7alt, 7b9, 7#9,
@@ -3119,6 +3124,23 @@ export function getAccompanimentNotes(
         if (finalVoicingMidis.length > 0) {
             compingState.lastVoicingMidis = [...finalVoicingMidis];
         }
+
+        // B2 (#707) — structural ceiling: a comp voicing must not ring past the
+        // chord it belongs to, or successive chords pile into each other (the
+        // "previous measure is still playing" overlap, audible as the organ
+        // ringing into the IV7). Clamp the note length to the steps remaining in
+        // THIS chord, minus a small release margin so the voice has faded before
+        // the next chord's onset. A ceiling only — it trims an over-long default
+        // (the flat 2-beat default; Acoustic's 2.5-beat ring) but never lengthens
+        // the per-genre durations chosen above, so their feel is preserved.
+        // Scope: this covers the smart/default comp lane. The genre early-return
+        // lanes (Funk chucks, ghost stabs) already emit short step-durations that
+        // can't overrun a chord, and B1's synth release backstops any residual.
+        const stepsToChordEnd = chord.beats * ts.stepsPerBeat - stepInChord;
+        durationSteps = Math.max(
+            0.5,
+            Math.min(durationSteps, stepsToChordEnd - CHORD_END_RELEASE_MARGIN_STEPS),
+        );
 
         voicing.forEach((f: number, i: number) => {
             const humanShift = Math.random() * 0.006 - 0.003;
