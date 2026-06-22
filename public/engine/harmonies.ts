@@ -278,13 +278,30 @@ export function generateCompingPattern(
             pattern[getBeatStep(1, lastBeat, Math.floor(ts.stepsPerBeat * 0.75))] = 3;
         }
     } else if (patternKey === 'bossa') {
-        // Authentic Bossa Nova Pattern (Bar 1: 0, 6, 12; Bar 2: 18, 24, 30)
-        pattern[0] = 1;
-        pattern[6] = 1;
-        pattern[12] = 1;
-        pattern[18] = 1;
-        pattern[24] = 1;
-        pattern[30] = 1;
+        // Authentic Bossa Nova 2-bar figure (4/4: steps 0, 6, 12, 18, 24, 30),
+        // expressed in beat terms so it stays in-bounds in non-4/4 meters. B12
+        // (#711): the old raw indices wrote pattern[24]/[30] past the spm*2 array
+        // in 3/4 (length 24), growing it and breaking every `step % length`.
+        // Half-beat pushes scale with stepsPerBeat; onsets on a non-existent beat
+        // or past the 2-bar window are skipped, never grown.
+        const halfBeat = Math.floor(ts.stepsPerBeat / 2);
+        const bossaOnsets: Array<[number, number, number]> = [
+            [0, 0, 0],
+            [0, 1, halfBeat],
+            [0, 3, 0],
+            [1, 0, halfBeat],
+            [1, 2, 0],
+            [1, 3, halfBeat],
+        ];
+        for (const [bar, beat, off] of bossaOnsets) {
+            if (beat >= ts.beats) {
+                continue;
+            }
+            const idx = getBeatStep(bar, beat, off);
+            if (idx >= 0 && idx < length) {
+                pattern[idx] = 1;
+            }
+        }
     } else if (patternKey === 'funk16') {
         pattern[getBeatStep(0, 0, 0)] = 1;
         pattern[getBeatStep(0, 0, 3)] = 3; // Added: 'a' of 1
