@@ -52,6 +52,38 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         gain: 8,
     },
     {
+        id: 'hammond-organ',
+        name: 'Drawbar Organ',
+        description:
+            'A sampled drawbar organ — warm tonewheel keys for reggae bubble, blues, gospel.',
+        attribution: 'FreePats Drawbar Organ Emulation (setBfree) — CC0 1.0 (public domain)',
+        approxSizeMB: 0.8,
+        instruments: ['chords'],
+        // Calibrated 2026-06-22 (#663) via `mix-report --calibrate-pack=chords:hammond-organ`.
+        // Sustained tonewheel tone (no Leslie baked in — the app adds its own
+        // movement); loudnorm-leveled across zones. mix-report RMS-match to the
+        // synth chords baseline was 6.62× (pack sat 16.4 dB under raw); the organ is
+        // a touch darker (−82 Hz centroid → reads slightly quieter than its RMS), so
+        // seated at the match: 6.6×. Confirm/nudge by ear on ensembletest (reggae
+        // bubble / blues / gospel). Paired with SYNTH_CHORD_LEVEL.
+        gain: 6.6,
+    },
+    {
+        id: 'clavinet',
+        name: 'Clavinet',
+        description: 'A sampled clavinet — bright, percussive funk keys for the chords.',
+        attribution: 'GeneralUser GS by S. Christian Collins — permissive (host-your-own-copy)',
+        approxSizeMB: 0.1,
+        instruments: ['chords'],
+        // Calibrated 2026-06-22 (#664) via `mix-report --calibrate-pack=chords:clavinet`.
+        // Percussive plucked tone (short natural decay, no loop); loudnorm-leveled
+        // across the 8 zones. mix-report RMS-match was 5.14× (pack sat 14.2 dB under
+        // raw), but the clavinet is brighter (+193 Hz) and transient (high
+        // peak-to-RMS → reads louder than its RMS), so seated under the match: 4.5×.
+        // Confirm/nudge by ear on ensembletest (funk). Paired with SYNTH_CHORD_LEVEL.
+        gain: 4.5,
+    },
+    {
         id: 'sax-alto',
         name: 'Alto Saxophone',
         description: 'A sampled alto sax — a real horn lead for the soloist.',

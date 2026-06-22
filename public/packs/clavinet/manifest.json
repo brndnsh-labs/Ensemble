@@ -1,0 +1,47 @@
+{
+    "id": "clavinet",
+    "name": "Clavinet",
+    "attribution": "GeneralUser GS by S. Christian Collins — permissive (host-your-own-copy); clavinet patch",
+    "samples": [
+        {
+            "key": "35",
+            "rootMidi": 35,
+            "url": "/packs/clavinet/35.m4a"
+        },
+        {
+            "key": "42",
+            "rootMidi": 42,
+            "url": "/packs/clavinet/42.m4a"
+        },
+        {
+            "key": "50",
+            "rootMidi": 50,
+            "url": "/packs/clavinet/50.m4a"
+        },
+        {
+            "key": "57",
+            "rootMidi": 57,
+            "url": "/packs/clavinet/57.m4a"
+        },
+        {
+            "key": "64",
+            "rootMidi": 64,
+            "url": "/packs/clavinet/64.m4a"
+        },
+        {
+            "key": "74",
+            "rootMidi": 74,
+            "url": "/packs/clavinet/74.m4a"
+        },
+        {
+            "key": "81",
+            "rootMidi": 81,
+            "url": "/packs/clavinet/81.m4a"
+        },
+        {
+            "key": "88",
+            "rootMidi": 88,
+            "url": "/packs/clavinet/88.m4a"
+        }
+    ]
+}
