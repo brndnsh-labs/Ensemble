@@ -221,6 +221,9 @@ export interface PocketState {
  */
 export type InstrumentVoice = 'synth' | `pack:${string}`;
 
+/** The five instrument modules that carry a sound source (`voice`). */
+export type InstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+
 export interface GrooveState {
     /** Whether the drum engine is active. */
     readonly enabled: boolean;
@@ -1216,7 +1219,7 @@ export interface ActionPayloadSetReverb {
 }
 
 export interface ActionPayloadSetInstrumentVoice {
-    module: 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
+    module: InstrumentModule;
     voice: InstrumentVoice;
 }
 

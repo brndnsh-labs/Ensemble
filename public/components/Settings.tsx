@@ -12,11 +12,13 @@ import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { secondsPerStepFor } from '../utils.js';
 import { Icon } from './Icon.jsx';
+import { SoundsSettings } from './SoundsSettings.jsx';
 import { ModeToggle, PalettePicker } from './ThemePicker.jsx';
 import { Select, SettingGroup, SettingRow, Slider, Stepper, Toggle } from './UIControls.jsx';
 
 const SETTINGS_TABS = [
     { id: 'playback', label: 'Playback' },
+    { id: 'sounds', label: 'Sounds' },
     { id: 'appearance', label: 'Appearance' },
     { id: 'midi', label: 'MIDI' },
     { id: 'about', label: 'About' },
@@ -186,6 +188,7 @@ export function Settings() {
                         ))}
                     </nav>
                     <div class="settings-panel" role="tabpanel">
+                        {tab === 'sounds' && <SoundsSettings />}
                         {tab === 'playback' && (
                             <SettingGroup title="Audio & Setup">
                                 <SettingRow
