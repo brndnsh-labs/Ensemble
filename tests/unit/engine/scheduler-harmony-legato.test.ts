@@ -189,4 +189,35 @@ describe('Harmony legato chain — scheduler + synth integration (Epic 10 S3.g)'
             61, 65, 68,
         ]);
     });
+
+    it('B11 (#710) — schedules the prior-pad release at the scheduled onset, not currentTime', () => {
+        // The scheduler runs ahead of playback. Killing at `currentTime` cut the
+        // prior pad ~200-400ms early; it must fade at the new chord's scheduled
+        // onset for a true crossfade (same clock chords use).
+        audio.currentTime = 10;
+        state.harmony.buffer.set(0, [
+            padNote(60, { isChordStart: true }),
+            padNote(64),
+            padNote(67),
+        ]);
+        scheduleHarmonies(state, {}, 0, 10);
+        const victim = state.harmony.activeVoices.find((v) => v.midi === 60);
+        const gainParam = victim.gain?.gain || victim.gain;
+
+        // Chord change with NO legato, scheduled 300 ms AHEAD of the audio clock.
+        audio.currentTime = 10; // clock has NOT advanced
+        const scheduledOnset = 10.3;
+        state.harmony.buffer.set(16, [
+            padNote(61, { isChordStart: true }),
+            padNote(65),
+            padNote(68),
+        ]);
+        scheduleHarmonies(state, {}, 16, scheduledOnset);
+
+        // The release fade-to-zero must be scheduled at the future onset (10.3),
+        // not at currentTime (10.0). Pre-#710 there was no call at 10.3.
+        const fadeCalls = gainParam.setTargetAtTime.mock.calls.filter((c) => c[0] === 0);
+        expect(fadeCalls.length).toBeGreaterThan(0);
+        expect(fadeCalls.some((c) => Math.abs(c[1] - scheduledOnset) < 1e-6)).toBe(true);
+    });
 });

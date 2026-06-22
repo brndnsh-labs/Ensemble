@@ -263,12 +263,20 @@ function resolveHarmonyTimbre(style: string, feel: string): HarmonyTimbre {
     return timbre;
 }
 
-export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05) {
+/**
+ * Release the harmony voicing. `when` schedules the fade at a future audio time
+ * (B11/#710) — pass the new chord's scheduled onset for a true crossfade rather
+ * than cutting the prior pad ~200-400ms early at `currentTime`. Defaults to
+ * `currentTime` for panic/immediate callers.
+ */
+export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05, when?: number) {
     const { playback, harmony } = state;
     if (!playback.audio) {
         return;
     }
-    killActiveVoices(harmony.activeVoices, playback.audio.currentTime, fadeTime);
+    const now = playback.audio.currentTime;
+    const killTime = Number.isFinite(when) ? Math.max(when as number, now) : now;
+    killActiveVoices(harmony.activeVoices, killTime, fadeTime);
 }
 
 // The synth harmony voice. `playHarmonyNoteNew` is the reworked synth-audit

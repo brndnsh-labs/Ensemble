@@ -370,7 +370,9 @@ describe('Scheduler Core System', () => {
 
             scheduleGlobalEvent(getState(), 0, 10.0);
 
-            expect(Engine.killHarmonyNote).toHaveBeenCalledWith(expect.any(Object), 0.1);
+            // B11 (#710) — the release is now scheduled at the chord's onset
+            // (`time` = 10.0), not currentTime, for a true crossfade.
+            expect(Engine.killHarmonyNote).toHaveBeenCalledWith(expect.any(Object), 0.1, 10.0);
             expect(Engine.playHarmonyNote).toHaveBeenCalled();
         });
 
