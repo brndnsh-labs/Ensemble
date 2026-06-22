@@ -32,8 +32,14 @@ const SYNTH_SOURCE: ResolvedSource = { kind: 'synth' };
 
 const PACK_PREFIX = 'pack:';
 
-/** Decoded buffers for one installed pack, keyed by sample/zone id. */
-type PackBuffers = Map<string, AudioBuffer>;
+/**
+ * Decoded buffers for one installed pack, keyed by sample/zone id. The value is
+ * a *list* so a single zone key can carry round-robin alternates (S2 #657): a
+ * drum zone registers N buffers under one key (`snare` → 3 takes) and the
+ * percussive path cycles them deterministically. A pitched zone (piano/strings)
+ * registers exactly one buffer per key, so its list is length-1.
+ */
+type PackBuffers = Map<string, AudioBuffer[]>;
 
 /** packId → its decoded buffers. Populated lazily by the S3 loader. */
 const packCache = new Map<string, PackBuffers>();
@@ -72,18 +78,44 @@ export function resolveInstrumentSource(voice: InstrumentVoice): ResolvedSource 
     return SYNTH_SOURCE;
 }
 
-/** S3 (loader): register one decoded buffer for a pack/zone key. */
+/**
+ * S3 (loader): register one decoded buffer for a pack/zone key. Successive
+ * registrations under the same key *append* — that's how a round-robin zone
+ * (#657) accumulates its alternates, in manifest order (primary url first, then
+ * each `variants[]` entry). A pitched zone calls this once, so its list stays
+ * length-1.
+ */
 export function registerPackBuffer(packId: string, key: string, buffer: AudioBuffer): void {
     let buffers = packCache.get(packId);
     if (buffers === undefined) {
         buffers = new Map();
         packCache.set(packId, buffers);
     }
-    buffers.set(key, buffer);
+    const existing = buffers.get(key);
+    if (existing === undefined) {
+        buffers.set(key, [buffer]);
+    } else {
+        existing.push(buffer);
+    }
 }
 
-/** S5 (playback): the decoded buffer for a pack/zone key, or `null` if absent. */
+/**
+ * S5 (playback): the *first* decoded buffer for a pack/zone key, or `null` if
+ * absent. This is the pitched-zone accessor — one buffer per key — and stays
+ * back-compatible for round-robin zones by returning take 0. Use
+ * {@link getPackBufferVariants} when you need the whole alternate set.
+ */
 export function getPackBuffer(packId: string, key: string): AudioBuffer | null {
+    return packCache.get(packId)?.get(key)?.[0] ?? null;
+}
+
+/**
+ * S2 (#657): every decoded buffer registered under a pack/zone key, in
+ * registration (manifest) order, or `null` if the key is absent. The
+ * round-robin accessor — the percussive path pairs this with
+ * {@link pickRoundRobin} to cycle a drum zone's alternate takes.
+ */
+export function getPackBufferVariants(packId: string, key: string): readonly AudioBuffer[] | null {
     return packCache.get(packId)?.get(key) ?? null;
 }
 

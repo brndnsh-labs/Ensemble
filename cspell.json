@@ -204,6 +204,7 @@
         "soundfonts",
         "predelay",
         "decorrelation",
+        "decorrelates",
         "highpass",
         "bandpass",
         "lowpass",
