@@ -18,6 +18,12 @@ function fakeParam() {
         linearRampToValueAtTime: vi.fn((value: number, time: number) => {
             calls.push({ op: 'ramp', value, time });
         }),
+        setTargetAtTime: vi.fn((value: number, time: number) => {
+            calls.push({ op: 'target', value, time });
+        }),
+        cancelScheduledValues: vi.fn((time: number) => {
+            calls.push({ op: 'cancel', value: 0, time });
+        }),
     };
 }
 
@@ -268,8 +274,45 @@ describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
     it('bails and fires onEnded on a missing buffer/destination (graceful synth fallback)', () => {
         const { ctx } = makeCtx();
         const onEnded = vi.fn();
-        playSampledStrike(ctx, null, {} as AudioNode, 0, { onEnded });
+        const handle = playSampledStrike(ctx, null, {} as AudioNode, 0, { onEnded });
         expect(onEnded).toHaveBeenCalledTimes(1);
         expect(ctx.createBufferSource).not.toHaveBeenCalled();
+        expect(handle).toBeNull(); // no voice to choke
+    });
+
+    it('returns a choke handle that cuts the voice early (hi-hat choke #679)', () => {
+        const { ctx, gain, source } = makeCtx();
+        // A 2 s open hat struck at t=3 — rings until ~5 s on its own.
+        const handle = playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 3, { velocity: 1 });
+        expect(handle).not.toBeNull();
+        source.stop.mockClear();
+
+        // Choke it at t=3.5 (a downbeat closed hat lands).
+        handle?.choke(3.5);
+        // Cancels the pending envelope, eases to 0 from the live value (no click),
+        // and re-stops the source early — well before the natural ~5.01 s stop.
+        const ops = gain.gain.calls.slice(-2);
+        expect(ops[0]).toMatchObject({ op: 'cancel', time: 3.5 });
+        expect(ops[1]).toMatchObject({ op: 'target', value: 0, time: 3.5 });
+        expect(source.stop).toHaveBeenCalledTimes(1);
+        expect(source.stop.mock.calls[0][0]).toBeGreaterThan(3.5);
+        expect(source.stop.mock.calls[0][0]).toBeLessThan(5); // earlier than natural end
+    });
+
+    it('clamps a choke time into the live window (never before the voice starts)', () => {
+        const { ctx, gain } = makeCtx();
+        const handle = playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 3, {});
+        handle?.choke(1.0); // before startTime 3 → clamps to 3
+        const target = gain.gain.calls.find((c: any) => c.op === 'target');
+        expect(target.time).toBe(3);
+    });
+
+    it('a choke after the source already stopped is swallowed (no throw)', () => {
+        const { ctx, source } = makeCtx();
+        const handle = playSampledStrike(ctx, fakeBuffer(1), {} as AudioNode, 0, {});
+        source.stop.mockImplementation(() => {
+            throw new Error('InvalidStateError'); // simulate already-stopped source
+        });
+        expect(() => handle?.choke(0.5)).not.toThrow();
     });
 });

@@ -31,6 +31,23 @@ export interface SampleZone {
     readonly buffer: AudioBuffer;
 }
 
+/**
+ * A handle to a playing percussion voice ({@link playSampledStrike}), letting a
+ * later hit cut it short — a hi-hat choke (#679): the same physical hi-hat can't
+ * ring open while it plays closed, so a closed/pedal hit silences the open ring.
+ */
+export interface SampleVoiceHandle {
+    /**
+     * Cut the voice to silence starting at `when` (the choking hit's onset).
+     * Cancels the remaining envelope and smoothly ramps the gain to ~0, then
+     * stops the source — the natural `onended` cleanup still fires exactly once.
+     */
+    choke(when: number): void;
+}
+
+/** Time constant for the choke ramp — ~3·tc ≈ 12 ms to inaudible, click-free. */
+const CHOKE_TC = 0.004;
+
 export interface SampledNoteOptions {
     /** Linear attack ramp (s). */
     readonly attack?: number;
@@ -108,8 +125,10 @@ export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
  *
  * `duration` defaults to the buffer's full length so the natural decay tail
  * rings out; callers fold the pack's calibrated `gainForPack` into `velocity`.
- * Bails (firing `onEnded`) on a missing context/buffer/destination — the same
- * graceful-fallback contract as `playSampledNote`.
+ * Returns a {@link SampleVoiceHandle} so a later hit can choke this one (hi-hat
+ * choke, #679), or `null` when it bails (firing `onEnded`) on a missing
+ * context/buffer/destination — the same graceful-fallback contract as
+ * `playSampledNote`.
  */
 export function playSampledStrike(
     audio: AudioContext,
@@ -123,10 +142,10 @@ export function playSampledStrike(
         duration,
         onEnded,
     }: Omit<SampledNoteOptions, 'duration'> & { duration?: number } = {},
-): void {
+): SampleVoiceHandle | null {
     if (!audio || !buffer || !destination) {
         onEnded?.();
-        return;
+        return null;
     }
 
     try {
@@ -166,11 +185,37 @@ export function playSampledStrike(
             onEnded?.();
         };
 
+        const naturalEnd = releaseStart + release + 0.01;
         source.start(startTime);
-        source.stop(releaseStart + release + 0.01);
+        source.stop(naturalEnd);
+
+        return {
+            choke(when: number) {
+                try {
+                    // Clamp into the voice's live window: never before it starts,
+                    // and a no-op once it's already past its natural stop.
+                    const at = Number.isFinite(when)
+                        ? Math.max(startTime, Math.min(when, naturalEnd))
+                        : audio.currentTime;
+                    // Cancel the pending envelope and ease the gain to silence from
+                    // wherever it currently sits (setTargetAtTime starts at the live
+                    // value → no click), then stop the source just past silence so it
+                    // self-frees via `onended`. stop() may have already fired on a
+                    // natural end — the try/catch swallows the InvalidState throw.
+                    gain.gain.cancelScheduledValues(at);
+                    gain.gain.setTargetAtTime(0, at, CHOKE_TC);
+                    // Never push the stop later than the natural end — a choke
+                    // arriving in the final tail should only ever shorten it.
+                    source.stop(Math.min(naturalEnd, at + CHOKE_TC * 8));
+                } catch {
+                    /* already stopped / closed context — nothing to choke */
+                }
+            },
+        };
     } catch {
         /* ignore audio errors (e.g. a closed context) */
         onEnded?.();
+        return null;
     }
 }
 

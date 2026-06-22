@@ -159,6 +159,7 @@ function cloneStateForRender(liveState: any): any {
             fillMap: null,
             accentMap: null,
             lastHatGain: null,
+            lastSampledHatVoice: null,
             lastRideGain: null,
             lastCrashGain: null,
         },

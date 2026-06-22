@@ -263,6 +263,14 @@ export interface GrooveState {
     readonly fillSteps: object;
     /** Last gain node for the hi-hat. */
     readonly lastHatGain: GainNode | null;
+    /**
+     * The currently-ringing *sampled* open/loose hi-hat voice (drum pack #662),
+     * eligible to be choked by the next hat hit (#679) — the sample-path analog
+     * of `lastHatGain`. Structural `{ choke }` to keep types.ts import-free; a
+     * `SampleVoiceHandle` (sample-voice.ts) is assignable to it. Held on state
+     * (not module-global) so each engine host has its own, like `lastHatGain`.
+     */
+    readonly lastSampledHatVoice: { readonly choke: (when: number) => void } | null;
     /** Last gain node for the ride cymbal. */
     readonly lastRideGain: GainNode | null;
     /** Last gain node for the crash cymbal. */

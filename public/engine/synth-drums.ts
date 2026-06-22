@@ -8,7 +8,7 @@ import {
     packIdFromVoice,
     resolveInstrumentSource,
 } from './instrument-registry.js';
-import { pickRoundRobin, playSampledStrike } from './sample-voice.js';
+import { pickRoundRobin, playSampledStrike, type SampleVoiceHandle } from './sample-voice.js';
 import {
     createSimplePanner,
     duckGain,
@@ -946,6 +946,12 @@ export function killDrumNote(state: EnsembleState): void {
         rampGain(groove.lastHatGain.gain, 0, playback.audio.currentTime, 0.005);
         (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
     }
+    if (groove.lastSampledHatVoice) {
+        // Choke the ringing sampled open/loose hat too (#679), then drop the slot —
+        // parallel to lastHatGain above so a stop/reset doesn't leave it ringing.
+        groove.lastSampledHatVoice.choke(playback.audio.currentTime);
+        (groove as Mutable<typeof groove>).lastSampledHatVoice = null; // @direct-mutation
+    }
     if (groove.lastRideGain) {
         rampGain(groove.lastRideGain.gain, 0, playback.audio.currentTime, 0.05);
         (groove as Mutable<typeof groove>).lastRideGain = null; // @direct-mutation
@@ -1105,11 +1111,60 @@ function tryPlaySampledDrum(
     if (!ctx) {
         return false;
     }
-    playSampledStrike(ctx.audio, buffer, ctx.panner, ctx.playTime, {
+    // Hi-hat choke (#679): the kit is one physical hi-hat, so any new hat hit
+    // silences a still-ringing open/loose hat — cut it at this hit's onset before
+    // the new strike sounds. This is what lets an open hat carry a natural decay
+    // (the sample rings out) yet stay tight in hat-dense genres like disco, where
+    // the downbeat closed hat chokes the offbeat open (the classic "tss-chk"). The
+    // active voice lives on `groove` state (per-host, like `lastHatGain`), written
+    // via @direct-mutation — the sanctioned audio hot-path escape hatch.
+    const groove = state.groove as Mutable<typeof state.groove>;
+    if (isHatName(name) && groove.lastSampledHatVoice) {
+        groove.lastSampledHatVoice.choke(ctx.playTime); // @direct-mutation
+        groove.lastSampledHatVoice = null; // @direct-mutation
+    }
+    // `let` (not `const`) so the onEnded closure below can reference `voice`
+    // without a temporal-dead-zone hazard on playSampledStrike's synchronous bail.
+    let voice: SampleVoiceHandle | null = null;
+    voice = playSampledStrike(ctx.audio, buffer, ctx.panner, ctx.playTime, {
         velocity: ctx.masterVol * gainForPack(packId),
-        onEnded: ctx.releasePanner,
+        onEnded: () => {
+            // Clear the slot if this voice is the active one and ended naturally,
+            // so a later choke never pokes a freed source.
+            if (groove.lastSampledHatVoice === voice) {
+                groove.lastSampledHatVoice = null; // @direct-mutation
+            }
+            ctx.releasePanner();
+        },
     });
+    // Only the ringing hats (open / semi-open) are worth choking later; closed and
+    // pedal hits are already short, so they choke others but aren't tracked themselves.
+    if (voice && isRingingHat(name)) {
+        groove.lastSampledHatVoice = voice; // @direct-mutation
+    }
     return true;
+}
+
+/** Any hi-hat articulation — all of these choke a ringing open/loose hat. */
+export function isHatName(name: string): boolean {
+    return (
+        name === 'HiHat' ||
+        name === 'Open' ||
+        name === 'HiHatQuarter' ||
+        name === 'HiHatHalf' ||
+        name === 'HiHatPedal'
+    );
+}
+
+/**
+ * The hats that ring long enough to be worth tracking + choking (open +
+ * semi-open). Deliberately a **strict subset** of {@link isHatName}: closed and
+ * pedal hats *choke* a ringing voice (so they're in `isHatName`) but are too
+ * short to need choking themselves (so they're excluded here). Keep this asymmetry
+ * — widening it to match `isHatName` would re-introduce the closed-hat pile-up.
+ */
+export function isRingingHat(name: string): boolean {
+    return name === 'Open' || name === 'HiHatQuarter' || name === 'HiHatHalf';
 }
 
 function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
