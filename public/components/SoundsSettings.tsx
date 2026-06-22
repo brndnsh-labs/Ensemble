@@ -8,9 +8,8 @@ import { dispatch, getState } from '../state.js';
 import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { Icon } from './Icon.jsx';
-import { Select, SettingGroup, SettingRow } from './UIControls.jsx';
+import { SettingGroup } from './UIControls.jsx';
 
-// Instrument modules that have ≥1 pack in the catalog get a source-picker row.
 const MODULE_LABELS: Record<InstrumentModule, string> = {
     chords: 'Chords',
     bass: 'Bass',
@@ -68,7 +67,7 @@ async function evictPackCache(packId: string): Promise<void> {
 }
 
 export function SoundsSettings() {
-    // Read every instrument's voice reactively so the source picker reflects the
+    // Read every instrument's voice reactively so each source group reflects the
     // current selection (and updates when a pack is removed → reset to synth).
     const voices = useEnsembleState((s) => ({
         chords: s.chords.voice,
@@ -79,15 +78,20 @@ export function SoundsSettings() {
     })) as Record<InstrumentModule, InstrumentVoice>;
 
     // `isPackLoaded` is a plain module-cache read, not a signal — bump this after
-    // install/remove to re-render the manager + the source-picker options.
+    // install/remove to re-render install state across the groups.
     const [, setRev] = useState(0);
     const refresh = () => setRev((r) => r + 1);
     const [busy, setBusy] = useState<Record<string, boolean>>({});
-
     const setPackBusy = (packId: string, value: boolean) =>
         setBusy((prev) => ({ ...prev, [packId]: value }));
 
-    const install = async (pack: SoundPack) => {
+    const selectSource = (module: InstrumentModule, voice: InstrumentVoice) => {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice });
+        saveCurrentState();
+    };
+
+    // Install a pack and select it as `module`'s source (you install it to use it).
+    const install = async (module: InstrumentModule, pack: SoundPack) => {
         const audio = ensureAudio();
         if (!audio) {
             return;
@@ -96,23 +100,26 @@ export function SoundsSettings() {
         await ensurePackLoaded(audio, pack.id);
         setPackBusy(pack.id, false);
         refresh();
+        if (isPackLoaded(pack.id)) {
+            selectSource(module, `pack:${pack.id}`);
+        }
     };
 
+    // Remove a pack: drop any instrument sourcing it back to synth, free the
+    // decoded buffers, and evict the cached audio files.
     const remove = async (pack: SoundPack) => {
-        // Drop any instrument currently sourcing this pack back to the synth.
         const state = getState();
         for (const module of pack.instruments) {
             if ((state[module] as { voice: InstrumentVoice }).voice === `pack:${pack.id}`) {
-                dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: 'synth' });
+                selectSource(module, 'synth');
             }
         }
         clearPack(pack.id);
         await evictPackCache(pack.id);
-        saveCurrentState();
         refresh();
     };
 
-    const preview = async (pack: SoundPack) => {
+    const preview = async (module: InstrumentModule, pack: SoundPack) => {
         const audio = ensureAudio();
         if (!audio) {
             return;
@@ -127,9 +134,7 @@ export function SoundsSettings() {
         if (!zones) {
             return;
         }
-        // Play through the first applicable instrument's mix bus (so it inherits
-        // that bus's EQ/reverb), falling back to the raw destination.
-        const bus = getState().playback.audioGraph?.[GRAPH_BUS[pack.instruments[0]]];
+        const bus = getState().playback.audioGraph?.[GRAPH_BUS[module]];
         const dest = bus?.gain ?? audio.destination;
         const start = audio.currentTime + 0.05;
         PREVIEW_MIDIS.forEach((midi, i) => {
@@ -148,102 +153,117 @@ export function SoundsSettings() {
     );
 
     return (
-        <>
-            <SettingGroup title="Instrument Sounds">
-                <p class="text-mini-muted sounds-intro">
-                    Choose a synth or an installed sample pack for each instrument. Packs download
-                    on demand and are cached for offline use — the app stays small until you install
-                    one.
-                </p>
-                {sourceModules.map((module) => {
-                    const installed = packsForInstrument(module).filter((p) => isPackLoaded(p.id));
-                    return (
-                        <SettingRow
-                            key={module}
-                            label={MODULE_LABELS[module]}
-                            id={`soundSource-${module}`}
-                        >
-                            <Select
-                                id={`soundSource-${module}`}
-                                value={voices[module]}
-                                onChange={(val) => {
-                                    dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
-                                        module,
-                                        voice: val as InstrumentVoice,
-                                    });
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'synth', label: 'Synth' },
-                                    ...installed.map((p) => ({
-                                        value: `pack:${p.id}`,
-                                        label: p.name,
-                                    })),
-                                ]}
-                            />
-                        </SettingRow>
-                    );
-                })}
-            </SettingGroup>
+        <SettingGroup title="Instrument Sounds">
+            <p class="text-mini-muted sounds-intro">
+                Pick a synth or a sample pack for each instrument. Packs download on demand and are
+                cached for offline use — the app stays small until you install one.
+            </p>
 
-            <SettingGroup title="Sample Packs">
-                {SOUND_PACKS.map((pack) => {
-                    const loaded = isPackLoaded(pack.id);
-                    const isBusy = busy[pack.id] ?? false;
-                    return (
-                        <div class="sound-pack-card" key={pack.id}>
-                            <div class="sound-pack-card-info">
-                                <div class="sound-pack-card-head">
-                                    <span class="sound-pack-card-name">{pack.name}</span>
-                                    <span
-                                        class={`sound-pack-status${loaded ? ' is-installed' : ''}`}
+            {sourceModules.map((module) => {
+                const voice = voices[module];
+                return (
+                    <div class="sound-instrument-group" key={module}>
+                        <h4 class="sound-instrument-title">{MODULE_LABELS[module]}</h4>
+                        <div
+                            class="sound-source-list"
+                            role="radiogroup"
+                            aria-label={`${MODULE_LABELS[module]} sound source`}
+                        >
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={voice === 'synth'}
+                                class={`sound-source-row${voice === 'synth' ? ' is-active' : ''}`}
+                                onClick={() => selectSource(module, 'synth')}
+                            >
+                                <span class="sound-source-dot" aria-hidden="true" />
+                                <span class="sound-source-name">Synth</span>
+                                <span class="sound-source-meta">Built-in</span>
+                            </button>
+
+                            {packsForInstrument(module).map((pack) => {
+                                const loaded = isPackLoaded(pack.id);
+                                const isBusy = busy[pack.id] ?? false;
+                                const active = voice === `pack:${pack.id}`;
+                                return (
+                                    <div
+                                        class={`sound-source-row sound-source-row--pack${active ? ' is-active' : ''}`}
+                                        key={pack.id}
                                     >
-                                        {isBusy
-                                            ? 'Downloading…'
-                                            : loaded
-                                              ? 'Installed'
-                                              : `${pack.approxSizeMB} MB`}
-                                    </span>
-                                </div>
-                                <p class="sound-pack-card-desc">{pack.description}</p>
-                                <p class="sound-pack-card-credit">{pack.attribution}</p>
-                            </div>
-                            <div class="sound-pack-card-actions">
-                                <button
-                                    type="button"
-                                    class="secondary-btn sound-pack-preview-btn"
-                                    aria-label={`Preview ${pack.name}`}
-                                    disabled={isBusy}
-                                    onClick={() => preview(pack)}
-                                >
-                                    <Icon name="headphones" /> Preview
-                                </button>
-                                {loaded ? (
-                                    <button
-                                        type="button"
-                                        class="secondary-btn danger-btn"
-                                        aria-label={`Remove ${pack.name}`}
-                                        disabled={isBusy}
-                                        onClick={() => remove(pack)}
-                                    >
-                                        <Icon name="trash" /> Remove
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        class="primary-btn"
-                                        aria-label={`Install ${pack.name}`}
-                                        disabled={isBusy}
-                                        onClick={() => install(pack)}
-                                    >
-                                        <Icon name="install" /> Install
-                                    </button>
-                                )}
-                            </div>
+                                        <button
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={active}
+                                            disabled={!loaded || isBusy}
+                                            class="sound-source-select"
+                                            title={
+                                                loaded
+                                                    ? `Use ${pack.name}`
+                                                    : `Install ${pack.name} to use it`
+                                            }
+                                            onClick={() => selectSource(module, `pack:${pack.id}`)}
+                                        >
+                                            <span class="sound-source-dot" aria-hidden="true" />
+                                            <span class="sound-source-name">{pack.name}</span>
+                                            <span class="sound-source-meta">
+                                                {isBusy
+                                                    ? 'Downloading…'
+                                                    : loaded
+                                                      ? 'Installed'
+                                                      : `${pack.approxSizeMB} MB`}
+                                            </span>
+                                        </button>
+                                        <div class="sound-source-actions">
+                                            <button
+                                                type="button"
+                                                class="icon-btn"
+                                                aria-label={`Preview ${pack.name}`}
+                                                disabled={isBusy}
+                                                onClick={() => preview(module, pack)}
+                                            >
+                                                <Icon name="headphones" />
+                                            </button>
+                                            {loaded ? (
+                                                <button
+                                                    type="button"
+                                                    class="icon-btn danger-btn"
+                                                    aria-label={`Remove ${pack.name}`}
+                                                    disabled={isBusy}
+                                                    onClick={() => remove(pack)}
+                                                >
+                                                    <Icon name="trash" />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    class="secondary-btn sound-source-install"
+                                                    aria-label={`Install ${pack.name}`}
+                                                    disabled={isBusy}
+                                                    onClick={() => install(module, pack)}
+                                                >
+                                                    <Icon name="install" /> Install
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    );
-                })}
-            </SettingGroup>
-        </>
+                        {/* Credit line for the active pack (license attribution). */}
+                        {packsForInstrument(module)
+                            .filter((pack) => voice === `pack:${pack.id}`)
+                            .map((pack) => (
+                                <p class="sound-source-credit" key={pack.id}>
+                                    {pack.attribution}
+                                </p>
+                            ))}
+                    </div>
+                );
+            })}
+
+            {SOUND_PACKS.length === 0 && (
+                <p class="text-mini-muted">No sample packs are available yet.</p>
+            )}
+        </SettingGroup>
     );
 }

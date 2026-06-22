@@ -2203,83 +2203,119 @@ input[type="range"] {
     color: var(--bg-color);
 }
 
-/* Sounds section (Epic 6 — sample packs) */
+/* Sounds section (Epic 6 — sample packs). Instrument-first: one source group
+   per instrument, each a radio list of Synth + its packs. */
 .sounds-intro {
     margin: 0 0 var(--space-3);
     line-height: 1.4;
 }
 
-.sound-pack-card {
+.sound-instrument-group + .sound-instrument-group {
+    margin-top: var(--space-4);
+}
+
+.sound-instrument-title {
+    margin: 0 0 var(--space-2);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.sound-source-list {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding: var(--space-3);
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+/* A source row — Synth (a single button) or a pack (select button + actions). */
+.sound-source-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     background: var(--input-bg, rgba(255, 255, 255, 0.04));
-}
-
-.sound-pack-card + .sound-pack-card {
-    margin-top: var(--space-2);
-}
-
-.sound-pack-card-info {
-    min-width: 0;
-}
-
-.sound-pack-card-head {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-}
-
-.sound-pack-card-name {
-    font-weight: 600;
     color: var(--text-color);
+    text-align: left;
+    cursor: pointer;
 }
 
-.sound-pack-status {
-    font-size: 0.78rem;
+.sound-source-row.is-active {
+    border-color: var(--accent-color);
+    background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+
+.sound-source-row:disabled,
+.sound-source-select:disabled {
+    cursor: default;
+}
+
+/* The pack row hosts a select button + an actions cluster, so it isn't itself
+   the button — its select child carries the row's flex layout. */
+.sound-source-row--pack {
+    padding: 0;
+    cursor: default;
+}
+
+.sound-source-select {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* The selected/unselected radio dot. */
+.sound-source-dot {
+    flex-shrink: 0;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 50%;
+    border: 2px solid var(--text-muted, rgba(255, 255, 255, 0.45));
+}
+
+.is-active .sound-source-dot {
+    border-color: var(--accent-color);
+    background: radial-gradient(circle, var(--accent-color) 0 40%, transparent 45%);
+}
+
+.sound-source-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sound-source-meta {
+    margin-left: auto;
+    font-size: 0.76rem;
     color: var(--text-muted, rgba(255, 255, 255, 0.6));
 }
 
-.sound-pack-status.is-installed {
-    color: var(--accent-color);
-    font-weight: 600;
-}
-
-.sound-pack-card-desc {
-    margin: var(--space-1) 0 0;
-    font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
-}
-
-.sound-pack-card-credit {
-    margin: var(--space-1) 0 0;
-    font-size: 0.72rem;
-    color: var(--text-muted, rgba(255, 255, 255, 0.45));
-}
-
-.sound-pack-card-actions {
+.sound-source-actions {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-1);
     flex-shrink: 0;
+    padding-right: var(--space-2);
 }
 
-.sound-pack-card-actions button {
+.sound-source-install {
     white-space: nowrap;
 }
 
-@media (max-width: 560px) {
-    .sound-pack-card {
-        flex-direction: column;
-    }
-
-    .sound-pack-card-actions {
-        flex-direction: row;
-        align-self: stretch;
-    }
+.sound-source-credit {
+    margin: var(--space-1) 0 0;
+    font-size: 0.7rem;
+    color: var(--text-muted, rgba(255, 255, 255, 0.45));
 }
