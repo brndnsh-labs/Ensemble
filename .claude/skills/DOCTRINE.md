@@ -65,13 +65,13 @@ workflow is ever toggled off, nothing downstream breaks (the board just lags rea
 - **`area:*`** — surface tags inferring the executor when Agent is unset: `area:soloist`,
   `area:bass`, `area:drums`, `area:chords`, `area:harmony`, `area:groove`, `area:synth`,
   `area:state`, `area:worker`, `area:ui`, `area:infra`.
-- **`track:*`** is **not** a label — the **Track field** (§3) owns musical/synth/bundle.
+- **`track:*`** is **not** a label — the **Track field** (§3) owns musical/synth/bundle/ui.
 
 ## §3 Fields & routing
 
 **Fields** (single-select; note **`Review lens`** has a space in its key):
-- **Track** — `musical` | `synth` | `bundle`. **The load-bearing routing field** — it picks the
-  Definition of Done and the reviewer set (below). The three tracks differ on their DoD:
+- **Track** — `musical` | `synth` | `bundle` | `ui`. **The load-bearing routing field** — it picks
+  the Definition of Done and the reviewer set (below). The tracks differ on their DoD:
   - **musical** → gated by a **critique test** in `tests/standards/` (statistical ranges, an
     automated oracle). Most musical stories are fully auto-mergeable on green; when the change is
     audible, ship it `verify-by-ear` (auto-merge on green + a 🎧 listen checklist — §5). Only
@@ -81,6 +81,12 @@ workflow is ever toggled off, nothing downstream breaks (the board just lags rea
     at the merge gate (§5) — build + PR, but **never auto-merge unheard**.
   - **bundle** → gated by a **measurable KB delta** (`npm run build` / size check) **and**
     behavior-preservation (full suite green). Auto-mergeable on green.
+  - **ui** → UI/UX surface work (`public/components/**`, non-engine `public/**`) with no new
+    generative behavior, synth voice, or bundle-shrink claim. Gated by **e2e smoke +
+    `npm run typecheck`** green; reviewer is `state-discipline` when it touches state, else
+    `/code-review`. Auto-mergeable on green (same safe posture as `bundle`). When a `ui` change
+    routes audible voices (e.g. a sound-source picker), pair it with `verify-by-ear` for a 🎧 pass —
+    but routing already-approved voices is **not** a `synth` Needs-ear hard stop.
 - **Model** — `sonnet` | `opus` (default **opus** — standing call: spawn agents on opus).
   **Model does not gate autonomy** (§5) — it only picks the executor's model.
 - **Size** — S | M | L.
