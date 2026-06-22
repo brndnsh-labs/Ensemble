@@ -77,7 +77,11 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         instruments: ['chords'],
         // Calibrated 2026-06-22 (#664) via `mix-report --calibrate-pack=chords:clavinet`.
         // Percussive plucked tone (short natural decay, no loop); loudnorm-leveled
-        // across the 8 zones. mix-report RMS-match was 5.14× (pack sat 14.2 dB under
+        // across the 8 zones. NOTE: the manifest roots are FRACTIONAL on purpose —
+        // the SF2 samples carry per-zone pitch-correction (mostly ~+30 cents flat,
+        // plus B1 −12 / F#2 +3), baked into `rootMidi = originalPitch − cents/100`
+        // so the seam's playbackRate tunes each zone true. Don't round them to ints.
+        // mix-report RMS-match was 5.14× (pack sat 14.2 dB under
         // raw), but the clavinet is brighter (+193 Hz) and transient (high
         // peak-to-RMS → reads louder than its RMS), so seated under the match: 4.5×.
         // Confirm/nudge by ear on ensembletest (funk). Paired with SYNTH_CHORD_LEVEL.
