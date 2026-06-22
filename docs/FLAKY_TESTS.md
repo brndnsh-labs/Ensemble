@@ -41,6 +41,14 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix:** `installSeededRandom()` at the `describe` level (replaces the redundant `beforeEach(vi.restoreAllMocks)`; 2026-06-20). With the default mulberry32 seed the draw is now `20/31 = 64.5%` every run (margin 0.345 above the floor, 0.205 below the 0.85 ceiling) — deterministic, still a representative draw. Full file 7/7 and the `standards/` batch 968/968 green.
 - **Last seen:** 2026-06-20 (post-merge CI on main, since fixed).
 
+### 🟢 `tests/e2e/harmony-click-free.spec.ts` — "worst sample step must stay below half peak"
+
+- **Class:** unseeded-statistical (the e2e variant — unseeded `Math.random` inside `page.evaluate`, not a critique test).
+- **Symptom:** `expect(metrics.maxStep).toBeLessThan(metrics.maxAbs * 0.5)` failed intermittently (failed the full e2e run of #533, #650, and #668; green on most re-runs). Same `@diagnostic` render every time; `maxStep`/`maxAbs` varied run-to-run.
+- **Root cause:** the harmony voice's per-note panning + timbre jitter draw unseeded `Math.random()`, so the offline render's `maxStep`/`maxAbs` varied each run. Worse, the `0.5×maxAbs` bound was calibrated against a couple of *lucky* unseeded renders — the legitimate worst step (sawtooth slew + constructive overlap of the stacked stab voices) actually reaches ~0.60×peak, *above* the 0.5 line. So the bound sat below real content and tripped on any unlucky roll.
+- **Fix (2026-06-22, #654):** both halves of the canonical fix. (1) Seed the render — a mulberry32 `Math.random` stub at the top of the `page.evaluate` callback (before importing the voice), the in-page analogue of `installSeededRandom`. Render is now exactly `maxStep=0.7523, maxAbs=1.2598` every run. (2) Re-anchor the threshold to the real failure boundary: legit content ~0.60×peak, a true full-scale hard-stop ~1.0×peak → `0.7×maxAbs` clears content (margin ~0.10) while still failing a full-scale discontinuity (margin ~0.30). The guard's intent (catch NaN + gross full-scale jumps; the fine click mechanism is unit-asserted in `harmonies-synthesis.test.ts`) is unchanged.
+- **Last seen:** 2026-06-22 (CI on PR #668, since fixed).
+
 ### 🟢 e2e hydration-wait timeouts (dev-server cold compile)
 
 - **Class:** e2e-timing
