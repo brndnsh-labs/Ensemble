@@ -9,10 +9,12 @@ import playwright from '@playwright/test';
 
 const { chromium } = playwright;
 
+import { gainForPack } from '../public/data/sound-packs.js';
 import { encodeWav } from '../public/engine/wav-encoder.js';
 import {
     buildRenderedMixReport,
     DEFAULT_MIX_REPORT_SCENES,
+    formatPackCalibration,
     formatRenderedMixReport,
     MIX_REPORT_STEMS,
     parseEnsembleAuditInput,
@@ -39,14 +41,14 @@ const MIME_TYPES = {
 };
 
 function runCommand(command, args, options = {}) {
-    const { forwardToStderr = false } = options;
+    const { forwardToStderr = false, env = {} } = options;
     const stdio = forwardToStderr ? ['ignore', 'pipe', 'pipe'] : 'inherit';
 
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
             cwd: REPO_ROOT,
             stdio,
-            env: process.env,
+            env: { ...process.env, ...env },
         });
         let output = '';
 
@@ -283,7 +285,7 @@ function printHumanMixReport(report) {
     }
 }
 
-async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
+async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePack }) {
     const loopCount = Math.max(1, Math.floor(loops || 1));
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
@@ -329,8 +331,8 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                 { timeout: 20000 },
             );
 
-            const sceneRuns = await page.evaluate(
-                async ({ scenes, stems, seeds, writeWav, loops }) => {
+            const evaluated = await page.evaluate(
+                async ({ scenes, stems, seeds, writeWav, loops, calibratePack }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     const {
                         getState,
@@ -449,7 +451,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                         };
                     }
 
-                    function createSceneState(scene, stem) {
+                    function createSceneState(scene, stem, voiceOverride) {
                         const liveState = getState();
                         const state = cloneState(liveState);
                         state.arranger.sections = scene.sections.map((section) => ({
@@ -518,6 +520,13 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                             }
                         }
                         state.groove.snareMask = snareMask;
+
+                        // Pack-calibration A/B: force the target lane onto a
+                        // specific voice ('synth' baseline vs 'pack:<id>') so the
+                        // two renders differ only in the voice under test.
+                        if (voiceOverride && state[voiceOverride.module]) {
+                            state[voiceOverride.module].voice = voiceOverride.voice;
+                        }
 
                         return state;
                     }
@@ -930,9 +939,9 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                         };
                     }
 
-                    async function renderStem(scene, stem, seedLabel) {
+                    async function renderStem(scene, stem, seedLabel, voiceOverride) {
                         await loadDrumPreset(scene.drumPreset || 'Basic Rock');
-                        const state = createSceneState(scene, stem);
+                        const state = createSceneState(scene, stem, voiceOverride);
                         const sixteenth = 60 / state.playback.bpm / 4;
                         const renderLeadIn = 0.25;
                         const stepsPerLoop = state.arranger.totalSteps;
@@ -1044,7 +1053,10 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
 
                     const sceneReports = [];
 
-                    for (const scene of scenes) {
+                    // In calibration mode the full per-stem report is discarded
+                    // (Node early-returns the calibration), so skip the whole
+                    // N-stem × scenes × seeds render and only do the paired A/B.
+                    for (const scene of calibratePack ? [] : scenes) {
                         const seedReports = [];
 
                         for (const seed of seeds) {
@@ -1071,7 +1083,65 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                         });
                     }
 
-                    return sceneReports;
+                    // Pack calibration: render the target lane's stem twice per
+                    // scene/seed — once on the synth voice (baseline), once on the
+                    // pack — and report the RMS + centroid the Node side turns into
+                    // a suggested gain. Same scene/seed → the only difference is the
+                    // voice under test.
+                    let calibration = null;
+                    if (calibratePack) {
+                        const { module, packId } = calibratePack;
+                        // module → which single-lane stem isolates it.
+                        const stemForModule = { groove: 'drums' };
+                        const stemId = stemForModule[module] || module;
+                        const stem = stems.find((entry) => entry.id === stemId);
+                        if (!stem) {
+                            calibration = {
+                                module,
+                                packId,
+                                error: `no isolated stem for module "${module}"`,
+                            };
+                        } else {
+                            // Load the pack zones once into the module-global cache
+                            // (decode on a throwaway offline ctx); subsequent pack
+                            // renders read the same cache.
+                            const loadCtx = new OfflineAudioContext(1, sampleRate, sampleRate);
+                            await ensemble.ensurePackLoaded(loadCtx, packId);
+                            const zones = ensemble.getPackZones(packId);
+                            if (!zones || zones.length === 0) {
+                                calibration = {
+                                    module,
+                                    packId,
+                                    error: `pack "${packId}" produced no playable zones (dist/packs/${packId} present? built?)`,
+                                };
+                            } else {
+                                const rows = [];
+                                for (const scene of scenes) {
+                                    for (const seed of seeds) {
+                                        const synthMetrics = await renderStem(scene, stem, seed, {
+                                            module,
+                                            voice: 'synth',
+                                        });
+                                        const packMetrics = await renderStem(scene, stem, seed, {
+                                            module,
+                                            voice: `pack:${packId}`,
+                                        });
+                                        rows.push({
+                                            sceneId: scene.id,
+                                            seed,
+                                            synthRmsDb: synthMetrics.rmsDb,
+                                            packRmsDb: packMetrics.rmsDb,
+                                            synthCentroid: synthMetrics.probes?.centroid || 0,
+                                            packCentroid: packMetrics.probes?.centroid || 0,
+                                        });
+                                    }
+                                }
+                                calibration = { module, packId, rows };
+                            }
+                        }
+                    }
+
+                    return { sceneReports, calibration };
                 },
                 {
                     scenes,
@@ -1079,10 +1149,15 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops }) {
                     seeds,
                     writeWav: Boolean(writeWav),
                     loops: loopCount,
+                    calibratePack: calibratePack || null,
                 },
             );
 
-            return { sceneRuns, writtenWavPaths };
+            return {
+                sceneRuns: evaluated.sceneReports,
+                calibration: evaluated.calibration,
+                writtenWavPaths,
+            };
         } finally {
             await browser.close();
         }
@@ -1109,17 +1184,37 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
 
     if (!cliOptions.noBuild) {
         log.write('Building dist for mix analysis...\n');
+        // The offline render drives `window.ensemble`, which `main.ts` gates
+        // behind `import.meta.env.DEV || VITE_E2E_BRIDGE`. A plain `vite build`
+        // (DEV=false) tree-shakes the bridge out, so opt it back in for this
+        // analysis build only — real prod builds never set the flag (#656).
         await runCommand('npm', ['run', 'build:quiet'], {
             forwardToStderr: machineReadable,
+            env: { VITE_E2E_BRIDGE: '1' },
         });
     }
 
-    const { sceneRuns, writtenWavPaths } = await renderSceneReports({
+    const { sceneRuns, calibration, writtenWavPaths } = await renderSceneReports({
         scenes,
         seeds,
         writeWav: cliOptions.writeWav,
         loops: cliOptions.loops,
+        calibratePack: cliOptions.calibratePack,
     });
+
+    // Calibration mode: the deliverable is the suggested gain, not the full
+    // report. Print it and return — the same paired numbers the catalog `gain`
+    // field should be set from.
+    if (cliOptions.calibratePack) {
+        process.stdout.write(
+            `${formatPackCalibration({
+                ...calibration,
+                currentGain: gainForPack(cliOptions.calibratePack.packId),
+            })}\n`,
+        );
+        return { calibration };
+    }
+
     const report = buildRenderedMixReport({
         sceneRuns,
         options: {

@@ -373,7 +373,98 @@ export function resolveMixReportCliOptions(argv = []) {
         // RMS arc gets reported per stem so front-loaded / arc-shaped /
         // flat intensity trajectories surface as hard numbers.
         loops: Math.max(1, Math.floor(readNumberOption(options, 'loops', 1))),
+        // `--calibrate-pack=<module>:<packId>` → run a paired synth-vs-pack
+        // render for that lane and print suggested gain instead of the report.
+        calibratePack: parseCalibratePack(readStringOption(options, 'calibrate-pack', '')),
     };
+}
+
+// Parse `--calibrate-pack=<module>:<packId>` (e.g. `--calibrate-pack=chords:grand`)
+// into a target descriptor, or null when the flag is absent / malformed. The CLI
+// parser only supports the `=` form, so a space-separated value sets the flag to
+// `true` and lands here as the string "true" → throws the clear error below.
+export const CALIBRATE_PACK_USAGE =
+    '--calibrate-pack=<module>:<packId> (e.g. --calibrate-pack=chords:grand)';
+
+export function parseCalibratePack(raw) {
+    const value = String(raw || '').trim();
+    if (!value) {
+        return null;
+    }
+    const [module, packId] = value.split(':').map((part) => part.trim());
+    if (!module || !packId) {
+        throw new Error(`expected ${CALIBRATE_PACK_USAGE}; got "${raw}"`);
+    }
+    return { module, packId };
+}
+
+// The threshold (dB) at which a pack is "off baseline" vs the synth it replaces.
+export const PACK_CALIBRATION_WARN_DB = 2;
+
+// Render the human calibration report from the paired synth-vs-pack rows the
+// mix-report browser pass returns. Suggested gain = currentGain · 10^(Δ/20),
+// where Δ = synthRms − packRms (positive when the pack sits quieter than synth).
+export function formatPackCalibration({ module, packId, currentGain, rows, error }) {
+    const lines = [];
+    lines.push('');
+    lines.push(`Pack calibration — ${module} : pack:${packId}  (baseline = synth voice)`);
+    lines.push('='.repeat(64));
+
+    if (error) {
+        lines.push(`  ✗ ${error}`);
+        return lines.join('\n');
+    }
+    if (!rows || rows.length === 0) {
+        lines.push('  ✗ no paired renders produced — check the scene/seed selection');
+        return lines.join('\n');
+    }
+
+    const finite = (xs) => xs.filter((x) => Number.isFinite(x));
+    const mean = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : Number.NaN);
+
+    lines.push('  scene/seed                  synthRMS    packRMS      Δ dB   centroidΔ');
+    for (const row of rows) {
+        const delta = row.synthRmsDb - row.packRmsDb;
+        const centroidDelta = (row.packCentroid || 0) - (row.synthCentroid || 0);
+        lines.push(
+            `  ${`${row.sceneId}/${row.seed}`.padEnd(26)}` +
+                `${row.synthRmsDb.toFixed(2).padStart(8)}` +
+                `${row.packRmsDb.toFixed(2).padStart(11)}` +
+                `${delta.toFixed(2).padStart(10)}` +
+                `${`${centroidDelta >= 0 ? '+' : ''}${Math.round(centroidDelta)}Hz`.padStart(11)}`,
+        );
+    }
+
+    const meanDelta = mean(finite(rows.map((r) => r.synthRmsDb - r.packRmsDb)));
+    const meanCentroidDelta = mean(
+        finite(rows.map((r) => (r.packCentroid || 0) - (r.synthCentroid || 0))),
+    );
+    const base = Number.isFinite(currentGain) && currentGain > 0 ? currentGain : 1;
+    const suggestedGain = base * 10 ** (meanDelta / 20);
+    const offBaseline = Math.abs(meanDelta) > PACK_CALIBRATION_WARN_DB;
+
+    lines.push('-'.repeat(64));
+    lines.push(
+        `  mean Δ (synth − pack): ${meanDelta.toFixed(2)} dB` +
+            `   centroid Δ: ${meanCentroidDelta >= 0 ? '+' : ''}${Math.round(meanCentroidDelta)} Hz`,
+    );
+    lines.push(`  current catalog gain:  ${base.toFixed(3)}×`);
+    lines.push(
+        `  suggested gain:        ${suggestedGain.toFixed(3)}×   (sets pack RMS = synth RMS)`,
+    );
+    lines.push(
+        !Number.isFinite(meanDelta)
+            ? '  ✗ no finite RMS deltas — the paired renders may have produced silence; nothing to calibrate'
+            : offBaseline
+              ? `  ⚠ OFF BASELINE — pack is ${meanDelta > 0 ? 'quieter' : 'louder'} than synth by ${Math.abs(meanDelta).toFixed(2)} dB (> ${PACK_CALIBRATION_WARN_DB} dB). Set sound-packs gain to ~${suggestedGain.toFixed(2)}, then re-run + listen.`
+              : `  ✓ within ${PACK_CALIBRATION_WARN_DB} dB of the synth baseline — gain looks calibrated.`,
+    );
+    if (Math.abs(meanCentroidDelta) > 600) {
+        lines.push(
+            `  ℹ centroid differs by ${Math.abs(Math.round(meanCentroidDelta))} Hz — the pack is timbrally ${meanCentroidDelta > 0 ? 'brighter' : 'darker'} than the synth; RMS-match won't fully equalize perceived balance. Trust the listen pass.`,
+        );
+    }
+    return lines.join('\n');
 }
 
 export function selectMixReportScenes(scenes, requestedIds = []) {

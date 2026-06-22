@@ -18,8 +18,10 @@ import { isPackLoaded, registerPackBuffer } from './instrument-registry.js';
  *     payload rejects the returned promise (and clears the in-flight entry so a
  *     later call can retry).
  *
- * Decoding requires a running `AudioContext`, so callers must pass the one from
- * `playback.audio` (created in `initAudio()`); the loader never creates its own.
+ * Decoding requires a `BaseAudioContext` — in app code the live `AudioContext`
+ * from `playback.audio` (created in `initAudio()`); the headless mix-calibration
+ * harness passes an `OfflineAudioContext`. Only `decodeAudioData` is used, which
+ * both provide. The loader never creates its own context.
  */
 
 /** One sample within a pack: the registry key it lands under + where to fetch it. */
@@ -74,7 +76,7 @@ function validateManifest(manifest: unknown): asserts manifest is PackManifest {
 }
 
 async function fetchAndDecode(
-    ctx: AudioContext,
+    ctx: BaseAudioContext,
     packId: string,
     sample: PackSample,
 ): Promise<{ key: string; buffer: AudioBuffer }> {
@@ -96,7 +98,7 @@ async function fetchAndDecode(
  * Lazily load + decode a sample pack and register its buffers. Resolves once the
  * pack is fully loaded (or was already). See module docs for the guarantees.
  */
-export async function loadPack(ctx: AudioContext, manifest: PackManifest): Promise<void> {
+export async function loadPack(ctx: BaseAudioContext, manifest: PackManifest): Promise<void> {
     validateManifest(manifest);
     if (isPackLoaded(manifest.id)) {
         return;

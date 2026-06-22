@@ -41,7 +41,7 @@ async function fetchManifest(packId: string): Promise<PackManifest> {
  * fails to load simply never populates `zoneCache`, and the instrument seam
  * falls back to its synth voice (the registry's graceful-fallback contract).
  */
-export function ensurePackLoaded(audio: AudioContext, packId: string): Promise<void> {
+export function ensurePackLoaded(audio: BaseAudioContext, packId: string): Promise<void> {
     if (zoneCache.has(packId)) {
         return Promise.resolve();
     }

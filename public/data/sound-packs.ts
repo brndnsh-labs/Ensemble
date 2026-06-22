@@ -28,6 +28,13 @@ export interface SoundPack {
     readonly approxSizeMB: number;
     /** Instrument modules whose voice can route through this pack today. */
     readonly instruments: readonly InstrumentModule[];
+    /**
+     * Playback gain multiplier that lands the (loudness-normalized) samples at
+     * the same seat as the synth voice they replace. Calibrated against the
+     * synth baseline by `scripts/mix-report.ts --calibrate-pack <module>:<id>`
+     * (RMS-match + a confirming listen). Defaults to `1` when omitted.
+     */
+    readonly gain?: number;
 }
 
 export const SOUND_PACKS: readonly SoundPack[] = [
@@ -38,10 +45,24 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         attribution: 'Salamander Grand Piano (Yamaha C5) by Alexander Holm — CC-BY 3.0',
         approxSizeMB: 1.3,
         instruments: ['chords'],
+        // Ear-locked 2026-06-21 (#533); now catalog-owned (#656). Paired with
+        // the synth chords' `SYNTH_CHORD_LEVEL 0.85×` trim so the sampled grand
+        // and the (slightly tamed) synth chords sit balanced in the A/B.
+        gain: 3.5,
     },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */
 export function packsForInstrument(module: InstrumentModule): readonly SoundPack[] {
     return SOUND_PACKS.filter((pack) => pack.instruments.includes(module));
+}
+
+/**
+ * The playback gain for a pack id — the calibrated lift that sits its samples
+ * at the synth voice's level. Unknown id or no calibrated value → `1` (no lift),
+ * so a freshly-added pack plays at its raw sample level until calibrated.
+ */
+export function gainForPack(packId: string): number {
+    const pack = SOUND_PACKS.find((entry) => entry.id === packId);
+    return pack?.gain ?? 1;
 }

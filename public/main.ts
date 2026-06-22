@@ -38,7 +38,13 @@ function init() {
         // static `false` and the whole branch — install call + `e2e-tools` import
         // — is tree-shaken out. Prod dispatches go through the imported `dispatch`
         // directly (below), so this global is never on the production dispatch path.
-        if (import.meta.env.DEV) {
+        //
+        // `VITE_E2E_BRIDGE=1` is the explicit opt-in for the offline-render
+        // analysis harness (`scripts/mix-report.ts`), which builds + serves a
+        // real `dist` and needs the bridge. Vite replaces the var statically, so
+        // an unset flag (every real prod build) keeps the whole branch tree-shaken
+        // — the #543 prod guarantee holds; only the analysis build sets it (#656).
+        if (import.meta.env.DEV || import.meta.env.VITE_E2E_BRIDGE === '1') {
             installE2EGlobals();
         }
 

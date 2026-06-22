@@ -1,3 +1,4 @@
+import { gainForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
@@ -177,12 +178,12 @@ function playSampledChord(
     }
     const numVoices = Math.max(1, opts?.numVoices ?? 1);
     const vol = Number.isFinite(opts?.vol) ? (opts?.vol as number) : 0.1;
-    // Level: mirror the synth's polyphony compensation, then lift so a normalized
-    // piano sample sits at a comparable loudness to the synth voice. Ear-locked
-    // 2026-06-21 at 3.5× — paired with the SYNTH_CHORD_LEVEL trim, the sampled
-    // grand and the (slightly tamed) synth chords sit balanced. The bus limiter
-    // catches peaks on dense chords.
-    const velocity = Math.min(1, (vol / Math.sqrt(numVoices)) * 3.5);
+    // Level: mirror the synth's polyphony compensation, then lift by the pack's
+    // calibrated gain so a normalized sample sits at a comparable loudness to the
+    // synth voice. The lift is catalog-owned (`gainForPack`, #656) — calibrated
+    // against the synth baseline via `mix-report --calibrate-pack` and paired with
+    // the SYNTH_CHORD_LEVEL trim. The bus limiter catches peaks on dense chords.
+    const velocity = Math.min(1, (vol / Math.sqrt(numVoices)) * gainForPack(packId));
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
