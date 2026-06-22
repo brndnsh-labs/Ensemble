@@ -97,14 +97,14 @@ describe('genre → sound map (#675)', () => {
     });
 
     describe('drums lane — per-genre kit (#695)', () => {
-        // Acoustic kit for the live-drummer genres; electronic genres keep synth.
-        const ACOUSTIC_KIT_GENRES = ['Jazz', 'Blues', 'Acoustic', 'Country', 'Bossa'];
+        // Acoustic kit is the DEFAULT (live drummer fits most genres, Brandon's
+        // ear 2026-06-22); synth kit is the exception for programmed/triggered
+        // drums only — Hip Hop (beats) and Metal (too soft on the natural kit).
+        const SYNTH_KIT_GENRES = ['Hip Hop', 'Metal'];
 
         it('maps every canonical genre to its decided groove voice (installed)', () => {
             for (const genre of GENRE_NAMES) {
-                const expected = ACOUSTIC_KIT_GENRES.includes(genre)
-                    ? 'pack:acoustic-kit'
-                    : 'synth';
+                const expected = SYNTH_KIT_GENRES.includes(genre) ? 'synth' : 'pack:acoustic-kit';
                 expect(
                     autoVoiceForGenre(genre, 'groove', allInstalled),
                     `${genre} groove voice drifted from the locked table`,
