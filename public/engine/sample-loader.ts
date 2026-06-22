@@ -37,6 +37,14 @@ export interface PackSample {
      * percussion packs (drums/cymbals), which play their buffer as-is.
      */
     readonly rootMidi?: number;
+    /**
+     * Additional sample URLs for this same zone key — round-robin alternates
+     * (#657). `url` is take 0; each `variants[]` entry is an extra take. The
+     * loader registers them all under `key` in order, and the percussive path
+     * cycles them deterministically so a sampled kit doesn't machine-gun. Absent
+     * (the common case) → a single-take zone, identical to pre-#657.
+     */
+    readonly variants?: readonly string[];
 }
 
 /** A pack's manifest — its id and the list of samples that make it up. */
@@ -71,6 +79,16 @@ function validateManifest(manifest: unknown): asserts manifest is PackManifest {
             typeof (sample as PackSample).url !== 'string'
         ) {
             throw new Error(`[sample-loader] pack "${m.id}" has a malformed sample entry`);
+        }
+        const variants = (sample as PackSample).variants;
+        if (
+            variants !== undefined &&
+            (!Array.isArray(variants) || variants.some((v) => typeof v !== 'string'))
+        ) {
+            throw new Error(
+                `[sample-loader] pack "${m.id}" sample "${(sample as PackSample).key}" has a ` +
+                    'malformed `variants` (must be an array of URL strings)',
+            );
         }
     }
 }
@@ -109,8 +127,15 @@ export async function loadPack(ctx: BaseAudioContext, manifest: PackManifest): P
     }
 
     const load = (async () => {
+        // Expand each sample into one fetch task per take: the primary `url`
+        // (take 0) followed by any round-robin `variants[]`, all sharing the
+        // sample's `key`. `Promise.all` preserves array order, so the registry
+        // accumulates a zone's takes in manifest order (#657).
+        const tasks = manifest.samples.flatMap((sample) =>
+            [sample.url, ...(sample.variants ?? [])].map((url) => ({ key: sample.key, url })),
+        );
         const decoded = await Promise.all(
-            manifest.samples.map((sample) => fetchAndDecode(ctx, manifest.id, sample)),
+            tasks.map((task) => fetchAndDecode(ctx, manifest.id, task)),
         );
         // Register only after every sample decodes — atomic present-or-absent.
         for (const { key, buffer } of decoded) {

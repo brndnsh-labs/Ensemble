@@ -15,6 +15,7 @@
  */
 
 import { safeDisconnect } from '../utils.js';
+import { scrambleHash } from './hash-utils.js';
 
 /** A pitched sample zone: a decoded buffer recorded at a known root pitch. */
 export interface SampleZone {
@@ -62,6 +63,28 @@ export function pickZone(zones: readonly SampleZone[], targetMidi: number): Samp
         }
     }
     return best;
+}
+
+/**
+ * Deterministic round-robin pick over a zone's alternate takes (#657). Given a
+ * seed composed from the playing position (e.g. `barIndex`/`step`, per the
+ * deterministic-phrasing rule — never `Math.random`), returns the take to play.
+ *
+ * Uses `scrambleHash` rather than a bare `seed % length`: a raw modulo locks the
+ * choice to a fixed grid pattern (take 0 on every downbeat, say), which is its
+ * own kind of machine-gun; scrambling decorrelates the take from the beat while
+ * staying fully reproducible — the same seed always yields the same take, so
+ * looped playback and the unit test are byte-stable. Returns `null` only for an
+ * empty set; a single-take zone always returns that take.
+ */
+export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
+    if (takes.length === 0) {
+        return null;
+    }
+    const idx = Math.floor(scrambleHash(seed) * takes.length);
+    // scrambleHash is [0,1); floor keeps idx in [0, length-1]. Guard the 1.0
+    // edge (unreachable in practice) so we never index past the end.
+    return takes[Math.min(idx, takes.length - 1)];
 }
 
 /**
