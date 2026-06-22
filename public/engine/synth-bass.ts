@@ -1,6 +1,9 @@
+import { gainForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { getPackZones } from './pack-runtime.js';
+import { pickZone, playSampledNote } from './sample-voice.js';
 import { playPercussiveStrike, rampGain, velocityTimbre } from './synth-utils.js';
 
 export function killBassNote(state: EnsembleState): void {
@@ -32,19 +35,68 @@ function dispatchBassSynth(...args: Parameters<typeof playBassNoteNew>): void {
     playBassNoteNew(...args);
 }
 
+// #697 — sampled bass voice (upright/double-bass pizzicato pack). Picks the
+// nearest loaded zone and plays it through the bass gain bus (inheriting the
+// lane's EQ / reverb send / sidechain-duck / limiting). Returns false — so the
+// caller falls back to the synth voice — when zones aren't loaded yet or the
+// note is unplayable. Bass is monophonic and `playSampledNote` is
+// duration-bounded (it stops each note past its release tail), so successive
+// notes don't pile up. The sample seam does NOT model continuous pitch bends or
+// the mute-morph the synth voice has — an accepted tradeoff for a real-recorded
+// upright (it just attenuates muted notes, below), confirmed at the listen gate.
+function playSampledBass(
+    state: EnsembleState,
+    packId: string,
+    freq: number,
+    time: number,
+    duration: number,
+    velocity: number,
+    muteAmount: number,
+): boolean {
+    const { playback } = state;
+    const audio = playback.audio;
+    const dest = playback.audioGraph?.bass?.gain;
+    const zones = getPackZones(packId);
+    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
+        return false;
+    }
+    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    const zone = pickZone(zones, targetMidi);
+    if (!zone) {
+        return false;
+    }
+    // Mirror the synth voice's mute attenuation so palm-muted notes sit back
+    // (the synth path does `* (1 - muteAmount * 0.85)`). Finite-guard both inputs
+    // locally — same "guard them all" discipline as playBassNoteNew — rather than
+    // leaning on playSampledNote's downstream clamp.
+    const vel = Number.isFinite(velocity) ? velocity : 0.5;
+    const mute = Number.isFinite(muteAmount) ? Math.max(0, muteAmount) : 0;
+    const v = vel * (1 - mute * 0.85);
+    // Pass the pack-calibrated velocity STRAIGHT to playSampledNote (which bounds
+    // the envelope peak at MAX_SAMPLE_PEAK). No `Math.min(1, …)` here: that clamp
+    // silently defeats gain calibration above unity (#660 strings lesson).
+    playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
+        velocity: v * gainForPack(packId),
+        duration,
+    });
+    return true;
+}
+
 /**
  * P-Bass Synthesis: Layered physical model
  */
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice resolves
-// to a sample source once its buffers load (S3); S5 routes that case to
-// `playSampledNote`. Until then, and whenever a pack buffer is unavailable, we
-// fall back to the synth voice — bit-identical with no packs installed. (Per
-// `bass.md` §4 the bass has no planned pack — continuous bends/mute morph would
-// regress — but it routes through the registry uniformly with every voice.)
+// to a sample source once its buffers load; #697 routes that case to
+// `playSampledBass` (the upright-bass pack). Until then, and whenever a pack
+// buffer is unavailable, we fall back to the synth voice — bit-identical with no
+// packs installed.
 export function playBassNote(...args: Parameters<typeof playBassNoteNew>): void {
-    if (resolveInstrumentSource(args[0].bass.voice).kind === 'sample') {
-        dispatchBassSynth(...args); // S5: → playSampledNote(packId, …)
-        return;
+    const source = resolveInstrumentSource(args[0].bass.voice);
+    if (source.kind === 'sample') {
+        const [state, freq, time, duration, velocity = 1, muteAmount = 0] = args;
+        if (playSampledBass(state, source.packId, freq, time, duration, velocity, muteAmount)) {
+            return;
+        }
     }
     dispatchBassSynth(...args);
 }

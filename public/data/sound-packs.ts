@@ -182,6 +182,35 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // and don't wash the pocket with hall-on-room. #686 start.
         reverbSend: 0.7,
     },
+    {
+        id: 'upright-bass',
+        name: 'Upright Bass',
+        description:
+            'A sampled pizzicato double bass — a real acoustic upright for jazz/bossa/blues walking lines.',
+        attribution:
+            'VSCO-2 Community Edition (Solo Contrabass, pizzicato) by Versilian Studios — CC0 1.0 (public domain)',
+        approxSizeMB: 0.2,
+        instruments: ['bass'],
+        // First sampled pack on the BASS lane (#697) — plays the nearest of 8
+        // pizz zones (MIDI 28–52, every 3–4 semitones) through `playSampledBass`
+        // → `playSampledNote`, inheriting the bass bus EQ / reverb send / kick
+        // sidechain-duck. The seam doesn't model continuous bends or the synth's
+        // mute-morph (accepted tradeoff for a real upright; muted notes just
+        // attenuate). Zone roots were set from the *measured* fundamental (FFT +
+        // YIN + harmonic-template), not VSCO's unreliable filename octaves.
+        // Source is loudnorm-leveled (VSCO is quiet) + mono. Calibrated 2026-06-22
+        // (#697) via `mix:report --calibrate-pack=bass:upright-bass`: pack sat
+        // 3.2 dB under the synth bass across rock/blues/jazz/funk (RMS-match =
+        // 1.45×). Bass is the foundation, so the synth bass stem is the right
+        // reference (like the drum kit, unlike the buried grand). The upright is
+        // a touch darker (−72 Hz centroid → reads slightly quieter than its RMS),
+        // so seated just over the match at 1.5×. Confirm/nudge by ear on
+        // ensembletest (jazz walking / bossa / blues).
+        gain: 1.5,
+        // Close-mic'd DI-ish pizz, fairly dry — a small lift to seat it in the
+        // room without washing out the low end. #686-style start; tune by ear.
+        reverbSend: 0.6,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */
