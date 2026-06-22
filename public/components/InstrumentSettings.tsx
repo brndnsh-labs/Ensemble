@@ -9,7 +9,7 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
-import { Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
+import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 
 type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 type InstrumentAudioControl = 'volume' | 'reverb';
@@ -160,6 +160,26 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
 
     return (
         <SettingGroup title={getInstrumentSpecificTitle(module)}>
+            {/* Epic 6 — throwaway audition toggle for the grand-piano sample pack.
+                Replaced by the real per-instrument source picker in the Sounds
+                section (#650); here only so the pack can be heard now. */}
+            {module === 'chords' && (
+                <SettingRow label="Acoustic Grand (sampled)" id="chordsPackToggle">
+                    <Toggle
+                        id="chordsPackToggle"
+                        checked={state.voice === 'pack:grand'}
+                        ariaLabel="Acoustic grand piano sample pack"
+                        onChange={(val) => {
+                            dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
+                                module,
+                                voice: val ? 'pack:grand' : 'synth',
+                            });
+                            saveCurrentState();
+                        }}
+                    />
+                </SettingRow>
+            )}
+
             {module === 'chords' && (
                 <SettingRow label="Density" id="densitySelect">
                     <Select

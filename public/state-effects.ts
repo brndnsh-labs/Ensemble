@@ -7,6 +7,8 @@ import {
     generateSoloistAccents,
 } from './engine/drum-seeder.js';
 import { initAudio, restoreGains } from './engine/engine.js';
+import { packIdFromVoice } from './engine/instrument-registry.js';
+import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { resolveSoloistStyle, STYLE_CONFIG } from './engine/soloist-config.js';
 import { deriveSoloistHook, generateSessionSeed } from './engine/soloist-seeder.js';
@@ -96,6 +98,35 @@ function regenerateSessionSeeds(
     }
 }
 
+/**
+ * Epic 6 (Packs) — kick off lazy load+decode for any instrument whose voice is
+ * a `pack:<id>`. Idempotent (the runtime dedupes); a no-op until a live
+ * AudioContext exists, since decode needs it. Called once audio comes up
+ * (INIT_AUDIO) and whenever a pack voice is selected (SET_INSTRUMENT_VOICE), so
+ * a selected pack is ready by the time playback needs it — whichever came first.
+ * Until the zones finish loading the instrument seam falls back to its synth
+ * voice (the registry's graceful-fallback contract).
+ */
+function loadSelectedPacks(stateMap: EnsembleState): void {
+    const audio = stateMap.playback.audio;
+    if (!audio) {
+        return;
+    }
+    const voices = [
+        stateMap.chords.voice,
+        stateMap.bass.voice,
+        stateMap.soloist.voice,
+        stateMap.harmony.voice,
+        stateMap.groove.voice,
+    ];
+    for (const voice of voices) {
+        const packId = packIdFromVoice(voice);
+        if (packId) {
+            void ensurePackLoaded(audio, packId);
+        }
+    }
+}
+
 export function handleEffects(
     action: string,
     payload: any,
@@ -104,6 +135,16 @@ export function handleEffects(
 ): void {
     const { dispatch } = context;
     switch (action) {
+        case ACTIONS.SET_INSTRUMENT_VOICE: {
+            // Epic 6 — selecting a `pack:<id>` voice lazily loads that pack's
+            // samples (decode needs the live AudioContext from initAudio).
+            const audio = stateMap.playback.audio;
+            const packId = packIdFromVoice(payload?.voice);
+            if (audio && packId) {
+                void ensurePackLoaded(audio, packId);
+            }
+            break;
+        }
         case ACTIONS.TOGGLE_PLAY: {
             const { playback, arranger } = stateMap;
             if (playback.isPlaying) {
@@ -198,6 +239,9 @@ export function handleEffects(
         }
         case ACTIONS.INIT_AUDIO: {
             initAudio(stateMap);
+            // Audio is now live — load any already-selected sample pack(s) (e.g.
+            // a persisted pack voice, or one chosen before the first play).
+            loadSelectedPacks(stateMap);
             break;
         }
         case 'HYDRATE': {

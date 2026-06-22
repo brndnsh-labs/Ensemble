@@ -87,11 +87,6 @@ describe('State Integrity Audit', () => {
                 'VIS_UPDATE',
                 'PROG_VALIDATED',
                 'DRUM_PRESET_LOADED',
-                // Handled by its reducer (instruments slice) but currently has no
-                // dispatcher: the "New Sound" A/B toggle was retired in #649 and
-                // the Sounds-section source picker (#650) re-introduces the
-                // dispatch (synth ↔ installed pack).
-                'SET_INSTRUMENT_VOICE',
             ];
 
             if (!isDispatched && !exceptions.includes(key)) {

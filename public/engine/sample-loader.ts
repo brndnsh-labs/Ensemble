@@ -28,12 +28,23 @@ export interface PackSample {
     readonly key: string;
     /** URL of the encoded audio file (resolved by the caller / pack author). */
     readonly url: string;
+    /**
+     * MIDI note the buffer was recorded at. Present for pitched packs (piano,
+     * strings, brass) — `pack-runtime` builds a `SampleZone` per sample so the
+     * pitched-voice player can `playbackRate`-shift to any target. Absent for
+     * percussion packs (drums/cymbals), which play their buffer as-is.
+     */
+    readonly rootMidi?: number;
 }
 
 /** A pack's manifest — its id and the list of samples that make it up. */
 export interface PackManifest {
     readonly id: string;
     readonly samples: readonly PackSample[];
+    /** Human-facing pack name (shown in the Sounds section). */
+    readonly name?: string;
+    /** License/credit line for the sampled source. */
+    readonly attribution?: string;
 }
 
 /** In-flight loads, keyed by pack id — dedupes concurrent {@link loadPack} calls. */
