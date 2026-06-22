@@ -10,6 +10,7 @@ import type {
 } from '../types.js';
 import { createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
+import { ensurePacksForVoices } from './pack-runtime.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
@@ -463,6 +464,21 @@ export function initAudio(
         if (playback.audio) {
             playback.audio.resume();
         }
+    }
+
+    // #666 — load any selected `pack:<id>` voice as soon as audio is live, on
+    // whatever path brought audio up (play, preview, performance). Idempotent;
+    // a persisted pack voice would otherwise stay unloaded (silent synth
+    // fallback) until the Sounds panel dispatched ACTIONS.INIT_AUDIO. Offline
+    // render/export contexts manage packs explicitly, so they're excluded.
+    if (!usingOfflineContext && playback.audio) {
+        ensurePacksForVoices(playback.audio, [
+            chords.voice,
+            bass.voice,
+            soloist.voice,
+            harmony.voice,
+            groove.voice,
+        ]);
     }
 }
 
