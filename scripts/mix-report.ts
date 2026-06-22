@@ -13,7 +13,9 @@ import { gainForPack } from '../public/data/sound-packs.js';
 import { encodeWav } from '../public/engine/wav-encoder.js';
 import {
     buildRenderedMixReport,
+    COHESION_SAMPLE_BAND,
     DEFAULT_MIX_REPORT_SCENES,
+    formatCohesionReport,
     formatPackCalibration,
     formatRenderedMixReport,
     MIX_REPORT_STEMS,
@@ -285,7 +287,7 @@ function printHumanMixReport(report) {
     }
 }
 
-async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePack }) {
+async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePack, cohesion }) {
     const loopCount = Math.max(1, Math.floor(loops || 1));
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
@@ -332,7 +334,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
             );
 
             const evaluated = await page.evaluate(
-                async ({ scenes, stems, seeds, writeWav, loops, calibratePack }) => {
+                async ({ scenes, stems, seeds, writeWav, loops, calibratePack, cohesionBand }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     const {
                         getState,
@@ -524,9 +526,39 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
 
                         // Pack-calibration A/B: force the target lane onto a
                         // specific voice ('synth' baseline vs 'pack:<id>') so the
-                        // two renders differ only in the voice under test.
-                        if (voiceOverride && state[voiceOverride.module]) {
-                            state[voiceOverride.module].voice = voiceOverride.voice;
+                        // two renders differ only in the voice under test. The
+                        // cohesion render (#687) passes a `voices` array to force
+                        // the whole band at once, and `muteReverb` to zero every
+                        // bus send for the dry leg of the wet/dry proxy.
+                        if (voiceOverride) {
+                            const list =
+                                voiceOverride.voices ||
+                                (voiceOverride.module
+                                    ? [
+                                          {
+                                              module: voiceOverride.module,
+                                              voice: voiceOverride.voice,
+                                          },
+                                      ]
+                                    : []);
+                            for (const entry of list) {
+                                if (state[entry.module]) {
+                                    state[entry.module].voice = entry.voice;
+                                }
+                            }
+                            if (voiceOverride.muteReverb) {
+                                for (const mod of [
+                                    'chords',
+                                    'bass',
+                                    'soloist',
+                                    'harmony',
+                                    'groove',
+                                ]) {
+                                    if (state[mod]) {
+                                        state[mod].reverb = 0;
+                                    }
+                                }
+                            }
                         }
 
                         return state;
@@ -1149,7 +1181,62 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                         }
                     }
 
-                    return { sceneReports, calibration };
+                    // Cohesion (#687): render the full band (full+solo stem)
+                    // all-synth vs all-sample per scene, plus an all-sample dry
+                    // leg (reverb muted) for the wet/dry proxy. Reuses the same
+                    // per-render metrics (side-ratio / crest / rms) the per-stem
+                    // report computes — only the voice config differs.
+                    let cohesion = null;
+                    if (cohesionBand) {
+                        const stem = stems.find((entry) => entry.id === 'full+solo');
+                        const SYNTH_BAND = ['chords', 'bass', 'soloist', 'harmony', 'groove'].map(
+                            (module) => ({ module, voice: 'synth' }),
+                        );
+                        // Preload every pack the sample band uses (into the
+                        // module-global cache the engine seam reads).
+                        const loadCtx = new OfflineAudioContext(1, sampleRate, sampleRate);
+                        for (const entry of cohesionBand) {
+                            const packId = entry.voice.startsWith('pack:')
+                                ? entry.voice.slice(5)
+                                : null;
+                            if (packId) {
+                                await ensemble.ensurePackLoaded(loadCtx, packId);
+                            }
+                        }
+                        const rows = [];
+                        for (const scene of scenes) {
+                            for (const seed of seeds) {
+                                const synthM = await renderStem(scene, stem, seed, {
+                                    voices: SYNTH_BAND,
+                                });
+                                const sampleM = await renderStem(scene, stem, seed, {
+                                    voices: cohesionBand,
+                                });
+                                const sampleDryM = await renderStem(scene, stem, seed, {
+                                    voices: cohesionBand,
+                                    muteReverb: true,
+                                });
+                                rows.push({
+                                    sceneId: scene.id,
+                                    seed,
+                                    synth: {
+                                        rmsDb: synthM.rmsDb,
+                                        crestDb: synthM.crestDb,
+                                        sideRatio: synthM.stereo?.sideRatio ?? null,
+                                    },
+                                    sample: {
+                                        rmsDb: sampleM.rmsDb,
+                                        crestDb: sampleM.crestDb,
+                                        sideRatio: sampleM.stereo?.sideRatio ?? null,
+                                    },
+                                    sampleWetnessDb: sampleM.rmsDb - sampleDryM.rmsDb,
+                                });
+                            }
+                        }
+                        cohesion = { stemId: stem.id, rows };
+                    }
+
+                    return { sceneReports, calibration, cohesion };
                 },
                 {
                     scenes,
@@ -1158,12 +1245,14 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                     writeWav: Boolean(writeWav),
                     loops: loopCount,
                     calibratePack: calibratePack || null,
+                    cohesionBand: cohesion ? COHESION_SAMPLE_BAND : null,
                 },
             );
 
             return {
                 sceneRuns: evaluated.sceneReports,
                 calibration: evaluated.calibration,
+                cohesion: evaluated.cohesion,
                 writtenWavPaths,
             };
         } finally {
@@ -1202,13 +1291,21 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         });
     }
 
-    const { sceneRuns, calibration, writtenWavPaths } = await renderSceneReports({
+    const { sceneRuns, calibration, cohesion, writtenWavPaths } = await renderSceneReports({
         scenes,
         seeds,
         writeWav: cliOptions.writeWav,
         loops: cliOptions.loops,
         calibratePack: cliOptions.calibratePack,
+        cohesion: cliOptions.cohesion,
     });
+
+    // Cohesion mode: the deliverable is the band-level synth-vs-sample block,
+    // not the per-stem report. Print it and return (#687).
+    if (cliOptions.cohesion) {
+        process.stdout.write(`${formatCohesionReport(cohesion)}\n`);
+        return { cohesion };
+    }
 
     // Calibration mode: the deliverable is the suggested gain, not the full
     // report. Print it and return — the same paired numbers the catalog `gain`
