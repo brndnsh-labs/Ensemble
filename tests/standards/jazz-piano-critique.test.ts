@@ -682,14 +682,19 @@ describe('Jazz Piano Critique', () => {
             );
 
             // why: empirically the opt-in second pass (with the pocket-preservation
-            //      gate in place) drops total motion to ~66% of the null baseline
-            //      and top-voice motion to ~74%. Guard at 0.72 / 0.80 — well above
-            //      the null-baseline noise floor (1.0) and ~6-8pp below measurement,
-            //      so disabling the opt-in pass or breaking the cost gate fails
-            //      loudly without flaking on per-key variance. Sub-baseline-threshold
-            //      guard per docs/archive/MUSICAL_AUDIT.md.
+            //      gate in place) drops total motion to ~66% of the null baseline.
+            //      Top-voice motion was ~74%; the #708 m2-cluster guard raised it to
+            //      ~82.5%: de-clustering a tight Imaj7 (root↔maj7 a half-step apart)
+            //      has no in-register spread that preserves the melody note, so it
+            //      necessarily relocates the top voice on those chords — the cost of
+            //      removing an audible B+C smear (the B6/#705 bug). VL still cuts top
+            //      motion ~17% and total ~34%, so the pass is demonstrably working;
+            //      guard at 0.72 / 0.86 — above measurement with headroom, below the
+            //      null-baseline floor (1.0), so disabling the pass or breaking the
+            //      cost gate still fails loudly. Sub-baseline-threshold guard per
+            //      docs/archive/MUSICAL_AUDIT.md.
             expect(totalRatio).toBeLessThan(0.72);
-            expect(topRatio).toBeLessThan(0.8);
+            expect(topRatio).toBeLessThan(0.86);
 
             // why: pocket-preservation assertion. The motion-ratio metric doesn't
             //      enforce a one-to-one match between new and prev voices, so it

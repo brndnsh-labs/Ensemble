@@ -78,4 +78,45 @@ describe('Voice-leading m2-cluster guard (#702)', () => {
             ).toBe(false);
         }
     });
+
+    it('#708 B6/B7 — baseline guard: no m2 cluster or duplicate MIDI on non-tension qualities', () => {
+        const st = getState();
+        st.bass.enabled = true;
+        st.groove.genreFeel = 'Jazz';
+        st.chords.density = 'rich';
+        st.playback.bandIntensity = 0.9; // exercises the intensity≥0.8 push(12) path
+
+        // Non-tension qualities must never voice an internal half-step or stack two
+        // voices on one MIDI, at any root / against any prior voicing. (Altered
+        // dominants are exempt — they legitimately carry an m2 — so not swept here.)
+        const qualities = ['maj7', 'maj9', '7', '9', '13', 'minor', 'm7', 'm9', 'major', '6'];
+        const prevVoicings = [
+            [55, 60, 64],
+            [52, 59, 65, 70],
+            [58, 63, 67],
+        ];
+        for (const q of qualities) {
+            const is7th = /7|9|11|13/.test(q);
+            const intervals = getIntervals(st, q, is7th, 'rich', 'Jazz');
+            for (let root = 52; root <= 64; root++) {
+                for (const prev of prevVoicings) {
+                    const voiced = getBestInversion(st, root, intervals, prev, {
+                        min: 52,
+                        max: 84,
+                        anchor: 60,
+                        enableVoiceLeading: true,
+                        quality: q,
+                    });
+                    expect(
+                        hasMinorSecond(voiced),
+                        `${q}@${root} clustered: ${voiced.join(',')}`,
+                    ).toBe(false);
+                    expect(
+                        new Set(voiced).size,
+                        `${q}@${root} duplicate MIDI: ${voiced.join(',')}`,
+                    ).toBe(voiced.length);
+                }
+            }
+        }
+    });
 });
