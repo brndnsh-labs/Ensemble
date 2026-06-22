@@ -126,7 +126,7 @@ describe('State Effects Handler', () => {
         it('uses synth for a genre with no harmony mapping', () => {
             markPackInstalled('horns-section', true);
             stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Reggae' }, stateMap, { dispatch });
+            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Hip Hop' }, stateMap, { dispatch });
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'harmony',
                 voice: 'synth',

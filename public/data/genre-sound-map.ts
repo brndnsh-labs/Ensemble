@@ -23,18 +23,21 @@ import type { InstrumentModule, InstrumentVoice } from '../types.js';
 export const GENRE_SOUND_MAP: Readonly<
     Record<string, Partial<Record<InstrumentModule, InstrumentVoice>>>
 > = {
-    // Brass stabs — punchy genres where a horn section is the idiom.
+    // Brass stabs — punchy genres where a horn section is the idiom (Blues &
+    // Reggae included: both lean on a tight horn-section answer to the changes).
     Funk: { harmony: 'pack:horns-section' },
     Metal: { harmony: 'pack:horns-section' },
     'Ska-Punk': { harmony: 'pack:horns-section' },
     Jazz: { harmony: 'pack:horns-section' },
+    Blues: { harmony: 'pack:horns-section' },
+    Reggae: { harmony: 'pack:horns-section' },
     // Sustained string pad — genres that want a lush bed under the changes.
     Rock: { harmony: 'pack:strings-ensemble' },
     Disco: { harmony: 'pack:strings-ensemble' },
     Country: { harmony: 'pack:strings-ensemble' },
     Acoustic: { harmony: 'pack:strings-ensemble' },
     Bossa: { harmony: 'pack:strings-ensemble' },
-    // Hip Hop · Blues · Neo-Soul · Reggae — no clear pack fit yet → synth pad.
+    // Hip Hop · Neo-Soul — no clear pack fit yet → synth pad.
 };
 
 /**

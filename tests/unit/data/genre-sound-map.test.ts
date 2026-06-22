@@ -48,8 +48,8 @@ describe('genre → sound map (#675)', () => {
         });
 
         it('falls back to synth for an unmapped genre', () => {
-            // Reggae has no harmony mapping → synth pad.
-            expect(autoVoiceForGenre('Reggae', 'harmony', allInstalled)).toBe('synth');
+            // Hip Hop has no harmony mapping → synth pad.
+            expect(autoVoiceForGenre('Hip Hop', 'harmony', allInstalled)).toBe('synth');
         });
 
         it('falls back to synth for an unmapped module', () => {
