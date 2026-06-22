@@ -57,6 +57,46 @@ describe('Instrument Reducer', () => {
         expect(soloist.mode).toBe('guitar');
     });
 
+    describe('SET_INSTRUMENT_VOICE sound-source mode (#675)', () => {
+        it('pins the source when auto:false (a manual pick)', () => {
+            instrumentReducer({
+                type: ACTIONS.SET_INSTRUMENT_VOICE,
+                payload: { module: 'harmony', voice: 'pack:strings-ensemble', auto: false },
+            });
+            expect(harmony.voice).toBe('pack:strings-ensemble');
+            expect(harmony.autoSound).toBe(false);
+        });
+
+        it('keeps Auto on when auto:true (genre auto-follow)', () => {
+            harmony.autoSound = false;
+            instrumentReducer({
+                type: ACTIONS.SET_INSTRUMENT_VOICE,
+                payload: { module: 'harmony', voice: 'pack:horns-section', auto: true },
+            });
+            expect(harmony.voice).toBe('pack:horns-section');
+            expect(harmony.autoSound).toBe(true);
+        });
+
+        it('leaves the mode untouched when auto is omitted (bare voice reset)', () => {
+            harmony.autoSound = true;
+            instrumentReducer({
+                type: ACTIONS.SET_INSTRUMENT_VOICE,
+                payload: { module: 'harmony', voice: 'synth' },
+            });
+            expect(harmony.voice).toBe('synth');
+            expect(harmony.autoSound).toBe(true);
+        });
+
+        it('defaults autoSound to true on reset', () => {
+            harmony.autoSound = false;
+            instrumentReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+            expect(harmony.autoSound).toBe(true);
+            expect(bass.autoSound).toBe(true);
+            expect(chords.autoSound).toBe(true);
+            expect(soloist.autoSound).toBe(true);
+        });
+    });
+
     it('should handle session resets', () => {
         soloist.session.sessionSteps = 100;
         instrumentReducer({ type: ACTIONS.RESET_SESSION, payload: undefined });

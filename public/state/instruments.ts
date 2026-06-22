@@ -36,6 +36,7 @@ export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
 export const chords = deepSignal<ChordState>({
     enabled: true,
     voice: 'synth',
+    autoSound: true,
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
@@ -51,6 +52,7 @@ export const chords = deepSignal<ChordState>({
 export const bass = deepSignal<BassState>({
     enabled: true,
     voice: 'synth',
+    autoSound: true,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
     lastFreq: null,
@@ -67,6 +69,7 @@ export const soloist = deepSignal<SoloistState>({
     // === Configuration (persisted) ===
     enabled: false,
     voice: 'synth',
+    autoSound: true,
     preset: 'trumpet',
     mode: 'monophonic',
     style: 'smart',
@@ -164,6 +167,7 @@ export const soloist = deepSignal<SoloistState>({
 export const harmony = deepSignal<HarmonyState>({
     enabled: false,
     voice: 'synth',
+    autoSound: true,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.harmony,
     buffer: new Map(),
@@ -355,6 +359,7 @@ export function instrumentReducer(action: Action): boolean {
             c.octave = 65;
             c.density = 'standard';
             c.voice = 'synth';
+            c.autoSound = true;
 
             b.enabled = true;
             b.volume = 1.0;
@@ -362,9 +367,11 @@ export function instrumentReducer(action: Action): boolean {
             b.octave = 38;
             b.style = 'smart';
             b.voice = 'synth';
+            b.autoSound = true;
 
             s.enabled = false;
             s.voice = 'synth';
+            s.autoSound = true;
             s.preset = 'trumpet';
             s.volume = 1.0;
             s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
@@ -454,6 +461,7 @@ export function instrumentReducer(action: Action): boolean {
             h.style = 'smart';
             h.complexity = 0.5;
             h.voice = 'synth';
+            h.autoSound = true;
             return true;
         }
         case ACTIONS.SET_STYLE:
@@ -483,6 +491,12 @@ export function instrumentReducer(action: Action): boolean {
             const target = instrumentStateMap[action.payload.module];
             if (target) {
                 target.voice = action.payload.voice;
+                // #675 — a manual pick pins (auto:false); selecting Auto sets
+                // auto:true + the genre's voice. Omitting `auto` (a bare voice
+                // set, e.g. pack-eviction reset) leaves the mode untouched.
+                if (action.payload.auto !== undefined) {
+                    target.autoSound = action.payload.auto;
+                }
                 return true;
             }
             break;

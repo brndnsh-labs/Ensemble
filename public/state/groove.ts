@@ -14,6 +14,7 @@ export type { GrooveState, Instrument, PocketState };
 export const groove = deepSignal<GrooveState>({
     enabled: true,
     voice: 'synth',
+    autoSound: true,
     instruments: [
         { name: 'Kick', symbol: '🥁', steps: new Array(128).fill(0), muted: false },
         { name: 'Snare', symbol: '👏', steps: new Array(128).fill(0), muted: false },
@@ -93,6 +94,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
         case ACTIONS.RESET_STATE:
             g.enabled = true;
             g.voice = 'synth';
+            g.autoSound = true;
             g.volume = 1.0;
             g.reverb = 0.2;
             g.swing = 0;

@@ -2214,6 +2214,30 @@ input[type="range"] {
     margin-top: var(--space-4);
 }
 
+/* #675/#674 — the Sounds tab stacks a per-instrument source control
+   (Auto/synth/pack) above the pack library (install/remove/preview). */
+.sound-pack-library {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-color);
+}
+
+.sound-pack-library-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.sound-pack-library-header .sound-instrument-title {
+    margin: 0;
+}
+
+.sound-pack-library .sound-source-row + .sound-source-row {
+    margin-top: var(--space-1);
+}
+
 .sound-instrument-title {
     margin: 0 0 var(--space-2);
     font-size: 0.82rem;

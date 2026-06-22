@@ -12,6 +12,7 @@ import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
+import { detectInstalledPacks } from './engine/pack-runtime.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
@@ -30,6 +31,12 @@ function init() {
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
         hydrateState();
         loadFromUrl();
+
+        // #675 — warm the registry's installed-pack set from the SW cache so
+        // genre auto-follow knows which mapped packs are available before the
+        // Sounds panel ever mounts. Fire-and-forget: a genre change before it
+        // resolves just falls back to synth (then corrects on the next change).
+        void detectInstalledPacks();
 
         // E2E/dev helpers attach engine internals to `window.ensemble` for
         // Playwright tooling (and local-dev debugging). Gated to the Vite dev

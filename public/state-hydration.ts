@@ -12,7 +12,7 @@ import { saveCurrentState } from './persistence.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
 
 import { dispatch, getState, storage } from './state.js';
-import type { Mutable, Palette, ThemeMode } from './types.js';
+import type { InstrumentVoice, Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
 import {
     decodeBase64Unicode,
@@ -30,6 +30,15 @@ const clamp = (val: any, min: number, max: number, defaultVal: number): number =
     }
     return Math.min(Math.max(min, num), max);
 };
+
+/**
+ * Hydrate the #675 sound-source mode. A persisted boolean wins; for pre-#675
+ * saves with no `autoSound`, default to **Auto** — unless the session had
+ * explicitly picked a pack voice (via the old per-instrument picker), in which
+ * case preserve that choice as a pin so auto-follow doesn't override it.
+ */
+const hydrateAutoSound = (saved: unknown, voice: InstrumentVoice): boolean =>
+    typeof saved === 'boolean' ? saved : voice === 'synth';
 
 // Mix-pass consolidation (2026-05-23) — soloist is now a single trumpet voice;
 // legacy presets (neo / vowel / saxophone / shred) coerce to trumpet here so
@@ -212,6 +221,10 @@ export function hydrateState(): void {
             Object.assign(chords, {
                 enabled: savedState.chords.enabled !== undefined ? savedState.chords.enabled : true,
                 voice: hydrateVoice(savedState.chords.voice),
+                autoSound: hydrateAutoSound(
+                    savedState.chords.autoSound,
+                    hydrateVoice(savedState.chords.voice),
+                ),
                 style: savedState.chords.style || 'smart',
                 instrument: 'Piano',
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
@@ -226,6 +239,10 @@ export function hydrateState(): void {
             Object.assign(bass, {
                 enabled: savedState.bass.enabled !== undefined ? savedState.bass.enabled : true,
                 voice: hydrateVoice(savedState.bass.voice),
+                autoSound: hydrateAutoSound(
+                    savedState.bass.autoSound,
+                    hydrateVoice(savedState.bass.voice),
+                ),
                 style: savedState.bass.style || 'smart',
                 octave: clamp(savedState.bass.octave, 0, 127, 36),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.bass.volume, 0, 1, 1.0),
@@ -239,6 +256,10 @@ export function hydrateState(): void {
                 enabled:
                     savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
                 voice: hydrateVoice(savedState.soloist.voice),
+                autoSound: hydrateAutoSound(
+                    savedState.soloist.autoSound,
+                    hydrateVoice(savedState.soloist.voice),
+                ),
                 style: savedState.soloist.style || 'smart',
                 preset: normalizeSoloistPreset(savedState.soloist.preset, 'trumpet'),
                 octave:
@@ -265,6 +286,10 @@ export function hydrateState(): void {
                 enabled:
                     savedState.harmony.enabled !== undefined ? savedState.harmony.enabled : false,
                 voice: hydrateVoice(savedState.harmony.voice),
+                autoSound: hydrateAutoSound(
+                    savedState.harmony.autoSound,
+                    hydrateVoice(savedState.harmony.voice),
+                ),
                 style: savedState.harmony.style || 'smart',
                 octave: clamp(savedState.harmony.octave, 0, 127, 60),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.harmony.volume, 0, 1, 1.0),
@@ -278,6 +303,10 @@ export function hydrateState(): void {
             Object.assign(groove, {
                 enabled: savedState.groove.enabled !== undefined ? savedState.groove.enabled : true,
                 voice: hydrateVoice(savedState.groove.voice),
+                autoSound: hydrateAutoSound(
+                    savedState.groove.autoSound,
+                    hydrateVoice(savedState.groove.voice),
+                ),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.groove.volume, 0, 1, 1.0),
                 reverb: shouldResetMixer
                     ? INSTRUMENT_REVERB_DEFAULTS.groove
