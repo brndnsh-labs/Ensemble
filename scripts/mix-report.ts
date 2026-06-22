@@ -396,6 +396,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 fillMap: null,
                                 accentMap: null,
                                 lastHatGain: null,
+                                lastSampledHatVoice: null,
                                 lastRideGain: null,
                                 lastCrashGain: null,
                             },

@@ -53,6 +53,7 @@ export const groove = deepSignal<GrooveState>({
     fillSteps: {},
     buffer: new Map(),
     lastHatGain: null,
+    lastSampledHatVoice: null,
     lastRideGain: null,
     lastCrashGain: null,
     fillStartStep: 0,
@@ -108,6 +109,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.accentMap = null;
             g.seedTimelineStartStep = 0;
             g.lastHatGain = null;
+            g.lastSampledHatVoice = null;
             g.lastRideGain = null;
             g.lastCrashGain = null;
 
