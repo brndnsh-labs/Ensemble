@@ -1198,7 +1198,12 @@ export function scheduleHarmonies(
             }
             if (legatoMidis.size > 0 && state.harmony.activeVoices) {
                 const fade = starter.killFade || 0.05;
-                const killTime = playback.audio ? playback.audio.currentTime : 0;
+                // B11 (#710) — schedule the release at the new chord's onset
+                // (`time`), not `currentTime`. The scheduler runs ~200-400ms ahead
+                // of playback, so killing at currentTime cut the prior pad early
+                // instead of a smooth fade into the change (chords use `time` at
+                // the activeChordVoices release above).
+                const killTime = time;
                 const survivors: any[] = [];
                 const toKill: any[] = [];
                 for (const v of state.harmony.activeVoices) {
@@ -1219,7 +1224,8 @@ export function scheduleHarmonies(
                     state.harmony.activeVoices.push(v); // @worker-mutation
                 }
             } else {
-                killHarmonyNote(state, starter.killFade || 0.05);
+                // B11 (#710) — likewise schedule the blanket release at `time`.
+                killHarmonyNote(state, starter.killFade || 0.05, time);
             }
         }
 
