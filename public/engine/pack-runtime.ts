@@ -1,4 +1,5 @@
-import { getPackBuffer } from './instrument-registry.js';
+import type { InstrumentVoice } from '../types.js';
+import { getPackBuffer, packIdFromVoice } from './instrument-registry.js';
 import { loadPack, type PackManifest } from './sample-loader.js';
 import type { SampleZone } from './sample-voice.js';
 
@@ -78,6 +79,27 @@ export function ensurePackLoaded(audio: BaseAudioContext, packId: string): Promi
         // Keep the in-flight promise around only until it settles; once cached,
         // the `zoneCache.has` short-circuit takes over.
         run.finally(() => ensuring.delete(packId));
+    }
+}
+
+/**
+ * Kick off load+decode for every `pack:<id>` voice in the list (idempotent; a
+ * no-op for synth voices). Called from `initAudio` so a persisted/selected pack
+ * voice loads whenever audio comes up — regardless of which path initialized it.
+ * This is the fix for #666: the only prior trigger was the `ACTIONS.INIT_AUDIO`
+ * effect, which fires solely from the Sounds panel, so the normal play path's
+ * direct `initAudio()` call left a persisted pack voice unloaded (silent synth
+ * fallback) until the user visited Settings.
+ */
+export function ensurePacksForVoices(
+    audio: BaseAudioContext,
+    voices: readonly InstrumentVoice[],
+): void {
+    for (const voice of voices) {
+        const packId = packIdFromVoice(voice);
+        if (packId) {
+            void ensurePackLoaded(audio, packId);
+        }
     }
 }
 

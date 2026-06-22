@@ -98,35 +98,6 @@ function regenerateSessionSeeds(
     }
 }
 
-/**
- * Epic 6 (Packs) — kick off lazy load+decode for any instrument whose voice is
- * a `pack:<id>`. Idempotent (the runtime dedupes); a no-op until a live
- * AudioContext exists, since decode needs it. Called once audio comes up
- * (INIT_AUDIO) and whenever a pack voice is selected (SET_INSTRUMENT_VOICE), so
- * a selected pack is ready by the time playback needs it — whichever came first.
- * Until the zones finish loading the instrument seam falls back to its synth
- * voice (the registry's graceful-fallback contract).
- */
-function loadSelectedPacks(stateMap: EnsembleState): void {
-    const audio = stateMap.playback.audio;
-    if (!audio) {
-        return;
-    }
-    const voices = [
-        stateMap.chords.voice,
-        stateMap.bass.voice,
-        stateMap.soloist.voice,
-        stateMap.harmony.voice,
-        stateMap.groove.voice,
-    ];
-    for (const voice of voices) {
-        const packId = packIdFromVoice(voice);
-        if (packId) {
-            void ensurePackLoaded(audio, packId);
-        }
-    }
-}
-
 export function handleEffects(
     action: string,
     payload: any,
@@ -238,10 +209,10 @@ export function handleEffects(
             break;
         }
         case ACTIONS.INIT_AUDIO: {
+            // initAudio now loads any already-selected pack voice itself (#666),
+            // on every audio-up path — so a persisted pack is ready whether audio
+            // came up here or via the play path's direct initAudio() call.
             initAudio(stateMap);
-            // Audio is now live — load any already-selected sample pack(s) (e.g.
-            // a persisted pack voice, or one chosen before the first play).
-            loadSelectedPacks(stateMap);
             break;
         }
         case 'HYDRATE': {

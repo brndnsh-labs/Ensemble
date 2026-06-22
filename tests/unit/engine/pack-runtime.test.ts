@@ -3,6 +3,7 @@ import { __resetPackCacheForTest } from '../../../public/engine/instrument-regis
 import {
     __resetPackRuntimeForTest,
     ensurePackLoaded,
+    ensurePacksForVoices,
     getPackZones,
 } from '../../../public/engine/pack-runtime.js';
 
@@ -75,6 +76,31 @@ describe('pack-runtime', () => {
         expect(getPackZones('grand')).toBeNull();
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
+    });
+
+    it('ensurePacksForVoices loads pack voices and ignores synth voices (#666)', async () => {
+        // The regression this guards: a persisted pack voice must load whenever
+        // audio comes up (initAudio calls this), not only after a Sounds-panel visit.
+        const fetchFn = stubFetch(manifest);
+        const ctx = makeCtx();
+
+        ensurePacksForVoices(ctx, ['synth', 'pack:grand', 'synth']);
+        // ensurePackLoaded dedupes to the in-flight promise kicked off above.
+        await ensurePackLoaded(ctx, 'grand');
+
+        expect(getPackZones('grand')).not.toBeNull();
+        // Only the one pack voice fetched a manifest; the two synth voices didn't.
+        const manifestFetches = fetchFn.mock.calls.filter((c) =>
+            String(c[0]).endsWith('manifest.json'),
+        );
+        expect(manifestFetches).toHaveLength(1);
+    });
+
+    it('ensurePacksForVoices is a no-op when every voice is synth (#666)', async () => {
+        const fetchFn = stubFetch(manifest);
+        ensurePacksForVoices(makeCtx(), ['synth', 'synth', 'synth', 'synth', 'synth']);
+        await Promise.resolve();
+        expect(fetchFn).not.toHaveBeenCalled();
     });
 
     it('skips samples with no rootMidi (percussive entries) when building zones', async () => {
