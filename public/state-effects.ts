@@ -7,7 +7,7 @@ import {
     generateDrumOrchestration,
     generateSoloistAccents,
 } from './engine/drum-seeder.js';
-import { initAudio, restoreGains } from './engine/engine.js';
+import { initAudio, restoreGains, syncBusReverbSend } from './engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.js';
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
@@ -114,6 +114,12 @@ export function handleEffects(
             const packId = packIdFromVoice(payload?.voice);
             if (audio && packId) {
                 void ensurePackLoaded(audio, packId);
+            }
+            // #686 — a pack sits in its own room: re-trim this lane's bus reverb
+            // send for the new voice now (synth → ×1), so switching sound doesn't
+            // wait for the next initAudio. Runs for synth too, to reset the send.
+            if (audio && payload?.module) {
+                syncBusReverbSend(stateMap, payload.module);
             }
             break;
         }

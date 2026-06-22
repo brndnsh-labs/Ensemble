@@ -4,6 +4,7 @@ import {
     clearPack,
     isPackInstalled,
     isPackLoaded,
+    MODULE_BUS_KEY,
     markPackInstalled,
 } from '../engine/instrument-registry.js';
 import { ensurePackLoaded, getPackZones } from '../engine/pack-runtime.js';
@@ -20,16 +21,6 @@ const MODULE_LABELS: Record<InstrumentModule, string> = {
     soloist: 'Soloist',
     harmony: 'Harmony',
     groove: 'Drums',
-};
-
-// Instrument module → its `audioGraph` mix-bus key (names diverge: harmony →
-// harmonies, groove → drums) — used to preview through the right bus.
-const GRAPH_BUS: Record<InstrumentModule, 'chords' | 'bass' | 'soloist' | 'harmonies' | 'drums'> = {
-    chords: 'chords',
-    bass: 'bass',
-    soloist: 'soloist',
-    harmony: 'harmonies',
-    groove: 'drums',
 };
 
 // A C-major triad — the preview gesture for a pitched pack.
@@ -203,7 +194,7 @@ export function PacksSettings() {
             return;
         }
         const module = pack.instruments[0] ?? 'chords';
-        const bus = getState().playback.audioGraph?.[GRAPH_BUS[module]];
+        const bus = getState().playback.audioGraph?.[MODULE_BUS_KEY[module]];
         const dest = bus?.gain ?? audio.destination;
         const start = audio.currentTime + 0.05;
         PREVIEW_MIDIS.forEach((midi, i) => {

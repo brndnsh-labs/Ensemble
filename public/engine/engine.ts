@@ -1,15 +1,19 @@
 import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
+import { reverbSendForPack } from '../data/sound-packs.js';
 import type { GlobalContext } from '../state/playback.js';
 import type {
     AlgorithmicReverb,
     AudioGraph,
     EnsembleState,
     InstrumentBus,
+    InstrumentModule,
+    InstrumentVoice,
     Mutable,
 } from '../types.js';
 import { createSoftClipCurve } from '../utils.js';
 import { audioWatchdog } from './audio-recovery.js';
+import { MODULE_BUS_KEY, packIdFromVoice } from './instrument-registry.js';
 import { ensurePacksForVoices } from './pack-runtime.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
@@ -398,7 +402,9 @@ export function initAudio(
             }
 
             const reverbGain = playback.audio.createGain();
-            const targetReverb = Math.max(0.0001, m.state.reverb);
+            // #686 — scale the bus send by the active voice's pack multiplier so
+            // a dry pack gets more hall / a roomy pack less; synth voice → ×1.
+            const targetReverb = reverbSendTarget(m.state.reverb, m.state.voice);
             reverbGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             reverbGain.gain.exponentialRampToValueAtTime(
                 targetReverb,
@@ -572,6 +578,34 @@ export function restoreGains(state: EnsembleState) {
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }
     });
+}
+
+/**
+ * Effective bus reverb send (#686): the lane's reverb value scaled by the active
+ * voice's per-pack multiplier. Synth voice → ×1 (unchanged). Floored above 0 so
+ * the exponential init ramp never targets zero.
+ */
+function reverbSendTarget(reverb: number, voice: InstrumentVoice): number {
+    return Math.max(0.0001, reverb * reverbSendForPack(packIdFromVoice(voice)));
+}
+
+/**
+ * Re-trim a lane's live bus reverb send for its current voice (#686). Called on
+ * a voice change (manual pick or auto-follow) so a pack's send takes effect
+ * immediately rather than only at the next `initAudio`. No-op before the graph
+ * exists.
+ */
+export function syncBusReverbSend(state: EnsembleState, module: InstrumentModule): void {
+    const { playback } = state;
+    const graph = playback.audioGraph;
+    if (!playback.audio || !graph) {
+        return;
+    }
+    const inst = state[module] as unknown as { reverb: number; voice: InstrumentVoice };
+    const bus = graph[MODULE_BUS_KEY[module]];
+    const t = playback.audio.currentTime;
+    bus.reverb.gain.cancelScheduledValues(t);
+    bus.reverb.gain.setTargetAtTime(reverbSendTarget(inst.reverb, inst.voice), t, 0.04);
 }
 
 let lastAudioTime = 0;

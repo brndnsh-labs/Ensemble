@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { gainForPack, packsForInstrument, SOUND_PACKS } from '../../../public/data/sound-packs.js';
+import {
+    gainForPack,
+    packsForInstrument,
+    reverbSendForPack,
+    SOUND_PACKS,
+} from '../../../public/data/sound-packs.js';
 
 describe('sound-packs catalog', () => {
     it('every pack has a non-empty id, name, attribution, and ≥1 instrument', () => {
@@ -30,6 +35,20 @@ describe('sound-packs catalog', () => {
         expect(gainForPack('grand')).toBeCloseTo(8, 5);
         // Unknown id → no lift (a freshly-added pack plays raw until calibrated).
         expect(gainForPack('does-not-exist')).toBe(1);
+    });
+
+    it('reverbSendForPack: dry packs lift the send, roomy packs cut it, synth/unknown → 1', () => {
+        // #686 — DI-dry sources need more hall to share the band's room; sources
+        // with baked-in ambience need less so we don't stack room-on-hall.
+        expect(reverbSendForPack('clavinet')).toBeGreaterThan(1); // bone-dry DI
+        expect(reverbSendForPack('hammond-organ')).toBeGreaterThan(1); // dry emulation
+        expect(reverbSendForPack('strings-ensemble')).toBeLessThan(1); // baked hall
+        expect(reverbSendForPack('acoustic-kit')).toBeLessThan(1); // recorded room
+        // Synth voice (null) and unknown/uncalibrated ids → unchanged send.
+        expect(reverbSendForPack(null)).toBe(1);
+        expect(reverbSendForPack('does-not-exist')).toBe(1);
+        // Grand omits the field → defaults to the synth send (1).
+        expect(reverbSendForPack('grand')).toBe(1);
     });
 
     it('packsForInstrument returns only packs that list that module', () => {
