@@ -2,7 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildRenderedMixReport,
+    COHESION_SAMPLE_BAND,
     DEFAULT_MIX_REPORT_SCENES,
+    formatCohesionReport,
     formatRenderedMixReport,
     parseEnsembleAuditInput,
     resolveMixReportCliOptions,
@@ -520,6 +522,66 @@ describe('mix report utilities', () => {
                 }),
             });
             expect(findings.some((n) => n.includes('flat across loops'))).toBe(true);
+        });
+    });
+
+    describe('cohesion readout (#687)', () => {
+        it('parses the --cohesion flag (default off)', () => {
+            expect(resolveMixReportCliOptions([]).cohesion).toBe(false);
+            expect(resolveMixReportCliOptions(['--cohesion']).cohesion).toBe(true);
+        });
+
+        it('COHESION_SAMPLE_BAND routes a representative pack per lane (bass stays synth)', () => {
+            const modules = COHESION_SAMPLE_BAND.map((entry) => entry.module);
+            // Every routed lane names a pack voice...
+            for (const entry of COHESION_SAMPLE_BAND) {
+                expect(entry.voice).toMatch(/^pack:/);
+            }
+            // ...and bass is deliberately absent (no bass pack exists yet).
+            expect(modules).not.toContain('bass');
+            expect(modules).toEqual(
+                expect.arrayContaining(['chords', 'soloist', 'harmony', 'groove']),
+            );
+        });
+
+        it('formats the synth→sample comparison with side-ratio, crest, and wetness', () => {
+            const out = formatCohesionReport({
+                stemId: 'full+solo',
+                rows: [
+                    {
+                        sceneId: 'funk-pocket',
+                        seed: 'MIX_AUDIT',
+                        synth: { rmsDb: -18.0, crestDb: 9.0, sideRatio: 0.05 },
+                        sample: { rmsDb: -17.4, crestDb: 11.0, sideRatio: 0.03 },
+                        sampleWetnessDb: 1.6,
+                    },
+                ],
+            });
+            expect(out).toContain('funk-pocket/MIX_AUDIT');
+            // Synth→sample side-ratio drop (0.050 → 0.030) is surfaced.
+            expect(out).toContain('0.050');
+            expect(out).toContain('0.030');
+            // Mean lines summarize both legs + the reverb wetness.
+            expect(out).toMatch(/mean side-ratio/);
+            expect(out).toMatch(/reverb wetness/);
+            expect(out).toContain('1.60');
+        });
+
+        it('degrades cleanly with no rows or null metrics', () => {
+            expect(formatCohesionReport(null)).toMatch(/no rows/);
+            expect(formatCohesionReport({ rows: [] })).toMatch(/no rows/);
+            const out = formatCohesionReport({
+                rows: [
+                    {
+                        sceneId: 's',
+                        seed: 'x',
+                        synth: { rmsDb: null, crestDb: null, sideRatio: null },
+                        sample: { rmsDb: null, crestDb: null, sideRatio: null },
+                        sampleWetnessDb: null,
+                    },
+                ],
+            });
+            expect(out).toContain('—'); // null metrics render as em-dash, no crash
         });
     });
 });

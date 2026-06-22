@@ -376,7 +376,89 @@ export function resolveMixReportCliOptions(argv = []) {
         // `--calibrate-pack=<module>:<packId>` → run a paired synth-vs-pack
         // render for that lane and print suggested gain instead of the report.
         calibratePack: parseCalibratePack(readStringOption(options, 'calibrate-pack', '')),
+        // `--cohesion` → render the full band all-synth vs all-sample and print a
+        // band-level cohesion block (side-ratio / crest / reverb wetness) instead
+        // of the per-stem report (#687). Tunes #685's reverb/tilt/width levers.
+        cohesion: readBooleanOption(options, 'cohesion', false),
     };
+}
+
+// The lanes the `--cohesion` "all-sample" band routes to a pack (bass has no
+// pack → stays synth). Mirrors the auto-follow intent: one representative
+// sampled voice per lane. Shared so the renderer and any test agree.
+export const COHESION_SAMPLE_BAND = [
+    { module: 'chords', voice: 'pack:grand' },
+    { module: 'soloist', voice: 'pack:sax-alto' },
+    { module: 'harmony', voice: 'pack:strings-ensemble' },
+    { module: 'groove', voice: 'pack:acoustic-kit' },
+];
+
+/**
+ * Format the `--cohesion` band-level comparison (#687): for each scene, the
+ * full-band side-ratio (stereo width), crest (transient/dynamics), and RMS for
+ * the all-synth vs all-sample render, plus the sample band's reverb wetness
+ * (wet−dry dB). Pure (no render) so it's unit-testable. `rows` come from the
+ * offline renderer; `null` metrics print as `—`.
+ */
+export function formatCohesionReport(cohesion) {
+    if (!cohesion || !Array.isArray(cohesion.rows) || cohesion.rows.length === 0) {
+        return 'Cohesion report — no rows (render produced nothing).';
+    }
+    const fixed = (value, digits = 2) =>
+        value == null || Number.isNaN(value) ? '—' : Number(value).toFixed(digits);
+    const lines = [];
+    lines.push('Full-band cohesion — all-synth vs all-sample  (#687)');
+    lines.push('='.repeat(72));
+    lines.push(
+        '  scene/seed              sideRatio s→p     crest s→p dB     RMS s→p dB   sampleWet dB',
+    );
+    const agg = { synthSide: [], sampleSide: [], synthCrest: [], sampleCrest: [], wet: [] };
+    for (const row of cohesion.rows) {
+        const s = row.synth || {};
+        const p = row.sample || {};
+        lines.push(
+            `  ${String(`${row.sceneId}/${row.seed}`).padEnd(22)} ` +
+                `${fixed(s.sideRatio, 3).padStart(6)}→${fixed(p.sideRatio, 3).padStart(6)}   ` +
+                `${fixed(s.crestDb).padStart(6)}→${fixed(p.crestDb).padStart(6)}   ` +
+                `${fixed(s.rmsDb).padStart(7)}→${fixed(p.rmsDb).padStart(7)}   ` +
+                `${fixed(row.sampleWetnessDb).padStart(6)}`,
+        );
+        if (s.sideRatio != null) {
+            agg.synthSide.push(s.sideRatio);
+        }
+        if (p.sideRatio != null) {
+            agg.sampleSide.push(p.sideRatio);
+        }
+        if (s.crestDb != null) {
+            agg.synthCrest.push(s.crestDb);
+        }
+        if (p.crestDb != null) {
+            agg.sampleCrest.push(p.crestDb);
+        }
+        if (row.sampleWetnessDb != null) {
+            agg.wet.push(row.sampleWetnessDb);
+        }
+    }
+    lines.push('-'.repeat(72));
+    lines.push(
+        `  mean side-ratio: synth ${fixed(average(agg.synthSide), 3)} → sample ${fixed(
+            average(agg.sampleSide),
+            3,
+        )}   (target ≥ 0.030; lower = narrower)`,
+    );
+    lines.push(
+        `  mean crest:      synth ${fixed(average(agg.synthCrest))} → sample ${fixed(
+            average(agg.sampleCrest),
+        )} dB   (sample punchier = higher)`,
+    );
+    lines.push(
+        `  mean sample reverb wetness: ${fixed(average(agg.wet))} dB lift (wet−dry)  — the #686 sends`,
+    );
+    lines.push(
+        '  Read: a big side-ratio drop = samples narrowed the mix (mono lanes); ' +
+            'a crest jump = transient packs poking; wetness shows the shared room.',
+    );
+    return lines.join('\n');
 }
 
 // Parse `--calibrate-pack=<module>:<packId>` (e.g. `--calibrate-pack=chords:grand`)
