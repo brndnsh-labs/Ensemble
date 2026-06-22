@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { packsForInstrument, SOUND_PACKS } from '../../../public/data/sound-packs.js';
+import { gainForPack, packsForInstrument, SOUND_PACKS } from '../../../public/data/sound-packs.js';
 
 describe('sound-packs catalog', () => {
     it('every pack has a non-empty id, name, attribution, and ≥1 instrument', () => {
@@ -21,6 +21,15 @@ describe('sound-packs catalog', () => {
         const grand = SOUND_PACKS.find((p) => p.id === 'grand');
         expect(grand).toBeDefined();
         expect(grand?.instruments).toContain('chords');
+    });
+
+    it('gainForPack returns the calibrated grand lift and 1 for unknown/uncalibrated ids', () => {
+        // The grand's lift lives in the catalog `gain` field (#656); ear-locked
+        // at 8× to seat the pack against the full band (was 3.5×, which the
+        // calibration tool measured ~13 dB under the rhythm section).
+        expect(gainForPack('grand')).toBeCloseTo(8, 5);
+        // Unknown id → no lift (a freshly-added pack plays raw until calibrated).
+        expect(gainForPack('does-not-exist')).toBe(1);
     });
 
     it('packsForInstrument returns only packs that list that module', () => {

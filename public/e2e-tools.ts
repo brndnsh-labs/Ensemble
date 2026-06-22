@@ -1,6 +1,7 @@
 import { loopArcMultiplier } from './engine/arc.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { initAudio } from './engine/engine.js';
+import { ensurePackLoaded, getPackZones } from './engine/pack-runtime.js';
 import { scheduleGlobalEvent } from './engine/scheduler-core.js';
 import { generateNotesForStep } from './engine/tick-logic.js';
 import { loadDrumPreset } from './instrument-controller.js';
@@ -21,5 +22,7 @@ export function installE2EGlobals(): void {
         loadDrumPreset,
         generateNotesForStep,
         loopArcMultiplier,
+        ensurePackLoaded,
+        getPackZones,
     };
 }

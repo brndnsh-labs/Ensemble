@@ -1571,6 +1571,8 @@ declare global {
             loadDrumPreset: (name: string) => unknown;
             generateNotesForStep: (...args: any[]) => any;
             loopArcMultiplier: (loopCount: number, loopLimit: number) => number;
+            ensurePackLoaded: (audio: BaseAudioContext, packId: string) => Promise<void>;
+            getPackZones: (packId: string) => unknown[] | null;
         };
         previewChord?: (index: number) => void;
     }
