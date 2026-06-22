@@ -149,6 +149,7 @@ export function generateResolutionNotes(
             anchor,
             min: 48,
             max: 80,
+            quality,
         });
         lastMidis = voicings;
 

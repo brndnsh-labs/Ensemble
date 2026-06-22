@@ -211,6 +211,12 @@ interface InversionOptions {
      * comping callers gate this on `style ∈ {Jazz, Bossa Nova, Blues}`.
      */
     enableVoiceLeading?: boolean;
+    /**
+     * Chord quality (e.g. 'maj7', '7b9'). Lets the m2-cluster guard (#708) exempt
+     * tension qualities whose voicing legitimately carries a half-step. When
+     * omitted, the guard treats the voicing as non-tension and de-clusters it.
+     */
+    quality?: string;
 }
 
 /** True if any two voices in the set sit a minor 2nd (1 semitone) apart. */
@@ -222,6 +228,70 @@ function hasMinorSecondCluster(midis: number[]): boolean {
         }
     }
     return false;
+}
+
+// B6 (#708) — qualities whose voicing legitimately carries an internal minor 2nd
+// as color (altered-dominant tensions: the b9 rubs the root, the #9 the major 3rd;
+// dim/halfdim carry none but are listed defensively), so the de-cluster guard
+// below leaves them alone. Everything else (maj7's root↔maj7, plain triads/7ths)
+// must NOT voice an m2 adjacent — that's an octave-fold artifact, not the chord.
+// Canonical quality strings only (`getChordDetails` emits 'dim'/'halfdim', never
+// 'dim7'/'m7b5'). maj7#11/augmaj7 are deliberately NOT exempt: their root↔maj7
+// fold must break, and spreading it also separates the #11/5 (a benign side
+// effect — the Lydian #11 color survives, just an octave from the 5).
+const M2_TOLERANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11', 'dim', 'halfdim']);
+
+/**
+ * B6 (#708) — break any internal minor-2nd cluster created by independent
+ * per-interval octave placement (e.g. Cmaj7 folding the maj7 down next to the
+ * root → B+C). Move the LOWER note of the lowest m2 pair up an octave (keeps the
+ * top voice / melody); fall back to dropping the UPPER note down if up would
+ * leave the register. Bounded iterations — a 3–4 note voicing resolves in ≤3.
+ */
+function spreadMinorSeconds(midis: number[], min: number, max: number): number[] {
+    const v = [...midis].sort((a, b) => a - b);
+    for (let iter = 0; iter < 4; iter++) {
+        let idx = -1;
+        for (let i = 1; i < v.length; i++) {
+            if (v[i] - v[i - 1] === 1) {
+                idx = i;
+                break;
+            }
+        }
+        if (idx === -1) {
+            break;
+        }
+        const lower = v[idx - 1];
+        const upper = v[idx];
+        if (lower + 12 <= max) {
+            v[idx - 1] = lower + 12;
+        } else if (upper - 12 >= min) {
+            v[idx] = upper - 12;
+        } else {
+            break; // can't separate within the register slot
+        }
+        v.sort((a, b) => a - b);
+    }
+    return v;
+}
+
+/**
+ * B7 (#708) — drop exact duplicate MIDIs before emit. The intensity≥0.8
+ * `intervals.push(12)` can fold pc0 onto the root's MIDI, which would otherwise
+ * schedule two oscillator banks on the same pitch (+6 dB, audible beating).
+ */
+function dedupeMidis(midis: number[]): number[] {
+    const seen = new Set<number>();
+    const out: number[] = [];
+    for (const m of midis) {
+        const n = Math.round(m);
+        if (seen.has(n)) {
+            continue;
+        }
+        seen.add(n);
+        out.push(n);
+    }
+    return out;
 }
 
 export function getBestInversion(
@@ -238,6 +308,7 @@ export function getBestInversion(
         max = 84,
         style = 'stabs',
         enableVoiceLeading = false,
+        quality,
     } = options;
     const { chords } = state;
     const homeAnchor = anchor || chords.octave || 60;
@@ -300,6 +371,16 @@ export function getBestInversion(
             }
             result.push(best);
         });
+    }
+
+    // B6 (#708) — de-cluster the BASELINE here, before the voice-leading pass, so
+    // VL re-smooths the cleaned voicing rather than having a later guard undo its
+    // top-voice work. The per-interval octave placement above can fold a chord's
+    // m2 pitch-class pair adjacent (e.g. Cmaj7 root↔maj7 → B+C); spread it unless
+    // the quality legitimately carries the half-step. VL's own introduces-cluster
+    // gate then keeps the refinement clean.
+    if (!quality || !M2_TOLERANT_QUALITIES.has(quality)) {
+        result = spreadMinorSeconds(result, RANGE_MIN, RANGE_MAX);
     }
 
     // Voice-leading second pass: refine the per-interval register-centroid baseline
@@ -411,6 +492,11 @@ export function getBestInversion(
     if (maxNote > RANGE_MAX) {
         finalResult = finalResult.map((n) => n - 12);
     }
+
+    // B7 (#708) — drop exact duplicate MIDIs after all register placement. The
+    // VL snap or the intensity≥0.8 octave-double can collapse two voices onto one
+    // pitch; emitting both schedules two oscillator banks on it (+6 dB beating).
+    finalResult = dedupeMidis(finalResult);
 
     return finalResult.sort((a, b) => a - b);
 }
@@ -903,6 +989,7 @@ function parseProgressionPart(
                     min: pianoMin,
                     max: 84,
                     enableVoiceLeading,
+                    quality,
                 });
                 if (bassMidi !== null) {
                     currentMidis = ensurePitchClassAboveFloor(

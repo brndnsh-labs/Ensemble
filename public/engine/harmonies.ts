@@ -888,6 +888,7 @@ function finalizeHarmonyNotes(
             min: safetyFloor,
             max: 100,
             style: styleConfig.rhythmicStyle,
+            quality: chord.quality,
         },
     );
 
