@@ -177,8 +177,16 @@ export function getSafeVoicings(intervals: number[], rootless = false): number[]
         if (rootless && iMod === 0) {
             return false;
         }
-        // Allow Root(0), 5th(7), 3rds(3/4), 7ths(10/11), 6ths(9)
-        return [0, 7, 3, 4, 10, 11, 9].includes(iMod);
+        // Allow Root(0), b5/#11(6), 5th(7), 3rds(3/4), 7ths(10/11), 6ths(9).
+        // #717: interval 6 retained — it's the *defining* tone of dim/ø/7b5
+        // chords (the diminished 5th). Without it a ø7 collapses to a m7 and a
+        // dim loses its identity when practice-grounding is off. The filter only
+        // keeps intervals already present, so adding 6 affects only chords that
+        // actually contain a tritone — it never inflates plain triads/7ths.
+        // Footprint is narrow: the b5 reaches output on the bloom/latch ø7/dim
+        // voicings, not steady-state tension comping (selectTensionSupportIntervals
+        // still prefers guide tones, where the b5 isn't one).
+        return [0, 6, 7, 3, 4, 10, 11, 9].includes(iMod);
     });
 }
 
@@ -1261,16 +1269,15 @@ export function getHarmonyNotes(
     //   - feel: the top-level feel branches produce completely different
     //     patterns (Jazz Charleston vs Funk 16ths vs Reggae bubble vs …).
     //   - activeStyle: Reggae organ-bubble (S1.b) branches on activeStyle.
-    //   - bandIntensity tier: defensive — any future generateCompingPattern
-    //     extension that gates on intensity will need the tier in the key.
-    //   - complexity: same defensive rationale as bandIntensity tier.
+    // #717: dropped the bandIntensity/complexity tiers from the key. The
+    // renderer's signature is (patternKey, seed, ts, activeStyle) and its seed
+    // is hash(sectionId) only — it reads neither intensity nor complexity, so
+    // those tiers produced byte-identical cached patterns and only fragmented
+    // the cache. If a future renderer extension gates on intensity, re-add the
+    // tier *with* the read, not speculatively ahead of it.
     // Without feel in the key, switching genre mid-session would serve the
     // previous feel's pattern until the sectionId changes.
-    const intensityTier =
-        playback.bandIntensity < 0.4 ? 'lo' : playback.bandIntensity < 0.7 ? 'mid' : 'hi';
-    const complexityTier =
-        playback.complexity < 0.4 ? 'lo' : playback.complexity < 0.7 ? 'mid' : 'hi';
-    const sectionKey = `${chord.sectionId ?? ''}|${feel}|${activeStyle}|${intensityTier}|${complexityTier}`;
+    const sectionKey = `${chord.sectionId ?? ''}|${feel}|${activeStyle}`;
     if (!motifCache.has(sectionKey)) {
         const seed = Math.abs(
             chord.sectionId

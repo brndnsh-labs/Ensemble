@@ -115,11 +115,10 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should remove dangerous extensions in getSafeVoicings', () => {
-            const unsafe = [0, 4, 7, 10, 13, 14, 18]; // 13, 9, #11
+            const unsafe = [0, 4, 7, 10, 13, 14]; // 0,4,7,10 safe; 13->b9, 14->9 unsafe
             const safe = getSafeVoicings(unsafe);
-            // 13 (1) -> b9? No, 13%12 = 1. b9. Unsafe.
+            // 13 (1) -> b9. Unsafe.
             // 14 (2) -> 9. Unsafe in safe mode.
-            // 18 (6) -> #11. Unsafe.
             // Safe should only be 0, 4, 7, 10
             expect(safe).toContain(0);
             expect(safe).toContain(4);
@@ -127,6 +126,18 @@ describe('Harmony Engine Logic', () => {
             expect(safe).toContain(10);
             expect(safe).not.toContain(13);
             expect(safe).not.toContain(14);
+        });
+
+        it('#717: retains the b5 (interval 6) — the defining tone of dim/ø/7b5', () => {
+            // ø7 = root, b3, b5, b7 → intervals [0, 3, 6, 10]. The b5 (6) is the
+            // chord's identity; dropping it collapses ø7 → m7. Pre-#717 the
+            // allow-list excluded 6, so the harmony voice lost the defining tone
+            // whenever practice-grounding was off.
+            const halfDim = getSafeVoicings([0, 3, 6, 10]);
+            expect(halfDim).toContain(6);
+            expect(halfDim).toEqual(expect.arrayContaining([0, 3, 6, 10]));
+            // 6 is only retained when present — it never inflates a plain triad.
+            expect(getSafeVoicings([0, 4, 7])).not.toContain(6);
         });
 
         it('should use guide tones at low complexity/intensity', () => {
