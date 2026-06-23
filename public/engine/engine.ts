@@ -387,6 +387,25 @@ export function initAudio(
                 // reference (47%). Non-jazz scenes keep 40 Hz.
                 drumsHP.frequency.setValueAtTime(isJazz ? 95 : 40, playback.audio.currentTime);
 
+                // why (low-end declutter): a bell cut in the ~120 Hz mud band where
+                // tom fundamentals (~92-188 Hz) and the kick's body (~54-174 Hz)
+                // pile onto a bass guitar's most-played register, blurring the
+                // low end — worst with the sampled acoustic kit, whose recorded
+                // toms carry natural sustain a synth voice doesn't (and which the
+                // per-voice synth-drums tom trim can't reach). This sits on the
+                // shared drum bus, so it treats BOTH the synth and sampled paths
+                // (and any future pack) in one place. A peaking (not shelf) cut
+                // is deliberate: it carves the mud while leaving the kick's deep
+                // sub-thump below it and the snare crack above it intact, so the
+                // kit stays punchy and full — it just stops fighting the bass.
+                // Q 0.8 spans ~80-180 Hz; gain is a conservative first pass tuned
+                // by ear on the test box.
+                const drumsMud = playback.audio.createBiquadFilter();
+                drumsMud.type = 'peaking';
+                drumsMud.frequency.setValueAtTime(120, playback.audio.currentTime);
+                drumsMud.Q.setValueAtTime(0.8, playback.audio.currentTime);
+                drumsMud.gain.setValueAtTime(-2.5, playback.audio.currentTime);
+
                 const drumsAir = playback.audio.createBiquadFilter();
                 drumsAir.type = 'peaking';
                 drumsAir.frequency.setValueAtTime(5000, playback.audio.currentTime);
@@ -394,7 +413,8 @@ export function initAudio(
                 drumsAir.gain.setValueAtTime(2, playback.audio.currentTime);
 
                 gainNode.connect(drumsHP);
-                drumsHP.connect(drumsAir);
+                drumsHP.connect(drumsMud);
+                drumsMud.connect(drumsAir);
                 drumsAir.connect(masterGain);
 
                 // Drums route through their own highpass, not the neutral `busEQ`.
