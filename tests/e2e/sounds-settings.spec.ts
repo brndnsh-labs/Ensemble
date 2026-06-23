@@ -57,18 +57,21 @@ test.describe('Sounds: per-instrument source control (rail) @ui', () => {
         page,
     }) => {
         const surface = await openInstrumentSettings(page, 'Harmony');
-        const source = surface.locator('#harmonySoundSource');
-        await expect(source).toBeVisible();
+        // Source is now a segmented chip row (tap-to-select), not a dropdown.
+        const sourceGroup = surface.locator('.instrument-sound-source');
+        const chip = (name: string) => sourceGroup.getByRole('button', { name, exact: true });
+        await expect(sourceGroup).toBeVisible();
 
-        // Default: Auto.
-        await expect(source).toHaveValue('auto');
+        // Default: Auto active.
+        await expect(chip('Auto')).toHaveAttribute('aria-pressed', 'true');
         expect((await readSource(page, 'harmony')).autoSound).toBe(true);
 
-        // Pin Synth — the lane is now manual.
-        await source.selectOption('synth');
+        // Tap Synth — the lane is now manual.
+        await chip('Synth').click();
         const pinned = await readSource(page, 'harmony');
         expect(pinned.autoSound).toBe(false);
         expect(pinned.voice).toBe('synth');
+        await expect(chip('Synth')).toHaveAttribute('aria-pressed', 'true');
 
         // A genre change must NOT move a pinned lane (Funk maps harmony→horns).
         await page.evaluate(() => {
@@ -78,8 +81,8 @@ test.describe('Sounds: per-instrument source control (rail) @ui', () => {
         expect(afterGenre.autoSound).toBe(false);
         expect(afterGenre.voice).toBe('synth');
 
-        // Choosing Auto re-enables follow-the-genre.
-        await source.selectOption('auto');
+        // Tapping Auto re-enables follow-the-genre.
+        await chip('Auto').click();
         expect((await readSource(page, 'harmony')).autoSound).toBe(true);
     });
 });

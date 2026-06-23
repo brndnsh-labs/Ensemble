@@ -12,7 +12,7 @@ import { isPackInstalled } from '../engine/instrument-registry.js';
 import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
-import { Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
+import { ButtonGroup, Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
 
 type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 type InstrumentAudioControl = 'volume' | 'reverb';
@@ -179,13 +179,16 @@ function InstrumentSoundSource({ module }: { module: StudioInstrumentModule }) {
             ? 'Synth'
             : (catalogPacks.find((p) => `pack:${p.id}` === autoTarget)?.name ?? 'Synth');
 
+    // Tap-to-select chips (one click, every option visible) instead of a
+    // dropdown. Auto's resolved target moves to the caption so the chip stays
+    // short; the pack names label the rest.
     const options = [
-        { value: 'auto', label: `Auto · ${autoTargetLabel}` },
+        { value: 'auto', label: 'Auto' },
         { value: 'synth', label: 'Synth' },
         ...packs.map((p) => ({ value: `pack:${p.id}`, label: p.name })),
     ];
 
-    const onChange = (val: string) => {
+    const selectSource = (val: string) => {
         if (val === 'auto') {
             dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module,
@@ -198,20 +201,20 @@ function InstrumentSoundSource({ module }: { module: StudioInstrumentModule }) {
         saveCurrentState();
     };
 
+    const hasUninstalled = catalogPacks.some((p) => !isPackInstalled(p.id));
+
     return (
         <SettingGroup title="Sound">
-            <SettingRow label="Source" id={`${module}SoundSource`}>
-                <Select
-                    id={`${module}SoundSource`}
-                    value={autoSound ? 'auto' : voice}
-                    onChange={onChange}
-                    options={options}
-                    ariaLabel={`${module} sound source`}
-                />
-            </SettingRow>
-            {catalogPacks.some((p) => !isPackInstalled(p.id)) && (
-                <p class="text-mini-muted">More sounds in Settings → Packs.</p>
-            )}
+            <ButtonGroup
+                className="instrument-sound-source"
+                value={autoSound ? 'auto' : voice}
+                onChange={(val) => selectSource(String(val))}
+                options={options}
+            />
+            <p class="text-mini-muted instrument-sound-source-note">
+                {autoSound ? `Following the genre → ${autoTargetLabel}` : 'Pinned to this sound'}
+                {hasUninstalled && ' · More in Settings → Packs'}
+            </p>
         </SettingGroup>
     );
 }

@@ -799,6 +799,12 @@
     padding: 0.28rem 0.62rem;
 }
 
+/* The per-instrument Sound source: tap-to-select chips + a caption that names
+   what Auto resolves to (and where to find more packs). */
+.instrument-sound-source-note {
+    margin: 0.45rem 0 0;
+}
+
 .workspace-studio-surface-card--soloist {
     width: 100%;
 }
