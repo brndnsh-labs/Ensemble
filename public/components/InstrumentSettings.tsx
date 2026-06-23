@@ -230,69 +230,53 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
         return null;
     }
 
+    // Bass has no generative knobs of its own yet — only the Sound source — so
+    // skip the specific-settings group rather than render a bare, empty title box.
+    const hasSpecificControls = module !== 'bass';
+
     return (
         <Fragment>
             <InstrumentSoundSource module={module} />
-            <SettingGroup title={getInstrumentSpecificTitle(module)}>
-                {module === 'chords' && (
-                    <SettingRow label="Density" id="densitySelect">
-                        <Select
+            {hasSpecificControls && (
+                <SettingGroup title={getInstrumentSpecificTitle(module)}>
+                    {module === 'chords' && (
+                        <SettingRow
+                            label="Density"
                             id="densitySelect"
-                            value={state.density || 'standard'}
-                            onChange={(val) => {
-                                dispatch(ACTIONS.SET_DENSITY, val);
-                                saveCurrentState();
-                            }}
-                            options={[
-                                { value: 'thin', label: 'Thin (3 notes)' },
-                                { value: 'standard', label: 'Standard (4 notes)' },
-                                { value: 'rich', label: 'Rich (5+ notes)' },
-                            ]}
-                        />
-                    </SettingRow>
-                )}
+                            description="Notes per chord — thinner or fuller voicings."
+                        >
+                            <Select
+                                id="densitySelect"
+                                value={state.density || 'standard'}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_DENSITY, val);
+                                    saveCurrentState();
+                                }}
+                                options={[
+                                    { value: 'thin', label: 'Thin (3 notes)' },
+                                    { value: 'standard', label: 'Standard (4 notes)' },
+                                    { value: 'rich', label: 'Rich (5+ notes)' },
+                                ]}
+                            />
+                        </SettingRow>
+                    )}
 
-                {module === 'harmony' && (
-                    <SettingRow
-                        label="Complexity"
-                        id="harmonyComplexity"
-                        valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                    >
-                        <Slider
-                            id="harmonyComplexity"
-                            min="0"
-                            max="1"
-                            step="0.05"
-                            value={state.complexity || 0.5}
-                            onInput={(val) => {
-                                dispatch(ACTIONS.SET_PARAM, {
-                                    module: 'harmony',
-                                    param: 'complexity',
-                                    value: parseFloat(val),
-                                });
-                                saveCurrentState();
-                            }}
-                            ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                        />
-                    </SettingRow>
-                )}
-
-                {module === 'soloist' && (
-                    <Fragment>
+                    {module === 'harmony' && (
                         <SettingRow
                             label="Complexity"
-                            id="soloistComplexity"
+                            id="harmonyComplexity"
+                            description="Higher adds extensions and inner-voice movement."
                             valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
                         >
                             <Slider
-                                id="soloistComplexity"
+                                id="harmonyComplexity"
                                 min="0"
                                 max="1"
                                 step="0.05"
-                                value={state.complexity !== undefined ? state.complexity : 0.5}
+                                value={state.complexity || 0.5}
                                 onInput={(val) => {
                                     dispatch(ACTIONS.SET_PARAM, {
-                                        module: 'soloist',
+                                        module: 'harmony',
                                         param: 'complexity',
                                         value: parseFloat(val),
                                     });
@@ -301,26 +285,58 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
                                 ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
                             />
                         </SettingRow>
+                    )}
 
-                        <SettingRow label="Phrasing Mode" id="soloistModeSelect">
-                            <Select
+                    {module === 'soloist' && (
+                        <Fragment>
+                            <SettingRow
+                                label="Complexity"
+                                id="soloistComplexity"
+                                description="Higher plays busier, more adventurous lines."
+                                valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                            >
+                                <Slider
+                                    id="soloistComplexity"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={state.complexity !== undefined ? state.complexity : 0.5}
+                                    onInput={(val) => {
+                                        dispatch(ACTIONS.SET_PARAM, {
+                                            module: 'soloist',
+                                            param: 'complexity',
+                                            value: parseFloat(val),
+                                        });
+                                        saveCurrentState();
+                                    }}
+                                    ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                                />
+                            </SettingRow>
+
+                            <SettingRow
+                                label="Phrasing Mode"
                                 id="soloistModeSelect"
-                                value={state.mode || 'monophonic'}
-                                onChange={(val) => {
-                                    dispatch(ACTIONS.SET_SOLOIST_MODE, val);
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'monophonic', label: 'Monophonic' },
-                                    { value: 'guitar', label: 'Guitar' },
-                                ]}
-                            />
-                        </SettingRow>
-                    </Fragment>
-                )}
+                                description="Single-note lead, or chord-aware guitar voicings."
+                            >
+                                <Select
+                                    id="soloistModeSelect"
+                                    value={state.mode || 'monophonic'}
+                                    onChange={(val) => {
+                                        dispatch(ACTIONS.SET_SOLOIST_MODE, val);
+                                        saveCurrentState();
+                                    }}
+                                    options={[
+                                        { value: 'monophonic', label: 'Monophonic' },
+                                        { value: 'guitar', label: 'Guitar' },
+                                    ]}
+                                />
+                            </SettingRow>
+                        </Fragment>
+                    )}
 
-                {module === 'groove' && <GrooveControls state={state} />}
-            </SettingGroup>
+                    {module === 'groove' && <GrooveControls state={state} />}
+                </SettingGroup>
+            )}
         </Fragment>
     );
 }
@@ -337,7 +353,12 @@ function GrooveControls({ state }: GrooveControlsProps) {
 
     return (
         <Fragment>
-            <SettingRow label="Swing" id="swingSlider" valueDisplay={`${swing || 0}%`}>
+            <SettingRow
+                label="Swing"
+                id="swingSlider"
+                description="Delays the off-beats for a triplet shuffle."
+                valueDisplay={`${swing || 0}%`}
+            >
                 <div class="flex-row instrument-settings-swing-controls">
                     <Slider
                         id="swingSlider"
@@ -368,6 +389,7 @@ function GrooveControls({ state }: GrooveControlsProps) {
             <SettingRow
                 label="Humanize"
                 id="humanizeSlider"
+                description="Subtle timing and velocity variation for a looser feel."
                 valueDisplay={`${state.humanize || 0}%`}
             >
                 <Slider
