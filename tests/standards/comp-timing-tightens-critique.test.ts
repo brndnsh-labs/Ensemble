@@ -17,6 +17,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { calculatePocketOffset } from '../../public/engine/groove-engine.js';
 import { getStepInfo } from '../../public/utils.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -129,7 +130,20 @@ function collectOnsetTimings(intensity: number, currentLoopCount: number): numbe
         for (let mStep = 0; mStep < STEPS_PER_BAR; mStep++) {
             const step = bar * STEPS_PER_BAR + mStep;
             const info = getStepInfo(step, FOUR_FOUR, [], TIME_SIGNATURES);
-            const notes = getAccompanimentNotes(state, chord, step, step, mStep, info, COORD);
+            // #714: the comp reads the shared groove pocket. Drive the REAL path —
+            // publish coordination.pocketOffset the way the drum preamble does — so
+            // this measures the integrated comp timing (shared pocket, which carries
+            // the intensity-tightened wobble, + the comp's own #713 pushes).
+            const coord = {
+                ...COORD,
+                pocketOffset: calculatePocketOffset(
+                    state.playback,
+                    state.groove,
+                    step,
+                    state.arranger.totalSteps,
+                ),
+            };
+            const notes = getAccompanimentNotes(state, chord, step, step, mStep, info, coord);
             const lead = notes.find((n: any) => n && n.midi > 0 && !n.muted);
             if (lead) {
                 timings.push(lead.timingOffset);

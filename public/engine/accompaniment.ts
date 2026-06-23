@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
-import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import { getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
@@ -74,6 +74,12 @@ export const compingState: CompingState = {
 //      picker re-runs every bar and the (sectionId, barIndex>>2) hash never
 //      gets to hold a cell across the 4-bar phrase.
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
+
+// #714: the comp's fixed per-lane feel on top of the shared groove pocket — a
+// keyboardist comps a hair behind the beat (cushioning the bass/drums). Small
+// and constant by design; the band-wide pocket + intensity pushes do the rest.
+// By-ear tunable (paired with BASS_POCKET_FEEL in bass-engine.ts).
+const COMP_POCKET_FEEL = 0.004; // ~4ms behind
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
@@ -1653,6 +1659,10 @@ interface AccompanimentCoordination {
     bassMidi?: number;
     kickHit?: boolean;
     snareHit?: boolean;
+    // #714: the shared groove pocket (written by the drum preamble,
+    // drums-tick.ts) the comp locks into, so chords + bass + harmony all sit in
+    // the same pocket relative to the drums instead of each drifting on its own.
+    pocketOffset?: number;
     // writer: tick-logic chord-preamble (readable by any producer)
     // why: chord anticipation gate reads the upcoming section root so the comper
     // can pre-voice the new chord on the "and-of-4" of the last measure.
@@ -2902,12 +2912,14 @@ export function getAccompanimentNotes(
             (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa Nova');
 
         // --- Holistic Pocket Implementation ---
-        // #713: the pocket's tightness jitter defaults to raw Math.random, which
-        // breaks the comp's loop-to-loop lock (#712). Feed it the loop-stable
-        // comp draw so the whole timing stream repeats every loop.
-        let timingOffset = calculateTimingOffset('chords', groove.pocket, intensity, () =>
-            compDraw(46),
-        );
+        // #714: the comp sits in the ONE shared groove pocket (drum preamble →
+        // coordination.pocketOffset) plus a small fixed comp-feel constant (a hair
+        // behind the beat), so chords + bass + harmony all lock to the same pocket
+        // relative to the drums instead of each running its own timing formula.
+        // The intensity-tightening pushes (#713) stay layered on top — that's the
+        // comp's own character the owner heard and liked. Falls back to 0 only
+        // when no coordination is supplied (bare tests).
+        let timingOffset = (coordination.pocketOffset || 0) + COMP_POCKET_FEEL;
 
         if (chords.style === 'smart') {
             // #713: the smart-path pushes were flat (±25/10/20ms) and ignored
