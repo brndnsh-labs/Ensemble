@@ -12,7 +12,7 @@ import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
 import { getVisualTime, initAudio, playNote } from './engine/engine.js';
-import { detectInstalledPacks } from './engine/pack-runtime.js';
+import { detectInstalledPacks, warmPacksForVoices } from './engine/pack-runtime.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
@@ -37,6 +37,22 @@ function init() {
         // Sounds panel ever mounts. Fire-and-forget: a genre change before it
         // resolves just falls back to synth (then corrects on the next change).
         void detectInstalledPacks();
+
+        // Pre-decode any selected sample-pack voice now, off a gesture-free
+        // OfflineAudioContext, so first playback comes up sampled instead of
+        // flashing the synth fallback while decode runs. The pack bytes are
+        // already in the SW cache after install; only the decode is left, and
+        // initAudio's ensurePacksForVoices later short-circuits on the warmed
+        // pack. Re-read post-hydrate state — the top-of-init destructure predates
+        // hydrateState(), so its voices are stale.
+        const hydrated = getState();
+        warmPacksForVoices([
+            hydrated.chords.voice,
+            hydrated.bass.voice,
+            hydrated.soloist.voice,
+            hydrated.harmony.voice,
+            hydrated.groove.voice,
+        ]);
 
         // E2E/dev helpers attach engine internals to `window.ensemble` for
         // Playwright tooling (and local-dev debugging). Gated to the Vite dev

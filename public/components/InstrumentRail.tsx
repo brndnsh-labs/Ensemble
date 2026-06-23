@@ -130,7 +130,6 @@ interface StudioSurfaceProps {
     closeLabel: string;
     isCompactViewport: boolean;
     isOpen: boolean;
-    kicker: string;
     meta?: ComponentChildren;
     onClose: () => void;
     subtitle?: string;
@@ -145,7 +144,6 @@ export function StudioSurface({
     closeLabel,
     isCompactViewport,
     isOpen,
-    kicker,
     meta,
     onClose,
     subtitle,
@@ -248,10 +246,11 @@ export function StudioSurface({
             >
                 <div class="workspace-studio-surface-header">
                     <div class="workspace-studio-surface-header-copy">
-                        <p class="workspace-kicker">{kicker}</p>
-                        <h3>{title}</h3>
+                        <div class="workspace-studio-surface-title-row">
+                            <h3>{title}</h3>
+                            {meta && <div class="workspace-studio-surface-meta">{meta}</div>}
+                        </div>
                         {subtitle && <p class="workspace-studio-surface-summary">{subtitle}</p>}
-                        {meta && <div class="workspace-studio-surface-meta">{meta}</div>}
                     </div>
                     <button
                         type="button"
@@ -322,7 +321,6 @@ function StudioBandFeelChooser({
                 closeLabel="Close genre"
                 isCompactViewport={isCompactViewport}
                 isOpen={isOpen}
-                kicker="Genre"
                 onClose={onClose}
                 subtitle="Choose the groove language and shared energy for the whole band."
                 title="Choose genre"
@@ -573,7 +571,6 @@ function StudioSettingsSurface({
             closeLabel={`Close ${instrument.label} settings`}
             isCompactViewport={isCompactViewport}
             isOpen={isOpen}
-            kicker="Live mix"
             meta={<span class={`workspace-instrument-state ${stateClass}`}>{stateLabel}</span>}
             onClose={onClose}
             subtitle={instrument.summary}

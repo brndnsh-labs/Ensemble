@@ -113,6 +113,38 @@ export function ensurePacksForVoices(
 }
 
 /**
+ * Pre-decode the packs backing `voices` at page load — before any live, gesture-
+ * unlocked `AudioContext` exists — so first playback comes up on the sampled
+ * voice instead of briefly flashing the synth fallback while decode runs.
+ *
+ * The gap this closes is **decode**, not download: a selected `pack:<id>` voice
+ * implies the pack was installed, so its bytes are already in the SW `/packs/`
+ * cache; only `decodeAudioData` is left, and today it runs async *after* the
+ * scheduler has already started (synth fallback until buffers land). We host that
+ * decode on an `OfflineAudioContext` — always allowed, no user gesture, no Chrome
+ * autoplay warning — feeding the *same* loader + registry as the live path, so
+ * `initAudio`'s later `ensurePacksForVoices` finds the pack loaded and short-
+ * circuits. `AudioBuffer`s are sample-rate-portable across contexts (each carries
+ * its own `sampleRate`, resampled correctly on the live context at playback), so
+ * the 44.1 kHz decode host is safe regardless of the device's output rate.
+ *
+ * No-op when no pack voice is selected, or where `OfflineAudioContext` is absent
+ * (non-browser test envs) — the lazy live path remains the fallback either way.
+ */
+export function warmPacksForVoices(voices: readonly InstrumentVoice[]): void {
+    if (typeof OfflineAudioContext === 'undefined') {
+        return;
+    }
+    const packVoices = voices.filter((voice) => packIdFromVoice(voice) !== null);
+    if (packVoices.length === 0) {
+        return;
+    }
+    // A minimal offline context used purely as a decode host — never rendered.
+    const decodeCtx = new OfflineAudioContext(1, 1, 44100);
+    ensurePacksForVoices(decodeCtx, packVoices);
+}
+
+/**
  * Scan the SW `/packs/` cache and seed the registry's installed-set (#675) so
  * genre auto-follow knows which mapped packs are available — synchronously,
  * without async cache I/O per genre change. Called once at bootstrap; the

@@ -58,7 +58,6 @@ export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) 
                 closeLabel="Close mix"
                 isCompactViewport={true}
                 isOpen={isMixOpen}
-                kicker="Band"
                 onClose={() => setIsMixOpen(false)}
                 subtitle="Choose feel, set the mix, toggle players."
                 title="Mix"

@@ -387,6 +387,10 @@
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     z-index: calc(var(--z-modal) - 1);
+    /* The parent layer is pointer-events:none (so it never blocks the app) and
+       pointer-events inherits — the panel re-enables it, but the backdrop must
+       too, or its onClick={onClose} never fires and click-away-to-dismiss dies. */
+    pointer-events: auto;
 }
 
 .workspace-studio-surface-layer {
@@ -462,7 +466,17 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.12rem;
+}
+
+/* Slim header: title + state badge share one line (was a separate kicker line
+   above and a meta line below), so the first control sits higher. */
+.workspace-studio-surface-title-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
 }
 
 .workspace-studio-surface-header h3 {
@@ -472,16 +486,16 @@
 
 .workspace-studio-surface-summary {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .workspace-studio-surface-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-top: 0.15rem;
+    margin: 0;
 }
 
 .workspace-studio-surface-body {
@@ -793,6 +807,12 @@
     max-width: 100%;
     border-radius: var(--radius-pill);
     padding: 0.28rem 0.62rem;
+}
+
+/* The per-instrument Sound source: tap-to-select chips + a caption that names
+   what Auto resolves to (and where to find more packs). */
+.instrument-sound-source-note {
+    margin: 0.45rem 0 0;
 }
 
 .workspace-studio-surface-card--soloist {
