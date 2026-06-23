@@ -1,0 +1,82 @@
+{
+    "id": "rhodes",
+    "name": "Electric Piano (Rhodes)",
+    "attribution": "jRhodes3c (1977 Rhodes Mark I) by Jeff Learman \u2014 CC BY-NC-SA 4.0",
+    "samples": [
+        {
+            "key": "29",
+            "rootMidi": 29,
+            "url": "/packs/rhodes/29.m4a"
+        },
+        {
+            "key": "35",
+            "rootMidi": 35,
+            "url": "/packs/rhodes/35.m4a"
+        },
+        {
+            "key": "40",
+            "rootMidi": 40,
+            "url": "/packs/rhodes/40.m4a"
+        },
+        {
+            "key": "45",
+            "rootMidi": 45,
+            "url": "/packs/rhodes/45.m4a"
+        },
+        {
+            "key": "50",
+            "rootMidi": 50,
+            "url": "/packs/rhodes/50.m4a"
+        },
+        {
+            "key": "55",
+            "rootMidi": 55,
+            "url": "/packs/rhodes/55.m4a"
+        },
+        {
+            "key": "59",
+            "rootMidi": 59,
+            "url": "/packs/rhodes/59.m4a"
+        },
+        {
+            "key": "62",
+            "rootMidi": 62,
+            "url": "/packs/rhodes/62.m4a"
+        },
+        {
+            "key": "65",
+            "rootMidi": 65,
+            "url": "/packs/rhodes/65.m4a"
+        },
+        {
+            "key": "71",
+            "rootMidi": 71,
+            "url": "/packs/rhodes/71.m4a"
+        },
+        {
+            "key": "76",
+            "rootMidi": 76,
+            "url": "/packs/rhodes/76.m4a"
+        },
+        {
+            "key": "81",
+            "rootMidi": 81,
+            "url": "/packs/rhodes/81.m4a"
+        },
+        {
+            "key": "86",
+            "rootMidi": 86,
+            "url": "/packs/rhodes/86.m4a"
+        },
+        {
+            "key": "91",
+            "rootMidi": 91,
+            "url": "/packs/rhodes/91.m4a"
+        },
+        {
+            "key": "96",
+            "rootMidi": 96,
+            "url": "/packs/rhodes/96.m4a"
+        }
+    ]
+}

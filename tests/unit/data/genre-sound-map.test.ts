@@ -36,22 +36,26 @@ describe('genre → sound map (#675)', () => {
     });
 
     describe('chords lane — per-genre keyboard (#682)', () => {
-        // The table decided with Brandon 2026-06-22. Locked here so a stray edit
-        // to GENRE_SOUND_MAP that re-points a genre's keyboard fails loudly.
+        // The table decided with Brandon 2026-06-22 (#682), revised 2026-06-23
+        // when the Rhodes pack (#655) took the electric-piano seats. Locked here
+        // so a stray edit to GENRE_SOUND_MAP that re-points a genre's keyboard
+        // fails loudly.
         const CHORDS_TABLE: Record<string, InstrumentVoice> = {
             Jazz: 'pack:grand',
             Acoustic: 'pack:grand',
             Bossa: 'pack:grand',
             Country: 'pack:grand',
-            Disco: 'pack:grand',
-            'Neo-Soul': 'pack:grand',
             Rock: 'pack:grand',
+            // Tine Rhodes (#655) — the neo-soul/hip-hop/disco electric-piano seats
+            // the grand used to stand in for.
+            'Neo-Soul': 'pack:rhodes',
+            'Hip Hop': 'pack:rhodes',
+            Disco: 'pack:rhodes',
             Reggae: 'pack:hammond-organ',
             Blues: 'pack:hammond-organ',
             'Ska-Punk': 'pack:hammond-organ',
             Funk: 'pack:clavinet',
-            // Hip Hop / Metal keep the synth keyboard (no acoustic-keys idiom).
-            'Hip Hop': 'synth',
+            // Metal keeps the synth keyboard (no acoustic-keys idiom).
             Metal: 'synth',
         };
 

@@ -33,11 +33,13 @@ export const GENRE_SOUND_MAP: Readonly<
     //
     // chords — the keyboard playing the changes:
     //   • grand    → acoustic-piano genres (jazz comping, singer-songwriter,
-    //                bossa, country, the disco/neo-soul Rhodes-ish seat, rock piano)
+    //                bossa, country, rock piano)
+    //   • rhodes   → tine electric piano (#655): neo-soul, hip-hop, disco — the
+    //                seats the grand used to stand in for as a "Rhodes-ish" placeholder
     //   • hammond  → tonewheel-organ genres (reggae bubble, blues/gospel, the
     //                2-tone ska skank that pairs with the horns)
     //   • clavinet → funk's percussive plucked comp
-    //   • synth    → Hip Hop / Metal (no acoustic-keys idiom → keep the synth)
+    //   • synth    → Metal (no acoustic-keys idiom → keep the synth)
     // harmony — the section answering the changes (horns vs. string pad vs. synth).
     // soloist — sax (#694): a real horn lead only where it's idiomatic (jazz/blues
     //   blowing, funk hits, bossa cool); everything else keeps the synth lead — one
@@ -80,7 +82,7 @@ export const GENRE_SOUND_MAP: Readonly<
     },
     // Sustained string pad — genres that want a lush bed under the changes.
     Rock: { chords: 'pack:grand', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
-    Disco: { chords: 'pack:grand', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
+    Disco: { chords: 'pack:rhodes', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
     Country: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
@@ -100,9 +102,11 @@ export const GENRE_SOUND_MAP: Readonly<
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
-    // Neo-Soul — grand on the keys; no harmony pack fit yet → synth pad.
-    'Neo-Soul': { chords: 'pack:grand', groove: 'pack:acoustic-kit' },
-    // Hip Hop · Metal chords — no acoustic-keys idiom yet → synth pad.
+    // Neo-Soul — Rhodes on the keys (#655); no harmony pack fit yet → synth pad.
+    'Neo-Soul': { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
+    // Hip Hop — Rhodes keys (#655); groove stays the synth kit (programmed beats).
+    'Hip Hop': { chords: 'pack:rhodes' },
+    // Metal chords — no acoustic-keys idiom → synth pad.
 };
 
 /**
