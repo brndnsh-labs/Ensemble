@@ -628,7 +628,12 @@ function scheduleDrums(
     const { playback, groove, vizState, arranger } = state;
 
     const conductorVel = playback.conductorVelocity || 1.0;
-    const finalTime = time + calculatePocketOffset(playback, groove);
+    // #714: thread the real step so the drum grid sits in the SAME per-step shared
+    // pocket the melodic lanes lock to (coordination.pocketOffset, published in the
+    // drum preamble) — "one shared pocket" is then literally one, and the drum
+    // timing is deterministic/loop-stable (was raw Math.random via the default args).
+    const finalTime =
+        time + calculatePocketOffset(playback, groove, absoluteStep, arranger.totalSteps);
 
     // Evaluate fills and standard groove patterns via our unified tick logic
     // This maintains 1:1 playback/export parity.

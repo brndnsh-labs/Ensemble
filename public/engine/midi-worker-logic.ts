@@ -554,7 +554,12 @@ export class ExportProcessor {
         }
 
         if (this.includedTracks.includes('drums')) {
-            const drumTimeS = stepTimeS + calculatePocketOffset(playback, groove);
+            // #714: thread the real step + loop length so export drum timing matches
+            // the shared per-step pocket (and the realtime scheduler), keeping
+            // playback/export parity airtight and the drum lane loop-stable.
+            const drumTimeS =
+                stepTimeS +
+                calculatePocketOffset(playback, groove, globalStep, this.totalStepsOneLoop);
 
             const nextStepTimeS = this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
             const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;

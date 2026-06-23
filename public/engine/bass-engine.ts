@@ -1,7 +1,15 @@
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
-import { calculateTimingOffset, getFrequency, getMidi } from '../utils.js';
+import { getFrequency, getMidi } from '../utils.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
+
+// #714: the bass's fixed per-lane feel on top of the shared groove pocket
+// (coordination.pocketOffset, written by the drum preamble). The bassist sits a
+// hair behind the beat for a fat pocket; the band-wide offset keeps bass + comp
+// + harmony locked to the same pocket relative to the drums instead of each
+// running its own calculateTimingOffset. By-ear tunable (paired with
+// COMP_POCKET_FEEL in accompaniment.ts). The Neo-Soul/Dilla lag layers on top.
+const BASS_POCKET_FEEL = 0.005; // ~5ms behind
 
 /**
  * BASS ENGINE - Procedural Line Generation
@@ -527,7 +535,7 @@ export function getBassNote(
         // the scheduler / MIDI export never read it.
         approachTargetRoot?: number,
     ) => {
-        let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
+        let timingOffset = (context?.stepCoordination?.pocketOffset || 0) + BASS_POCKET_FEEL;
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             timingOffset += 0.01 + intensity * 0.015;
         }
@@ -704,7 +712,7 @@ export function getBassNote(
         if (isDownbeat) {
             const intensityFactor = 0.6 + intensity * 0.7;
             const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
-            let timingOffset = calculateTimingOffset('bass', groove.pocket, intensity);
+            let timingOffset = (context?.stepCoordination?.pocketOffset || 0) + BASS_POCKET_FEEL;
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
                 timingOffset += 0.01 + intensity * 0.015;
             }

@@ -908,11 +908,34 @@ export function calculateStepDuration(step: number, bpm: number, ts: any, groove
     return duration;
 }
 
-export function calculatePocketOffset(playback: any, groove: any): number {
-    let pocketOffset = calculateTimingOffset('drums', groove.pocket, playback.bandIntensity);
+export function calculatePocketOffset(
+    playback: any,
+    groove: any,
+    step = 0,
+    totalSteps = 0,
+): number {
+    // #714: the ONE shared groove pocket the melodic lanes (bass, chords, harmony)
+    // all sit in, RELATIVE to the drums' grid (drums play at instTimeOffset 0).
+    // Published once here on coordination.pocketOffset; every lane adds THIS + a
+    // small fixed per-lane feel constant, so the whole band breathes as a unit
+    // instead of running four independent timing formulas.
+    //
+    // Lane-agnostic: pass 'shared' so calculateTimingOffset contributes only the
+    // global drive + intensity-tightened wobble (no per-instrument gravity term).
+    // Seeded off the IN-LOOP step (not raw Math.random and not the monotonic
+    // global step) so the pocket is deterministic AND repeats loop-to-loop — the
+    // band locks like the comp does (#712). Falls back to the raw step when the
+    // loop length is unknown (never collapses to step 0).
+    const inLoopStep =
+        totalSteps > 0 ? (((step % totalSteps) + totalSteps) % totalSteps) | 0 : step;
+    let pocketOffset = groove.pocket
+        ? calculateTimingOffset('shared', groove.pocket, playback.bandIntensity, () =>
+              scrambleHash((inLoopStep * 0x9e3779b1) | 0),
+          )
+        : 0;
     const strategy = getStrategy(groove);
     if (strategy?.config.dillaFeel) {
-        pocketOffset += 0.015;
+        pocketOffset += 0.015; // band-wide laid-back lag (everyone lays back together)
     }
     return pocketOffset;
 }
