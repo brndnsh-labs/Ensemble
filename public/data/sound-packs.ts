@@ -317,8 +317,13 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // → `playSampledNote`, inheriting the bass bus EQ / reverb send / kick
         // sidechain-duck. The seam doesn't model continuous bends or the synth's
         // mute-morph (accepted tradeoff for a real upright; muted notes just
-        // attenuate). Zone roots were set from the *measured* fundamental (FFT +
-        // YIN + harmonic-template), not VSCO's unreliable filename octaves.
+        // attenuate). Zone roots are the *measured* fractional fundamental (FFT +
+        // YIN + harmonic-template), not VSCO's unreliable filename octaves — and
+        // NOT rounded to the nearest integer note. Rounding discarded up to ±50c
+        // of each sample's true pitch, which `pitchRatio` then baked in as constant
+        // per-zone detuning (zones 31/42/45 read −12/+23/+18c — audibly off while
+        // the rest sang). The fractional roots in the manifest cancel that. If a
+        // re-measure or re-sample lands a zone back on an integer, suspect this.
         // Source is loudnorm-leveled (VSCO is quiet) + mono. Calibrated 2026-06-22
         // (#697) via `mix:report --calibrate-pack=bass:upright-bass`: pack sat
         // 3.2 dB under the synth bass across rock/blues/jazz/funk (RMS-match =

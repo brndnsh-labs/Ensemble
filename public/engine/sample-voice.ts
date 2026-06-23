@@ -26,7 +26,15 @@ const MAX_SAMPLE_PEAK = 8;
 
 /** A pitched sample zone: a decoded buffer recorded at a known root pitch. */
 export interface SampleZone {
-    /** MIDI note the buffer was sampled at (playbackRate 1.0 plays in tune here). */
+    /**
+     * The buffer's *measured* fundamental, in MIDI units — playbackRate 1.0 plays
+     * in tune here. This is intentionally **fractional** (e.g. `45.18`), not the
+     * nearest integer note: a real recording's true pitch sits a few to tens of
+     * cents off its nominal note, and since `pitchRatio` shifts by exact ratios,
+     * rounding the root to an integer bakes that offset in as constant detuning on
+     * every note routed through the zone (the upright-bass #697 "occasionally out
+     * of tune" bug). Store the measured value; let the ratio cancel the offset.
+     */
     readonly rootMidi: number;
     readonly buffer: AudioBuffer;
 }
