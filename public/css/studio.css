@@ -387,6 +387,10 @@
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     z-index: calc(var(--z-modal) - 1);
+    /* The parent layer is pointer-events:none (so it never blocks the app) and
+       pointer-events inherits — the panel re-enables it, but the backdrop must
+       too, or its onClick={onClose} never fires and click-away-to-dismiss dies. */
+    pointer-events: auto;
 }
 
 .workspace-studio-surface-layer {

@@ -119,6 +119,25 @@ test.describe('Instrument settings — desktop @ui', () => {
         );
         expect(fits).toBe(true);
     });
+
+    // Regression guard: the dimmed backdrop must dismiss on click (it inherits
+    // the layer's pointer-events:none and needs pointer-events:auto re-enabled,
+    // or click-away silently dies). Inner clicks must NOT dismiss. All
+    // StudioSurface overlays (gear settings + genre) share this one backdrop.
+    test('clicking the backdrop dismisses settings; inner clicks do not', async ({ page }) => {
+        const surface = await openInstrumentSettings(page, 'Chords');
+
+        // A click inside the panel keeps it open (the fix must not over-dismiss).
+        await surface.locator('.workspace-studio-surface-header h3').click();
+        await expect(surface).toBeVisible();
+
+        // A click on the dimmed backdrop, away from the top-right anchored panel,
+        // closes it (StudioSurface unmounts → the surface locator detaches).
+        await page
+            .locator('.workspace-studio-surface-backdrop')
+            .click({ position: { x: 5, y: 5 } });
+        await expect(surface).toBeHidden();
+    });
 });
 
 test.describe('Instrument settings — mobile @mobile', () => {
