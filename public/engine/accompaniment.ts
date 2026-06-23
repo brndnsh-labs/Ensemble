@@ -2902,18 +2902,31 @@ export function getAccompanimentNotes(
             (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa Nova');
 
         // --- Holistic Pocket Implementation ---
-        let timingOffset = calculateTimingOffset('chords', groove.pocket, intensity);
+        // #713: the pocket's tightness jitter defaults to raw Math.random, which
+        // breaks the comp's loop-to-loop lock (#712). Feed it the loop-stable
+        // comp draw so the whole timing stream repeats every loop.
+        let timingOffset = calculateTimingOffset('chords', groove.pocket, intensity, () =>
+            compDraw(46),
+        );
 
         if (chords.style === 'smart') {
+            // #713: the smart-path pushes were flat (±25/10/20ms) and ignored
+            // intensity, so the comp wandered the SAME amount at full energy as at
+            // a ballad — it never "locked in" as the band drove. Scale them by the
+            // SAME intensity elasticity the pocket uses (1.1 - elasticity): ~0.7×
+            // at low intensity (loose, expressive) down to ~0.1× at intensity 1
+            // (tight, locked to the grid). B3.
+            const elasticity = 0.4 + intensity * 0.6; // matches calculateTimingOffset
+            const pushScale = 1.1 - elasticity; // 0.7 (loose) → 0.1 (tight)
             const pushProb = 0.15 + intensity * 0.2;
             if (!isDownbeat && compDraw(8) < pushProb) {
-                timingOffset -= 0.025;
+                timingOffset -= 0.025 * pushScale;
             }
             if (compDraw(9) < playback.intent.anticipation) {
-                timingOffset -= 0.01;
+                timingOffset -= 0.01 * pushScale;
             }
             if (compDraw(10) < playback.intent.layBack) {
-                timingOffset += 0.02;
+                timingOffset += 0.02 * pushScale;
             }
         }
 
