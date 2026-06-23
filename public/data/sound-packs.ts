@@ -105,6 +105,33 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         reverbSend: 1.6,
     },
     {
+        id: 'rhodes',
+        name: 'Electric Piano (Rhodes)',
+        description:
+            'A sampled 1977 Rhodes Mark I — warm tine electric piano with a bell-y bark for neo-soul, hip-hop, jazz.',
+        attribution: 'jRhodes3c (1977 Rhodes Mark I) by Jeff Learman — CC BY-NC-SA 4.0',
+        approxSizeMB: 0.8,
+        instruments: ['chords'],
+        // Calibrated 2026-06-23 (#655) via `mix-report --calibrate-pack=chords:rhodes`:
+        // pack sat 13.1 dB under the synth chords across rock/blues/jazz/funk
+        // (RMS-match = 4.5×). The Rhodes is markedly darker than the synth chords
+        // (−287 Hz centroid → reads slightly quieter than its RMS), so seated AT
+        // the match (a percussive/bright voice would seat under, cf. clavinet) and
+        // it may want a small nudge UP on the listen. Tine electric piano with a
+        // natural per-note decay (no loop — the looped source clips were
+        // tail-faded, so a chord held longer than the sample decays out rather
+        // than cutting hard). 15 zones F1–C7, kept STEREO on purpose: jRhodes3c
+        // bakes a mid-side doubling-chorus that *cancels to mono*, so a mono
+        // downmix would strip the shimmer that defines the tone. Source zones were
+        // loudnorm-leveled (uneven raw peaks) before AAC. Confirm/nudge by ear on
+        // ensembletest (neo-soul comp / hip-hop keys / jazz Rhodes).
+        gain: 4.5,
+        // DI-ish electric piano (only the baked chorus for width, no recorded
+        // room) — lift the send like the other dry keys (hammond/clav) so it
+        // shares the band's space. By-ear start. #686-style.
+        reverbSend: 1.4,
+    },
+    {
         id: 'sax-alto',
         name: 'Alto Saxophone',
         description: 'A sampled alto sax — a real horn lead for the soloist.',
