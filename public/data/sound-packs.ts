@@ -215,23 +215,27 @@ export const SOUND_PACKS: readonly SoundPack[] = [
             'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
         approxSizeMB: 0.7,
         instruments: ['soloist'],
-        // Calibrated 2026-06-23 (#741) via `mix-report --calibrate-pack=soloist:electric-guitar-driven`.
         // Same 13 source zones as the clean electric (#740), re-voiced through an
         // OFFLINE amp sim (data-only, no engine code): tanh soft-clip drive (×4,
-        // slight even-harmonic asymmetry for tube warmth) → cabinet EQ (sharp ~5.2k
-        // low-pass to kill the clipping fizz, sub trim, +4 dB presence at 2.6k for
-        // cut, small low-mid scoop). Pitch-preserving (waveshaping); the drive
-        // measurably enriches the upper harmonics. The honest limit: drive + sustain
-        // approximate a lead tone but bends/vibrato still aren't in the samples (the
-        // real "screaming lead" unlock is soloist-engine pitch expression, separate).
+        // even-harmonic asymmetry for tube warmth) → cabinet EQ. Pitch-preserving
+        // (waveshaping); the drive measurably enriches the upper harmonics. The
+        // honest limit: drive + sustain approximate a lead tone but bends/vibrato
+        // still aren't in the samples (the real "screaming lead" unlock is
+        // soloist-engine pitch expression, separate).
+        // CABINET VOICING — warmed 2026-06-23 after Brandon's ear ("a little
+        // brittle"): the first cut (5.2k low-pass, +4 dB presence at 2.6k, low-mid
+        // scoop) read thin/edgy. Now: darker 4.0k low-pass (real-cab roll-off, less
+        // fizz), a +2.5 dB BODY bump at 450 Hz (was a scoop — that was the missing
+        // warmth), and only a gentle +1.5 dB presence at 2.4k (cut without glass).
+        // Flipped the centroid from +353 Hz (bright) to −159 Hz (warmer than synth).
         // DRIVE (×4) is the #1 by-ear knob — push to 5–6 for more grit, down to 3 for
         // a bluesy edge; re-bake from the clean source to retune. Manual-select PoC —
         // genre seat (Rock the intended target) decided by ear after the listen.
         // Calibrated via `mix-report --calibrate-pack=soloist:electric-guitar-driven`:
-        // only 5.7 dB under the synth lead (RMS-match = 1.92×) — far less lift than
-        // the clean's 3× because the drive's compression already raised the RMS.
-        // Brighter (+353 Hz) so seated just under the match at 1.8×. Ear-lock on test.
-        gain: 1.8,
+        // the warm re-voice rolled off HF energy so it sits 5.6 dB under the synth
+        // lead (RMS-match = 3.4×, up from the bright cut's 1.9×); slightly darker
+        // now (−159 Hz) so seated AT the match, 3.4×. Ear-lock on test.
+        gain: 3.4,
         // Amp-sim tone, no recorded room — a lead-guitar lift to seat it in the
         // band's space. By-ear start. #686-style.
         reverbSend: 1.2,
