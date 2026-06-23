@@ -178,6 +178,35 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         reverbSend: 1.0,
     },
     {
+        id: 'electric-guitar-clean',
+        name: 'Electric Guitar (Clean)',
+        description:
+            'A sampled clean Fender electric — a real single-coil lead for jazz, funk, soul, country, clean blues.',
+        attribution:
+            'FreePats Clean Electric Guitar (Fender, bridge pickup) — CC0 1.0 (public domain)',
+        approxSizeMB: 0.7,
+        instruments: ['soloist'],
+        // Calibrated 2026-06-23 (#740) via `mix-report --calibrate-pack=soloist:electric-guitar-clean`:
+        // pack sat 9.7 dB under the synth lead (RMS-match = 3.0×). Centroid is
+        // essentially matched (−52 Hz — unlike the dark nylon's −820 Hz), so the
+        // RMS-match is trustworthy and no dark-voice over-match is needed: seated AT
+        // the match, 3×. Confirm/nudge by ear on ensembletest.
+        // Sustained single-coil lead — looped source (loop_continuous), so the
+        // clips were tail-faded for the one-shot seam (a long held note decays out
+        // rather than ringing forever). 13 zones C2–C#6 at the FreePats author's
+        // own key ranges (~major-third spacing — sustain masks the modest pitch-shift
+        // between zones, unlike the plucked nylon's denser every-2). Mono (single-
+        // note lead, halves size); source peaked at 0 dBFS so backed off −1 dB for
+        // AAC true-peak headroom (gain compensates). PROOF OF CONCEPT (#740) for the
+        // electric-lead family: same samples feed the driven-tone v2 (#741) and can
+        // serve the chords lane (clean comp, #698) by adding 'chords' here. Manual-
+        // select for now — genre Auto-map seats are a by-ear call after the listen.
+        gain: 3,
+        // Clean amp/FX-rack tone, fairly dry — a small lift like the sax/nylon to
+        // seat the lead in the band's space. By-ear start. #686-style.
+        reverbSend: 1.1,
+    },
+    {
         id: 'strings-ensemble',
         name: 'String Ensemble',
         description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',

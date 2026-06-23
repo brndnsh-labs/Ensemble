@@ -41,12 +41,15 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • clavinet → funk's percussive plucked comp
     //   • synth    → Metal (no acoustic-keys idiom → keep the synth)
     // harmony — the section answering the changes (horns vs. string pad vs. synth).
-    // soloist — two real leads, each only where idiomatic (everything else keeps
+    // soloist — three real leads, each only where idiomatic (everything else keeps
     //   the synth lead — one voice on every genre would wear thin):
-    //   • sax (#694)   → jazz/blues blowing, funk hits
-    //   • nylon (#659) → the fingerstyle-guitar combo: bossa (the nylon takes the
-    //                    lead seat over the sax — bossa nova IS the nylon guitar),
-    //                    acoustic singer-songwriter, country picking
+    //   • sax (#694)          → jazz/blues blowing (blues flips to harp once #699
+    //                           ships — harmonica is the surer blues lead)
+    //   • nylon (#659)        → the fingerstyle-guitar combo: bossa (the nylon
+    //                           takes the lead over the sax — bossa nova IS nylon),
+    //                           acoustic singer-songwriter
+    //   • electric-clean (#740) → funk (iconic single-coil lead) + country (clean
+    //                           electric twang — more idiomatic there than the nylon)
     // groove — acoustic kit (#695): a live drummer is the better default for most
     //   genres (Brandon's ear 2026-06-22), so the kit is the default and synth is
     //   the exception. Synth kit only where the drums are programmed/triggered:
@@ -55,7 +58,7 @@ export const GENRE_SOUND_MAP: Readonly<
     Funk: {
         chords: 'pack:clavinet',
         harmony: 'pack:horns-section',
-        soloist: 'pack:sax-alto',
+        soloist: 'pack:electric-guitar-clean',
         groove: 'pack:acoustic-kit',
     },
     Metal: { harmony: 'pack:horns-section' },
@@ -89,7 +92,7 @@ export const GENRE_SOUND_MAP: Readonly<
     Country: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
-        soloist: 'pack:nylon-guitar',
+        soloist: 'pack:electric-guitar-clean',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
