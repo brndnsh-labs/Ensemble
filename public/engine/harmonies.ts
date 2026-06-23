@@ -637,19 +637,33 @@ function playHornSectionMode(context: HarmonyContext): HarmonyBehavior | null {
         return null;
     }
 
-    // Classic horn-section accents: the & of 2 and the & of 4 (the push into the
-    // next bar). spb-relative so they stay musical in any meter.
+    // Horn-section ANSWER FIGURES (movement without clutter). Rather than a single
+    // isolated stab, the section answers with a short 1–2 hit gesture in the gap —
+    // a "bah-DAH", a pickup, a push into the next bar. spb-relative so they stay
+    // musical in any meter. (4/4, spb=4 → &-of-2=6, beat3=8, beat4=12, &-of-4=14.)
     const andOf2 = spb + Math.floor(spb / 2);
+    const beat3 = 2 * spb;
+    const beat4 = 3 * spb;
     const andOf4 = 3 * spb + Math.floor(spb / 2);
-    if (measureStep !== andOf2 && measureStep !== andOf4) {
+    const FIGURES: number[][] = [
+        [andOf4], // single push into the next bar — the breather
+        [andOf2, beat3], // "bah-DAH" answer through the middle of the bar
+        [beat4, andOf4], // quick pickup setting up the next bar
+        [andOf2, andOf4], // two pushes bracketing the bar half
+    ];
+
+    // Some bars the section rests so it breathes (fewer rests as the band drives);
+    // the rest play one figure, rotated bar-to-bar for conversational movement.
+    // Seeded so it's deterministic/reproducible.
+    const barIndex = Math.floor(step / Math.max(1, stepsPerMeasure));
+    const playBarProb = 0.55 + intensity * 0.4;
+    if (scrambleHash(motif.seed + barIndex * 17 + 9) > playBarProb) {
         return null;
     }
-
-    // Sparse: the section breathes — it doesn't punch every bar. Seeded by bar so
-    // it locks loop-to-loop; punches more often as the band drives harder.
-    const barIndex = Math.floor(step / Math.max(1, stepsPerMeasure));
-    const punchProb = 0.35 + intensity * 0.5;
-    if (scrambleHash(motif.seed + barIndex * 17 + measureStep + 9) > punchProb) {
+    const figure =
+        FIGURES[Math.floor(scrambleHash(motif.seed + barIndex * 23 + 5) * FIGURES.length)] ||
+        FIGURES[0];
+    if (!figure.includes(measureStep)) {
         return null;
     }
 
@@ -1326,10 +1340,14 @@ export function getHarmonyNotes(
     // split is driven by the configured rhythmic style.
     if (!behavior) {
         if (context.hornSection) {
-            // #716 — the BB King horn section never pads: it punches sparse
-            // call-and-response stabs at every intensity (the antiphony above
-            // answers the soloist; this fills the gaps when the soloist lays out).
-            behavior = playHornSectionMode(context);
+            // #716 — the BB King horn section: soft sustained swells on a ballad
+            // (the section behind a slow blues), punchy sparse call-and-response
+            // answer figures once the band drives. The antiphony above answers the
+            // soloist's phrase ends at any intensity.
+            behavior =
+                playback.bandIntensity < HARMONY_PAD_CEILING
+                    ? playSeaMode(context)
+                    : playHornSectionMode(context);
         } else if (profile.voicing?.arpeggiate) {
             // Acoustic fingerpick replaces the held pad with a rolling
             // counter-line at every intensity (above the mute floor). #561.

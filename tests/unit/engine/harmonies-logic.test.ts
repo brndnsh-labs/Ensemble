@@ -705,16 +705,18 @@ describe('Harmony Engine Logic', () => {
             expect(steps.length).toBe(0);
         });
 
-        it('punches sparse stabs only on the horn accents (&-of-2 / &-of-4) when the soloist lays out', () => {
+        it('punches sparse answer figures only on the horn-figure steps when the soloist lays out', () => {
             const steps = bluesStabSteps({ soloistBusy: false, soloistResting: true });
             // It does punch...
             expect(steps.length).toBeGreaterThan(0);
-            // ...only on the classic horn accents (mStep 6 = &-of-2, 14 = &-of-4)...
+            // ...only on the answer-figure steps (mStep 6 &-of-2, 8 beat-3,
+            // 12 beat-4, 14 &-of-4 — the gesture notes, never the downbeat)...
             for (const s of steps) {
-                expect([6, 14]).toContain(s % 16);
+                expect([6, 8, 12, 14]).toContain(s % 16);
             }
-            // ...and sparsely (it breathes — not every accent in every bar).
-            expect(steps.length).toBeLessThan(8); // < 4 bars × 2 accents
+            // ...and sparsely (it breathes — 1–2 hit figures, some bars rest),
+            // nowhere near a full comp over 4 bars.
+            expect(steps.length).toBeLessThan(10);
         });
 
         it('is deterministic loop-to-loop (same gaps fire the same way each chorus)', () => {
