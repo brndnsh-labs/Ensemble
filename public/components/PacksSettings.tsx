@@ -97,6 +97,8 @@ export function PacksSettings() {
         () => new Set(SOUND_PACKS.filter((p) => isPackInstalled(p.id)).map((p) => p.id)),
     );
     const [busy, setBusy] = useState<Record<string, boolean>>({});
+    // Which pack's info panel (description + credit) is expanded; one at a time.
+    const [openInfo, setOpenInfo] = useState<string | null>(null);
 
     useEffect(() => {
         let alive = true;
@@ -251,18 +253,29 @@ export function PacksSettings() {
                 const isInstalled = installed.has(pack.id);
                 const isBusy = busy[pack.id] ?? false;
                 const serves = pack.instruments.map((m) => MODULE_LABELS[m]).join(', ');
+                const infoOpen = openInfo === pack.id;
+                const detailId = `pack-detail-${pack.id}`;
                 return (
                     <div class="sound-source-row sound-source-row--pack" key={pack.id}>
-                        <span class="sound-source-dot" aria-hidden="true" />
                         <span class="sound-source-name">{pack.name}</span>
                         <span class="sound-source-meta">
                             {isBusy
                                 ? 'Downloading…'
                                 : isInstalled
-                                  ? `Installed · ${serves}`
-                                  : `${pack.approxSizeMB} MB · ${serves}`}
+                                  ? `${serves} · ✓ Installed`
+                                  : `${serves} · ${pack.approxSizeMB} MB`}
                         </span>
                         <div class="sound-source-actions">
+                            <button
+                                type="button"
+                                class="icon-btn"
+                                aria-label={`About ${pack.name}`}
+                                aria-expanded={infoOpen}
+                                aria-controls={detailId}
+                                onClick={() => setOpenInfo(infoOpen ? null : pack.id)}
+                            >
+                                <Icon name="info" />
+                            </button>
                             <button
                                 type="button"
                                 class="icon-btn"
@@ -294,7 +307,12 @@ export function PacksSettings() {
                                 </button>
                             )}
                         </div>
-                        {isInstalled && <p class="sound-source-credit">{pack.attribution}</p>}
+                        {infoOpen && (
+                            <div class="sound-source-detail" id={detailId}>
+                                <p class="sound-source-desc">{pack.description}</p>
+                                <p class="sound-source-credit">{pack.attribution}</p>
+                            </div>
+                        )}
                     </div>
                 );
             })}

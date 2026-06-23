@@ -2276,11 +2276,13 @@ input[type="range"] {
     cursor: default;
 }
 
-/* The pack row hosts a select button + an actions cluster, so it isn't itself
-   the button — its select child carries the row's flex layout. */
+/* The pack library row isn't a selector (you install many, not pick one), so it
+   carries its own padding and wraps to let the info panel drop to a full-width
+   second line below the controls. */
 .sound-source-row--pack {
-    padding: 0;
     cursor: default;
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
 }
 
 .sound-source-select {
@@ -2297,21 +2299,9 @@ input[type="range"] {
     cursor: pointer;
 }
 
-/* The selected/unselected radio dot. */
-.sound-source-dot {
-    flex-shrink: 0;
-    width: 0.85rem;
-    height: 0.85rem;
-    border-radius: 50%;
-    border: 2px solid var(--text-muted, rgba(255, 255, 255, 0.45));
-}
-
-.is-active .sound-source-dot {
-    border-color: var(--accent-color);
-    background: radial-gradient(circle, var(--accent-color) 0 40%, transparent 45%);
-}
-
 .sound-source-name {
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -2334,6 +2324,22 @@ input[type="range"] {
 
 .sound-source-install {
     white-space: nowrap;
+}
+
+/* The info panel: wraps to a full-width line below the row's controls (the row
+   is flex-wrap), holding the pack's character note + license credit on demand. */
+.sound-source-detail {
+    flex-basis: 100%;
+    margin-top: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-color);
+}
+
+.sound-source-desc {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
 }
 
 .sound-source-credit {
