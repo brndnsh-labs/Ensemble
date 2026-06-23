@@ -4,7 +4,7 @@ import { clampFreq, safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
-import { pickZone, playSampledNote } from './sample-voice.js';
+import { pickZone, playSampledNote, type SampleVibrato } from './sample-voice.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
@@ -53,6 +53,21 @@ function dispatchSoloSynth(...args: Parameters<typeof playSoloNoteCurrent>): voi
 // The soloist is monophonic, but `playSampledNote` is duration-bounded (it stops
 // each note past its release tail), so successive lead notes don't pile up; a
 // hard previous-note cutoff can follow if auditioning shows overlap.
+/**
+ * Default lead vibrato for the sampled soloist (#744 Slice 1). ~5.5 Hz / ±18c
+ * mirrors the synth voice's pitch-vibrato depth (`createVibrato`), but the rate
+ * jitter is **deterministic** (seeded `scrambleHash`, per the project's
+ * deterministic-phrasing rule) rather than the synth side's `Math.random` — so
+ * looped playback and tests reproduce, and repeated held notes still don't
+ * phase-lock into a machine tremolo. The depth fades in after the attack so the
+ * note's onset stays clean. Per-instrument idiom tuning is deferred to Slice 3.
+ */
+function leadVibrato(noteSeed: number): SampleVibrato {
+    // ±6% rate jitter, kept independent of any other per-note draw via the XOR.
+    const jitter = 1 + (scrambleHash(noteSeed ^ 0x5f356495) - 0.5) * 0.12;
+    return { depthCents: 18, rateHz: 5.5 * jitter, delay: 0.12, ramp: 0.3 };
+}
+
 function playSampledSolo(
     state: EnsembleState,
     packId: string,
@@ -60,6 +75,8 @@ function playSampledSolo(
     time: number,
     duration: number,
     vol: number,
+    vibrato: boolean,
+    noteSeed: number,
 ): boolean {
     const { playback } = state;
     const audio = playback.audio;
@@ -77,6 +94,9 @@ function playSampledSolo(
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
+        // The engine flags vibrato on sustained notes (durationSteps >= a beat);
+        // the synth voice already renders it, the sampled seam now does too (#744).
+        vibrato: vibrato ? leadVibrato(noteSeed) : undefined,
     });
     return true;
 }
@@ -90,8 +110,8 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
     const state = args[0];
     const source = resolveInstrumentSource(state.soloist.voice);
     if (source.kind === 'sample') {
-        const [, freq, time, duration, vol] = args;
-        if (playSampledSolo(state, source.packId, freq, time, duration, vol)) {
+        const [, freq, time, duration, vol, , , , vibrato = false, noteSeed = 0] = args;
+        if (playSampledSolo(state, source.packId, freq, time, duration, vol, vibrato, noteSeed)) {
             return;
         }
     }

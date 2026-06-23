@@ -63,6 +63,23 @@ export interface SampledNoteHandle {
 /** Time constant for the choke ramp — ~3·tc ≈ 12 ms to inaudible, click-free. */
 const CHOKE_TC = 0.004;
 
+/**
+ * Continuous pitch vibrato for a sampled note (#744 Slice 1) — the lead-voice
+ * "sing/cry" the fixed-`playbackRate` seam couldn't express. Rendered as an LFO
+ * summed onto `BufferSource.playbackRate`, so it works in any context (live or
+ * offline export) and inherits the instrument bus like the rest of the voice.
+ */
+export interface SampleVibrato {
+    /** Peak pitch deviation, in cents (±). ~18c reads as expressive, not seasick. */
+    readonly depthCents: number;
+    /** LFO rate, in Hz. Instrumental vibrato sits ~5–7 Hz regardless of tempo. */
+    readonly rateHz: number;
+    /** Seconds before the depth fades in — keeps the attack transient clean. */
+    readonly delay?: number;
+    /** Seconds over which depth ramps from 0 to full after the delay. */
+    readonly ramp?: number;
+}
+
 export interface SampledNoteOptions {
     /** Linear attack ramp (s). */
     readonly attack?: number;
@@ -72,6 +89,8 @@ export interface SampledNoteOptions {
     readonly velocity?: number;
     /** Seconds the note is held at peak before the release ramp. */
     readonly duration?: number;
+    /** Opt-in continuous pitch vibrato (#744). Omitted → fixed pitch, as before. */
+    readonly vibrato?: SampleVibrato;
     readonly onEnded?: () => void;
 }
 
@@ -235,6 +254,65 @@ export function playSampledStrike(
 }
 
 /**
+ * Attach a pitch-vibrato LFO to a playing buffer source (#744 Slice 1). The LFO
+ * sums onto `playbackRate` (Web Audio param summing): the base ratio holds the
+ * note in tune, the LFO wobbles around it. `playbackRate` is a *ratio* and the
+ * LFO sums (linearly) onto it, so the depth gain is `baseRate · (2^(cents/1200)
+ * − 1)`: the sharp peak lands at exactly +`depthCents`, the flat trough a
+ * fraction of a cent deeper (additive-on-ratio asymmetry, far below the ~5c
+ * JND). Depth is held at 0 through the attack, then ramps in (mirroring the
+ * synth voice's vibrato delay) so only the sustained tail moves. Returns the
+ * created nodes so the caller folds them into its `onended` cleanup. No-op
+ * (returns `[]`) for a non-positive depth/rate, or a note too short to fade in.
+ */
+function attachSampleVibrato(
+    audio: AudioContext,
+    rate: AudioParam,
+    baseRate: number,
+    spec: SampleVibrato,
+    startTime: number,
+    endTime: number,
+): AudioNode[] {
+    if (!(spec.depthCents > 0) || !(spec.rateHz > 0) || !Number.isFinite(baseRate)) {
+        return [];
+    }
+    const depthRatio = baseRate * (2 ** (spec.depthCents / 1200) - 1);
+    if (!(depthRatio > 0)) {
+        return [];
+    }
+    // Fit the fade-in inside the note. A note shorter than delay+ramp would stop
+    // before the depth ever ramps up, so the LFO would cost a node for zero
+    // audible vibrato. We compress delay/ramp into the available window (so a
+    // short sustained note still blooms within its life) and bail outright when
+    // there's no window at all. Today's only caller gates on sustained notes, so
+    // no compression happens in practice — this keeps the primitive honest for
+    // the wider callers Slices 2–3 will add.
+    const noteWindow = endTime - startTime;
+    if (!(noteWindow > 0)) {
+        return [];
+    }
+    const wantDelay = Math.max(0, Number.isFinite(spec.delay) ? (spec.delay as number) : 0.1);
+    const wantRamp = Math.max(0.01, Number.isFinite(spec.ramp) ? (spec.ramp as number) : 0.3);
+    const delay = Math.min(wantDelay, noteWindow * 0.5);
+    const ramp = Math.min(wantRamp, Math.max(0.001, noteWindow - delay));
+
+    const lfo = audio.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(spec.rateHz, startTime);
+
+    const lfoGain = audio.createGain();
+    lfoGain.gain.setValueAtTime(0, startTime);
+    lfoGain.gain.setValueAtTime(0, startTime + delay);
+    lfoGain.gain.linearRampToValueAtTime(depthRatio, startTime + delay + ramp);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(rate);
+    lfo.start(startTime);
+    lfo.stop(endTime);
+    return [lfo, lfoGain];
+}
+
+/**
  * Play a pitched sample through an instrument bus. Pitch-shifts the given zone
  * to `targetMidi` via `playbackRate`, applies a click-free attack/hold/release
  * gain envelope, and connects to `destination` (the instrument's `[name]Gain`
@@ -254,6 +332,7 @@ export function playSampledNote(
         release = 0.08,
         velocity = 1,
         duration = 0.5,
+        vibrato,
         onEnded,
     }: SampledNoteOptions = {},
 ): SampledNoteHandle | null {
@@ -281,7 +360,8 @@ export function playSampledNote(
 
         const source = audio.createBufferSource();
         source.buffer = zone.buffer;
-        source.playbackRate.setValueAtTime(pitchRatio(zone.rootMidi, targetMidi), startTime);
+        const baseRate = pitchRatio(zone.rootMidi, targetMidi);
+        source.playbackRate.setValueAtTime(baseRate, startTime);
 
         const gain = audio.createGain();
         // Click-free envelope: linear attack to peak, hold for `duration`, linear
@@ -296,18 +376,33 @@ export function playSampledNote(
         source.connect(gain);
         gain.connect(destination);
 
+        // Stop just past the release tail so the source frees itself; never cut
+        // the envelope short.
+        const naturalEnd = releaseStart + release + 0.01;
+
+        // Opt-in pitch vibrato (#744): an LFO summed onto playbackRate, stopped
+        // with the source so it never runs past cleanup. Folded into the node
+        // chain below so onended disconnects it too.
+        const vibratoNodes = vibrato
+            ? attachSampleVibrato(
+                  audio,
+                  source.playbackRate,
+                  baseRate,
+                  vibrato,
+                  startTime,
+                  naturalEnd,
+              )
+            : [];
+
         // Disconnect the node chain once the note finishes, then fire onEnded —
         // the same self-cleanup contract as `playPercussiveStrike`, so sampled
         // notes don't leak a source+gain per played note.
         source.onended = () => {
-            safeDisconnect([source, gain]);
+            safeDisconnect([source, gain, ...vibratoNodes]);
             onEnded?.();
         };
 
         source.start(startTime);
-        // Stop just past the release tail so the source frees itself; never cut
-        // the envelope short.
-        const naturalEnd = releaseStart + release + 0.01;
         source.stop(naturalEnd);
 
         return {
