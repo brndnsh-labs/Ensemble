@@ -299,11 +299,15 @@ const COMPOUND_COMPING_CELLS: readonly (readonly number[])[] = [
  * partido-alto pattern that defines the genre (bossa-guitar right-hand thumb-
  * and-fingers comping, ANSWERED by the singer on the &-of-4 anticipation-of-1).
  *
- * The canonical partido-alto figure ANTICIPATES beat 1 of the next bar with a
- * tied &-of-4 hit (step 14) — this is the genre's signature gesture. Every cell
- * here includes step 14 so anticipation-of-1 fires on chord-change downbeats
- * (the consumer at `getAccompanimentNotes` interprets a step-14 hit immediately
- * before a chord change as a tie INTO the new chord's downbeat).
+ * The canonical partido-alto figure ANTICIPATES beat 1 of the next bar with an
+ * &-of-4 hit (step 14) — this is the genre's signature gesture. Every cell here
+ * includes step 14 so that offbeat anticipation fires on chord-change downbeats.
+ * NB (#732): the "anticipation" is purely the offbeat PLACEMENT — there is no
+ * cross-barline tie. The step-14 hit is a plain `currentCell` lookup that voices
+ * whatever chord is live at that tick (the OUTGOING chord at a within-section
+ * change, since Bossa isn't in WITHIN_SECTION_ANTICIPATION_GENRES); the next
+ * bar's step-0 then voices the incoming chord normally. No consumer ties step 14
+ * into the new chord's downbeat — don't assume one exists.
  *
  * 16th-grid nomenclature (beat-N at step 4*(N-1); e=+1; &=+2; a=+3):
  *   Steps:  0  1  2  3   4  5  6  7   8  9 10 11  12 13 14 15
