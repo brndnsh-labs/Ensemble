@@ -73,7 +73,11 @@ export const compingState: CompingState = {
 //      `grooveRetentionCount = 0` branch — without STICKY membership the
 //      picker re-runs every bar and the (sectionId, barIndex>>2) hash never
 //      gets to hold a cell across the 4-bar phrase.
-const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
+// #717: 'Soul' removed — it's a phantom routing key (the canonical genre is
+// 'Neo-Soul', already present). No code resolves a genre to bare 'Soul', so the
+// entry was dead. Per CLAUDE.md, Soul/Minimal/Shred/Latin/Afrobeat are
+// non-canonical keys being retired, not the supported 13.
+const STICKY_GENRES = ['Funk', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
 
 // #714: the comp's fixed per-lane feel on top of the shared groove pocket — a
 // keyboardist comps a hair behind the beat (cushioning the bass/drums). Small
@@ -873,6 +877,10 @@ export function generateCompingPattern(
 
         // Active: Add some 16th syncopations or "double upstrokes"
         // (deterministic, phrase-keyed — locks the upstroke variations per phrase)
+        // #585: intentionally sparse seasoning — gated on active/high-intensity
+        // and fires on only ~30% of qualifying bars (pickBar < 0.3). Zero hits in
+        // a non-active/low-intensity harness is expected, not a dead gate; the
+        // deterministic '&' skank lane above carries the Ska identity on its own.
         if (vibe === 'active' || intensity > 0.7) {
             for (let b = 0; b < ts.beats; b++) {
                 if (pickBar(b) < 0.3) {
