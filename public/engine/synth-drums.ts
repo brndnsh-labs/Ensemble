@@ -504,9 +504,14 @@ const TOM_VOICE_PROFILES: Record<TomRegister, TomVoiceProfile> = {
         bodyVolume: 0.96,
         bodyDecay: 0.11,
         bodyDuration: 0.42,
-        shellVolume: 0.58,
-        shellDecay: 0.24,
-        shellDuration: 1.0,
+        // why (low-end declutter): the shell is a pure low sine that lingered
+        // ~1s, smearing the bass register during fills. High tom sits at ~184 Hz
+        // (least bass overlap), so it gets the gentlest trim. Decay shortened so
+        // the fundamental thumps and clears; duration kept ≥ ~5× decay to stay
+        // click-free on the hard stop.
+        shellVolume: 0.52,
+        shellDecay: 0.18,
+        shellDuration: 0.9,
         shellAttack: 0.006,
     },
     Mid: {
@@ -521,9 +526,12 @@ const TOM_VOICE_PROFILES: Record<TomRegister, TomVoiceProfile> = {
         bodyVolume: 1.04,
         bodyDecay: 0.16,
         bodyDuration: 0.56,
-        shellVolume: 0.74,
-        shellDecay: 0.36,
-        shellDuration: 1.3,
+        // why (low-end declutter): mid tom (~137 Hz) overlaps the bass low-mids;
+        // pull the sustained shell back and shorten its tail so fills read as
+        // punch, not a lingering low cloud.
+        shellVolume: 0.6,
+        shellDecay: 0.24,
+        shellDuration: 1.1,
         shellAttack: 0.008,
     },
     Low: {
@@ -538,9 +546,15 @@ const TOM_VOICE_PROFILES: Record<TomRegister, TomVoiceProfile> = {
         bodyVolume: 1.14,
         bodyDecay: 0.22,
         bodyDuration: 0.7,
-        shellVolume: 0.9,
-        shellDecay: 0.52,
-        shellDuration: 1.75,
+        // why (low-end declutter): the low tom (~92 Hz) sits right on a bass
+        // guitar's low E/F#, and its shell was the loudest (0.9) AND longest
+        // (0.52s decay / 1.75s) of the three — backwards for mud. It gets the
+        // biggest pull-back: quieter and a much shorter tail so it punches and
+        // gets out of the bass's way. duration (1.4) stays ≥ ~5× decay (was
+        // only ~3×, which cut an audible residual on stop).
+        shellVolume: 0.66,
+        shellDecay: 0.3,
+        shellDuration: 1.4,
         shellAttack: 0.012,
     },
 };
@@ -2607,7 +2621,7 @@ function playDrumSoundCurrent(
             duration: voiceConfig.bodyDuration,
         });
 
-        // 4. Shell Resonance — longest-lived Tom layer (shellDuration ~1-1.75s), owns panner release.
+        // 4. Shell Resonance — longest-lived Tom layer (shellDuration ~0.9-1.4s), owns panner release.
         playResonantTone(playback.audio, panner, playTime, {
             type: 'sine',
             freqStart: voiceConfig.shellFreq * rr(0.01),
