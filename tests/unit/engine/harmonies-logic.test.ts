@@ -670,4 +670,59 @@ describe('Harmony Engine Logic', () => {
             randomSpy.mockRestore();
         });
     });
+
+    describe('#716 BB King horn section (Blues)', () => {
+        // Mechanism guards (the FEEL is by-ear / audition). These pin the
+        // call-and-response contract that won't change as the feel is tuned:
+        // the section answers in the GAPS, it does not comp over the solo.
+        function bluesStabSteps(coordination) {
+            clearHarmonyMemory(getState());
+            _groove.genreFeel = 'Blues';
+            _harmony.style = 'smart';
+            _soloist.enabled = false; // soloist laid out → horns fill the gaps
+            const steps = [];
+            for (let step = 0; step < 64; step++) {
+                const notes = getHarmonyNotes(
+                    getState(),
+                    chordC,
+                    null,
+                    step,
+                    60,
+                    'smart',
+                    step % 16,
+                    null,
+                    coordination,
+                );
+                if (notes?.some((n) => n && n.midi > 0 && !n.muted)) {
+                    steps.push(step);
+                }
+            }
+            return steps;
+        }
+
+        it('lays out entirely while the soloist is busy (answers in the gaps, never comps over the solo)', () => {
+            const steps = bluesStabSteps({ soloistBusy: true, soloistActive: true });
+            expect(steps.length).toBe(0);
+        });
+
+        it('punches sparse answer figures only on the horn-figure steps when the soloist lays out', () => {
+            const steps = bluesStabSteps({ soloistBusy: false, soloistResting: true });
+            // It does punch...
+            expect(steps.length).toBeGreaterThan(0);
+            // ...only on the answer-figure steps (mStep 6 &-of-2, 8 beat-3,
+            // 12 beat-4, 14 &-of-4 — the gesture notes, never the downbeat)...
+            for (const s of steps) {
+                expect([6, 8, 12, 14]).toContain(s % 16);
+            }
+            // ...and sparsely (it breathes — 1–2 hit figures, some bars rest),
+            // nowhere near a full comp over 4 bars.
+            expect(steps.length).toBeLessThan(10);
+        });
+
+        it('is deterministic loop-to-loop (same gaps fire the same way each chorus)', () => {
+            const a = bluesStabSteps({ soloistBusy: false, soloistResting: true });
+            const b = bluesStabSteps({ soloistBusy: false, soloistResting: true });
+            expect(b).toEqual(a);
+        });
+    });
 });

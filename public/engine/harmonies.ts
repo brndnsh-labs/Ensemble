@@ -68,6 +68,8 @@ interface HarmonyContext {
     stepsPerMeasure: number;
     stepInChord: number;
     motif: MotifCacheEntry;
+    /** #716 — BB King horn-section mode (sparse call-and-response stabs). */
+    hornSection: boolean;
 }
 
 interface HarmonyNote {
@@ -408,12 +410,26 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
 
     // A. Antiphony (Response)
     if (coordination.soloistPhraseEnd && !coordination.soloistActive) {
-        const responseProb = 0.4 + playback.bandIntensity * 0.5;
+        // #716: the BB King horn section answers the soloist's phrase ends
+        // confidently — that's its whole job — so it responds far more reliably
+        // than a background pad would.
+        const responseProb = context.hornSection
+            ? 0.7 + playback.bandIntensity * 0.3
+            : 0.4 + playback.bandIntensity * 0.5;
         // why: tag 1 — response trigger. Seeded from motif.seed (section hash)
         // and step so the same phrase-end position fires the same way each loop.
         if (scrambleHash(context.motif.seed + step * 31 + 1) < responseProb) {
             return { type: 'reinforce', isResponse: true, duration: 2 };
         }
+    }
+
+    // #716: the horn section is purely CALL-AND-RESPONSE — it answers in the gaps
+    // (the antiphony above) and otherwise lays out, rather than melodically
+    // shadowing every soloist anchor (B/C/D below) which would track the solo
+    // note-for-note instead of conversing with it. The sparse, punchy section
+    // stabs when the soloist isn't playing come from playHornSectionMode.
+    if (context.hornSection) {
+        return null;
     }
 
     // B. Shared Hook Reinforcement (Ska-Punk)
@@ -589,6 +605,71 @@ function playArpeggioMode(context: HarmonyContext): HarmonyBehavior | null {
     }
     const arpStep = Math.round(measureStep / stepsPerEighth);
     return { type: 'arp', duration: stepsPerEighth + 1, arpStep };
+}
+
+/**
+ * #716 — BB King horn section: sparse, punchy section stabs.
+ *
+ * The horns LAY OUT while the soloist plays (the antiphony in playShadowMode
+ * answers at phrase ends); when the soloist isn't busy they punch the classic
+ * horn-stab accents — the &-of-2 and the &-of-4 push into the next bar — sparse
+ * and seeded so the section locks loop-to-loop and breathes (not every bar).
+ */
+function playHornSectionMode(context: HarmonyContext): HarmonyBehavior | null {
+    const {
+        step,
+        motif,
+        playback,
+        coordination,
+        ts,
+        measureStep,
+        soloistEffectiveEnabled,
+        stepsPerMeasure,
+    } = context;
+    const intensity = playback.bandIntensity;
+    const spb = ts.stepsPerBeat;
+
+    const isSoloistBusy =
+        coordination.soloistBusy || (soloistEffectiveEnabled && !coordination.soloistResting);
+    // Lay out under the solo — the section answers in the gaps (playShadowMode
+    // antiphony), it doesn't comp over the top of a phrase.
+    if (isSoloistBusy) {
+        return null;
+    }
+
+    // Horn-section ANSWER FIGURES (movement without clutter). Rather than a single
+    // isolated stab, the section answers with a short 1–2 hit gesture in the gap —
+    // a "bah-DAH", a pickup, a push into the next bar. spb-relative so they stay
+    // musical in any meter. (4/4, spb=4 → &-of-2=6, beat3=8, beat4=12, &-of-4=14.)
+    const andOf2 = spb + Math.floor(spb / 2);
+    const beat3 = 2 * spb;
+    const beat4 = 3 * spb;
+    const andOf4 = 3 * spb + Math.floor(spb / 2);
+    const FIGURES: number[][] = [
+        [andOf4], // single push into the next bar — the breather
+        [andOf2, beat3], // "bah-DAH" answer through the middle of the bar
+        [beat4, andOf4], // quick pickup setting up the next bar
+        [andOf2, andOf4], // two pushes bracketing the bar half
+    ];
+
+    // Some bars the section rests so it breathes (fewer rests as the band drives);
+    // the rest play one figure, rotated bar-to-bar for conversational movement.
+    // Seeded so it's deterministic/reproducible.
+    const barIndex = Math.floor(step / Math.max(1, stepsPerMeasure));
+    const playBarProb = 0.55 + intensity * 0.4;
+    if (scrambleHash(motif.seed + barIndex * 17 + 9) > playBarProb) {
+        return null;
+    }
+    const figure =
+        FIGURES[Math.floor(scrambleHash(motif.seed + barIndex * 23 + 5) * FIGURES.length)] ||
+        FIGURES[0];
+    if (!figure.includes(measureStep)) {
+        return null;
+    }
+
+    // Punchy short stab; the &-of-4 push leans a touch longer into the next bar.
+    const dur = measureStep === andOf4 ? 2 : 1;
+    return { type: 'comp', duration: dur, isGhost: false };
 }
 
 /**
@@ -1232,6 +1313,7 @@ export function getHarmonyNotes(
         stepsPerMeasure,
         stepInChord,
         motif,
+        hornSection: !!profile.voicing?.hornSection,
     };
 
     // 3. MODE DISPATCHER
@@ -1257,7 +1339,16 @@ export function getHarmonyNotes(
     // plays sparse organ swells"). At >= HARMONY_PAD_CEILING the comp/sea
     // split is driven by the configured rhythmic style.
     if (!behavior) {
-        if (profile.voicing?.arpeggiate) {
+        if (context.hornSection) {
+            // #716 — the BB King horn section: soft sustained swells on a ballad
+            // (the section behind a slow blues), punchy sparse call-and-response
+            // answer figures once the band drives. The antiphony above answers the
+            // soloist's phrase ends at any intensity.
+            behavior =
+                playback.bandIntensity < HARMONY_PAD_CEILING
+                    ? playSeaMode(context)
+                    : playHornSectionMode(context);
+        } else if (profile.voicing?.arpeggiate) {
             // Acoustic fingerpick replaces the held pad with a rolling
             // counter-line at every intensity (above the mute floor). #561.
             behavior = playArpeggioMode(context);

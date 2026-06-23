@@ -33,7 +33,8 @@ const EXPECTED_PROFILE: Record<string, Omit<HarmonyGenreProfile, 'voicing'>> = {
     Funk: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
     Disco: { smartStyle: 'strings', rhythmicStyle: 'stabs', patternKey: 'funk16' },
     'Hip Hop': { smartStyle: 'plucks', rhythmicStyle: 'stabs', patternKey: 'default' },
-    Blues: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'default' },
+    // #716 — Blues harmony is the BB King horn section (sparse call-and-response stabs).
+    Blues: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'default' },
     'Neo-Soul': { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'neosoul' },
     Reggae: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'reggae' },
     Acoustic: { smartStyle: 'strings', rhythmicStyle: 'pads', patternKey: 'default' },

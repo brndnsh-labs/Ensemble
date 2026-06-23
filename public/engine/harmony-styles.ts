@@ -50,6 +50,12 @@ export interface HarmonyVoicing {
     pedalSteelSwell?: boolean;
     /** Replace the held pad with a gently rolling fingerpicked counter-line (acoustic). */
     arpeggiate?: boolean;
+    /**
+     * #716 — BB King big-band horn section: sparse, punchy call-and-response
+     * stabs that ANSWER in the gaps (when the soloist rests / at phrase ends)
+     * rather than comping every accent. Pairs with `smartStyle: 'horns'`.
+     */
+    hornSection?: boolean;
 }
 
 export interface HarmonyGenreProfile {
@@ -85,7 +91,14 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
     Funk: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'funk16' },
     Disco: { smartStyle: 'strings', rhythmicStyle: 'stabs', patternKey: 'funk16' },
     'Hip Hop': { smartStyle: 'plucks', rhythmicStyle: 'stabs', patternKey: 'default' },
-    Blues: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'default' },
+    // #716 — the BB King horn section: a horn voice playing sparse call-and-
+    // response stabs that answer the soloist/vocal in the gaps.
+    Blues: {
+        smartStyle: 'horns',
+        rhythmicStyle: 'stabs',
+        patternKey: 'default',
+        voicing: { hornSection: true },
+    },
     'Neo-Soul': { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'neosoul' },
     Reggae: { smartStyle: 'organ', rhythmicStyle: 'stabs', patternKey: 'reggae' },
     Acoustic: {
