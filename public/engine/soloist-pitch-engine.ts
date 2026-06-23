@@ -204,6 +204,29 @@ const MILES_INTERVALS_BY_QUALITY: Record<ChordQualityClass, ReadonlySet<number>>
     aug: new Set<number>(),
 };
 
+// Functional chord-tone "pillars" per quality class, as a 12-bit pitch-class mask
+// relative to the chord ROOT. Used by the blues bend (#747 Slice 3b) to choose a
+// resolution target that does NOT depend on the comping voicing. Blues comps ROOTLESS
+// when a bass is present (voicing-policy.ts → BASS_SPACE_FEELS), so the soloist's
+// `chordMask` — built from the voicing's intervals — omits the root and can include
+// tensions (9/13). A bend's whole job is to land the cry on a *structural* tone, so we
+// derive its targets from the chord quality: 1/3/5, plus ♭7 on dominants and minors,
+// the 6 on m6, ♭5 on dim/halfdim. Pillars only — no upper extensions (a bend resolving
+// to the 9 isn't a blues cry, it's ambiguity). This is what makes the canonical
+// ♭7→root and ♭3→3 bends reachable regardless of how the piano is voicing the chord.
+const pcMask = (...pcs: number[]): number => pcs.reduce((m, p) => m | (1 << p), 0);
+const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
+    maj: pcMask(0, 4, 7),
+    min: pcMask(0, 3, 7, 10),
+    min6: pcMask(0, 3, 7, 9),
+    dom: pcMask(0, 4, 7, 10),
+    alt: pcMask(0, 4, 10), // altered 5 is ambiguous — don't target it
+    halfdim: pcMask(0, 3, 6, 10),
+    dim: pcMask(0, 3, 6, 9),
+    sus: pcMask(0, 5, 7), // no 3rd — resolve to root / 4 / 5
+    aug: pcMask(0, 4, 8),
+};
+
 // Base rarity penalty for chromatic neighbors of chord tones. Scaled by
 // per-style config.chromaticism so high-chromaticism profiles (bird 0.9,
 // coltrane 0.7, jazz 0.5, bossa 0.5, neo 0.6) admit neighbors freely while
@@ -1839,60 +1862,70 @@ export function selectPitchAndDevices(
                 : 1
             : 0;
 
-    // Blues bend-and-release (#744 Slice 2) — the genre's signature expressive
-    // "cry": on a sustained blues note with no bend-in, bend the written pitch
-    // UP a half/whole step and release back. Deterministic (seeded off the
-    // per-note picker base, discriminators 15–17 — clear of the bend-in 8/9,
-    // device-pick 12, double-stop 11, and timing 13/14 draws) and gated to the
+    // Blues bend-and-release (#744 Slice 2/3b) — the genre's signature expressive
+    // "cry": on a sustained blues note with no bend-in, bend the written pitch UP to a
+    // chord tone and release back. Deterministic (seeded off the per-note picker base,
+    // discriminators 15 = fire / 17 = release — clear of the bend-in 8/9, device-pick
+    // 12, double-stop 11, and timing 13/14 draws; 16 retired in 3b) and gated to the
     // blues style + long notes, so it never fires on a bossa/nylon or staccato line.
     //
-    // Mode-aware idiom: a GUITAR lead bends constantly and wide — string bends
-    // ARE blues guitar, whole-step is the staple. A horn/MONO lead inflects
-    // mostly with scoops (the bend-in) and vibrato; a literal whole-step pitch
-    // bend is rare and gentler there — so it fires far less often (~⅓ the rate)
-    // and leans to half-steps. Intensity lifts the rate so a hotter solo cries more.
+    // Slice 3b — harmonic targeting + bend-from-blue-note trigger. The bend resolves UP
+    // to the nearest FUNCTIONAL PILLAR within a whole step (♭3→3, 4→5, ♭7→root). Two
+    // deliberate choices (#747):
+    //   • Target the rooted functional pillars (`FUNCTIONAL_PILLARS_BY_QUALITY`), NOT
+    //     the soloist's `chordMask` — blues comps rootless when a bass is present, so
+    //     `chordMask` omits the root and the canonical ♭7→root cry would be unreachable.
+    //   • Only fire when a pillar is actually reachable above (the bend goes FROM a
+    //     blue/passing note TO a pillar; it never curls a root/3rd/5th up into a
+    //     dissonance). So every bend resolves — there is no gentle-curl fallback.
+    // Targeting is harmonic, so the interval is the same in both modes — the
+    // GUITAR-vs-HORN idiom lives purely in the fire RATE (a guitarist bends far more
+    // often), lifted by intensity so a hotter solo cries more.
     let expression: SoloistExpression | undefined;
     if (activeStyle === 'blues' && durationSteps >= 4 && bendStartInterval === 0) {
-        const i = Math.max(0, Math.min(1, intensity));
-        const fireProb = isGuitarMode ? 0.18 + 0.15 * i : 0.05 + 0.06 * i;
-        if (scrambleHash(pickerSeedBase + 15) < fireProb) {
-            // Whole-step staple on guitar (75%); a horn leans half-step (35% whole).
-            const wholeStepProb = isGuitarMode ? 0.75 : 0.35;
-            const peakSemitones = scrambleHash(pickerSeedBase + 16) < wholeStepProb ? 2 : 1;
-            const releaseFrac = 0.7 + scrambleHash(pickerSeedBase + 17) * 0.15;
-            expression = {
-                bend: { peakSemitones, onsetFrac: 0.12, peakFrac: 0.4, releaseFrac },
-            };
+        const pillarMask = FUNCTIONAL_PILLARS_BY_QUALITY[classifyChordQuality(targetChord.quality)];
+        // Degree of the written pitch relative to the chord root (`targetChord` is the
+        // chord the pitch was selected against — correct during anticipation).
+        const writtenDegree = (((selectedMidi - targetChord.rootMidi) % 12) + 12) % 12;
+        // Nearest pillar within a whole step above; prefer +1 (the smaller, ♭3→3-style
+        // bend) over +2 (4→5, ♭7→root). 0 = no pillar in reach → this note doesn't bend.
+        let peakSemitones = 0;
+        for (let d = 1; d <= 2; d++) {
+            if (((pillarMask >> ((writtenDegree + d) % 12)) & 1) === 1) {
+                peakSemitones = d;
+                break;
+            }
+        }
+        if (peakSemitones > 0) {
+            const i = Math.max(0, Math.min(1, intensity));
+            const fireProb = isGuitarMode ? 0.18 + 0.15 * i : 0.05 + 0.06 * i;
+            if (scrambleHash(pickerSeedBase + 15) < fireProb) {
+                const releaseFrac = 0.7 + scrambleHash(pickerSeedBase + 17) * 0.15;
+                expression = {
+                    bend: { peakSemitones, onsetFrac: 0.12, peakFrac: 0.4, releaseFrac },
+                };
 
-            // #747 Slice 3a — bend diagnostics. Gated behind playback.debugSoloist
-            // (false on real sessions). Prints the harmonic context of every bend
-            // as it fires so an "that one sounded bad" moment can be pinned down: the
-            // written pitch, the peak pitch, and — the key tell — which scale degree
-            // (relative to the chord root) the peak lands on and whether it's a chord
-            // tone. A blind bend peaking on a non-chord-tone that never resolves is the
-            // prime suspect for the ugly cry; this readout is the raw data 3b
-            // (harmonic targeting) uses to pick a sensible target instead.
-            if (playback.debugSoloist) {
-                // Evaluate against `targetChord` — the chord the pitch was actually
-                // selected against, which `chordMask` is also built from. During
-                // anticipation it's `nextChord`, so a `currentChord` reading would be
-                // wrong exactly in the transitional moments most likely to bend ugly.
-                const peakMidi = selectedMidi + peakSemitones;
-                const peakDegree = (((peakMidi - targetChord.rootMidi) % 12) + 12) % 12;
-                const peakIsChordTone = ((chordMask >> peakDegree) & 1) === 1;
-                const writtenDegree = (((selectedMidi - targetChord.rootMidi) % 12) + 12) % 12;
-                const writtenIsChordTone = ((chordMask >> writtenDegree) & 1) === 1;
-                const w = midiToNote(selectedMidi);
-                const p = midiToNote(peakMidi);
-                const anticipating = targetChord !== currentChord ? ' (anticipating)' : '';
-                // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
-                console.log(
-                    `[Bend Debug] step ${step} ${isGuitarMode ? 'guitar' : 'mono'} | ` +
-                        `${w.name}${w.octave}(${selectedMidi}, deg ${writtenDegree}${writtenIsChordTone ? ' CT' : ''}) ` +
-                        `+${peakSemitones}→${p.name}${p.octave}(${peakMidi}, deg ${peakDegree}${peakIsChordTone ? ' CT' : ' ⚠non-CT'}) | ` +
-                        `chord ${targetChord.root ?? targetChord.rootMidi}${targetChord.quality ?? ''}${anticipating} | ` +
-                        `dur ${durationSteps} rel ${releaseFrac.toFixed(2)}`,
-                );
+                // #747 Slice 3a/3b — bend diagnostics. Gated behind playback.debugSoloist
+                // (false on real sessions). Prints the harmonic context of every bend so
+                // an "that one sounded bad" moment can be pinned down and the targeting
+                // confirmed by eye: written pitch + degree, the pillar it resolves to,
+                // and whether that pillar happens to also be in the comping voicing.
+                if (playback.debugSoloist) {
+                    const peakMidi = selectedMidi + peakSemitones;
+                    const peakDegree = (((peakMidi - targetChord.rootMidi) % 12) + 12) % 12;
+                    const inVoicing = ((chordMask >> peakDegree) & 1) === 1;
+                    const w = midiToNote(selectedMidi);
+                    const p = midiToNote(peakMidi);
+                    const anticipating = targetChord !== currentChord ? ' (anticipating)' : '';
+                    // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
+                    console.log(
+                        `[Bend Debug] step ${step} ${isGuitarMode ? 'guitar' : 'mono'} | ` +
+                            `${w.name}${w.octave}(${selectedMidi}, deg ${writtenDegree}) ` +
+                            `+${peakSemitones}→${p.name}${p.octave}(deg ${peakDegree} pillar${inVoicing ? '+voicing' : ''}) | ` +
+                            `chord ${targetChord.root ?? targetChord.rootMidi}${targetChord.quality ?? ''}${anticipating} | ` +
+                            `dur ${durationSteps} rel ${releaseFrac.toFixed(2)}`,
+                    );
+                }
             }
         }
     }
