@@ -41,9 +41,12 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • clavinet → funk's percussive plucked comp
     //   • synth    → Metal (no acoustic-keys idiom → keep the synth)
     // harmony — the section answering the changes (horns vs. string pad vs. synth).
-    // soloist — sax (#694): a real horn lead only where it's idiomatic (jazz/blues
-    //   blowing, funk hits, bossa cool); everything else keeps the synth lead — one
-    //   alto voice on every genre would wear thin.
+    // soloist — two real leads, each only where idiomatic (everything else keeps
+    //   the synth lead — one voice on every genre would wear thin):
+    //   • sax (#694)   → jazz/blues blowing, funk hits
+    //   • nylon (#659) → the fingerstyle-guitar combo: bossa (the nylon takes the
+    //                    lead seat over the sax — bossa nova IS the nylon guitar),
+    //                    acoustic singer-songwriter, country picking
     // groove — acoustic kit (#695): a live drummer is the better default for most
     //   genres (Brandon's ear 2026-06-22), so the kit is the default and synth is
     //   the exception. Synth kit only where the drums are programmed/triggered:
@@ -86,19 +89,21 @@ export const GENRE_SOUND_MAP: Readonly<
     Country: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
+        soloist: 'pack:nylon-guitar',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Acoustic: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
+        soloist: 'pack:nylon-guitar',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },
     Bossa: {
         chords: 'pack:grand',
         harmony: 'pack:strings-ensemble',
-        soloist: 'pack:sax-alto',
+        soloist: 'pack:nylon-guitar',
         bass: 'pack:upright-bass',
         groove: 'pack:acoustic-kit',
     },

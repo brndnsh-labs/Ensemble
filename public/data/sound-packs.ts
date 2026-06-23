@@ -147,6 +147,31 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         reverbSend: 1.2,
     },
     {
+        id: 'nylon-guitar',
+        name: 'Nylon Guitar',
+        description:
+            'A sampled Spanish classical guitar — a warm fingerstyle nylon lead for bossa, acoustic, country.',
+        attribution:
+            'FreePats Spanish Classical Guitar (nylon-string) by roberto@zenvoid.org — CC0 1.0 (public domain)',
+        approxSizeMB: 0.6,
+        instruments: ['soloist'],
+        // Calibrated 2026-06-23 (#659) via `mix-report --calibrate-pack=soloist:nylon-guitar`:
+        // pack sat 12.0 dB under the synth lead across rock/blues/jazz/funk
+        // (RMS-match = 4.0×). The nylon is markedly darker than the synth lead
+        // (−820 Hz centroid → reads quieter than its RMS), so seated AT the match
+        // and it may want a small nudge UP on the listen. Plucked single-note lead
+        // — natural per-note decay (no loop), 19 mono zones C3–C6 every 2 semitones
+        // (denser than the sax's every-3: plucked transients pitch-shift more
+        // audibly than a sustained horn). Source was already peak-even across notes
+        // (~−0.1 dB), so left un-loudnorm'd to avoid pumping up the recording's
+        // noise-floor tail. Confirm/nudge by ear on ensembletest (bossa / acoustic
+        // / country lead lines).
+        gain: 4,
+        // Close-mic'd, dry-ish room (FreePats home recording) — a small lift like
+        // the sax to seat the lead in the band's space. By-ear start. #686-style.
+        reverbSend: 1.3,
+    },
+    {
         id: 'strings-ensemble',
         name: 'String Ensemble',
         description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',
