@@ -547,6 +547,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
                 false,
                 res.vibrato,
                 humanizeSeed(pickupStep, 'soloist', voiceIndex),
+                res.expression,
             );
             dispatchMidiCountInSoloist(state, res, time);
             if (vizState.enabled) {
@@ -858,6 +859,7 @@ function scheduleSoloist(
                     timingOffset,
                     noteType,
                     vibrato,
+                    expression,
                 } = noteEntry;
                 const { chord } = chordData as any;
                 const offsetS = timingOffset || 0;
@@ -890,6 +892,7 @@ function scheduleSoloist(
                 const isLegato =
                     !noteEntry.isDoubleStop &&
                     !bendStartInterval &&
+                    !expression?.bend &&
                     finalTime - soloist.audio.lastNoteEnd < gridSlack;
 
                 playSoloNote(
@@ -906,6 +909,7 @@ function scheduleSoloist(
                     // (step, voiceIndex) so successive same-pitch notes differ
                     // yet stay deterministic for looped playback / tests.
                     humanizeSeed(step, 'soloist', voiceIndex),
+                    expression,
                 );
 
                 // Soloist is monophonic UNLESS double stops are enabled

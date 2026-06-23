@@ -18,6 +18,9 @@ function fakeParam() {
         linearRampToValueAtTime: vi.fn((value: number, time: number) => {
             calls.push({ op: 'ramp', value, time });
         }),
+        exponentialRampToValueAtTime: vi.fn((value: number, time: number) => {
+            calls.push({ op: 'exp', value, time });
+        }),
         setTargetAtTime: vi.fn((value: number, time: number) => {
             calls.push({ op: 'target', value, time });
         }),
@@ -393,6 +396,85 @@ describe('sample-voice — playSampledNote vibrato (#744 Slice 1)', () => {
             vibrato: { depthCents: 18, rateHz: 0 },
         });
         expect(b.ctx.createOscillator).not.toHaveBeenCalled();
+    });
+});
+
+describe('sample-voice — playSampledNote bend (#744 Slice 2)', () => {
+    it('holds fixed pitch when no bend option is passed (shared seams unaffected)', () => {
+        const { ctx, source } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, { duration: 1 });
+        // Just the single base setValueAtTime, no ramps.
+        expect(source.playbackRate.calls).toEqual([{ op: 'set', value: 1, time: 0 }]);
+    });
+
+    it('renders a bend-IN: starts off-pitch and ramps to the target ratio', () => {
+        const { ctx, source } = makeCtx();
+        // fromSemitones -2 → start a whole step flat, ramp up to in-tune.
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            bend: { fromSemitones: -2 },
+        });
+        const c = source.playbackRate.calls;
+        expect(c[0]).toMatchObject({ op: 'set', value: 2 ** (-2 / 12) }); // start flat
+        const arrive = c.find((x: any) => x.op === 'exp');
+        expect(arrive.value).toBeCloseTo(1, 10); // ramps to the base rate (in tune)
+    });
+
+    it('renders a bend-and-release: base → up to peak → back to base', () => {
+        const { ctx, source } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 10, {
+            duration: 2, // hold window 2s from t=10
+            bend: { peakSemitones: 2, onsetFrac: 0.1, peakFrac: 0.4, releaseFrac: 0.8 },
+        });
+        const c = source.playbackRate.calls;
+        // base anchor at start, base re-anchored at onset, exp ramp UP to +2st, exp ramp back to base.
+        expect(c[0]).toMatchObject({ op: 'set', value: 1, time: 10 });
+        const onsetAnchor = c.find((x: any) => x.op === 'set' && x.time > 10);
+        expect(onsetAnchor.time).toBeCloseTo(10 + 0.1 * 2, 6); // onsetFrac·hold
+        const ramps = c.filter((x: any) => x.op === 'exp');
+        expect(ramps).toHaveLength(2);
+        expect(ramps[0].value).toBeCloseTo(2 ** (2 / 12), 6); // up to whole step
+        expect(ramps[0].time).toBeCloseTo(10 + 0.4 * 2, 6); // peakFrac·hold
+        expect(ramps[1].value).toBeCloseTo(1, 10); // back to base
+        expect(ramps[1].time).toBeCloseTo(10 + 0.8 * 2, 6); // releaseFrac·hold
+        // Strictly increasing schedule (no inverted ramps).
+        const times = c.map((x: any) => x.time);
+        for (let i = 1; i < times.length; i++) {
+            expect(times[i]).toBeGreaterThanOrEqual(times[i - 1]);
+        }
+    });
+
+    it('holds the peak (no return) when releaseFrac is omitted', () => {
+        const { ctx, source } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 2,
+            bend: { peakSemitones: 1, onsetFrac: 0.1, peakFrac: 0.5 },
+        });
+        const ramps = source.playbackRate.calls.filter((x: any) => x.op === 'exp');
+        expect(ramps).toHaveLength(1); // only the up-bend, never returns
+        expect(ramps[0].value).toBeCloseTo(2 ** (1 / 12), 6);
+    });
+
+    it('scales the bend by the zone shift (transposed notes bend in tune)', () => {
+        const { ctx, source } = makeCtx();
+        // A fifth up: base ratio 2^(7/12); a +2 peak is base·2^(2/12).
+        playSampledNote(ctx, zone(60), {} as AudioNode, 67, 0, {
+            duration: 2,
+            bend: { peakSemitones: 2, onsetFrac: 0.1, peakFrac: 0.5, releaseFrac: 0.8 },
+        });
+        const ramps = source.playbackRate.calls.filter((x: any) => x.op === 'exp');
+        expect(ramps[0].value).toBeCloseTo(2 ** (7 / 12) * 2 ** (2 / 12), 6);
+        expect(ramps[1].value).toBeCloseTo(2 ** (7 / 12), 6); // back to the (shifted) base
+    });
+
+    it('no-ops the bend-and-release for a non-positive peak', () => {
+        const { ctx, source } = makeCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 2,
+            bend: { peakSemitones: 0, fromSemitones: 0 },
+        });
+        // Only the base anchor — no ramps at all.
+        expect(source.playbackRate.calls.filter((x: any) => x.op === 'exp')).toHaveLength(0);
     });
 });
 

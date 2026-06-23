@@ -527,6 +527,44 @@ export interface RhythmNode {
 }
 
 /**
+ * A pitch bend-and-release gesture on a soloist note (#744 Slice 2) — the
+ * expressive "cry" of a blues lead: the written note bends UP to a peak and
+ * (optionally) releases back down to it.
+ *
+ * This is deliberately **distinct from `bendStartInterval`**, the one-way
+ * bend-*in* scalar (start an interval off the written pitch, ramp *to* it) used
+ * widely by the bass engine, the soloist device system, and MIDI export. A
+ * bend-and-release starts *on* the note and goes *above* it — a different shape
+ * the scalar can't represent. Keeping them separate keeps each legible; the
+ * scalar stays the ubiquitous simple case, this object the expressive one.
+ *
+ * Fractions are 0..1 of the note's duration. The AUDIO renderers honor it — the
+ * synth voice (`applyPitchEnvelope`), the sampled seam (`scheduleSampleBend`),
+ * and offline *audio* export (same scheduler path). MIDI export does NOT yet
+ * render it (only the `bendStartInterval` scalar maps to pitch-bend) — a `.mid`
+ * stem currently loses the cry; wiring it is a follow-up.
+ */
+export interface PitchBendGesture {
+    /** Peak offset above the written note, in semitones (+1 = ½-step, +2 = whole). */
+    peakSemitones: number;
+    /** When the bend leaves the written pitch (0..1 of duration). */
+    onsetFrac: number;
+    /** When the bend reaches its peak (0..1; should exceed `onsetFrac`). */
+    peakFrac: number;
+    /** When the bend returns to the written pitch (0..1; > `peakFrac`). Omit = hold the bend. */
+    releaseFrac?: number;
+}
+
+/**
+ * Continuous-pitch expression on a soloist note (#744). A semantic home for
+ * expressive gestures kept off the simple `bendStartInterval` scalar; Slice 3
+ * adds slide/scoop/fall fields here.
+ */
+export interface SoloistExpression {
+    bend?: PitchBendGesture;
+}
+
+/**
  * A short-lived musical "event" buffered for a future step — e.g. a chromatic
  * fall, a grace note pair, a banjo roll. Produced by `soloist-devices.ts` and
  * popped by the pitch engine.

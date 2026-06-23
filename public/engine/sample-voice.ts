@@ -91,6 +91,8 @@ export interface SampledNoteOptions {
     readonly duration?: number;
     /** Opt-in continuous pitch vibrato (#744). Omitted → fixed pitch, as before. */
     readonly vibrato?: SampleVibrato;
+    /** Opt-in pitch bend — bend-in and/or bend-and-release (#744 Slice 2). */
+    readonly bend?: SampleBend;
     readonly onEnded?: () => void;
 }
 
@@ -313,6 +315,90 @@ function attachSampleVibrato(
 }
 
 /**
+ * A pitch-bend gesture for a sampled note (#744 Slice 2). Covers both shapes the
+ * soloist needs, rendered as automation on `BufferSource.playbackRate`:
+ *  - **bend-in** (`fromSemitones`): start the note off-pitch and ramp *to* it —
+ *    the existing `bendStartInterval` scalar, finally rendered on the sampled
+ *    seam (it was synth-only before this slice).
+ *  - **bend-and-release** (`peakSemitones` + fractions): hold the written pitch, bend
+ *    *up* to a peak, and (with `releaseFrac`) come back — the blues "cry".
+ * The two compose; a vibrato LFO (if any) sums on top of whatever the bend is
+ * doing, so a held bend can still shimmer.
+ */
+export interface SampleBend {
+    /** Start offset from the target, in semitones (bend-IN). 0/omit = start in tune. */
+    fromSemitones?: number;
+    /** Peak offset *above* the target for a bend-and-release. 0/omit = no up-bend. */
+    peakSemitones?: number;
+    /** When the up-bend leaves the note (0..1 of hold). */
+    onsetFrac?: number;
+    /** When it reaches the peak (0..1 of hold). */
+    peakFrac?: number;
+    /** When it returns to the target (0..1 of hold). Omit = hold the peak. */
+    releaseFrac?: number;
+}
+
+/** Clamp to [0,1], mapping a non-finite input to the given fallback. */
+export function clampFrac(v: number | undefined, fallback: number): number {
+    const n = Number.isFinite(v) ? (v as number) : fallback;
+    return Math.max(0, Math.min(1, n));
+}
+
+/**
+ * Schedule a pitch bend onto `rate` (a `BufferSource.playbackRate`). `playbackRate`
+ * is a ratio, so a semitone offset `s` is `baseRate · 2^(s/12)`; we ramp
+ * *exponentially* between ratios because exponential-in-ratio is linear-in-pitch
+ * (a musically even glide). All ratios are positive, so the exponential ramp is
+ * always legal. Establishes the param's base value itself, so the caller skips
+ * its own `setValueAtTime(baseRate)` when a bend is present. Returns nothing —
+ * it only writes automation; the LFO vibrato sums on top.
+ */
+function scheduleSampleBend(
+    rate: AudioParam,
+    baseRate: number,
+    bend: SampleBend,
+    startTime: number,
+    hold: number,
+): void {
+    const ratioAt = (semis: number) => baseRate * 2 ** (semis / 12);
+    const dur = hold > 0 ? hold : 0;
+
+    // Bend-IN: start off-target and ramp to the written pitch over a short, fixed
+    // glide (matches the synth voice's `min(0.1, dur*0.5)`); else anchor at base.
+    const from = Number.isFinite(bend.fromSemitones) ? (bend.fromSemitones as number) : 0;
+    const bendInEnd = startTime + Math.min(0.1, dur * 0.5 || 0.1);
+    if (from !== 0) {
+        rate.setValueAtTime(ratioAt(from), startTime);
+        rate.exponentialRampToValueAtTime(baseRate, bendInEnd);
+    } else {
+        rate.setValueAtTime(baseRate, startTime);
+    }
+
+    // Bend-and-release: hold the written pitch to `onset`, bend up to `peak`, and
+    // (if a release is given) ramp back. Times are kept strictly increasing so
+    // the ramps never invert. No-op for a zero/negative peak or a zero-length note.
+    // When a bend-IN is also present, the onset anchor is pushed past the glide's
+    // end so the re-anchor never truncates the in-progress bend-in — the two
+    // genuinely compose (the producer keeps them exclusive today, but the
+    // primitive stays honest for the wider callers Slice 3 adds).
+    const peak = Number.isFinite(bend.peakSemitones) ? (bend.peakSemitones as number) : 0;
+    if (peak > 0 && dur > 0) {
+        const rawOnset = startTime + clampFrac(bend.onsetFrac, 0.2) * dur;
+        const onsetT = from !== 0 ? Math.max(rawOnset, bendInEnd + 0.01) : rawOnset;
+        const peakT = Math.max(onsetT + 0.01, startTime + clampFrac(bend.peakFrac, 0.5) * dur);
+        rate.setValueAtTime(baseRate, onsetT);
+        rate.exponentialRampToValueAtTime(ratioAt(peak), peakT);
+        if (Number.isFinite(bend.releaseFrac)) {
+            const relT = Math.max(
+                peakT + 0.01,
+                startTime + clampFrac(bend.releaseFrac, 0.85) * dur,
+            );
+            rate.exponentialRampToValueAtTime(baseRate, relT);
+        }
+    }
+}
+
+/**
  * Play a pitched sample through an instrument bus. Pitch-shifts the given zone
  * to `targetMidi` via `playbackRate`, applies a click-free attack/hold/release
  * gain envelope, and connects to `destination` (the instrument's `[name]Gain`
@@ -333,6 +419,7 @@ export function playSampledNote(
         velocity = 1,
         duration = 0.5,
         vibrato,
+        bend,
         onEnded,
     }: SampledNoteOptions = {},
 ): SampledNoteHandle | null {
@@ -361,7 +448,14 @@ export function playSampledNote(
         const source = audio.createBufferSource();
         source.buffer = zone.buffer;
         const baseRate = pitchRatio(zone.rootMidi, targetMidi);
-        source.playbackRate.setValueAtTime(baseRate, startTime);
+        // A bend writes the full playbackRate timeline itself (incl. the base
+        // anchor); without one we just hold the base. A vibrato LFO, if present,
+        // sums on top of whichever the bend leaves on the param.
+        if (bend) {
+            scheduleSampleBend(source.playbackRate, baseRate, bend, startTime, hold);
+        } else {
+            source.playbackRate.setValueAtTime(baseRate, startTime);
+        }
 
         const gain = audio.createGain();
         // Click-free envelope: linear attack to peak, hold for `duration`, linear
