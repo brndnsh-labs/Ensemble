@@ -18,6 +18,10 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 const C7 = { rootMidi: 60, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
+// Rootless dominant voicing (3/5/♭7, no root) — what blues actually comps when a bass
+// is present. The bend must IGNORE this voicing and target functional pillars, so the
+// ♭7→root cry stays reachable even though pc 0 is absent here. (#747 Slice 3b.)
+const C7_ROOTLESS = { rootMidi: 60, quality: '7', intervals: [4, 7, 10], beats: 4 };
 
 function makeState(mode = 'guitar', intensity = 0.8) {
     return {
@@ -50,47 +54,93 @@ function makeState(mode = 'guitar', intensity = 0.8) {
 }
 
 // Sweep many steps, returning every emitted note.
-function sweep(state, style, steps = 600) {
+function sweep(state, style, steps = 600, chord = C7) {
     getState.mockReturnValue(state);
     const out = [];
     for (let s = 0; s < steps; s++) {
         state.soloist.session.rhythm.deviceBuffer = [];
         state.soloist.session.phrasing.busySteps = 0;
         state.soloist.session.phrasing.isResting = false;
-        const r = getSoloistNote(state, C7, null, s, 60, 4, style, 0, { bypassRhythm: true });
+        const r = getSoloistNote(state, chord, null, s, 60, 4, style, 0, { bypassRhythm: true });
         const notes = Array.isArray(r) ? r : r ? [r] : [];
         out.push(...notes);
     }
     return out;
 }
 
-// Bend fraction (bent / sustained) and whole-step share for a sweep.
+// Functional dominant pillars (1/3/5/♭7), root MIDI 60 — what the bend targets for a
+// '7' chord regardless of how the chord is voiced. The bend must land its peak here.
+const DOM_PILLARS = [0, 4, 7, 10];
+const isPillar = (deg) => DOM_PILLARS.includes(((deg % 12) + 12) % 12);
+
+// Bend-rate stats + the bent notes (with .midi) so callers can check targeting.
 function bendStats(mode, intensity) {
     const notes = sweep(makeState(mode, intensity), 'blues');
     const long = notes.filter((n) => (n.durationSteps || 0) >= 4);
-    const bends = notes.filter((n) => n.expression?.bend).map((n) => n.expression.bend);
-    const wholes = bends.filter((b) => b.peakSemitones === 2).length;
-    return { long: long.length, bent: bends.length, wholes, bends };
+    const bentNotes = notes.filter((n) => n.expression?.bend);
+    const bends = bentNotes.map((n) => n.expression.bend);
+    return { long: long.length, bent: bends.length, bends, notes: bentNotes };
 }
 
-describe('soloist bend-and-release gesture (#744 Slice 2)', () => {
-    it('guitar leads bend often and wide (whole-step staple)', () => {
-        const { long, bent, wholes } = bendStats('guitar', 0.8);
+// #747 Slice 3b contract: a bend ALWAYS resolves UP to a functional pillar (1/3/5/♭7
+// on a dominant). There is no gentle-curl fallback — a note with no pillar within a
+// whole step above simply doesn't bend. So every emitted bend peaks on a pillar.
+function peaksOnPillar(note) {
+    return isPillar(note.midi - 60 + note.expression.bend.peakSemitones);
+}
+
+describe('soloist bend-and-release gesture (#744 Slice 2/3b)', () => {
+    it('guitar leads bend often, and every bend resolves onto a functional pillar', () => {
+        const { long, bent, notes } = bendStats('guitar', 0.8);
         expect(long).toBeGreaterThan(30);
-        expect(bent).toBeGreaterThan(10); // string bends are central to blues guitar
+        expect(bent).toBeGreaterThan(5); // string bends are central to blues guitar
         expect(bent).toBeLessThan(long); // still a flourish, not every note
-        expect(wholes).toBeGreaterThan(bent / 2); // whole-step is the staple
+        // Every bend lands on a pillar (♭3→3, 4→5, ♭7→root) — no off-pillar peaks.
+        for (const n of notes) {
+            expect(
+                peaksOnPillar(n),
+                `bend peak off-pillar: midi ${n.midi} +${n.expression.bend.peakSemitones}`,
+            ).toBe(true);
+        }
     });
 
-    it('horn/mono leads bend sparingly and gentler (half-step lean)', () => {
-        // Idiom: a horn inflects with scoops + vibrato, not constant string bends.
+    it('horn/mono leads bend more sparingly than guitar (rate is the mode idiom)', () => {
+        // Idiom: a horn inflects with scoops + vibrato, not constant string bends, so it
+        // fires far less often. Targeting (the interval) is harmonic and identical across
+        // modes — the difference now lives purely in the fire RATE.
         const guitar = bendStats('guitar', 0.8);
         const mono = bendStats('mono', 0.8);
-        // Far sparser than guitar at the same intensity (rate, not raw count).
         expect(mono.bent / mono.long).toBeLessThan(guitar.bent / guitar.long);
         expect(mono.bent).toBeGreaterThan(0); // still cries occasionally
-        // And when it does bend, it leans to the gentle half-step.
-        expect(mono.wholes).toBeLessThan(mono.bent / 2);
+        for (const n of mono.notes) {
+            expect(peaksOnPillar(n)).toBe(true);
+        }
+    });
+
+    it('targets functional pillars even when the chord is voiced ROOTLESS (#747 fix)', () => {
+        // The regression guard for the bug Slice 3b fixed: blues comps rootless when a
+        // bass is present, so the soloist's chord carries a voicing WITHOUT the root.
+        // The bend must ignore that voicing and target the functional pillars, keeping
+        // the canonical ♭7→root cry reachable. If the bend read the voicing mask
+        // (intervals [4,7,10], no pc 0), the root could never be a target.
+        const notes = sweep(makeState('guitar', 0.9), 'blues', 600, C7_ROOTLESS);
+        const bent = notes.filter((n) => n.expression?.bend);
+        expect(bent.length).toBeGreaterThan(5);
+        // Every peak is a functional pillar despite the rootless voicing...
+        for (const n of bent) {
+            expect(peaksOnPillar(n), `off-pillar peak under rootless voicing: midi ${n.midi}`).toBe(
+                true,
+            );
+        }
+        // ...and crucially, the ROOT (deg 0) is reached as a target — impossible if the
+        // bend had read the rootless voicing mask.
+        const rootPeaks = bent.filter(
+            (n) => (((n.midi - 60 + n.expression.bend.peakSemitones) % 12) + 12) % 12 === 0,
+        );
+        expect(
+            rootPeaks.length,
+            'expected at least one ♭7→root bend under rootless voicing',
+        ).toBeGreaterThan(0);
     });
 
     it('only ever bends sustained notes', () => {
@@ -157,19 +207,15 @@ describe('soloist bend-and-release gesture (#744 Slice 2)', () => {
             expect(bent.length).toBeGreaterThan(0);
             // Exactly one log line per bend — no spurious fires, none dropped.
             expect(bendLines.length).toBe(bent.length);
-            // C7 = {0,4,7,10}. Recompute the expected peak degree from each note and
-            // assert the line reports it, with the chord-tone tag matching the chord mask.
-            const chordMask = (1 << 0) | (1 << 4) | (1 << 7) | (1 << 10);
+            // Recompute the expected peak degree from each note and assert the line
+            // reports it as the resolved pillar. The peak token `(deg <N> pillar...)` is
+            // unambiguous — a bare `deg N` also appears for the written pitch, so we
+            // match the whole token to pin the degree math and the pillar classification.
             for (const n of bent) {
-                const peakMidi = n.midi + n.expression.bend.peakSemitones;
-                const peakDeg = (((peakMidi - 60) % 12) + 12) % 12;
-                const isCT = ((chordMask >> peakDeg) & 1) === 1;
-                // The peak token is unambiguous: `(<peakMidi>, deg <peakDeg> <marker>)`.
-                // Matching the whole token (not a bare `deg N`, which also appears for
-                // the written pitch) pins both the degree math and the CT classification.
-                const peakToken = `(${peakMidi}, deg ${peakDeg}${isCT ? ' CT' : ' ⚠non-CT'})`;
+                const peakDeg = (((n.midi + n.expression.bend.peakSemitones - 60) % 12) + 12) % 12;
+                const peakToken = `(deg ${peakDeg} pillar`;
                 const match = bendLines.find((l) => l.includes(peakToken));
-                expect(match, `expected a bend line with peak token ${peakToken}`).toBeTruthy();
+                expect(match, `expected a bend line with peak token "${peakToken}"`).toBeTruthy();
             }
         } finally {
             spy.mockRestore();
