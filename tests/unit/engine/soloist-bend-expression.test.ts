@@ -141,4 +141,49 @@ describe('soloist bend-and-release gesture (#744 Slice 2)', () => {
         const hot = bendStats('guitar', 1.0);
         expect(hot.bent / hot.long).toBeGreaterThan(cool.bent / cool.long);
     });
+
+    // #747 Slice 3a — bend diagnostics. The log is the measuring instrument for the
+    // harmonic-targeting work; if its degree/chord-tone math is wrong we'd misread the
+    // by-ear pass, so guard it here (not just "it doesn't crash").
+    it('debug log fires once per bend with correct harmonic readout (debugSoloist)', () => {
+        const state = makeState('guitar', 1.0);
+        state.playback.debugSoloist = true;
+        const lines = [];
+        const spy = vi.spyOn(console, 'log').mockImplementation((m) => lines.push(String(m)));
+        try {
+            const notes = sweep(state, 'blues');
+            const bent = notes.filter((n) => n.expression?.bend);
+            const bendLines = lines.filter((l) => l.includes('[Bend Debug]'));
+            expect(bent.length).toBeGreaterThan(0);
+            // Exactly one log line per bend — no spurious fires, none dropped.
+            expect(bendLines.length).toBe(bent.length);
+            // C7 = {0,4,7,10}. Recompute the expected peak degree from each note and
+            // assert the line reports it, with the chord-tone tag matching the chord mask.
+            const chordMask = (1 << 0) | (1 << 4) | (1 << 7) | (1 << 10);
+            for (const n of bent) {
+                const peakMidi = n.midi + n.expression.bend.peakSemitones;
+                const peakDeg = (((peakMidi - 60) % 12) + 12) % 12;
+                const isCT = ((chordMask >> peakDeg) & 1) === 1;
+                // The peak token is unambiguous: `(<peakMidi>, deg <peakDeg> <marker>)`.
+                // Matching the whole token (not a bare `deg N`, which also appears for
+                // the written pitch) pins both the degree math and the CT classification.
+                const peakToken = `(${peakMidi}, deg ${peakDeg}${isCT ? ' CT' : ' ⚠non-CT'})`;
+                const match = bendLines.find((l) => l.includes(peakToken));
+                expect(match, `expected a bend line with peak token ${peakToken}`).toBeTruthy();
+            }
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('debug log stays silent when debugSoloist is off', () => {
+        const lines = [];
+        const spy = vi.spyOn(console, 'log').mockImplementation((m) => lines.push(String(m)));
+        try {
+            sweep(makeState('guitar', 1.0), 'blues');
+            expect(lines.filter((l) => l.includes('[Bend Debug]')).length).toBe(0);
+        } finally {
+            spy.mockRestore();
+        }
+    });
 });

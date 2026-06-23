@@ -99,6 +99,14 @@ vi.mock('../../public/utils.js', () => ({
     applyBluesBends: vi.fn(),
     getMidi: (freq) => Math.round(69 + 12 * Math.log2(freq / 440)),
     calculateTimingOffset: vi.fn(() => 0),
+    // Used by the #747 bend-diagnostics log, which this trace exercises with
+    // debugSoloist on.
+    midiToNote: (midi) => ({
+        name: ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][
+            ((midi % 12) + 12) % 12
+        ],
+        octave: Math.floor(midi / 12) - 1,
+    }),
 }));
 vi.mock('../../public/engine/theory-scales.js', () => ({
     getScaleForChord: () => [0, 2, 3, 4, 5, 7, 9, 10, 11],

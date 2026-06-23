@@ -1,6 +1,6 @@
 import type { GlobalContext } from '../state/playback.js';
 import type { EnsembleState, SoloistExpression } from '../types.js';
-import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
+import { applyBluesBends, calculateTimingOffset, getFrequency, midiToNote } from '../utils.js';
 import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
 import { scrambleHash } from './hash-utils.js';
 import type { SoloistIntent } from './soloist-config.js';
@@ -1863,6 +1863,37 @@ export function selectPitchAndDevices(
             expression = {
                 bend: { peakSemitones, onsetFrac: 0.12, peakFrac: 0.4, releaseFrac },
             };
+
+            // #747 Slice 3a — bend diagnostics. Gated behind playback.debugSoloist
+            // (false on real sessions). Prints the harmonic context of every bend
+            // as it fires so an "that one sounded bad" moment can be pinned down: the
+            // written pitch, the peak pitch, and — the key tell — which scale degree
+            // (relative to the chord root) the peak lands on and whether it's a chord
+            // tone. A blind bend peaking on a non-chord-tone that never resolves is the
+            // prime suspect for the ugly cry; this readout is the raw data 3b
+            // (harmonic targeting) uses to pick a sensible target instead.
+            if (playback.debugSoloist) {
+                // Evaluate against `targetChord` — the chord the pitch was actually
+                // selected against, which `chordMask` is also built from. During
+                // anticipation it's `nextChord`, so a `currentChord` reading would be
+                // wrong exactly in the transitional moments most likely to bend ugly.
+                const peakMidi = selectedMidi + peakSemitones;
+                const peakDegree = (((peakMidi - targetChord.rootMidi) % 12) + 12) % 12;
+                const peakIsChordTone = ((chordMask >> peakDegree) & 1) === 1;
+                const writtenDegree = (((selectedMidi - targetChord.rootMidi) % 12) + 12) % 12;
+                const writtenIsChordTone = ((chordMask >> writtenDegree) & 1) === 1;
+                const w = midiToNote(selectedMidi);
+                const p = midiToNote(peakMidi);
+                const anticipating = targetChord !== currentChord ? ' (anticipating)' : '';
+                // biome-ignore lint/suspicious/noConsole: deliberate diagnostic, gated behind playback.debugSoloist
+                console.log(
+                    `[Bend Debug] step ${step} ${isGuitarMode ? 'guitar' : 'mono'} | ` +
+                        `${w.name}${w.octave}(${selectedMidi}, deg ${writtenDegree}${writtenIsChordTone ? ' CT' : ''}) ` +
+                        `+${peakSemitones}→${p.name}${p.octave}(${peakMidi}, deg ${peakDegree}${peakIsChordTone ? ' CT' : ' ⚠non-CT'}) | ` +
+                        `chord ${targetChord.root ?? targetChord.rootMidi}${targetChord.quality ?? ''}${anticipating} | ` +
+                        `dur ${durationSteps} rel ${releaseFrac.toFixed(2)}`,
+                );
+            }
         }
     }
 
