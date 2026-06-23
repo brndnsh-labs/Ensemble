@@ -68,6 +68,36 @@ function sweep(state, style, steps = 600, chord = C7) {
     return out;
 }
 
+// Faithful, busySteps-gated sweep (#747 Slice 3c): honor busySteps the way the live
+// worker loop does — decrement while held, skip emission — so note-to-note spacing is
+// the REAL spacing. (The `sweep` above deliberately bypasses rhythm to harvest bends
+// densely; this one must NOT, because the truncation it guards lives in the spacing.)
+// The engine writes phr.busySteps itself (soloist-pitch-engine.ts / soloist.ts); we
+// only decrement, exactly like the worker.
+function faithfulSweep(mode, intensity, loopCount, steps = 6000) {
+    const state = makeState(mode, intensity);
+    state.playback.currentLoopCount = loopCount;
+    getState.mockReturnValue(state);
+    const phr = state.soloist.session.phrasing;
+    const emitted = [];
+    for (let s = 0; s < steps; s++) {
+        if ((phr.busySteps || 0) > 0) {
+            phr.busySteps -= 1;
+            continue;
+        }
+        const r = getSoloistNote(state, C7, null, s, 60, 4, 'blues', s % 16, {});
+        const notes = Array.isArray(r) ? r : r ? [r] : [];
+        for (const n of notes) {
+            emitted.push({
+                step: s,
+                durationSteps: n.durationSteps || 1,
+                bend: n.expression?.bend,
+            });
+        }
+    }
+    return emitted;
+}
+
 // Functional dominant pillars (1/3/5/♭7), root MIDI 60 — what the bend targets for a
 // '7' chord regardless of how the chord is voiced. The bend must land its peak here.
 const DOM_PILLARS = [0, 4, 7, 10];
@@ -141,6 +171,39 @@ describe('soloist bend-and-release gesture (#744 Slice 2/3b)', () => {
             rootPeaks.length,
             'expected at least one ♭7→root bend under rootless voicing',
         ).toBeGreaterThan(0);
+    });
+
+    it('reserves the lane so a bend is never truncated before its release (#747 3c)', () => {
+        // A bend schedules its release across releaseFrac * durationSteps. If the
+        // next attack lands before that, the cry is chopped mid-flight. The plan's
+        // last "ring to phrase end" note used to escape the per-plan gap-cap, so a
+        // fresh plan's first attack could stomp a long bent note (a dur=12 bend cut
+        // at gap=5, guitar-mode only). The fix reserves busySteps on bent notes.
+        // Guard the invariant across modes / intensities / loops (which exercise the
+        // head-replay and plan-regeneration seams) with the FAITHFUL sweep.
+        let bentTotal = 0;
+        for (const mode of ['guitar', 'mono']) {
+            for (const intensity of [0.2, 0.5, 0.85, 1.0]) {
+                for (const loopCount of [0, 1, 3]) {
+                    const notes = faithfulSweep(mode, intensity, loopCount);
+                    for (let i = 0; i < notes.length - 1; i++) {
+                        const n = notes[i];
+                        if (!n.bend) {
+                            continue;
+                        }
+                        bentTotal++;
+                        const gap = notes[i + 1].step - n.step; // steps to the next onset
+                        const releaseDone = (n.bend.releaseFrac ?? 0.85) * n.durationSteps;
+                        expect(
+                            gap,
+                            `bend truncated: ${mode} i=${intensity} loop=${loopCount} dur=${n.durationSteps} releaseDoneAt=${releaseDone.toFixed(1)} gap=${gap}`,
+                        ).toBeGreaterThanOrEqual(releaseDone);
+                    }
+                }
+            }
+        }
+        // Sanity: the sweep actually produced bends to guard (not a vacuous pass).
+        expect(bentTotal).toBeGreaterThan(100);
     });
 
     it('only ever bends sustained notes', () => {
