@@ -438,7 +438,13 @@ describe('Jazz Comping Integrity', () => {
             sectionId: 'A',
         };
 
-        // 1. Jazz should vary
+        // 1. Jazz should vary across the form.
+        // #712: the comp is now keyed off the IN-LOOP bar, so variation comes from
+        // moving across phrases of a real multi-bar loop — NOT from re-dicing the
+        // same bar (a 1-bar loop correctly locks to one cell now). Give it a long
+        // enough loop that these 10 samples land on distinct in-loop bars; Jazz's
+        // (phraseIndex >> 2) cell bank then advances across phrases.
+        arranger.totalSteps = 16 * 16; // 16-bar loop
         groove.genreFeel = 'Jazz';
         const patterns = new Set();
         for (let i = 0; i < 10; i++) {
