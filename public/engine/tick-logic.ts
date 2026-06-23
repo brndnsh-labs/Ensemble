@@ -1,5 +1,5 @@
 import { getJamMacroArc } from '../form-analysis.js';
-import type { EnsembleState, Mutable } from '../types.js';
+import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { binarySearchMap, getFrequency, getMidi } from '../utils.js';
 import { getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
@@ -27,7 +27,10 @@ export interface NoteResult {
     velocity?: number;
     durationSteps?: number;
     timingOffset?: number;
+    /** One-way bend-*in*: start this many semitones off the written pitch, ramp to it. */
     bendStartInterval?: number;
+    /** Bend-and-release + future slide/scoop (#744). Distinct from `bendStartInterval`. */
+    expression?: SoloistExpression;
     isDoubleStop?: boolean;
     isLegato?: boolean;
     dry?: boolean;

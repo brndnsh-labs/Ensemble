@@ -1,5 +1,5 @@
 import type { GlobalContext } from '../state/playback.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, SoloistExpression } from '../types.js';
 import { applyBluesBends, calculateTimingOffset, getFrequency } from '../utils.js';
 import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
 import { scrambleHash } from './hash-utils.js';
@@ -1830,6 +1830,42 @@ export function selectPitchAndDevices(
         }
     }
 
+    // why: discriminators 8/9 — guitar bend-in (8 gates whether a long sustained
+    // note bends in, 9 picks the bend direction).
+    const bendStartInterval =
+        isGuitarMode && durationSteps >= 4 && scrambleHash(pickerSeedBase + 8) < 0.3
+            ? scrambleHash(pickerSeedBase + 9) < 0.5
+                ? -1
+                : 1
+            : 0;
+
+    // Blues bend-and-release (#744 Slice 2) — the genre's signature expressive
+    // "cry": on a sustained blues note with no bend-in, bend the written pitch
+    // UP a half/whole step and release back. Deterministic (seeded off the
+    // per-note picker base, discriminators 15–17 — clear of the bend-in 8/9,
+    // device-pick 12, double-stop 11, and timing 13/14 draws) and gated to the
+    // blues style + long notes, so it never fires on a bossa/nylon or staccato line.
+    //
+    // Mode-aware idiom: a GUITAR lead bends constantly and wide — string bends
+    // ARE blues guitar, whole-step is the staple. A horn/MONO lead inflects
+    // mostly with scoops (the bend-in) and vibrato; a literal whole-step pitch
+    // bend is rare and gentler there — so it fires far less often (~⅓ the rate)
+    // and leans to half-steps. Intensity lifts the rate so a hotter solo cries more.
+    let expression: SoloistExpression | undefined;
+    if (activeStyle === 'blues' && durationSteps >= 4 && bendStartInterval === 0) {
+        const i = Math.max(0, Math.min(1, intensity));
+        const fireProb = isGuitarMode ? 0.18 + 0.15 * i : 0.05 + 0.06 * i;
+        if (scrambleHash(pickerSeedBase + 15) < fireProb) {
+            // Whole-step staple on guitar (75%); a horn leans half-step (35% whole).
+            const wholeStepProb = isGuitarMode ? 0.75 : 0.35;
+            const peakSemitones = scrambleHash(pickerSeedBase + 16) < wholeStepProb ? 2 : 1;
+            const releaseFrac = 0.7 + scrambleHash(pickerSeedBase + 17) * 0.15;
+            expression = {
+                bend: { peakSemitones, onsetFrac: 0.12, peakFrac: 0.4, releaseFrac },
+            };
+        }
+    }
+
     // Base Result without polyphony
     const result: any = {
         midi: selectedMidi,
@@ -1837,14 +1873,8 @@ export function selectPitchAndDevices(
         durationSteps: durationSteps,
         vibrato: vibrato,
         isSustained: rhythmNode.isSustained,
-        // why: discriminators 8/9 — guitar bend-in (8 gates whether a long
-        // sustained note bends in, 9 picks the bend direction).
-        bendStartInterval:
-            isGuitarMode && durationSteps >= 4 && scrambleHash(pickerSeedBase + 8) < 0.3
-                ? scrambleHash(pickerSeedBase + 9) < 0.5
-                    ? -1
-                    : 1
-                : 0,
+        bendStartInterval,
+        expression,
         ccEvents: [],
         timingOffset: 0,
         style: activeStyle,
@@ -1962,6 +1992,10 @@ export function selectPitchAndDevices(
                     ...extra[i],
                     durationSteps: supportDuration,
                     isLegato: false,
+                    // The bend-and-release belongs to the LEAD voice only (#744);
+                    // a double-stop's harmony note holds while the lead cries,
+                    // rather than every stacked voice bending on its own.
+                    expression: undefined,
                 };
             }
             polyResult[extra.length] = result;
