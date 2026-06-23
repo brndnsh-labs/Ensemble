@@ -244,6 +244,158 @@ describe('sample-voice — playSampledNote', () => {
     });
 });
 
+// A context that records every gain + oscillator it creates, so a vibrato test
+// can inspect the LFO chain separately from the envelope gain.
+function makeVibratoCtx() {
+    const source: any = {
+        playbackRate: fakeParam(),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(),
+        onended: null,
+        buffer: null,
+    };
+    const gains: any[] = [];
+    const oscs: any[] = [];
+    const ctx = {
+        currentTime: 0,
+        createBufferSource: vi.fn(() => source),
+        createGain: vi.fn(() => {
+            const g: any = { gain: fakeParam(), connect: vi.fn(), disconnect: vi.fn() };
+            gains.push(g);
+            return g;
+        }),
+        createOscillator: vi.fn(() => {
+            const o: any = {
+                type: 'sine',
+                frequency: fakeParam(),
+                connect: vi.fn(),
+                disconnect: vi.fn(),
+                start: vi.fn(),
+                stop: vi.fn(),
+            };
+            oscs.push(o);
+            return o;
+        }),
+    } as unknown as AudioContext;
+    return { ctx, source, gains, oscs };
+}
+
+describe('sample-voice — playSampledNote vibrato (#744 Slice 1)', () => {
+    it('never creates an LFO when no vibrato option is passed (shared seams unaffected)', () => {
+        const { ctx } = makeVibratoCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, { duration: 1 });
+        expect(ctx.createOscillator).not.toHaveBeenCalled();
+    });
+
+    it('attaches an LFO summed onto playbackRate at the requested rate', () => {
+        const { ctx, source, oscs } = makeVibratoCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 5.5, delay: 0.1, ramp: 0.3 },
+        });
+        expect(oscs).toHaveLength(1);
+        const lfo = oscs[0];
+        // LFO runs at the requested rate...
+        expect(lfo.frequency.calls.find((c: any) => c.op === 'set')?.value).toBeCloseTo(5.5, 10);
+        // ...and its depth-gain output is wired into the source's playbackRate param
+        // (summing on top of the base ratio, so the note stays in tune around it).
+        expect(lfo.connect).toHaveBeenCalled();
+        const lfoGain = lfo.connect.mock.calls[0][0];
+        expect(lfoGain.connect).toHaveBeenCalledWith(source.playbackRate);
+        expect(lfo.start).toHaveBeenCalled();
+        expect(lfo.stop).toHaveBeenCalled();
+    });
+
+    it('converts ±cents to the correct multiplicative playbackRate swing', () => {
+        // At the zone root the base rate is 1.0, so the peak deviation is
+        // exactly 2^(cents/1200) − 1. A shifted note scales by its base ratio.
+        const root = makeVibratoCtx();
+        playSampledNote(root.ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 5.5 },
+        });
+        // Isolate the LFO depth-gain by index (the last gain created, after the
+        // envelope gain) rather than by value — so the assertion can't silently
+        // latch onto the envelope's velocity ramp if a default changes.
+        const rootLfoGain = root.gains[root.gains.length - 1];
+        const rootDepth = rootLfoGain.gain.calls.find((c: any) => c.op === 'ramp')?.value;
+        expect(rootDepth).toBeCloseTo(2 ** (18 / 1200) - 1, 6);
+
+        // A fifth up: base ratio 2^(7/12), depth scales with it.
+        const up = makeVibratoCtx();
+        playSampledNote(up.ctx, zone(60), {} as AudioNode, 67, 0, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 5.5 },
+        });
+        const upLfoGain = up.gains[up.gains.length - 1];
+        const upDepth = upLfoGain.gain.calls.find((c: any) => c.op === 'ramp')?.value;
+        expect(upDepth).toBeCloseTo(2 ** (7 / 12) * (2 ** (18 / 1200) - 1), 6);
+    });
+
+    it('holds depth at 0 through the attack delay, then ramps in (clean onset)', () => {
+        const { ctx, gains } = makeVibratoCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 2, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 5.5, delay: 0.12, ramp: 0.3 },
+        });
+        // The LFO depth-gain is the last gain created (after the envelope gain).
+        const lfoGain = gains[gains.length - 1];
+        const c = lfoGain.gain.calls;
+        expect(c[0]).toMatchObject({ op: 'set', value: 0, time: 2 });
+        expect(c[1]).toMatchObject({ op: 'set', value: 0, time: 2.12 });
+        expect(c[2]).toMatchObject({ op: 'ramp', time: 2.12 + 0.3 });
+        expect(c[2].value).toBeGreaterThan(0);
+    });
+
+    it('compresses the fade-in to fit a short note (vibrato still blooms within its life)', () => {
+        // A 0.05 s note: naturalEnd ≈ 0.14 s, shorter than the default 0.1+0.3 s
+        // fade. The LFO still attaches, but delay+ramp is compressed so the depth
+        // ramp completes by the note's end rather than never reaching depth.
+        const { ctx, source, gains } = makeVibratoCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 0.05,
+            vibrato: { depthCents: 18, rateHz: 5.5, delay: 0.1, ramp: 0.3 },
+        });
+        expect(ctx.createOscillator).toHaveBeenCalled(); // not skipped
+        const lfoGain = gains[gains.length - 1];
+        const ramp = lfoGain.gain.calls.find((c: any) => c.op === 'ramp');
+        const stopAt = source.stop.mock.calls.at(-1)[0];
+        // The fade-in lands at or before the source stops — no ramp left dangling
+        // past the note, and the depth is actually reached.
+        expect(ramp.time).toBeLessThanOrEqual(stopAt + 1e-9);
+        expect(ramp.value).toBeCloseTo(2 ** (18 / 1200) - 1, 6);
+    });
+
+    it('disconnects the LFO nodes with the voice on end (no leak)', () => {
+        const { ctx, source, oscs, gains } = makeVibratoCtx();
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 5.5 },
+        });
+        source.onended();
+        expect(oscs[0].disconnect).toHaveBeenCalled();
+        expect(gains[gains.length - 1].disconnect).toHaveBeenCalled();
+    });
+
+    it('is a no-op for a non-positive depth or rate (graceful, no LFO)', () => {
+        const a = makeVibratoCtx();
+        playSampledNote(a.ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            vibrato: { depthCents: 0, rateHz: 5.5 },
+        });
+        expect(a.ctx.createOscillator).not.toHaveBeenCalled();
+
+        const b = makeVibratoCtx();
+        playSampledNote(b.ctx, zone(60), {} as AudioNode, 60, 0, {
+            duration: 1,
+            vibrato: { depthCents: 18, rateHz: 0 },
+        });
+        expect(b.ctx.createOscillator).not.toHaveBeenCalled();
+    });
+});
+
 describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
     it('plays the buffer at native rate (no pitch-shift — a real drum plays as recorded)', () => {
         const { ctx, source } = makeCtx();
