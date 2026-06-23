@@ -234,7 +234,7 @@ describe('Stella voicing — durable invariants (safety net for #715/#728)', () 
     }
 });
 
-describe('Stella voicing — KNOWN DEFECT #733 (maj7 hand-span splay)', () => {
+describe('Stella voicing — maj7 hand-span continuity (#733, fixed)', () => {
     beforeEach(() => {
         groove.genreFeel = 'Jazz';
         chords.style = 'smart';
@@ -248,16 +248,14 @@ describe('Stella voicing — KNOWN DEFECT #733 (maj7 hand-span splay)', () => {
         compingState.lastVoicingMidis = [];
     });
 
-    // Brandon flagged Stella m7 (IVmaj7) by ear: the comp suddenly splays to a
-    // ~15-17 semitone open voicing while every neighboring ii-V shell stays
-    // ~7-9 st — a hand-span discontinuity no pianist would play. The recipe is
-    // tight ([4,7,11] / [4,11,14]); the splay is introduced in placement.
-    //
-    // `it.fails` ⇒ this is GREEN while the bug exists (the inner expect throws)
-    // and turns RED the instant the maj7 is compacted to neighbor-like span —
-    // at which point promote it to a normal `it(...)` and delete this note.
+    // Brandon flagged Stella m7 (IVmaj7) by ear: the comp used to splay to a
+    // ~15-17 semitone open voicing while every neighboring ii-V shell stayed
+    // ~7-9 st — a hand-span discontinuity no pianist would play. The cause was
+    // a maj7-ONLY "open voicing" gesture (accompaniment.ts) that raised the
+    // middle voice an octave. Removed in this change; the maj7 now keeps the
+    // section's hand-width. This test guards against the splay returning.
     for (const key of KEYS) {
-        it.fails(`[fix target] in ${key}, the maj7 voicing span is no wider than the section's shells`, () => {
+        it(`in ${key}, the maj7 voicing span is no wider than the section's shells`, () => {
             const bars = walkStella(key);
             const spans = bars.map((b) => b.span).sort((a, b) => a - b);
             const median = spans[Math.floor(spans.length / 2)];

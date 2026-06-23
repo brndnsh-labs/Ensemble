@@ -3205,16 +3205,13 @@ export function getAccompanimentNotes(
             }
         }
 
-        // --- Open Voicings for Jazz/Acoustic ---
-        if ((genre === 'Jazz' || genre === 'Acoustic') && chord.quality === 'maj7') {
-            if (voicing.length >= 3 && compDraw(38) < 0.6) {
-                const targetIdx = 1;
-                const midi = getMidi(voicing[targetIdx]);
-                if (midi) {
-                    voicing[targetIdx] = getFrequency(midi + 12);
-                }
-            }
-        }
+        // why (#733): no maj7-only "open voicing" splay. The old gesture raised
+        // the middle voice an octave on maj7 ONLY, so the tonic of a ii-V-I
+        // suddenly spread to ~15 st while the surrounding m7b5/dominant shells
+        // stayed ~7-9 st — a per-chord hand-width discontinuity no pianist plays
+        // (confirmed by ear on Stella, m7). The maj7 now voices with the same
+        // compactness as its neighbors; a deliberate, section-CONSISTENT open
+        // color can return later, but not as a tonic-only surprise.
 
         if (genre === 'Jazz' && previousVoicingMidis.length > 0) {
             const minMidi = reserveBassSpace && bassMidi ? bassMidi + 13 : 52;
