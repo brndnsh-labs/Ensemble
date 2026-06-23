@@ -14,6 +14,13 @@
  *       a loop), so a determinism-only check isn't trivially satisfied by a
  *       lane that ignored the gate.
  *   (3) loop reproducibility — a later loop reproduces itself.
+ *   (5) #712 — the comp LOCKS loop-to-loop: for non-sticky lanes (picker keyed
+ *       off the IN-LOOP bar, no cross-loop rotation/retention), loop N+1 must
+ *       reproduce loop N bar-for-bar EVEN as currentLoopCount changes. This is
+ *       the property that makes the rhythm "lock in"; the pre-#712 seed
+ *       (global-step ^ loopCount) made every loop a different pattern and failed
+ *       it. Sticky/rotation lanes (Funk, Neo-Soul) deliberately evolve across
+ *       the form, so the guard is scoped to the non-sticky lanes.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
@@ -141,16 +148,71 @@ function runPass(genreFeel: string, chordStyle: string, currentLoopCount: number
 // by design and its ghost contribution doesn't surface in this minimal harness —
 // the seeded ghost gate (compDraw 22) is the same proven pattern as Funk's, so
 // determinism (guards 1+3) is the meaningful check there.
-const LANES: { name: string; genreFeel: string; chordStyle: string; checkVariation: boolean }[] = [
+// lockLoopToLoop: the lane's onsets are purely picker-keyed off the IN-LOOP bar
+// with no cross-loop rotation counter (Funk/Bossa) or sticky retention that
+// straddles the loop boundary (the STICKY_GENRES) — so loop N+1 must reproduce
+// loop N exactly. Rock/Country are non-sticky; Funk and Neo-Soul are not.
+const LANES: {
+    name: string;
+    genreFeel: string;
+    chordStyle: string;
+    checkVariation: boolean;
+    lockLoopToLoop: boolean;
+}[] = [
     {
         name: 'strum-country',
         genreFeel: 'Country',
         chordStyle: 'strum-country',
         checkVariation: true,
+        lockLoopToLoop: true,
     },
-    { name: 'Neo-Soul', genreFeel: 'Neo-Soul', chordStyle: 'smart', checkVariation: false },
-    { name: 'Funk', genreFeel: 'Funk', chordStyle: 'smart', checkVariation: true },
+    {
+        name: 'Rock',
+        genreFeel: 'Rock',
+        chordStyle: 'smart',
+        checkVariation: true,
+        lockLoopToLoop: true,
+    },
+    {
+        name: 'Neo-Soul',
+        genreFeel: 'Neo-Soul',
+        chordStyle: 'smart',
+        checkVariation: false,
+        lockLoopToLoop: false,
+    },
+    {
+        name: 'Funk',
+        genreFeel: 'Funk',
+        chordStyle: 'smart',
+        checkVariation: true,
+        lockLoopToLoop: false,
+    },
 ];
+
+// Run `numLoops` full loops back-to-back on ONE evolving comping state. step
+// keeps climbing and currentLoopCount is bumped each loop — so if a lane still
+// repeats bar-for-bar across the boundary, it's genuinely keyed off the in-loop
+// position and not the global step or the loop counter.
+function runPassNLoops(genreFeel: string, chordStyle: string, numLoops: number): boolean[][] {
+    resetCompingState();
+    const state = buildState(genreFeel, chordStyle, 0);
+    const chord = makeC7();
+    const bars: boolean[][] = [];
+    for (let loop = 0; loop < numLoops; loop++) {
+        state.playback.currentLoopCount = loop;
+        for (let bar = 0; bar < NUM_BARS; bar++) {
+            const row = new Array(STEPS_PER_BAR).fill(false);
+            for (let mStep = 0; mStep < STEPS_PER_BAR; mStep++) {
+                const step = loop * NUM_BARS * STEPS_PER_BAR + bar * STEPS_PER_BAR + mStep;
+                const info = getStepInfo(step, FOUR_FOUR, [], TIME_SIGNATURES);
+                const notes = getAccompanimentNotes(state, chord, step, step, mStep, info, COORD);
+                row[mStep] = notes.some((n: any) => n && n.midi > 0 && !n.muted);
+            }
+            bars.push(row);
+        }
+    }
+    return bars;
+}
 
 const barsEqual = (a: boolean[], b: boolean[]) => a.every((v, i) => v === b[i]);
 
@@ -186,6 +248,23 @@ describe('Comp genre lanes lock (determinism + non-tautology)', () => {
                     runPass(lane.genreFeel, lane.chordStyle, 3),
                 );
             });
+
+            if (lane.lockLoopToLoop) {
+                it('(5) #712 — LOCKS loop-to-loop: loops 1 and 2 reproduce loop 0 bar-for-bar', () => {
+                    // 3 loops, not 2 — also catches a hypothetical odd/even-loop
+                    // alternation that a single boundary comparison would miss.
+                    const three = runPassNLoops(lane.genreFeel, lane.chordStyle, 3);
+                    for (let loop = 1; loop < 3; loop++) {
+                        for (let bar = 0; bar < NUM_BARS; bar++) {
+                            expect(
+                                barsEqual(three[loop * NUM_BARS + bar], three[bar]),
+                                `${lane.name}: bar ${bar} of loop ${loop} differs from loop 0 — ` +
+                                    `the comp isn't locking loop-to-loop`,
+                            ).toBe(true);
+                        }
+                    }
+                });
+            }
         });
     }
 });

@@ -364,18 +364,34 @@ describe('Accompaniment Engine Logic', () => {
             expect(foundCharleston).toBe(true);
         });
 
-        it('should offer multiple balanced Rock patterns at medium settings', () => {
+        it('should offer multiple balanced Rock patterns across phrases at medium settings', () => {
+            // #712: the Rock picker is now deterministic — variation comes from the
+            // phrase/section key (phraseIndex), NOT from re-dicing identical calls.
+            // Repeated identical calls now (correctly) return the SAME figure (it
+            // locks); a varied repertoire shows up as you move across phrases.
             const ts44 = TIME_SIGNATURES['4/4'];
             playback.bandIntensity = 0.55;
             playback.complexity = 0.45;
 
+            // Same inputs → same figure (the lock).
+            const a = generateCompingPattern(getState(), 'Rock', 'balanced', ts44, 16, 0).join('');
+            const b = generateCompingPattern(getState(), 'Rock', 'balanced', ts44, 16, 0).join('');
+            expect(b).toBe(a);
+
+            // Across phrases the bank still offers more than one figure.
             const patterns = new Set();
-            for (let i = 0; i < 24; i++) {
+            for (let phraseIndex = 0; phraseIndex < 24; phraseIndex++) {
                 patterns.add(
-                    generateCompingPattern(getState(), 'Rock', 'balanced', ts44, 16).join(''),
+                    generateCompingPattern(
+                        getState(),
+                        'Rock',
+                        'balanced',
+                        ts44,
+                        16,
+                        phraseIndex,
+                    ).join(''),
                 );
             }
-
             expect(patterns.size).toBeGreaterThan(1);
         });
 

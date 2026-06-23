@@ -75,18 +75,6 @@ export const compingState: CompingState = {
 //      gets to hold a cell across the 4-bar phrase.
 const STICKY_GENRES = ['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
 
-// why: epic-deterministic-phrasing S2 — picker genres whose 6th-param
-//      `phraseIndex` argument is the load-bearing hash input (Funk uses
-//      funkRotationIndex; Jazz/Bossa/Blues use barIndex). For these genres
-//      the no-repeat retry in `updateRhythmicIntent` MUST NOT fire: a "same
-//      cell as last bar" result is the desired locked-cell / phrase-stable
-//      behavior, not stochastic collision to be re-rolled. Stochastic genres
-//      (Rock, Country, Pop default) still benefit from the retry.
-//      Hip Hop (#554) is also a deterministic picker — its stab cell is keyed
-//      off phraseIndex, so two consecutive bars landing on the same stab cell
-//      is intentional (sparse loop coherence), not a collision to re-roll.
-const DETERMINISTIC_PICKER_GENRES = new Set(['Funk', 'Jazz', 'Bossa Nova', 'Blues', 'Hip Hop']);
-
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
 // rather than as a premature downbeat. Block-chord styles (Reggae skank,
@@ -815,6 +803,22 @@ export function generateCompingPattern(
         });
     };
 
+    // #712: deterministic phrase-keyed draws — these replace the per-call
+    // `Math.random()` onset gates in the stochastic branches (Neo-Soul, Ska,
+    // Rock/Country, Pop default) so the comp figure is reproducible and LOCKS to
+    // the phrase identity instead of re-dicing every bar (the most common genres
+    // could not establish a repeating figure by construction — the core "doesn't
+    // lock in" bug). `pickPhrase(k)` holds a value for a full 4-bar phrase (the
+    // skeleton/pocket); `pickBar(k)` varies per bar (living ornament detail).
+    // Both are loop-stable because `phraseIndex` is the IN-LOOP bar now. Same
+    // recipe the Funk/Hip-Hop cell banks already use, just expressed as uniform
+    // draws so each branch's existing probabilities/feel are preserved verbatim.
+    const pickerSectionHash = hashSectionId(sectionId);
+    const pickPhrase = (k: number) =>
+        scrambleHash((pickerSectionHash * 131 + (phraseIndex >> 2) * 17 + k * 7) | 0);
+    const pickBar = (k: number) =>
+        scrambleHash((pickerSectionHash * 131 + phraseIndex * 17 + k * 7) | 0);
+
     // --- GENRE ARCHETYPES ---
 
     if (genre === 'Neo-Soul') {
@@ -824,11 +828,11 @@ export function generateCompingPattern(
             hit(getBeatStep(b, Math.floor(spb / 2))); // The "and"
         });
 
-        // Add random syncopated "filler" at high intensity
+        // Add syncopated "filler" at high intensity (deterministic, phrase-keyed)
         if (intensity > 0.6) {
             // fillers roughly on offbeats of 1, 3 etc
             [0, 2].forEach((b: number) => {
-                if (Math.random() < intensity * 0.4) {
+                if (pickBar(b) < intensity * 0.4) {
                     hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
             });
@@ -862,9 +866,10 @@ export function generateCompingPattern(
         }
 
         // Active: Add some 16th syncopations or "double upstrokes"
+        // (deterministic, phrase-keyed — locks the upstroke variations per phrase)
         if (vibe === 'active' || intensity > 0.7) {
             for (let b = 0; b < ts.beats; b++) {
-                if (Math.random() < 0.3) {
+                if (pickBar(b) < 0.3) {
                     hit(getBeatStep(b, Math.floor(spb * 0.75)));
                 }
             }
@@ -1141,7 +1146,10 @@ export function generateCompingPattern(
     }
 
     if (genre === 'Rock' || genre === 'Country') {
-        const type = Math.random();
+        // #712: the pocket choice is the phrase SKELETON — hold it for the whole
+        // 4-bar phrase (`pickPhrase`) so the comp figure locks in; the small
+        // ornament adds below vary per bar (`pickBar`) for living detail.
+        const type = pickPhrase(0);
         const firstBackbeat = backbeat[0] ?? Math.min(1, finalBeat);
         const secondBackbeat = backbeat[1] ?? finalBeat;
 
@@ -1150,12 +1158,12 @@ export function generateCompingPattern(
         if (vibe === 'sparse') {
             if (intensity < 0.4) {
                 addBeatHits([middleBeat]);
-                if (Math.random() < 0.35) {
+                if (pickBar(1) < 0.35) {
                     hit(getBeatStep(finalBeat, offbeatStep));
                 }
             } else {
                 addBeatHits([firstBackbeat]);
-                if (ts.beats >= 4 && Math.random() < 0.45) {
+                if (ts.beats >= 4 && pickBar(2) < 0.45) {
                     addBeatHits([secondBackbeat]);
                 }
             }
@@ -1183,19 +1191,15 @@ export function generateCompingPattern(
         const shouldAddOffbeats =
             vibe === 'active' || intensity > 0.52 || playback.complexity > 0.4;
         if (shouldAddOffbeats) {
-            if (Math.random() < 0.45) {
+            if (pickBar(3) < 0.45) {
                 hit(getBeatStep(middleBeat, offbeatStep));
             }
-            if (Math.random() < 0.3) {
+            if (pickBar(4) < 0.3) {
                 hit(getBeatStep(secondBackbeat, offbeatStep));
             }
         }
 
-        if (
-            (playback.complexity > 0.4 || intensity > 0.5) &&
-            ts.beats >= 4 &&
-            Math.random() > 0.55
-        ) {
+        if ((playback.complexity > 0.4 || intensity > 0.5) && ts.beats >= 4 && pickBar(5) > 0.55) {
             pattern[getBeatStep(middleBeat)] = 0;
             hit(getBeatStep(firstBackbeat, latePushStep));
         }
@@ -1295,16 +1299,16 @@ export function generateCompingPattern(
     }
 
     if (vibe === 'active' || intensity > 0.6) {
-        // 8th notes
+        // 8th notes (deterministic, phrase-keyed per-beat for living detail)
         for (let b = 0; b < ts.beats; b++) {
-            if (Math.random() > 0.4) {
+            if (pickBar(10 + b) > 0.4) {
                 hit(getBeatStep(b, Math.floor(spb / 2)));
             }
         }
     }
 
-    // Syncopation
-    if (playback.complexity > 0.6 && Math.random() > 0.5) {
+    // Syncopation — a figure-level choice, so hold it for the whole phrase.
+    if (playback.complexity > 0.6 && pickPhrase(1) > 0.5) {
         const b3 = 2; // Beat 3
         if (ts.beats > b3 && pattern[getBeatStep(b3)] === 1) {
             pattern[getBeatStep(b3)] = 0;
@@ -1475,7 +1479,18 @@ function updateRhythmicIntent(
     //      not once per absolute bar (which is meaningless inside a 4–8 bar retain).
     //      For non-Funk genres `barIndex` is unused; we still pass the real bar number
     //      for future deterministic pickers to key off. Reviewer P0-1, 2026-05-17.
-    const barIndex = Math.floor(step / spm);
+    // #712: key the comp picker off the IN-LOOP bar, not the monotonic global
+    // step, so the rhythmic figure REPEATS every loop. The "doesn't lock in"
+    // complaint traced to a global-bar key that walked the cell bank forward each
+    // loop — so the same chord drew a different cell on every pass. This matches
+    // the funk/bossa per-section rotation-reset intent above. `totalSteps` is the
+    // loop length (see tick-logic's `step % totalSteps`). When it's unknown (some
+    // tests don't set it) fall back to the raw global step — still deterministic
+    // and per-bar distinct, just not loop-stable; never collapse to bar 0.
+    const loopSteps = arranger.totalSteps && arranger.totalSteps > 0 ? arranger.totalSteps : 0;
+    const inLoopStep =
+        loopSteps > 0 ? (((step % loopSteps) + loopSteps) % loopSteps) | 0 : step | 0;
+    const barIndex = Math.floor(inLoopStep / spm);
     const funkPickIndex = compingState.funkRotationIndex;
     if (genre === 'Funk') {
         // Advance the counter so the next rotation draws a fresh cell. We snapshot
@@ -1494,7 +1509,7 @@ function updateRhythmicIntent(
     }
     const pickerBarIndex =
         genre === 'Funk' ? funkPickIndex : genre === 'Bossa Nova' ? bossaPickIndex : barIndex;
-    let newCell = generateCompingPattern(
+    const newCell = generateCompingPattern(
         state,
         genre,
         compingState.currentVibe,
@@ -1508,38 +1523,12 @@ function updateRhythmicIntent(
         // reference point for the continuity cache instead of starting empty.
         newCell[0] = 1;
     }
-    // why: the no-repeat retry below is for stochastic genres (Rock, Country,
-    //      Pop default). Deterministic-picker genres (Funk S1; Jazz/Bossa/Blues
-    //      S2) intentionally hold a cell for multiple bars — a "same as last
-    //      bar" result is the desired locked-cell / phrase-stable behavior, not
-    //      a stochastic collision to re-roll. Without this guard, a phrase-2
-    //      Jazz cell that equals phrase-1's cell would get re-picked out of the
-    //      deterministic hash and break the (sectionId, barIndex>>2) invariant.
-    if (
-        !DETERMINISTIC_PICKER_GENRES.has(genre) &&
-        JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)
-    ) {
-        newCell = generateCompingPattern(
-            state,
-            genre,
-            compingState.currentVibe,
-            ts,
-            spm,
-            pickerBarIndex,
-            sectionId,
-        );
-        if (JSON.stringify(newCell) === JSON.stringify(compingState.currentCell)) {
-            newCell = generateCompingPattern(
-                state,
-                genre,
-                compingState.currentVibe,
-                ts,
-                spm,
-                pickerBarIndex,
-                sectionId,
-            );
-        }
-    }
+    // #712: the old no-repeat retry re-rolled the cell whenever it matched the
+    // previous bar — which, for the most common genres, structurally PREVENTED a
+    // repeating figure from ever establishing (the core "doesn't lock in" bug).
+    // The picker is now fully deterministic (phrase-keyed, no Math.random), so a
+    // "same as last bar" result is the desired locked figure, not a collision to
+    // re-roll — and retrying would just return the identical cell anyway. Deleted.
     compingState.currentCell = newCell;
 
     // Update global mask for module interaction
@@ -1600,6 +1589,12 @@ function handleSustainEvents(
     const isNewChord = chordIndex !== compingState.lastChordIndex;
     const isNewMeasure = measureStep === 0;
 
+    // #712: deterministic, loop-stable seed for the pedal-flutter gates below —
+    // keyed off (measureStep, chordIndex), both of which repeat every loop, so the
+    // sustain humanization no longer re-rolls on every pass (was raw Math.random).
+    const flutterSeed = ((measureStep * 0x9e3779b1) ^ (chordIndex * 0x85ebca77)) | 0;
+    const flutterDraw = (k: number) => scrambleHash((flutterSeed + k) | 0);
+
     if (genre === 'Reggae' || genre === 'Funk' || genre === 'Disco' || genre === 'Ska') {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: 0 }); // Sustain Off
         return events;
@@ -1626,7 +1621,7 @@ function handleSustainEvents(
     // Update quality tracker even if not new chord (in case of init)
     compingState.lastChordQuality = currentQuality || null;
 
-    if (stepInfo?.isGroupStart && Math.random() < intensity * 0.5) {
+    if (stepInfo?.isGroupStart && flutterDraw(1) < intensity * 0.5) {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: -0.01 });
         events.push({ type: 'cc', controller: 64, value: 127, timingOffset: 0 });
         return events;
@@ -1638,7 +1633,7 @@ function handleSustainEvents(
     //      Using stepInfo.isBeatStart directly is both correct and simpler.
     const isBeat = stepInfo ? stepInfo.isBeatStart : false;
     const flutterProb = intensity * 0.4;
-    if (isBeat && Math.random() < flutterProb) {
+    if (isBeat && flutterDraw(2) < flutterProb) {
         events.push({ type: 'cc', controller: 64, value: 0, timingOffset: -0.015 });
         events.push({ type: 'cc', controller: 64, value: 127, timingOffset: 0 });
     }
@@ -1736,13 +1731,23 @@ export function getAccompanimentNotes(
     const ts = signatures[arranger.timeSignature] || signatures['4/4'];
     const spm = ts.beats * ts.stepsPerBeat;
 
-    // why: seed for the per-step comp gates — both the per-genre lanes below
-    // (Epic 2 S5) and the smart-path overlay further down (the original comp-lock
-    // fix). Same (step, loopCount) shape bass/drums/soloist use, so the comp
-    // LOCKS with the band and repeats loop-to-loop. The genre lanes are
-    // early-return paths, so they use a distinct offset range (20+) from the
-    // overlay's 1-10 to keep the streams obviously independent.
-    const compRandSeed = ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
+    // why (#712): seed for the per-step comp gates — both the per-genre lanes
+    // below (Epic 2 S5) and the smart-path overlay further down (the original
+    // comp-lock fix). The comp is the band's steady anchor, so these gates must
+    // REPEAT loop-to-loop for the rhythm to LOCK IN. Key off the IN-LOOP step
+    // (step % totalSteps), NOT the monotonic global step, and drop the loopCount
+    // term — the old (global-step ^ loopCount) seed made every loop a different
+    // deterministic pattern, which is exactly the owner's "doesn't lock in"
+    // complaint. The genre lanes are early-return paths, so they use a distinct
+    // offset range (20+) from the overlay's 1-10 to keep the streams independent.
+    // Voicing still evolves across repeat passes via the separate
+    // sectionOccurrence / compTargetSeed path below.
+    const compLoopSteps = arranger.totalSteps && arranger.totalSteps > 0 ? arranger.totalSteps : 0;
+    const compInLoopStep =
+        compLoopSteps > 0
+            ? (((step % compLoopSteps) + compLoopSteps) % compLoopSteps) | 0
+            : step | 0;
+    const compRandSeed = (compInLoopStep * 0x9e3779b1) | 0;
     const compDraw = (n: number) => scrambleHash((compRandSeed + n) | 0);
 
     // --- Imperfect Symmetry: per-phrase voicing inversion on repeat passes ---
@@ -2348,8 +2353,8 @@ export function getAccompanimentNotes(
                 vel = 0.7 + intensity * 0.3; // Accent
                 dur = 1.5; // Let ring slightly more
             } else {
-                // Random chug variations
-                if (Math.random() < intensity) {
+                // Chug variations (deterministic, loop-stable)
+                if (compDraw(30) < intensity) {
                     vel += 0.1;
                 }
             }
@@ -2426,8 +2431,8 @@ export function getAccompanimentNotes(
             voicing = rotateVoicingMidi(voicing);
             compingState.lastVoicingMidis = [...voicing];
 
-            // Neo-Soul "Drunken" Timing (Randomized displacement) - TIGHTENED
-            const drunk = (Math.random() - 0.5) * (intensity * 0.02);
+            // Neo-Soul "Drunken" Timing (deterministic, loop-stable displacement)
+            const drunk = (compDraw(31) - 0.5) * (intensity * 0.02);
 
             voicing.forEach((m: any, i: number) => {
                 notes.push({
@@ -2481,7 +2486,7 @@ export function getAccompanimentNotes(
             voicing.forEach((f, i) => {
                 notes.push({
                     midi: getMidi(f),
-                    velocity: (0.4 + intensity * 0.4) * (0.9 + Math.random() * 0.2),
+                    velocity: (0.4 + intensity * 0.4) * (0.9 + compDraw(200 + i) * 0.2),
                     durationSteps: 0.5, // Super staccato
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.005 + 0.01,
@@ -2672,10 +2677,10 @@ export function getAccompanimentNotes(
                     velocity:
                         (isGhost ? 0.18 : 0.65) *
                         (0.5 + intensity * 0.9) *
-                        (0.9 + Math.random() * 0.2),
+                        (0.9 + compDraw(220 + i) * 0.2),
                     durationSteps: isGhost ? 0.1 : 0.35, // Super short ghost "chucks"
                     ccEvents: i === 0 ? ccEvents : [],
-                    timingOffset: i * 0.003 + (isGhost ? 0.005 + Math.random() * 0.01 : -0.005),
+                    timingOffset: i * 0.003 + (isGhost ? 0.005 + compDraw(240 + i) * 0.01 : -0.005),
                     instrument: 'Piano',
                     muted: isGhost,
                     dry: true,
@@ -2978,12 +2983,14 @@ export function getAccompanimentNotes(
             const extensions = chord.intervals.filter(
                 (i: number) => i !== 0 && i !== 3 && i !== 4 && i !== 7 && i !== 10 && i !== 11,
             );
-            if (extensions.length > 0 && Math.random() < (complexity - 0.4) * 1.5) {
-                // Shift voicing to include more color tones
+            if (extensions.length > 0 && compDraw(39) < (complexity - 0.4) * 1.5) {
+                // Shift voicing to include more color tones (deterministic, loop-stable)
                 voicing = voicing.map((f, idx) => {
-                    if (idx > 1 && Math.random() < 0.5) {
-                        const ext = extensions[Math.floor(Math.random() * extensions.length)];
-                        return getFrequency(chord.rootMidi + ext + (Math.random() < 0.5 ? 12 : 0));
+                    if (idx > 1 && compDraw(260 + idx) < 0.5) {
+                        const ext = extensions[Math.floor(compDraw(280 + idx) * extensions.length)];
+                        return getFrequency(
+                            chord.rootMidi + ext + (compDraw(300 + idx) < 0.5 ? 12 : 0),
+                        );
                     }
                     return f;
                 });
@@ -3090,18 +3097,18 @@ export function getAccompanimentNotes(
             }
 
             // Soloist Pocket: Reduce density or drop velocity when soloist is high
-            else if (!groundingRequired && useClarity && Math.random() < 0.7) {
+            else if (!groundingRequired && useClarity && compDraw(35) < 0.7) {
                 if (voicing.length > 3) {
                     voicing = voicing.slice(0, 3);
                 }
             }
 
-            if (!groundingRequired && !isStructural && voicing.length > 3 && Math.random() < 0.5) {
+            if (!groundingRequired && !isStructural && voicing.length > 3 && compDraw(36) < 0.5) {
                 voicing = voicing.slice(0, 3);
             }
 
             // HIGH INTENSITY: Add Octave sparkle
-            if (intensity > 0.75 && voicing.length > 0 && Math.random() < 0.6) {
+            if (intensity > 0.75 && voicing.length > 0 && compDraw(37) < 0.6) {
                 // Double the highest note up an octave
                 const sorted = [...voicing].sort((a, b) => (getMidi(a) || 0) - (getMidi(b) || 0));
                 const topMidi = getMidi(sorted[sorted.length - 1]);
@@ -3163,7 +3170,7 @@ export function getAccompanimentNotes(
 
         // --- Open Voicings for Jazz/Acoustic ---
         if ((genre === 'Jazz' || genre === 'Acoustic') && chord.quality === 'maj7') {
-            if (voicing.length >= 3 && Math.random() < 0.6) {
+            if (voicing.length >= 3 && compDraw(38) < 0.6) {
                 const targetIdx = 1;
                 const midi = getMidi(voicing[targetIdx]);
                 if (midi) {
@@ -3215,8 +3222,8 @@ export function getAccompanimentNotes(
         );
 
         voicing.forEach((f: number, i: number) => {
-            const humanShift = Math.random() * 0.006 - 0.003;
-            const humanVol = 0.95 + Math.random() * 0.1;
+            const humanShift = compDraw(320 + i) * 0.006 - 0.003;
+            const humanVol = 0.95 + compDraw(340 + i) * 0.1;
 
             // Dynamic Strumming:
             // Low Intensity = Slower (lazier) strum (0.02 - 0.04)
