@@ -1,0 +1,72 @@
+{
+    "id": "electric-guitar-driven",
+    "name": "Electric Guitar (Driven)",
+    "attribution": "FreePats Clean Electric Guitar (Fender) \u2014 CC0 1.0; overdrive + cabinet voicing applied (CC0)",
+    "samples": [
+        {
+            "key": "36",
+            "rootMidi": 36,
+            "url": "/packs/electric-guitar-driven/36.m4a"
+        },
+        {
+            "key": "41",
+            "rootMidi": 41,
+            "url": "/packs/electric-guitar-driven/41.m4a"
+        },
+        {
+            "key": "45",
+            "rootMidi": 45,
+            "url": "/packs/electric-guitar-driven/45.m4a"
+        },
+        {
+            "key": "48",
+            "rootMidi": 48,
+            "url": "/packs/electric-guitar-driven/48.m4a"
+        },
+        {
+            "key": "52",
+            "rootMidi": 52,
+            "url": "/packs/electric-guitar-driven/52.m4a"
+        },
+        {
+            "key": "55",
+            "rootMidi": 55,
+            "url": "/packs/electric-guitar-driven/55.m4a"
+        },
+        {
+            "key": "59",
+            "rootMidi": 59,
+            "url": "/packs/electric-guitar-driven/59.m4a"
+        },
+        {
+            "key": "64",
+            "rootMidi": 64,
+            "url": "/packs/electric-guitar-driven/64.m4a"
+        },
+        {
+            "key": "67",
+            "rootMidi": 67,
+            "url": "/packs/electric-guitar-driven/67.m4a"
+        },
+        {
+            "key": "71",
+            "rootMidi": 71,
+            "url": "/packs/electric-guitar-driven/71.m4a"
+        },
+        {
+            "key": "74",
+            "rootMidi": 74,
+            "url": "/packs/electric-guitar-driven/74.m4a"
+        },
+        {
+            "key": "80",
+            "rootMidi": 80,
+            "url": "/packs/electric-guitar-driven/80.m4a"
+        },
+        {
+            "key": "85",
+            "rootMidi": 85,
+            "url": "/packs/electric-guitar-driven/85.m4a"
+        }
+    ]
+}

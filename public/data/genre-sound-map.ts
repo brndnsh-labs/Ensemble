@@ -48,8 +48,10 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • nylon (#659)        → the fingerstyle-guitar combo: bossa (the nylon
     //                           takes the lead over the sax — bossa nova IS nylon),
     //                           acoustic singer-songwriter
-    //   • electric-clean (#740) → funk (iconic single-coil lead) + country (clean
-    //                           electric twang — more idiomatic there than the nylon)
+    //   • electric-clean (#740)  → funk (iconic single-coil lead) + country (clean
+    //                            electric twang — more idiomatic there than the nylon)
+    //   • electric-driven (#741) → rock (a crunchy overdrive lead; baked offline
+    //                            from the same clean source)
     // groove — acoustic kit (#695): a live drummer is the better default for most
     //   genres (Brandon's ear 2026-06-22), so the kit is the default and synth is
     //   the exception. Synth kit only where the drums are programmed/triggered:
@@ -87,7 +89,12 @@ export const GENRE_SOUND_MAP: Readonly<
         groove: 'pack:acoustic-kit',
     },
     // Sustained string pad — genres that want a lush bed under the changes.
-    Rock: { chords: 'pack:grand', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
+    Rock: {
+        chords: 'pack:grand',
+        harmony: 'pack:strings-ensemble',
+        soloist: 'pack:electric-guitar-driven',
+        groove: 'pack:acoustic-kit',
+    },
     Disco: { chords: 'pack:rhodes', harmony: 'pack:strings-ensemble', groove: 'pack:acoustic-kit' },
     Country: {
         chords: 'pack:grand',
