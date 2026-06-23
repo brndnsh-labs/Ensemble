@@ -80,16 +80,17 @@ describe('genre → sound map (#675)', () => {
         });
     });
 
-    describe('soloist lane — per-genre lead (#694 sax · #659 nylon · #740 electric)', () => {
-        // Three real leads, each only where idiomatic; everything else keeps synth.
-        //   sax     = jazz/blues blowing (blues flips to harp once #699 ships)
-        //   nylon   = the fingerstyle combo: bossa (over the sax), acoustic
-        //   electric-clean = funk (single-coil lead) + country (clean twang; took
-        //                    country off the nylon 2026-06-23)
+    describe('soloist lane — per-genre lead (#694 sax · #659 nylon · #740/#741 electric)', () => {
+        // Four real leads, each only where idiomatic; everything else keeps synth.
+        //   sax            = jazz/blues blowing
+        //   nylon          = the fingerstyle combo: bossa (over the sax), acoustic
+        //   electric-clean = funk (single-coil lead) + country (clean twang)
+        //   electric-driven= rock (a crunchy overdrive lead, #741)
         // One voice per genre.
         const SAX_GENRES = ['Jazz', 'Blues'];
         const NYLON_GENRES = ['Bossa', 'Acoustic'];
         const ELECTRIC_CLEAN_GENRES = ['Funk', 'Country'];
+        const ELECTRIC_DRIVEN_GENRES = ['Rock'];
 
         it('maps every canonical genre to its decided soloist voice (installed)', () => {
             for (const genre of GENRE_NAMES) {
@@ -99,7 +100,9 @@ describe('genre → sound map (#675)', () => {
                       ? 'pack:nylon-guitar'
                       : ELECTRIC_CLEAN_GENRES.includes(genre)
                         ? 'pack:electric-guitar-clean'
-                        : 'synth';
+                        : ELECTRIC_DRIVEN_GENRES.includes(genre)
+                          ? 'pack:electric-guitar-driven'
+                          : 'synth';
                 expect(
                     autoVoiceForGenre(genre, 'soloist', allInstalled),
                     `${genre} soloist voice drifted from the locked table`,
@@ -110,8 +113,8 @@ describe('genre → sound map (#675)', () => {
         it('falls back to synth when the lead pack is NOT installed', () => {
             expect(autoVoiceForGenre('Jazz', 'soloist', noneInstalled)).toBe('synth'); // sax
             expect(autoVoiceForGenre('Bossa', 'soloist', noneInstalled)).toBe('synth'); // nylon
-            expect(autoVoiceForGenre('Funk', 'soloist', noneInstalled)).toBe('synth'); // electric
-            expect(autoVoiceForGenre('Country', 'soloist', noneInstalled)).toBe('synth'); // electric
+            expect(autoVoiceForGenre('Funk', 'soloist', noneInstalled)).toBe('synth'); // electric-clean
+            expect(autoVoiceForGenre('Rock', 'soloist', noneInstalled)).toBe('synth'); // electric-driven
         });
     });
 
