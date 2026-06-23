@@ -5,6 +5,7 @@ import {
     ensurePackLoaded,
     ensurePacksForVoices,
     getPackZones,
+    warmPacksForVoices,
 } from '../../../public/engine/pack-runtime.js';
 
 const fakeBuffer = (): AudioBuffer => ({}) as AudioBuffer;
@@ -100,6 +101,45 @@ describe('pack-runtime', () => {
         const fetchFn = stubFetch(manifest);
         ensurePacksForVoices(makeCtx(), ['synth', 'synth', 'synth', 'synth', 'synth']);
         await Promise.resolve();
+        expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it('warmPacksForVoices pre-decodes a selected pack voice off an OfflineAudioContext', async () => {
+        // The flash this guards: without a load-time warm, first playback comes
+        // up on the synth fallback while the pack decodes. Warming decodes into
+        // the registry so initAudio's ensurePacksForVoices later short-circuits.
+        const fetchFn = stubFetch(manifest);
+        // A normal function (not an arrow) so it's construct-callable via `new`.
+        const oacCtor = vi.fn(function FakeOAC() {
+            return makeCtx();
+        });
+        vi.stubGlobal('OfflineAudioContext', oacCtor);
+
+        warmPacksForVoices(['pack:grand', 'synth']);
+        // Dedupes to the in-flight load the warm kicked off (packId-keyed).
+        await ensurePackLoaded(makeCtx(), 'grand');
+
+        expect(oacCtor).toHaveBeenCalledTimes(1); // one decode host, not per-voice
+        expect(getPackZones('grand')).not.toBeNull();
+        const manifestFetches = fetchFn.mock.calls.filter((c) =>
+            String(c[0]).endsWith('manifest.json'),
+        );
+        expect(manifestFetches).toHaveLength(1);
+    });
+
+    it('warmPacksForVoices is a no-op with no pack voice (no decode host, no fetch)', () => {
+        const fetchFn = stubFetch(manifest);
+        const oacCtor = vi.fn(() => makeCtx());
+        vi.stubGlobal('OfflineAudioContext', oacCtor);
+        warmPacksForVoices(['synth', 'synth']);
+        expect(oacCtor).not.toHaveBeenCalled();
+        expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it('warmPacksForVoices no-ops (no throw) where OfflineAudioContext is absent', () => {
+        const fetchFn = stubFetch(manifest);
+        vi.stubGlobal('OfflineAudioContext', undefined);
+        expect(() => warmPacksForVoices(['pack:grand'])).not.toThrow();
         expect(fetchFn).not.toHaveBeenCalled();
     });
 
