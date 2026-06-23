@@ -2257,6 +2257,38 @@ export function getSoloistNote(
                 stepsPerBeat,
                 intentBehavior,
             );
+            // #747 Slice 3c — protect the bend gesture from truncation. Melodic
+            // notes normally skip busySteps (the rhythm plan spaces the next
+            // attack by `gap` >= durationSteps within a plan — see the note in
+            // selectPitchAndDevices). But a plan's LAST note gets a long
+            // "ring to phrase end" duration, and when the NEXT plan is generated
+            // its first attack can land sooner than that ring-out — stomping a
+            // still-bending note before its release completes (confirmed: a
+            // dur=12 bend chopped at gap=5, guitar-mode only). A bend is a
+            // commitment to a complete cry, so reserve the lane until it resolves
+            // (the same busySteps idiom the device/embellishment paths use). Only
+            // bent notes: a plain sustained note being clipped is far less audible
+            // than a half-finished pitch sweep. The reservation matches the
+            // plan's natural spacing in the common case (gap == durationSteps), so
+            // it only ever suppresses the rare early-stomp attack.
+            //
+            // Main-improv path only: head-bypass bends (the selectPitchAndDevices
+            // call above the head-replay branch) are already protected by the
+            // duration-based busySteps at ~line 1586 (= durationSteps-1 in the
+            // common case, which covers any releaseFrac < 1) — don't duplicate the
+            // reservation there.
+            const lead = Array.isArray(result) ? result[result.length - 1] : result;
+            const bendGesture = lead?.expression?.bend;
+            if (bendGesture && (lead.durationSteps || 0) > 1) {
+                const rel = Number.isFinite(bendGesture.releaseFrac)
+                    ? bendGesture.releaseFrac
+                    : 0.85;
+                // Hold until the release lands, but never longer than the note itself.
+                phr.busySteps = Math.max(
+                    phr.busySteps || 0,
+                    Math.min(lead.durationSteps - 1, Math.ceil(rel * lead.durationSteps)),
+                ); // @worker-mutation
+            }
             trackPhraseNote(
                 soloist,
                 step,
