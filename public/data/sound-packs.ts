@@ -147,6 +147,37 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         reverbSend: 1.2,
     },
     {
+        id: 'nylon-guitar',
+        name: 'Nylon Guitar',
+        description:
+            'A sampled Spanish classical guitar — a warm fingerstyle nylon lead for bossa, acoustic, country.',
+        attribution:
+            'FreePats Spanish Classical Guitar (nylon-string) by roberto@zenvoid.org — CC0 1.0 (public domain)',
+        approxSizeMB: 0.6,
+        instruments: ['soloist'],
+        // Calibrated 2026-06-23 (#659) via `mix-report --calibrate-pack=soloist:nylon-guitar`:
+        // pack sat 12.0 dB under the synth lead across rock/blues/jazz/funk
+        // (RMS-match = 4.0×). The nylon is markedly darker than the synth lead
+        // (−820 Hz centroid → reads quieter than its RMS), so it read low/back even
+        // at the match — Brandon's ear 2026-06-23: bumped to 5× (~+2 dB over the
+        // match, the expected over-match for a dark voice) to sit it higher in the
+        // full mix. (If it still needs to *cut* rather than just sit louder, the
+        // next lever is a baked ~3 kHz presence lift — held off to keep the tone.)
+        // Plucked single-note lead
+        // — natural per-note decay (no loop), 19 mono zones C3–C6 every 2 semitones
+        // (denser than the sax's every-3: plucked transients pitch-shift more
+        // audibly than a sustained horn). Source was already peak-even across notes
+        // (~−0.1 dB), so left un-loudnorm'd to avoid pumping up the recording's
+        // noise-floor tail. Confirm/nudge by ear on ensembletest (bossa / acoustic
+        // / country lead lines).
+        gain: 5,
+        // Close-mic'd, dry-ish room (FreePats home recording). Started at 1.3 (a
+        // sax-like lift), but reverb pushes a lead back/down — pulled to 1.0 (the
+        // synth send, unchanged) to bring the nylon *forward* in the mix without
+        // adding loudness. Brandon's ear 2026-06-23. #686-style.
+        reverbSend: 1.0,
+    },
+    {
         id: 'strings-ensemble',
         name: 'String Ensemble',
         description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',

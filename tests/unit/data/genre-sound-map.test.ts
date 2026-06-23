@@ -80,13 +80,20 @@ describe('genre → sound map (#675)', () => {
         });
     });
 
-    describe('soloist lane — per-genre lead (#694)', () => {
-        // Sax only where a horn lead is idiomatic; everything else keeps synth.
-        const SAX_GENRES = ['Jazz', 'Blues', 'Funk', 'Bossa'];
+    describe('soloist lane — per-genre lead (#694 sax · #659 nylon)', () => {
+        // Two real leads, each only where idiomatic; everything else keeps synth.
+        // Sax = jazz/blues/funk; nylon = the fingerstyle combo (bossa took the
+        // nylon over the sax 2026-06-23, acoustic, country). One voice per genre.
+        const SAX_GENRES = ['Jazz', 'Blues', 'Funk'];
+        const NYLON_GENRES = ['Bossa', 'Acoustic', 'Country'];
 
         it('maps every canonical genre to its decided soloist voice (installed)', () => {
             for (const genre of GENRE_NAMES) {
-                const expected = SAX_GENRES.includes(genre) ? 'pack:sax-alto' : 'synth';
+                const expected = SAX_GENRES.includes(genre)
+                    ? 'pack:sax-alto'
+                    : NYLON_GENRES.includes(genre)
+                      ? 'pack:nylon-guitar'
+                      : 'synth';
                 expect(
                     autoVoiceForGenre(genre, 'soloist', allInstalled),
                     `${genre} soloist voice drifted from the locked table`,
@@ -94,9 +101,11 @@ describe('genre → sound map (#675)', () => {
             }
         });
 
-        it('falls back to synth when the sax pack is NOT installed', () => {
-            expect(autoVoiceForGenre('Jazz', 'soloist', noneInstalled)).toBe('synth');
-            expect(autoVoiceForGenre('Funk', 'soloist', noneInstalled)).toBe('synth');
+        it('falls back to synth when the lead pack is NOT installed', () => {
+            expect(autoVoiceForGenre('Jazz', 'soloist', noneInstalled)).toBe('synth'); // sax
+            expect(autoVoiceForGenre('Funk', 'soloist', noneInstalled)).toBe('synth'); // sax
+            expect(autoVoiceForGenre('Bossa', 'soloist', noneInstalled)).toBe('synth'); // nylon
+            expect(autoVoiceForGenre('Acoustic', 'soloist', noneInstalled)).toBe('synth'); // nylon
         });
     });
 

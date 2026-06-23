@@ -1,0 +1,102 @@
+{
+    "id": "nylon-guitar",
+    "name": "Nylon Guitar",
+    "attribution": "FreePats Spanish Classical Guitar (nylon-string) by roberto@zenvoid.org \u2014 CC0 1.0 (public domain)",
+    "samples": [
+        {
+            "key": "48",
+            "rootMidi": 48,
+            "url": "/packs/nylon-guitar/48.m4a"
+        },
+        {
+            "key": "50",
+            "rootMidi": 50,
+            "url": "/packs/nylon-guitar/50.m4a"
+        },
+        {
+            "key": "52",
+            "rootMidi": 52,
+            "url": "/packs/nylon-guitar/52.m4a"
+        },
+        {
+            "key": "54",
+            "rootMidi": 54,
+            "url": "/packs/nylon-guitar/54.m4a"
+        },
+        {
+            "key": "56",
+            "rootMidi": 56,
+            "url": "/packs/nylon-guitar/56.m4a"
+        },
+        {
+            "key": "58",
+            "rootMidi": 58,
+            "url": "/packs/nylon-guitar/58.m4a"
+        },
+        {
+            "key": "60",
+            "rootMidi": 60,
+            "url": "/packs/nylon-guitar/60.m4a"
+        },
+        {
+            "key": "62",
+            "rootMidi": 62,
+            "url": "/packs/nylon-guitar/62.m4a"
+        },
+        {
+            "key": "64",
+            "rootMidi": 64,
+            "url": "/packs/nylon-guitar/64.m4a"
+        },
+        {
+            "key": "66",
+            "rootMidi": 66,
+            "url": "/packs/nylon-guitar/66.m4a"
+        },
+        {
+            "key": "67",
+            "rootMidi": 67,
+            "url": "/packs/nylon-guitar/67.m4a"
+        },
+        {
+            "key": "70",
+            "rootMidi": 70,
+            "url": "/packs/nylon-guitar/70.m4a"
+        },
+        {
+            "key": "72",
+            "rootMidi": 72,
+            "url": "/packs/nylon-guitar/72.m4a"
+        },
+        {
+            "key": "74",
+            "rootMidi": 74,
+            "url": "/packs/nylon-guitar/74.m4a"
+        },
+        {
+            "key": "76",
+            "rootMidi": 76,
+            "url": "/packs/nylon-guitar/76.m4a"
+        },
+        {
+            "key": "78",
+            "rootMidi": 78,
+            "url": "/packs/nylon-guitar/78.m4a"
+        },
+        {
+            "key": "80",
+            "rootMidi": 80,
+            "url": "/packs/nylon-guitar/80.m4a"
+        },
+        {
+            "key": "82",
+            "rootMidi": 82,
+            "url": "/packs/nylon-guitar/82.m4a"
+        },
+        {
+            "key": "84",
+            "rootMidi": 84,
+            "url": "/packs/nylon-guitar/84.m4a"
+        }
+    ]
+}
