@@ -466,7 +466,17 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.12rem;
+}
+
+/* Slim header: title + state badge share one line (was a separate kicker line
+   above and a meta line below), so the first control sits higher. */
+.workspace-studio-surface-title-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
 }
 
 .workspace-studio-surface-header h3 {
@@ -476,16 +486,16 @@
 
 .workspace-studio-surface-summary {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .workspace-studio-surface-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-top: 0.15rem;
+    margin: 0;
 }
 
 .workspace-studio-surface-body {
