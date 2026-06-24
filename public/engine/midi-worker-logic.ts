@@ -232,6 +232,8 @@ export class ExportProcessor {
         compingState.lastChordIndex = -1; // @worker-mutation
         compingState.grooveRetentionCount = 0; // @worker-mutation
         compingState.lastVoicingMidis = []; // @worker-mutation
+        compingState.statementChordKey = null; // @worker-mutation — #715 per-hit-economy memory
+        compingState.statementVoicingMidis = []; // @worker-mutation
 
         // Conductor State
         this.exportConductor = {

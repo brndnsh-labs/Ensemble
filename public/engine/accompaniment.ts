@@ -28,6 +28,13 @@ interface CompingState {
     maxGrooveLength: number;
     lastSectionId: string | null;
     lastVoicingMidis: number[];
+    // why: per-hit comp economy (#715) — the most recent "statement" voicing
+    //      (the full voicing emitted on a structural/downbeat hit) and the chord
+    //      it belonged to. Offbeat hits on the SAME chord answer it with a leaner,
+    //      moving fragment instead of re-striking it identically. Reset implicitly
+    //      whenever a structural hit or a fresh chord makes a new statement.
+    statementVoicingMidis: number[];
+    statementChordKey: string | null;
     // why: epic-deterministic-phrasing S1 — counter incremented every time the
     //      STICKY (Funk) cell-bank picker fires (initial pick + each rotation).
     //      Used as the phrase-index input to the cell-bank hash so cell choice
@@ -61,6 +68,8 @@ export const compingState: CompingState = {
     maxGrooveLength: 4,
     lastSectionId: null,
     lastVoicingMidis: [],
+    statementVoicingMidis: [],
+    statementChordKey: null,
     funkRotationIndex: 0,
     bossaRotationIndex: 0,
 };
@@ -93,6 +102,22 @@ const COMP_POCKET_FEEL = 0.004; // ~4ms behind
 // vocabulary (`Neo-Soul` is); omitted intentionally.
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
+
+// why (owner audition): the comp must GROOVE ON ITS OWN — imply its pulse without
+// borrowing it from the drums. These genres have genuinely sparse cells that float
+// when soloed (Jazz [14] / [6,14]), so every bar is guaranteed at least one
+// strong-beat (beat 1 or 3) anchor (see the pulse-floor in the overlay). Excluded
+// by design:
+//   • offbeat-IDIOM genres whose identity is the dodged downbeat (Disco/Ska
+//     upstrokes, Hip-Hop behind-the-beat stabs);
+//   • the percussive lanes (Funk/Reggae/Neo-Soul) which early-return before the
+//     overlay with their own deterministic placement;
+//   • Bossa Nova — its partido-alto answering bar deliberately drops the One (a
+//     dense 4-hit [2,6,10,14] cell that grooves on its own; with bass, the bass
+//     thumb keeps the One). Forcing a downbeat would flatten the 2-bar contour,
+//     and unlike Jazz's lone [14] it never sounds pulse-less. The pre-existing
+//     ~80% force-One below still applies to it exactly as on main.
+const PULSE_ANCHOR_GENRES = new Set(['Jazz', 'Blues', 'Rock', 'Country', 'Acoustic']);
 
 // why: genres whose comp is sparse enough that the final beat before a *within-
 // section* chord change should become an idiomatic horn pickup — a single
@@ -561,6 +586,162 @@ function selectSupportiveVoicing(
     }
 
     return selected.sort((a, b) => a - b);
+}
+
+// why: genres whose comp SUSTAINS (a held/strummed chord that wants to ring and
+// breathe), as opposed to the percussive-identity lanes (Funk clav chucks,
+// Reggae/Ska skank, Hip-Hop stabs) whose rhythmic restatement IS the genre. Only
+// the sustained set gets the per-hit economy below. The percussive lanes are
+// excluded two ways: Funk/Reggae/Ska/Neo-Soul/Country/Metal early-return in
+// getAccompanimentNotes before ever reaching the economy; Hip-Hop falls through
+// to the shared smart lane but is left out of this set. Either way they keep
+// their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
+// stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
+const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
+
+/**
+ * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic step
+ * to a different pitch-class still in the chord), to give the top of an "answer"
+ * voicing a little inner-voice motion so consecutive answers aren't identical.
+ *
+ * Destination rules keep the move from DEGRADING the lean shell:
+ * - guide tones (3rd / 7th) are preferred over other chord tones;
+ * - the ROOT is never a destination — moving onto it collapses a 3-and-7 shell
+ *   into a rooty triad fragment that no longer states the seventh (review #2);
+ * - any pitch-class already sounding in the rest of the answer is forbidden, so
+ *   the move can't octave-double an existing voice into a bare unison (review #1).
+ *
+ * Returns the input unchanged when no eligible destination sits within a step or
+ * two (in which case the caller simply leaves the answer un-moved).
+ */
+function nearestOtherChordTone(
+    midi: number,
+    chord: { rootMidi: number; intervals?: number[] },
+    forbidPCs: Set<number> = new Set(),
+): number {
+    const intervals = chord.intervals;
+    if (!intervals || intervals.length === 0) {
+        return midi;
+    }
+    const fromPC = ((midi % 12) + 12) % 12;
+    const guidePCs = new Set<number>();
+    const otherPCs = new Set<number>();
+    for (const i of intervals) {
+        const ic = ((i % 12) + 12) % 12;
+        const pc = (((chord.rootMidi + i) % 12) + 12) % 12;
+        if (ic === 0 || pc === fromPC || forbidPCs.has(pc)) {
+            continue; // skip the root, the current tone, and PCs already sounding
+        }
+        // ic 3/4 = third; 9/10/11 = (bb7/b7/maj7) seventh — the guide tones.
+        if (ic === 3 || ic === 4 || ic === 9 || ic === 10 || ic === 11) {
+            guidePCs.add(pc);
+        } else {
+            otherPCs.add(pc);
+        }
+    }
+    const targets = guidePCs.size > 0 ? guidePCs : otherPCs;
+    if (targets.size === 0) {
+        return midi;
+    }
+    let best = midi;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (let d = -5; d <= 5; d++) {
+        if (d === 0) {
+            continue;
+        }
+        const cand = midi + d;
+        const pc = ((cand % 12) + 12) % 12;
+        if (!targets.has(pc)) {
+            continue;
+        }
+        if (Math.abs(d) < bestDist) {
+            bestDist = Math.abs(d);
+            best = cand;
+        }
+    }
+    return best;
+}
+
+/**
+ * Per-hit comp economy (#715). A real comper doesn't re-strike the full voicing
+ * identically on every hit: the structural/downbeat hit makes the "statement"
+ * (full chosen voicing); offbeat hits on the SAME chord answer it with a leaner,
+ * MOVING fragment so the bar breathes instead of hammering the same 3-4 notes.
+ *
+ * Reshapes only what is EMITTED — voice-leading continuity still tracks the full
+ * voicing (compingState.lastVoicingMidis) upstream, so the next bar's
+ * recenter/rotate cascade is unaffected. Seeded by the per-step `draw` (compDraw)
+ * so the variation LOCKS IN loop-to-loop rather than being random jitter.
+ *
+ * Sustained-comp genres only (see {@link SUSTAINED_COMP_GENRES}); mutates the
+ * statement memory on compingState as a side effect.
+ */
+function applyPerHitEconomy(
+    voicingMidis: number[],
+    chord: { rootMidi: number; quality: string; intervals?: number[] },
+    isStructural: boolean,
+    draw: (n: number) => number,
+): number[] {
+    const chordKey = `${chord.rootMidi}:${chord.quality}`;
+    const isFreshHarmony = chordKey !== compingState.statementChordKey;
+
+    // Statement: the strong-beat / group-start hit, or the first hit on a new
+    // chord. Emit the full chosen voicing and remember it as the bar's reference.
+    if (isStructural || isFreshHarmony) {
+        compingState.statementChordKey = chordKey;
+        compingState.statementVoicingMidis = [...voicingMidis];
+        return voicingMidis;
+    }
+
+    // Answer: an offbeat repeat of the same chord. Reduce to the harmonic
+    // essence (guide tones, 2 voices) so it sits UNDER the statement instead of
+    // matching it.
+    const statement =
+        compingState.statementVoicingMidis.length > 0
+            ? compingState.statementVoicingMidis
+            : voicingMidis;
+    let answer = selectSupportiveVoicing(statement, chord, 2);
+    if (answer.length < 2) {
+        // Triad / already-sparse voicing: keep the top two so the answer still
+        // thins relative to the statement.
+        const sorted = [...new Set(voicingMidis)].sort((a, b) => a - b);
+        answer = sorted.slice(-2);
+    }
+
+    // dim / half-dim: the ♭5 is the tone that NAMES the chord (iiø vs ii-7), but
+    // selectSupportiveVoicing buckets it as color, so a 2-note reduction can drop
+    // it (review #3). Force the diminished core (♭3 + ♭5) from the statement, and
+    // skip the inner-voice move (it would just push one of those two off again —
+    // passing diminished chords want stability over variety).
+    let forcedDiminishedCore = false;
+    if (chord.quality === 'dim' || chord.quality === 'halfdim') {
+        const core = [3, 6] // ♭3, ♭5
+            .map((ic) => {
+                const pc = (((chord.rootMidi + ic) % 12) + 12) % 12;
+                return statement.find((m) => ((m % 12) + 12) % 12 === pc);
+            })
+            .filter((m): m is number => m !== undefined);
+        if (core.length === 2) {
+            answer = [...core].sort((a, b) => a - b);
+            forcedDiminishedCore = true;
+        }
+    }
+
+    // Inner-voice motion: ~55% of answers nudge the top voice to a neighboring
+    // guide tone so consecutive answers move instead of stamping an identical
+    // shape — the "living" part. The destination rules in nearestOtherChordTone
+    // keep this from octave-doubling or collapsing to a rooty fragment.
+    if (!forcedDiminishedCore && answer.length > 1 && draw(361) < 0.55) {
+        const top = answer[answer.length - 1];
+        const rest = answer.slice(0, -1);
+        const forbidPCs = new Set(rest.map((m) => ((m % 12) + 12) % 12));
+        const moved = nearestOtherChordTone(top, chord, forbidPCs);
+        if (moved !== top && !answer.includes(moved)) {
+            answer = [...rest, moved].sort((a, b) => a - b);
+        }
+    }
+
+    return answer;
 }
 
 function getMidiVoicing(voicing: number[]): number[] {
@@ -1374,6 +1555,11 @@ function updateRhythmicIntent(
         //      across loops produces the same cell.
         compingState.funkRotationIndex = 0;
         compingState.bossaRotationIndex = 0;
+        // #715 — a section change is a fresh statement opportunity; clear the
+        // per-hit-economy memory so the new section's first hit isn't read as an
+        // answer if it happens to share the prior chord's root+quality.
+        compingState.statementChordKey = null;
+        compingState.statementVoicingMidis = [];
     }
 
     if (step < compingState.lockedUntil) {
@@ -2776,6 +2962,37 @@ export function getAccompanimentNotes(
         }
     }
 
+    // --- Self-supporting pulse floor (owner audition) ---
+    // why: the comp must GROOVE ON ITS OWN, not float because a syncopated cell
+    // (Jazz [6,14] / [14]) left no strong beat and the "Force One" backfill below
+    // is only an ~80% coin-flip — so ~1 bar in 5 floats with a lone offbeat and,
+    // soloed, reads as "the timing is wrong." Guarantee a felt pulse: if the WHOLE
+    // bar's cell lands no strong beat (a group-start step: beat 1 or 3 in 4/4),
+    // anchor the One deterministically. This only catches the truly pulse-less bar
+    // — when the cell already lands beat 3, the One can still be dropped by the
+    // coin-flip below (reverse-Charleston stays intact). Pulse genres only (see
+    // PULSE_ANCHOR_GENRES — Bossa/Disco/Ska/Hip-Hop excluded by design); the
+    // percussive lanes early-return before this overlay.
+    //
+    // note: `groupStride` matches the engine's own isGroupStart definition
+    // (grouping[0]*stepsPerBeat); exact for symmetric meters (4/4, 3/4, 6/8,
+    // 12/8). In asymmetric meters (5/4, 7/8) it can scan a non-group-start step
+    // and UNDER-fire (skip the floor) — benign: it never forces the One onto a
+    // non-pulse position, it just occasionally misses the guarantee.
+    if (measureStep === 0 && !isHit && PULSE_ANCHOR_GENRES.has(genre)) {
+        const groupStride = Math.max(1, (ts.grouping?.[0] || 1) * ts.stepsPerBeat);
+        let barHasStrongAnchor = false;
+        for (let s = 0; s < spm; s += groupStride) {
+            if (compingState.currentCell[s] === 1) {
+                barHasStrongAnchor = true;
+                break;
+            }
+        }
+        if (!barHasStrongAnchor) {
+            isHit = true; // never leave a soloed bar pulse-less
+        }
+    }
+
     // Force hit on "One" if empty — the downbeat is the chord-change landmark.
     // why: anchor it near-deterministically in compound (0.97) so the 6/8 waltz
     // spine is reliably present and the band locks; simple meters keep ~80%.
@@ -3238,6 +3455,18 @@ export function getAccompanimentNotes(
             compingState.lastVoicingMidis = [...finalVoicingMidis];
         }
 
+        // #715 — per-hit comp economy: keep the full voicing for voice-leading
+        // memory (set above), but EMIT a statement on structural hits and a
+        // leaner, moving answer on offbeat repeats of the same chord, so the bar
+        // breathes instead of re-striking the same notes. Sustained-comp genres
+        // only; the percussive-identity lanes early-return well before here.
+        if (SUSTAINED_COMP_GENRES.has(genre) && finalVoicingMidis.length > 0) {
+            const emitMidis = applyPerHitEconomy(finalVoicingMidis, chord, isStructural, compDraw);
+            if (emitMidis.length > 0) {
+                voicing = emitMidis.map((midi) => getFrequency(midi));
+            }
+        }
+
         // B2 (#707) — structural ceiling: a comp voicing must not ring past the
         // chord it belongs to, or successive chords pile into each other (the
         // "previous measure is still playing" overlap, audible as the organ
@@ -3259,20 +3488,17 @@ export function getAccompanimentNotes(
             const humanShift = compDraw(320 + i) * 0.006 - 0.003;
             const humanVol = 0.95 + compDraw(340 + i) * 0.1;
 
-            // Dynamic Strumming:
-            // Low Intensity = Slower (lazier) strum (0.02 - 0.04)
-            // High Intensity = Tighter strum (0.005 - 0.01)
-            let baseStrum = 0.008;
-            if (intensity < 0.4) {
-                baseStrum = 0.025;
-            } else if (intensity > 0.8) {
-                baseStrum = 0.005;
-            }
-
-            if (genre === 'Acoustic') {
-                baseStrum *= 1.5; // Always looser
-            }
-
+            // Attack character: a confident pianist STRIKES a block chord — every
+            // voice lands essentially together — whereas a guitarist rolls the
+            // strings. The old ascending strum (up to 25ms/voice at low intensity)
+            // rolled the keys too, which reads as hesitation instead of a chart-
+            // following accompanist. Chords are keyboards today, so the comp emits
+            // a near-block strike (a hair of spread for naturalism, tightest on the
+            // statement/downbeat). The strum lives in ONE place now — the
+            // scheduler's strum-rank, gated on a guitar voice via
+            // isStrummedChordVoice — so a future guitar chords pack rolls without
+            // this layer double-strumming it. (Owner audition.)
+            const baseStrum = isStructural ? 0.0006 : 0.0012;
             const stagger = i * baseStrum + humanShift;
             const noteCC = i === 0 ? ccEvents : [];
 

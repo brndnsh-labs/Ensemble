@@ -94,6 +94,12 @@ function processMessage(type: string, data: any, startTime: number): void {
                 compingState.lastChordIndex = -1;
                 compingState.lockedUntil = 0;
                 compingState.lastVoicingMidis = [];
+                // #715 — clear the per-hit-economy statement memory too, or a new
+                // song that opens on the same chord the last one ended on treats
+                // its first downbeat as an "answer" (thin shell) instead of a
+                // statement (full voicing).
+                compingState.statementChordKey = null;
+                compingState.statementVoicingMidis = [];
                 (compingState as any).rhythmPattern = [];
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
