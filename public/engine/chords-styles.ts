@@ -135,6 +135,19 @@ export function getRootlessVoicing(
     return null; // Fallback to standard triads
 }
 
+// why: a strummed instrument (guitar) rolls its strings low→high; a keyboard
+// STRIKES a block chord, all voices essentially together. The comp's strum
+// stagger should therefore follow the VOICE, not the genre — so it stays off for
+// every keyboard voice (piano/Rhodes/organ/clav/grand) and only engages when a
+// guitar voice is selected for the chords lane (e.g. the electric-guitar chords
+// pack, #698). Keyed off the `chords.voice` string (`pack:<id>` or a synth name)
+// so no audio-layer import is needed; today no chord voice is a guitar, so this
+// is universally false and chords strike a block. Single source of truth for the
+// strum decision, shared by the comp emitter and the scheduler's strum-rank.
+export function isStrummedChordVoice(voice: string | undefined | null): boolean {
+    return typeof voice === 'string' && voice.toLowerCase().includes('guitar');
+}
+
 export function getIntervals(
     state: EnsembleState,
     quality: string,

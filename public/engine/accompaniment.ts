@@ -3436,20 +3436,17 @@ export function getAccompanimentNotes(
             const humanShift = compDraw(320 + i) * 0.006 - 0.003;
             const humanVol = 0.95 + compDraw(340 + i) * 0.1;
 
-            // Dynamic Strumming:
-            // Low Intensity = Slower (lazier) strum (0.02 - 0.04)
-            // High Intensity = Tighter strum (0.005 - 0.01)
-            let baseStrum = 0.008;
-            if (intensity < 0.4) {
-                baseStrum = 0.025;
-            } else if (intensity > 0.8) {
-                baseStrum = 0.005;
-            }
-
-            if (genre === 'Acoustic') {
-                baseStrum *= 1.5; // Always looser
-            }
-
+            // Attack character: a confident pianist STRIKES a block chord — every
+            // voice lands essentially together — whereas a guitarist rolls the
+            // strings. The old ascending strum (up to 25ms/voice at low intensity)
+            // rolled the keys too, which reads as hesitation instead of a chart-
+            // following accompanist. Chords are keyboards today, so the comp emits
+            // a near-block strike (a hair of spread for naturalism, tightest on the
+            // statement/downbeat). The strum lives in ONE place now — the
+            // scheduler's strum-rank, gated on a guitar voice via
+            // isStrummedChordVoice — so a future guitar chords pack rolls without
+            // this layer double-strumming it. (Owner audition.)
+            const baseStrum = isStructural ? 0.0006 : 0.0012;
             const stagger = i * baseStrum + humanShift;
             const noteCC = i === 0 ? ccEvents : [];
 

@@ -27,6 +27,7 @@ import {
     stopWorker,
     syncWorker,
 } from '../worker-client.js';
+import { isStrummedChordVoice } from './chords-styles.js';
 import { checkSectionTransition, updateAutoConductor } from './conductor.js';
 import { generateDrumsForStep } from './drums-tick.js';
 import {
@@ -1072,10 +1073,15 @@ function scheduleChords(
             }
         }
 
-        // synth-audit Epic 2 S1 — strum index. The synth chord voice rolls the
-        // chord low→high; rank each non-muted note by ascending pitch and pass
-        // that rank as `index` (the strum stagger). (Was A/B-gated on the `new`
-        // voice; #649 made the reworked voice the only one, so always compute.)
+        // synth-audit Epic 2 S1 — strum index. A strummed voice (guitar) rolls the
+        // chord low→high; rank each non-muted note by ascending pitch and pass that
+        // rank as `index` (the strum stagger). A KEYBOARD strikes a block — every
+        // voice on the beat — so its rank stays 0 (no roll). Chords are keyboards
+        // today, so this is off until a guitar chords voice is selected; the strum
+        // capability is preserved for that (#698). One source of truth for the
+        // strum decision: isStrummedChordVoice (the comp emitter strikes a block
+        // unconditionally, so there's no double-strum).
+        const strummedVoice = isStrummedChordVoice(state.chords.voice);
         const playable: number[] = [];
         for (let i = 0; i < notes.length; i++) {
             if (!notes[i].muted && notes[i].freq) {
@@ -1084,8 +1090,10 @@ function scheduleChords(
         }
         playable.sort((a, b) => notes[a].freq - notes[b].freq);
         const strumRank: number[] = new Array(notes.length).fill(0);
-        for (let r = 0; r < playable.length; r++) {
-            strumRank[playable[r]] = r;
+        if (strummedVoice) {
+            for (let r = 0; r < playable.length; r++) {
+                strumRank[playable[r]] = r;
+            }
         }
 
         for (let ni = 0; ni < notes.length; ni++) {

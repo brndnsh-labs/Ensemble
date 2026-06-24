@@ -30,6 +30,7 @@ vi.mock('../../public/config.js', () => ({
 }));
 
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { isStrummedChordVoice } from '../../public/engine/chords-styles.js';
 import { getState } from '../../public/state.js';
 
 const { arranger, chords, bass, groove } = getState();
@@ -203,6 +204,42 @@ describe('Comp economy (#715) — intra-bar voicing motion', () => {
             const pcs = new Set(midis.map((m) => ((m % 12) + 12) % 12));
             expect(pcs.has(flat5PC)).toBe(true);
         }
+    });
+
+    it('keys STRIKE a tight block on the statement — no rolled chord on any keyboard genre', () => {
+        // Timing spread = max - min timingOffset across the voices of a single hit.
+        function statementSpread(genreName) {
+            groove.genreFeel = genreName;
+            resetComp();
+            arranger.progression = [mockChord];
+            // step 0 is a group-start (structural) hit → the full statement.
+            const notes = getAccompanimentNotes(getState(), mockChord, 0, 0, 0, stepInfoFor(0));
+            const offs = notes
+                .filter((n) => n && n.velocity > 0 && Number.isFinite(n.timingOffset))
+                .map((n) => n.timingOffset);
+            return { spread: Math.max(...offs) - Math.min(...offs), count: offs.length };
+        }
+
+        // Chords are keyboards today (no guitar chord voice), so every sustained
+        // genre strikes a near-block — none should read as a rolled/strummed chord.
+        for (const g of ['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']) {
+            const { spread, count } = statementSpread(g);
+            console.log(
+                `[comp-economy] ${g} statement spread ${(spread * 1000).toFixed(1)}ms (${count}v)`,
+            );
+            expect(count).toBeGreaterThanOrEqual(2);
+            expect(spread).toBeLessThan(0.008); // < 8ms — a block strike, not a roll
+        }
+    });
+
+    it('strum capability is preserved for a future guitar chord voice (isStrummedChordVoice)', () => {
+        // Keyboards strike (false); a guitar voice strums (true). Off for everything
+        // today; lights up when the electric-guitar chords pack lands (#698).
+        expect(isStrummedChordVoice(undefined)).toBe(false);
+        expect(isStrummedChordVoice('pack:rhodes')).toBe(false);
+        expect(isStrummedChordVoice('grand')).toBe(false);
+        expect(isStrummedChordVoice('pack:electric-guitar-clean')).toBe(true);
+        expect(isStrummedChordVoice('nylon-guitar')).toBe(true);
     });
 
     it('GUARD: percussive-identity genres never engage the economy (Funk untouched)', () => {
