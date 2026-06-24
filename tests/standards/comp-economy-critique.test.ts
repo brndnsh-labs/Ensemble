@@ -253,4 +253,57 @@ describe('Comp economy (#715) — intra-bar voicing motion', () => {
         // scoped out of the percussive lanes.
         expect(compingState.statementChordKey).toBeNull();
     });
+
+    it('grooves by itself — every pulse-genre bar lands a strong beat (no floating bars, soloed)', () => {
+        // Isolate the comp: no bass/soloist to borrow a pulse from. Every bar that
+        // comps at all must land at least one strong beat (step 0 = beat 1, or
+        // step 8 = beat 3 in 4/4) so the groove is self-supporting.
+        function anchorCoverage(genreName, bars) {
+            groove.genreFeel = genreName;
+            bass.enabled = false;
+            resetComp();
+            arranger.progression = [mockChord];
+            let nonEmpty = 0;
+            let anchored = 0;
+            for (let bar = 0; bar < bars; bar++) {
+                const hitSteps = new Set();
+                for (let m = 0; m < 16; m++) {
+                    const step = bar * 16 + m;
+                    const notes = getAccompanimentNotes(
+                        getState(),
+                        mockChord,
+                        step,
+                        m,
+                        m,
+                        stepInfoFor(step),
+                    );
+                    if (
+                        notes.some(
+                            (n) => n && n.velocity > 0 && Number.isFinite(n.midi) && n.midi > 0,
+                        )
+                    ) {
+                        hitSteps.add(m);
+                    }
+                }
+                if (hitSteps.size === 0) {
+                    continue;
+                }
+                nonEmpty++;
+                if (hitSteps.has(0) || hitSteps.has(8)) {
+                    anchored++;
+                }
+            }
+            return { nonEmpty, anchored };
+        }
+
+        for (const g of ['Jazz', 'Blues', 'Bossa Nova', 'Rock', 'Country', 'Acoustic']) {
+            const { nonEmpty, anchored } = anchorCoverage(g, 24);
+            console.log(
+                `[comp-groove] ${g}: ${anchored}/${nonEmpty} non-empty bars land a strong beat`,
+            );
+            expect(nonEmpty).toBeGreaterThan(0);
+            expect(anchored).toBe(nonEmpty);
+        }
+        bass.enabled = true;
+    });
 });

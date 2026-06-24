@@ -103,6 +103,16 @@ const COMP_POCKET_FEEL = 0.004; // ~4ms behind
 // Source: form-arranger.md P0 #2; epic-coordination-contract.md S3.
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
 
+// why (owner audition): the comp must GROOVE ON ITS OWN — imply its pulse without
+// borrowing it from the drums. These genres want a felt pulse under the
+// syncopation, so every bar is guaranteed at least one strong-beat (beat 1 or 3)
+// anchor (see the pulse-floor in the overlay). Excluded by design: the
+// offbeat-IDIOM genres whose identity is the dodged downbeat (Disco/Ska
+// upstrokes, Hip-Hop behind-the-beat stabs), and the percussive lanes
+// (Funk/Reggae/Neo-Soul) which early-return before the overlay with their own
+// deterministic placement.
+const PULSE_ANCHOR_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Rock', 'Country', 'Acoustic']);
+
 // why: genres whose comp is sparse enough that the final beat before a *within-
 // section* chord change should become an idiomatic horn pickup — a single
 // staccato stab of the INCOMING chord on the &-of-the-last-beat, with the rest
@@ -2938,6 +2948,32 @@ export function getAccompanimentNotes(
         if (hasHarmonyHit && compDraw(4) < 0.4 + playback.bandIntensity * 0.3) {
             // Background stab present, suppress piano hit to let it pop
             isHit = false;
+        }
+    }
+
+    // --- Self-supporting pulse floor (owner audition) ---
+    // why: the comp must GROOVE ON ITS OWN, not borrow its pulse from the drums.
+    // The cell banks include syncopated cells with no strong-beat hit (Jazz
+    // [6,14] / [14], Bossa answering bars), and the "Force One" backfill below is
+    // only an ~80% coin-flip — so ~1 bar in 5 floats with a lone offbeat and,
+    // soloed, reads as "the timing is wrong." Guarantee a felt pulse: if the
+    // WHOLE bar's cell lands no strong beat (a group-start step: beat 1 or 3 in
+    // 4/4), anchor the One deterministically. This only catches the truly
+    // pulse-less bar — when the cell already lands beat 3, the One can still be
+    // dropped by the coin-flip below (reverse-Charleston stays intact). Pulse
+    // genres only; the offbeat-idiom genres (Disco/Ska/Hip-Hop) keep their dodged
+    // downbeat, and the percussive lanes early-return before this overlay.
+    if (measureStep === 0 && !isHit && PULSE_ANCHOR_GENRES.has(genre)) {
+        const groupStride = Math.max(1, (ts.grouping?.[0] || 1) * ts.stepsPerBeat);
+        let barHasStrongAnchor = false;
+        for (let s = 0; s < spm; s += groupStride) {
+            if (compingState.currentCell[s] === 1) {
+                barHasStrongAnchor = true;
+                break;
+            }
+        }
+        if (!barHasStrongAnchor) {
+            isHit = true; // never leave the bar pulse-less
         }
     }
 
