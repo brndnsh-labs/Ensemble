@@ -43,6 +43,7 @@ export type IconName =
     | 'warn'
     | 'success'
     | 'info'
+    | 'heart'
     | 'drums'
     | 'bass'
     | 'chords'
@@ -236,6 +237,10 @@ export const ICON_PATHS: Record<IconName, () => JSX.Element> = {
             <path d="M12 11.2v5" />
             <path d="M12 7.9h.01" />
         </>
+    ),
+    // Line heart — a low-key "support / made with care" mark for the donate link.
+    heart: () => (
+        <path d="M12 20s-7-4.35-9.2-8.5A4.6 4.6 0 0 1 12 6.1a4.6 4.6 0 0 1 9.2 5.4C19 15.65 12 20 12 20Z" />
     ),
 
     // ---- Instruments (shared musical vocabulary) ----
