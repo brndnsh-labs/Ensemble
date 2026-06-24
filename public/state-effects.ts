@@ -156,6 +156,17 @@ export function handleEffects(
             }
             break;
         }
+        case ACTIONS.SET_REVERB: {
+            // #688 — the per-instrument reverb slider writes state.<module>.reverb,
+            // but the bus reverb-send GainNode is otherwise only re-trimmed at
+            // initAudio / voice change (SET_INSTRUMENT_VOICE, #686). Re-send now so
+            // moving the slider alone is live (= slider × reverbSendForPack(voice)).
+            // The helper no-ops before the audio graph exists.
+            if (payload?.module) {
+                syncBusReverbSend(stateMap, payload.module);
+            }
+            break;
+        }
         case ACTIONS.TOGGLE_PLAY: {
             const { playback, arranger } = stateMap;
             if (playback.isPlaying) {
