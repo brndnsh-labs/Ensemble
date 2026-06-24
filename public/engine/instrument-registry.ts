@@ -155,6 +155,16 @@ export function isPackInstalled(packId: string): boolean {
     return installedPacks.has(packId) || isPackLoaded(packId);
 }
 
+/**
+ * Whether the user has *any* sound pack installed. Reads the sync installed-set
+ * mirror (seeded at bootstrap from the SW cache), so it's reliable once
+ * {@link seedInstalledPacks} has run. Drives the one-time "install a pack" nudge
+ * (#684) — a fresh synth-only user has zero installed, so the set is empty.
+ */
+export function hasAnyPackInstalled(): boolean {
+    return installedPacks.size > 0;
+}
+
 /** Mark a pack installed/uninstalled — the Sounds UI calls this on install/remove. */
 export function markPackInstalled(packId: string, installed: boolean): void {
     if (installed) {

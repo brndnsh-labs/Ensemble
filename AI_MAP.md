@@ -191,6 +191,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- |
 | `public/ui-root.tsx` | Preact application entry point and hydration. |
 | `public/pwa.ts` | PWA install prompt management. |
+| `public/pack-nudge.ts` | One-time "install a sound pack" onboarding nudge. | `maybeShowPackInstallNudge` |
 | `public/ui.ts` | Lazy Proxy-based DOM access layer. |
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.ts` | Global timing and musical constants. |

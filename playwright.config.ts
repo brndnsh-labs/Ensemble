@@ -32,9 +32,13 @@ export default defineConfig({
         /* Force dark mode to prevent theme mismatches between local and CI */
         colorScheme: 'dark',
 
-        /* Signal to CSS that we are in E2E mode for stabilization */
+        /* Signal to CSS that we are in E2E mode for stabilization, and pre-set the
+         * pack-install nudge's "seen" flag (#684) so the one-time onboarding toast
+         * never fires across the suite and pollutes interaction tests. The
+         * dedicated pack-nudge spec clears this flag to exercise the real trigger. */
         addInitScript: () => {
             document.documentElement.dataset.e2eMode = 'true';
+            localStorage.setItem('ensemble.packNudgeSeen', '1');
         },
     },
 

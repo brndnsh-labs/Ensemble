@@ -72,6 +72,7 @@ export const playback = deepSignal<GlobalContext>({
         // autoplay gesture requirement and starts the rendered scene.
         audition: false,
     },
+    settingsTab: 'playback',
 });
 
 export function playbackReducer(action: Action): boolean {
@@ -116,6 +117,9 @@ export function playbackReducer(action: Action): boolean {
                 return true;
             }
             return false;
+        case ACTIONS.SET_SETTINGS_TAB:
+            p.settingsTab = String(action.payload);
+            return true;
         case ACTIONS.SET_CHART_LOCKED:
             p.chartLocked = !!action.payload;
             return true;

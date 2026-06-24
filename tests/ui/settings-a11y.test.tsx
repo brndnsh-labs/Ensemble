@@ -34,6 +34,10 @@ describe('Settings Accessibility', () => {
 
         // Ensure modal is "open" so we can interact with it (though render happens anyway)
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'settings', open: true });
+        // The active tab now lives in shared state (#684), so reset it between
+        // cases — otherwise an earlier MIDI-tab test leaves 'midi' selected and
+        // the Playback-tab assertions find no sliders.
+        dispatch(ACTIONS.SET_SETTINGS_TAB, 'playback');
         // Enable MIDI to see MIDI controls
         dispatch(ACTIONS.SET_MIDI_CONFIG, { enabled: true });
 

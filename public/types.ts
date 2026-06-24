@@ -1187,6 +1187,13 @@ export interface GlobalContext {
     readonly isScheduling: boolean;
     /** Visibility state for various UI modals. */
     readonly modals: ModalsState;
+    /**
+     * Active tab in the Settings overlay (`playback` | `packs` | `appearance` |
+     * `midi` | `about`). Lifted out of Settings-local state so any opener can
+     * deep-link a tab — e.g. the pack-install nudge (#684) opens straight to
+     * `packs`.
+     */
+    readonly settingsTab: string;
     /** Number of loops before stopping (0 = infinite). */
     readonly loopLimit: number;
     /** Current loop iteration counter. */
@@ -1478,6 +1485,7 @@ export interface ActionPayloadMap {
     TRIGGER_FLASH?: number;
     SET_UPDATE_AVAILABLE: boolean;
     SET_MODAL_OPEN: ActionPayloadSetModalOpen;
+    SET_SETTINGS_TAB: string;
     SET_CHART_LOCKED: boolean;
     TOGGLE_PLAY: undefined;
     SET_BPM: number | string;
@@ -1556,6 +1564,7 @@ export const ACTIONS = {
     TRIGGER_FLASH: 'TRIGGER_FLASH',
     SET_UPDATE_AVAILABLE: 'SET_UPDATE_AVAILABLE',
     SET_MODAL_OPEN: 'SET_MODAL_OPEN',
+    SET_SETTINGS_TAB: 'SET_SETTINGS_TAB',
     SET_CHART_LOCKED: 'SET_CHART_LOCKED',
     TOGGLE_PLAY: 'TOGGLE_PLAY',
     SET_BPM: 'SET_BPM',

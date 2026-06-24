@@ -136,7 +136,10 @@ export function Settings() {
     };
 
     const [showConfirmReset, setShowConfirmReset] = useState(false);
-    const [tab, setTab] = useState<string>('playback');
+    // Tab lives in state (not local) so external openers can deep-link a tab —
+    // e.g. the pack-install nudge (#684) opens straight to Packs.
+    const tab = useEnsembleState((s) => s.playback.settingsTab);
+    const setTab = (id: string) => dispatch(ACTIONS.SET_SETTINGS_TAB, id);
 
     const isOpen = useEnsembleState((s) => s.playback.modals.settings);
     const notation = useEnsembleState((s) => s.arranger.notation);
