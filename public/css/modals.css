@@ -878,6 +878,28 @@ body.modal-open {
     opacity: 0.7;
 }
 
+/* Low-key support link under the version — a quiet text link, not a CTA. */
+.settings-donate-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-decoration: none;
+    opacity: 0.7;
+    transition:
+        opacity 0.15s ease,
+        color 0.15s ease;
+}
+
+.settings-donate-link:hover,
+.settings-donate-link:focus-visible {
+    color: var(--accent-color);
+    opacity: 1;
+}
+
 .modal-footer {
     padding: 1rem;
     border-top: 1px solid var(--border-color);

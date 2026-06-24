@@ -5,7 +5,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 
 const { playback } = getState();
 
-import { APP_VERSION, MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { APP_VERSION, KOFI_URL, MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
@@ -830,6 +830,16 @@ export function Settings() {
                                 <div id="appVersion" class="app-version-display">
                                     Ensemble v{APP_VERSION}
                                 </div>
+                                <a
+                                    id="donateLink"
+                                    class="settings-donate-link"
+                                    href={KOFI_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label="Support Ensemble on Ko-fi (opens in a new tab)"
+                                >
+                                    <Icon name="heart" /> Support this project
+                                </a>
                             </div>
                         )}
                     </div>

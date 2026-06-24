@@ -1,5 +1,8 @@
 // Note: Keep APP_VERSION in sync with CACHE_NAME in sw.js
 export const APP_VERSION = '2.44';
+// Ensemble is free + open. A no-pressure "support this project" link in
+// Settings → About points here. Swap the handle to point the donate button elsewhere.
+export const KOFI_URL = 'https://ko-fi.com/brndnsh';
 export const KEY_ORDER = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 export const ENHARMONIC_MAP = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
 export const ROMAN_VALS = { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 };

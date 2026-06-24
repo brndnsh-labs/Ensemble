@@ -66,6 +66,25 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#settingsOverlay', { state: 'hidden' });
     });
 
+    test('Settings About tab - donate link is present, safe, and accessible', async ({ page }) => {
+        await openSettings(page);
+        const settingsModal = page.locator('#settingsOverlay .settings-content');
+        await expect(settingsModal).toBeVisible();
+
+        await settingsModal.getByRole('tab', { name: 'About' }).click();
+
+        const donate = page.locator('#donateLink');
+        await expect(donate).toBeVisible();
+        // Opens the external Ko-fi page in a new tab, safely.
+        await expect(donate).toHaveAttribute('href', /ko-fi\.com/);
+        await expect(donate).toHaveAttribute('target', '_blank');
+        await expect(donate).toHaveAttribute('rel', /noopener/);
+        // Accessible name is present and the control is keyboard-focusable.
+        await expect(donate).toHaveAttribute('aria-label', /Ko-fi/);
+        await donate.focus();
+        await expect(donate).toBeFocused();
+    });
+
     test('Settings panel keeps scroll position when a control updates state', async ({ page }) => {
         // Regression: changing a setting (e.g. the session-timer stepper) used to
         // re-run the modal-a11y focus effect and snap the panel back to the top.
