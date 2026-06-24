@@ -66,23 +66,36 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#settingsOverlay', { state: 'hidden' });
     });
 
-    test('Settings About tab - donate link is present, safe, and accessible', async ({ page }) => {
+    test('Settings About tab - identity, support card, and troubleshooting footer', async ({
+        page,
+    }) => {
         await openSettings(page);
         const settingsModal = page.locator('#settingsOverlay .settings-content');
         await expect(settingsModal).toBeVisible();
 
         await settingsModal.getByRole('tab', { name: 'About' }).click();
 
+        // Identity header: app name, tagline, and version.
+        await expect(settingsModal.locator('.about-name')).toHaveText('Ensemble');
+        await expect(settingsModal.locator('.about-tagline')).toHaveText('Your virtual band.');
+        await expect(settingsModal.locator('#appVersion')).toBeVisible();
+
+        // Support card: the donate link, now a prominent button — still safe + accessible.
         const donate = page.locator('#donateLink');
         await expect(donate).toBeVisible();
-        // Opens the external Ko-fi page in a new tab, safely.
         await expect(donate).toHaveAttribute('href', /ko-fi\.com/);
         await expect(donate).toHaveAttribute('target', '_blank');
         await expect(donate).toHaveAttribute('rel', /noopener/);
-        // Accessible name is present and the control is keyboard-focusable.
         await expect(donate).toHaveAttribute('aria-label', /Ko-fi/);
         await donate.focus();
         await expect(donate).toBeFocused();
+
+        // Troubleshooting footer keeps the maintenance actions.
+        await expect(settingsModal.locator('.about-troubleshooting')).toBeVisible();
+        await expect(settingsModal.locator('#resetSettingsBtn')).toBeVisible();
+
+        // The redundant Share & Export button was removed (Share lives in the topbar).
+        await expect(settingsModal.locator('#settingsShareHubBtn')).toHaveCount(0);
     });
 
     test('Settings panel keeps scroll position when a control updates state', async ({ page }) => {
