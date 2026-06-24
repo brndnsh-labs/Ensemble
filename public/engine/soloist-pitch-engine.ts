@@ -696,6 +696,27 @@ export function selectPitchAndDevices(
     const chordQualityClass = classifyChordQuality(targetChord.quality);
     const evansLegalIntervals = EVANS_INTERVALS_BY_QUALITY[chordQualityClass];
     const milesLegalIntervals = MILES_INTERVALS_BY_QUALITY[chordQualityClass];
+
+    // --- Aeolian-minor b6 avoid-tone context (#703) ---
+    // why: over the vi of a major key (e.g. Am in C), getScaleForChord hands
+    // A-Aeolian (A B C D E F G), so the b6 — interval 8, F over Am — is a legit
+    // SCALE tone but an AVOID tone as a landing/sustained note: it's a m6 against
+    // the chord's perfect 5th (E) and a m9 against the chord 5th an octave down,
+    // so sitting on it rubs. The picker already de-weights the b5-on-m7 avoid
+    // note (interval 6 dropped from the min Evans/Miles sets) but nothing biases
+    // the b6 over a plain aeolian minor triad. We detect the context precisely so
+    // the penalty fires ONLY on a true aeolian flat-6 minor — NOT dorian:
+    //   - chordQualityClass === 'min' restricts to plain minor triad / m7 family
+    //     (excludes min6 [dorian, 6 is the chord tone], halfdim/m7b5 [6 is the b5
+    //     chord tone], dim, dom, maj — each of which treats interval 8 differently).
+    //   - scaleMask bit 8 set AND bit 9 clear means the active scale is a flat-6
+    //     minor (aeolian / natural-minor / phrygian), NOT dorian. The neo/jazz/
+    //     funk/bossa "favorDorian" override in getScaleForChord returns DORIAN
+    //     (interval 9 set, 8 clear), so those styles never trip this — correct,
+    //     because in a dorian reharm the natural 6 is the color tone and the b6
+    //     isn't even in the scale.
+    const isAeolianMinorB6Context =
+        chordQualityClass === 'min' && ((scaleMask >> 8) & 1) === 1 && ((scaleMask >> 9) & 1) === 0;
     const responseConfig = config.motivicResponse || null;
     const hasDynamicHeadSeed = Boolean(sessionSeed?.notes?.length);
     const responseSignature = soloistState.session.currentPhrase.context?.responseSignature || null;
@@ -1539,6 +1560,40 @@ export function selectPitchAndDevices(
                     break;
                 }
             }
+        }
+
+        // --- Aeolian-minor b6 landing penalty (final-stage multiplier, #703) ---
+        // why: de-weight the b6 (interval 8) as a LANDING/SUSTAINED tone over a
+        // plain aeolian minor triad — the F-over-Am rub against the chord's 5th.
+        // Gated on isAeolianMinorB6Context (computed above: plain min family +
+        // flat-6 minor scale, excludes dorian/min6/m7b5). Crucially we ONLY
+        // penalize when the note would PARK on the b6 — a strong-beat attack or a
+        // note held a beat or longer. Short weak-beat notes (durationSteps <=
+        // stepsPerBeat/2 and not a strong beat) stay at full weight so the b6
+        // remains fully reachable as a passing/approach/grace tone into the 5th
+        // (E) or b7 (G) — which is exactly its idiomatic use in an aeolian line.
+        //
+        // Final-stage multiplier per CLAUDE.md "final-stage multipliers win":
+        // the scale-tone boost, profile/Greats bonuses, and SRDC mult all push
+        // the b6 up as a legit scale tone, so an additive penalty gets washed out
+        // (see feedback_weight_tuning_multiplier_placement). Multiplier 0.2:
+        // empirically tuned against soloist-aeolian-b6-critique.test.ts. The b6
+        // arrives with a strong scale-tone weight stack (it's diatonic), so a
+        // gentle 0.5-0.7 barely dents the sustained-landing rate; 0.2 cuts the
+        // sustained b6 landing rate over plain-minor aeolian chords by ~50%
+        // RELATIVE vs the dorian control (realized sustained-b6-landing rate
+        // ~0.5%) while leaving plenty of residual reachability — the picker still
+        // sounds the b6 freely as a passing tone (it's untouched by construction)
+        // and occasionally as color. Not lower (0.05): the b6 is a real aeolian
+        // color tone and zeroing it out flattens the mode toward an avoid-note-
+        // free line, which loses the melancholy the aeolian vi is FOR — the goal
+        // is "don't park on it," not "never sound it."
+        const isB6Landing =
+            interval === 8 &&
+            (isStrongBeat || durationSteps >= stepsPerBeat) &&
+            !(durationSteps <= Math.max(2, stepsPerBeat / 2) && !isStrongBeat);
+        if (isAeolianMinorB6Context && isB6Landing) {
+            weight *= 0.2;
         }
 
         CANDIDATE_WEIGHTS[m] = weight;
