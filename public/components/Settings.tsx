@@ -5,7 +5,7 @@ import { useEnsembleState } from '../ui-bridge.js';
 
 const { playback } = getState();
 
-import { APP_VERSION, KOFI_URL, MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { APP_VERSION, BUILD_REV, KOFI_URL, MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
@@ -702,7 +702,7 @@ export function Settings() {
                                         <h3 class="about-name">Ensemble</h3>
                                         <p class="about-tagline">Your virtual band.</p>
                                         <div id="appVersion" class="about-version">
-                                            v{APP_VERSION}
+                                            {APP_VERSION} <span class="about-rev">{BUILD_REV}</span>
                                         </div>
                                     </div>
                                 </div>
