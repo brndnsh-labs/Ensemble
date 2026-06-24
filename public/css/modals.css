@@ -870,34 +870,103 @@ body.modal-open {
     color: var(--text-color);
 }
 
-.app-version-display {
-    text-align: center;
-    margin-top: 1.5rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    opacity: 0.7;
+/* ---- Settings → About tab ---- */
+.about-tab {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
-/* Low-key support link under the version — a quiet text link, not a CTA. */
-.settings-donate-link {
+/* Identity — app mark + name + tagline + version. */
+.about-identity {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    text-decoration: none;
-    opacity: 0.7;
-    transition:
-        opacity 0.15s ease,
-        color 0.15s ease;
+    gap: 1rem;
 }
 
-.settings-donate-link:hover,
-.settings-donate-link:focus-visible {
-    color: var(--accent-color);
-    opacity: 1;
+.about-mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    flex-shrink: 0;
+}
+
+.about-name {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text-color);
+}
+
+.about-tagline {
+    margin: 0.1rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.about-version {
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    opacity: 0.8;
+}
+
+/* Support card — prominent (accent-tinted panel + filled button), never a nag. */
+.about-support {
+    background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 28%, transparent);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+}
+
+.about-support h4 {
+    margin: 0 0 0.4rem;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+
+.about-support p {
+    margin: 0 0 0.9rem;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.about-support-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: var(--accent-color);
+    color: white;
+    padding: 0.55rem 1.1rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition:
+        filter 0.15s ease,
+        transform 0.1s ease;
+}
+
+.about-support-btn:hover,
+.about-support-btn:focus-visible {
+    filter: brightness(1.08);
+}
+
+.about-support-btn:active {
+    transform: translateY(1px);
+}
+
+/* Troubleshooting — demoted footer for rarely-touched + destructive actions. */
+.about-troubleshooting {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+.about-troubleshooting-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.6rem;
 }
 
 .modal-footer {

@@ -688,158 +688,172 @@ export function Settings() {
                             </SettingGroup>
                         )}
                         {tab === 'about' && (
-                            <SettingGroup
-                                title="System Actions"
-                                className="settings-section--borderless settings-section--no-padding"
-                            >
-                                <div class="grid-actions">
-                                    <button
-                                        id="settingsShareHubBtn"
-                                        class="secondary-btn flex-row settings-action-center"
-                                        onClick={() => {
-                                            closeSettings();
-                                            dispatch(ACTIONS.SET_MODAL_OPEN, {
-                                                modal: 'share',
-                                                open: true,
-                                            });
-                                        }}
-                                    >
-                                        <Icon name="upload" /> Share & Export
-                                    </button>
-                                    <button
-                                        id="installAppBtn"
-                                        class="secondary-btn flex-row settings-install-btn"
-                                        onClick={handleInstall}
-                                    >
-                                        <Icon name="install" /> Install App
-                                    </button>
-                                    {showConfirmReset ? (
-                                        <div
-                                            class="confirm-reset-panel settings-reset-panel"
-                                            role="alert"
-                                            aria-live="polite"
-                                        >
-                                            <div class="settings-reset-copy">
-                                                Reset all settings and progress?
-                                            </div>
-                                            <div class="settings-reset-actions">
-                                                <button
-                                                    id="confirmResetBtn"
-                                                    class="primary-btn settings-reset-btn settings-reset-btn--primary"
-                                                    onClick={handleReset}
-                                                >
-                                                    Yes, Reset
-                                                </button>
-                                                <button
-                                                    id="cancelResetBtn"
-                                                    class="secondary-btn settings-reset-btn settings-reset-btn--secondary"
-                                                    onClick={() => {
-                                                        setShowConfirmReset(false);
-                                                        setTimeout(() => {
-                                                            const btn =
-                                                                document.getElementById(
-                                                                    'resetSettingsBtn',
-                                                                );
-                                                            if (btn) {
-                                                                btn.focus();
-                                                            }
-                                                        }, 50);
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            id="resetSettingsBtn"
-                                            class="secondary-btn danger-btn"
-                                            onClick={() => {
-                                                setShowConfirmReset(true);
-                                                setTimeout(() => {
-                                                    const btn =
-                                                        document.getElementById('cancelResetBtn');
-                                                    if (btn) {
-                                                        btn.focus();
-                                                    }
-                                                }, 50);
-                                            }}
-                                        >
-                                            <Icon name="trash" /> Reset All
-                                        </button>
-                                    )}
-                                    <button
-                                        id="refreshAppBtn"
-                                        class="secondary-btn flex-row settings-action-center"
-                                        onClick={() => window.location.reload()}
-                                    >
-                                        <Icon name="refresh" /> Force Refresh
-                                    </button>
-                                </div>
-                            </SettingGroup>
-                        )}
-                        {tab === 'about' && (
-                            <SettingGroup title="Advanced">
-                                <SettingRow
-                                    label="Debug Soloist"
-                                    description="Enable chain-of-thought logging for the Soloist engine. Helpful for troubleshooting."
-                                    id="debugSoloistToggle"
-                                >
-                                    <Toggle
-                                        id="debugSoloistToggle"
-                                        checked={playbackState.debugSoloist}
-                                        onChange={(val) =>
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'playback',
-                                                param: 'debugSoloist',
-                                                value: val,
-                                            })
-                                        }
+                            <div class="about-tab">
+                                {/* Identity — what this is, at a glance. */}
+                                <div class="about-identity">
+                                    <img
+                                        class="about-mark"
+                                        src="/icon.svg"
+                                        alt=""
+                                        width="56"
+                                        height="56"
                                     />
-                                </SettingRow>
-                            </SettingGroup>
-                        )}
-                        {tab === 'about' && (
-                            <div class="settings-help">
-                                <details open>
-                                    <summary>
-                                        <span>Help & Instructions</span>
-                                        <span class="summary-arrow">▼</span>
-                                    </summary>
-                                    <div class="help-content">
-                                        <div class="help-card">
-                                            <h4>Need more help?</h4>
-                                            <p>
-                                                For a deep dive into notation, soloing styles, and
-                                                MIDI export, check out the full manual.
-                                            </p>
-                                            <button
-                                                onClick={() =>
-                                                    dispatch(ACTIONS.SET_MODAL_OPEN, {
-                                                        modal: 'manual',
-                                                        open: true,
-                                                    })
-                                                }
-                                                class="manual-link settings-manual-btn"
-                                            >
-                                                Open User Manual
-                                            </button>
+                                    <div class="about-identity-text">
+                                        <h3 class="about-name">Ensemble</h3>
+                                        <p class="about-tagline">Your virtual band.</p>
+                                        <div id="appVersion" class="about-version">
+                                            v{APP_VERSION}
                                         </div>
                                     </div>
-                                </details>
-                                <div id="appVersion" class="app-version-display">
-                                    Ensemble v{APP_VERSION}
                                 </div>
-                                <a
-                                    id="donateLink"
-                                    class="settings-donate-link"
-                                    href={KOFI_URL}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label="Support Ensemble on Ko-fi (opens in a new tab)"
-                                >
-                                    <Icon name="heart" /> Support this project
-                                </a>
+
+                                {/* Support — prominent but no-pressure (no modal, no nag). */}
+                                <div class="about-support">
+                                    <h4>Enjoying Ensemble?</h4>
+                                    <p>
+                                        It's free and open. If it's useful to you, you can chip in
+                                        to support development — no pressure, and no features are
+                                        ever locked behind it.
+                                    </p>
+                                    <a
+                                        id="donateLink"
+                                        class="about-support-btn"
+                                        href={KOFI_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label="Support Ensemble on Ko-fi (opens in a new tab)"
+                                    >
+                                        <Icon name="heart" /> Support on Ko-fi
+                                    </a>
+                                </div>
+
+                                {/* Help */}
+                                <div class="settings-help">
+                                    <details open>
+                                        <summary>
+                                            <span>Help & Instructions</span>
+                                            <span class="summary-arrow">▼</span>
+                                        </summary>
+                                        <div class="help-content">
+                                            <div class="help-card">
+                                                <h4>Need more help?</h4>
+                                                <p>
+                                                    For a deep dive into notation, soloing styles,
+                                                    and MIDI export, check out the full manual.
+                                                </p>
+                                                <button
+                                                    onClick={() =>
+                                                        dispatch(ACTIONS.SET_MODAL_OPEN, {
+                                                            modal: 'manual',
+                                                            open: true,
+                                                        })
+                                                    }
+                                                    class="manual-link settings-manual-btn"
+                                                >
+                                                    Open User Manual
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
+
+                                {/* Troubleshooting — demoted footer; rarely-touched + destructive. */}
+                                <div class="about-troubleshooting">
+                                    <div class="about-troubleshooting-title">Troubleshooting</div>
+                                    <div class="grid-actions">
+                                        <button
+                                            id="installAppBtn"
+                                            class="secondary-btn flex-row settings-install-btn"
+                                            onClick={handleInstall}
+                                        >
+                                            <Icon name="install" /> Install App
+                                        </button>
+                                        {showConfirmReset ? (
+                                            <div
+                                                class="confirm-reset-panel settings-reset-panel"
+                                                role="alert"
+                                                aria-live="polite"
+                                            >
+                                                <div class="settings-reset-copy">
+                                                    Reset all settings and progress?
+                                                </div>
+                                                <div class="settings-reset-actions">
+                                                    <button
+                                                        id="confirmResetBtn"
+                                                        class="primary-btn settings-reset-btn settings-reset-btn--primary"
+                                                        onClick={handleReset}
+                                                    >
+                                                        Yes, Reset
+                                                    </button>
+                                                    <button
+                                                        id="cancelResetBtn"
+                                                        class="secondary-btn settings-reset-btn settings-reset-btn--secondary"
+                                                        onClick={() => {
+                                                            setShowConfirmReset(false);
+                                                            setTimeout(() => {
+                                                                const btn =
+                                                                    document.getElementById(
+                                                                        'resetSettingsBtn',
+                                                                    );
+                                                                if (btn) {
+                                                                    btn.focus();
+                                                                }
+                                                            }, 50);
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                id="resetSettingsBtn"
+                                                class="secondary-btn danger-btn"
+                                                onClick={() => {
+                                                    setShowConfirmReset(true);
+                                                    setTimeout(() => {
+                                                        const btn =
+                                                            document.getElementById(
+                                                                'cancelResetBtn',
+                                                            );
+                                                        if (btn) {
+                                                            btn.focus();
+                                                        }
+                                                    }, 50);
+                                                }}
+                                            >
+                                                <Icon name="trash" /> Reset All
+                                            </button>
+                                        )}
+                                        <button
+                                            id="refreshAppBtn"
+                                            class="secondary-btn flex-row settings-action-center"
+                                            onClick={() => window.location.reload()}
+                                        >
+                                            <Icon name="refresh" /> Force Refresh
+                                        </button>
+                                    </div>
+                                    {/* Developer-only — hidden in production builds. */}
+                                    {import.meta.env.DEV && (
+                                        <SettingRow
+                                            label="Debug Soloist"
+                                            description="Enable chain-of-thought logging for the Soloist engine. Helpful for troubleshooting."
+                                            id="debugSoloistToggle"
+                                        >
+                                            <Toggle
+                                                id="debugSoloistToggle"
+                                                checked={playbackState.debugSoloist}
+                                                onChange={(val) =>
+                                                    dispatch(ACTIONS.SET_PARAM, {
+                                                        module: 'playback',
+                                                        param: 'debugSoloist',
+                                                        value: val,
+                                                    })
+                                                }
+                                            />
+                                        </SettingRow>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
