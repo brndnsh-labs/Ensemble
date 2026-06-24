@@ -16,6 +16,7 @@ import { detectInstalledPacks, warmPacksForVoices } from './engine/pack-runtime.
 import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
+import { maybeShowPackInstallNudge } from './pack-nudge.js';
 import { initPWA } from './pwa.js';
 import { dispatch, getState, subscribe } from './state.js';
 import { handleEffects } from './state-effects.js';
@@ -36,7 +37,14 @@ function init() {
         // genre auto-follow knows which mapped packs are available before the
         // Sounds panel ever mounts. Fire-and-forget: a genre change before it
         // resolves just falls back to synth (then corrects on the next change).
-        void detectInstalledPacks();
+        //
+        // Once detection settles we know whether any pack is installed, so chain
+        // the one-time "install a pack" nudge (#684) off it — deferred ~2s so it
+        // lands after the UI has settled, never on first paint, and never blocks
+        // interaction. Self-gates on the seen-flag + zero installed packs.
+        void detectInstalledPacks().then(() => {
+            setTimeout(maybeShowPackInstallNudge, 2000);
+        });
 
         // Pre-decode any selected sample-pack voice now, off a gesture-free
         // OfflineAudioContext, so first playback comes up sampled instead of
