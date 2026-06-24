@@ -575,29 +575,58 @@ function selectSupportiveVoicing(
 // why: genres whose comp SUSTAINS (a held/strummed chord that wants to ring and
 // breathe), as opposed to the percussive-identity lanes (Funk clav chucks,
 // Reggae/Ska skank, Hip-Hop stabs) whose rhythmic restatement IS the genre. Only
-// the sustained set gets the per-hit economy below — the percussive lanes
-// early-return in getAccompanimentNotes before ever reaching it, so they keep
+// the sustained set gets the per-hit economy below. The percussive lanes are
+// excluded two ways: Funk/Reggae/Ska/Neo-Soul/Country/Metal early-return in
+// getAccompanimentNotes before ever reaching the economy; Hip-Hop falls through
+// to the shared smart lane but is left out of this set. Either way they keep
 // their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
 // stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
 const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
 
 /**
- * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic
- * step to a different pitch-class that's still in the chord). Used to give the
- * top of an "answer" voicing a little inner-voice motion so consecutive answers
- * aren't byte-identical. Returns the input unchanged if no nearby chord tone of a
- * different pitch-class exists within a step or two.
+ * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic step
+ * to a different pitch-class still in the chord), to give the top of an "answer"
+ * voicing a little inner-voice motion so consecutive answers aren't identical.
+ *
+ * Destination rules keep the move from DEGRADING the lean shell:
+ * - guide tones (3rd / 7th) are preferred over other chord tones;
+ * - the ROOT is never a destination — moving onto it collapses a 3-and-7 shell
+ *   into a rooty triad fragment that no longer states the seventh (review #2);
+ * - any pitch-class already sounding in the rest of the answer is forbidden, so
+ *   the move can't octave-double an existing voice into a bare unison (review #1).
+ *
+ * Returns the input unchanged when no eligible destination sits within a step or
+ * two (in which case the caller simply leaves the answer un-moved).
  */
 function nearestOtherChordTone(
     midi: number,
     chord: { rootMidi: number; intervals?: number[] },
+    forbidPCs: Set<number> = new Set(),
 ): number {
     const intervals = chord.intervals;
     if (!intervals || intervals.length === 0) {
         return midi;
     }
-    const tonePCs = new Set(intervals.map((i) => (((chord.rootMidi + i) % 12) + 12) % 12));
     const fromPC = ((midi % 12) + 12) % 12;
+    const guidePCs = new Set<number>();
+    const otherPCs = new Set<number>();
+    for (const i of intervals) {
+        const ic = ((i % 12) + 12) % 12;
+        const pc = (((chord.rootMidi + i) % 12) + 12) % 12;
+        if (ic === 0 || pc === fromPC || forbidPCs.has(pc)) {
+            continue; // skip the root, the current tone, and PCs already sounding
+        }
+        // ic 3/4 = third; 9/10/11 = (bb7/b7/maj7) seventh — the guide tones.
+        if (ic === 3 || ic === 4 || ic === 9 || ic === 10 || ic === 11) {
+            guidePCs.add(pc);
+        } else {
+            otherPCs.add(pc);
+        }
+    }
+    const targets = guidePCs.size > 0 ? guidePCs : otherPCs;
+    if (targets.size === 0) {
+        return midi;
+    }
     let best = midi;
     let bestDist = Number.POSITIVE_INFINITY;
     for (let d = -5; d <= 5; d++) {
@@ -606,7 +635,7 @@ function nearestOtherChordTone(
         }
         const cand = midi + d;
         const pc = ((cand % 12) + 12) % 12;
-        if (pc === fromPC || !tonePCs.has(pc)) {
+        if (!targets.has(pc)) {
             continue;
         }
         if (Math.abs(d) < bestDist) {
@@ -663,13 +692,36 @@ function applyPerHitEconomy(
         answer = sorted.slice(-2);
     }
 
+    // dim / half-dim: the ♭5 is the tone that NAMES the chord (iiø vs ii-7), but
+    // selectSupportiveVoicing buckets it as color, so a 2-note reduction can drop
+    // it (review #3). Force the diminished core (♭3 + ♭5) from the statement, and
+    // skip the inner-voice move (it would just push one of those two off again —
+    // passing diminished chords want stability over variety).
+    let forcedDiminishedCore = false;
+    if (chord.quality === 'dim' || chord.quality === 'halfdim') {
+        const core = [3, 6] // ♭3, ♭5
+            .map((ic) => {
+                const pc = (((chord.rootMidi + ic) % 12) + 12) % 12;
+                return statement.find((m) => ((m % 12) + 12) % 12 === pc);
+            })
+            .filter((m): m is number => m !== undefined);
+        if (core.length === 2) {
+            answer = [...core].sort((a, b) => a - b);
+            forcedDiminishedCore = true;
+        }
+    }
+
     // Inner-voice motion: ~55% of answers nudge the top voice to a neighboring
-    // chord tone so consecutive answers aren't identical — the "living" part.
-    if (answer.length > 0 && draw(361) < 0.55) {
+    // guide tone so consecutive answers move instead of stamping an identical
+    // shape — the "living" part. The destination rules in nearestOtherChordTone
+    // keep this from octave-doubling or collapsing to a rooty fragment.
+    if (!forcedDiminishedCore && answer.length > 1 && draw(361) < 0.55) {
         const top = answer[answer.length - 1];
-        const moved = nearestOtherChordTone(top, chord);
+        const rest = answer.slice(0, -1);
+        const forbidPCs = new Set(rest.map((m) => ((m % 12) + 12) % 12));
+        const moved = nearestOtherChordTone(top, chord, forbidPCs);
         if (moved !== top && !answer.includes(moved)) {
-            answer = [...answer.slice(0, -1), moved].sort((a, b) => a - b);
+            answer = [...rest, moved].sort((a, b) => a - b);
         }
     }
 

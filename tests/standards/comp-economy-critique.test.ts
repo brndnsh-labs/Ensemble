@@ -154,6 +154,57 @@ describe('Comp economy (#715) — intra-bar voicing motion', () => {
         expect(byStep.size).toBeGreaterThan(0);
     });
 
+    it('no answer octave-doubles or unisons a voice (review #1 — each hit is all distinct pitch-classes)', () => {
+        const hits = collectVoicings(4);
+        for (const h of hits) {
+            const pcs = new Set(h.midis.map((m) => ((m % 12) + 12) % 12));
+            // Same number of distinct pitch-classes as notes → no two voices share
+            // a PC (no octave-doubled bare tone, no unison).
+            expect(pcs.size).toBe(h.midis.length);
+        }
+    });
+
+    it('half-diminished answers keep the ♭5 — the tone that names the chord (review #3)', () => {
+        groove.genreFeel = 'Jazz';
+        resetComp();
+        const halfDim = {
+            rootMidi: 62, // D
+            freqs: [293.66, 349.23, 415.3, 523.25], // D F Ab C (Dm7♭5)
+            intervals: [0, 3, 6, 10],
+            quality: 'halfdim',
+            is7th: true,
+            beats: 4,
+            sectionId: 'sectionA',
+        };
+        arranger.progression = [halfDim];
+        const flat5PC = (((62 + 6) % 12) + 12) % 12; // ♭5 of D = Ab
+        const hits = [];
+        for (let bar = 0; bar < 2; bar++) {
+            for (let m = 0; m < 16; m++) {
+                const step = bar * 16 + m;
+                const notes = getAccompanimentNotes(
+                    getState(),
+                    halfDim,
+                    step,
+                    m,
+                    m,
+                    stepInfoFor(step),
+                );
+                const midis = notes
+                    .filter((n) => n && n.velocity > 0 && Number.isFinite(n.midi) && n.midi > 0)
+                    .map((n) => Math.round(n.midi));
+                if (midis.length > 0 && !stepInfoFor(step).isGroupStart) {
+                    hits.push(midis);
+                }
+            }
+        }
+        expect(hits.length).toBeGreaterThan(0);
+        for (const midis of hits) {
+            const pcs = new Set(midis.map((m) => ((m % 12) + 12) % 12));
+            expect(pcs.has(flat5PC)).toBe(true);
+        }
+    });
+
     it('GUARD: percussive-identity genres never engage the economy (Funk untouched)', () => {
         groove.genreFeel = 'Funk';
         resetComp();
