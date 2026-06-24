@@ -17,6 +17,8 @@
         },
         "jsxRuntime": "reactClassic",
         "globals": [
+            "__APP_VERSION__",
+            "__BUILD_REV__",
             "describe",
             "it",
             "expect",

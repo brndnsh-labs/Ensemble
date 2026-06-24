@@ -44,6 +44,12 @@ function computeBuildRev(): string {
 
 const REV = computeBuildRev();
 
+// CalVer display version: the build's year-month (`YYYY.MM`). Shown on
+// Settings → About next to the build REV (`2026.06 c2d1e30`). Auto-derived at
+// build time — there is no manual version to bump. The REV (git SHA, above) is
+// the exact build identity; this is just the human-readable "what era" label.
+const BUILD_MONTH = new Date().toISOString().slice(0, 7).replace('-', '.');
+
 // Files that must ship to dist/ verbatim (no hashing, no transformation):
 // - manifest.json references icons by their unhashed names
 // - icon-512.png is only referenced from manifest.json (not HTML), so Vite would skip it
@@ -107,6 +113,12 @@ function copyStaticAssets(): Plugin {
 export default defineConfig({
     root: 'public',
     publicDir: false,
+    // Build-time version stamp surfaced on Settings → About. CalVer month +
+    // exact git REV; both auto-derived, nothing to hand-bump.
+    define: {
+        __APP_VERSION__: JSON.stringify(BUILD_MONTH),
+        __BUILD_REV__: JSON.stringify(REV),
+    },
     build: {
         outDir: '../dist',
         emptyOutDir: true,

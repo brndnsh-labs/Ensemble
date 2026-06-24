@@ -1635,6 +1635,11 @@ export const ACTIONS = {
  * `window as any` casts.
  */
 declare global {
+    // Build-time stamps injected by Vite `define` (see vite.config.ts). Replaced
+    // with string literals at build; consumed via public/config.ts.
+    const __APP_VERSION__: string;
+    const __BUILD_REV__: string;
+
     interface Window {
         // The signatures here mirror the runtime helpers installed by
         // installE2EGlobals(); callers consume them via Playwright tooling

@@ -910,6 +910,13 @@ body.modal-open {
     opacity: 0.8;
 }
 
+/* Exact git SHA of the deployed build — the support/debug anchor, set apart
+   from the CalVer month with a monospace face. */
+.about-rev {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    opacity: 0.85;
+}
+
 /* Support card — prominent (accent-tinted panel + filled button), never a nag. */
 .about-support {
     background: color-mix(in srgb, var(--accent-color) 12%, transparent);

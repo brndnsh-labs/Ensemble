@@ -1,5 +1,15 @@
-// Note: Keep APP_VERSION in sync with CACHE_NAME in sw.js
-export const APP_VERSION = '2.44';
+// Version stamp shown on Settings → About, e.g. `2026.06 c2d1e30`. Both halves
+// are injected at build time by Vite `define` (vite.config.ts) — there's nothing
+// to bump by hand. APP_VERSION is the CalVer month ("what era"); BUILD_REV is the
+// exact git SHA of the deployed build (the support/debug anchor). Cache-busting is
+// handled separately by Workbox content hashes + the asset-filename REV, so this
+// stamp is purely informational.
+//
+// The `typeof` guard keeps these safe under Vitest, which doesn't apply Vite's
+// `define`: the build folds `__APP_VERSION__` to its literal (so the guard picks
+// the real value), while in tests the bare identifier resolves to `'dev'`.
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+export const BUILD_REV = typeof __BUILD_REV__ !== 'undefined' ? __BUILD_REV__ : 'dev';
 // Ensemble is free + open. A no-pressure "support this project" link in
 // Settings → About points here. Swap the handle to point the donate button elsewhere.
 export const KOFI_URL = 'https://ko-fi.com/brndnsh';
