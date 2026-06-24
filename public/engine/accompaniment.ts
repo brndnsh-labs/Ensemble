@@ -28,6 +28,13 @@ interface CompingState {
     maxGrooveLength: number;
     lastSectionId: string | null;
     lastVoicingMidis: number[];
+    // why: per-hit comp economy (#715) — the most recent "statement" voicing
+    //      (the full voicing emitted on a structural/downbeat hit) and the chord
+    //      it belonged to. Offbeat hits on the SAME chord answer it with a leaner,
+    //      moving fragment instead of re-striking it identically. Reset implicitly
+    //      whenever a structural hit or a fresh chord makes a new statement.
+    statementVoicingMidis: number[];
+    statementChordKey: string | null;
     // why: epic-deterministic-phrasing S1 — counter incremented every time the
     //      STICKY (Funk) cell-bank picker fires (initial pick + each rotation).
     //      Used as the phrase-index input to the cell-bank hash so cell choice
@@ -61,6 +68,8 @@ export const compingState: CompingState = {
     maxGrooveLength: 4,
     lastSectionId: null,
     lastVoicingMidis: [],
+    statementVoicingMidis: [],
+    statementChordKey: null,
     funkRotationIndex: 0,
     bossaRotationIndex: 0,
 };
@@ -561,6 +570,110 @@ function selectSupportiveVoicing(
     }
 
     return selected.sort((a, b) => a - b);
+}
+
+// why: genres whose comp SUSTAINS (a held/strummed chord that wants to ring and
+// breathe), as opposed to the percussive-identity lanes (Funk clav chucks,
+// Reggae/Ska skank, Hip-Hop stabs) whose rhythmic restatement IS the genre. Only
+// the sustained set gets the per-hit economy below — the percussive lanes
+// early-return in getAccompanimentNotes before ever reaching it, so they keep
+// their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
+// stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
+const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
+
+/**
+ * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic
+ * step to a different pitch-class that's still in the chord). Used to give the
+ * top of an "answer" voicing a little inner-voice motion so consecutive answers
+ * aren't byte-identical. Returns the input unchanged if no nearby chord tone of a
+ * different pitch-class exists within a step or two.
+ */
+function nearestOtherChordTone(
+    midi: number,
+    chord: { rootMidi: number; intervals?: number[] },
+): number {
+    const intervals = chord.intervals;
+    if (!intervals || intervals.length === 0) {
+        return midi;
+    }
+    const tonePCs = new Set(intervals.map((i) => (((chord.rootMidi + i) % 12) + 12) % 12));
+    const fromPC = ((midi % 12) + 12) % 12;
+    let best = midi;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (let d = -5; d <= 5; d++) {
+        if (d === 0) {
+            continue;
+        }
+        const cand = midi + d;
+        const pc = ((cand % 12) + 12) % 12;
+        if (pc === fromPC || !tonePCs.has(pc)) {
+            continue;
+        }
+        if (Math.abs(d) < bestDist) {
+            bestDist = Math.abs(d);
+            best = cand;
+        }
+    }
+    return best;
+}
+
+/**
+ * Per-hit comp economy (#715). A real comper doesn't re-strike the full voicing
+ * identically on every hit: the structural/downbeat hit makes the "statement"
+ * (full chosen voicing); offbeat hits on the SAME chord answer it with a leaner,
+ * MOVING fragment so the bar breathes instead of hammering the same 3-4 notes.
+ *
+ * Reshapes only what is EMITTED — voice-leading continuity still tracks the full
+ * voicing (compingState.lastVoicingMidis) upstream, so the next bar's
+ * recenter/rotate cascade is unaffected. Seeded by the per-step `draw` (compDraw)
+ * so the variation LOCKS IN loop-to-loop rather than being random jitter.
+ *
+ * Sustained-comp genres only (see {@link SUSTAINED_COMP_GENRES}); mutates the
+ * statement memory on compingState as a side effect.
+ */
+function applyPerHitEconomy(
+    voicingMidis: number[],
+    chord: { rootMidi: number; quality: string; intervals?: number[] },
+    isStructural: boolean,
+    draw: (n: number) => number,
+): number[] {
+    const chordKey = `${chord.rootMidi}:${chord.quality}`;
+    const isFreshHarmony = chordKey !== compingState.statementChordKey;
+
+    // Statement: the strong-beat / group-start hit, or the first hit on a new
+    // chord. Emit the full chosen voicing and remember it as the bar's reference.
+    if (isStructural || isFreshHarmony) {
+        compingState.statementChordKey = chordKey;
+        compingState.statementVoicingMidis = [...voicingMidis];
+        return voicingMidis;
+    }
+
+    // Answer: an offbeat repeat of the same chord. Reduce to the harmonic
+    // essence (guide tones, 2 voices) so it sits UNDER the statement instead of
+    // matching it.
+    const statement =
+        compingState.statementVoicingMidis.length > 0
+            ? compingState.statementVoicingMidis
+            : voicingMidis;
+    let answer = selectSupportiveVoicing(statement, chord, 2);
+    if (answer.length < 2) {
+        // Triad / already-sparse voicing: keep the top two so the answer still
+        // thins relative to the statement.
+        const sorted = [...new Set(voicingMidis)].sort((a, b) => a - b);
+        answer = sorted.slice(-2);
+    }
+
+    // Inner-voice motion: ~55% of answers nudge the top voice to a neighboring
+    // chord tone so consecutive answers aren't identical — the "living" part.
+    if (answer.length > 0 && draw(361) < 0.55) {
+        const top = answer[answer.length - 1];
+        const moved = nearestOtherChordTone(top, chord);
+        if (moved !== top && !answer.includes(moved)) {
+            answer = [...answer.slice(0, -1), moved].sort((a, b) => a - b);
+        }
+    }
+
+    return answer;
 }
 
 function getMidiVoicing(voicing: number[]): number[] {
@@ -3236,6 +3349,18 @@ export function getAccompanimentNotes(
         const finalVoicingMidis = getMidiVoicing(voicing);
         if (finalVoicingMidis.length > 0) {
             compingState.lastVoicingMidis = [...finalVoicingMidis];
+        }
+
+        // #715 — per-hit comp economy: keep the full voicing for voice-leading
+        // memory (set above), but EMIT a statement on structural hits and a
+        // leaner, moving answer on offbeat repeats of the same chord, so the bar
+        // breathes instead of re-striking the same notes. Sustained-comp genres
+        // only; the percussive-identity lanes early-return well before here.
+        if (SUSTAINED_COMP_GENRES.has(genre) && finalVoicingMidis.length > 0) {
+            const emitMidis = applyPerHitEconomy(finalVoicingMidis, chord, isStructural, compDraw);
+            if (emitMidis.length > 0) {
+                voicing = emitMidis.map((midi) => getFrequency(midi));
+            }
         }
 
         // B2 (#707) — structural ceiling: a comp voicing must not ring past the
