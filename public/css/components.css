@@ -310,6 +310,26 @@ input:focus-visible + .toggle-slider {
     max-width: 90vw;
 }
 
+/* Gentle rise + fade so a toast feels intentional rather than popping in.
+   Honors reduced-motion (instant appear) and is force-disabled under e2e-mode.
+   The keyframe keeps translateX(-50%) so the box stays centered while it rises. */
+@media (prefers-reduced-motion: no-preference) {
+    .notification-box {
+        animation: notification-rise var(--anim-normal) var(--anim-ease) both;
+    }
+}
+
+@keyframes notification-rise {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(0.75rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
 .notification-content {
     display: flex;
     flex-direction: column;
