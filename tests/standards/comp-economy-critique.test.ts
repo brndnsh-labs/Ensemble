@@ -26,7 +26,20 @@ vi.mock('../../public/state.js', () => {
     return { ...mockState, stateMap: mockState, getState: () => mockState };
 });
 vi.mock('../../public/config.js', () => ({
-    TIME_SIGNATURES: { '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' } },
+    // Mirror the real 4/4 TimeSignatureConfig — `grouping`/`pulse` matter: the
+    // pulse-floor scans group-starts via grouping[0]*stepsPerBeat (= stride 8,
+    // strong beats 0 & 8), NOT every beat. Omitting grouping would make the test
+    // scan stride 4 and silently diverge from production.
+    TIME_SIGNATURES: {
+        '4/4': {
+            beats: 4,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12],
+            grouping: [2, 2],
+            backbeat: [1, 3],
+        },
+    },
 }));
 
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
@@ -130,15 +143,21 @@ describe('Comp economy (#715) — intra-bar voicing motion', () => {
         expect(avg(structuralSizes)).toBeGreaterThan(avg(answerSizes));
     });
 
-    it('answers MOVE — inner-voice motion makes consecutive answers differ (living, not static)', () => {
+    it('answers MOVE — the inner-voice nudge introduces a non-guide tone, not just cell variety', () => {
         const hits = collectVoicings(4);
-        const distinctAnswers = new Set(
-            hits.filter((h) => !h.isStructural).map((h) => h.midis.join(',')),
+        const answers = hits.filter((h) => !h.isStructural);
+        expect(answers.length).toBeGreaterThan(0);
+        // Isolate the MOVE (not cell variety): Cmaj7's guide tones are the 3rd
+        // (E, pc4) and 7th (B, pc11). A pure 2-note answer is exactly {4,11}; only
+        // the top-voice nudge can introduce another chord tone (root C / 5th G).
+        // So a non-guide PC appearing in some answer proves the move fired,
+        // regardless of which steps the cell makes answers. Without the move every
+        // answer would be {4,11} and this fails.
+        const guidePCs = new Set([(60 + 4) % 12, (60 + 11) % 12]);
+        const someAnswerMoved = answers.some((h) =>
+            h.midis.some((m) => !guidePCs.has(((m % 12) + 12) % 12)),
         );
-        // At least two distinct answer voicings across the phrase — the top-voice
-        // nudge to a neighboring chord tone is firing, so offbeats aren't a static
-        // 2-note stamp.
-        expect(distinctAnswers.size).toBeGreaterThanOrEqual(2);
+        expect(someAnswerMoved).toBe(true);
     });
 
     it('locks in loop-to-loop — the same step emits the same voicing every bar', () => {
@@ -248,62 +267,63 @@ describe('Comp economy (#715) — intra-bar voicing motion', () => {
         for (let m = 0; m < 16; m++) {
             getAccompanimentNotes(getState(), mockChord, m, m, m, stepInfoFor(m));
         }
-        // Funk early-returns in its own lane long before applyPerHitEconomy, so the
-        // statement memory is never written — proof the sustained-comp economy is
-        // scoped out of the percussive lanes.
+        // The economy is gated by `SUSTAINED_COMP_GENRES.has(genre)`. Funk also
+        // early-returns in its own lane before reaching it; Hip-Hop (not shown
+        // here) falls through the shared lane but is excluded by the same set
+        // check. Either way the statement memory is never written for a percussive
+        // genre, so it stays null.
         expect(compingState.statementChordKey).toBeNull();
     });
 
-    it('grooves by itself — every pulse-genre bar lands a strong beat (no floating bars, soloed)', () => {
-        // Isolate the comp: no bass/soloist to borrow a pulse from. Every bar that
-        // comps at all must land at least one strong beat (step 0 = beat 1, or
-        // step 8 = beat 3 in 4/4) so the groove is self-supporting.
-        function anchorCoverage(genreName, bars) {
-            groove.genreFeel = genreName;
-            bass.enabled = false;
-            resetComp();
-            arranger.progression = [mockChord];
-            let nonEmpty = 0;
-            let anchored = 0;
-            for (let bar = 0; bar < bars; bar++) {
-                const hitSteps = new Set();
-                for (let m = 0; m < 16; m++) {
-                    const step = bar * 16 + m;
-                    const notes = getAccompanimentNotes(
-                        getState(),
-                        mockChord,
-                        step,
-                        m,
-                        m,
-                        stepInfoFor(step),
-                    );
-                    if (
-                        notes.some(
-                            (n) => n && n.velocity > 0 && Number.isFinite(n.midi) && n.midi > 0,
-                        )
-                    ) {
-                        hitSteps.add(m);
-                    }
-                }
-                if (hitSteps.size === 0) {
-                    continue;
-                }
-                nonEmpty++;
-                if (hitSteps.has(0) || hitSteps.has(8)) {
-                    anchored++;
+    // Strong beats in 4/4 are the group-starts step 0 (beat 1) and step 8 (beat 3).
+    // Bass disabled to isolate the comp's own rhythm (no voicing/coordination
+    // interference); the floor itself is not bass-gated.
+    function anchorCoverage(genreName, bars) {
+        groove.genreFeel = genreName;
+        bass.enabled = false;
+        resetComp();
+        arranger.progression = [mockChord];
+        let nonEmpty = 0;
+        let anchored = 0;
+        for (let bar = 0; bar < bars; bar++) {
+            const hitSteps = new Set();
+            for (let m = 0; m < 16; m++) {
+                const step = bar * 16 + m;
+                const notes = getAccompanimentNotes(
+                    getState(),
+                    mockChord,
+                    step,
+                    m,
+                    m,
+                    stepInfoFor(step),
+                );
+                if (
+                    notes.some((n) => n && n.velocity > 0 && Number.isFinite(n.midi) && n.midi > 0)
+                ) {
+                    hitSteps.add(m);
                 }
             }
-            return { nonEmpty, anchored };
+            if (hitSteps.size === 0) {
+                continue;
+            }
+            nonEmpty++;
+            if (hitSteps.has(0) || hitSteps.has(8)) {
+                anchored++;
+            }
         }
+        bass.enabled = true;
+        return { nonEmpty, anchored };
+    }
 
-        for (const g of ['Jazz', 'Blues', 'Bossa Nova', 'Rock', 'Country', 'Acoustic']) {
+    it('grooves by itself — every pulse-genre bar lands a strong beat (no floating bars, soloed)', () => {
+        // Every bar that comps must land a strong beat (step 0 or 8) so the groove
+        // is self-supporting. Bossa is intentionally excluded (its dense partido-
+        // alto answering bar grooves without a downbeat — see PULSE_ANCHOR_GENRES).
+        for (const g of ['Jazz', 'Blues', 'Rock', 'Country', 'Acoustic']) {
             const { nonEmpty, anchored } = anchorCoverage(g, 24);
-            console.log(
-                `[comp-groove] ${g}: ${anchored}/${nonEmpty} non-empty bars land a strong beat`,
-            );
+            console.log(`[comp-groove] ${g}: ${anchored}/${nonEmpty} bars land a strong beat`);
             expect(nonEmpty).toBeGreaterThan(0);
             expect(anchored).toBe(nonEmpty);
         }
-        bass.enabled = true;
     });
 });

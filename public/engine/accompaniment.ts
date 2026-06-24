@@ -104,14 +104,20 @@ const COMP_POCKET_FEEL = 0.004; // ~4ms behind
 const CHORD_ANTICIPATION_GENRES = new Set(['Jazz', 'Funk', 'Neo-Soul', 'Blues', 'Bossa Nova']);
 
 // why (owner audition): the comp must GROOVE ON ITS OWN — imply its pulse without
-// borrowing it from the drums. These genres want a felt pulse under the
-// syncopation, so every bar is guaranteed at least one strong-beat (beat 1 or 3)
-// anchor (see the pulse-floor in the overlay). Excluded by design: the
-// offbeat-IDIOM genres whose identity is the dodged downbeat (Disco/Ska
-// upstrokes, Hip-Hop behind-the-beat stabs), and the percussive lanes
-// (Funk/Reggae/Neo-Soul) which early-return before the overlay with their own
-// deterministic placement.
-const PULSE_ANCHOR_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Rock', 'Country', 'Acoustic']);
+// borrowing it from the drums. These genres have genuinely sparse cells that float
+// when soloed (Jazz [14] / [6,14]), so every bar is guaranteed at least one
+// strong-beat (beat 1 or 3) anchor (see the pulse-floor in the overlay). Excluded
+// by design:
+//   • offbeat-IDIOM genres whose identity is the dodged downbeat (Disco/Ska
+//     upstrokes, Hip-Hop behind-the-beat stabs);
+//   • the percussive lanes (Funk/Reggae/Neo-Soul) which early-return before the
+//     overlay with their own deterministic placement;
+//   • Bossa Nova — its partido-alto answering bar deliberately drops the One (a
+//     dense 4-hit [2,6,10,14] cell that grooves on its own; with bass, the bass
+//     thumb keeps the One). Forcing a downbeat would flatten the 2-bar contour,
+//     and unlike Jazz's lone [14] it never sounds pulse-less. The pre-existing
+//     ~80% force-One below still applies to it exactly as on main.
+const PULSE_ANCHOR_GENRES = new Set(['Jazz', 'Blues', 'Rock', 'Country', 'Acoustic']);
 
 // why: genres whose comp is sparse enough that the final beat before a *within-
 // section* chord change should become an idiomatic horn pickup — a single
@@ -1549,6 +1555,11 @@ function updateRhythmicIntent(
         //      across loops produces the same cell.
         compingState.funkRotationIndex = 0;
         compingState.bossaRotationIndex = 0;
+        // #715 — a section change is a fresh statement opportunity; clear the
+        // per-hit-economy memory so the new section's first hit isn't read as an
+        // answer if it happens to share the prior chord's root+quality.
+        compingState.statementChordKey = null;
+        compingState.statementVoicingMidis = [];
     }
 
     if (step < compingState.lockedUntil) {
@@ -2952,17 +2963,22 @@ export function getAccompanimentNotes(
     }
 
     // --- Self-supporting pulse floor (owner audition) ---
-    // why: the comp must GROOVE ON ITS OWN, not borrow its pulse from the drums.
-    // The cell banks include syncopated cells with no strong-beat hit (Jazz
-    // [6,14] / [14], Bossa answering bars), and the "Force One" backfill below is
-    // only an ~80% coin-flip — so ~1 bar in 5 floats with a lone offbeat and,
-    // soloed, reads as "the timing is wrong." Guarantee a felt pulse: if the
-    // WHOLE bar's cell lands no strong beat (a group-start step: beat 1 or 3 in
-    // 4/4), anchor the One deterministically. This only catches the truly
-    // pulse-less bar — when the cell already lands beat 3, the One can still be
-    // dropped by the coin-flip below (reverse-Charleston stays intact). Pulse
-    // genres only; the offbeat-idiom genres (Disco/Ska/Hip-Hop) keep their dodged
-    // downbeat, and the percussive lanes early-return before this overlay.
+    // why: the comp must GROOVE ON ITS OWN, not float because a syncopated cell
+    // (Jazz [6,14] / [14]) left no strong beat and the "Force One" backfill below
+    // is only an ~80% coin-flip — so ~1 bar in 5 floats with a lone offbeat and,
+    // soloed, reads as "the timing is wrong." Guarantee a felt pulse: if the WHOLE
+    // bar's cell lands no strong beat (a group-start step: beat 1 or 3 in 4/4),
+    // anchor the One deterministically. This only catches the truly pulse-less bar
+    // — when the cell already lands beat 3, the One can still be dropped by the
+    // coin-flip below (reverse-Charleston stays intact). Pulse genres only (see
+    // PULSE_ANCHOR_GENRES — Bossa/Disco/Ska/Hip-Hop excluded by design); the
+    // percussive lanes early-return before this overlay.
+    //
+    // note: `groupStride` matches the engine's own isGroupStart definition
+    // (grouping[0]*stepsPerBeat); exact for symmetric meters (4/4, 3/4, 6/8,
+    // 12/8). In asymmetric meters (5/4, 7/8) it can scan a non-group-start step
+    // and UNDER-fire (skip the floor) — benign: it never forces the One onto a
+    // non-pulse position, it just occasionally misses the guarantee.
     if (measureStep === 0 && !isHit && PULSE_ANCHOR_GENRES.has(genre)) {
         const groupStride = Math.max(1, (ts.grouping?.[0] || 1) * ts.stepsPerBeat);
         let barHasStrongAnchor = false;
@@ -2973,7 +2989,7 @@ export function getAccompanimentNotes(
             }
         }
         if (!barHasStrongAnchor) {
-            isHit = true; // never leave the bar pulse-less
+            isHit = true; // never leave a soloed bar pulse-less
         }
     }
 
