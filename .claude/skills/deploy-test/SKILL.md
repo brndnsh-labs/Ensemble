@@ -1,6 +1,6 @@
 ---
 name: deploy-test
-description: Build and deploy the Ensemble app to the TEST environment (ensembletest.brndn.zip) via scripts/deploy-test.sh, then a light confirm that the right build landed. TEST ONLY — low ceremony (a private box); does not touch prod. May run from the autonomous pipeline after a merge to main.
+description: Build and deploy the Ensemble app to the TEST environment (ensembletest.brndn.zip) via scripts/deploy.sh test, then a light confirm that the right build landed. TEST ONLY — low ceremony (a private box); does not touch prod. May run from the autonomous pipeline after a merge to main.
 ---
 
 # Deploy to test
@@ -21,16 +21,18 @@ staging push; prod is the gated awake-only call) and §4 (gates).
 - Ops target: rsync over ssh to the scoped **`ensembletest-admin`** alias (the
   least-privilege `claude` account, `IdentitiesOnly homelab_nginx`) →
   `/var/www/html/`; the `--delete` mirrors the build, so stale files are pruned.
-- `scripts/deploy-test.sh` builds (`vite build --mode test`), prints the **Built REV**
-  + bundle footprint, rsyncs, then moves **`refs/deploys/test`** to HEAD. It does
-  **not** verify itself — on test, "the right asset hash is up" is all the check needs.
+- `scripts/deploy.sh test` builds (`vite build --mode test`), prints the **Built REV** +
+  footprint + the delta vs the live test site, rsyncs, then **re-verifies the live asset
+  hash itself** (`✅ Verified live on TEST: …`). So the script already does the confirm;
+  the step-3 curl below is just an independent double-check.
 - **Verification is free:** `vite.config.ts` (`computeBuildRev`) bakes the revision into
-  every asset filename (`main.<REV>.js`), so the deployed `index.html` names the exact
+  every asset filename (`index.<REV>.js`), so the deployed `index.html` names the exact
   build. REV is `git rev-parse --short HEAD` for a **clean** tree, and `<head>-<sig>`
   (short hash of the uncommitted diff) for a **dirty** tree — so a dirty audition build
   is stamped *honestly* and a redeploy after an edit flips the stamp. The deploy script
   echoes the exact REV it built (`📌 Built REV: …`); verify against that, not against
-  bare `HEAD` (which only matches a clean tree).
+  bare `HEAD` (which only matches a clean tree). **No stored deploy ref** — the running
+  site is the source of truth (§6).
 
 ## Steps (the default — keep it quick)
 
@@ -39,14 +41,14 @@ staging push; prod is the gated awake-only call) and §4 (gates).
      the working tree**, so dirty edits go to test (fine for iterating — just surface
      it). A dirty tree stamps `<head>-<sig>`, so the asset hash *does* attest the exact
      bytes now — no caveat needed. (Prefer a branch over dirty `main` for anything
-     you'll keep, so the deploy ref stays exact.)
-   - (Optional) what's shipping since the last test deploy:
-     `git fetch -q origin '+refs/deploys/*:refs/deploys/*' 2>/dev/null || true` then
-     `git log --oneline refs/deploys/test..HEAD` (or "(no test deploy ref yet)").
+     you'll keep, so the Built REV is a clean SHA.)
+   - **What's shipping** is printed by the deploy itself — it curls the live test rev and
+     lists `git log <live>..HEAD` (the `📦`/`🆕` lines), so no pre-flight ref dance needed.
 
-2. **Deploy.** Run `./scripts/deploy-test.sh` and stream it. Non-zero exit (build or
-   ssh) → report the failing step and **stop**. (`--dry-run`/`-whatif` builds without
-   syncing; `--quiet` trims log noise — useful when the pipeline calls it.)
+2. **Deploy.** Run `./scripts/deploy.sh test` (or `npm run deploy:test`) and stream it.
+   Non-zero exit (build, ssh, or the post-deploy verify) → report the failing step and
+   **stop**. (`--dry-run`/`-whatif` builds without syncing; `--quiet` trims log noise —
+   useful when the pipeline calls it.)
 
 3. **Light confirm — the only check the default needs.** Curl the edge and check the
    deployed asset hash matches the **Built REV** the script printed:

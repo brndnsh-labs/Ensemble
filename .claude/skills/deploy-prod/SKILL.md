@@ -13,7 +13,7 @@ one irreversible act). Ensemble's runtime is simple — **static files, no DB, n
 restart), but the public origin still earns the gate.
 
 **Shared rules in `.claude/skills/DOCTRINE.md`** — §4 (gates), §5 (a prod deploy is an
-always-brake, awake-only judgment call), §6 (deploy mechanics: `deploy-prod.sh` is
+always-brake, awake-only judgment call), §6 (deploy mechanics: `scripts/deploy.sh prod` is
 always a manual call; a merge to `main` ships nothing on its own), §8/§9 (branch/commit).
 
 ## Context (so a failure is legible)
@@ -24,13 +24,15 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
 - Ops target: rsync over ssh to the scoped **`ensemble-admin`** alias (the
   least-privilege `claude` account, `IdentitiesOnly homelab_nginx`) →
   `/var/www/html/`; `--delete` mirrors the build.
-- `scripts/deploy-prod.sh` builds (`vite build --mode production`), prints the footprint,
-  rsyncs, then moves **`refs/deploys/prod`** to HEAD (best-effort origin push).
+- `scripts/deploy.sh prod` builds (`vite build --mode production`), prints the **Built REV**
+  + footprint + the delta vs the live prod site, rsyncs, then **re-verifies the live asset
+  hash itself**. It also **refuses a dirty tree** for prod (a built-in backstop to the
+  pre-flight gate below).
 - **Verification is free:** `vite.config.ts` (`computeBuildRev`) bakes the revision into
-  every asset filename (`main.<REV>.js`), so the live `index.html` names the exact build
+  every asset filename (`index.<REV>.js`), so the live `index.html` names the exact build
   — the Ensemble equivalent of an `/api/version` SHA. Prod gates on a clean tree, so REV
-  is the bare commit short SHA; the deploy script also echoes it (`📌 Built REV: …`).
-  (A dirty tree would stamp `<head>-<sig>` — but prod refuses to ship dirty.)
+  is the bare commit short SHA; the deploy script echoes it (`📌 Built REV: …`) and the
+  running site is the **only** source of truth (there is no stored deploy ref — §6).
 
 ## Steps
 
@@ -43,24 +45,28 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
      format + `npm test`). A red gate → stop. (If HEAD is a just-merged `main` commit
      CI already ran this, but prod re-verifies locally — cheap insurance for the public
      origin.)
-   - **What's about to ship:** fetch the deploy refs and list the pending commits:
+   - **What's about to ship:** read what's *actually* live on prod off the running site
+     (the asset hash bakes the rev — there's no ref to trust), and list the delta:
      ```sh
-     git fetch -q origin '+refs/deploys/*:refs/deploys/*' 2>/dev/null || true
-     git log --oneline refs/deploys/prod..HEAD 2>/dev/null || echo "(no prod deploy ref yet — this deploy sets it)"
+     LIVE=$(curl -s "https://ensemble.brndn.zip/?cb=$(date +%s)" | grep -oE 'index\.[0-9a-f]{7,}(-[0-9a-f]+)?\.js' | head -1 | sed -E 's/^index\.//; s/\.js$//')
+     git log --oneline "${LIVE%%-*}..HEAD" 2>/dev/null || echo "(live rev ${LIVE:-unknown} not a local commit)"
      ```
+     A `./scripts/deploy.sh prod --dry-run` prints this same delta (its `📦`/`🆕` lines).
 
 2. **GATE — present the plan, get an explicit "go".** Lay out: the commit (SHA +
    subject) going live, the pending-commit list from step 1, that gates are green and
    the tree is clean, and that you'll `rsync --delete` to the live web root. **Wait for
    Brandon's explicit go. Do not touch the prod box until he confirms.** (A dry run is
-   available first if useful: `./scripts/deploy-prod.sh --dry-run` builds + prints the
-   footprint without syncing.)
+   available first if useful: `./scripts/deploy.sh prod --dry-run` builds + prints the
+   delta + footprint without syncing.)
 
-3. **Deploy.** `./scripts/deploy-prod.sh`. Stream it. Non-zero exit (build or ssh) →
-   report the failing step and **stop** — don't verify a half-deploy. (The `rm -rf dist`
-   and the `refs/deploys/prod` move happen only after a successful rsync.)
+3. **Deploy.** `./scripts/deploy.sh prod` (or `npm run deploy:prod`). Stream it. Non-zero
+   exit (build, dirty-tree refusal, ssh, or the post-deploy verify) → report the failing
+   step and **stop** — don't verify a half-deploy. (The `rm -rf dist` happens only after a
+   successful rsync.)
 
-4. **Verify — the public origin.**
+4. **Verify — the public origin.** The script already curls the live hash and fails if it
+   ≠ the build, but re-confirm independently for the public origin:
    ```sh
    # (a) edge is serving:
    curl -s -o /dev/null -w '%{http_code}' https://ensemble.brndn.zip/        # expect 200
@@ -71,23 +77,24 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
    ```
    Then a **changed-surface spot-check**: if the release touched a visible surface,
    curl the page and grep for an expected string (e.g. a new control's label), and a
-   light **regression check** that the chart still renders
-   (`curl -s https://ensemble.brndn.zip/ | grep -o '<div id="app"'` or a known stable
-   marker). A **stale asset hash** means rsync didn't land or an edge cache is in front
-   — not an app issue (there is no app process).
+   light **regression check** that the page renders. **Note:** the app mounts client-side
+   into a runtime-created container — there is *no* static `<div id="app">` to grep; use a
+   real static marker like `<title>Ensemble` or `rel="manifest"`. A **stale asset hash**
+   means rsync didn't land or an edge cache is in front — not an app issue (there is no
+   app process).
 
 5. **Report** pass/fail. **Green only if** the edge returns **200** and the live asset
-   hash equals the **deployed SHA**, and the spot-checks pass. Note that
-   `refs/deploys/prod` now points at this commit, so `git log refs/deploys/prod..main`
-   is the pending set going forward. **A merge to `main` is not a deploy** — this skill
+   hash equals the **deployed SHA**, and the spot-checks pass. The live prod hash now ==
+   HEAD, so `git log <live-prod-sha>..HEAD` (curl the origin to get it) is the pending set
+   going forward — no ref to consult. **A merge to `main` is not a deploy** — this skill
    is the only thing that ships prod.
 
 ## If it goes wrong (rollback)
 There's no DB and no migration, so rollback is **redeploy the previous good commit** —
 static files only, fast and total:
 ```sh
-git checkout <prev-good-sha>   # e.g. the commit refs/deploys/prod pointed at before
-./scripts/deploy-prod.sh       # rebuilds + rsyncs the old bundle over the web root
+git checkout <prev-good-sha>   # the previously-live SHA — the deploy's 📦 "Currently live" line
+./scripts/deploy.sh prod       # rebuilds + rsyncs the old bundle over the web root
 git checkout main
 ```
 - **Edge ≠ 200 but the files are on the box** → it's the Caddy→nginx edge, not the

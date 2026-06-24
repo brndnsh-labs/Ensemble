@@ -46,7 +46,7 @@ never `--auto`) are load-bearing — the standing go below removes the *checkpoi
 
 3. **Ship to test + build the eyeball list.** If the run **merged anything**, deploy what shipped so
    Brandon can see it over coffee — run the **`/deploy-test`** skill (the single source of truth for
-   the staging push: `scripts/deploy-test.sh` + the live-asset-hash confirm against
+   the staging push: `scripts/deploy.sh test` + the live-asset-hash confirm against
    `git rev-parse --short HEAD`). Then assemble a **smoke-test checklist from the night's
    diff**, grouped the way a human checks:
    - **Lead with the highest-value / riskiest *visible* change** — the one thing most worth a look.
@@ -62,7 +62,7 @@ never `--auto`) are load-bearing — the standing go below removes the *checkpoi
      one-line revert** (`git revert <sha>`). These landed on `main` on CI-green trust — the checklist
      is how Brandon closes the loop, so make the revert frictionless.
    **Nothing merged** (dry queue, or all halted for review) → **skip the deploy** and say so. Prod is
-   never part of this — promoting to prod is Brandon's awake, gated call (`scripts/deploy-prod.sh`).
+   never part of this — promoting to prod is Brandon's awake, gated call (`scripts/deploy.sh prod`).
 
 4. **Report.** One morning-ready summary, in order: **lead with the run duration** (`date +%s` again
    minus the step-0 start, human-readable — "ran 4h 12m, 23:40 → 03:52"); then what `/burndown`
@@ -85,7 +85,7 @@ as in an attended `/burndown`. The standing go removes the *checkpoint pauses*, 
 - **Auto-merge = §6's poll-then-merge guard only, never `gh pr merge --auto`** (no server-side
   required checks here, so `--auto` can land before gates finish).
 - **Prod is never touched.** The standard finish deploys to **test** (step 3); `/nightly` never runs
-  `deploy-prod.sh`. Promoting to prod is always Brandon's explicit, awake decision.
+  `deploy.sh prod`. Promoting to prod is always Brandon's explicit, awake decision.
 - **Scout finds, never fixes.** Step 2 only files issues; never branches/merges speculative work.
 - **Re-verify gates yourself** — never trust a spawned "green."
 - **Honor every hard stop:** judgment call, red CI, dry queue, or interrupt. A clean halt with a good

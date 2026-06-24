@@ -236,20 +236,25 @@ merged-but-not-Shipped item, the workflow was toggled off — `node scripts/gh-p
 
 **Deploy (static-file app).** Ensemble ships as **static files on nginx behind Caddy** —
 `vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app server, no DB,
-no migrations, no restart; nginx serves the new files the instant rsync finishes. Two skills
-wrap the scripts:
-- **`/deploy-test`** (`scripts/deploy-test.sh` → `ensembletest.brndn.zip`) — low ceremony, the
+no migrations, no restart; nginx serves the new files the instant rsync finishes. **One script
+— `scripts/deploy.sh <test|prod>`** — owns the mechanics for both; two skills wrap it with the
+right ceremony:
+- **`/deploy-test`** (`scripts/deploy.sh test` → `ensembletest.brndn.zip`) — low ceremony, the
   staging push. **May run unattended from the pipeline after a merge to `main`** (private box,
-  non-destructive static rsync). Confirms the live asset hash matches HEAD.
-- **`/deploy-prod`** (`scripts/deploy-prod.sh` → `ensemble.brndn.zip`) — **gated, awake-only,
+  non-destructive static rsync). The script confirms the live asset hash matches the build.
+- **`/deploy-prod`** (`scripts/deploy.sh prod` → `ensemble.brndn.zip`) — **gated, awake-only,
   never automatic** (§5 always-brake). Full `validate` + clean pushed `main` → one explicit
-  "go" → deploy → verify the public origin. **A merge to `main` is NOT a prod deploy — it ships
-  nothing on its own.**
+  "go" → deploy → verify the public origin. The script **refuses a dirty tree** for prod as a
+  built-in backstop. **A merge to `main` is NOT a prod deploy — it ships nothing on its own.**
 
-Both scripts move a **`refs/deploys/{test,prod}`** ref to the deployed HEAD on success, so
-`git log refs/deploys/<env>..HEAD` is the pending set. **Verification needs no `/api/version`:**
-`vite.config.ts` bakes `git rev-parse --short HEAD` into every asset filename, so the live
-`index.html` names the exact build — curl it and match the hash to HEAD.
+**The live site is the source of truth for what's deployed — there is no stored deploy ref**
+(the old `refs/deploys/*` refs were retired: their best-effort push silently drifted, faking
+the deploy history). `vite.config.ts` (`computeBuildRev`) bakes the rev into every asset
+filename, so the running `index.html` names the exact build. `scripts/deploy.sh` reads that
+live rev itself — curling it **before** to print the real delta (`git log <live-sha>..HEAD`,
+accurate regardless of who deployed last or from where) and **after** to verify the right
+bundle landed. To check the pending set by hand: curl the origin's `index.<rev>.js`, strip any
+dirty `-<sig>` suffix, and `git log <rev>..HEAD`.
 
 ## §7 gh-project mechanics
 

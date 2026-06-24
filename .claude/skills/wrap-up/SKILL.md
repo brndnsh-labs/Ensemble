@@ -22,7 +22,7 @@ write something, that's the smell — stop and re-check the gate.
    - `git log --oneline @{u}..HEAD` (unpushed) and the diff/log since the session began — what
      shipped/changed.
    - Working tree: anything uncommitted? Anything merged-but-undeployed (on `main`, not on test/prod
-     via `scripts/deploy-test.sh` / `scripts/deploy-prod.sh`)?
+     via `scripts/deploy.sh test` / `scripts/deploy.sh prod`)?
    - Anything **blocked on Brandon** on the board (Status `Needs-ear` / `Needs-decision`), and any
      open `finding` issues (review debt — should trend to empty).
    - Did a story or **epic (milestone)** close? (If an epic completed, fold in `/cycle`'s

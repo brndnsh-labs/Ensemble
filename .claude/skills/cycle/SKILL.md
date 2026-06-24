@@ -39,7 +39,7 @@ Read the issue's **Track** field; it sets the loop's tail:
 
 - **`/cycle #<n>`** — one issue, full loop. `/done` auto-merges a safe story on CI green (§6) or leaves
   a judgment-call PR for Brandon. A **synth** issue halts at the listening gate. `--deploy` runs
-  `scripts/deploy-test.sh` after the merge.
+  `scripts/deploy.sh test` after the merge.
 - **`/cycle #<n> approved`** — finalize a synth issue whose audition you've now signed off: run §6's
   merge + set Shipped, then continue.
 - **`/cycle next`** — runs `/next` first, then cycles whatever Ready issue it picks.
@@ -47,7 +47,7 @@ Read the issue's **Track** field; it sets the loop's tail:
   judgment call (§5 — incl. a synth listening gate or a PR left un-merged) · no Ready issue left ·
   a milestone boundary (retrospective) · interrupt · a `/done` that fails or yields an empty diff.
   **Does NOT stop merely because the next story is `opus`.**
-- Add **`--deploy`** to run `scripts/deploy-test.sh` after each safe merge.
+- Add **`--deploy`** to run `scripts/deploy.sh test` after each safe merge.
 
 ## Workflow
 

@@ -39,8 +39,8 @@
         "validate": "npm run typecheck && npm run knip && npm run jscpd && npm run format && npm test",
         "build": "npx vite build --mode test",
         "build:quiet": "npx vite build --mode test --logLevel warn",
-        "deploy:test": "./scripts/deploy-test.sh",
-        "deploy:prod": "./scripts/deploy-prod.sh",
+        "deploy:test": "./scripts/deploy.sh test",
+        "deploy:prod": "./scripts/deploy.sh prod",
         "prepare": "husky"
     },
     "devDependencies": {

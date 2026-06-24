@@ -47,7 +47,7 @@ explicit status write, no markdown tracker to touch.
       design call, or anything Brandon should *see*) → **leave the PR open**, Status stays In review
       (or Needs-ear for synth awaiting audition), report "ready for your merge: <url>" + *why* it's
       gated. Do NOT auto-merge.
-12. **Suggest next:** `scripts/deploy-test.sh` (staging), `/next`, or `/cycle` continues.
+12. **Suggest next:** `scripts/deploy.sh test` (staging), `/next`, or `/cycle` continues.
 
 ## Edge cases
 

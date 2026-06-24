@@ -52,7 +52,7 @@ npm run build
 
 This emits an optimized bundle into `dist/`, including the service worker (via `vite-plugin-pwa`) so the app is installable and works offline. `dist/` is a plain static site — host it on any static file server or CDN.
 
-**Deploy:** `npm run deploy:test` and `npm run deploy:prod` are thin wrappers around `vite build` + `rsync` (see [`scripts/deploy-test.sh`](scripts/deploy-test.sh) / [`scripts/deploy-prod.sh`](scripts/deploy-prod.sh)). Point them at your own host, or copy `dist/` wherever you like.
+**Deploy:** `npm run deploy:test` and `npm run deploy:prod` are thin aliases for `scripts/deploy.sh <test|prod>` — a wrapper around `vite build` + `rsync` (see [`scripts/deploy.sh`](scripts/deploy.sh)). Point them at your own host, or copy `dist/` wherever you like.
 
 ---
 
