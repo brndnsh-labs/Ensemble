@@ -1,4 +1,4 @@
-import { gainForPack } from '../data/sound-packs.js';
+import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable, SoloistExpression, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
@@ -6,6 +6,7 @@ import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import {
     clampFrac,
+    foldToSampledCeiling,
     pickZone,
     playSampledNote,
     type SampleBend,
@@ -120,7 +121,11 @@ function playSampledSolo(
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
         return false;
     }
-    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    // Fold notes above the pack's sampled range down an octave (#755): the
+    // soloist runs to MIDI 90 but the packs top out lower (nylon 84, sax 79,
+    // guitars 85), so the top zone would otherwise pitch-shift up into a thin
+    // metallic ring. In-range notes are unchanged.
+    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
         return false;
@@ -135,6 +140,7 @@ function playSampledSolo(
         // Bend-in (bendStartInterval) and/or bend-and-release (expression.bend),
         // now rendered on the sampled seam too — full pitch-gesture parity (#744).
         bend: toSampleBend(bendStartInterval, expression),
+        tone: toneTiltForPack(packId),
     });
     return true;
 }

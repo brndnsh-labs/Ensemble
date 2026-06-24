@@ -101,7 +101,50 @@ export interface SampledNoteOptions {
     readonly vibrato?: SampleVibrato;
     /** Opt-in pitch bend — bend-in and/or bend-and-release (#744 Slice 2). */
     readonly bend?: SampleBend;
+    /**
+     * Opt-in per-pack tone-correction tilt in dB (#755) — positive brightens,
+     * negative darkens. Omitted/`0`/non-finite leaves the path un-filtered.
+     */
+    readonly tone?: number;
     readonly onEnded?: () => void;
+}
+
+/**
+ * Tilt pivot (Hz) — the hinge between the low-shelf cut and high-shelf lift.
+ * ~800 Hz sits near the median centroid of the pro-mix reference corpus, so a
+ * tilt re-weights brightness around the musical mid without skewing the low
+ * fundamentals or the air band.
+ */
+const TONE_TILT_PIVOT_HZ = 800;
+
+/**
+ * Build a per-pack tone-correction tilt (#755): a paired low-shelf/high-shelf
+ * that re-weights a sampled voice's brightness so it sits right through the bus
+ * EQ authored around the synth voice. One dB number — positive = brighter
+ * (high-shelf +tilt/2, low-shelf −tilt/2), negative = darker. The symmetric
+ * ±tilt/2 around the pivot keeps it roughly level-preserving, so it shapes tone
+ * without re-opening the pack's `gain` calibration. Returns the chain's
+ * `{ input, output, nodes }`, or `null` for a missing/zero/non-finite tilt so
+ * the caller keeps the un-filtered path byte-identical.
+ */
+export function buildToneTilt(
+    audio: AudioContext,
+    tiltDb: number | undefined,
+): { input: AudioNode; output: AudioNode; nodes: AudioNode[] } | null {
+    if (!audio || !Number.isFinite(tiltDb) || !tiltDb) {
+        return null;
+    }
+    const half = (tiltDb as number) / 2;
+    const lowShelf = audio.createBiquadFilter();
+    lowShelf.type = 'lowshelf';
+    lowShelf.frequency.value = TONE_TILT_PIVOT_HZ;
+    lowShelf.gain.value = -half;
+    const highShelf = audio.createBiquadFilter();
+    highShelf.type = 'highshelf';
+    highShelf.frequency.value = TONE_TILT_PIVOT_HZ;
+    highShelf.gain.value = half;
+    lowShelf.connect(highShelf);
+    return { input: lowShelf, output: highShelf, nodes: [lowShelf, highShelf] };
 }
 
 /**
@@ -131,6 +174,43 @@ export function pickZone(zones: readonly SampleZone[], targetMidi: number): Samp
         }
     }
     return best;
+}
+
+/**
+ * Fold a target note down by whole octaves so it never sits more than
+ * `maxUpshift` semitones above the pack's highest sampled zone (#755). An
+ * instrument's register can exceed its pack's sampled range — the soloist runs
+ * to MIDI 90 but nylon tops out at 84, sax at 79; harmony runs to 84 but the
+ * strings top at 74 — so without this the top zone gets pitch-shifted *up*
+ * several semitones, and upward-resampling a plucked/blown sample rings thin and
+ * metallic (aliasing + a shifted formant), which a brightening tone tilt then
+ * drags into earshot. Folding by octaves keeps the pitch class (musically
+ * coherent — the same note, an octave down) while landing on a zone the sampler
+ * plays near unity. `maxUpshift` (default 2 ≈ the inter-zone spacing) lets a note
+ * a tone above the top sample still shift up like any in-range note rather than
+ * jumping an octave. In-range notes return unchanged, so the fold only ever
+ * touches notes that would otherwise alias upward.
+ */
+export function foldToSampledCeiling(
+    targetMidi: number,
+    zones: readonly SampleZone[],
+    maxUpshift = 2,
+): number {
+    if (zones.length === 0) {
+        return targetMidi;
+    }
+    let topRoot = Number.NEGATIVE_INFINITY;
+    for (const zone of zones) {
+        if (zone.rootMidi > topRoot) {
+            topRoot = zone.rootMidi;
+        }
+    }
+    const ceiling = topRoot + maxUpshift;
+    let midi = targetMidi;
+    while (midi > ceiling) {
+        midi -= 12;
+    }
+    return midi;
 }
 
 /**
@@ -428,6 +508,7 @@ export function playSampledNote(
         duration = 0.5,
         vibrato,
         bend,
+        tone,
         onEnded,
     }: SampledNoteOptions = {},
 ): SampledNoteHandle | null {
@@ -476,7 +557,16 @@ export function playSampledNote(
         gain.gain.linearRampToValueAtTime(0, releaseStart + release);
 
         source.connect(gain);
-        gain.connect(destination);
+        // Opt-in per-pack tone correction (#755): splice a tilt between the note
+        // gain and the bus so only this pack is reshaped — the synth voice shares
+        // `destination` and must stay untouched. No tilt → the un-filtered path.
+        const toneTilt = buildToneTilt(audio, tone);
+        if (toneTilt) {
+            gain.connect(toneTilt.input);
+            toneTilt.output.connect(destination);
+        } else {
+            gain.connect(destination);
+        }
 
         // Stop just past the release tail so the source frees itself; never cut
         // the envelope short.
@@ -500,7 +590,7 @@ export function playSampledNote(
         // the same self-cleanup contract as `playPercussiveStrike`, so sampled
         // notes don't leak a source+gain per played note.
         source.onended = () => {
-            safeDisconnect([source, gain, ...vibratoNodes]);
+            safeDisconnect([source, gain, ...(toneTilt?.nodes ?? []), ...vibratoNodes]);
             onEnded?.();
         };
 

@@ -1,4 +1,4 @@
-import { gainForPack } from '../data/sound-packs.js';
+import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
@@ -207,6 +207,7 @@ function playSampledChord(
     return playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
+        tone: toneTiltForPack(packId),
     });
 }
 

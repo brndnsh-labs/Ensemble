@@ -46,6 +46,20 @@ export interface SoundPack {
      * voice change via `syncBusReverbSend`). By-ear.
      */
     readonly reverbSend?: number;
+    /**
+     * Spectral **tilt** in dB applied to this pack's own playback path (#755) so
+     * its brightness sits right through the bus EQ — which was authored around
+     * the *synth* voice and is shared, unchanged, by every pack on the lane. A
+     * sampled voice is `gainForPack`-matched in loudness but not in timbre (the
+     * calibrator reports centroid deltas of hundreds of Hz: nylon reads dark,
+     * the strings bright), so a dark pack lands at the right level but the wrong
+     * brightness. One number: positive = brighter (high-shelf lift + low-shelf
+     * cut), negative = darker; level-preserving by construction (±tilt/2 around
+     * the pivot), so it shapes tone without re-opening the `gain` calibration.
+     * Seeded from the calibrator's centroid Δ, then ear-locked. `0`/omitted = no
+     * correction (the path is byte-identical to the un-tilted sampler).
+     */
+    readonly toneTiltDb?: number;
 }
 
 export const SOUND_PACKS: readonly SoundPack[] = [
@@ -143,6 +157,10 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // ~677 Hz brighter than the synth trumpet (reads louder than its RMS), so
         // seated a touch under at 3.0×. Starting point — confirm by ear on ensembletest.
         gain: 3,
+        // Tone tilt (#755): the sax reads ~677 Hz brighter than the synth trumpet
+        // on the shared soloist bus, so a gentle darkening seats its timbre.
+        // Seeded from the centroid Δ, ear-locked 2026-06-23 on ensembletest.
+        toneTiltDb: -1.5,
         // Close-mic'd horn, fairly dry — a small lift to seat the lead in the room. #686 start.
         reverbSend: 1.2,
     },
@@ -171,6 +189,14 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // noise-floor tail. Confirm/nudge by ear on ensembletest (bossa / acoustic
         // / country lead lines).
         gain: 5,
+        // Tone tilt (#755): this is the "~3 kHz presence lift held off to keep the
+        // tone" the gain note above anticipated — the nylon reads ~820 Hz darker
+        // than the synth lead, so a modest brightening lets it cut rather than only
+        // sit louder. Kept gentle to preserve the warm fingerstyle body. Seeded
+        // from the centroid Δ, ear-locked 2026-06-23 on ensembletest. (Brightening
+        // first exposed an upward-pitch-shift ring on the soloist's top notes; that
+        // is fixed at the source by foldToSampledCeiling, so +2 is artifact-free.)
+        toneTiltDb: 2,
         // Close-mic'd, dry-ish room (FreePats home recording). Started at 1.3 (a
         // sax-like lift), but reverb pushes a lead back/down — pulled to 1.0 (the
         // synth send, unchanged) to bring the nylon *forward* in the mix without
@@ -256,6 +282,11 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // straight to playSampledNote, which bounds it at MAX_SAMPLE_PEAK and the
         // master limiter catches stacked-voice peaks. Confirm/adjust by ear.
         gain: 5,
+        // Tone tilt (#755): the VSCO strings read ~1029 Hz brighter than the synth
+        // pad they replace on the harmony bus (the widest mismatch in the catalog),
+        // so the strongest darkening of the seeded set rounds the top end into the
+        // pad's seat. Seeded from the centroid Δ, ear-locked 2026-06-23 on ensembletest.
+        toneTiltDb: -2.5,
         // VSCO ensemble carries its own hall — pull the send back so we don't
         // stack the algorithmic hall on the recorded room (mud). #686 start.
         reverbSend: 0.7,
@@ -366,4 +397,18 @@ export function reverbSendForPack(packId: string | null): number {
     }
     const pack = SOUND_PACKS.find((entry) => entry.id === packId);
     return pack?.reverbSend ?? 1;
+}
+
+/**
+ * The tone-correction tilt (dB) for a pack id (#755) — the per-pack brightness
+ * trim that sits its samples right through the synth-authored bus EQ. `0` for a
+ * `null`/unknown id (the synth voice) or an un-tuned pack, so the synth path and
+ * any freshly-added pack are unfiltered until a tilt is calibrated and ear-locked.
+ */
+export function toneTiltForPack(packId: string | null): number {
+    if (!packId) {
+        return 0;
+    }
+    const pack = SOUND_PACKS.find((entry) => entry.id === packId);
+    return pack?.toneTiltDb ?? 0;
 }

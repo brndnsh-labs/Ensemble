@@ -1,9 +1,9 @@
-import { gainForPack } from '../data/sound-packs.js';
+import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
-import { pickZone, playSampledNote } from './sample-voice.js';
+import { foldToSampledCeiling, pickZone, playSampledNote } from './sample-voice.js';
 import { playPercussiveStrike, rampGain, velocityTimbre } from './synth-utils.js';
 
 export function killBassNote(state: EnsembleState): void {
@@ -60,7 +60,10 @@ function playSampledBass(
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
         return false;
     }
-    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    // Fold notes above the pack's sampled range down an octave (#755): the bass
+    // register runs to MIDI 57 but the upright pack tops at 52, so a high note
+    // would otherwise pitch-shift the top zone up. In-range notes are unchanged.
+    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
         return false;
@@ -78,6 +81,7 @@ function playSampledBass(
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity: v * gainForPack(packId),
         duration,
+        tone: toneTiltForPack(packId),
     });
     return true;
 }

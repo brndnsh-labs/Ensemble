@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+    buildToneTilt,
+    foldToSampledCeiling,
     pickZone,
     pitchRatio,
     playSampledNote,
@@ -50,12 +52,24 @@ function makeCtx() {
         connect: vi.fn(),
         disconnect: vi.fn(),
     };
+    const biquads: any[] = [];
     const ctx = {
         currentTime: 5,
         createBufferSource: vi.fn(() => source),
         createGain: vi.fn(() => gain),
+        createBiquadFilter: vi.fn(() => {
+            const node: any = {
+                type: '',
+                frequency: { value: 0 },
+                gain: { value: 0 },
+                connect: vi.fn(),
+                disconnect: vi.fn(),
+            };
+            biquads.push(node);
+            return node;
+        }),
     } as unknown as AudioContext;
-    return { ctx, source, gain };
+    return { ctx, source, gain, biquads };
 }
 
 const zone = (rootMidi: number): SampleZone => ({ rootMidi, buffer: fakeBuffer() });
@@ -579,5 +593,100 @@ describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
             throw new Error('InvalidStateError'); // simulate already-stopped source
         });
         expect(() => handle?.choke(0.5)).not.toThrow();
+    });
+});
+
+describe('sample-voice — foldToSampledCeiling (#755 anti-aliasing fold)', () => {
+    // Nylon-like zones: every 2 semitones, topping at 84 (the reported case).
+    const nylon = [48, 60, 72, 80, 82, 84].map((rootMidi) => ({ rootMidi, buffer: fakeBuffer() }));
+
+    it('leaves an in-range note unchanged', () => {
+        expect(foldToSampledCeiling(72, nylon)).toBe(72);
+        expect(foldToSampledCeiling(84, nylon)).toBe(84);
+    });
+
+    it('keeps a note within the default upshift tolerance (top + 2) unchanged', () => {
+        expect(foldToSampledCeiling(85, nylon)).toBe(85); // +1 over top — like any in-range shift
+        expect(foldToSampledCeiling(86, nylon)).toBe(86); // +2 over top — at the tolerance
+    });
+
+    it('folds a note beyond the tolerance down a whole octave (preserves pitch class)', () => {
+        expect(foldToSampledCeiling(87, nylon)).toBe(75); // 87 → 75, same pitch class
+        expect(foldToSampledCeiling(90, nylon)).toBe(78); // the soloist ceiling → 78
+        // Folded results land back within the sampled range.
+        expect(foldToSampledCeiling(90, nylon)).toBeLessThanOrEqual(84 + 2);
+    });
+
+    it('folds repeatedly when a note is multiple octaves too high', () => {
+        // sax-like top of 79: a note way up folds by octaves until within tolerance.
+        const sax = [49, 67, 79].map((rootMidi) => ({ rootMidi, buffer: fakeBuffer() }));
+        expect(foldToSampledCeiling(100, sax)).toBe(76); // 100 → 88 → 76 (≤ 81)
+    });
+
+    it('respects a custom maxUpshift', () => {
+        expect(foldToSampledCeiling(85, nylon, 0)).toBe(73); // no tolerance → fold 85 → 73
+    });
+
+    it('returns the note unchanged for an empty zone set', () => {
+        expect(foldToSampledCeiling(90, [])).toBe(90);
+    });
+});
+
+describe('sample-voice — buildToneTilt (#755 per-pack tone correction)', () => {
+    it('returns null for a missing / zero / non-finite tilt (un-filtered path)', () => {
+        const { ctx } = makeCtx();
+        expect(buildToneTilt(ctx, undefined)).toBeNull();
+        expect(buildToneTilt(ctx, 0)).toBeNull();
+        expect(buildToneTilt(ctx, Number.NaN)).toBeNull();
+    });
+
+    it('builds a level-preserving paired shelf: low-shelf −tilt/2, high-shelf +tilt/2 at one pivot', () => {
+        const { ctx, biquads } = makeCtx();
+        const tilt = buildToneTilt(ctx, 3);
+        expect(tilt).not.toBeNull();
+        expect(biquads).toHaveLength(2);
+        const [low, high] = biquads;
+        expect(low.type).toBe('lowshelf');
+        expect(high.type).toBe('highshelf');
+        // Symmetric ±tilt/2 keeps it roughly level-preserving.
+        expect(low.gain.value).toBe(-1.5);
+        expect(high.gain.value).toBe(1.5);
+        // Both shelves hinge at the same pivot frequency.
+        expect(low.frequency.value).toBe(high.frequency.value);
+        // The chain runs input(low) → output(high); the caller wires it inline.
+        expect(low.connect).toHaveBeenCalledWith(high);
+        expect(tilt?.input).toBe(low);
+        expect(tilt?.output).toBe(high);
+        expect(tilt?.nodes).toEqual([low, high]);
+    });
+
+    it('a negative tilt darkens (low-shelf boost, high-shelf cut)', () => {
+        const { ctx, biquads } = makeCtx();
+        buildToneTilt(ctx, -2);
+        const [low, high] = biquads;
+        expect(low.gain.value).toBe(1);
+        expect(high.gain.value).toBe(-1);
+    });
+});
+
+describe('sample-voice — playSampledNote tone insertion (#755)', () => {
+    it('splices the tilt between the note gain and the bus when tone is set', () => {
+        const { ctx, gain, biquads } = makeCtx();
+        const dest = {} as AudioNode;
+        playSampledNote(ctx, zone(60), dest, 60, 5, { tone: 2, duration: 0.5 });
+        expect(biquads).toHaveLength(2);
+        const [low, high] = biquads;
+        // gain → low-shelf (not straight to the bus), high-shelf → bus.
+        expect(gain.connect).toHaveBeenCalledWith(low);
+        expect(gain.connect).not.toHaveBeenCalledWith(dest);
+        expect(high.connect).toHaveBeenCalledWith(dest);
+    });
+
+    it('connects the note gain straight to the bus when no tone is set (byte-identical path)', () => {
+        const { ctx, gain, biquads } = makeCtx();
+        const dest = {} as AudioNode;
+        playSampledNote(ctx, zone(60), dest, 60, 5, { duration: 0.5 });
+        expect(biquads).toHaveLength(0);
+        expect(gain.connect).toHaveBeenCalledWith(dest);
     });
 });
