@@ -27,6 +27,10 @@ cleanupOutdatedCaches();
 // and works offline, while the core's instant-load guarantee is untouched.
 // CacheFirst because pack assets are immutable — once fetched, always served
 // from cache (no revalidation round-trip), the right trade for a few-MB sample.
+// Re-encoding a pack in place is handled by the catalog `rev` cache-bust (#752):
+// the loader appends `?v=<rev>`, and CacheFirst keys by the full request URL
+// incl. query (no `ignoreSearch` here), so a bumped rev is a distinct cache
+// entry. The route predicate matches on `pathname`, so tokened URLs still route.
 registerRoute(
     ({ url }) => url.pathname.startsWith('/packs/'),
     new CacheFirst({

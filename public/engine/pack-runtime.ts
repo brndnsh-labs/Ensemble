@@ -1,4 +1,4 @@
-import { SOUND_PACKS } from '../data/sound-packs.js';
+import { revForPack, SOUND_PACKS } from '../data/sound-packs.js';
 import type { InstrumentVoice } from '../types.js';
 import {
     getPackBuffer,
@@ -6,7 +6,7 @@ import {
     packIdFromVoice,
     seedInstalledPacks,
 } from './instrument-registry.js';
-import { loadPack, type PackManifest } from './sample-loader.js';
+import { loadPack, type PackManifest, withRevToken } from './sample-loader.js';
 import type { SampleZone } from './sample-voice.js';
 
 /**
@@ -32,8 +32,11 @@ export function getPackZones(packId: string): SampleZone[] | null {
     return zoneCache.get(packId) ?? null;
 }
 
-async function fetchManifest(packId: string): Promise<PackManifest> {
-    const res = await fetch(`/packs/${packId}/manifest.json`);
+async function fetchManifest(packId: string, rev: number): Promise<PackManifest> {
+    // #752 — token the manifest URL too, from the same catalog `rev`: the
+    // manifest is itself under `/packs/` (CacheFirst), so a bare URL would serve
+    // a stale manifest after a re-encode and never reach the new sample bytes.
+    const res = await fetch(withRevToken(`/packs/${packId}/manifest.json`, rev));
     if (!res.ok) {
         throw new Error(
             `[pack-runtime] manifest fetch failed (${res.status}) for pack "${packId}"`,
@@ -61,8 +64,9 @@ export function ensurePackLoaded(audio: BaseAudioContext, packId: string): Promi
     }
 
     const run = (async () => {
-        const manifest = await fetchManifest(packId);
-        await loadPack(audio, manifest);
+        const rev = revForPack(packId);
+        const manifest = await fetchManifest(packId, rev);
+        await loadPack(audio, manifest, rev);
         // Build zones only for samples that declare a root pitch (pitched packs).
         const zones: SampleZone[] = [];
         for (const sample of manifest.samples) {

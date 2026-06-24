@@ -60,6 +60,18 @@ export interface SoundPack {
      * correction (the path is byte-identical to the un-tilted sampler).
      */
     readonly toneTiltDb?: number;
+    /**
+     * Cache-bust revision for this pack's audio (#752). Pack files live at stable
+     * `/packs/<id>/*` URLs served `CacheFirst` (correct while packs are add-only/
+     * immutable). If a pack's audio is ever **re-encoded in place**, bump `rev`:
+     * the loader appends `?v=<rev>` to the manifest + sample URLs, so the SW +
+     * browser cache (keyed by full URL incl. query) miss and re-fetch. The token
+     * MUST come from this bundled catalog — it's hash-busted on every deploy —
+     * not from `manifest.json`, which is itself under `/packs/` and would go stale
+     * too (chicken-and-egg). `1`/omitted = today's bare URLs, byte-identical, so
+     * the rollout re-downloads nothing already cached.
+     */
+    readonly rev?: number;
 }
 
 export const SOUND_PACKS: readonly SoundPack[] = [
@@ -411,4 +423,14 @@ export function toneTiltForPack(packId: string | null): number {
     }
     const pack = SOUND_PACKS.find((entry) => entry.id === packId);
     return pack?.toneTiltDb ?? 0;
+}
+
+/**
+ * The cache-bust revision for a pack id (#752) — bumped when a pack's audio is
+ * re-encoded in place so the loader's `?v=<rev>` token forces a cache miss.
+ * Unknown id or unset → `1` (today's bare URLs, byte-identical — no re-download).
+ */
+export function revForPack(packId: string): number {
+    const pack = SOUND_PACKS.find((entry) => entry.id === packId);
+    return pack?.rev ?? 1;
 }

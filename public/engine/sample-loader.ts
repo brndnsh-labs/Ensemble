@@ -93,16 +93,32 @@ function validateManifest(manifest: unknown): asserts manifest is PackManifest {
     }
 }
 
+/**
+ * Append the catalog cache-bust token (#752) to a pack asset URL. `rev <= 1`
+ * (the default) returns the URL unchanged, so today's already-cached packs keep
+ * their bare URLs and re-download nothing; bumping a pack's `rev` to `>= 2`
+ * yields `?v=<rev>` → a distinct SW/browser cache key → a fresh fetch. The
+ * manifest keeps clean `sample.url` values; the token is added here at fetch time.
+ */
+export function withRevToken(url: string, rev: number): string {
+    if (rev <= 1) {
+        return url;
+    }
+    return `${url}${url.includes('?') ? '&' : '?'}v=${rev}`;
+}
+
 async function fetchAndDecode(
     ctx: BaseAudioContext,
     packId: string,
     sample: PackSample,
+    rev: number,
 ): Promise<{ key: string; buffer: AudioBuffer }> {
-    const res = await fetch(sample.url);
+    const url = withRevToken(sample.url, rev);
+    const res = await fetch(url);
     if (!res.ok) {
         throw new Error(
             `[sample-loader] pack "${packId}" sample "${sample.key}" — fetch failed ` +
-                `(${res.status}) for ${sample.url}`,
+                `(${res.status}) for ${url}`,
         );
     }
     const bytes = await res.arrayBuffer();
@@ -116,7 +132,11 @@ async function fetchAndDecode(
  * Lazily load + decode a sample pack and register its buffers. Resolves once the
  * pack is fully loaded (or was already). See module docs for the guarantees.
  */
-export async function loadPack(ctx: BaseAudioContext, manifest: PackManifest): Promise<void> {
+export async function loadPack(
+    ctx: BaseAudioContext,
+    manifest: PackManifest,
+    rev = 1,
+): Promise<void> {
     validateManifest(manifest);
     if (isPackLoaded(manifest.id)) {
         return;
@@ -135,7 +155,7 @@ export async function loadPack(ctx: BaseAudioContext, manifest: PackManifest): P
             [sample.url, ...(sample.variants ?? [])].map((url) => ({ key: sample.key, url })),
         );
         const decoded = await Promise.all(
-            tasks.map((task) => fetchAndDecode(ctx, manifest.id, task)),
+            tasks.map((task) => fetchAndDecode(ctx, manifest.id, task, rev)),
         );
         // Register only after every sample decodes — atomic present-or-absent.
         for (const { key, buffer } of decoded) {
