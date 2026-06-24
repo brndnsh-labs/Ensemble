@@ -11,8 +11,10 @@ const mocks = vi.hoisted(() => ({
     resolveInstrumentSource: vi.fn(),
     getPackZones: vi.fn(),
     pickZone: vi.fn(),
+    foldToSampledCeiling: vi.fn((midi: number) => midi),
     playSampledNote: vi.fn(),
     gainForPack: vi.fn(() => 2),
+    toneTiltForPack: vi.fn(() => 0),
 }));
 
 vi.mock('../../../public/engine/instrument-registry.js', () => ({
@@ -23,10 +25,12 @@ vi.mock('../../../public/engine/pack-runtime.js', () => ({
 }));
 vi.mock('../../../public/engine/sample-voice.js', () => ({
     pickZone: mocks.pickZone,
+    foldToSampledCeiling: mocks.foldToSampledCeiling,
     playSampledNote: mocks.playSampledNote,
 }));
 vi.mock('../../../public/data/sound-packs.js', () => ({
     gainForPack: mocks.gainForPack,
+    toneTiltForPack: mocks.toneTiltForPack,
 }));
 
 import { playBassNote } from '../../../public/engine/synth-bass.js';

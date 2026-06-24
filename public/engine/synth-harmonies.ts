@@ -1,9 +1,9 @@
-import { gainForPack } from '../data/sound-packs.js';
+import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
-import { pickZone, playSampledNote } from './sample-voice.js';
+import { foldToSampledCeiling, pickZone, playSampledNote } from './sample-voice.js';
 import { createSimplePanner, killActiveVoices } from './synth-utils.js';
 
 /**
@@ -307,7 +307,10 @@ function playSampledHarmony(
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
         return false;
     }
-    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    // Fold notes above the pack's sampled range down an octave (#755): harmony
+    // runs to MIDI 84 but the strings top at 74 and horns at 72, so the top zone
+    // would otherwise pitch-shift up into a thin metallic ring. In-range unchanged.
+    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
         return false;
@@ -325,6 +328,7 @@ function playSampledHarmony(
         duration,
         attack: 0.06,
         release: 0.3,
+        tone: toneTiltForPack(packId),
     });
     return true;
 }
