@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyThemeToDom, setBpm } from '../../../public/app-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
-import { initAudio, restoreGains } from '../../../public/engine/engine.js';
+import { initAudio, restoreGains, syncBusReverbSend } from '../../../public/engine/engine.js';
 import {
     __resetPackCacheForTest,
     markPackInstalled,
@@ -30,6 +30,7 @@ vi.mock('../../../public/instrument-controller.js', () => ({
 vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
     restoreGains: vi.fn(),
+    syncBusReverbSend: vi.fn(),
 }));
 vi.mock('../../../public/midi-controller.js', () => ({
     initMIDI: vi.fn(),
@@ -133,6 +134,17 @@ describe('State Effects Handler', () => {
                 auto: true,
             });
         });
+    });
+
+    it('should re-send the bus reverb on SET_REVERB action (#688)', () => {
+        const payload = { module: 'chords', value: 0.6 };
+        handleEffects(ACTIONS.SET_REVERB, payload, stateMap, { dispatch });
+        expect(syncBusReverbSend).toHaveBeenCalledWith(stateMap, 'chords');
+    });
+
+    it('should NOT re-send the bus reverb on SET_REVERB with no module', () => {
+        handleEffects(ACTIONS.SET_REVERB, { value: 0.6 }, stateMap, { dispatch });
+        expect(syncBusReverbSend).not.toHaveBeenCalled();
     });
 
     it('should call restoreGains on RESTORE_GAINS action', () => {
