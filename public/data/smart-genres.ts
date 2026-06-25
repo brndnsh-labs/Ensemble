@@ -108,7 +108,10 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         sub: '8th',
         drum: 'Acoustic',
         feel: 'Acoustic',
-        chord: 'pad',
+        // The chords lane plays a fingerpick arpeggio (the 'arp' style); the
+        // strings harmony holds the sustained pad underneath — each instrument
+        // on its idiomatic gesture. See accompaniment.ts + harmony-styles.ts.
+        chord: 'arp',
         bass: 'acoustic',
         // #592: the Acoustic genre plays its hand-tuned 'acoustic' profile
         // (space-over-flash: restBase 0.15, slide/run devices) rather than the

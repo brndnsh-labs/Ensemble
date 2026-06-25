@@ -3114,8 +3114,11 @@ export function getAccompanimentNotes(
         isHit = stepInChord === 0;
     }
 
-    // Acoustic Arpeggiator Override
-    if (genre === 'Acoustic' && intensity < 0.45 && chords.style === 'smart') {
+    // Arpeggiator style ('arp'): one pluck per beat (the voicing + ring are set
+    // in the matching block below). A first-class chord style — Acoustic routes
+    // here via smart-genres `chord: 'arp'`. Replaces the old genre+intensity
+    // hardcode that left this unreached in production.
+    if (chords.style === 'arp') {
         isHit = isBeatStart;
     }
 
@@ -3267,10 +3270,15 @@ export function getAccompanimentNotes(
             }
         }
 
-        // --- Low Intensity Arpeggiation / Fingerpicking (Acoustic) ---
-        if (genre === 'Acoustic' && intensity < 0.45 && chords.style === 'smart') {
-            // We need 4 hits per measure (1 hit per beat) to pass the critique.
-            const pattern = [0, 2, 1, 3]; // Bass, High, Mid, High sequence
+        // --- Arpeggiation / Fingerpicking ('arp' chord style) ---
+        // One pluck per beat (isHit forced to isBeatStart above), each ringing
+        // to the chord boundary for a sustain-pedal bloom.
+        if (chords.style === 'arp') {
+            // 4 hits per measure (1 per beat) — the fingerpick critique gate.
+            // Voicing indices per beat; wraps via `% voicing.length`, so on a bare
+            // triad `3` folds back to the root (index 0) and on a 4+-note colored
+            // voicing it reaches the top extension.
+            const pattern = [0, 2, 1, 3];
             const pickIdx = pattern[intBeat % pattern.length];
             const noteIdx = pickIdx % voicing.length;
             voicing = [voicing[noteIdx]];
@@ -3279,7 +3287,13 @@ export function getAccompanimentNotes(
             if (measureStep === 0) {
                 voicing.push(chord.freqs[0]);
             }
-            durationSteps = ts.stepsPerBeat;
+            // Sustain-pedal feel: ring each pluck out toward the chord span so the
+            // notes accumulate into the full voicing within the chord (the Piano
+            // voice handles 64 overlapping voices cleanly). The B2 ceiling below
+            // (#707) trims this to the chord end minus a release margin — that's
+            // the "pedal lift" at the harmony change, so the ring stays inside one
+            // chord and successive chords never blur.
+            durationSteps = chord.beats * ts.stepsPerBeat;
         }
 
         // --- Frequency Slotting & Soloist Pocket ---
