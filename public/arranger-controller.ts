@@ -13,7 +13,7 @@ import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
 import { dispatch, getState, stateMap } from './state.js';
-import type { SectionInstrumentKey } from './types.js';
+import type { Chord, Section, SectionInstrumentKey } from './types.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
@@ -75,10 +75,10 @@ export function refreshArrangerUI(): void {
 export function onSectionUpdate(id: string, field: string, value: any): void {
     const { arranger } = getState();
     if (field === 'reorder') {
-        const sectionMap = new Map(arranger.sections.map((s: any) => [s.id, s]));
+        const sectionMap = new Map(arranger.sections.map((s: Section) => [s.id, s]));
         const newSections = value.map((sid: string) => sectionMap.get(sid));
 
-        const currentIds = arranger.sections.map((s: any) => s.id);
+        const currentIds = arranger.sections.map((s: Section) => s.id);
         const hasChanged =
             value.length !== currentIds.length ||
             value.some((id: string, index: number) => id !== currentIds[index]);
@@ -94,7 +94,7 @@ export function onSectionUpdate(id: string, field: string, value: any): void {
             return;
         }
     } else {
-        const index = arranger.sections.findIndex((s: any) => s.id === id);
+        const index = arranger.sections.findIndex((s: Section) => s.id === id);
         if (index === -1) {
             return;
         }
@@ -140,7 +140,7 @@ export function onSectionDelete(id: string): void {
         return;
     }
 
-    const section = arranger.sections.find((s: any) => s.id === id);
+    const section = arranger.sections.find((s: Section) => s.id === id);
     if (section?.value && section.value.trim() !== '' && section.value.trim() !== 'I') {
         if (!confirm(`Delete section "${section.label || 'Untitled'}" and its chords?`)) {
             return;
@@ -150,7 +150,7 @@ export function onSectionDelete(id: string): void {
     dispatch(ACTIONS.SET_PARAM, {
         module: 'arranger',
         param: 'sections',
-        value: arranger.sections.filter((s: any) => s.id !== id),
+        value: arranger.sections.filter((s: Section) => s.id !== id),
     });
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     clearChordPresetHighlight();
@@ -159,13 +159,13 @@ export function onSectionDelete(id: string): void {
 
 export function onSectionDuplicate(id: string): void {
     const { arranger } = getState();
-    const section = arranger.sections.find((s: any) => s.id === id);
+    const section = arranger.sections.find((s: Section) => s.id === id);
     if (!section) {
         return;
     }
     pushHistory();
     const newSection = { ...section, id: generateId(), label: `${section.label} (Copy)` };
-    const index = arranger.sections.findIndex((s: any) => s.id === id);
+    const index = arranger.sections.findIndex((s: Section) => s.id === id);
     const newSections = [...arranger.sections];
     newSections.splice(index + 1, 0, newSection);
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
@@ -251,7 +251,7 @@ export function transposeKey(delta: number): void {
         );
     };
 
-    arranger.sections.forEach((section: any) => {
+    arranger.sections.forEach((section: Section) => {
         const parts = section.value.split(/([\s,|,-]+)/);
         const transposed = parts.map((part: string) => {
             const noteMatch = part.match(NOTE_MATCH_PATTERN);
@@ -308,7 +308,7 @@ export function switchToRelativeKey(): void {
     // Build a fresh section array off the live snapshot — no in-place writes,
     // so we route through dispatch atomically without the prior duplicate
     // mutate-then-clone step.
-    const transformedSections = arranger.sections.map((section: any) => {
+    const transformedSections = arranger.sections.map((section: Section) => {
         const next = {
             ...section,
             value: transformRelativeProgression(section.value, shift),
@@ -344,7 +344,7 @@ export function switchToRelativeKey(): void {
  */
 export function setSectionIntensity(id: string, value: number | undefined): void {
     const { arranger } = getState();
-    const index = arranger.sections.findIndex((s: any) => s.id === id);
+    const index = arranger.sections.findIndex((s: Section) => s.id === id);
     if (index === -1) {
         return;
     }
@@ -374,7 +374,7 @@ export function setSectionInstrumentEnabled(
     enabled: boolean | undefined,
 ): void {
     const { arranger } = getState();
-    const index = arranger.sections.findIndex((s: any) => s.id === id);
+    const index = arranger.sections.findIndex((s: Section) => s.id === id);
     if (index === -1) {
         return;
     }
@@ -414,15 +414,16 @@ export function replaceChordInSection(
     newText: string,
 ): boolean {
     const { arranger } = getState();
-    const section = arranger.sections.find((s: any) => s.id === sectionId);
+    const section = arranger.sections.find((s: Section) => s.id === sectionId);
     if (!section) {
         return false;
     }
     // localIndex repeats per `repeatIndex` for sections with repeat > 1; the
     // charStart/charEnd are identical across repeats since they index the
     // single source text. Pick the first occurrence.
-    const chord = (arranger.progression as any[]).find(
-        (c) => c.sectionId === sectionId && c.localIndex === localIndex && c.repeatIndex === 0,
+    const chord = arranger.progression.find(
+        (c: Chord) =>
+            c.sectionId === sectionId && c.localIndex === localIndex && c.repeatIndex === 0,
     );
     if (!chord || typeof chord.charStart !== 'number' || typeof chord.charEnd !== 'number') {
         return false;
