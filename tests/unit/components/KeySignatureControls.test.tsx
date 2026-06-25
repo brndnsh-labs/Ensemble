@@ -22,6 +22,7 @@ vi.mock('../../../public/ui-bridge.js', () => ({
 
 // Mock arranger-controller
 vi.mock('../../../public/arranger-controller.js', () => ({
+    setKeyCenter: vi.fn(),
     switchToRelativeKey: vi.fn(),
     transposeKey: vi.fn(),
     validateAndAnalyze: vi.fn(),
@@ -75,6 +76,7 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 import {
+    setKeyCenter,
     switchToRelativeKey,
     transposeKey,
     validateAndAnalyze,
@@ -156,13 +158,14 @@ describe('KeySignatureControls Component', () => {
 
         await vi.waitFor(
             () => {
-                expect(mockDispatch).toHaveBeenCalledWith('SET_KEY', 'G');
+                // #778: the dropdown now TRANSPOSES to the chosen tonic (via setKeyCenter),
+                // rather than relabeling the key (the old SET_KEY dispatch).
+                expect(setKeyCenter).toHaveBeenCalledWith('G');
             },
             { timeout: 1000, interval: 5 },
         );
-
-        expect(validateAndAnalyze).toHaveBeenCalled();
-        expect(saveCurrentState).toHaveBeenCalled();
+        // validate/save now happen inside setKeyCenter -> transposeKey -> refreshArrangerUI
+        // (covered in arranger-controller.test.ts), not in the component.
     });
 
     it('handles time signature change without lastDrumPreset', async () => {

@@ -1,4 +1,9 @@
-import { switchToRelativeKey, transposeKey, validateAndAnalyze } from '../arranger-controller.js';
+import {
+    setKeyCenter,
+    switchToRelativeKey,
+    transposeKey,
+    validateAndAnalyze,
+} from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { getCanonicalMeters } from '../data/smart-genres.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
@@ -35,12 +40,6 @@ function formatKeySummary(key: string, isMinor: boolean) {
 
 function getRelativeKeyActionLabel(isMinor: boolean) {
     return isMinor ? 'Relative major' : 'Relative minor';
-}
-
-function updateArrangerKey(newKey: string, dispatch: (action: any, ...args: any[]) => void) {
-    dispatch(ACTIONS.SET_KEY, newKey);
-    validateAndAnalyze();
-    saveCurrentState();
 }
 
 function updateTimeSignature(
@@ -213,9 +212,7 @@ export function KeySignatureMenuControl({
                 <select
                     id="keySelect"
                     value={arrangerKey}
-                    onChange={(event) =>
-                        updateArrangerKey((event.target as HTMLSelectElement).value, dispatch)
-                    }
+                    onChange={(event) => setKeyCenter((event.target as HTMLSelectElement).value)}
                     aria-label="Select Key"
                 >
                     {KEYS.map((key) => (
