@@ -103,22 +103,36 @@ export function getChordDetails(symbol: string): ChordDetails {
             symbol.includes('13') ||
             symbol.includes('alt');
     const suffixMatch = symbol.match(
-        /(maj7#11|maj7#5|maj7\+|maj7|maj9|maj11|maj13|maj|M7#5|M7\+|M7|m13|m11|m9|m7b5|m7|m6|min|m|dim7|dim|o7|o|°7|°|7#5|7\+|7aug|aug7|aug|\+7|\+|-|ø7|ø|h7|7b5|sus4|sus2|add9|7alt|7b13|7#11|7b9|7#9|7|alt|13|11|9|6|5)/,
+        // why: △/^/ma/ma7 are common jazz shorthand for major-7; they must appear BEFORE the bare
+        // 'm' and '7' alternatives so leftmost-match picks the correct maj7-family suffix.
+        // Extended ma9/ma11/ma13 and △9 follow the same pattern for consistency.
+        /(maj7#11|maj7#5|maj7\+|maj7|maj9|maj11|maj13|maj|ma13|ma11|ma9|ma7|ma|M7#5|M7\+|M7|△9|△7|△|\^7|\^|m13|m11|m9|m7b5|m7|m6|min|m|dim7|dim|o7|o|°7|°|7#5|7\+|7aug|aug7|aug|\+7|\+|-|ø7|ø|h7|7b5|sus4|sus2|add9|7alt|7b13|7#11|7b9|7#9|7|alt|13|11|9|6|5)/,
     );
     const suffix = suffixMatch ? suffixMatch[1] : '';
 
-    if (suffix === 'maj13') {
+    if (suffix === 'maj13' || suffix === 'ma13') {
         quality = 'maj13';
-    } else if (suffix === 'maj11') {
+    } else if (suffix === 'maj11' || suffix === 'ma11') {
         quality = 'maj11';
-    } else if (suffix === 'maj9') {
+    } else if (suffix === 'maj9' || suffix === 'ma9' || suffix === '△9') {
         quality = 'maj9';
     } else if (suffix === 'maj7#11') {
         quality = 'maj7#11';
     } else if (suffix === 'maj7#5' || suffix === 'maj7+' || suffix === 'M7#5' || suffix === 'M7+') {
         quality = 'augmaj7';
         is7th = true;
-    } else if (suffix.includes('maj') || suffix === 'M7') {
+    } else if (
+        suffix.includes('maj') ||
+        suffix === 'M7' ||
+        suffix === 'ma7' ||
+        suffix === '△7' ||
+        suffix === '^7'
+    ) {
+        // why: △7 (triangle-7) and ^7 are jazz shorthand for major-7; ma/ma7 are also common
+        quality = 'maj7';
+    } else if (suffix === 'ma' || suffix === '△' || suffix === '^') {
+        // why: bare △/^/ma without a numeric extension are often written for plain major or
+        // major-7 context; treat as maj7 to match common usage (Cmaj = major, C△ = maj7)
         quality = 'maj7';
     } else if (suffix === 'm13') {
         quality = 'm13';
@@ -831,6 +845,9 @@ export function getFormattedChordNames(
             'm9',
             'm11',
             'm13',
+            // why: add9 contains '9' so is7th=true, but the quality resolves to 'add9' not a
+            // dominant/extended chord — excluding it prevents a stray '7' being appended (→ "add97")
+            'add9',
         ].includes(quality)
     ) {
         absSuffix += '7';

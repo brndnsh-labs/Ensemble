@@ -68,6 +68,12 @@ const ENHARMONIC_KEY_MAP: Record<string, string> = {
     'F#': 'Gb',
     'G#': 'Ab',
     'A#': 'Bb',
+    // why: kept in sync with ENHARMONIC_MAP in config.ts — enharmonic naturals (B#/E#/Cb/Fb)
+    // must resolve to KEY_ORDER members or getKeyContext returns keyRootIdx -1.
+    'B#': 'C',
+    Cb: 'B',
+    'E#': 'F',
+    Fb: 'E',
 };
 
 function getKeyContext(
