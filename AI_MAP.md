@@ -58,6 +58,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/conductor.ts` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
 | `public/engine/arc.ts` | Loop-driven intensity arc (head→build→peak→release). Synth-audit Epic 7 S4. | `loopArcMultiplier` |
 | `public/engine/theory-scales.ts` | Scale degrees and mode definitions. | `getScaleForChord` |
+| `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
 | `public/engine/resolution.ts` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
 | `public/engine/arranger-utils.ts` | Arrangement unrolling and form utilities. | `unrollArrangement` |
 | `public/engine/arrangement-layering.ts` | Per-engine intro/outro mute schedule (S5). | `INTRO_MUTES`, `OUTRO_MUTES`, `isIntroSectionLabel` |

@@ -315,6 +315,16 @@ describe('Arranger Controller', () => {
 
             expect(state.arranger.sections[0].value).toBe('Amaj7 | Dm7');
         });
+
+        it('should transpose the slash bass together with the root (#777)', () => {
+            state.arranger.key = 'C';
+            state.arranger.sections = [{ id: 's1', value: 'C/E F/A | G/B' }];
+
+            // +2 semitones — the bass must move too (was the bug: bass stayed put → 'D/E').
+            transposeKey(2);
+
+            expect(state.arranger.sections[0].value).toBe('D/Gb G/B | A/Db');
+        });
     });
 
     describe('switchToRelativeKey', () => {

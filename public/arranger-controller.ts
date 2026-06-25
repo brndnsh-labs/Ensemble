@@ -4,6 +4,7 @@ import {
     transformRelativeProgression,
     validateProgression,
 } from './engine/chords-engine.js';
+import { transposeChordText } from './engine/transpose.js';
 
 export { mutateProgression };
 
@@ -18,8 +19,6 @@ import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 import { compressSections, generateId, normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
-
-const NOTE_MATCH_PATTERN = /^([A-G](?:[#b♯♭])?)(.*)/i;
 
 export function saveProgression(): void {
     const { arranger } = getState();
@@ -240,43 +239,21 @@ export function transposeKey(delta: number): void {
     const { arranger } = getState();
     const currentKeyName = arranger.key || 'C';
     const currentIndex = KEY_ORDER.indexOf(normalizeKey(currentKeyName));
-    const newKey = KEY_ORDER[(currentIndex + delta + 12) % 12];
+    const newKey = KEY_ORDER[(((currentIndex + delta) % 12) + 12) % 12];
 
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: newKey });
 
-    const isMusicalNotation = (part: string): RegExpMatchArray | null => {
-        return (
-            part.match(/^(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i) ||
-            part.match(/^[#b♯♭](III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v|[1-7])/i)
-        );
-    };
-
     arranger.sections.forEach((section: Section) => {
-        const parts = section.value.split(/([\s,|,-]+)/);
-        const transposed = parts.map((part: string) => {
-            const noteMatch = part.match(NOTE_MATCH_PATTERN);
-            if (noteMatch && !isMusicalNotation(part)) {
-                let rootStr = noteMatch[1];
-                rootStr = rootStr.replace('♯', '#').replace('♭', 'b');
-
-                const root = normalizeKey(
-                    rootStr.charAt(0).toUpperCase() + rootStr.slice(1).toLowerCase(),
-                );
-                const rootIndex = KEY_ORDER.indexOf(root);
-
-                if (rootIndex !== -1) {
-                    const newRoot = KEY_ORDER[(rootIndex + delta + 12) % 12];
-                    return newRoot + noteMatch[2];
-                }
-            }
-            return part;
-        });
-        section.value = transposed.join('');
+        // Absolute transpose: note-name roots AND slash basses move by delta; Roman/NNS tokens
+        // are key-relative and stay put (the key label above moves by the same delta). Shares the
+        // single tokenizer in transpose.ts with switchToRelativeKey — this is the fix that gets the
+        // slash bass to transpose (`C/E` +2 → `D/Gb`, previously `D/E`).
+        section.value = transposeChordText(section.value, delta);
 
         if (section.key) {
             const secKeyIndex = KEY_ORDER.indexOf(normalizeKey(section.key));
             if (secKeyIndex !== -1) {
-                section.key = KEY_ORDER[(secKeyIndex + delta + 12) % 12];
+                section.key = KEY_ORDER[(((secKeyIndex + delta) % 12) + 12) % 12];
             }
         }
     });
