@@ -10,7 +10,7 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 - **docs/README.md** — living documentation index.
 - **docs/VISION.md** — product direction and open work.
 - **docs/archive/ARCHITECTURE_FOLLOWUPS.md** — archived (May 2026): the TS-migration follow-up tracker, all items shipped. Useful historical context for *why* recent architectural decisions were made.
-- **docs/guides/** — deep-dive guides (worker contract, register slotting, performance, reference tuning).
+- **docs/guides/** — deep-dive guides (worker contract, coordination & register slotting, performance, reference tuning, musical-engine patterns, bundle hygiene, listening-gate tools).
 
 If any guide drifts from live code/config, prefer live and update the docs.
 
