@@ -270,6 +270,24 @@ export function transposeKey(delta: number): void {
     refreshArrangerUI();
 }
 
+/**
+ * Set the chart's key from the key picker. Per the #778 decision, picking a key TRANSPOSES the
+ * whole chart to that tonic (preserving major/minor mode) — the iReal Pro model — rather than
+ * relabeling. So the dropdown is a "jump to key" sibling of the +/- transpose buttons, sharing
+ * `transposeKey` (and thus the unified transpose.ts tokenizer). Mode is left untouched: in A minor,
+ * picking C yields C minor (the minor song transposed up a minor third). Switching major<->minor
+ * stays the Relative button's job.
+ */
+export function setKeyCenter(newKey: string): void {
+    const { arranger } = getState();
+    const from = KEY_ORDER.indexOf(normalizeKey(arranger.key || 'C'));
+    const to = KEY_ORDER.indexOf(normalizeKey(newKey));
+    if (from === -1 || to === -1 || from === to) {
+        return;
+    }
+    transposeKey(to - from);
+}
+
 export function switchToRelativeKey(): void {
     const { arranger } = getState();
     const wasMinor = !!arranger.isMinor;

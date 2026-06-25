@@ -11,6 +11,7 @@ import {
     refreshArrangerUI,
     replaceChordInSection,
     saveProgression,
+    setKeyCenter,
     setSectionInstrumentEnabled,
     setSectionIntensity,
     switchToRelativeKey,
@@ -324,6 +325,49 @@ describe('Arranger Controller', () => {
             transposeKey(2);
 
             expect(state.arranger.sections[0].value).toBe('D/Gb G/B | A/Db');
+        });
+    });
+
+    describe('setKeyCenter', () => {
+        it('transposes the whole chart to the chosen tonic, preserving minor mode (#778)', () => {
+            state.arranger.key = 'A';
+            state.arranger.isMinor = true;
+            state.arranger.sections = [{ id: 's1', value: 'Am Dm E7' }];
+
+            setKeyCenter('C'); // A minor -> C minor (transpose up a minor third, mode kept)
+
+            expect(state.arranger.key).toBe('C');
+            expect(state.arranger.isMinor).toBe(true);
+            expect(state.arranger.sections[0].value).toBe('Cm Fm G7');
+        });
+
+        it('leaves Roman notation intact (key-relative) while moving the key label', () => {
+            state.arranger.key = 'C';
+            state.arranger.isMinor = false;
+            state.arranger.sections = [{ id: 's1', value: 'I V vi IV' }];
+
+            setKeyCenter('E');
+
+            expect(state.arranger.key).toBe('E');
+            expect(state.arranger.sections[0].value).toBe('I V vi IV');
+        });
+
+        it('transposes the slash bass too (shares the unified transposer)', () => {
+            state.arranger.key = 'C';
+            state.arranger.sections = [{ id: 's1', value: 'C/E' }];
+
+            setKeyCenter('D'); // +2
+
+            expect(state.arranger.sections[0].value).toBe('D/Gb');
+        });
+
+        it('is a no-op when the selected key equals the current key', () => {
+            state.arranger.key = 'G';
+            state.arranger.sections = [{ id: 's1', value: 'G C D' }];
+
+            setKeyCenter('G');
+
+            expect(state.arranger.sections[0].value).toBe('G C D');
         });
     });
 
