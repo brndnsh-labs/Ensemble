@@ -323,11 +323,20 @@ function playSampledHarmony(
     // MAX_SAMPLE_PEAK and the master limiter catches peaks when 3 voices stack.
     // A slower attack/release than the default reads as a bowed pad, not a pluck.
     const velocity = (Number.isFinite(vol) ? vol : 0.4) * gainForPack(packId);
+    // Scale the release tail with the note's own duration (#785). The sampled
+    // pad's tail is appended AFTER the hold, so a fixed 0.3 s tail is ~60-70% of
+    // a 1-beat note at 120-140 bpm — short notes smear into the next chord and
+    // Acoustic strings turn to mud. The synth pad path already scales its release
+    // with duration; mirror that here. ~40% of the note rings out, capped at the
+    // old 0.3 s so genuinely long held chords keep the lush bowed tail, floored
+    // at 0.08 s so a fast fingerpick note still decays click-free.
+    const heldDur = Number.isFinite(duration) && duration > 0 ? duration : 0.5;
+    const release = Math.max(0.08, Math.min(0.3, heldDur * 0.4));
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
         attack: 0.06,
-        release: 0.3,
+        release,
         tone: toneTiltForPack(packId),
     });
     return true;
