@@ -10,13 +10,15 @@ vi.mock('../../public/state.js', () => ({
 }));
 
 /**
- * Acoustic harmony critique (#561).
+ * Acoustic harmony critique (#787).
  *
- * Before #561, Acoustic harmony was a flat triadic whole-note pad —
- * indistinguishable from a generic string swell. Acoustic now plays a gently
- * rolling fingerpicked counter-line: ONE chord tone per eighth-note, climbing
- * root → 3rd → 5th → octave → 9th and back down across the bar. The single-note
- * line (not a chord) and the add9 color tone are the signature.
+ * Acoustic harmony is now the SUSTAINED STRING PAD. The fingerpick arpeggio that
+ * used to live here (#561) moved to the chords lane (the 'arp' chord style — see
+ * acoustic-piano-critique), because the bowed strings sample wants to HOLD, not
+ * pluck. The signature is now the opposite of the old roll: a polyphonic chord
+ * voicing, re-struck sparsely (one voicing per chord that then holds) rather than
+ * a single-note ~8-notes-per-bar line. (Legato carry across chord changes is
+ * covered by harmony-pad-sustain.test.ts.)
  */
 describe('Acoustic Harmony Critique', () => {
     let mockState;
@@ -54,18 +56,29 @@ describe('Acoustic Harmony Critique', () => {
         getState.mockReturnValue(mockState);
     });
 
-    it('plays a single-note fingerpick roll (not a held chord), ~8 notes/bar', () => {
+    it('holds a sustained chord pad (polyphonic, sparsely re-struck), not an 8-note roll', () => {
         const bars = 64;
         let emissions = 0;
         let polyphonic = 0;
         for (let bar = 0; bar < bars; bar++) {
             const chord = PROG[bar % PROG.length];
+            const nextChord = PROG[(bar + 1) % PROG.length];
             for (let s = 0; s < 16; s++) {
                 const step = bar * 16 + s;
-                const notes = getHarmonyNotes(getState(), chord, null, step, 60, 'smart', s, null, {
-                    soloistResting: true,
-                    soloistNotesInPhrase: 0,
-                });
+                const notes = getHarmonyNotes(
+                    getState(),
+                    chord,
+                    nextChord,
+                    step,
+                    60,
+                    'strings',
+                    s,
+                    null,
+                    {
+                        soloistResting: true,
+                        soloistNotesInPhrase: 0,
+                    },
+                );
                 if (notes.length > 0) {
                     emissions++;
                     if (notes.length > 1) {
@@ -77,25 +90,26 @@ describe('Acoustic Harmony Critique', () => {
         const avgPerBar = emissions / bars;
 
         console.log(
-            '\n--- ACOUSTIC HARMONY CRITIQUE REPORT (line shape) ---\n' +
+            '\n--- ACOUSTIC HARMONY CRITIQUE REPORT (pad shape) ---\n' +
                 `[Emissions]        ${emissions}\n` +
-                `[Polyphonic]       ${polyphonic} (Target: 0 — it's a single-note line)\n` +
-                `[Notes / bar]      ${avgPerBar.toFixed(1)} (Target: ~8, an eighth-note roll)\n` +
+                `[Polyphonic]       ${polyphonic} (Target: >0 — it's a held chord voicing)\n` +
+                `[Notes / bar]      ${avgPerBar.toFixed(1)} (Target: sparse — a sustained pad, not an ~8-note roll)\n` +
                 '-----------------------------------------------------\n',
         );
 
-        // A monophonic rolling line, not a chord pad.
-        expect(polyphonic).toBe(0);
-        // An eighth-note fingerpick: ~8 notes per bar.
-        expect(avgPerBar).toBeGreaterThan(6);
-        expect(avgPerBar).toBeLessThanOrEqual(8);
+        // A held chord voicing, not a mono line: EVERY re-strike is the full pad
+        // (a single mono emission slipping through would be a regression).
+        expect(polyphonic).toBe(emissions);
+        // Sustained, not a rolling eighth-note line — far below the old ~8/bar.
+        expect(avgPerBar).toBeLessThan(4);
     });
 
-    it('rolls through chord tones plus the open add9 color', () => {
-        // One C-major bar: the roll must visit root, 3rd, 5th and the 9th (D).
+    it('sounds the chord (the pad voicing holds real chord tones)', () => {
+        // One C-major bar: the sustained pad must voice the chord — at least the
+        // root and third present (a real triad pad, not noise or a single tone).
         const pcs = new Set();
         for (let s = 0; s < 16; s++) {
-            const notes = getHarmonyNotes(getState(), C, null, s, 60, 'smart', s, null, {
+            const notes = getHarmonyNotes(getState(), C, Am, s, 60, 'strings', s, null, {
                 soloistResting: true,
                 soloistNotesInPhrase: 0,
             });
@@ -105,19 +119,17 @@ describe('Acoustic Harmony Critique', () => {
         }
         const root = 0; // C
         const third = 4; // E
-        const fifth = 7; // G
-        const ninth = 2; // D
 
         console.log(
-            `\n--- ACOUSTIC HARMONY CRITIQUE REPORT (C bar pitch classes) ---\n` +
-                `[PCs visited]   {${[...pcs].sort((a, b) => a - b).join(', ')}}\n` +
-                `[Need]          root 0, 3rd 4, 5th 7, 9th 2\n` +
+            `\n--- ACOUSTIC HARMONY CRITIQUE REPORT (C bar pad voicing) ---\n` +
+                `[PCs sounded]   {${[...pcs].sort((a, b) => a - b).join(', ')}}\n` +
+                `[Need]          root 0 + 3rd 4 (a real triad pad)\n` +
                 '--------------------------------------------------------------\n',
         );
 
+        // The pad is a polyphonic voicing built from the chord's tones.
+        expect(pcs.size).toBeGreaterThanOrEqual(2);
         expect(pcs.has(root)).toBe(true);
         expect(pcs.has(third)).toBe(true);
-        expect(pcs.has(fifth)).toBe(true);
-        expect(pcs.has(ninth)).toBe(true); // the open add9 color
     });
 });

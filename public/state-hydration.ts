@@ -225,7 +225,15 @@ export function hydrateState(): void {
                     savedState.chords.autoSound,
                     hydrateVoice(savedState.chords.voice),
                 ),
-                style: savedState.chords.style || 'smart',
+                // #787: Acoustic's chord-style default changed 'pad' → 'arp' (the
+                // fingerpick lane). A session saved under the old default would
+                // otherwise reload as a static block pad with no arpeggio, so
+                // upgrade that one stale default. A deliberately-chosen 'pad' on
+                // any other genre is preserved.
+                style:
+                    savedState.groove?.genreFeel === 'Acoustic' && savedState.chords.style === 'pad'
+                        ? 'arp'
+                        : savedState.chords.style || 'smart',
                 instrument: 'Piano',
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
                 density: savedState.chords.density,

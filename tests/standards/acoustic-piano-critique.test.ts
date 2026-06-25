@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getIntervals } from '../../public/engine/chords-styles.js';
 import { getState } from '../../public/state.js';
+import { getStepInfo } from '../../public/utils.js';
+
+// Real 4/4 step metadata so the engine sees isGroupStart/isStructural on the
+// One (a bare `{ isBeatStart }` left isStructural false on every step, hiding
+// the structural-downbeat voicing the arp emits).
+const TS_4_4 = { beats: 4, stepsPerBeat: 4, grouping: [4], backbeat: [1, 3] };
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -22,7 +28,7 @@ describe('Acoustic Piano Critique', () => {
             soloist: makeSoloistMock({ enabled: true, busySteps: 0, lastFreq: 0 }),
             bass: { enabled: true, lastFreq: 110 },
             harmony: { enabled: false },
-            chords: { enabled: true, style: 'smart', density: 'balanced' },
+            chords: { enabled: true, style: 'arp', density: 'balanced' },
             arranger: { timeSignature: '4/4', totalSteps: 1000, progression: [] },
         };
         getState.mockReturnValue(mockState);
@@ -35,6 +41,7 @@ describe('Acoustic Piano Critique', () => {
             intervals: [0, 4, 7],
             freqs: [261.63, 329.63, 392.0],
             sectionId: 'A',
+            beats: 4, // a full-bar chord — the arp rings toward this boundary
         };
         mockState.arranger.progression = [chordC];
         const totalMeasures = 128;
@@ -42,6 +49,8 @@ describe('Acoustic Piano Critique', () => {
 
         let singleNoteHits = 0;
         let totalActiveSteps = 0;
+        let downbeatRing = 0; // durationSteps of the first pluck in a bar
+        let downbeatNotes = []; // the "One" pluck shape (doubled-root foundation)
 
         for (let i = 0; i < totalSteps; i++) {
             mockState.playback.step = i;
@@ -52,7 +61,7 @@ describe('Acoustic Piano Critique', () => {
                 i,
                 stepInMeasure,
                 stepInMeasure,
-                { isBeatStart: stepInMeasure % 4 === 0 },
+                getStepInfo(i, TS_4_4),
                 {},
             );
 
@@ -60,6 +69,10 @@ describe('Acoustic Piano Critique', () => {
                 totalActiveSteps++;
                 if (notes.length <= 2) {
                     singleNoteHits++;
+                }
+                if (stepInMeasure === 0) {
+                    downbeatRing = notes[0].durationSteps;
+                    downbeatNotes = notes;
                 }
             }
         }
@@ -70,11 +83,22 @@ describe('Acoustic Piano Critique', () => {
             '\n--- ACOUSTIC PIANO CRITIQUE REPORT ---\n' +
                 `[Fingerpicking Accuracy] ${(fingerpickScore * 100).toFixed(1)}%\n` +
                 `[Rhythmic Density]       ${(totalActiveSteps / totalMeasures).toFixed(2)} hits/bar\n` +
+                `[Downbeat Pluck Ring]    ${downbeatRing.toFixed(1)} steps (>4 = sustains past 1 beat)\n` +
+                `[Downbeat Pluck]         ${downbeatNotes.length} notes @ pc {${downbeatNotes
+                    .map((n) => ((n.midi % 12) + 12) % 12)
+                    .join(', ')}} (doubled root)\n` +
                 '------------------------------------\n',
         );
 
         expect(fingerpickScore).toBeGreaterThan(0.9);
         expect(totalActiveSteps / totalMeasures).toBeGreaterThanOrEqual(4.0);
+        // Sustain-pedal ring: the downbeat pluck must hold well past its own beat
+        // (toward the chord boundary), not the old dry 1-beat (4-step) cutoff.
+        expect(downbeatRing).toBeGreaterThan(4);
+        // The "One" foundation: the arp doubles the root on the downbeat (pattern
+        // note + pushed root), so the One is a 2-note pluck, both the chord root.
+        expect(downbeatNotes.length).toBe(2);
+        expect(downbeatNotes.every((n) => ((n.midi % 12) + 12) % 12 === 0)).toBe(true);
     });
 
     describe('Color tones at moderate intensity (chords.md P1 #11 / S6c)', () => {

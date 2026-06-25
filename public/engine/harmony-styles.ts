@@ -105,7 +105,9 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         smartStyle: 'strings',
         rhythmicStyle: 'pads',
         patternKey: 'default',
-        voicing: { arpeggiate: true },
+        // Harmony holds the sustained string PAD (no `arpeggiate` → playSeaMode);
+        // the fingerpick arpeggio lives in the chords lane (the 'arp' style), its
+        // idiomatic plucked home. The bowed strings sample wants to hold, not pluck.
     },
     'Bossa Nova': { smartStyle: 'strings', rhythmicStyle: 'stabs', patternKey: 'bossa' },
     Country: {
