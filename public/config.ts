@@ -14,7 +14,21 @@ export const BUILD_REV = typeof __BUILD_REV__ !== 'undefined' ? __BUILD_REV__ : 
 // Settings → About points here. Swap the handle to point the donate button elsewhere.
 export const KOFI_URL = 'https://ko-fi.com/brndnsh';
 export const KEY_ORDER = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-export const ENHARMONIC_MAP = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
+export const ENHARMONIC_MAP = {
+    // Standard sharp→flat equivalents (the 5 chromatic sharps)
+    'C#': 'Db',
+    'D#': 'Eb',
+    'F#': 'Gb',
+    'G#': 'Ab',
+    'A#': 'Bb',
+    // why: enharmonic naturals — B#/E# are valid notation (e.g. augmented chords, key of C#)
+    // and Cb/Fb appear in flat keys (e.g. Cb major = B major). Without these, KEY_ORDER.indexOf
+    // returns -1 and rootMidi computes baseOctave-1 (wrong pitch).
+    'B#': 'C',
+    Cb: 'B',
+    'E#': 'F',
+    Fb: 'E',
+};
 export const ROMAN_VALS = { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 };
 export const NNS_OFFSETS = [0, 2, 4, 5, 7, 9, 11];
 export const INTERVAL_TO_NNS = {

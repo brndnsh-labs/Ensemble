@@ -248,6 +248,17 @@ describe('Utility Functions', () => {
             expect(normalizeKey('C')).toBe('C');
             expect(normalizeKey('F')).toBe('F');
         });
+
+        // #776: enharmonic naturals must resolve onto KEY_ORDER members, else
+        // resolveChordRoot computes baseOctave-1 (wrong pitch). Guards the real
+        // config.ts ENHARMONIC_MAP (chords-logic.test.ts mocks config, so this is
+        // the test that actually fails if those entries are reverted).
+        it('should normalize enharmonic naturals B#/Cb/E#/Fb to their KEY_ORDER members', () => {
+            expect(normalizeKey('B#')).toBe('C');
+            expect(normalizeKey('Cb')).toBe('B');
+            expect(normalizeKey('E#')).toBe('F');
+            expect(normalizeKey('Fb')).toBe('E');
+        });
     });
 
     describe('transposeKeyName', () => {

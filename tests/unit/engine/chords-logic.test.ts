@@ -1,6 +1,6 @@
 // @ts-nocheck
 /* eslint-disable */
-// cspell:ignore iidim Emaj
+// cspell:ignore iidim Emaj Fbmaj Cbmaj
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { makeSoloistMock } = await vi.hoisted(
@@ -39,7 +39,17 @@ vi.mock('../../../public/state.js', () => {
 
 vi.mock('../../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-    ENHARMONIC_MAP: { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' },
+    ENHARMONIC_MAP: {
+        'C#': 'Db',
+        'D#': 'Eb',
+        'F#': 'Gb',
+        'G#': 'Ab',
+        'A#': 'Bb',
+        'B#': 'C',
+        Cb: 'B',
+        'E#': 'F',
+        Fb: 'E',
+    },
     ROMAN_VALS: { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 },
     NNS_OFFSETS: [0, 2, 4, 5, 7, 9, 11],
     INTERVAL_TO_ROMAN: {
@@ -321,6 +331,108 @@ describe('Chords & Voicing Logic', () => {
             expect(voicedPitchClasses.filter((pc) => pc === 11)).toHaveLength(1);
             expect(voicedPitchClasses).toContain(2); // D retained above the bass
             expect(voicedPitchClasses).toContain(5); // F retained above the bass
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Bug-fix regression tests (GitHub #776)
+    // -----------------------------------------------------------------------
+
+    describe('Bug #776 — maj7 alt-symbol parsing', () => {
+        it('△7 should resolve to maj7, not dominant 7', () => {
+            expect(getChordDetails('△7').quality).toBe('maj7');
+        });
+
+        it('^7 should resolve to maj7, not dominant 7', () => {
+            expect(getChordDetails('^7').quality).toBe('maj7');
+        });
+
+        it('ma7 should resolve to maj7, not minor', () => {
+            const details = getChordDetails('ma7');
+            expect(details.quality).toBe('maj7');
+            // Cma7 must NOT parse as minor (the 'm' prefix must not win over 'ma7')
+            expect(details.quality).not.toBe('minor');
+        });
+
+        it('Cma7 full symbol should not be minor', () => {
+            expect(getChordDetails('Cma7').quality).not.toBe('minor');
+            expect(getChordDetails('Cma7').quality).toBe('maj7');
+        });
+
+        it('existing m7b5/ø/h7 → halfdim still correct after regex change', () => {
+            expect(getChordDetails('m7b5').quality).toBe('halfdim');
+            expect(getChordDetails('ø7').quality).toBe('halfdim');
+            expect(getChordDetails('h7').quality).toBe('halfdim');
+        });
+
+        it('existing dim7/o7/°7 → dim still correct after regex change', () => {
+            expect(getChordDetails('dim7').quality).toBe('dim');
+            expect(getChordDetails('o7').quality).toBe('dim');
+        });
+
+        it('existing aug/7#5/aug7/+7 → aug still correct after regex change', () => {
+            expect(getChordDetails('7#5').quality).toBe('aug');
+            expect(getChordDetails('aug7').quality).toBe('aug');
+            expect(getChordDetails('+7').quality).toBe('aug');
+        });
+
+        it('existing sus4/sus2 still correct after regex change', () => {
+            expect(getChordDetails('sus4').quality).toBe('sus4');
+            expect(getChordDetails('sus2').quality).toBe('sus2');
+        });
+
+        it('existing 6 still correct after regex change', () => {
+            expect(getChordDetails('6').quality).toBe('6');
+        });
+    });
+
+    describe('Bug #776 — enharmonic root pitch resolution', () => {
+        it('B# resolves to pitch class 0 (C)', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'B#maj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            expect(arranger.progression[0].rootMidi % 12).toBe(0);
+        });
+
+        it('E# resolves to pitch class 5 (F)', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'E#maj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            expect(arranger.progression[0].rootMidi % 12).toBe(5);
+        });
+
+        it('Fb resolves to pitch class 4 (E)', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'Fbmaj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            expect(arranger.progression[0].rootMidi % 12).toBe(4);
+        });
+
+        it('Cb resolves to pitch class 11 (B)', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'Cbmaj7', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            expect(arranger.progression[0].rootMidi % 12).toBe(11);
+        });
+    });
+
+    describe('Bug #776 — Cadd9 display label', () => {
+        it('Cadd9 absName should not contain a stray 7', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'Cadd9', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            expect(arranger.progression[0].absName).toBe('Cadd9');
+            expect(arranger.progression[0].absName).not.toContain('7');
+        });
+
+        it('Cadd9 intervals should be [0,4,7,14]', () => {
+            const intervals = getIntervals(getState(), 'add9', false, 'standard', 'Rock', false);
+            expect(intervals).toEqual([0, 4, 7, 14]);
         });
     });
 });
