@@ -9,6 +9,7 @@ import {
 import type { Chord, ChordNamePart, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
+import { transposeChordText } from './transpose.js';
 import { getBassSpaceFloor, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
 export type { Chord, ChordNamePart, FormattedChordNames };
@@ -568,73 +569,9 @@ export function mutateProgression(progressionStr: string): {
  * Rewrites the progression string while maintaining original pitches.
  */
 export function transformRelativeProgression(input: string, semitoneShift: number): string {
-    const parts = input.split(/([\s,|,-]+|\/)/);
-    const transformed = parts.map((part) => {
-        if (!part.trim() || part === '|' || part === '/' || part === ',' || part === '-') {
-            return part;
-        }
-
-        const romanMatch = part.match(ROMAN_REGEX);
-        const nnsMatch = part.match(NNS_REGEX);
-        const noteMatch = part.match(NOTE_REGEX);
-
-        if (romanMatch) {
-            const accidental = romanMatch[1] || '';
-            const numeral = romanMatch[2];
-            const suffix = part.slice(romanMatch[0].length);
-
-            let originalOffset = (ROMAN_VALS as any)[numeral.toUpperCase()];
-            if (accidental === 'b') {
-                originalOffset -= 1;
-            }
-            if (accidental === '#') {
-                originalOffset += 1;
-            }
-
-            // Calculate new offset relative to the new key
-            const newOffset = (originalOffset - semitoneShift + 12) % 12;
-            let newRoman: string = (INTERVAL_TO_ROMAN as any)[newOffset];
-
-            // Preserve the original casing/quality of the chord
-            const isSourceMinorChord = numeral === numeral.toLowerCase();
-            if (isSourceMinorChord) {
-                newRoman = newRoman.toLowerCase();
-            }
-
-            return newRoman + suffix;
-        } else if (nnsMatch) {
-            const accidental = nnsMatch[1] || '';
-            const number = parseInt(nnsMatch[2], 10);
-            const suffix = part.slice(nnsMatch[0].length);
-
-            let originalOffset = NNS_OFFSETS[number - 1];
-            if (accidental === 'b') {
-                originalOffset -= 1;
-            }
-            if (accidental === '#') {
-                originalOffset += 1;
-            }
-
-            const newOffset = (originalOffset - semitoneShift + 12) % 12;
-            const newNNS = (INTERVAL_TO_NNS as any)[newOffset];
-
-            return newNNS + suffix;
-        } else if (noteMatch) {
-            const root = normalizeKey(
-                noteMatch[1].charAt(0).toUpperCase() + noteMatch[1].slice(1).toLowerCase(),
-            );
-            const suffix = part.slice(noteMatch[0].length);
-            const originalIndex = KEY_ORDER.indexOf(root);
-            if (originalIndex !== -1) {
-                const newIndex = (originalIndex + semitoneShift + 12) % 12;
-                return KEY_ORDER[newIndex] + suffix;
-            }
-        }
-
-        return part;
-    });
-
-    return transformed.join('');
+    // Relative major/minor switch: rewrite Roman/NNS tokens against the new key while note-name
+    // roots move by +shift. Shares the single tokenizer in transpose.ts with `transposeKey`.
+    return transposeChordText(input, semitoneShift, { rewriteRelative: true });
 }
 
 /**
