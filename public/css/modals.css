@@ -609,8 +609,13 @@ body.modal-open {
     color: var(--text-color);
     border: 1px solid var(--border-color);
     box-shadow: none;
-    border-radius: var(--radius-pill);
-    padding: 0.55rem 0.9rem;
+    /* Match the toolbar siblings' box shape (#775): rounded-rect, not a pill,
+       and the same height as .primary-btn.editor-toolbar-btn so the two buttons
+       line up. Fill stays secondary (ghost) — Add Section is the visual primary. */
+    border-radius: var(--radius-md);
+    height: 42px;
+    min-height: 40px;
+    padding: var(--space-2) var(--space-5);
 }
 
 .editor-action-trigger:hover {
@@ -631,7 +636,12 @@ body.modal-open {
 .editor-action-menu {
     top: calc(100% + 0.65rem);
     bottom: auto;
-    right: 0;
+    /* The inline-editor Tools trigger sits on the LEFT of the toolbar (after
+       Add Section), so right-anchoring (the action-menu-content default) pushed
+       this 32rem-wide menu off the left viewport edge (#774). Anchor it left so
+       it grows rightward into the open space instead. */
+    left: 0;
+    right: auto;
     min-width: min(32rem, calc(100vw - 2rem));
     max-width: min(36rem, calc(100vw - 2rem));
     padding: 0.9rem;

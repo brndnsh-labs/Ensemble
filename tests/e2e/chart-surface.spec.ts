@@ -1,6 +1,7 @@
 // @ts-nocheck
 import pkg from '@playwright/test';
 import { gotoHydrated } from './helpers/nav.js';
+import { expectLocatorFitsViewport, expectOwnsInteriorProbe } from './helpers/visibility.js';
 
 const { expect, test } = pkg;
 
@@ -201,6 +202,26 @@ test.describe('ChartSurface @ui', () => {
             const box = await editor.boundingBox();
             expect(box).not.toBeNull();
             expect(box.width).toBeGreaterThanOrEqual(360);
+        });
+    });
+
+    test.describe('Inline editor Tools menu', () => {
+        // The Tools trigger sits on the LEFT of the inline-editor toolbar (after
+        // Add Section). It was right-anchored, so the 32rem-wide menu hung off the
+        // left viewport edge (#774). It must open fully on-screen, not clipped.
+        test('opens fully within the viewport on desktop', async ({ page }) => {
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await page.getByRole('button', { name: 'Unlock chart to edit' }).click();
+            await expect(page.locator('.inline-editor')).toBeVisible();
+
+            await page.getByRole('button', { name: 'Arrangement Tools Menu' }).click();
+            const menu = page.locator('.editor-action-menu');
+            await expect(menu).toBeVisible();
+
+            // Bounding rect sits within the viewport (top/left >= 0, right/bottom
+            // within innerWidth/innerHeight) and nothing paints over the menu.
+            await expectLocatorFitsViewport(page, menu);
+            await expectOwnsInteriorProbe(menu);
         });
     });
 
