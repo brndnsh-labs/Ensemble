@@ -105,7 +105,7 @@ export function analyzeFormUI(arranger: EnsembleState['arranger'], dispatch?: Di
 }
 
 export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
-    const { playback, soloist, groove, arranger } = state;
+    const { playback, groove } = state;
     const intensity = playback.bandIntensity; // 0.0 - 1.0
     const complexity = playback.complexity; // 0.0 - 1.0
 
@@ -122,80 +122,19 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     // --- 2. Complexity / Busyness ---
     const targetHookProb = 0.2 + complexity * 0.6;
 
-    // --- 3. Musical Conversation (Soloist Density) ---
-    // If soloist is active, the accompanist should "listen" and back off.
-    const isSoloistBusy = soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0;
-    const targetIntentDensity = isSoloistBusy ? 0.3 * (1 - complexity) : 0.5 + intensity * 0.4;
-
     // --- 4. Harmony Evolution ---
     // Harmonies follow the complexity signal for activity level.
     let targetHbComplexity = complexity;
 
     // If Song Mode is active and we are in the last 30 seconds, push for a "Final Build"
-    const elapsedMins =
-        playback.sessionTimer > 0 && playback.sessionStartTime > 0
-            ? (performance.now() - playback.sessionStartTime) / 60000
-            : 0;
-    const progress =
-        playback.sessionTimer > 0 ? Math.min(1.0, elapsedMins / playback.sessionTimer) : 0;
-
     if (playback.songMode && playback.isEndingPending) {
         targetHbComplexity = Math.max(targetHbComplexity, 0.85);
     }
-
-    // --- 5. Expression (Lyrical vs Involved) ---
-    // Lyrical = 1.0 (Melodic, slower), Involved = 0.0 (Busy, technical)
-    let lyricalBias = 0.5;
-
-    // Song Arc: Smooth interpolation instead of hard jumps
-    if (playback.songMode && playback.sessionTimer > 0) {
-        if (progress < 0.3) {
-            // Initial Phase: 0.9 down to 0.5
-            lyricalBias = 0.9 - (progress / 0.3) * 0.4;
-        } else if (progress < 0.7) {
-            // Building Phase: 0.5 down to 0.2
-            lyricalBias = 0.5 - ((progress - 0.3) / 0.4) * 0.3;
-        } else if (progress < 0.9) {
-            // Peak: 0.2
-            lyricalBias = 0.2;
-        } else {
-            // Resolution: 0.2 up to 0.95
-            lyricalBias = 0.2 + ((progress - 0.9) / 0.1) * 0.75;
-        }
-    }
-
-    // Section Overrides (Smoothed)
-    const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : 0;
-    const currentEntry = binarySearchMap(arranger.stepMap || [], modStep);
-    if (currentEntry) {
-        const label = (currentEntry.chord as any).sectionLabel.toLowerCase();
-        let sectionBias = 0.5;
-        if (label.includes('solo')) {
-            sectionBias = 0.2;
-        } else if (label.includes('verse')) {
-            sectionBias = 0.75;
-        } else if (label.includes('outro') || label.includes('intro')) {
-            sectionBias = 0.9;
-        }
-
-        // Blend section bias with song arc (70% section, 30% arc)
-        lyricalBias = sectionBias * 0.7 + lyricalBias * 0.3;
-    }
-
-    // Soloist Energy Cap: Prevent "runaway" density at loop starts
-    const isFirstHalfOfSection =
-        currentEntry && modStep - currentEntry.start < (currentEntry.end - currentEntry.start) / 2;
-    const soloistIntensityMod = isFirstHalfOfSection ? -0.15 : 0.05;
 
     dispatch(ACTIONS.UPDATE_CONDUCTOR_DECISION, {
         density: targetDensity,
         velocity: targetVelocity,
         hookProb: targetHookProb,
-        intent: {
-            density: targetIntentDensity,
-            soloistMod: soloistIntensityMod,
-        },
-        lyricalBias: lyricalBias,
     });
 
     dispatch(ACTIONS.UPDATE_HB, {

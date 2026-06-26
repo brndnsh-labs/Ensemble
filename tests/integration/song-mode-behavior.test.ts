@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyConductor } from '../../public/engine/conductor.js';
 import { scheduler } from '../../public/engine/scheduler-core.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
@@ -135,27 +134,5 @@ describe('Song Mode Behavior', () => {
 
         expect(workerClient.requestResolution).not.toHaveBeenCalled();
         expect(playback.step).toBe(5);
-    });
-
-    it('should calculate lyricalBias based on section label', () => {
-        dispatch(ACTIONS.RESET_STATE);
-        const { playback, arranger } = getState();
-
-        // Setup "Solo" section
-        arranger.totalSteps = 16;
-        arranger.stepMap = [{ start: 0, end: 16, chord: { sectionLabel: 'Solo' } }];
-        playback.step = 0;
-        playback.songMode = true;
-        playback.sessionTimer = 0; // Disable arc for this test
-
-        applyConductor(getState(), dispatch);
-        // Section bias (0.2) * 0.7 + Arc default (0.5) * 0.3 = 0.29
-        expect(playback.lyricalBias).toBeCloseTo(0.29, 2);
-
-        // Setup "Verse" section
-        arranger.stepMap = [{ start: 0, end: 16, chord: { sectionLabel: 'Verse' } }];
-        applyConductor(getState(), dispatch);
-        // Section bias (0.75) * 0.7 + Arc default (0.5) * 0.3 = 0.675
-        expect(playback.lyricalBias).toBeCloseTo(0.675, 2);
     });
 });

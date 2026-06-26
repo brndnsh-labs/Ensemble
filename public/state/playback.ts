@@ -39,7 +39,6 @@ export const playback = deepSignal<GlobalContext>({
         syncopation: 0.5,
         anticipation: 0.2,
         layBack: 0,
-        density: 0.5,
     },
     lastActiveDrumElements: null,
     heldNotes: new Set(),
@@ -50,7 +49,6 @@ export const playback = deepSignal<GlobalContext>({
     suspendTimeout: null,
     currentKey: null,
     conductorVelocity: 1.0,
-    lyricalBias: 0.5,
     masterVolume: 0.4,
     countIn: true,
     visualFlash: false,
@@ -182,9 +180,6 @@ export function playbackReducer(action: Action): boolean {
             if (action.payload.velocity) {
                 p.conductorVelocity = action.payload.velocity;
             }
-            if (action.payload.lyricalBias !== undefined) {
-                p.lyricalBias = action.payload.lyricalBias;
-            }
             if (action.payload.intent) {
                 if (action.payload.intent.syncopation !== undefined) {
                     playback.intent.syncopation = action.payload.intent.syncopation;
@@ -194,9 +189,6 @@ export function playbackReducer(action: Action): boolean {
                 }
                 if (action.payload.intent.layBack !== undefined) {
                     playback.intent.layBack = action.payload.intent.layBack;
-                }
-                if (action.payload.intent.density !== undefined) {
-                    playback.intent.density = action.payload.intent.density;
                 }
             }
             break;
