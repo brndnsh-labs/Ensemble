@@ -4,7 +4,7 @@ import { debounceSaveState, saveCurrentState } from '../persistence.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
-import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
+import { binarySearchMap, binarySearchMapIndex, createPRNG } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
 import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
@@ -614,16 +614,34 @@ export function checkSectionTransition(
                     !seededTimelineActive ||
                     seedTimelineStep >= seededTimelineEnd;
                 if (shouldUseProceduralFallback) {
+                    // why: #799 — seed the fallback so looped fills are
+                    // reproducible. The primary fillMap path is deterministic;
+                    // this fallback (reached once the seeded timeline runs dry —
+                    // the extended-looping/practice case) used raw Math.random,
+                    // so the fill template differed on every pass. Key on the
+                    // (genre, step) of the fill so the same arrangement replays
+                    // identically.
+                    const fillPrng = createPRNG(`fallback-fill:${groove.genreFeel}:${currentStep}`);
                     const fillSteps = generateProceduralFill(
                         groove.genreFeel,
                         playback.bandIntensity,
                         stepsPerMeasure,
+                        fillPrng,
                     );
+                    // why: #799 — mirror the seeded path's "Crash Contract"
+                    // (drum-seeder.ts:337) instead of an unconditional crash on
+                    // every fallback fill: crash when energy is rising into the
+                    // fill, OR when arriving at an energetic section (target >
+                    // 0.4) — a structural section/loop downbeat still wants the
+                    // cymbal even if the energy delta is flat. Only a genuinely
+                    // quiet, non-building transition now lands without a crash.
+                    const energyRising = targetEnergy > playback.bandIntensity;
+                    const fillCrash = energyRising || targetEnergy > 0.4;
                     dispatch(ACTIONS.TRIGGER_FILL, {
                         steps: fillSteps,
                         startStep: currentStep,
                         length: stepsPerMeasure,
-                        crash: true,
+                        crash: fillCrash,
                     });
 
                     if (playback.visualFlash) {

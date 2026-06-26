@@ -602,8 +602,9 @@ export function generateProceduralFill(
     genre: string,
     intensity: number,
     stepsPerMeasure: number,
+    prng: () => number = Math.random,
 ): Record<number, { name: string; vel: number }[]> {
-    return generateDeterministicFill(genre, intensity, stepsPerMeasure, Math.random);
+    return generateDeterministicFill(genre, intensity, stepsPerMeasure, prng);
 }
 
 /**
