@@ -147,23 +147,6 @@ describe('Conductor Logic', () => {
             );
         });
 
-        it('should yield intent density when soloist is busy', () => {
-            soloist.enabled = true;
-            soloist.session.phrasing.busySteps = 5; // Busy
-            playback.complexity = 0.8;
-
-            applyConductor(getState(), dispatch);
-
-            expect(dispatch).toHaveBeenCalledWith(
-                'UPDATE_CONDUCTOR_DECISION',
-                expect.objectContaining({
-                    intent: expect.objectContaining({
-                        density: 0.3 * (1 - 0.8), // Expected yielding calculation
-                    }),
-                }),
-            );
-        });
-
         it('should push harmony complexity during final build in song mode', () => {
             playback.songMode = true;
             playback.sessionTimer = 5; // 5 mins
@@ -176,27 +159,6 @@ describe('Conductor Logic', () => {
                 'UPDATE_HB',
                 expect.objectContaining({
                     complexity: expect.any(Number), // Should be pushed to max(complexity, 0.85)
-                }),
-            );
-        });
-
-        it('should apply lyrical bias based on song progress and section overrides', () => {
-            playback.songMode = true;
-            playback.sessionTimer = 5; // 5 mins
-            playback.sessionStartTime = performance.now() - 1 * 60000; // 1 min elapsed (progress 0.2)
-
-            arranger.stepMap = [
-                { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Solo' } },
-            ];
-            playback.step = 0;
-
-            applyConductor(getState(), dispatch);
-
-            // Should blend Solo override (0.2) with arc bias
-            expect(dispatch).toHaveBeenCalledWith(
-                'UPDATE_CONDUCTOR_DECISION',
-                expect.objectContaining({
-                    lyricalBias: expect.any(Number),
                 }),
             );
         });

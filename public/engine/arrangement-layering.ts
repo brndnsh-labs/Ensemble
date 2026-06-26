@@ -18,11 +18,9 @@
  * of the layered intro, and a fading-drums outro would defeat the "land the
  * landing" cadence (S4) on the final bar.
  *
- * Soloist is also intentionally absent — `conductor.lyricalBias` (`conductor.ts:
- * 85-90`) already routes intro/outro into the soloist's phrasing weights, and
- * holding the soloist out further would compound that gesture awkwardly. If a
- * future story adds a "soloist sits out the first 4 bars" feature, it should
- * live here.
+ * Soloist is also intentionally absent — holding it out of the layered intro
+ * would compound that gesture awkwardly. If a future story adds a "soloist sits
+ * out the first 4 bars" feature, it should live here.
  *
  * Source: docs/audit/form-arranger.md P1 #4;
  *         docs/audit/epic-form-arrangement.md S5.

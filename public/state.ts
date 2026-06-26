@@ -54,7 +54,6 @@ export function getSyncState() {
             modals: {},
             intent: playback.intent,
             conductorVelocity: playback.conductorVelocity,
-            lyricalBias: playback.lyricalBias,
             songMode: playback.songMode,
             isEndingPending: playback.isEndingPending,
             currentLoopCount: playback.currentLoopCount,

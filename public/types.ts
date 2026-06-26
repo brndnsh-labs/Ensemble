@@ -76,8 +76,6 @@ export interface PlaybackIntent {
     anticipation: number;
     /** Dilla feel; 0-1 */
     layBack: number;
-    /** 0-1 */
-    density: number;
 }
 
 export interface ModalsState {
@@ -1163,8 +1161,6 @@ export interface GlobalContext {
     readonly currentKey: string | null;
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
     readonly conductorVelocity: number;
-    /** Bias towards lyrical phrasing in soloist (0.0-1.0). */
-    readonly lyricalBias: number;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
@@ -1328,7 +1324,6 @@ export interface ActionPayloadSetGenreFeel {
 
 export interface ActionPayloadUpdateConductorDecision {
     velocity?: number;
-    lyricalBias?: number;
     intent?: Partial<PlaybackIntent>;
     density?: string;
     hookProb?: number;
