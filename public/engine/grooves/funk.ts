@@ -7,6 +7,7 @@ import {
     type DrumStepBase,
     type GrooveContext,
     getPhraseSeed,
+    humanizeDraw,
     makeMotifSelector,
     roll,
     rollSeed,
@@ -258,7 +259,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (!isBeatStart && roll(0.6 + intensity * 0.3, 1.0, rollSeed(context, 1))) {
                 shouldPlay = true;
                 soundName = 'Sidestick';
-                velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
+                velocity = scaleVelocity(0.15, intensity, 0.15) + humanizeDraw(context, 1) * 0.1;
             }
         }
 

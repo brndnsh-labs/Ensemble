@@ -6,7 +6,9 @@ import {
     type DrumStepBase,
     type GrooveContext,
     getPhraseSeed,
+    humanizeDraw,
     INTENSITY_BANDS,
+    placementSkew,
     roll,
     rollSeed,
     scaleVelocity,
@@ -101,7 +103,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     if (!isBackbeat) {
         // Even beats drift too, but less than subdivisions
         const multiplier = isBeatStart ? 0.3 : 1.0;
-        instTimeOffset += (Math.random() - 0.5) * drunkenFactor * multiplier;
+        instTimeOffset += (placementSkew(context, 1) - 0.5) * drunkenFactor * multiplier;
     }
 
     // --- 3. HI-HAT DYNAMICS ---
@@ -171,7 +173,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             } else if (isAOfBeat) {
                 // Ghost note placements - keep deterministic for "structured" feel
                 shouldPlay = true;
-                velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
+                velocity = scaleVelocity(0.15, intensity, 0.15) + humanizeDraw(context, 1) * 0.1;
             }
         } else {
             // Motif 0 & 2: Solid backbeat

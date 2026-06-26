@@ -3,10 +3,11 @@
  * #790: `roll()` (the genre strategies' ghost/decoration die) used raw
  * `Math.random()`, so a looped bar re-rolled every pass and never settled. It
  * now draws `scrambleHash(rollSeed(context, salt))`, seeded off the tick's
- * (barIndex, sectionId, loopStep, inst.name). This guard proves the seam is
- * reproducible: two identical passes through `applyGrooveOverrides` produce
- * byte-identical drum output. Before the fix this test would flake on every
- * roll-gated step.
+ * (barIndex, sectionId, loopStep, inst.name). #792 then seeded the remaining
+ * per-genre velocity + micro-timing `Math.random` humanization. With both
+ * landed, two identical passes through `applyGrooveOverrides` produce
+ * byte-identical drum output (gate, velocity, sound AND timing offset). Before
+ * the fixes this test flaked on every roll-gated / humanized step.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
@@ -55,11 +56,13 @@ function runPass(genre, numBars) {
                     beatIndex: info.beatIndex,
                     tsConfig: info.tsConfig,
                 });
-                // #790 gates `shouldPlay` (and routes `soundName`); velocity
-                // still carries #792's unseeded `Math.random` micro-jitter in
-                // some genres, so it is deliberately excluded here — this guard
-                // isolates the roll() determinism #790 owns.
-                out.push(`${r.shouldPlay ? 1 : 0}:${r.soundName}`);
+                // #790 seeds the roll() gate (`shouldPlay`/`soundName`); #792
+                // seeds the remaining velocity + micro-timing humanization. With
+                // both landed the whole drum step is deterministic, so the guard
+                // now checks the FULL output tuple.
+                out.push(
+                    `${r.shouldPlay ? 1 : 0}:${r.velocity.toFixed(4)}:${r.soundName}:${(r.instTimeOffset ?? 0).toFixed(4)}`,
+                );
             }
         }
     }
