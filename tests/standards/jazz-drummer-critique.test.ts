@@ -80,7 +80,6 @@ describe('Jazz Drummer Critique', () => {
             groove: { genreFeel: 'Jazz' },
         });
 
-        let rideHits = 0;
         let quarterRideHits = 0;
         let skipRideHits = 0;
         let footChickHits = 0;
@@ -95,7 +94,6 @@ describe('Jazz Drummer Critique', () => {
 
                 // --- CRITIQUE: Ride Pattern (Now Ride soundName) ---
                 if (stepData.instruments.Ride) {
-                    rideHits++;
                     if ([0, 4, 8, 12].includes(s)) {
                         quarterRideHits++;
                     } else if ([6, 14].includes(s)) {
@@ -135,14 +133,23 @@ describe('Jazz Drummer Critique', () => {
         });
 
         const totalBars = performance.length;
-        const rideConsistency = (quarterRideHits + skipRideHits) / rideHits;
+        // Honest occupancy metrics — NOT the old `(quarter+skip)/rideHits`
+        // tautology, which is identically 1.0 because rideHits only ever counts
+        // the {0,4,8,12,6,14} positions it then re-buckets (a silently-removed
+        // ride lane still scored 100%). Measure each lane against the number of
+        // slots it COULD fill: 4 quarter-note slots/bar and 2 skip slots/bar.
+        const quarterRideOccupancy = quarterRideHits / (totalBars * 4);
+        const skipRideOccupancy = skipRideHits / (totalBars * 2);
         const footChickSolidity = footChickHits / (totalBars * 2);
         const kickFeatheringScore = kickFeatheringHits / (totalBars * 4);
         const compingDensity = (snareCompingHits + kickBombs) / totalBars;
 
         console.log('\n--- JAZZ DRUMMER CRITIQUE REPORT ---');
         console.log(
-            `[Ride Pattern Consistency]  ${(rideConsistency * 100).toFixed(1)}% (Target: >95%)`,
+            `[Quarter Ride Occupancy]   ${(quarterRideOccupancy * 100).toFixed(1)}% (Target: >95%)`,
+        );
+        console.log(
+            `[Skip Ride Occupancy]      ${(skipRideOccupancy * 100).toFixed(1)}% (Target: 40-98%)`,
         );
         console.log(
             `[Foot Chick Solidity]      ${(footChickSolidity * 100).toFixed(1)}% (Target: 100%)`,
@@ -156,8 +163,22 @@ describe('Jazz Drummer Critique', () => {
         );
         console.log('------------------------------------\n');
 
-        // CRITICAL: Jazz ride pulse should be highly consistent
-        expect(rideConsistency).toBeGreaterThan(0.95);
+        // CRITICAL: the quarter-note ride pulse is the bedrock of swing time —
+        // the engine sets rideProb=1.0 on every beat (jazz.ts:101), so this is
+        // deterministic at 100%. Measured 1.0 across 128 bars; threshold 0.95
+        // gives a 5pt cushion and still fails outright if the quarter pulse is
+        // dropped (a removed lane scores 0).
+        expect(quarterRideOccupancy).toBeGreaterThan(0.95);
+
+        // MUSICAL: the "skip" note (the and-of-2 / and-of-4) is a LIVING
+        // ornament, not a metronome tick. Engine fires it at rideProb =
+        // 0.6 + drumComplexity(0.8)*0.3 = 0.84; measured ~0.84 occupancy across
+        // 128 bars (std ~0.023, so ~6 std inside both bounds). The band
+        // (0.40, 0.98) asserts the skip note is genuinely present (a removed
+        // skip lane → 0 → fails the floor) yet not mechanically every bar
+        // (a hard-coded every-bar skip → 1.0 → fails the ceiling).
+        expect(skipRideOccupancy).toBeGreaterThan(0.4);
+        expect(skipRideOccupancy).toBeLessThan(0.98);
 
         // CRITICAL: Foot chick on 2 and 4 is the bedrock
         expect(footChickSolidity).toBe(1.0);
