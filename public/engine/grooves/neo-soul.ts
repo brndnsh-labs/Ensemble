@@ -8,6 +8,7 @@ import {
     getPhraseSeed,
     INTENSITY_BANDS,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -181,7 +182,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // --- Snare Turnarounds ---
         if (isTurnaround && intensity > 0.6) {
-            if (beatIndex >= 3 && !isBeatStart && roll(0.6)) {
+            if (beatIndex >= 3 && !isBeatStart && roll(0.6, 1.0, rollSeed(context, 1))) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
                 instTimeOffset += 0.01; // Extra drag on turnaround ghosts

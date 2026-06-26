@@ -9,6 +9,7 @@ import {
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -164,7 +165,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Fill Logic
         if (isTurnaround && loopStep >= halfBarStep) {
             if (isEighthNote || isEOfBeat || isAOfBeat) {
-                if (roll(0.7, intensity)) {
+                if (roll(0.7, intensity, rollSeed(context, 1))) {
                     shouldPlay = true;
                     velocity = 1.15;
                 }

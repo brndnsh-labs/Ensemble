@@ -430,6 +430,18 @@ export function applyGrooveOverrides(
         sectionSeed = deriveSectionSeed(sectionId ?? '', arrangerState.seed ?? '');
     }
 
+    // #790: deterministic base seed for this tick's strategy `roll()` decisions —
+    // same (sectionId, barIndex, loopStep, inst.name) fold the entropy phase uses
+    // below (`_entropyBaseSeed`). Strategies derive each roll's seed from this via
+    // `rollSeed(context, salt)`, so ghost/decoration rolls reproduce across loops
+    // and critique runs instead of re-rolling raw Math.random every pass.
+    const rollBaseSeed =
+        (stringHash33(sectionIdFromTick || sectionId || '') ^
+            (barIndex * 0x9e3779b1) ^
+            (loopStep * 131) ^
+            stringHash31(inst.name ?? '')) |
+        0;
+
     const context = {
         step,
         inst,
@@ -458,6 +470,7 @@ export function applyGrooveOverrides(
         barIndex,
         isFirstStepOfNewBar,
         sectionSeed,
+        rollBaseSeed,
         isTurnaround,
         // why: read effective soloist activity (section override may force-off the
         // soloist even when the global flag is on). Without this, drums hear a

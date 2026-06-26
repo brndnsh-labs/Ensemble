@@ -10,6 +10,7 @@ import {
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -208,10 +209,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isDownbeat) {
                 shouldPlay = true;
                 velocity = 1.4;
-            } else if (isBeatStart && !isBackbeat && !isDownbeat && roll(0.6, intensity)) {
+            } else if (
+                isBeatStart &&
+                !isBackbeat &&
+                !isDownbeat &&
+                roll(0.6, intensity, rollSeed(context, 1))
+            ) {
                 shouldPlay = true;
                 velocity = 1.1;
-            } else if (isOffbeat && isBackbeat && roll(0.4, intensity)) {
+            } else if (isOffbeat && isBackbeat && roll(0.4, intensity, rollSeed(context, 2))) {
                 shouldPlay = true; // Anticipation
                 velocity = 0.85;
             }
@@ -224,7 +230,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // General Syncopation (Random kicks)
-        if (intensity > 0.7 && !shouldPlay && isOffbeat && roll(0.2, intensity)) {
+        if (
+            intensity > 0.7 &&
+            !shouldPlay &&
+            isOffbeat &&
+            roll(0.2, intensity, rollSeed(context, 3))
+        ) {
             shouldPlay = true;
             velocity = scaleVelocity(0.7, intensity, 0.2);
         }
@@ -262,7 +273,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // Ghost notes (Modern/Driving)
-        if (intensity > 0.6 && !shouldPlay && isOffbeat && roll(0.15, intensity)) {
+        if (
+            intensity > 0.6 &&
+            !shouldPlay &&
+            isOffbeat &&
+            roll(0.15, intensity, rollSeed(context, 4))
+        ) {
             shouldPlay = true;
             soundName = 'Sidestick';
             velocity = 0.4;
@@ -270,7 +286,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Turnaround Fills
         if (isTurnaround && loopStep >= halfBarStep) {
-            if (isEighthNote && roll(0.5, intensity)) {
+            if (isEighthNote && roll(0.5, intensity, rollSeed(context, 5))) {
                 shouldPlay = true;
                 soundName = 'Snare';
                 velocity = 1.1;
@@ -281,7 +297,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     else if (context.inst.name.includes('Tom')) {
         if (isTurnaround && loopStep >= halfBarStep) {
             // Distribute across toms for energy
-            if (isEighthNote && roll(0.6, intensity)) {
+            if (isEighthNote && roll(0.6, intensity, rollSeed(context, 6))) {
                 shouldPlay = true;
                 velocity = 1.15;
             }

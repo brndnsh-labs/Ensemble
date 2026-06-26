@@ -10,6 +10,7 @@ import {
     isBackbeatAdjacentStep,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -61,7 +62,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     const lastBeatIndex = beatsPerMeasure - 1;
 
     // --- Crashes ---
-    if (context.inst.name === 'Open' && isDownbeat && intensity > 0.75 && roll(0.25)) {
+    if (
+        context.inst.name === 'Open' &&
+        isDownbeat &&
+        intensity > 0.75 &&
+        roll(0.25, 1.0, rollSeed(context, 1))
+    ) {
         shouldPlay = true;
         velocity = 1.25;
         soundName = 'Crash';
@@ -75,7 +81,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // The core shuffle pattern: downbeats and the swung offbeat
         if (isBeatStart || isOffbeat) {
             // Spang-a-lang: Occasionally omit the offbeat on beats 1 and 3 at lower complexity
-            if (isOffbeat && !isBackbeat && drumComplexity < 0.5 && roll(0.4)) {
+            if (
+                isOffbeat &&
+                !isBackbeat &&
+                drumComplexity < 0.5 &&
+                roll(0.4, 1.0, rollSeed(context, 2))
+            ) {
                 return { shouldPlay: false, velocity, soundName, instTimeOffset };
             }
 
@@ -101,7 +112,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
 
             // Turnaround Open Hat on the offbeat of 4
-            if (isOffbeat && beatIndex === lastBeatIndex && activeMotif >= 1 && roll(0.4)) {
+            if (
+                isOffbeat &&
+                beatIndex === lastBeatIndex &&
+                activeMotif >= 1 &&
+                roll(0.4, 1.0, rollSeed(context, 3))
+            ) {
                 soundName = 'Open';
                 velocity = scaleVelocity(0.7, intensity, 0.1);
             }
@@ -136,7 +152,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // "Four-on-the-Floor" Drive (High intensity only)
-        if (isBeatStart && isBackbeat && intensity > 0.8 && roll(0.7, intensity)) {
+        if (
+            isBeatStart &&
+            isBackbeat &&
+            intensity > 0.8 &&
+            roll(0.7, intensity, rollSeed(context, 4))
+        ) {
             shouldPlay = true;
             velocity = scaleVelocity(0.55, intensity, 0.1); // Significantly quieter than primary hits
         }
@@ -158,7 +179,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Texas Shuffle snare participation (isOffbeat ghosting)
         const texasProb = activeMotif === 3 ? 0.7 : intensity > 0.7 ? 0.3 : 0;
         if (isOffbeat && !isBackbeat && drumComplexity > 0.6) {
-            if (roll(texasProb)) {
+            if (roll(texasProb, 1.0, rollSeed(context, 5))) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.35, intensity, 0.1);
                 instTimeOffset += 0.008; // Lay it back for the 'shuffle' feel
@@ -175,7 +196,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             const isEOfBeat1Or3 = stepInMeasure === 1 || stepInMeasure === 9;
             const crowdsBackbeat = isBackbeatAdjacentStep(stepInMeasure, context.stepsPerBar);
             if (!isEOfBeat1Or3 && !crowdsBackbeat) {
-                if (roll(0.2, intensity)) {
+                if (roll(0.2, intensity, rollSeed(context, 6))) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.25, intensity, 0.1);
                 }

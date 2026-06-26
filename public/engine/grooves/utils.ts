@@ -1,6 +1,7 @@
 /**
  * Shared utility functions for generative drum strategies.
  */
+import { scrambleHash } from '../hash-utils.js';
 
 export const INTENSITY_BANDS = {
     LOW: 0.35,
@@ -43,6 +44,14 @@ export interface GrooveContext {
     sectionSeed: number;
     isTurnaround: boolean;
     isSoloistBusy: boolean;
+    // #790: a deterministic base seed for this (barIndex, sectionId, loopStep,
+    // inst.name) tick, supplied by the groove engine. Strategy `roll()` calls
+    // derive a per-decision seed from it via `rollSeed(context, salt)` so
+    // ghost/decoration decisions are reproducible across loops and critique
+    // runs instead of re-rolling raw `Math.random` every pass. Absent only for
+    // bare test contexts that call a strategy directly — those keep the legacy
+    // unseeded `roll()` path.
+    rollBaseSeed?: number;
 }
 
 export interface DrumStepBase {
@@ -61,10 +70,40 @@ export interface DrumStepExtended extends DrumStepBase {
 type MotifTier = { maxIntensity?: number; picks: ([number, number] | number)[] };
 
 /**
- * Returns true if a random roll is successful, scaled by intensity.
+ * Returns true if a roll is successful, scaled by intensity.
+ *
+ * #790: when `seed` is provided the draw is the deterministic `scrambleHash(seed)`
+ * instead of `Math.random()`, so a looped/critique-replayed bar produces the same
+ * ghost/decoration decisions every pass (a practice drummer that settles instead
+ * of re-rolling chaos). Production call sites in the genre strategies pass
+ * `rollSeed(context, salt)`; bare test contexts (no `rollBaseSeed`) get `undefined`
+ * and fall back to the legacy `Math.random()` path unchanged.
  */
-export function roll(probability: number, intensity = 1.0): boolean {
-    return Math.random() < probability * intensity;
+export function roll(probability: number, intensity = 1.0, seed?: number): boolean {
+    const draw = seed === undefined ? Math.random() : scrambleHash(seed | 0);
+    return draw < probability * intensity;
+}
+
+/**
+ * #790: derive a per-decision deterministic seed for a `roll()` call from the
+ * tick's `context.rollBaseSeed` (which folds barIndex, sectionId, loopStep and
+ * inst.name) and a call-site `salt` that keeps co-located rolls independent.
+ * Returns `undefined` when the context carries no base seed (bare strategy-unit
+ * test contexts) so `roll()` cleanly falls back to its legacy unseeded behavior.
+ *
+ * Salts only need to be distinct among the roll sites reachable for the SAME
+ * instrument in one tick — the base seed already folds inst.name, so different
+ * lanes never collide. Assigning a unique salt per site within a strategy file
+ * is the simple, collision-proof convention.
+ */
+export function rollSeed(context: GrooveContext, salt: number): number | undefined {
+    if (context.rollBaseSeed === undefined) {
+        return undefined;
+    }
+    // 0x85ebca6b: an odd 32-bit avalanche mixing constant — multiplying the salt
+    // by it scatters adjacent salts across the seed space, well clear of the
+    // entropy phase's +1/+3/+5 discriminators on the same base seed.
+    return (context.rollBaseSeed ^ Math.imul(salt, 0x85ebca6b)) | 0;
 }
 
 /**

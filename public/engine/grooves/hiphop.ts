@@ -9,6 +9,7 @@ import {
     getPhraseSeed,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -67,7 +68,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isDownbeat) {
                 shouldPlay = true;
             }
-            if (isOffbeat && beatIndex === 2 && roll(0.7, intensity)) {
+            if (isOffbeat && beatIndex === 2 && roll(0.7, intensity, rollSeed(context, 1))) {
                 shouldPlay = true;
             }
         } else {
@@ -75,10 +76,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isDownbeat) {
                 shouldPlay = true;
             } else if (isOffbeat && (beatIndex === 1 || beatIndex === 2)) {
-                if (roll(0.6, intensity)) {
+                if (roll(0.6, intensity, rollSeed(context, 2))) {
                     shouldPlay = true;
                 }
-            } else if (isAOfBeat && roll(0.4 * intensity)) {
+            } else if (isAOfBeat && roll(0.4 * intensity, 1.0, rollSeed(context, 3))) {
                 shouldPlay = true;
             }
         }
@@ -122,7 +123,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // Occasional ghosting / chatter for Boom Bap
-        if (activeMotif === 0 && !shouldPlay && intensity > 0.6 && isOffbeat && roll(0.3)) {
+        if (
+            activeMotif === 0 &&
+            !shouldPlay &&
+            intensity > 0.6 &&
+            isOffbeat &&
+            roll(0.3, 1.0, rollSeed(context, 4))
+        ) {
             shouldPlay = true;
             soundName = 'Sidestick';
             velocity = 0.4;

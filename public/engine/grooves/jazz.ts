@@ -8,6 +8,7 @@ import {
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -100,7 +101,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         } else if (isRideStep) {
             const rideProb = isSkipBeat ? 0.6 + drumComplexity * 0.3 : 1.0;
 
-            if (roll(rideProb)) {
+            if (roll(rideProb, 1.0, rollSeed(context, 1))) {
                 shouldPlay = true;
                 if (isBackbeat) {
                     velocity = scaleVelocity(0.9, intensity, 0.2);
@@ -125,7 +126,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         }
 
-        if (context.playback.bpm && context.playback.bpm > 180 && isSkipBeat && roll(0.4)) {
+        if (
+            context.playback.bpm &&
+            context.playback.bpm > 180 &&
+            isSkipBeat &&
+            roll(0.4, 1.0, rollSeed(context, 2))
+        ) {
             shouldPlay = false;
         }
     } else if (context.inst.name === 'HiHat') {
@@ -182,7 +188,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                     bombProb *= 0.3;
                 }
 
-                if (roll(bombProb) && isOffbeat && beatIndex % 2 !== 0) {
+                if (roll(bombProb, 1.0, rollSeed(context, 3)) && isOffbeat && beatIndex % 2 !== 0) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.85, Math.random(), 0.25);
                 }
@@ -193,7 +199,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (isSoloistBusy) {
                 bombProb *= 1.4;
             }
-            if (roll(bombProb) && isSkipBeat) {
+            if (roll(bombProb, 1.0, rollSeed(context, 4)) && isSkipBeat) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.85, Math.random(), 0.25);
             }
@@ -206,7 +212,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 ((isBeatStart || isOffbeat) && beatIndex === lastBeatIndex - 1) ||
                 (isOffbeat && beatIndex === lastBeatIndex)
             ) {
-                if (roll(0.7)) {
+                if (roll(0.7, 1.0, rollSeed(context, 5))) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.6, Math.random(), 0.4);
                     if (isOffbeat && beatIndex === lastBeatIndex) {
@@ -240,9 +246,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 }
 
                 if (
-                    (isOffbeat && beatIndex === lastBeatIndex && roll(0.5 + compProb)) ||
-                    (isOffbeat && beatIndex === 1 && roll(0.3 + compProb)) ||
-                    (isOffbeat && beatIndex !== 1 && roll(compProb * 0.4))
+                    (isOffbeat &&
+                        beatIndex === lastBeatIndex &&
+                        roll(0.5 + compProb, 1.0, rollSeed(context, 6))) ||
+                    (isOffbeat &&
+                        beatIndex === 1 &&
+                        roll(0.3 + compProb, 1.0, rollSeed(context, 7))) ||
+                    (isOffbeat &&
+                        beatIndex !== 1 &&
+                        roll(compProb * 0.4, 1.0, rollSeed(context, 8)))
                 ) {
                     shouldPlay = true;
                     velocity = 0.25 + Math.random() * 0.3 + intensity * 0.2;
@@ -274,7 +286,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // THE BIG FINISH (Ending Signaling)
         if (context.playback.songMode && context.playback.isEndingPending) {
-            if (isOffbeat && beatIndex === lastBeatIndex && roll(0.7)) {
+            if (isOffbeat && beatIndex === lastBeatIndex && roll(0.7, 1.0, rollSeed(context, 9))) {
                 shouldPlay = true;
                 velocity = 1.1;
                 instTimeOffset -= 0.005;

@@ -9,6 +9,7 @@ import {
     getPhraseSeed,
     INTENSITY_BANDS,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -127,7 +128,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // low-intensity busy section gets quieter, sparser ghosts naturally —
         // not a binary on/off cliff at 0.7.
         if (isSyncopationFlavor) {
-            if (isAOfBeat && beatIndex >= 3 && roll(0.4, intensity)) {
+            if (isAOfBeat && beatIndex >= 3 && roll(0.4, intensity, rollSeed(context, 1))) {
                 shouldPlay = true;
                 velocity = scaleVelocity(0.3, intensity, 0.3);
             }
@@ -220,7 +221,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                         ? 'CowbellHigh'
                         : 'CowbellLow';
             }
-            if (intensity > 0.9 && !isEighthNote && roll(0.3)) {
+            if (intensity > 0.9 && !isEighthNote && roll(0.3, 1.0, rollSeed(context, 2))) {
                 shouldPlay = true;
                 velocity = 0.6;
                 soundName = 'CowbellHigh';

@@ -8,6 +8,7 @@ import {
     type GrooveContext,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -125,7 +126,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Dub/Rub-a-Dub Chatter
         if (activeMotif === 3 && !shouldPlay) {
-            if (isAOfBeat && roll(0.4, intensity)) {
+            if (isAOfBeat && roll(0.4, intensity, rollSeed(context, 1))) {
                 shouldPlay = true;
                 soundName = 'Sidestick';
                 velocity = 0.5;
@@ -134,7 +135,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Turnaround Fills (Rimshot rolls)
         if (isTurnaround && intensity > 0.6 && !shouldPlay) {
-            if (isAOfBeat && roll(0.6)) {
+            if (isAOfBeat && roll(0.6, 1.0, rollSeed(context, 2))) {
                 shouldPlay = true;
                 soundName = 'Sidestick';
                 velocity = 0.85;
@@ -150,14 +151,18 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = isBeatStart ? 0.85 : 0.65;
 
             // Subtle 16th note shuffle at high intensity
-            if (intensity > 0.75 && (isAOfBeat || isEOfBeat) && roll(0.3)) {
+            if (
+                intensity > 0.75 &&
+                (isAOfBeat || isEOfBeat) &&
+                roll(0.3, 1.0, rollSeed(context, 3))
+            ) {
                 shouldPlay = true;
                 velocity = 0.35;
             }
         }
 
         // Offbeat Open Barks
-        if (isOffbeat && isBackbeat && intensity > 0.65 && roll(0.4)) {
+        if (isOffbeat && isBackbeat && intensity > 0.65 && roll(0.4, 1.0, rollSeed(context, 4))) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 1.1;

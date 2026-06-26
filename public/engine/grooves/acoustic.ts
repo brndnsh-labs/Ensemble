@@ -8,6 +8,7 @@ import {
     type GrooveContext,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -104,7 +105,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         // Occasional light ghost chatter at high intensity
-        if (intensity > 0.7 && !shouldPlay && isOffbeat && roll(0.3)) {
+        if (intensity > 0.7 && !shouldPlay && isOffbeat && roll(0.3, 1.0, rollSeed(context, 1))) {
             shouldPlay = true;
             soundName = 'Sidestick';
             velocity = 0.4;
@@ -128,7 +129,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Syncopation: "& of 2" or "& of 4"
         if (intensity > 0.5 && !shouldPlay && isOffbeat && (beatIndex === 1 || beatIndex === 3)) {
-            if (roll(0.4, intensity)) {
+            if (roll(0.4, intensity, rollSeed(context, 2))) {
                 shouldPlay = true;
                 velocity = 0.85;
             }
@@ -162,13 +163,18 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // 16th note "ghost" pulse
             velocity = scaleVelocity(0.3, intensity, 0.1);
             soundName = 'HiHat';
-            if (intensity < 0.5 && roll(0.4)) {
+            if (intensity < 0.5 && roll(0.4, 1.0, rollSeed(context, 3))) {
                 shouldPlay = false; // lower density at low intensity
             }
         }
 
         // Open Hat "Breath"
-        if (isOffbeat && beatIndex === 3 && intensity > 0.6 && roll(0.3)) {
+        if (
+            isOffbeat &&
+            beatIndex === 3 &&
+            intensity > 0.6 &&
+            roll(0.3, 1.0, rollSeed(context, 4))
+        ) {
             shouldPlay = true;
             soundName = 'Open';
             velocity = 0.95;
