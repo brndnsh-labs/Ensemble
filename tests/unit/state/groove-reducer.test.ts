@@ -24,6 +24,22 @@ describe('Groove Reducer', () => {
         expect(groove.currentMeasure).toBe(2);
     });
 
+    it('#791: clears the section-seed memo on RESET_STATE and on SET_SONG_SEED', () => {
+        // sectionSeedMap is a memo of deriveSectionSeed(sectionId, songSeed);
+        // it must be invalidated whenever the song seed changes so stale,
+        // wrong-seed groove markers never linger.
+        grooveReducer({ type: ACTIONS.SET_GROOVE_SEED, payload: { sectionId: 's1', seed: 0.42 } });
+        expect(groove.sectionSeedMap.s1).toBe(0.42);
+
+        grooveReducer({ type: ACTIONS.SET_SONG_SEED, payload: 'A1B2C3' });
+        expect(groove.sectionSeedMap).toEqual({});
+
+        grooveReducer({ type: ACTIONS.SET_GROOVE_SEED, payload: { sectionId: 's2', seed: 0.7 } });
+        expect(groove.sectionSeedMap.s2).toBe(0.7);
+        grooveReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+        expect(groove.sectionSeedMap).toEqual({});
+    });
+
     it('should set swing and subdivision', () => {
         grooveReducer({ type: ACTIONS.SET_SWING, payload: 25 });
         expect(groove.swing).toBe(25);

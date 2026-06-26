@@ -20,7 +20,7 @@ import * as reggae from './grooves/reggae.js';
 import * as rock from './grooves/rock.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
-import { scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
+import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 
 const strategies: Record<string, any> = {
@@ -419,10 +419,15 @@ export function applyGrooveOverrides(
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     if (sectionSeed === undefined) {
-        // Latin/Bossa requires 2-bar stability for authentic Clave motifs
-        const seedBarIndex = config.isLatin ? Math.floor(barIndex / 2) * 2 : barIndex;
-        // +42 was the creativity-on offset (now always engaged).
-        sectionSeed = ((seedBarIndex * 137 + 42) % 256) / 256;
+        // #791: derive the SAME per-section marker the conductor writes into
+        // sectionSeedMap — from (sectionId, songSeed) — so the seeded and
+        // fallback paths agree (no mid-section groove swap as the lagged
+        // conductor write lands) and a pinned song seed reproduces the exact
+        // groove across replays and devices. The marker is constant for the
+        // whole section, so `getMotif` settles on one pattern instead of
+        // re-picking every bar; per-bar breathing still comes from the
+        // downstream `getPhraseSeed(sectionSeed, barIndex, …)` draws.
+        sectionSeed = deriveSectionSeed(sectionId ?? '', arrangerState.seed ?? '');
     }
 
     const context = {

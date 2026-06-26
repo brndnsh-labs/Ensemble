@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { sectionSweepArranger } from '../utils/groove-seed.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -149,9 +150,19 @@ describe('Latin Drummer Critique', () => {
         // We use genreFeel 'Bossa Nova' with intensity 0.9 — at this level the motif
         // selector (binaryTier 0.6/0.7) pushes to activeMotif 2 or 3.
 
+        // #791: the engine now derives ONE sticky sectionSeed per section, and it
+        // dropped the old Latin/Bossa 2-bar `Math.floor(barIndex/2)*2` grouping
+        // from the fallback. An empty arranger would play a single motif for the
+        // whole run — so if that motif isn't Samba(2)/Partido Alto(3), backbeats
+        // never upgrade to Snare. A per-2-bar-section sweep mirrors the son
+        // clave's 2-bar cycle (clave stays coherent within a section) and lets
+        // the vocabulary land on the high-energy Samba/Partido sections that
+        // route the backbeat to a full Snare crack. Deterministic: under songSeed
+        // 'CRITIQUE' ~34% of 2-bar sections are motif 2/3 at intensity 0.9.
         const performance = simulatePerformance(64, {
             playback: { bandIntensity: 0.9 },
             groove: { genreFeel: 'Bossa Nova' },
+            arranger: sectionSweepArranger(64, { barsPerSection: 2 }),
         });
 
         let snareOnBackbeat = 0;

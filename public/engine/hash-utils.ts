@@ -101,3 +101,27 @@ export const stringHash31 = (str: string): number => {
     }
     return h;
 };
+
+/**
+ * deriveSectionSeed — the per-section groove-variation marker, derived purely
+ * from `(sectionId, songSeed)`. Returns a well-distributed float in [0, 1) used
+ * as the abstract pool marker that `getMotif` (and the per-genre phrase seeds)
+ * key off (groove-engine.ts).
+ *
+ * why (finding #791): this used to be `Math.random()` written into
+ * `groove.sectionSeedMap` by the conductor, with a *different*, bar-indexed
+ * fallback in the groove engine for sections the conductor hadn't seeded yet.
+ * Three bugs fell out of that: the seed wasn't reproducible (same chart + same
+ * song seed → different groove across replays/devices), the two paths
+ * disagreed (a mid-section groove swap as the lagged conductor write landed
+ * over the fallback), and the bar-indexed fallback re-picked the motif every
+ * bar so an unseeded section never settled. Deriving BOTH the conductor write
+ * and the engine fallback from this one function makes the two paths identical
+ * — the swap is gone by construction — and ties the groove to the song seed so
+ * a pinned seed reproduces the exact drum performance everywhere.
+ *
+ * Keyed via `stringHash31` (the engines' general string→int32 fold) XORed so a
+ * given section moves with the song seed but stays distinct from its siblings.
+ */
+export const deriveSectionSeed = (sectionId: string, songSeed: string): number =>
+    scrambleHash((stringHash31(sectionId) ^ stringHash31(songSeed)) | 0);

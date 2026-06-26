@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { sectionSweepArranger } from '../utils/groove-seed.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -25,6 +26,11 @@ describe('Ska-Punk Drummer Critique', () => {
                 instruments: [],
             },
             soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+            // #791: section seeds are now sticky per (sectionId, songSeed). An
+            // empty arranger collapses the whole run to ONE motif; the sweep
+            // arranger restores the motif-vocabulary spread these harnesses
+            // measure (one deterministic section per bar).
+            arranger: sectionSweepArranger(numBars),
             ...stateOverrides,
         };
         getState.mockReturnValue(mockState);

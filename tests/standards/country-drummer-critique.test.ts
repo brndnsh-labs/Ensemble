@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { sectionSweepArranger } from '../utils/groove-seed.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -25,6 +26,11 @@ describe('Country Drummer Critique', () => {
                 instruments: [],
             },
             soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+            // #791: groove engine now derives ONE sticky sectionSeed per
+            // (sectionId, songSeed). An empty arranger collapses the whole run
+            // to a single motif, so we sweep the motif vocabulary across sections
+            // (one section per bar) the way a real multi-section song does.
+            arranger: sectionSweepArranger(numBars),
             ...stateOverrides,
         };
         getState.mockReturnValue(mockState);

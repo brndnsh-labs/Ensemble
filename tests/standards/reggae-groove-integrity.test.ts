@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides, getDrumMotif } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { findSectionForMotif, sectionSweepArranger } from '../utils/groove-seed.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -59,26 +60,21 @@ describe('Reggae Groove Integrity', () => {
             };
         };
 
+        // #791: the engine now derives ONE sticky sectionSeed per
+        // (sectionId, songSeed) instead of a per-bar formula. Drive a section
+        // that actually plays the target motif under that deterministic seed
+        // (via the shared sweep arranger) rather than replaying the old formula.
+        const seedMock = { ...mockState, arranger: sectionSweepArranger(256) };
+
         it('should play One Drop: Kick only on backbeat for Motif 0', () => {
-            getState.mockReturnValue(mockState);
-            let barIndexMotif0 = -1;
-            for (let i = 0; i < 100; i++) {
-                if (
-                    getDrumMotif(((i * 137 + 42) % 256) / 256, 'Reggae', 0.8) === 0 &&
-                    i % 4 !== 3
-                ) {
-                    barIndexMotif0 = i;
-                    break;
-                }
-            }
-            if (barIndexMotif0 === -1) {
-                return;
-            }
+            getState.mockReturnValue(seedMock);
+            const section = findSectionForMotif(0, 'Reggae');
+            expect(section).toBeGreaterThanOrEqual(0);
 
             const ts44 = TIME_SIGNATURES['4/4'];
             for (let step = 0; step < 16; step++) {
                 const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-                const absStep = barIndexMotif0 * 16 + step;
+                const absStep = section * 16 + step;
                 const result = applyGrooveOverrides(getState(), createParams(absStep, 'Kick'));
 
                 if (info.isBeatStart && info.isBackbeat) {
@@ -90,25 +86,14 @@ describe('Reggae Groove Integrity', () => {
         });
 
         it('should play Steppers: Kick on every pulse start for Motif 1', () => {
-            getState.mockReturnValue(mockState);
-            let barIndexMotif1 = -1;
-            for (let i = 0; i < 100; i++) {
-                if (
-                    getDrumMotif(((i * 137 + 42) % 256) / 256, 'Reggae', 0.8) === 1 &&
-                    i % 4 !== 3
-                ) {
-                    barIndexMotif1 = i;
-                    break;
-                }
-            }
-            if (barIndexMotif1 === -1) {
-                return;
-            }
+            getState.mockReturnValue(seedMock);
+            const section = findSectionForMotif(1, 'Reggae');
+            expect(section).toBeGreaterThanOrEqual(0);
 
             const ts44 = TIME_SIGNATURES['4/4'];
             for (let step = 0; step < 16; step++) {
                 const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
-                const absStep = barIndexMotif1 * 16 + step;
+                const absStep = section * 16 + step;
                 const result = applyGrooveOverrides(getState(), createParams(absStep, 'Kick'));
 
                 if (info.isPulseStart) {
