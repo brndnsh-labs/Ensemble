@@ -320,8 +320,14 @@ describe('Ska-Punk Drummer Critique', () => {
         // Engine: motif 0 (intensity < 0.6) → backbeat only (2/bar).
         // Motif 2 (intensity ≥ 0.6 with seed 0.5-0.8) → all offbeats (4/bar).
         // Density should scale with intensity from ~2/bar to ~3+/bar.
-        const lowPerf = simulatePerformance(64, { playback: { bandIntensity: 0.4 } });
-        const highPerf = simulatePerformance(64, { playback: { bandIntensity: 0.9 } });
+        // #806: the busier offbeat motifs are loop-2+ behaviors (Chorus Evolution
+        // holds back The Head); compare intensities at the established-feel loop.
+        const lowPerf = simulatePerformance(64, {
+            playback: { bandIntensity: 0.4, currentLoopCount: 2 },
+        });
+        const highPerf = simulatePerformance(64, {
+            playback: { bandIntensity: 0.9, currentLoopCount: 2 },
+        });
 
         const snareDensity = (perf) => {
             let h = 0;
@@ -353,7 +359,9 @@ describe('Ska-Punk Drummer Critique', () => {
         // Run enough bars for the motif-3 section to appear
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.99 },
+            // #806: D-beat (motif 3) is a loop-2+ behavior (Chorus Evolution holds
+            // back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.99, currentLoopCount: 2 },
         });
 
         // For bars that look like the gallop pattern (kick on step 0 AND step 2 AND

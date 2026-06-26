@@ -160,7 +160,9 @@ describe('Hip Hop Drummer Critique', () => {
         // the strict velocity ramp, not the hit count.
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.85 },
+            // #806: motif 2 (Trap-roll burst) is a loop-2+ behavior (Chorus
+            // Evolution holds back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.85, currentLoopCount: 2 },
             groove: { genreFeel: 'Hip Hop' },
         });
 

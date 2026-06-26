@@ -82,7 +82,11 @@ describe('Metal Drummer Critique', () => {
     };
 
     it('should implement high-speed Double Kick at maximum intensity', () => {
-        const performance = simulatePerformance(64, { playback: { bandIntensity: 0.95 } });
+        // #806: the busy gallop/16th/blast motifs (2/3/4) are loop-2+ behaviors
+        // (Chorus Evolution holds back The Head); test at the established-feel loop.
+        const performance = simulatePerformance(64, {
+            playback: { bandIntensity: 0.95, currentLoopCount: 2 },
+        });
 
         let kickHits = 0;
         performance.forEach((bar) => {
@@ -112,7 +116,9 @@ describe('Metal Drummer Critique', () => {
         // shared a step (co-articulation), which codified the unison bug. The genre-defining
         // buzz comes from alternation, so we assert disjointness on the blast-pattern bars.
         const performance = simulatePerformance(128, {
-            playback: { bandIntensity: 0.95 },
+            // #806: blast-beat (motif 4) is a loop-2+ behavior (Chorus Evolution
+            // holds back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.95, currentLoopCount: 2 },
             groove: { genreFeel: 'Metal' },
         });
 

@@ -65,11 +65,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isCompound,
         stepInGroup,
         groupIndex,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity, halfBarStep } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
     const lastBeatIndex = Math.max(1, Math.round(stepsPerBar / 4) - 1);
     const isPulse = tsConfig?.pulse?.includes(mStep);
 

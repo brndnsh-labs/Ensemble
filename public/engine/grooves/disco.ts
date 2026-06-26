@@ -72,11 +72,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isTurnaround,
         stepsPerBar,
         loopStep,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
 
     // why: when busy is selected, pick a per-bar sub-flavor that decides
     // whether this bar leans into syncopation (ghost snares + e-of-2 closed

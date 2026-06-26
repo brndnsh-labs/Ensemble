@@ -62,12 +62,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         sectionSeed,
         loopStep,
         isTurnaround,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote, halfBarStep } =
         base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
     // why: epic-1-compound-meter S16b — force motif 0 in compound meters.
     // Motifs 1 (Driving 8ths), 2 (Gallop), 3 (Double-16ths), 4 (Blast Beat) are
     // 4/4-idiomatic and have no 6/8 metal equivalent. Without this, when the

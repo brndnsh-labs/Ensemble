@@ -53,11 +53,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         beatIndex,
         drumComplexity,
         sectionSeed,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
     const beatsPerMeasure = context.stepsPerBar / 4;
     const lastBeatIndex = beatsPerMeasure - 1;
 

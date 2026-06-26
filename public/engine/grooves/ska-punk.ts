@@ -49,11 +49,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         beatIndex,
         isPulseStart,
         isCompound,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
 
     // --- 1. ENERGETIC PUSH (Micro-timing) ---
     // Rushing the beat drives the Ska-Punk energy.

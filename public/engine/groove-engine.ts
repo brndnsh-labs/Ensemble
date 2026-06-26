@@ -266,17 +266,53 @@ function humanizeVelocity(vel: number, seed: number, amount = 0.05): number {
 }
 
 /**
- * Per-loop motif complexity cap for Chorus Evolution pocket discipline.
- * Loop 0,1 → Standard (1): metronomic foundation on The Head.
- * Loop 2+  → Active   (2): groove opens up on repeat passes.
- * Cap never exceeds 2 so the engine doesn't jump straight to Busy (3).
- * why: form-arranger.md P0 #3 — drums must prove Chorus Evolution contract
- * before fanning out to other engines; groove-engine.ts applies this at
- * per-tick time so the same OrchestrationMap entry renders differently
- * across loop passes without re-seeding the whole arrangement.
+ * Chorus Evolution — entropy ghost-density opening over repeat passes (#806).
+ *
+ * The drummer establishes a solid pocket on the Head and OPENS UP across loops:
+ * `currentLoopCount` ramps the entropy phase's ghost-density scale from
+ * `CHORUS_EVOLUTION_HEAD_FLOOR` at loop 0 to full (1.0) by ~loop 2, then holds.
+ * It is applied as a multiplier inside the entropy gate, which already scales
+ * by `bandIntensity` and respects each genre's `suppressEntropyBelow` floor —
+ * so the build is intensity- and genre-aware for free (a quiet ballad chorus
+ * opens up far less than a high-energy one, and not at all below its floor).
+ *
+ * why a ramp, not a motif cap: the prior lever (a per-loop motif-index cap fed
+ * to `getMotif` as a complexity float) was inert — `getMotif` treats complexity
+ * as a coarse on/off gate, so loop 0 and loop 2 produced identical motifs and
+ * Chorus Evolution did nothing for the drums (form-arranger.md P0 #3; the
+ * inert-lever finding that motivated this). The entropy phase is the one place
+ * a single density signal reaches every genre deterministically.
  */
-export function motifCapForLoop(loopCount: number): number {
-    return Math.min(2, 1 + Math.floor(loopCount / 2));
+const CHORUS_EVOLUTION_HEAD_FLOOR = 0.5;
+export function chorusEvolutionScale(loopCount: number): number {
+    const loopOpenness = Math.min(1, Math.max(0, loopCount) / 2); // 0 head → 1 by loop 2+
+    return CHORUS_EVOLUTION_HEAD_FLOOR + (1 - CHORUS_EVOLUTION_HEAD_FLOOR) * loopOpenness;
+}
+
+/**
+ * Chorus Evolution motif backbone (#806) — the structural half of the build.
+ *
+ * Caps the motif INDEX each genre's getMotif may reach, by loop, so the kit
+ * plays a simpler pattern on The Head and unlocks busier motifs on repeats:
+ *   Loop 0  → ceiling 1 (Standard): tight, foundational statement.
+ *   Loop 1  → ceiling 2 (Active):   opening up.
+ *   Loop 2+ → no cap (genre's full range): the established, full-tilt feel —
+ *             so later passes match today's behavior and nothing regresses.
+ *
+ * Applied as `Math.min(getMotif(...), motifCeiling)` at each genre call site.
+ * The orchestration's intrinsic complexity still governs via getMotif's gate
+ * (a Pocket section returns motif 0 regardless of loop), so this only ever
+ * holds BACK early loops — it never forces a busier motif than the section or
+ * the intensity tier already wanted.
+ */
+export function loopMotifCeiling(loopCount: number): number {
+    if (loopCount <= 0) {
+        return 1;
+    }
+    if (loopCount === 1) {
+        return 2;
+    }
+    return Number.POSITIVE_INFINITY; // loop 2+: full genre range (today's feel)
 }
 
 // why: tick-logic builds this bag inline for every drum tick. Tightening
@@ -390,16 +426,20 @@ export function applyGrooveOverrides(
     const orchestration: any = groove.orchestrationMap
         ? binarySearchMap(groove.orchestrationMap, timelineStep)
         : null;
-    // Pocket discipline by loop: Loop 0,1 → Standard (1); Loop 2+ → Active (2).
-    // Read playback.currentLoopCount at per-tick time so the same orchestration
-    // entry renders differently across repeat passes (Chorus Evolution).
-    const loopCount = playback?.currentLoopCount ?? 0;
-    const motifCap = motifCapForLoop(loopCount);
-    const cappedMotif =
+    // #806: drumComplexity = the section's intrinsic busy-ness (Pocket 0 /
+    // Standard 1 / Active 2 / Busy 3 → /3) RIDING the same Chorus Evolution ramp
+    // as the motif ceiling and entropy levers. The genres that read drumComplexity
+    // directly in their ghost/comp probabilities (jazz ride+comp, blues + latin
+    // gates) therefore hold back on The Head and open up over loops in lockstep
+    // with the rest of the kit — rather than sitting at full section density from
+    // loop 0. For an Active section this reproduces the prior loop-0/loop-2 values
+    // (0.667 × {0.5, 1.0} = 0.333 / 0.667). The fallback (no orchestration) keeps
+    // the live-play default unscaled.
+    const evoScale = chorusEvolutionScale(playback?.currentLoopCount ?? 0);
+    const effectiveComplexity =
         orchestration?.motifComplexity !== undefined
-            ? Math.min(orchestration.motifComplexity, motifCap)
-            : undefined;
-    const effectiveComplexity = cappedMotif !== undefined ? cappedMotif / 3 : drumComplexity;
+            ? (orchestration.motifComplexity / 3) * evoScale
+            : drumComplexity;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
     const isTurnaround = isSectionTurnaround(step, arrangerState.sectionMap, stepsPerBar, 1);
@@ -466,6 +506,10 @@ export function applyGrooveOverrides(
         stepsPerBar,
         loopStep,
         drumComplexity: effectiveComplexity,
+        // #806: per-loop motif-index ceiling for Chorus Evolution — genres clamp
+        // their getMotif result to this so The Head stays simple and later loops
+        // open up. Infinity (loop 2+) is a no-op clamp = full genre range.
+        motifCeiling: loopMotifCeiling(playback?.currentLoopCount ?? 0),
         orchestration,
         barIndex,
         isFirstStepOfNewBar,
@@ -590,6 +634,20 @@ export function applyGrooveOverrides(
     const firstIterBoundary = arrangerState.totalSteps || seedTimelineStartStep + stepsPerBar;
     const firstIterationSuppression = step < firstIterBoundary ? 0.3 : 1.0;
 
+    // Chorus Evolution (#806): the drummer settles into the pocket on the Head
+    // and OPENS UP over repeat passes — entropy ghost density ramps from a
+    // suppressed floor at loop 0 to full by ~loop 2, then holds. Read
+    // currentLoopCount at per-tick time so the same orchestration entry renders
+    // busier on later passes. Intensity-/genre-aware downstream: the gate below
+    // multiplies by bandIntensity and the per-genre suppressEntropyBelow floor
+    // already gates quiet sections out entirely.
+    const evolutionScale = chorusEvolutionScale(playback?.currentLoopCount ?? 0);
+    // Velocity dynamic-range widening: as the kit opens up, ghost hits gain a
+    // little more accent-vs-ghost contrast (a wider velocity ceiling), not just
+    // more of them. 0 at the Head floor → full widening by ~loop 2.
+    const evolutionVelSpread =
+        (evolutionScale - CHORUS_EVOLUTION_HEAD_FLOOR) / (1 - CHORUS_EVOLUTION_HEAD_FLOOR); // 0 at loop 0 → 1 at loop 2+
+
     // why: Epic 12 S4 — migrate the three entropy-phase Math.random() draws to
     // scrambleHash seeded on (barIndex, sectionId, loopStep, inst.name) so
     // drum-strategy probability and velocity decisions are deterministic across
@@ -622,6 +680,7 @@ export function applyGrooveOverrides(
             playback.bandIntensity *
                 config.entropyMultiplier *
                 firstIterationSuppression *
+                evolutionScale *
                 (config.blockAdjacentSnare && groove.genreFeel !== 'Rock' ? 0.7 : 1.0)
     ) {
         const isSyncopated = loopStep % 2 === 1;
@@ -641,9 +700,13 @@ export function applyGrooveOverrides(
             currentState.shouldPlay = true;
             // why: draw 2 (discriminator 3) — ghost snare velocity in [0.1, 0.25).
             // Must be distinct from draw 1 to avoid correlation; discriminator 3
-            // separates the gate decision from the velocity assignment. Range matches
-            // prior Math.random(): 0.1 + r*0.15 ∈ [0.10, 0.25).
-            currentState.velocity = 0.1 + scrambleHash((_entropyBaseSeed + 3) | 0) * 0.15;
+            // separates the gate decision from the velocity assignment. Base range
+            // matches prior Math.random(): 0.1 + r*0.15 ∈ [0.10, 0.25). Chorus
+            // Evolution (#806) widens the internal dynamic range of the entropy
+            // sprinkle by raising the ceiling up to +0.10 by ~loop 2 — more dynamic
+            // life among the ghost hits as the kit opens up: [0.10, 0.35) at full.
+            currentState.velocity =
+                0.1 + scrambleHash((_entropyBaseSeed + 3) | 0) * (0.15 + 0.1 * evolutionVelSpread);
             // why: gate kept at 0.4 (NOT swept with the per-genre S8 backbeat gates).
             // This fires entropy-phase syncopation hits across ALL genres including ones
             // whose per-genre Snare gates were deliberately preserved (Jazz brushwork,
@@ -662,10 +725,13 @@ export function applyGrooveOverrides(
         ) {
             currentState.shouldPlay = true;
             // why: draw 3 (discriminator 5) — entropy hihat velocity in [0.2, 0.4).
-            // Discriminator 5 separates this from draws 1 and 2. Range matches prior
-            // Math.random(): 0.2 + r*0.2 ∈ [0.20, 0.40). Kept in a separate branch
-            // from draw 2 (Snare) so a single step can't trigger both velocity paths.
-            currentState.velocity = 0.2 + scrambleHash((_entropyBaseSeed + 5) | 0) * 0.2;
+            // Discriminator 5 separates this from draws 1 and 2. Base range matches
+            // prior Math.random(): 0.2 + r*0.2 ∈ [0.20, 0.40). Kept in a separate
+            // branch from draw 2 (Snare) so a single step can't trigger both velocity
+            // paths. Chorus Evolution (#806) widens the internal dynamic range of the
+            // sprinkle by raising the ceiling up to +0.10 by ~loop 2: [0.20, 0.50).
+            currentState.velocity =
+                0.2 + scrambleHash((_entropyBaseSeed + 5) | 0) * (0.2 + 0.1 * evolutionVelSpread);
             currentState.soundName = 'HiHat';
         }
     }

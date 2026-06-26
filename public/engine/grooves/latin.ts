@@ -48,11 +48,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isOffbeat,
         isAOfBeat,
         isCompound,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
 
     // --- Lay-back: Bossa is relaxed ---
     instTimeOffset += 0.005 + intensity * 0.005;
