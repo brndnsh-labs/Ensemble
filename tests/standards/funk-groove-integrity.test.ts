@@ -72,17 +72,30 @@ describe('Funk Groove Integrity', () => {
             // Force a seed that maps to Motif 1 (0.2 - 0.5)
             mockState.groove.sectionSeedMap['1'] = 0.3;
 
-            // Force math.random to ensure the 'roll' succeeds
-            const mockMath = vi.spyOn(Math, 'random').mockReturnValue(0.01);
+            // #790: the ghost roll is now deterministic (seeded), so the old
+            // `vi.spyOn(Math, 'random').mockReturnValue(0.01)` no longer steers
+            // it — and pinning one magic step is brittle. Instead scan the bar
+            // and assert the STRUCTURAL property: the Funky Drummer lays a spread
+            // of quiet Sidestick ghosts on the non-beat 16ths (never on a beat
+            // start, always soft). This is the real musical claim.
+            const ts44 = TIME_SIGNATURES['4/4'];
+            const sidesticks = [];
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(step, ts44, [], TIME_SIGNATURES);
+                const r = applyGrooveOverrides(getState(), createParams(step, 'Snare'));
+                if (r.shouldPlay && r.soundName === 'Sidestick') {
+                    sidesticks.push({ step, velocity: r.velocity, isBeatStart: info.isBeatStart });
+                }
+            }
 
-            const stepGhost = 6; // step 6 is an offbeat (non-beatStart)
-            const resultSnare = applyGrooveOverrides(getState(), createParams(stepGhost, 'Snare'));
-
-            // The ghost note should play, but with low velocity
-            expect(resultSnare.shouldPlay).toBe(true);
-            expect(resultSnare.velocity).toBeLessThan(0.5);
-
-            mockMath.mockRestore();
+            // The Funky Drummer signature is a spread of QUIET ghosts on the
+            // non-beat 16ths — expect several soft ones (a louder syncopation
+            // Sidestick may also appear; that's a different, intentional gesture).
+            const softGhosts = sidesticks.filter((g) => g.velocity < 0.5);
+            expect(softGhosts.length).toBeGreaterThanOrEqual(4);
+            // Ghosts/syncopations never clobber a beat start — the downbeats stay
+            // clean for the kick and the backbeat crack.
+            expect(sidesticks.every((g) => !g.isBeatStart)).toBe(true);
         });
 
         it('should displace the backbeat for Motif 2 (Cold Sweat Style) — structural per phrase', () => {

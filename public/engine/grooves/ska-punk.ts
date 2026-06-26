@@ -8,6 +8,7 @@ import {
     type GrooveContext,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -70,7 +71,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 velocity = scaleVelocity(1.3, intensity, 0.1);
             } else if (intensity > 0.78 && activeMotif >= 1) {
                 const accentChance = beatIndex === 3 ? 0.35 : 0.18;
-                if (roll(accentChance)) {
+                if (roll(accentChance, 1.0, rollSeed(context, 1))) {
                     shouldPlay = true;
                     soundName = 'Open';
                     velocity = scaleVelocity(1.1, intensity, 0.08);
@@ -96,7 +97,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Crash on the One for section energy
         // why: route to the real Crash voice (not Open) — matches the S1 fix in groove-engine.ts
         // that points section-marker hits at the actual crash branch in synth-drums.ts.
-        if (isOpenLane && isDownbeat && intensity > 0.8 && roll(0.4)) {
+        if (isOpenLane && isDownbeat && intensity > 0.8 && roll(0.4, 1.0, rollSeed(context, 2))) {
             shouldPlay = true;
             soundName = 'Crash';
             velocity = 1.4;

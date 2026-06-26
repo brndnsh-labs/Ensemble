@@ -9,6 +9,7 @@ import {
     getPhraseSeed,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -254,7 +255,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // the standard backbeat above.
         if (activeMotif === 1 && !shouldPlay && !context.isCompound) {
             // High probability for ghosting on all non-beat steps
-            if (!isBeatStart && roll(0.6 + intensity * 0.3)) {
+            if (!isBeatStart && roll(0.6 + intensity * 0.3, 1.0, rollSeed(context, 1))) {
                 shouldPlay = true;
                 soundName = 'Sidestick';
                 velocity = scaleVelocity(0.15, intensity, 0.15) + Math.random() * 0.1;
@@ -264,7 +265,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Motif 3: Linear Snare (interlocking)
         if (activeMotif === 3 && !shouldPlay) {
             if (isAOfBeat && !isBackbeat && isPulse) {
-                if (roll(0.7, intensity)) {
+                if (roll(0.7, intensity, rollSeed(context, 2))) {
                     shouldPlay = true;
                     soundName = 'Sidestick';
                     velocity = 0.5;
@@ -275,8 +276,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // General Syncopation
         if (intensity > 0.6 && !shouldPlay) {
             // General syncopation on 'a' of beats or offbeats
-            if ((isAOfBeat && isBackbeat) || (isOffbeat && roll(0.2))) {
-                if (roll(0.3)) {
+            if ((isAOfBeat && isBackbeat) || (isOffbeat && roll(0.2, 1.0, rollSeed(context, 3)))) {
+                if (roll(0.3, 1.0, rollSeed(context, 4))) {
                     shouldPlay = true;
                     soundName = intensity > 0.8 ? 'Snare' : 'Sidestick';
                     velocity = 0.7;
@@ -318,7 +319,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // General Syncopation
         if (intensity > 0.7 && !shouldPlay) {
             const syncProb = activeMotif === 1 ? 0.5 : 0.2;
-            if (isOffbeat && roll(syncProb)) {
+            if (isOffbeat && roll(syncProb, 1.0, rollSeed(context, 5))) {
                 shouldPlay = true;
                 velocity = 0.85;
             }

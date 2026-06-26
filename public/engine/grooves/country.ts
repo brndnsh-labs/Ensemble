@@ -8,6 +8,7 @@ import {
     type GrooveContext,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -126,7 +127,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = 1.1;
         }
         // Four-on-the-floor drive at high intensity
-        else if (isBeatStart && intensity > 0.8 && roll(0.8)) {
+        else if (isBeatStart && intensity > 0.8 && roll(0.8, 1.0, rollSeed(context, 1))) {
             shouldPlay = true;
             velocity = scaleVelocity(0.6, intensity, 0.1); // Feathered
         }

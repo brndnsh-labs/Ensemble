@@ -9,6 +9,7 @@ import {
     type GrooveContext,
     makeMotifSelector,
     roll,
+    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -80,7 +81,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Samba variation: Add 16th note pushes
         if (activeMotif >= 2 && !shouldPlay) {
             if (isAOfBeat && !isBackbeat) {
-                if (roll(0.6, intensity)) {
+                if (roll(0.6, intensity, rollSeed(context, 1))) {
                     shouldPlay = true;
                     velocity = scaleVelocity(0.7, intensity, 0.1);
                 }
@@ -231,7 +232,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
             // High-complexity embellishments: occasional offbeat ghost between clave hits
             if (!shouldPlay && drumComplexity > 0.7 && intensity > 0.6) {
-                if (isOffbeat && roll(0.3)) {
+                if (isOffbeat && roll(0.3, 1.0, rollSeed(context, 2))) {
                     shouldPlay = true;
                     velocity = 0.5;
                 }
@@ -245,7 +246,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             // above. Gate Samba motif to simple meters; compound latin falls back
             // to motif 0/1 (clave-driven, which is correctly compound-gated).
             if (isBeatStart || isOffbeat) {
-                if (roll(0.7, intensity)) {
+                if (roll(0.7, intensity, rollSeed(context, 3))) {
                     shouldPlay = true;
                 }
             }
@@ -325,7 +326,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         }
 
         if (context.inst.name === 'Perc') {
-            shouldPlay = activeMotif >= 2 && roll(0.4, intensity);
+            shouldPlay = activeMotif >= 2 && roll(0.4, intensity, rollSeed(context, 4));
             soundName = 'AgogoHigh';
         }
     }
