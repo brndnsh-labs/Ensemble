@@ -8,6 +8,7 @@ import {
     type GrooveContext,
     INTENSITY_BANDS,
     makeMotifSelector,
+    placementSkew,
     roll,
     rollSeed,
     scaleVelocity,
@@ -128,7 +129,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = isDownbeat ? 1.3 : isBeatStart ? 1.15 : 0.95;
             // Humanize continuous runs
             if (!isBeatStart) {
-                instTimeOffset += (Math.random() - 0.5) * 0.003;
+                instTimeOffset += (placementSkew(context, 1) - 0.5) * 0.003;
             }
         }
 

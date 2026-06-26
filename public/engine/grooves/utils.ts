@@ -1,7 +1,7 @@
 /**
  * Shared utility functions for generative drum strategies.
  */
-import { scrambleHash } from '../hash-utils.js';
+import { scrambleHash, stringHash31 } from '../hash-utils.js';
 
 export const INTENSITY_BANDS = {
     LOW: 0.35,
@@ -104,6 +104,42 @@ export function rollSeed(context: GrooveContext, salt: number): number | undefin
     // by it scatters adjacent salts across the seed space, well clear of the
     // entropy phase's +1/+3/+5 discriminators on the same base seed.
     return (context.rollBaseSeed ^ Math.imul(salt, 0x85ebca6b)) | 0;
+}
+
+/**
+ * #792: a deterministic [0, 1) draw for VELOCITY humanization, keyed on the
+ * tick's `context.rollBaseSeed` (folds barIndex, sectionId, loopStep, inst.name)
+ * + a call-site `salt`. Velocity naturally varies bar-to-bar, so a per-tick seed
+ * is right here — the win is reproducibility (a looped take has the same dynamics
+ * every pass) without flattening the humanization. Bare test contexts (no
+ * `rollBaseSeed`) fall back to the legacy `Math.random()` so their statistical
+ * shape is unchanged.
+ */
+export function humanizeDraw(context: GrooveContext, salt: number): number {
+    if (context.rollBaseSeed === undefined) {
+        return Math.random();
+    }
+    return scrambleHash((context.rollBaseSeed ^ Math.imul(salt, 0x27d4eb2f)) | 0);
+}
+
+/**
+ * #792: a deterministic [0, 1) draw for micro-TIMING placement, keyed ONLY on
+ * (loopStep, inst.name, salt) — deliberately bar-INDEPENDENT. A given 16th in a
+ * given lane is then nudged the SAME way every bar, so the lean reads as a
+ * player's deliberate, consistent placement behind/ahead of the grid (the J
+ * Dilla feel) rather than per-hit white noise that averages to "slightly
+ * sloppy." Bare test contexts fall back to `Math.random()`.
+ */
+export function placementSkew(context: GrooveContext, salt: number): number {
+    if (context.rollBaseSeed === undefined) {
+        return Math.random();
+    }
+    const seed =
+        (Math.imul(context.loopStep + 1, 0x9e3779b1) ^
+            stringHash31(context.inst.name ?? '') ^
+            Math.imul(salt, 0x85ebca6b)) |
+        0;
+    return scrambleHash(seed);
 }
 
 /**

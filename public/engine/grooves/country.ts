@@ -7,6 +7,7 @@ import {
     type DrumStepBase,
     type GrooveContext,
     makeMotifSelector,
+    placementSkew,
     roll,
     rollSeed,
     scaleVelocity,
@@ -69,7 +70,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
 
             // Add a small amount of random jitter to all snare hits to prevent "machine gun" effect
-            const jitter = (Math.random() - 0.5) * 0.08;
+            const jitter = (placementSkew(context, 1) - 0.5) * 0.08;
 
             if (isBackbeat) {
                 // why: gate lowered from 0.4 → 0.3 (S8 sweep). Same conductor-

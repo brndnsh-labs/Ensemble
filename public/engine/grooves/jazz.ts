@@ -5,6 +5,7 @@ import {
     type DrumStepBase,
     type GrooveContext,
     getPhraseSeed,
+    humanizeDraw,
     INTENSITY_BANDS,
     makeMotifSelector,
     roll,
@@ -177,7 +178,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 velocity = scaleVelocity(0.75, intensity, 0.2);
             } else if (activeMotif === 4 && isOffbeat && beatIndex >= 2) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.85, Math.random(), 0.2);
+                velocity = scaleVelocity(0.85, humanizeDraw(context, 1), 0.2);
             } else {
                 // General Kick Bombs
                 let bombProb = intensity * 0.12;
@@ -190,7 +191,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
                 if (roll(bombProb, 1.0, rollSeed(context, 3)) && isOffbeat && beatIndex % 2 !== 0) {
                     shouldPlay = true;
-                    velocity = scaleVelocity(0.85, Math.random(), 0.25);
+                    velocity = scaleVelocity(0.85, humanizeDraw(context, 2), 0.25);
                 }
             }
         } else {
@@ -201,7 +202,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
             if (roll(bombProb, 1.0, rollSeed(context, 4)) && isSkipBeat) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.85, Math.random(), 0.25);
+                velocity = scaleVelocity(0.85, humanizeDraw(context, 3), 0.25);
             }
         }
     } else if (context.inst.name === 'Snare') {
@@ -214,7 +215,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             ) {
                 if (roll(0.7, 1.0, rollSeed(context, 5))) {
                     shouldPlay = true;
-                    velocity = scaleVelocity(0.6, Math.random(), 0.4);
+                    velocity = scaleVelocity(0.6, humanizeDraw(context, 4), 0.4);
                     if (isOffbeat && beatIndex === lastBeatIndex) {
                         velocity = 1.1;
                     }
@@ -235,7 +236,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 velocity = scaleVelocity(0.8, intensity, 0.3);
             } else if (activeMotif === 4 && isOffbeat && beatIndex < lastBeatIndex) {
                 shouldPlay = true;
-                velocity = scaleVelocity(0.5, Math.random(), 0.3);
+                velocity = scaleVelocity(0.5, humanizeDraw(context, 5), 0.3);
             } else {
                 let compProb = 0.1 + drumComplexity * 0.3;
                 if (!isSoloistBusy) {
@@ -257,7 +258,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                         roll(compProb * 0.4, 1.0, rollSeed(context, 8)))
                 ) {
                     shouldPlay = true;
-                    velocity = 0.25 + Math.random() * 0.3 + intensity * 0.2;
+                    velocity = 0.25 + humanizeDraw(context, 6) * 0.3 + intensity * 0.2;
                 }
             }
         }
