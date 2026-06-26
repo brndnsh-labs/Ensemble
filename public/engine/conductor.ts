@@ -523,7 +523,19 @@ export function checkSectionTransition(
                     }
 
                     targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
-                    targetEnergy += Math.random() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2;
+                    // #793: seed the per-section macro jitter off
+                    // (formIteration, currentStep) instead of raw Math.random.
+                    // These draws sit only in the targetEnergy-undefined fallback
+                    // (unreachable while the ~128-bar seeded window is active), so
+                    // default timer sessions were already repeatable — but a long
+                    // open jam that outruns the window used to acquire
+                    // non-repeatable drift that can randomly cross a drum gate
+                    // (e.g. funk's 0.5 shimmer) and desync the arc thereafter.
+                    // createPRNG is the same seeded PRNG the fallback fill uses.
+                    const macroJitterPrng = createPRNG(
+                        `macro-jitter:${conductor.formIteration}:${currentStep}`,
+                    );
+                    targetEnergy += macroJitterPrng() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2;
 
                     // why: genre-specific floors keep the auto-intensity above each
                     // genre's Snare-vs-Sidestick gate. Applied AFTER the random jitter
@@ -539,9 +551,16 @@ export function checkSectionTransition(
                     targetEnergy = Math.max(0.1, Math.min(1.0, targetEnergy));
 
                     if (isLoopEnd && playback.autoIntensity) {
+                        // #793: seed the loop-end jitter off currentLoopCount so a
+                        // long looped session's energy arc is reproducible
+                        // run-to-run instead of drifting cumulatively (±0.1/loop)
+                        // by raw Math.random.
+                        const loopEndJitterPrng = createPRNG(
+                            `loop-end-jitter:${conductor.formIteration}:${playback.currentLoopCount}`,
+                        );
                         targetEnergy = Math.max(
                             0.3,
-                            Math.min(0.95, targetEnergy + (Math.random() * 0.2 - 0.1)),
+                            Math.min(0.95, targetEnergy + (loopEndJitterPrng() * 0.2 - 0.1)),
                         );
                     }
                 } else {

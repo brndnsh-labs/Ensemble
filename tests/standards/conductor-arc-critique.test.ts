@@ -24,11 +24,15 @@
  *   gloss over an actual stepped ladder; we test what the engine literally does.
  *
  * "Drops < 0.5 in the final 15%":
- *   Macro window [0.20, 0.50] AFTER which `+= Math.random() * 0.15 - 0.075`
- *   jitter is applied (line 445), which can push the realized value above 0.50.
- *   With Math.random stubbed to 0.5 the jitter resolves to 0 and the bound is
- *   exact. We assert with that stub (deterministic) AND run a 30-iteration
- *   varied-seed sweep that allows for the +/-0.075 jitter.
+ *   Macro window [0.20, 0.50] AFTER which a seeded `+= prng()*0.15 - 0.075`
+ *   jitter is applied (#793: conductor.ts createPRNG('macro-jitter:<formIteration>:<step>')),
+ *   which can push the realized value above 0.50. The jitter is now DETERMINISTIC
+ *   per (formIteration, currentStep) — stubbing Math.random no longer affects it.
+ *   At the fixture's formIteration=0 / currentStep=16 the draw resolves to a
+ *   fixed +0.0713 offset, so every transition here lands the same ladder-rung +
+ *   jitter value. We derive that exact offset (same createPRNG seed) and assert
+ *   the realized target equals rung + offset, and a 30-iteration sweep over
+ *   distinct formIterations exercises the full ±0.075 jitter envelope.
  *
  * Role-based switch (conductor.ts:401-428): The switch handles roles
  *   `Exposition / Development / Contrast / Build / Climax / Recapitulation /
@@ -53,6 +57,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition, MACRO_JITTER_RANGE } from '../../public/engine/conductor.js';
 import { getJamMacroArc, JAM_CYCLE_LENGTHS } from '../../public/form-analysis.js';
 import { ACTIONS } from '../../public/types.js';
+import { createPRNG } from '../../public/utils.js';
+
+// The exact deterministic macro jitter the conductor applies at the fixture's
+// (formIteration, currentStep). #793 seeds the jitter on
+// `macro-jitter:<formIteration>:<currentStep>` (conductor.ts), so for a known
+// pair it is a single fixed offset — NOT centered. `runTransitionAtProgress`
+// drives currentStep=16 and formIteration defaults to 0, so the ladder tests
+// see this exact value and can assert the rung + offset to full precision
+// (a wide ±half-jitter band would let a downward rung collapse slip through,
+// since the offset here is ~+0.071, eating almost the whole upper half-band).
+const macroJitterAt = (formIteration: number, currentStep: number): number =>
+    createPRNG(`macro-jitter:${formIteration}:${currentStep}`)() * MACRO_JITTER_RANGE -
+    MACRO_JITTER_RANGE / 2;
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -201,18 +218,23 @@ function makeMulberry32(seed: number): () => number {
  * UPDATE_CONDUCTOR_STATE writes (macro-arc) and the TRIGGER_FILL writes
  * (section-boundary crash).
  *
- * `randomImpl` is the Math.random replacement. The macro-arc has a
- * Math.random()*0.15 - 0.075 jitter at line 445; the procedural-fill template
- * picker at fills.ts:266 also calls Math.random(). Both share this stub.
+ * `randomImpl` is the Math.random replacement — still used by the
+ * procedural-fill template picker (fills.ts). NOTE: post-#793 the macro-arc
+ * energy jitter is SEEDED (createPRNG keyed on formIteration+currentStep), so
+ * `randomImpl` no longer affects targetIntensity. To vary the macro jitter,
+ * pass `formIteration` (it re-keys the seeded draw `macro-jitter:<fi>:<step>`).
  */
 function runTransitionAtProgress(
     progress: number,
-    opts: { randomImpl?: () => number; mockState?: any } = {},
+    opts: { randomImpl?: () => number; mockState?: any; formIteration?: number } = {},
 ): {
     dispatched: Array<{ type: string; payload: any }>;
     targetIntensity: number | undefined;
 } {
     const mockState = opts.mockState ?? makeMockState();
+    if (opts.formIteration !== undefined) {
+        mockState.conductor.formIteration = opts.formIteration;
+    }
     const dispatched: Array<{ type: string; payload: any }> = [];
     const dispatch = (type: string, payload: any) => {
         dispatched.push({ type, payload });
@@ -260,14 +282,18 @@ describe('Conductor Arc Critique (S7)', () => {
     // ---------------------------------------------------------------------
     // 1. Macro-arc shape — sampled at 5 points along the session timer.
     //
-    // With Math.random stubbed to 0.5 the +/-0.075 jitter resolves to exactly
-    // 0 (`0.5 * 0.15 - 0.075 = 0`), so we can assert the EXACT macro-clamp
-    // value rather than a range. This is deliberate — for the deterministic
-    // shape test the goal is "the ladder is wired" and exact values are the
-    // tightest possible guard. The varied-seed sweep below asserts the same
-    // claims under realistic jitter.
+    // Post-#793 the macro-arc energy jitter is SEEDED (createPRNG keyed on
+    // formIteration+currentStep), not raw Math.random — so at the fixture's
+    // (formIteration=0, currentStep=16) it is a single DETERMINISTIC offset
+    // (a fixed +0.0713, NOT centered on zero). We derive that exact offset with
+    // the same createPRNG seed and assert the realized target EQUALS rung +
+    // offset — the tightest possible guard, with no blind spot. (A symmetric
+    // ±half-jitter band would, combined with the off-center +0.071, let a
+    // downward rung collapse of up to ~0.146 pass silently — which would defeat
+    // the whole point of a ladder test.) The varied-formIteration sweep below
+    // exercises the full ±0.075 envelope as a separate, range-based check.
     // ---------------------------------------------------------------------
-    describe('session-timer macro-arc (Math.random stubbed = 0.5)', () => {
+    describe('session-timer macro-arc (seeded jitter, exact rung+offset)', () => {
         // Section label 'Chorus' -> getSectionEnergy = 0.9. The macro clamp
         // `Math.min(macroCeiling, 0.9)` therefore resolves to the ceiling
         // itself in every window -> the test directly probes the ladder.
@@ -281,9 +307,18 @@ describe('Conductor Arc Critique (S7)', () => {
         ];
 
         for (const [phase, progress, expected] of ladder) {
-            it(`${phase} -> targetIntensity == ${expected}`, () => {
+            it(`${phase} -> targetIntensity == ${expected} + seeded jitter`, () => {
                 const { targetIntensity } = runTransitionAtProgress(progress);
-                expect(targetIntensity).toBeCloseTo(expected, 5);
+                // why exact (rung + derived offset), not a ±half-jitter band:
+                // the seeded macro jitter (#793) is DETERMINISTIC at the
+                // fixture's (formIteration=0, currentStep=16) — a single fixed
+                // offset (~+0.071). A symmetric ±0.075 band around the rung
+                // would, combined with that off-center offset, let a downward
+                // rung collapse (e.g. climax 0.9 -> 0.8) land within tolerance
+                // and pass silently. Deriving the exact offset and asserting
+                // equality keeps the ladder guard at full precision: any rung
+                // move surfaces 1:1.
+                expect(targetIntensity ?? 0).toBeCloseTo(expected + macroJitterAt(0, 16), 6);
             });
         }
 
@@ -312,19 +347,18 @@ describe('Conductor Arc Critique (S7)', () => {
         });
 
         // Audit-doc claim c: "drops < 0.5 in the final 15%"
-        // With Math.random stubbed to 0.5 the jitter is exactly 0 -> 0.50.
-        // The audit says "< 0.5"; the engine's macroCeiling IS 0.5 so the
-        // realized target is <= 0.5 (with possible +0.075 jitter excursion
-        // under noise). We assert <= 0.5 deterministically and document the
-        // looser bound in the varied-seed sweep.
-        it('audit claim: target <= 0.5 in final 15% (deterministic, no jitter)', () => {
+        // The cool-down macroCeiling IS 0.5; post-#793 the seeded macro jitter
+        // is always present, so the realized target is the ceiling plus a
+        // bounded ±MACRO_JITTER_RANGE/2 offset. The upper edge is therefore
+        // 0.5 + MACRO_JITTER_RANGE/2. We assert against that envelope edge.
+        it('audit claim: target <= cool-down ceiling + jitter in final 15%', () => {
             const { targetIntensity } = runTransitionAtProgress(0.95);
-            // why 0.5: macroCeiling for the p>=0.85 window. The audit-doc
-            // "< 0.5" cannot hold exactly because the engine clamps AT the
-            // ceiling, not strictly below it. We assert <=, matching engine
-            // reality. The varied-seed sweep below catches the jitter
-            // contribution (target can rise to ~0.575 under noise).
-            expect(targetIntensity).toBeLessThanOrEqual(0.5);
+            // why 0.5 + MACRO_JITTER_RANGE/2: macroCeiling 0.5 for the p>=0.85
+            // window, plus the always-present seeded jitter's upper half-range.
+            // The audit-doc "< 0.5" can't hold exactly — the engine clamps AT
+            // the ceiling and then adds jitter. This bounds the realized target
+            // at the engine's true worst case rather than overstating it.
+            expect(targetIntensity).toBeLessThanOrEqual(0.5 + MACRO_JITTER_RANGE / 2 + 1e-9);
         });
 
         // Direction guard: climax window is strictly higher than cool-down.
@@ -334,9 +368,10 @@ describe('Conductor Arc Critique (S7)', () => {
             const climax = runTransitionAtProgress(0.75).targetIntensity ?? 0;
             const coolDown = runTransitionAtProgress(0.95).targetIntensity ?? 0;
             expect(climax).toBeGreaterThan(coolDown);
-            // Headroom: climax-deterministic is 0.9, cool-down 0.5 -> gap 0.4.
-            // Under jitter both move +/-0.075 so worst-case gap is 0.25.
-            // Threshold 0.20 with 0.05 cushion below worst-case.
+            // Headroom: both calls use the SAME (formIteration=0, currentStep=16)
+            // seed, so the #793 macro jitter is the identical +0.0713 offset on
+            // each and cancels in the difference: climax 0.9+j, cool-down 0.5+j
+            // -> gap exactly 0.4. Threshold 0.20 leaves a 0.20 cushion.
             expect(climax - coolDown).toBeGreaterThanOrEqual(0.2);
         });
 
@@ -367,49 +402,56 @@ describe('Conductor Arc Critique (S7)', () => {
             state.arranger.stepMap[1].chord.sectionLabel = 'Verse';
 
             const { targetIntensity } = runTransitionAtProgress(0.25, { mockState: state });
-            // why 0.5: getSectionEnergy('Verse') = 0.5; development-window clamp
-            // [0.40, 0.70] leaves it untouched; Math.random stub 0.5 -> jitter 0;
-            // Rock genre floor 0.35 < 0.5, so no lift. Ceiling here is 0.70 — a
-            // ceiling-clamp regression would surface as 0.70.
-            expect(targetIntensity).toBeCloseTo(0.5, 5);
+            // why exact 0.5 + derived jitter: getSectionEnergy('Verse') = 0.5;
+            // development-window clamp [0.40, 0.70] leaves it untouched; Rock
+            // genre floor 0.35 < 0.5, so no lift; the seeded macro jitter (#793)
+            // adds its fixed (formIteration=0, currentStep=16) offset. The point
+            // still holds — the realized target reads section energy (0.5), NOT
+            // the ceiling (0.70): 0.70 is >0.075 away even with the offset, so a
+            // ceiling-clamp regression surfaces. Exact (not band) for the same
+            // reason as the ladder above — keep the guard at full precision.
+            expect(targetIntensity ?? 0).toBeCloseTo(0.5 + macroJitterAt(0, 16), 6);
         });
     });
 
     // ---------------------------------------------------------------------
-    // 2. Varied-seed reliability sweep — 30 distinct mulberry32 seeds across
-    //    the macro-arc claims. Targets must hold across the engine's natural
-    //    jitter envelope, not just at the convenient 0.5 stub.
+    // 2. Varied-formIteration reliability sweep — 30 distinct formIterations
+    //    across the macro-arc claims. Post-#793 the macro jitter is SEEDED on
+    //    `macro-jitter:<formIteration>:<currentStep>`, so the envelope is swept
+    //    by varying formIteration (NOT Math.random, which the seeded jitter
+    //    ignores — a Math.random sweep would now yield 30 identical samples and
+    //    test nothing). Each formIteration draws a distinct bounded jitter, so
+    //    the 30 samples genuinely span the ±MACRO_JITTER_RANGE/2 envelope; the
+    //    `distinct > 1` assertions pin that the sweep is non-vacuous.
     //
-    //    The jitter adds Math.random()*MACRO_JITTER_RANGE - MACRO_JITTER_RANGE/2,
-    //    range [-MACRO_JITTER_RANGE/2, +MACRO_JITTER_RANGE/2]:
-    //      warmup    p=0.10: 0.45 +/- 0.075 -> [0.375, 0.525]
-    //      climax    p=0.75: 0.90 +/- 0.075 -> [0.825, 0.975]
-    //      cool-down p=0.95: 0.50 +/- 0.075 -> [0.425, 0.575]
+    //    The jitter adds prng()*MACRO_JITTER_RANGE - MACRO_JITTER_RANGE/2,
+    //    range [-MACRO_JITTER_RANGE/2, +MACRO_JITTER_RANGE/2):
+    //      climax    p=0.75: 0.90 + jitter -> [0.825, 0.975)
+    //      cool-down p=0.95: 0.50 + jitter -> [0.425, 0.575)
     //
-    //    Reliability target: each seed-claim pair must hold for ALL 30 seeds.
+    //    Reliability target: each claim must hold for ALL 30 formIterations.
     //    Reported in console as "X/30 passes" so a regression that shrinks the
     //    envelope shows up as a partial fail rather than a binary pass/fail.
     // ---------------------------------------------------------------------
-    describe('varied-seed reliability sweep (30 mulberry32 seeds)', () => {
-        const SEEDS = Array.from({ length: 30 }, (_, i) => 0xc0ffee + i * 0x101);
+    describe('varied-formIteration reliability sweep (30 macro-jitter draws)', () => {
+        const FORM_ITERATIONS = Array.from({ length: 30 }, (_, i) => i);
 
-        it('climax window: target > 0.7 across 30 seeds', () => {
+        it('climax window: target > 0.7 across 30 form iterations', () => {
             let passes = 0;
             const samples: number[] = [];
-            for (const seed of SEEDS) {
-                const prng = makeMulberry32(seed);
-                const { targetIntensity } = runTransitionAtProgress(0.75, {
-                    randomImpl: prng,
-                });
+            for (const formIteration of FORM_ITERATIONS) {
+                const { targetIntensity } = runTransitionAtProgress(0.75, { formIteration });
                 samples.push(targetIntensity ?? 0);
                 if ((targetIntensity ?? 0) > 0.7) {
                     passes++;
                 }
             }
+            const distinct = new Set(samples.map((v) => v.toFixed(6))).size;
             console.log('\n--- CONDUCTOR ARC CRITIQUE — CLIMAX SWEEP ---');
-            console.log(`[Seeds]              30 (mulberry32)`);
+            console.log(`[Form iterations]    30 (seeded macro-jitter draws)`);
             console.log(`[Target window]      progress 0.75 (climax: macro [0.7, 1.0])`);
             console.log(`[Assertion]          targetIntensity > 0.7`);
+            console.log(`[Distinct samples]   ${distinct}/30`);
             console.log(`[Passes]             ${passes}/30`);
             console.log(
                 `[Sample mean]        ${(samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(3)}`,
@@ -419,21 +461,23 @@ describe('Conductor Arc Critique (S7)', () => {
             );
             console.log('--------------------------------------------\n');
 
-            // Engine reality: with macroCeiling=1.0 and Chorus-label clamp
-            // landing at 0.9, the +/-0.075 jitter gives samples in [0.825,
-            // 0.975] — all above 0.7. 30/30 is the bar.
+            // Engine reality: macroCeiling=1.0, Chorus-label clamp lands at 0.9,
+            // the seeded ±0.075 jitter gives samples in [0.825, 0.975) — all
+            // above 0.7. 30/30 is the bar, and the draws are genuinely distinct
+            // (the sweep actually varies the jitter now).
             expect(passes).toBeGreaterThanOrEqual(30);
+            expect(distinct).toBeGreaterThan(1);
         });
 
-        it('cool-down window: target stays inside the jitter envelope across 30 seeds', () => {
-            // The cool-down macroCeiling is 0.5; the jitter at conductor.ts:510
-            // is `Math.random() * 0.15 - 0.075`, range [-0.075, +0.075). So the
-            // realized target cannot exceed 0.5 + 0.075 = 0.575. Asserting
-            // against THAT envelope edge (rather than a loose < 0.6) means a
-            // regression that widens the jitter — or raises the cool-down
-            // ceiling — surfaces here as a deliberate failure instead of
-            // silently eating the old 0.025 cushion.
-            const COOLDOWN_CEILING = 0.5; // macro ladder, conductor.ts:417
+        it('cool-down window: target stays inside the jitter envelope across 30 form iterations', () => {
+            // The cool-down macroCeiling is 0.5; the seeded jitter (#793) adds
+            // prng()*MACRO_JITTER_RANGE - MACRO_JITTER_RANGE/2, range
+            // [-0.075, +0.075). So the realized target cannot reach 0.5 + 0.075
+            // = 0.575. Asserting against THAT envelope edge (rather than a loose
+            // < 0.6) means a regression that widens the jitter — or raises the
+            // cool-down ceiling — surfaces here as a deliberate failure instead
+            // of silently eating the old 0.025 cushion.
+            const COOLDOWN_CEILING = 0.5; // macro ladder, conductor.ts p>=0.85 window
             // why: derive from MACRO_JITTER_RANGE so a change to the constant
             // automatically tightens or loosens this envelope assertion too.
             const JITTER_HALF_RANGE = MACRO_JITTER_RANGE / 2; // = 0.075
@@ -441,11 +485,8 @@ describe('Conductor Arc Critique (S7)', () => {
             const EPS = 1e-9;
             let passes = 0;
             const samples: number[] = [];
-            for (const seed of SEEDS) {
-                const prng = makeMulberry32(seed);
-                const { targetIntensity } = runTransitionAtProgress(0.95, {
-                    randomImpl: prng,
-                });
+            for (const formIteration of FORM_ITERATIONS) {
+                const { targetIntensity } = runTransitionAtProgress(0.95, { formIteration });
                 const v = targetIntensity ?? 0;
                 samples.push(v);
                 if (v <= WORST_CASE + EPS) {
@@ -453,14 +494,16 @@ describe('Conductor Arc Critique (S7)', () => {
                 }
             }
             const maxSample = Math.max(...samples);
+            const distinct = new Set(samples.map((v) => v.toFixed(6))).size;
             console.log('\n--- CONDUCTOR ARC CRITIQUE — COOL-DOWN SWEEP ---');
-            console.log(`[Seeds]              30 (mulberry32)`);
+            console.log(`[Form iterations]    30 (seeded macro-jitter draws)`);
             console.log(`[Target window]      progress 0.95 (cool-down: macro [0.2, 0.5])`);
             console.log(`[Assertion]          targetIntensity <= ${WORST_CASE} (ceiling + jitter)`);
             console.log(`[Audit-doc claim]    "drops < 0.5 in final 15%"`);
             console.log(
-                `[Engine reality]     clamps at ceiling 0.5; +/-0.075 jitter -> [0.425, 0.575)`,
+                `[Engine reality]     clamps at ceiling 0.5; +/-0.075 seeded jitter -> [0.425, 0.575)`,
             );
+            console.log(`[Distinct samples]   ${distinct}/30`);
             console.log(`[Passes]             ${passes}/30`);
             console.log(
                 `[Sample mean]        ${(samples.reduce((a, b) => a + b, 0) / samples.length).toFixed(3)}`,
@@ -470,35 +513,36 @@ describe('Conductor Arc Critique (S7)', () => {
             );
             console.log('-------------------------------------------------\n');
 
-            // Every seed must land at or below the engine's worst-case sample
+            // Every draw must land at or below the engine's worst-case sample
             // (ceiling + half-jitter). Pinned to the jitter constant above —
-            // if conductor.ts:510 widens the envelope, this fails on purpose.
+            // if conductor.ts widens the envelope, this fails on purpose.
             expect(passes).toBeGreaterThanOrEqual(30);
             expect(maxSample).toBeLessThanOrEqual(WORST_CASE + EPS);
+            expect(distinct).toBeGreaterThan(1);
         });
 
-        it('arc-direction: climax > cool-down for every seed', () => {
+        it('arc-direction: climax > cool-down for every form iteration', () => {
             let passes = 0;
             const deltas: number[] = [];
-            for (const seed of SEEDS) {
-                // Same seed for both calls -> the jitter-add inside each call
-                // consumes one prng() value, so the *jitter* applied to climax
-                // and cool-down are different draws — exactly the comparison
-                // a listener would make across the actual session arc.
-                const prngClimax = makeMulberry32(seed);
-                const prngCool = makeMulberry32(seed);
+            for (const formIteration of FORM_ITERATIONS) {
+                // Different formIteration seeds for climax vs cool-down (fi vs
+                // fi+100) so the macro jitter applied to each is an INDEPENDENT
+                // draw — exactly the comparison a listener makes across the
+                // actual session arc, where climax and cool-down land on
+                // different bars (hence different jitter seeds).
                 const climax =
-                    runTransitionAtProgress(0.75, { randomImpl: prngClimax }).targetIntensity ?? 0;
+                    runTransitionAtProgress(0.75, { formIteration }).targetIntensity ?? 0;
                 const coolDown =
-                    runTransitionAtProgress(0.95, { randomImpl: prngCool }).targetIntensity ?? 0;
+                    runTransitionAtProgress(0.95, { formIteration: formIteration + 100 })
+                        .targetIntensity ?? 0;
                 deltas.push(climax - coolDown);
                 if (climax > coolDown) {
                     passes++;
                 }
             }
             console.log('\n--- CONDUCTOR ARC CRITIQUE — DIRECTION SWEEP ---');
-            console.log(`[Seeds]              30 (mulberry32)`);
-            console.log(`[Assertion]          climax > cool-down for every seed`);
+            console.log(`[Form iterations]    30 (independent climax/cool-down jitter seeds)`);
+            console.log(`[Assertion]          climax > cool-down for every iteration`);
             console.log(`[Passes]             ${passes}/30`);
             console.log(
                 `[Delta mean]         ${(deltas.reduce((a, b) => a + b, 0) / deltas.length).toFixed(3)}`,
@@ -508,8 +552,9 @@ describe('Conductor Arc Critique (S7)', () => {
             );
             console.log('-------------------------------------------------\n');
 
-            // Engine reality: climax in [0.825, 0.975], cool-down in [0.425,
-            // 0.575] -> delta in [0.25, 0.55]. Always positive, never below 0.25.
+            // Engine reality: climax in [0.825, 0.975), cool-down in [0.425,
+            // 0.575) with independent jitter -> delta in (0.25, 0.55). Always
+            // positive.
             expect(passes).toBeGreaterThanOrEqual(30);
         });
     });
@@ -532,9 +577,13 @@ describe('Conductor Arc Critique (S7)', () => {
     // ---------------------------------------------------------------------
     describe('timer-less open-jam macro-arc (S3)', () => {
         // Sample the realized targetIntensity across `count` consecutive form
-        // iterations of the timer-less fallback. Math.random stubbed to 0.5 so
-        // the conductor.ts:510 jitter resolves to exactly 0 — the contour we
-        // measure is purely getJamMacroArc's swell, not noise.
+        // iterations of the timer-less fallback. NOTE (#793): the macro jitter
+        // is now SEEDED on (formIteration, currentStep), so each iteration's
+        // realized target carries a bounded ±0.075 offset on top of
+        // getJamMacroArc's swell (Math.random no longer zeroes it). The
+        // sawtooth / cycle-variation / smoothness / band tests below tolerate
+        // that offset; the genre-cycle crest test reads getJamMacroArc directly
+        // to stay jitter-free (the offset injects spurious local maxima).
         function sampleJamArc(count: number, genreFeel = 'Rock'): number[] {
             const out: number[] = [];
             for (let it = 0; it < count; it++) {
@@ -669,9 +718,18 @@ describe('Conductor Arc Critique (S7)', () => {
         });
 
         it('genre-aware cycle length: Funk re-crests sooner than Jazz', () => {
-            // Funk cycle is 9, Jazz is 18 — Funk's contour should complete more
-            // full swells over the same iteration count. Count local maxima as
-            // a proxy for swell crests.
+            // Funk cycle is 9, Jazz is 18 — Funk's swell should complete more
+            // full crests over the same iteration count. Count local maxima of
+            // the swell ceiling as a proxy for swell crests.
+            //
+            // why read getJamMacroArc directly (not sampleJamArc): post-#793 the
+            // realized targetIntensity carries a seeded ±0.075 macro jitter that
+            // injects spurious per-iteration local maxima — that noise swamps the
+            // genre-cycle signal (measured directly it INVERTS the count to
+            // Jazz > Funk: 15 vs 11). The claim under test is a property of the
+            // genre-aware swell itself, so we measure the swell contour the
+            // engine produces (macroCeiling), mirroring the direct-read approach
+            // the dynamic-window test uses. Jitter-free, Funk crests 9 > Jazz 5.
             const N = 72;
             const countCrests = (arc: number[]) => {
                 let crests = 0;
@@ -682,11 +740,13 @@ describe('Conductor Arc Critique (S7)', () => {
                 }
                 return crests;
             };
-            const funkCrests = countCrests(sampleJamArc(N, 'Funk'));
-            const jazzCrests = countCrests(sampleJamArc(N, 'Jazz'));
+            const swellCeiling = (genre: string) =>
+                Array.from({ length: N }, (_, it) => getJamMacroArc(it, genre).macroCeiling);
+            const funkCrests = countCrests(swellCeiling('Funk'));
+            const jazzCrests = countCrests(swellCeiling('Jazz'));
 
             console.log('\n--- CONDUCTOR ARC CRITIQUE — JAM-ARC GENRE CYCLE ---');
-            console.log(`[Samples]      ${N} iterations`);
+            console.log(`[Samples]      ${N} iterations (swell ceiling, jitter-free)`);
             console.log(`[Funk crests]  ${funkCrests} (cycle 9)`);
             console.log(`[Jazz crests]  ${jazzCrests} (cycle 18)`);
             console.log('-------------------------------------------------\n');
