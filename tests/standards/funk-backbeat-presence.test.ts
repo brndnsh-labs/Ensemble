@@ -625,11 +625,22 @@ describe('Funk Backbeat Presence — integrated conductor-driven arc (S8 PART 3)
         console.log('---------------------------------------------------------\n');
 
         expect(m.playedCount).toBeGreaterThan(0);
-        // The opening window must hold at least 3 backbeats (the count at the
+        // The opening window must hold at least 2 backbeats (the count at the
         // current Funk ramp rate). A floor, not `> 0`: a ramp retune that
         // shrank the window would fail HERE — loudly — instead of quietly
         // leaving a near-vacuous guard.
-        expect(m.openingPlayed.length).toBeGreaterThanOrEqual(3);
+        //
+        // why 2 (was 3): post-#793 the seeded macro jitter is always present —
+        // at the first transition (formIteration 0, currentStep 16) it resolves
+        // to a deterministic +0.071 offset, raising the first ramp target and so
+        // the per-tick stepSize. The Funk ramp therefore crosses the narrow
+        // [0.35, 0.4) opening band marginally faster, leaving 2 backbeats inside
+        // it instead of 3. This is NOT a gate-crossing regression — every one of
+        // those backbeats still routes Snare (the teeth below, and the 100%
+        // overall ratio, are unchanged). 2 still gives the revert-detection real
+        // bite: with the gate reverted to 0.4 both opening backbeats flip to
+        // Sidestick and `openingSnare === openingPlayed.length` fails.
+        expect(m.openingPlayed.length).toBeGreaterThanOrEqual(2);
         // Teeth: every backbeat the conductor emits while intensity is still in
         // the [0.35, 0.4) band routes Snare. This is what the 216 gate revert
         // (0.3 -> 0.4) breaks, and it proves the groove reads the live
