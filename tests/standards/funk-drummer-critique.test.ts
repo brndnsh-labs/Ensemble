@@ -174,7 +174,7 @@ describe('Funk Drummer Critique', () => {
         console.log(`[Backbeat Consistency]  ${(backbeatScore * 100).toFixed(1)}% (Target: >95%)`);
         console.log(`[Ghost Note Density]    ${(snareGhostHits / totalBars).toFixed(2)} hits/bar`);
         console.log(
-            `[Ghost to Backbeat %]   ${(ghostToBackbeatRatio * 100).toFixed(1)}% (Target: 15-35%)`,
+            `[Ghost to Backbeat %]   ${(ghostToBackbeatRatio * 100).toFixed(1)}% (Target: 25-50%)`,
         );
         console.log(
             `[Kick Syncopation]      ${(totalSyncopatedKickHits / totalBars).toFixed(2)} hits/bar`,
@@ -187,10 +187,16 @@ describe('Funk Drummer Critique', () => {
         // CRITICAL: Strong backbeat or displaced accent is mandatory
         expect(backbeatScore).toBeGreaterThan(0.95);
 
-        // MUSICAL: Ghost notes are essential for Funk
+        // MUSICAL: Ghost notes are essential for Funk. The ghost-to-backbeat
+        // velocity ratio must bracket the engine's real delivery honestly:
+        // measured ~0.37–0.40 across 8 unseeded runs (mean ~0.385). The band
+        // (0.25, 0.50) sits ~0.12 below the observed min and ~0.10 above the
+        // observed max — wide enough to be non-flaky, tight enough that a
+        // no-ghost groove (~0) fails the floor and an over-ghosted groove
+        // (>~0.55) fails the ceiling. Print target and assertion now match.
         expect(snareGhostHits / totalBars).toBeGreaterThan(1.0);
-        expect(ghostToBackbeatRatio).toBeGreaterThan(0.1);
-        expect(ghostToBackbeatRatio).toBeLessThan(0.7); // Increased from 0.45 to allow dense ghosting
+        expect(ghostToBackbeatRatio).toBeGreaterThan(0.25);
+        expect(ghostToBackbeatRatio).toBeLessThan(0.5);
 
         // MUSICAL: Funk kick is the engine of the groove — most hits land off
         // the four beats. Engine delivers ~3.0/bar; threshold sits at 2.0 so a
