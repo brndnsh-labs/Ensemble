@@ -38,6 +38,11 @@ export interface GrooveContext {
     stepsPerBar: number;
     loopStep: number;
     drumComplexity: number;
+    // #806: per-loop motif-index ceiling for Chorus Evolution. Genres clamp
+    // their getMotif result to this (loop 0 → 1, loop 1 → 2, loop 2+ → Infinity).
+    // Optional: production (groove-engine) always sets it; partial test mocks
+    // that exercise a specific motif omit it and the clamp falls back to no cap.
+    motifCeiling?: number;
     orchestration: { rideVoice?: string; snareVoice?: string } | null;
     barIndex: number;
     isFirstStepOfNewBar: boolean;

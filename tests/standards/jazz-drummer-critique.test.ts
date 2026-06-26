@@ -256,8 +256,15 @@ describe('Jazz Drummer Critique', () => {
     });
 
     it('should increase comping density with intensity', () => {
-        const lowIntensityPerf = simulatePerformance(64, { playback: { bandIntensity: 0.2 } });
-        const highIntensityPerf = simulatePerformance(64, { playback: { bandIntensity: 0.9 } });
+        // #806: full comping density is a loop-2+ behavior — drumComplexity =
+        // (motifComplexity/3) * chorusEvolutionScale(loopCount), so the Head (loop
+        // 0) runs at half density. Compare intensities at the established-feel loop.
+        const lowIntensityPerf = simulatePerformance(64, {
+            playback: { bandIntensity: 0.2, currentLoopCount: 2 },
+        });
+        const highIntensityPerf = simulatePerformance(64, {
+            playback: { bandIntensity: 0.9, currentLoopCount: 2 },
+        });
 
         const getCompingHits = (perf) => {
             let hits = 0;

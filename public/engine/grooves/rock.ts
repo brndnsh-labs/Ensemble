@@ -57,12 +57,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         barIndex,
         isTurnaround,
         loopStep,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity, isEighthNote, halfBarStep } =
         base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
 
     // --- 1. HI-HAT / RIDE ---
     if (context.inst.name === 'HiHat' || context.inst.name === 'Open') {

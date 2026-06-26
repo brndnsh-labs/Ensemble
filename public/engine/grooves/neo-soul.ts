@@ -72,11 +72,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         sectionSeed,
         barIndex,
         isTurnaround,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
     const phraseSeed = getPhraseSeed(sectionSeed, barIndex, 2, activeMotif + 9);
     const phraseLiftBeat = phraseSeed < 0.5 ? 0 : 2;
     const releaseBeat = phraseSeed > 0.62 ? 3 : 1;

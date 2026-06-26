@@ -100,6 +100,11 @@ describe('Funk Groove Integrity', () => {
 
         it('should displace the backbeat for Motif 2 (Cold Sweat Style) — structural per phrase', () => {
             getState.mockReturnValue(mockState);
+            // #806: motif 2 (Displaced backbeat) is a loop-2+ behavior (Chorus
+            // Evolution holds back The Head); test at the established-feel loop.
+            // Restored to 0 at the end so the shared mockState doesn't leak loop 2
+            // into the following bark tests.
+            mockState.playback.currentLoopCount = 2;
             // drums.md P1 #9: motif 2 picks ONE displacement amount per
             // 2-bar phrase (via getPhraseSeed salt 17), then fires
             // deterministically. Old behavior was `roll(0.5)` per step =
@@ -153,6 +158,8 @@ describe('Funk Groove Integrity', () => {
             // space). 10 seeds sampling phraseSeed via salt 17 lands in
             // multiple buckets.
             expect(seenPatterns.size).toBeGreaterThanOrEqual(2);
+            // Restore loop 0 so the shared mockState is clean for later tests.
+            mockState.playback.currentLoopCount = 0;
         });
 
         it('should trigger anticipatory hi-hat barks on phrase turnarounds', () => {

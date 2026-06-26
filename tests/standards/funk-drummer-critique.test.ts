@@ -110,7 +110,9 @@ describe('Funk Drummer Critique', () => {
     it('should pass an authenticity critique for a 128-bar Funk performance', () => {
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.8 },
+            // #806: busy motif/full density is a loop-2+ behavior (Chorus Evolution
+            // holds back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.8, currentLoopCount: 2 },
             groove: { genreFeel: 'Funk' },
         });
 
@@ -226,7 +228,9 @@ describe('Funk Drummer Critique', () => {
         // assertion is the cleaner test of "structural, not scattered".)
         const numBars = 128;
         const performance = simulatePerformance(numBars, {
-            playback: { bandIntensity: 0.8 },
+            // #806: motif 2 (Displaced backbeat) is a loop-2+ behavior (Chorus
+            // Evolution holds back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.8, currentLoopCount: 2 },
             groove: { genreFeel: 'Funk' },
         });
 

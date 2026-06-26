@@ -160,7 +160,9 @@ describe('Latin Drummer Critique', () => {
         // route the backbeat to a full Snare crack. Deterministic: under songSeed
         // 'CRITIQUE' ~34% of 2-bar sections are motif 2/3 at intensity 0.9.
         const performance = simulatePerformance(64, {
-            playback: { bandIntensity: 0.9 },
+            // #806: Samba (motif 2) and Partido Alto (motif 3) are loop-2+ behaviors
+            // (Chorus Evolution holds back The Head); test at the established-feel loop.
+            playback: { bandIntensity: 0.9, currentLoopCount: 2 },
             groove: { genreFeel: 'Bossa Nova' },
             arranger: sectionSweepArranger(64, { barsPerSection: 2 }),
         });

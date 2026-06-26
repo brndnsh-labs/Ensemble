@@ -55,11 +55,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isPulseStart,
         isCompound,
         groupIndex,
+        motifCeiling,
     } = context;
 
     let { shouldPlay, velocity, soundName, instTimeOffset, intensity } = base;
 
-    const activeMotif = getMotif(sectionSeed, drumComplexity, intensity);
+    const activeMotif = Math.min(
+        getMotif(sectionSeed, drumComplexity, intensity),
+        motifCeiling ?? Number.POSITIVE_INFINITY,
+    );
 
     // why: epic-2 S8 — "beat 3 presence" is the bar's single secondary strong beat.
     // In 4/4 that's beat 3 (beatIndex 2). In compound (6/8/12/8, stepsPerBeat=2)
