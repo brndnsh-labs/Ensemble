@@ -107,6 +107,11 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.orchestrationMap = null;
             g.fillMap = null;
             g.accentMap = null;
+            // #791: RESET_STATE previously left sectionSeedMap frozen from the
+            // first-ever play while the song seed re-rolled — an incoherent
+            // partial re-randomization. Clear it with its sibling seed maps so a
+            // reset truly starts the groove memory fresh.
+            g.sectionSeedMap = {};
             g.seedTimelineStartStep = 0;
             g.lastHatGain = null;
             g.lastSampledHatVoice = null;
@@ -161,6 +166,17 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 g.sectionSeedMap = {};
             }
             g.sectionSeedMap[action.payload.sectionId] = action.payload.seed;
+            return true;
+        case ACTIONS.SET_SONG_SEED:
+            // #791: sectionSeedMap is a memo of deriveSectionSeed(sectionId,
+            // songSeed). When the song seed changes (re-roll on play, the seed
+            // control, a shared-URL load) the memo is stale — invalidate it so
+            // every section re-derives from the new seed. Without this, a
+            // re-rolled take keeps the old groove for already-seeded sections
+            // (the "incoherent partial re-randomization" of finding #791). A
+            // PINNED seed never dispatches SET_SONG_SEED on replay, so its memo
+            // survives and the groove reproduces exactly.
+            g.sectionSeedMap = {};
             return true;
         case ACTIONS.SET_GENRE_COUNTDOWN:
             if (groove.genreSwitchCountdown !== action.payload) {

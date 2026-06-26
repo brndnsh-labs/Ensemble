@@ -4,6 +4,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { sectionSweepArranger } from '../utils/groove-seed.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -25,6 +26,11 @@ describe('Jazz Drummer Critique', () => {
                 instruments: [],
             },
             soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+            // #791: each bar is its own section, so the engine's now-sticky
+            // sectionSeed sweeps the motif vocabulary across the run
+            // deterministically (restoring the per-bar motif variety the old
+            // Math-formula fallback gave, but reproducibly).
+            arranger: sectionSweepArranger(numBars),
             ...stateOverrides,
         };
         getState.mockReturnValue(mockState);

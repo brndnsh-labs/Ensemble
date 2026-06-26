@@ -8,7 +8,7 @@ import { binarySearchMap, binarySearchMapIndex, createPRNG } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
 import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
-import { stringHash31 } from './hash-utils.js';
+import { deriveSectionSeed, stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
 import { effectiveTargetIntensity } from './section-overrides.js';
 
@@ -625,8 +625,13 @@ export function checkSectionTransition(
                 if (nextSection) {
                     // Re-evaluate the drum seed only if it hasn't been set for this section
                     if (groove.sectionSeedMap?.[nextSection.id] === undefined) {
-                        // Generate a robust float seed (0.0 to 1.0) to serve as the abstract pool marker
-                        const seed = Math.random();
+                        // #791: derive the section's groove marker from (sectionId,
+                        // songSeed) instead of Math.random(). The groove-engine
+                        // fallback derives the SAME value, so this write is now a
+                        // memo (it pre-warms sectionSeedMap and seeds the
+                        // drums-tick variation index) — never a source of a
+                        // mid-section groove swap or a non-reproducible take.
+                        const seed = deriveSectionSeed(nextSection.id, arranger.seed ?? '');
                         dispatch(ACTIONS.SET_GROOVE_SEED, { sectionId: nextSection.id, seed });
                     }
                 }

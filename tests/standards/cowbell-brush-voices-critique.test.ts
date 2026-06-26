@@ -23,6 +23,7 @@ import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { KNOWN_SOUND_NAMES } from '../../public/engine/synth-drums.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
+import { sectionSweepArranger } from '../utils/groove-seed.js';
 
 vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
@@ -81,12 +82,16 @@ function makeDiscoState(opts: { intensity: number; bpm?: number } = { intensity:
             enabled: false,
             session: { phrasing: { busySteps: 0 } },
         },
-        arranger: {
-            timeSignature: '4/4',
-            sectionMap: [{ start: 0, end: 16 * 64 }],
-            stepMap: [],
-            totalSteps: 16 * 64,
-        },
+        // #791: the engine now derives ONE sticky sectionSeed per (sectionId,
+        // songSeed), so a single-section arranger plays a single motif for the
+        // whole run — and if that motif isn't the busy-cowbell flavor, ZERO
+        // cowbells ever fire. Disco's cowbell lane is `getMotif === 1 (busy) &&
+        // flavorRoll >= 0.5` — there is no standalone "motif 3"; the §18
+        // collapse folded the 4 intensity-gated motifs into 2 (foundation/busy)
+        // plus a per-bar cowbell-vs-syncopation flavor sub-roll. A per-section
+        // sweep restores motif/flavor variety deterministically so some
+        // sections land on the busy motif's cowbell flavor.
+        arranger: sectionSweepArranger(64),
     };
 }
 
