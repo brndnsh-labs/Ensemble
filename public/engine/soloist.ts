@@ -121,9 +121,7 @@ export function resetSoloistState(state: EnsembleState): void {
     context.sectionLabel = null;
     context.sectionOccurrence = 0;
 
-    memory.rhythmicMotif = [];
     memory.recentNotes = [];
-    memory.hookBuffer = [];
     memory.sharedHookBuffer = [];
     memory.sectionRecall = {};
     memory.sectionRecallLoop = null;

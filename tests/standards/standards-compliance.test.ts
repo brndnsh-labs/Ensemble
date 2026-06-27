@@ -19,7 +19,6 @@ vi.mock('../../public/state.js', () => {
             melodicTrend: 'Static',
             tension: 0,
             motifBuffer: [],
-            hookBuffer: [],
             lastFreq: 440,
             hookRetentionProb: 0.5,
             mode: 'guitar',

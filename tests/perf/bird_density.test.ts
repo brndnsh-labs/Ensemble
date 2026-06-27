@@ -48,7 +48,6 @@ vi.mock('../../public/state.js', () => {
             melodicTrend: 'Static',
             tension: 0,
             motifBuffer: [],
-            hookBuffer: [],
             lastFreq: 440,
             pitchHistory: [],
             deviceBuffer: [],

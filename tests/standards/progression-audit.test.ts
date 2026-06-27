@@ -18,7 +18,6 @@ vi.mock('../../public/state.js', () => {
             melodicTrend: 'Static',
             tension: 0,
             motifBuffer: [],
-            hookBuffer: [],
             lastFreq: 440,
             hookRetentionProb: 0.5,
             phraseContext: {
@@ -112,7 +111,6 @@ describe('Progression Audit: Verifying All Library Presets', () => {
         soloist.session.currentPhrase.notesInPhrase = 0;
         soloist.session.phrasing.busySteps = 0;
         soloist.motifBuffer = [];
-        soloist.session.memory.hookBuffer = [];
         soloist.activeBuffer = null;
         soloist.isReplayingMotif = false;
     });
