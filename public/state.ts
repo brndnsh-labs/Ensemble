@@ -104,6 +104,10 @@ export function getSyncState() {
             // the initial snapshot AND every delta (UPDATE_SB / SET_PARAM
             // handle the delta path generically).
             pinnedProfile: soloist.pinnedProfile,
+            // Experimental engine selector — read per-tick in tick-logic on the
+            // worker side, so it must travel with the full snapshot (the delta
+            // path is handled generically by SET_PARAM/UPDATE_SB).
+            phraseFirstSoloist: soloist.phraseFirstSoloist,
             session: {
                 sessionSteps: soloist.session.sessionSteps,
                 seed: soloist.session.seed,

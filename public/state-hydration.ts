@@ -287,6 +287,7 @@ export function hydrateState(): void {
                           ? 'guitar'
                           : 'monophonic',
                 ),
+                phraseFirstSoloist: savedState.soloist.phraseFirstSoloist ?? false,
             });
         }
         if (savedState.harmony) {

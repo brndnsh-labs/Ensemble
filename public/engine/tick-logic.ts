@@ -12,6 +12,7 @@ import {
 import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { getSoloistNote } from './soloist.js';
+import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
 
 export interface TickCursors {
@@ -107,7 +108,13 @@ export function generateNotesForStep(
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
-            soloResult = getSoloistNote(
+            // Parallel phrase-first engine, gated by the user-facing flag. Both
+            // share an identical signature + session-state contract, so the
+            // post-call block below works unchanged either way.
+            const soloistFn = soloist.phraseFirstSoloist
+                ? getSoloistNotePhraseFirst
+                : getSoloistNote;
+            soloResult = soloistFn(
                 state,
                 chord || null,
                 nextChordData?.chord || null,
