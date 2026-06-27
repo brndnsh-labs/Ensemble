@@ -149,6 +149,32 @@ test.describe('Modals Responsiveness @ui', () => {
         expect(rightCard.x).toBeGreaterThan(leftCard.x + leftCard.width * 0.45);
     });
 
+    test('Inline editor — drag handle is decorative, not a keyboard stop (#811)', async ({
+        page,
+    }) => {
+        const editor = await openEditorFromLibraryPreset(page);
+        await expect(editor).toBeVisible();
+
+        // The ⋮⋮ drag handle is a pointer-only affordance — keyboard/AT users
+        // reorder via the Move Up/Down buttons. It must be out of the tab order
+        // and hidden from assistive tech (regression guard against re-adding the
+        // role="button" + tabindex focus stop).
+        const handle = page.locator('.inline-editor .section-card .section-drag-handle').first();
+        await expect(handle).toBeVisible();
+        await expect(handle).toHaveAttribute('aria-hidden', 'true');
+        await expect(handle).not.toHaveAttribute('role');
+        await expect(handle).not.toHaveAttribute('tabindex');
+
+        // The keyboard reorder path still exists.
+        await expect(
+            page
+                .locator('.inline-editor .section-card')
+                .first()
+                .getByRole('button', { name: /Move Section (Up|Down)/ })
+                .first(),
+        ).toBeAttached();
+    });
+
     test('Inline editor — linked sections stack vertically on mobile @mobile', async ({ page }) => {
         const editor = await openEditorFromLibraryPreset(page);
         await expect(editor).toBeVisible();

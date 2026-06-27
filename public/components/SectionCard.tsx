@@ -274,10 +274,12 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                             draggable={true}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
-                            role="button"
-                            tabIndex={0}
                             title="Drag to reorder"
-                            aria-label="Drag handle"
+                            // Pointer-only affordance: keyboard/AT users reorder
+                            // via the Move Up/Down buttons below, so the handle is
+                            // out of the tab order and hidden from assistive tech
+                            // (was a focus stop with no operable behavior, #811).
+                            aria-hidden="true"
                         >
                             ⋮⋮
                         </span>
