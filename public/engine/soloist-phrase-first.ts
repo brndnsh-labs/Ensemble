@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { getSoloistNote } from './soloist.js';
@@ -24,9 +25,10 @@ import { getSoloistNote } from './soloist.js';
  * window (its local peak) LANDS on a **money note** — a strong key tone a
  * third-to-sixth above — whenever it sounds, so the lead reaches a resolved
  * signature peak roughly once per cycle (~24 bars), not once per macro-form
- * (design §9). Build 2d adds the first expressive device — a quick scoop UP
- * INTO each peak's money note (a vocal/guitar "reach"), held off the body of the
- * line so the gesture reads because it's rare (design §10). Every
+ * (design §9). Build 2d adds expression as a lyrical FLURRY around each peak — a
+ * whole-step scoop UP INTO the money note, lighter scoops on ~half the nearby
+ * notes, and vibrato on any held note in the zone — clustered into a burst, with
+ * the long stretch between peaks left clean so the flurries have space (§10). Every
  * emitted note's duration is clamped to the next note that sounds, so the
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
@@ -201,9 +203,11 @@ export function getSoloistNotePhraseFirst(
     // both the apex window and the later development depth share one definition.
     const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
     const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
-    // The signature-peak window is a FIXED musical span (~24 bars), independent
+    // The signature-peak window is a FIXED musical span (~12 bars), independent
     // of the progression length — a 12-bar blues must not get a third as many
     // peaks as a 4-bar pop turnaround just because its `totalSteps` is 3× larger.
+    // ~12 bars (not 24) so the peaks recur often enough to read as a signature
+    // hook (~once per 20s) — tuned up by ear; lower the constant for more.
     // Snap the span to a whole number of arrangement loops so window edges still
     // land on loop boundaries (where pitch/fold already shift): no new mid-phrase
     // seam, and the duration-clamp lookahead — which never crosses a loop
@@ -212,7 +216,7 @@ export function getSoloistNotePhraseFirst(
     // the progression: 6 peaks on a 4-bar form but only 2 on a 12-bar blues,
     // ~3.5 min apart — effectively never heard, and the peak-reach bend with them.
     // Caught by a production probe in the failing config.)
-    const TARGET_PEAK_WINDOW_STEPS = 384; // ≈ 24 bars in 4/4 (16 steps/bar)
+    const TARGET_PEAK_WINDOW_STEPS = 192; // ≈ 12 bars in 4/4 (16 steps/bar)
     const loopsPerWindow = Math.max(1, Math.round(TARGET_PEAK_WINDOW_STEPS / totalSteps));
     const cycleLen = loopsPerWindow * totalSteps;
     const curWindow = Math.floor(stepInLoop / cycleLen);
@@ -443,17 +447,38 @@ export function getSoloistNotePhraseFirst(
         }
     }
 
-    // --- Expression: reach INTO the signature peak (design §10, Build 2d) ---
-    // One expressive device, at the one moment that earns it: a quick scoop UP
-    // into each cycle's money note — the way a singer or guitarist reaches for a
-    // high target instead of landing on it cold. A negative `bendStartInterval`
-    // starts a whole-step below and glides up over ≤0.1s (synth-soloist.ts
-    // `scheduleSoloistBend`). Deliberately held OFF the body of the line:
-    // restraint is the point — the reach reads BECAUSE it's rare (~once per
-    // cycle, on the peak the ear is already listening for). Vibrato/dynamics on a
-    // held peak are the next slice, kept separate so this gesture auditions alone.
-    const PEAK_REACH_SEMITONES = -2; // whole-step scoop up into the money note
-    const bendStartInterval = isApexStep ? PEAK_REACH_SEMITONES : 0;
+    // --- Expression: a lyrical FLURRY around each signature peak (design §10) ---
+    // A player doesn't decorate one isolated note — they get lyrical in BURSTS: a
+    // little cluster of bends/vibrato around an expressive moment, then breathing
+    // room before the next. So expression clusters into a FLURRY ZONE around each
+    // cycle's money note (~¾ bar each side) and the long stretch between peaks
+    // stays clean — flurries with space between, the space guaranteed by the
+    // ~12-bar peak spacing.
+    //   • The apex itself: the big whole-step reach UP into the money note (a
+    //     negative `bendStartInterval` starts below and glides up over ≤0.1s,
+    //     synth-soloist.ts `scheduleSoloistBend`).
+    //   • Other notes in the zone: a lighter half-step scoop on ~half of them —
+    //     gated by a per-note hash so the cluster sounds lyrical (bends in rapid
+    //     succession), not a uniform mechanical trill.
+    //   • Vibrato: any SUSTAINED note in the zone sings (its clamped duration is
+    //     at least a beat) — so multiple vibrato events cluster at the peak, while
+    //     quick notes and the whole line between peaks stay clean. Gated on the
+    //     post-clamp `durationSteps` so a note shortened to fit its successor never
+    //     gets a vibrato it has no room to voice.
+    const EXPRESSIVE_RADIUS = 12; // steps each side of the peak (~¾ bar) = flurry zone
+    const inFlurry = Math.abs(stepInLoop - apexStepInLoop) <= EXPRESSIVE_RADIUS;
+    let bendStartInterval = 0;
+    if (isApexStep) {
+        bendStartInterval = -2; // whole-step reach UP into the money note
+    } else if (inFlurry) {
+        // ~half the flurry notes get a lighter scoop — varied per (step, loop) so
+        // the cluster reads as lyrical phrasing, not every note bent identically.
+        if (scrambleHash(step * 13 + Math.max(loopCount, 0) * 7 + 3) < 0.5) {
+            bendStartInterval = -1; // half-step scoop up
+        }
+    }
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
 
     phr.isResting = false; // @worker-mutation
     return {
@@ -462,7 +487,7 @@ export function getSoloistNotePhraseFirst(
         durationSteps,
         timingOffset: primary.timingOffset ?? 0,
         bendStartInterval,
-        vibrato: false,
+        vibrato,
         isDoubleStop: false,
     };
 }
