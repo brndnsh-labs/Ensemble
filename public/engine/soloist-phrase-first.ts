@@ -18,11 +18,13 @@ import { getSoloistNote } from './soloist.js';
  * .isResting` each tick (tick-logic publishes it to the coordination context so
  * bass/chords/harmony know whether the lead is breathing).
  *
- * **Build status — 2c (apex reach):** on top of 2b (theme + breath + arc +
- * chord-tone landing + cumulative development with theme return), the climb now
- * has a *destination*: the form's single highest note (its one peak) LANDS on a
- * **money note** — a strong key tone a third-to-sixth above — whenever it
- * sounds, so the climax always resolves onto a curated target (design §9). Every
+ * **Build status — 2c (apex reach + recurring peaks):** on top of 2b (theme +
+ * breath + arc + chord-tone landing + cumulative development with theme return),
+ * the climb now has a *destination*: the highest note of EACH development-cycle
+ * window (its local peak) LANDS on a **money note** — a strong key tone a
+ * third-to-sixth above — whenever it sounds, so the lead reaches a resolved
+ * signature peak roughly once per cycle (~24 bars), not once per macro-form
+ * (design §9). Every
  * emitted note's duration is clamped to the next note that sounds, so the
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
@@ -183,19 +185,35 @@ export function getSoloistNotePhraseFirst(
         return null;
     }
 
-    // --- Locate the theme's high point (its apex) for the money-note reach ---
-    // The single highest seed note in the loop is the theme's peak; the climax
-    // (§9) strains it toward a fixed target. Pickups (negative steps) are never
-    // the climax, so they're excluded. Computed from seed.notes only (loop-stable).
+    // --- Locate the current cycle's local apex (recurring signature peaks) ---
+    // The form is divided into development-cycle WINDOWS (~24 bars each); every
+    // window has its own local apex — its single highest seed note — which lands
+    // on its own money note whenever it sounds. So the lead reaches a resolved
+    // signature peak roughly once per cycle (heard several times in a normal
+    // listen) instead of one rare global climax. Pickups (negative steps) are
+    // never a peak, so they're excluded. The window is a whole number of
+    // arrangement loops (`cycleLen` is a multiple of `totalSteps`), so window
+    // boundaries always coincide with loop boundaries — where pitch/fold can
+    // already shift — and no new mid-phrase seam is introduced. Computed from
+    // seed.notes only (loop-stable). cyclePeriod/totalSteps are hoisted here so
+    // both the apex window and the later development depth share one definition.
+    const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
+    const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
+    const cycleLen = Math.max(cyclePeriod * totalSteps, totalSteps);
+    const curWindow = Math.floor(stepInLoop / cycleLen);
     let themeApexMidi = -1;
     let apexStepInLoop = -1;
     for (const n of seed.notes as any[]) {
         if (n.step < 0) {
             continue;
         }
+        const sIL = ((n.step % loopLen) + loopLen) % loopLen;
+        if (Math.floor(sIL / cycleLen) !== curWindow) {
+            continue; // a different cycle's peak — not this window's reach
+        }
         if (n.midi > themeApexMidi) {
             themeApexMidi = n.midi;
-            apexStepInLoop = ((n.step % loopLen) + loopLen) % loopLen;
+            apexStepInLoop = sIL;
         }
     }
     const isApexStep = stepInLoop === apexStepInLoop;
@@ -215,7 +233,6 @@ export function getSoloistNotePhraseFirst(
     //     and a settle at its edges, so every pass breathes as an arc.
     const loopCount = playback.currentLoopCount ?? -1;
     const loopLift = Math.min(Math.max(loopCount, 0), 4) * 0.14; // builds over ~4 loops
-    const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
     // Tempo-awareness (design §7): breath is roughly constant in WALL-CLOCK, so a
     // slow tune's long bars read as too sparse at a fixed musical density — it
     // needs more notes per bar to feel as present. Fill more below ~120bpm. We do
@@ -253,27 +270,27 @@ export function getSoloistNotePhraseFirst(
     // preserved exactly by diatonic transposition and the reach is bounded — that
     // bound IS the similarity leash (growth, not drift).
     const c = Math.max(loopCount, 0);
-    const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
     const developmentDepth = c % cyclePeriod;
     const liftDegrees = DEPTH_DEGREES[Math.min(developmentDepth, DEPTH_DEGREES.length - 1)];
     const keyRootPc = KEY_PC[arranger.key] ?? 0;
     const keyIsMinor = Boolean(arranger.isMinor);
 
-    // --- Apex / money note: the form's one climactic peak (design §9) ---
-    // The apex is the single highest seed note in the whole macro-form — by
-    // definition the solo's one peak. Whenever it sounds, it LANDS on the "money
-    // note": a strong, resolved KEY tone (tonic or 5th) a third-to-sixth above
-    // the theme apex, so the climax always resolves onto a curated target instead
-    // of an arbitrary tension tone. A held tonic/5th over the changes is the
-    // idiomatic pedal climax, so the apex keeps the money note (no chord-snap).
+    // --- Apex / money note: this cycle's signature peak (design §9) ---
+    // `themeApexMidi` is the highest seed note in the CURRENT development-cycle
+    // window (computed above) — this cycle's local peak. Whenever it sounds it
+    // LANDS on the "money note": a strong, resolved KEY tone (tonic or 5th) a
+    // third-to-sixth above it, so each cycle's peak resolves onto a curated target
+    // instead of an arbitrary tension tone. A held tonic/5th over the changes is
+    // the idiomatic pedal climax, so the peak keeps the money note (no chord-snap).
+    // Because the peak recurs per window, the lead reaches a fresh signature peak
+    // roughly once per cycle (~24 bars) rather than once per whole macro-form.
     //
-    // The reach is driven by the apex's IDENTITY as the form peak, NOT by the
-    // loop-count development phase. (The first cut scaled the reach by
-    // `developmentDepth` — but the apex is a single fixed point in the 128-bar
-    // macro-form while depth cycles every ~24 bars, so the two are decoupled: the
-    // apex almost always sounded at a low-reach phase and landed on a near-by
-    // tension tone, e.g. the leading tone. Confirmed by a production-faithful
-    // probe across genres before this fix.)
+    // The reach is driven by the peak's IDENTITY as its window's high point, NOT
+    // by the loop-count development phase. (The first cut scaled the reach by
+    // `developmentDepth` — but a peak is a fixed point in the form while depth
+    // cycles independently, so the two were decoupled: the peak almost always
+    // sounded at a low-reach phase and landed on a near-by tension tone, e.g. the
+    // leading tone. Confirmed by a production-faithful probe across genres.)
     //
     // Derive the money note BY CONSTRUCTION (a nearest-snap can land below the
     // apex or above the ceiling): the highest strong tone in (apex+3 … apex+9],
