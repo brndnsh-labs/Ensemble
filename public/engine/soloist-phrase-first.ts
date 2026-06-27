@@ -68,8 +68,11 @@ const DEPTH_DEGREES = [0, 2, 4, 5, 6];
  * preserving melodic contour (parallel diatonic motion — the classic
  * "sequence" that keeps a restated idea recognizably the same). A non-scale
  * source note snaps onto the scale, which only helps keep development in key.
- * Folds down an octave if it would climb out of a singable register; the
- * downstream `enforceRegisterSlotting` is the hard backstop.
+ * Returns the raw transposed pitch (may exceed the register ceiling) — the
+ * caller folds the whole developed line into register as one unit so the
+ * contour is never broken at the seam. Note the soloist's HIGH register is not
+ * clamped downstream (`enforceRegisterSlotting` only lifts notes below 52), so
+ * the ceiling must be respected here, not deferred.
  */
 function diatonicTranspose(
     midi: number,
@@ -96,11 +99,10 @@ function diatonicTranspose(
     const octaveShift = Math.floor(targetIdx / len);
     const wrapped = ((targetIdx % len) + len) % len;
     const newRel = steps[wrapped] + octaveShift * 12;
-    let result = midi - relPc + newRel;
-    if (result > 88) {
-        result -= 12;
-    }
-    return Math.round(result);
+    // Pure contour-preserving transpose — register folding is applied to the
+    // developed line as ONE unit at the call site (a per-note fold here would
+    // invert the contour at the seam where adjacent notes straddle the ceiling).
+    return Math.round(midi - relPc + newRel);
 }
 
 /**
@@ -267,20 +269,48 @@ export function getSoloistNotePhraseFirst(
     // climax (reachFraction → 1), then resets on the theme-return loop. A held
     // tonic/5th ringing over the changes at the peak is idiomatic (pedal climax),
     // so the apex deliberately keeps the money note rather than chord-snapping.
+    // Derive the money note BY CONSTRUCTION (not by free-snapping a raw target —
+    // a nearest-snap can land below the theme apex or above the ceiling, killing
+    // the reach): the highest strong key tone (tonic/5th) that sits a clear third
+    // or more above the theme apex and within the soloist ceiling (90 — the
+    // upper register is NOT clamped downstream, so it must hold here). If the apex
+    // is already so high that no strong tone fits, the reach is a no-op (apex stays).
     const strongKeyPcs = new Set<number>([keyRootPc % 12, (keyRootPc + 7) % 12]);
-    let moneyTarget = Math.min(themeApexMidi + 9, 86); // reach up toward the ceiling
-    if (moneyTarget < themeApexMidi + 3) {
-        moneyTarget = themeApexMidi + 3; // …but always clearly above the theme's peak
+    const highestStrongTone = (lo: number, hi: number): number => {
+        for (let m = hi; m >= lo; m--) {
+            if (strongKeyPcs.has(((m % 12) + 12) % 12)) {
+                return m;
+            }
+        }
+        return -1;
+    };
+    let moneyNote = highestStrongTone(themeApexMidi + 3, 88);
+    if (moneyNote < 0) {
+        moneyNote = highestStrongTone(themeApexMidi + 1, 90); // apex near ceiling
     }
-    const moneyNote = snapToNearestPc(moneyTarget, strongKeyPcs);
+    if (moneyNote < 0) {
+        moneyNote = themeApexMidi; // no strong tone fits above → reach becomes a no-op
+    }
     const reachFraction = clamp01(developmentDepth / Math.max(1, cyclePeriod - 1));
 
+    // Register fold for the developed body line, decided ONCE so every body note
+    // shifts together (contour intact). The developed theme apex is the line's
+    // highest note (diatonic transposition is order-preserving); fold the line
+    // down by whole octaves until that apex sits within the ceiling.
+    const developedApex = diatonicTranspose(themeApexMidi, liftDegrees, keyRootPc, keyIsMinor);
+    let bodyOctaveFold = 0;
+    while (developedApex + bodyOctaveFold > 88) {
+        bodyOctaveFold -= 12;
+    }
+
     // Will a note actually SOUND at this absolute step? Mirrors the live emit
-    // decision exactly: anchors and the apex always sound; an ornament passes the
-    // same density gate. Used below to clamp a note's duration to the next note
-    // that sounds — a monophonic lead must not overrun its successor (the legacy
-    // engine clamps durations the same way; without it, held seed notes overlap
-    // the next note as development opens the line up).
+    // decision (anchors and the apex always sound; an ornament passes the same
+    // density gate) for every step WITHIN the current loop — across a loop seam
+    // the real future emit uses the next loop's depth/gate, so this is a close
+    // approximation there, bounded by `span` (a few steps). Used below to clamp a
+    // note's duration to the next note that sounds — a monophonic lead must not
+    // overrun its successor (the legacy engine clamps durations the same way;
+    // without it, held seed notes overlap the next note as development opens up).
     const emitsAt = (absStep: number): boolean => {
         const sInLoop = ((absStep % loopLen) + loopLen) % loopLen;
         let present = false;
@@ -321,28 +351,32 @@ export function getSoloistNotePhraseFirst(
     }
 
     // --- Pitch: develop the theme, then LAND with intention on strong beats ---
-    // Sequence the stated theme up by the cycle's current reach (verbatim at
-    // depth 0 / theme-return loops), preserving its contour so it stays the same
-    // idea, climbing higher.
-    let midi = diatonicTranspose(primary.midi, liftDegrees, keyRootPc, keyIsMinor);
     const isDownbeat = stepInfo
         ? Boolean(stepInfo.isDownbeat || stepInfo.isMeasureStart)
         : stepInChord === 0;
-    if (isDownbeat) {
-        // On the strongest beat, snap the landing to the nearest chord tone so
-        // the phrase resolves onto the harmony rather than passing over it.
-        // (Approach/voice-leading on weak beats arrives in a later build.)
-        const root = ((currentChord.rootMidi % 12) + 12) % 12;
-        const intervals: number[] = currentChord.intervals || [0, 4, 7];
-        const chordPcs = new Set<number>(intervals.map((i) => (((root + i) % 12) + 12) % 12));
-        midi = snapToNearestPc(midi, chordPcs);
-    }
-
-    // The theme's apex strains toward the money note, landing on it at the climax.
-    // Interpolating from the (already developed) note keeps the climb continuous;
-    // this overrides any downbeat chord-snap so the long-range target stands.
-    if (isApexStep && reachFraction > 0 && moneyNote > midi) {
-        midi = Math.min(midi + Math.round((moneyNote - midi) * reachFraction), moneyNote);
+    let midi: number;
+    if (isApexStep && reachFraction > 0) {
+        // The apex is governed PURELY by the long-range goal: interpolate from the
+        // raw theme apex toward the money note, so the climax lands EXACTLY on the
+        // curated strong tone (reachFraction → 1) and grows monotonically without
+        // overshoot. It is NOT stacked on the uniform lift and NOT chord-snapped —
+        // a held tonic/5th ringing over the changes is the idiomatic pedal climax
+        // (design §9). At reachFraction 0 (the theme-return loops) this branch is
+        // skipped, so the apex is stated faithfully below like any theme note.
+        midi = Math.round(themeApexMidi + (moneyNote - themeApexMidi) * reachFraction);
+    } else {
+        // Body of the line: parallel diatonic sequence (contour preserved),
+        // climbing higher as the cycle develops, then landing chord tones on
+        // strong beats so phrases resolve onto the harmony. The whole developed
+        // line is folded into register as ONE unit (bodyOctaveFold) so the seam
+        // never inverts the contour. (Weak-beat voice-leading is a later build.)
+        midi = diatonicTranspose(primary.midi, liftDegrees, keyRootPc, keyIsMinor) + bodyOctaveFold;
+        if (isDownbeat) {
+            const root = ((currentChord.rootMidi % 12) + 12) % 12;
+            const intervals: number[] = currentChord.intervals || [0, 4, 7];
+            const chordPcs = new Set<number>(intervals.map((i) => (((root + i) % 12) + 12) % 12));
+            midi = snapToNearestPc(midi, chordPcs);
+        }
     }
 
     // --- Dynamics follow the arc: softer when sparse, fuller toward the peak ---
