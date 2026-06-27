@@ -169,6 +169,25 @@ describe('phrase-first soloist (Build 2a)', () => {
         expect(84 % 12).toBe(0); // …which is the tonic — a resolved, strong tone
     });
 
+    it('lands the climax on the money note without overshooting (P1 regression)', () => {
+        // High theme apex (G5=79): the uniform cycle lift ALONE would push the
+        // apex to D6 (86, the 9th — a weak tension on a C chord). The apex must
+        // instead be driven purely by the long-range reach and land on the
+        // curated strong tone (C6=84), a chord tone >= the theme apex.
+        const seed: any[] = [];
+        for (let s = 0; s < 64; s += 4) {
+            seed.push(
+                s === 8
+                    ? { step: 8, midi: 79, isAnchor: false, durationSteps: 2, velocity: 0.8 }
+                    : { step: s, midi: 67, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+            );
+        }
+        const climax = run(makeState(seed, { loopCount: 2 })).emitted.find((e) => e.step === 8);
+        expect(climax.midi).toBe(84); // C6 — the money note, NOT the 86 overshoot
+        expect(climax.midi % 12).toBe(0); // a strong key tone (tonic)
+        expect(climax.midi).toBeGreaterThanOrEqual(79); // never below the theme apex
+    });
+
     it('never gates out the apex — the money note always sounds', () => {
         // Even though the apex is a non-anchor ornament at the sparsest loop.
         for (const lc of [0, 1, 2]) {
