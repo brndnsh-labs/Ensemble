@@ -37,7 +37,6 @@ describe('Soloist Rhythmic Reactive Alignment', () => {
             lastAttackStep: -100,
             deviceBuffer: [],
             motifBuffer: [],
-            hookBuffer: [],
             pitchHistory: [],
             recentNotes: [],
             notesInPhrase: 0,

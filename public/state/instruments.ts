@@ -132,9 +132,7 @@ export const soloist = deepSignal<SoloistState>({
         },
         memory: {
             recentNotes: [],
-            hookBuffer: [],
             sharedHookBuffer: [],
-            rhythmicMotif: [],
             sectionRecall: {},
             sectionRecallLoop: null,
             formArcRecall: {},
@@ -245,9 +243,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
 
     // --- Memory ---
     recentNotes: { kind: 'memory', key: 'recentNotes' },
-    hookBuffer: { kind: 'memory', key: 'hookBuffer' },
     sharedHookBuffer: { kind: 'memory', key: 'sharedHookBuffer' },
-    rhythmicMotif: { kind: 'memory', key: 'rhythmicMotif' },
     sectionRecall: { kind: 'memory', key: 'sectionRecall' },
     sectionRecallLoop: { kind: 'memory', key: 'sectionRecallLoop' },
     formArcRecall: { kind: 'memory', key: 'formArcRecall' },
@@ -426,9 +422,7 @@ export function instrumentReducer(action: Action): boolean {
             cpCtx.srdcState = 'statement';
             cpCtx.restatementEcho = null;
             mem.recentNotes = [];
-            mem.hookBuffer = [];
             mem.sharedHookBuffer = [];
-            mem.rhythmicMotif = [];
             mem.sectionRecall = {};
             mem.sectionRecallLoop = null;
             mem.formArcRecall = {};

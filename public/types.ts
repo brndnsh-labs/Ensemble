@@ -748,12 +748,8 @@ export interface SoloistCurrentPhrase {
 export interface SoloistMemory {
     /** Recently played notes. Used for signature building and direction tracking. */
     readonly recentNotes: RecentSoloistNote[];
-    /** Short term hook memory (currently always reset to `[]` — kept for future reintroduction). */
-    readonly hookBuffer: SoloistHook[];
     /** Hooks shared from other instruments (e.g. Ska-Punk harmonies echoing the soloist). */
     readonly sharedHookBuffer: SoloistHook[];
-    /** Current rhythmic motif (subset of the active rhythm plan retained across phrases). */
-    readonly rhythmicMotif: RhythmNode[];
     /** Per-loop section signatures keyed by section label. */
     readonly sectionRecall: Record<string, SectionRecallEntry>;
     /** Loop number currently represented in sectionRecall. */
@@ -1394,8 +1390,7 @@ export type ActionPayloadUpdateHB = Partial<HarmonyState>;
  *   `restSteps`, `activeSteps`, `busySteps`, `isWaitingForEntry`, `isYielding`,
  *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
  *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
- *   `hookBuffer`, `sharedHookBuffer`, `rhythmicMotif`,
- *   `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
+ *   `sharedHookBuffer`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
  *   `rhythmPlan`, `rhythmicEntropy`, `deviceBuffer`, `embellishmentBuffer`,
  *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
  *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
@@ -1444,9 +1439,7 @@ export type ActionPayloadUpdateSB = Partial<{
     notesInPhrase: number;
     phraseContext: SoloistPhraseContext;
     recentNotes: RecentSoloistNote[];
-    hookBuffer: SoloistHook[];
     sharedHookBuffer: SoloistHook[];
-    rhythmicMotif: RhythmNode[];
     sectionRecall: Record<string, SectionRecallEntry>;
     sectionRecallLoop: number | null;
     formArcRecall: Record<string, FormArcEntry>;
