@@ -26,7 +26,7 @@ export interface WorkerContext {
     // why: sticky cross-tick coordination state (soloist's most recent non-rest MIDI
     // + the absolute step at which it was written). Lives here because the per-tick
     // coordination context is recreated each call to generateNotesForStep — without
-    // this carryover the harmony spectral-gap branch (harmonies.ts:535-540) would
+    // this carryover the harmony spectral-gap branch (in finalizeHarmonyNotes) would
     // essentially never fire. The step is paired so consumers can age-cap the value.
     lastActiveSoloistMidi: number;
     lastActiveSoloistStep: number;

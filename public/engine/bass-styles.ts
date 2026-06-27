@@ -156,7 +156,7 @@ export function checkBassActiveStyle(
 
             // why: deterministic-per-step seed so loops + critique tests stay
             // coherent. Mirrors the funk-bass slap seed pattern (golden-ratio mix
-            // with currentLoopCount XOR) — see bass-styles.ts:837. No bare LCG on
+            // with currentLoopCount XOR) — see slapSeedBase. No bare LCG on
             // small integer seeds (feedback_seeded_prng_mulberry32).
             const compoundSeed =
                 ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
@@ -874,7 +874,7 @@ export function getBassNoteStyle(
                     const below = normalizeToRange(nextTarget - 1);
                     const above = normalizeToRange(nextTarget + 1);
                     // why: pick direction by proximity to prevMidi for smooth voice leading
-                    // (mirrors the country walk-up logic at bass-styles.ts:373-376).
+                    // (mirrors the country walk-up direction logic in getBassNoteStyle).
                     const ref = prevMidi ?? baseRoot;
                     const approach = Math.abs(below - ref) <= Math.abs(above - ref) ? below : above;
                     // why: chromatic and root anticipation share velocity (1.2). Both
@@ -1314,7 +1314,7 @@ export function getBassNoteStyle(
         // the root). Density gate already lives in checkBassActiveStyle (S12); this
         // branch only sets the PITCH for the slots that gate fires.
         //
-        // Slot derivation mirrors checkBassActiveStyle's compound branch (bass-styles.ts:83-124):
+        // Slot derivation mirrors checkBassActiveStyle's compound-meter isCompound branch:
         //   - pulse:   stepInfo.isPulseStart        — mStep {0, 6} in 6/8
         //   - pickup:  stepInGroup === groupSteps-2 — mStep {4, 10} in 6/8
         //   - approach: stepInGroup === 2           — mStep {2, 8} in 6/8 (high intensity)
@@ -1329,7 +1329,7 @@ export function getBassNoteStyle(
 
             // why: deterministic seed for any chromatic-vs-scalar / above-vs-below
             // pick in this branch. Same shape as the compound density gate seed
-            // (bass-styles.ts:130-131) and the funk slap seed — golden-ratio mix
+            // (bassRandSeed in checkBassActiveStyle) and the funk slap seed — golden-ratio mix
             // with currentLoopCount XOR, mulberry32-scrambled. No bare LCG
             // (feedback_seeded_prng_mulberry32).
             const compoundPitchSeed =
@@ -1338,7 +1338,7 @@ export function getBassNoteStyle(
             if (isPulseSlot) {
                 // why: pulses on a held or changing chord ALWAYS take the chord
                 // root. `baseRoot` is already register-normalized via the upstream
-                // normalizeToRange call (bass-engine.ts:413), so this respects the
+                // normalizeToRange call in bass-engine.ts, so this respects the
                 // register slot (23–57) + previous-note proximity that
                 // clampAndNormalize embeds. `withOctaveJump` is reserved for
                 // explicit downbeat-displacement gestures — pulse roots should sit

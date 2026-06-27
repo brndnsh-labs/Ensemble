@@ -219,7 +219,7 @@ const PER_GENRE_FINAL_BAR: Record<string, FinalBarTreatment> = {
     // metal.ts accentCymbal: 'China'). Route Open lane to 'China' so the
     // genre's idiomatic accent fires on the final downbeat alongside the
     // reinforced double-kick weight (Kick 1.4). The China sample shares the
-    // Crash dispatch in synth-drums.ts:2206 (same buffer chain, bandpass-
+    // Crash dispatch in playDrumSoundCurrent's Crash/China block (same buffer chain, bandpass-
     // shaped for the bark-like trash), so no new audio plumbing is needed.
     //
     // Compromise (reviewer P2, Epic 12 S11): the audit spec'd "Crash + China
@@ -531,7 +531,7 @@ export function applyGrooveOverrides(
 
     // --- Phase 2b: Section-boundary Crash (applied post-strategy so genre overrides don't clobber it) ---
     // why: the turnaround block previously ran BEFORE strategy.applyOverrides, which unconditionally
-    // resets the hat lane (e.g. funk.ts:64 sets shouldPlay=false and rebuilds from scratch), so the
+    // resets the hat lane (e.g. funk's `applyOverrides` sets shouldPlay=false and rebuilds from scratch), so the
     // Crash routing was always wiped. Moving it here — parallel with the crash-catch accent below —
     // guarantees the Crash fires on the final, post-strategy state.
     if (justFinishedTurnaround && isDownbeat) {
@@ -539,10 +539,10 @@ export function applyGrooveOverrides(
             currentState.shouldPlay = true;
             currentState.velocity = 1.35;
         } else if (inst.name === 'Open' && playback.bandIntensity > 0.45) {
-            // why: route the section-start crash splash on the Open lane only — `blues.ts:59`
+            // why: route the section-start crash splash on the Open lane only — blues's `applyOverrides`
             // is the reference pattern. Firing on both HiHat and Open lanes (the previous
             // implementation) produces two stacked Crash drumHits per boundary, and the
-            // second voice's `lastCrashGain` ramp-down in synth-drums.ts:949-955 actively
+            // second voice's `lastCrashGain` ramp-down in playDrumSoundCurrent's Crash/China block actively
             // chokes the first voice's tail (audible "flam" + gain stutter). The HiHat lane
             // keeps whatever the genre strategy decided. At intensity < 0.45 we leave the
             // Open lane to its strategy default — no crash on a quiet intro return.
@@ -840,7 +840,7 @@ export function applyGrooveOverrides(
     //
     // Lane assignments mirror the section-boundary Crash routing (line ~221)
     // and `crash-routing-critique.test.ts`: route the crash on the Open lane to
-    // avoid the double-Crash audio artifact (synth-drums.ts:949-955's
+    // avoid the double-Crash audio artifact (playDrumSoundCurrent's Crash/China-block
     // lastCrashGain ramp-down would otherwise choke the second voice's tail).
     // Kick gets a reinforced thump for arrival weight. The HiHat lane is left
     // alone — its closed-hat ticking on the final bar would clutter the swell.

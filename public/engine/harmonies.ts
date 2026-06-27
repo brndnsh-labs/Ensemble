@@ -107,7 +107,7 @@ let lastPlayedStep = -1;
 //                                 comping, to match the audit-doc acceptance
 //                                 criterion in epic-harmony-polish S5.
 //                                 Soloist-driven shadow-mode (response,
-//                                 melodic latch, hype-man at harmonies.ts:997)
+//                                 melodic latch, hype-man in playShadowMode)
 //                                 preempts this default and still fires in
 //                                 this band when a live soloist is present.
 //   >= HARMONY_PAD_CEILING      : comping behavior is unlocked
@@ -376,7 +376,7 @@ export function generateCompingPattern(
         pattern[getBeatStep(1, 3, 3)] = 2;
     } else if (patternKey === 'ska') {
         // why: ska horn-section stabs lock with the guitar/organ chop on the
-        // OFFBEATS — but the chord channel (accompaniment.ts:837) already chops
+        // OFFBEATS — but the chord channel (generateCompingPattern) already chops
         // every offbeat upstroke, so the horn layer punctuates SPARSELY above it
         // (the &-of-2 and &-of-4 punch) rather than doubling the full chop into
         // mud. This replaces the old beats-2&4 backbeat (which read as the

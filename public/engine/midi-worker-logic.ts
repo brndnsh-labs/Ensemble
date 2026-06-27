@@ -624,7 +624,7 @@ export class ExportProcessor {
                             midi = (DRUM_MAP as any).CongaHigh;
                         }
                     } else if (name.includes('Cowbell')) {
-                        // why: live drum engine (synth-drums.ts:1085-1098) emits
+                        // why: live drum engine (playDrumSoundCurrent's Cowbell block) emits
                         // 'CowbellHigh'/'CowbellLow' for the disco octave-cowbell
                         // motif (Epic 7 S2). Without this branch the variants
                         // would fall through and silently drop from MIDI export

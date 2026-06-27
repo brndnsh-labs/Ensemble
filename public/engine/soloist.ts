@@ -149,7 +149,7 @@ export function resetSoloistState(state: EnsembleState): void {
 // the coordination-context preamble that publishes sectionOccurrence).
 
 // SRDC phase derivation (Statement / Restatement / Departure / Conclusion).
-// Mirrors the seeder's logic at soloist-seeder.ts:1602-1603 so live phrase
+// Mirrors isDepartureCategory in soloist-seeder.ts so live phrase
 // pitch selection and the seeded head motif agree on where in the form we are.
 // Departure categories follow soloist-seeder.ts:isDepartureCategory.
 const DEPARTURE_LABEL_KEYWORDS = ['chorus', 'bridge', 'prechorus', 'drop'];
