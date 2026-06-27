@@ -48,8 +48,6 @@ export interface HarmonyVoicing {
     powerChord?: boolean;
     /** Long chord-tone swells with an added major-6th / 6-9 color (country pedal-steel). */
     pedalSteelSwell?: boolean;
-    /** Replace the held pad with a gently rolling fingerpicked counter-line (acoustic). */
-    arpeggiate?: boolean;
     /**
      * #716 — BB King big-band horn section: sparse, punchy call-and-response
      * stabs that ANSWER in the gaps (when the soloist rests / at phrase ends)
@@ -105,9 +103,9 @@ export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
         smartStyle: 'strings',
         rhythmicStyle: 'pads',
         patternKey: 'default',
-        // Harmony holds the sustained string PAD (no `arpeggiate` → playSeaMode);
-        // the fingerpick arpeggio lives in the chords lane (the 'arp' style), its
-        // idiomatic plucked home. The bowed strings sample wants to hold, not pluck.
+        // Harmony holds the sustained string PAD; the fingerpick arpeggio lives in
+        // the chords lane (the 'arp' chord style, #787), its idiomatic plucked home.
+        // The bowed strings sample wants to hold, not pluck.
     },
     'Bossa Nova': { smartStyle: 'strings', rhythmicStyle: 'stabs', patternKey: 'bossa' },
     Country: {

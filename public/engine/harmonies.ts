@@ -29,15 +29,13 @@ interface MotifCacheEntry {
 }
 
 interface HarmonyBehavior {
-    type: 'reinforce' | 'comp' | 'pad' | 'arp';
+    type: 'reinforce' | 'comp' | 'pad';
     duration: number;
     isLatched?: boolean;
     isBloom?: boolean;
     isResponse?: boolean;
     isGhost?: boolean;
     anchorMidi?: number;
-    /** Position in the per-bar arpeggio roll (acoustic fingerpick), 0-based. */
-    arpStep?: number;
 }
 
 interface StyleConfig {
@@ -90,13 +88,6 @@ interface HarmonyNote {
      * a new voice. See epic-harmony-polish.md S1.
      */
     isLegato?: boolean;
-    /**
-     * True for acoustic fingerpick-roll notes (#561). The synth gives these a
-     * plucked envelope — fast attack, ring-down from the peak — instead of the
-     * strings voice's slow pad swell, so each note speaks and the 3-voice cap
-     * culls the (now quietest) oldest voice inaudibly.
-     */
-    isArp?: boolean;
 }
 
 // Internal memory for motif consistency
@@ -601,20 +592,6 @@ function playSeaMode(context: HarmonyContext): HarmonyBehavior | null {
     return null;
 }
 
-// Gently rolling fingerpicked counter-line (acoustic, #561). Instead of a held
-// pad, emit ONE chord tone per eighth-note, rolling up over the chord (+9th
-// color) and back down across the bar — the singer-songwriter fingerpick. Each
-// note rings ~1.5 eighths into the next so the line stays legato, not staccato.
-function playArpeggioMode(context: HarmonyContext): HarmonyBehavior | null {
-    const { measureStep, ts } = context;
-    const stepsPerEighth = Math.max(1, Math.round(ts.stepsPerBeat / 2));
-    if (measureStep % stepsPerEighth !== 0) {
-        return null;
-    }
-    const arpStep = Math.round(measureStep / stepsPerEighth);
-    return { type: 'arp', duration: stepsPerEighth + 1, arpStep };
-}
-
 /**
  * #716 — BB King horn section: sparse, punchy section stabs.
  *
@@ -860,18 +837,6 @@ function finalizeHarmonyNotes(
         intervals = [0, 7, 12];
     }
 
-    // --- ACOUSTIC: fingerpick roll (#561) ---
-    // why: the arpeggio behavior emits ONE chord tone per eighth — reduce the
-    // voicing to the single rolling tone for this position. The roll climbs
-    // root → 3rd → 5th → octave → 9th and back down; the 9th peak is the open
-    // add9 color folk fingerpicking leans on. Bloom/latch accents are left as
-    // their fuller stack (a deliberate swell over the picked line).
-    if (behavior.type === 'arp' && !isBloom && !isLatched) {
-        const arpThird = chordThirdIsMinor(chord) ? 3 : 4;
-        const roll = [0, arpThird, 7, 12, 14, 12, 7, arpThird];
-        intervals = [roll[(behavior.arpStep ?? 0) % roll.length]];
-    }
-
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
     const baseDensity = isBloom ? Math.max(styleConfig.density || 2, 3) : styleConfig.density || 2;
@@ -1062,13 +1027,6 @@ function finalizeHarmonyNotes(
         if (isBloom || isLatched) {
             baseVol *= 1.8; // Boost highlights to clear test thresholds
         }
-        if (behavior.type === 'arp') {
-            // The fingerpick is a single decaying voice carrying the whole part,
-            // vs the old held 3-voice pad — lift it toward pad presence (the
-            // plucked fast-attack envelope in synth-harmonies does the main
-            // audibility work). Clamped so the loudest hits can't clip the bus.
-            baseVol = Math.min(1.0, baseVol * 2.0);
-        }
         if (accompanimentCrowding) {
             baseVol *= 0.9;
         }
@@ -1114,7 +1072,6 @@ function finalizeHarmonyNotes(
             isBloom: !!isBloom,
             isChordStart: true,
             isLegato,
-            isArp: behavior.type === 'arp',
         });
         finalMidisForMemory.push(midi);
     }
@@ -1355,10 +1312,6 @@ export function getHarmonyNotes(
                 playback.bandIntensity < HARMONY_PAD_CEILING
                     ? playSeaMode(context)
                     : playHornSectionMode(context);
-        } else if (profile.voicing?.arpeggiate) {
-            // Acoustic fingerpick replaces the held pad with a rolling
-            // counter-line at every intensity (above the mute floor). #561.
-            behavior = playArpeggioMode(context);
         } else if (
             config.rhythmicStyle === 'pads' ||
             playback.bandIntensity < HARMONY_PAD_CEILING
