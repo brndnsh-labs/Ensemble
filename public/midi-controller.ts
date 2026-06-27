@@ -102,9 +102,7 @@ function getMIDIOutputAndTimestamp(
     }
 
     const midiTime =
-        (time - ((playback as any).audio?.currentTime || 0)) * 1000 +
-        performance.now() +
-        midi.latency;
+        (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
 
     return { output, midiTime, midiState: midi };
 }
@@ -217,7 +215,7 @@ export function sendMIDINote(
     const bend = typeof options === 'object' ? (options as any).bend : 0;
 
     const key = `${channel}_${note}`;
-    const now = (playback as any).audio?.currentTime || 0;
+    const now = playback.audio?.currentTime || 0;
 
     // 0. Strict Monophony Enforcement (Voice Stealing at MIDI level)
     if (isMono) {
@@ -242,8 +240,7 @@ export function sendMIDINote(
                                 if (activeNotes.has(ak)) {
                                     output.send(
                                         [status, activeNote, 0],
-                                        (cutoffTime - ((playback as any).audio?.currentTime || 0)) *
-                                            1000 +
+                                        (cutoffTime - (playback.audio?.currentTime || 0)) * 1000 +
                                             performance.now() +
                                             midiState.latency,
                                     );
@@ -307,7 +304,7 @@ export function sendMIDINote(
     const delayMs = Math.max(0, delaySeconds * 1000);
 
     const timeoutId = setTimeout(() => {
-        sendMIDINoteOff(channel, note, (playback as any).audio?.currentTime || 0);
+        sendMIDINoteOff(channel, note, playback.audio?.currentTime || 0);
         const current = activeNoteOffs.get(key);
         if (current && current.id === timeoutId) {
             activeNoteOffs.delete(key);
