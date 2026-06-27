@@ -201,34 +201,42 @@ describe('phrase-first soloist (Build 2a)', () => {
         }
     });
 
-    it('reaches INTO the peak — a scoop-up bend on the money note, never the body', () => {
-        // Build 2d expression (one device, one location): the apex note carries a
-        // negative bendStartInterval (start below, glide UP into the money note);
-        // every body note stays unbent. Restraint — the reach reads because it's
-        // rare. apex is the non-anchor ornament at step 8.
+    it('clusters bends into a flurry around the peak, with clean space between', () => {
+        // Build 2d expression: the apex carries the big reach UP into the money
+        // note, AND nearby notes get lighter scoops — a lyrical burst, not one
+        // isolated ornament. Notes well away from the peak stay clean, so the
+        // flurries have space. apex is the non-anchor ornament at step 8.
         const { emitted } = run(makeState(buildApexSeed(), { loopCount: 2 }));
         const apex = emitted.find((e) => e.step === 8);
-        expect(apex.bendStartInterval).toBeLessThan(0); // a reach UP into the peak
+        expect(apex.bendStartInterval).toBeLessThan(0); // the big reach into the peak
+        // A FLURRY: nearby notes also scoop — multiple bends in succession.
+        const flurryBends = emitted.filter(
+            (e) => e.step !== 8 && Math.abs(e.step - 8) <= 12 && (e.bendStartInterval ?? 0) < 0,
+        );
+        expect(flurryBends.length).toBeGreaterThan(0);
+        // SPACE between flurries: notes well away from the peak stay clean.
         for (const e of emitted) {
-            if (e.step !== 8) {
-                expect(e.bendStartInterval ?? 0).toBe(0); // body of the line is unbent
+            if (Math.abs(e.step - 8) > 16) {
+                expect(e.bendStartInterval ?? 0).toBe(0);
+                expect(e.vibrato).toBe(false);
             }
         }
     });
 
-    it('sings ON a sustained peak — vibrato when the money note is held, never the body', () => {
-        // buildApexSeed's apex (step 8) has durationSteps 2 < a beat (4 steps), so
-        // it's a quick reach with NO vibrato. Lengthen it to a full beat and the
-        // held money note shimmers; the body of the line never does.
-        const heldApex = buildApexSeed().map((n) =>
-            n.step === 8 ? { ...n, durationSteps: 4 } : n,
+    it('sings on SUSTAINED notes in the flurry — vibrato clusters at the peak', () => {
+        // Lengthen the apex AND a flurry neighbor (step 4) to a full beat: both
+        // held notes in the cluster shimmer — multiple vibrato events in
+        // succession. A quick note in the zone and notes far away stay clean.
+        const held = buildApexSeed().map((n) =>
+            n.step === 8 || n.step === 4 ? { ...n, durationSteps: 4 } : n,
         );
-        const { emitted } = run(makeState(heldApex, { loopCount: 2 }));
-        const apex = emitted.find((e) => e.step === 8);
-        expect(apex.vibrato).toBe(true); // a held peak sings
+        const { emitted } = run(makeState(held, { loopCount: 2 }));
+        expect(emitted.find((e) => e.step === 8).vibrato).toBe(true); // the peak sings
+        expect(emitted.find((e) => e.step === 4).vibrato).toBe(true); // a flurry neighbor too
+        expect(emitted.find((e) => e.step === 12).vibrato).toBe(false); // dur 2 < a beat → clean
         for (const e of emitted) {
-            if (e.step !== 8) {
-                expect(e.vibrato).toBe(false); // the body of the line stays clean
+            if (Math.abs(e.step - 8) > 16) {
+                expect(e.vibrato).toBe(false); // space between flurries stays clean
             }
         }
 

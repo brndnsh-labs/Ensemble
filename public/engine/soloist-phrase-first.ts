@@ -25,10 +25,10 @@ import { getSoloistNote } from './soloist.js';
  * window (its local peak) LANDS on a **money note** — a strong key tone a
  * third-to-sixth above — whenever it sounds, so the lead reaches a resolved
  * signature peak roughly once per cycle (~24 bars), not once per macro-form
- * (design §9). Build 2d adds expression reserved for each peak's money note — a
- * quick scoop UP INTO it (a vocal/guitar "reach"), plus vibrato when the peak
- * SUSTAINS (a held money note shimmers; a quick one stays clean) — held off the
- * body of the line so the gestures read because they're rare (design §10). Every
+ * (design §9). Build 2d adds expression as a lyrical FLURRY around each peak — a
+ * whole-step scoop UP INTO the money note, lighter scoops on ~half the nearby
+ * notes, and vibrato on any held note in the zone — clustered into a burst, with
+ * the long stretch between peaks left clean so the flurries have space (§10). Every
  * emitted note's duration is clamped to the next note that sounds, so the
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
@@ -447,24 +447,38 @@ export function getSoloistNotePhraseFirst(
         }
     }
 
-    // --- Expression on the signature peak (design §10, Build 2d) ---
-    // Two gestures, both reserved for the cycle's money note — the one moment that
-    // earns ornament — and held OFF the body of the line, because the reach reads
-    // BECAUSE it's rare (~once per cycle, on the peak the ear already anticipates):
-    //   • Reach IN — a whole-step scoop UP into the note: a negative
-    //     `bendStartInterval` starts below and glides up over ≤0.1s
-    //     (synth-soloist.ts `scheduleSoloistBend`), the way a singer/guitarist
-    //     reaches for a high target instead of landing on it cold.
-    //   • Sing ON it — vibrato, but ONLY when the peak actually SUSTAINS (its
-    //     clamped duration is at least a beat): a held money note shimmers the way
-    //     a vocalist holds a climax, while a quick reach-and-go peak stays clean.
-    //     Gated on the post-clamp `durationSteps` so a peak shortened to fit the
-    //     next note never gets a vibrato it has no room to voice (~half the peaks
-    //     sustain, which keeps the device varied rather than a mechanical stamp).
-    const PEAK_REACH_SEMITONES = -2; // whole-step scoop up into the money note
-    const bendStartInterval = isApexStep ? PEAK_REACH_SEMITONES : 0;
+    // --- Expression: a lyrical FLURRY around each signature peak (design §10) ---
+    // A player doesn't decorate one isolated note — they get lyrical in BURSTS: a
+    // little cluster of bends/vibrato around an expressive moment, then breathing
+    // room before the next. So expression clusters into a FLURRY ZONE around each
+    // cycle's money note (~¾ bar each side) and the long stretch between peaks
+    // stays clean — flurries with space between, the space guaranteed by the
+    // ~12-bar peak spacing.
+    //   • The apex itself: the big whole-step reach UP into the money note (a
+    //     negative `bendStartInterval` starts below and glides up over ≤0.1s,
+    //     synth-soloist.ts `scheduleSoloistBend`).
+    //   • Other notes in the zone: a lighter half-step scoop on ~half of them —
+    //     gated by a per-note hash so the cluster sounds lyrical (bends in rapid
+    //     succession), not a uniform mechanical trill.
+    //   • Vibrato: any SUSTAINED note in the zone sings (its clamped duration is
+    //     at least a beat) — so multiple vibrato events cluster at the peak, while
+    //     quick notes and the whole line between peaks stay clean. Gated on the
+    //     post-clamp `durationSteps` so a note shortened to fit its successor never
+    //     gets a vibrato it has no room to voice.
+    const EXPRESSIVE_RADIUS = 12; // steps each side of the peak (~¾ bar) = flurry zone
+    const inFlurry = Math.abs(stepInLoop - apexStepInLoop) <= EXPRESSIVE_RADIUS;
+    let bendStartInterval = 0;
+    if (isApexStep) {
+        bendStartInterval = -2; // whole-step reach UP into the money note
+    } else if (inFlurry) {
+        // ~half the flurry notes get a lighter scoop — varied per (step, loop) so
+        // the cluster reads as lyrical phrasing, not every note bent identically.
+        if (scrambleHash(step * 13 + Math.max(loopCount, 0) * 7 + 3) < 0.5) {
+            bendStartInterval = -1; // half-step scoop up
+        }
+    }
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const vibrato = isApexStep && durationSteps >= ts.stepsPerBeat;
+    const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
 
     phr.isResting = false; // @worker-mutation
     return {
