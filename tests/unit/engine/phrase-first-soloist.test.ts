@@ -17,7 +17,7 @@ function makeState(
 ): any {
     return {
         playback: { currentLoopCount: loopCount },
-        arranger: { totalSteps },
+        arranger: { totalSteps, key: 'C', isMinor: false },
         soloist: {
             session: {
                 seed: { notes: seedNotes, loopLengthSteps },
@@ -101,6 +101,24 @@ describe('phrase-first soloist (Build 2a)', () => {
         const downbeat = emitted.find((e) => e.step === 0);
         expect(downbeat).toBeDefined();
         expect(downbeat.midi % 12).toBe(7); // G — a chord tone
+    });
+
+    // The anchor at step 4 (G=67) always sounds and is NOT a downbeat (bars are
+    // every 16 steps here), so the chord-tone snap leaves it alone — it isolates
+    // the development transposition. loopLengthSteps 64 → cycle period 3.
+    const pitchAtStep4 = (loopCount: number): number | undefined =>
+        run(makeState(buildSeed(), { loopCount })).emitted.find((e) => e.step === 4)?.midi;
+
+    it('develops the theme — sequences progressively higher across loops', () => {
+        // C major, theme note G: a diatonic third up = B (71), a fifth up = D (74).
+        expect(pitchAtStep4(0)).toBe(67); // head: stated verbatim
+        expect(pitchAtStep4(1)).toBe(71); // depth 1: reached up a third (same contour)
+        expect(pitchAtStep4(2)).toBe(74); // depth 2: cumulative — higher still
+    });
+
+    it('returns to the head on the cadence (the recognizable recurrence)', () => {
+        // period 3 → depth resets to 0 at loop 3: the idea comes home, verbatim.
+        expect(pitchAtStep4(3)).toBe(pitchAtStep4(0));
     });
 
     it('emits crash-safe, playable note objects', () => {

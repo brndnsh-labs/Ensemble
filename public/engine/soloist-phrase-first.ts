@@ -18,17 +18,87 @@ import { getSoloistNote } from './soloist.js';
  * .isResting` each tick (tick-logic publishes it to the coordination context so
  * bass/chords/harmony know whether the lead is breathing).
  *
- * **Build status — 2a (first audible layer):** states the session-seed THEME,
- * breathes (real phrase-then-rest rather than constant filling), shapes a
- * simple dramatic ARC (enter sparse → open up over the song, swell within each
- * form pass), and LANDS chord tones on strong beats so phrases resolve onto the
- * harmony instead of wandering. It does not yet *develop* the theme — that
- * (live motivic development, then voice-leading targeting, then full
- * expression) is the next build. With no seed it defers to the legacy engine so
- * the lead is never silent-by-bug.
+ * **Build status — 2b (live development):** on top of 2a (theme + breath +
+ * dramatic arc + chord-tone landing), the theme now *develops* — it sequences
+ * progressively higher across loops (cumulative growth) and RETURNS to the head
+ * on a cadence that scales with song length, so it stays recognizable rather
+ * than wandering (design §6). Still to come: apex/money-note reach and op
+ * variety (inversion, displacement), then voice-leading targeting, then full
+ * expression (bends/vibrato, sparingly). With no seed it defers to the legacy
+ * engine so the lead is never silent-by-bug.
  */
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+// --- Key / diatonic vocabulary (self-contained, like the rest of this engine) ---
+// Note-name → pitch class, including the sharp spellings the arranger emits.
+const KEY_PC: Record<string, number> = {
+    C: 0,
+    'C#': 1,
+    Db: 1,
+    D: 2,
+    'D#': 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    'F#': 6,
+    Gb: 6,
+    G: 7,
+    'G#': 8,
+    Ab: 8,
+    A: 9,
+    'A#': 10,
+    Bb: 10,
+    B: 11,
+};
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_STEPS = [0, 2, 3, 5, 7, 8, 10]; // natural minor
+
+// How far the line reaches, in *diatonic degrees*, at each development depth.
+// depth 0 = the head (verbatim); then a third, a fifth, a sixth, a seventh as
+// the cycle climbs to its climax. These are by-ear knobs — the shape (returns
+// to 0, grows monotonically) is what matters, not the exact intervals.
+const DEPTH_DEGREES = [0, 2, 4, 5, 6];
+
+/**
+ * Transpose a MIDI note UP by `degrees` scale degrees within the given key,
+ * preserving melodic contour (parallel diatonic motion — the classic
+ * "sequence" that keeps a restated idea recognizably the same). A non-scale
+ * source note snaps onto the scale, which only helps keep development in key.
+ * Folds down an octave if it would climb out of a singable register; the
+ * downstream `enforceRegisterSlotting` is the hard backstop.
+ */
+function diatonicTranspose(
+    midi: number,
+    degrees: number,
+    keyRootPc: number,
+    isMinor: boolean,
+): number {
+    if (degrees <= 0) {
+        return midi;
+    }
+    const steps = isMinor ? MINOR_STEPS : MAJOR_STEPS;
+    const len = steps.length;
+    const relPc = (((midi - keyRootPc) % 12) + 12) % 12;
+    // Index of the scale degree at or just below this pitch class.
+    let idx = 0;
+    for (let i = 0; i < len; i++) {
+        if (steps[i] <= relPc) {
+            idx = i;
+        } else {
+            break;
+        }
+    }
+    const targetIdx = idx + degrees;
+    const octaveShift = Math.floor(targetIdx / len);
+    const wrapped = ((targetIdx % len) + len) % len;
+    const newRel = steps[wrapped] + octaveShift * 12;
+    let result = midi - relPc + newRel;
+    if (result > 88) {
+        result -= 12;
+    }
+    return Math.round(result);
+}
 
 /**
  * Snap a MIDI note to the nearest pitch class in `pcSet`, preserving register,
@@ -127,6 +197,27 @@ export function getSoloistNotePhraseFirst(
     // 0.30 floor keeps the theme's bones audible even at the sparsest.
     const activity = clamp01(0.3 + loopLift + formSwell);
 
+    // --- Motivic development: cumulative-but-anchored, with theme return ---
+    // The idea GROWS across loops (the line sequences progressively higher) but
+    // periodically RETURNS to the head so it stays recognizable — the recurrence
+    // that makes a solo feel composed rather than wandering (design §6).
+    //   • `depth` rises 0→peak across a rise-and-resolve cycle, then resets to 0
+    //     at the top of the next cycle (the theme return). depth 0 = verbatim head.
+    //   • The cycle PERIOD scales with song length: short loops come home sooner,
+    //     long forms earn more departure before re-grounding.
+    //   • Keyed on `loopCount` (integer) so the transposition only ever changes at
+    //     a loop boundary — a clean musical seam, never a mid-phrase pitch jump.
+    // Cumulative: depth d transposes by a stable monotonic amount, so each deeper
+    // loop contains the prior loop's reach plus more. Anchored: contour is
+    // preserved exactly by diatonic transposition and the reach is bounded — that
+    // bound IS the similarity leash (growth, not drift).
+    const c = Math.max(loopCount, 0);
+    const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
+    const developmentDepth = c % cyclePeriod;
+    const liftDegrees = DEPTH_DEGREES[Math.min(developmentDepth, DEPTH_DEGREES.length - 1)];
+    const keyRootPc = KEY_PC[arranger.key] ?? 0;
+    const keyIsMinor = Boolean(arranger.isMinor);
+
     // --- Breath via density gate ---
     // Anchors (the theme's structural skeleton) always sound — they ARE the
     // melody. Non-anchor ornament notes only fill in as the arc opens up, so
@@ -140,8 +231,11 @@ export function getSoloistNotePhraseFirst(
         }
     }
 
-    // --- Pitch: state the theme, but LAND with intention on strong beats ---
-    let midi = primary.midi;
+    // --- Pitch: develop the theme, then LAND with intention on strong beats ---
+    // Sequence the stated theme up by the cycle's current reach (verbatim at
+    // depth 0 / theme-return loops), preserving its contour so it stays the same
+    // idea, climbing higher.
+    let midi = diatonicTranspose(primary.midi, liftDegrees, keyRootPc, keyIsMinor);
     const isDownbeat = stepInfo
         ? Boolean(stepInfo.isDownbeat || stepInfo.isMeasureStart)
         : stepInChord === 0;
