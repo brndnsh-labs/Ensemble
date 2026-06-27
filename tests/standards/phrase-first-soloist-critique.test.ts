@@ -54,8 +54,8 @@ function simulate(genre: string, presetName: string) {
     // Recurring signature peaks: the form is divided into development-cycle
     // WINDOWS (~24 bars), each with its OWN local apex (its highest seed note).
     // Mirror the engine's window math so we know where every peak should sound.
-    const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
-    const cycleLen = Math.max(cyclePeriod * total, total);
+    const loopsPerWindow = Math.max(1, Math.round(384 / total));
+    const cycleLen = loopsPerWindow * total;
     const apexByWindow = new Map<number, { midi: number; stepInLoop: number }>();
     for (const n of seed.notes) {
         if (n.step < 0) {
@@ -100,6 +100,11 @@ const GENRES = [
     { genre: 'Jazz', preset: 'Pop (Standard)' },
     { genre: 'Neo-Soul', preset: 'Pop (Standard)' },
     { genre: 'Rock', preset: 'Pop (Standard)' },
+    // A LONG progression (12-bar) — the case the original window math degraded:
+    // tying the peak window to `cyclePeriod × totalSteps` gave a 12-bar form a 72-
+    // bar window (~2 peaks/song), so peaks (and the peak-reach bend) were never
+    // heard. The fixed ~24-bar window must keep peaks recurring here too.
+    { genre: 'Blues', preset: 'Jazz Blues' },
 ];
 
 describe('phrase-first soloist · musical critique', () => {
@@ -145,6 +150,13 @@ describe('phrase-first soloist · musical critique', () => {
                     `density=${density.toFixed(2)} notes=${sim.emitted.length} overlaps=${overlaps} at=${overlapAt.join(',')}`,
             );
 
+            // Peaks must RECUR at a roughly constant musical rate (~24 bars),
+            // independent of the progression length — the regression a 12-bar form
+            // exposed. A peak window longer than ~32 bars (512 steps) means peaks
+            // are too rare to register as a signature gesture (and the bend with
+            // them). This is the assertion that actually catches the rate bug —
+            // `length > 1` alone passed even at 2 peaks / 3.5 minutes.
+            expect(sim.cycleLen, 'peak window must stay ~24 bars (≤32)').toBeLessThanOrEqual(512);
             // The form has multiple cycles, so multiple peaks should recur and sound.
             expect(peakPcs.length, 'cycle peaks should sound').toBeGreaterThan(1);
             expect(offTones, `every cycle peak must land tonic(0)/5th(7)`).toHaveLength(0);

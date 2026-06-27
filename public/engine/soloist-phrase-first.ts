@@ -201,7 +201,20 @@ export function getSoloistNotePhraseFirst(
     // both the apex window and the later development depth share one definition.
     const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
     const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
-    const cycleLen = Math.max(cyclePeriod * totalSteps, totalSteps);
+    // The signature-peak window is a FIXED musical span (~24 bars), independent
+    // of the progression length — a 12-bar blues must not get a third as many
+    // peaks as a 4-bar pop turnaround just because its `totalSteps` is 3× larger.
+    // Snap the span to a whole number of arrangement loops so window edges still
+    // land on loop boundaries (where pitch/fold already shift): no new mid-phrase
+    // seam, and the duration-clamp lookahead — which never crosses a loop
+    // boundary — keeps using the correct window's apex. (The first cut tied the
+    // window to `cyclePeriod × totalSteps`, so the recurrence silently scaled with
+    // the progression: 6 peaks on a 4-bar form but only 2 on a 12-bar blues,
+    // ~3.5 min apart — effectively never heard, and the peak-reach bend with them.
+    // Caught by a production probe in the failing config.)
+    const TARGET_PEAK_WINDOW_STEPS = 384; // ≈ 24 bars in 4/4 (16 steps/bar)
+    const loopsPerWindow = Math.max(1, Math.round(TARGET_PEAK_WINDOW_STEPS / totalSteps));
+    const cycleLen = loopsPerWindow * totalSteps;
     const curWindow = Math.floor(stepInLoop / cycleLen);
     let themeApexMidi = -1;
     let apexStepInLoop = -1;
@@ -434,12 +447,12 @@ export function getSoloistNotePhraseFirst(
     // One expressive device, at the one moment that earns it: a quick scoop UP
     // into each cycle's money note — the way a singer or guitarist reaches for a
     // high target instead of landing on it cold. A negative `bendStartInterval`
-    // starts a half-step below and glides up over ≤0.1s (synth-soloist.ts
+    // starts a whole-step below and glides up over ≤0.1s (synth-soloist.ts
     // `scheduleSoloistBend`). Deliberately held OFF the body of the line:
     // restraint is the point — the reach reads BECAUSE it's rare (~once per
     // cycle, on the peak the ear is already listening for). Vibrato/dynamics on a
     // held peak are the next slice, kept separate so this gesture auditions alone.
-    const PEAK_REACH_SEMITONES = -1; // half-step scoop up into the money note
+    const PEAK_REACH_SEMITONES = -2; // whole-step scoop up into the money note
     const bendStartInterval = isApexStep ? PEAK_REACH_SEMITONES : 0;
 
     phr.isResting = false; // @worker-mutation
