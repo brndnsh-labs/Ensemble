@@ -194,8 +194,19 @@ export function getSoloistNotePhraseFirst(
     const arcPos =
         totalSteps > 0 ? (((step % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
     const formSwell = 0.25 * Math.sin(Math.PI * arcPos); // 0 at edges, peak mid-form
+    // Tempo-awareness (design §7): breath is roughly constant in WALL-CLOCK, so a
+    // slow tune's long bars read as too sparse at a fixed musical density — it
+    // needs more notes per bar to feel as present. Fill more below ~120bpm. We do
+    // NOT thin fast tempos here (the §7 density *ceiling* is a separate,
+    // unvalidated change — left out so the mid-tempo genres that already sound
+    // right stay untouched). Confirmed by ear: neo-soul at 86 felt sparse, 110 didn't.
+    const bpm = playback.bpm || 120;
+    const tempoFill = Math.min(0.22, Math.max(0, (120 - bpm) / 200));
+    // phrasingIntensity (user slider, default 0.5) nudges how fully the theme is
+    // stated: a "more present" ↔ "more spacious" knob layered on the arc.
+    const intensityLift = ((soloist.phrasingIntensity ?? 0.5) - 0.5) * 0.3; // ±0.15
     // 0.30 floor keeps the theme's bones audible even at the sparsest.
-    const activity = clamp01(0.3 + loopLift + formSwell);
+    const activity = clamp01(0.3 + tempoFill + intensityLift + loopLift + formSwell);
 
     // --- Motivic development: cumulative-but-anchored, with theme return ---
     // The idea GROWS across loops (the line sequences progressively higher) but
