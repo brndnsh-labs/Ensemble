@@ -142,6 +142,40 @@ describe('phrase-first soloist (Build 2a)', () => {
         expect(present.emitted.length).toBeGreaterThan(spacious.emitted.length);
     });
 
+    // A theme whose lone high point (the apex) is a non-anchor ornament at step 8
+    // (E5=76), over plain anchors (G=67) elsewhere — isolates the money-note reach.
+    function buildApexSeed(): any[] {
+        const notes: any[] = [];
+        for (let s = 0; s < 64; s += 4) {
+            if (s === 8) {
+                notes.push({ step: 8, midi: 76, isAnchor: false, durationSteps: 2, velocity: 0.8 });
+            } else {
+                notes.push({ step: s, midi: 67, isAnchor: true, durationSteps: 2, velocity: 0.8 });
+            }
+        }
+        return notes;
+    }
+    const apexPitch = (loopCount: number): number | undefined =>
+        run(makeState(buildApexSeed(), { loopCount })).emitted.find((e) => e.step === 8)?.midi;
+
+    it('reaches a fixed money note at the climax (the long-range goal)', () => {
+        // period 3 → peak depth 2. The apex strains up across the cycle and lands
+        // on the money note (a strong key tone: high C=84 in C major) at the climax.
+        expect(apexPitch(0)).toBe(76); // head: stated at natural height
+        const mid = apexPitch(1);
+        expect(mid).toBeGreaterThan(76); // mid-climb: partway up
+        expect(mid).toBeLessThan(84);
+        expect(apexPitch(2)).toBe(84); // climax: lands on the money note
+        expect(84 % 12).toBe(0); // …which is the tonic — a resolved, strong tone
+    });
+
+    it('never gates out the apex — the money note always sounds', () => {
+        // Even though the apex is a non-anchor ornament at the sparsest loop.
+        for (const lc of [0, 1, 2]) {
+            expect(apexPitch(lc)).toBeDefined();
+        }
+    });
+
     it('emits crash-safe, playable note objects', () => {
         const { emitted } = run(makeState(buildSeed(), { loopCount: 3 }));
         for (const n of emitted) {
