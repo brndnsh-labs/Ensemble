@@ -376,7 +376,8 @@ export function generateCompingPattern(
         pattern[getBeatStep(1, 3, 3)] = 2;
     } else if (patternKey === 'ska') {
         // why: ska horn-section stabs lock with the guitar/organ chop on the
-        // OFFBEATS — but the chord channel (generateCompingPattern) already chops
+        // OFFBEATS — but the chord channel (generateCompingPattern in
+        // accompaniment.ts) already chops
         // every offbeat upstroke, so the horn layer punctuates SPARSELY above it
         // (the &-of-2 and &-of-4 punch) rather than doubling the full chop into
         // mud. This replaces the old beats-2&4 backbeat (which read as the
