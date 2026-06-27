@@ -203,9 +203,11 @@ export function getSoloistNotePhraseFirst(
     // both the apex window and the later development depth share one definition.
     const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
     const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
-    // The signature-peak window is a FIXED musical span (~24 bars), independent
+    // The signature-peak window is a FIXED musical span (~12 bars), independent
     // of the progression length — a 12-bar blues must not get a third as many
     // peaks as a 4-bar pop turnaround just because its `totalSteps` is 3× larger.
+    // ~12 bars (not 24) so the peaks recur often enough to read as a signature
+    // hook (~once per 20s) — tuned up by ear; lower the constant for more.
     // Snap the span to a whole number of arrangement loops so window edges still
     // land on loop boundaries (where pitch/fold already shift): no new mid-phrase
     // seam, and the duration-clamp lookahead — which never crosses a loop
@@ -214,7 +216,7 @@ export function getSoloistNotePhraseFirst(
     // the progression: 6 peaks on a 4-bar form but only 2 on a 12-bar blues,
     // ~3.5 min apart — effectively never heard, and the peak-reach bend with them.
     // Caught by a production probe in the failing config.)
-    const TARGET_PEAK_WINDOW_STEPS = 384; // ≈ 24 bars in 4/4 (16 steps/bar)
+    const TARGET_PEAK_WINDOW_STEPS = 192; // ≈ 12 bars in 4/4 (16 steps/bar)
     const loopsPerWindow = Math.max(1, Math.round(TARGET_PEAK_WINDOW_STEPS / totalSteps));
     const cycleLen = loopsPerWindow * totalSteps;
     const curWindow = Math.floor(stepInLoop / cycleLen);
