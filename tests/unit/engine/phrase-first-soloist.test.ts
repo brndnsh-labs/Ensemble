@@ -176,6 +176,28 @@ describe('phrase-first soloist (Build 2a)', () => {
         }
     });
 
+    it('clamps a note duration to the next sounding note (monophonic, no overlap)', () => {
+        // A long held anchor (dur 8) at step 0 with the next anchor 2 steps later:
+        // the lead is one voice, so step 0 must release by step 2 — not ring over it.
+        const seed = [
+            { step: 0, midi: 67, isAnchor: true, durationSteps: 8, velocity: 0.8 },
+            { step: 2, midi: 69, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+        ];
+        const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
+        const first = emitted.find((e) => e.step === 0);
+        const second = emitted.find((e) => e.step === 2);
+        expect(first.durationSteps).toBe(2); // clamped from 8 → gap to the next note
+        expect(first.step + first.durationSteps).toBeLessThanOrEqual(second.step); // no overlap
+    });
+
+    it('preserves a long note that sustains into a rest (sustain, not truncation)', () => {
+        // Lone held note over a 16-step window: nothing sounds after it, so its
+        // full duration must survive — the clamp removes overlap, not sustain.
+        const seed = [{ step: 0, midi: 67, isAnchor: true, durationSteps: 8, velocity: 0.8 }];
+        const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
+        expect(emitted.find((e) => e.step === 0).durationSteps).toBe(8);
+    });
+
     it('emits crash-safe, playable note objects', () => {
         const { emitted } = run(makeState(buildSeed(), { loopCount: 3 }));
         for (const n of emitted) {
