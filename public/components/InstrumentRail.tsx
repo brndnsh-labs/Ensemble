@@ -326,7 +326,10 @@ function StudioBandFeelChooser({
                 title="Choose genre"
             >
                 <SettingGroup title="Genre">
-                    <div class="workspace-studio-genre-grid" role="list">
+                    {/* Single-select toggle group (each option is an aria-pressed
+                        button) — role="group", not role="list" (whose required
+                        owned element is listitem, which these buttons aren't). #812 */}
+                    <div class="workspace-studio-genre-grid" role="group" aria-label="Genre">
                         {GENRE_NAMES.map((genreName) => {
                             const isActive = activeGenre === genreName;
                             return (
