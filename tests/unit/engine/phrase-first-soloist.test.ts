@@ -216,6 +216,29 @@ describe('phrase-first soloist (Build 2a)', () => {
         }
     });
 
+    it('sings ON a sustained peak — vibrato when the money note is held, never the body', () => {
+        // buildApexSeed's apex (step 8) has durationSteps 2 < a beat (4 steps), so
+        // it's a quick reach with NO vibrato. Lengthen it to a full beat and the
+        // held money note shimmers; the body of the line never does.
+        const heldApex = buildApexSeed().map((n) =>
+            n.step === 8 ? { ...n, durationSteps: 4 } : n,
+        );
+        const { emitted } = run(makeState(heldApex, { loopCount: 2 }));
+        const apex = emitted.find((e) => e.step === 8);
+        expect(apex.vibrato).toBe(true); // a held peak sings
+        for (const e of emitted) {
+            if (e.step !== 8) {
+                expect(e.vibrato).toBe(false); // the body of the line stays clean
+            }
+        }
+
+        // …and a SHORT peak (the default 2-step apex) gets no vibrato to voice.
+        const quick = run(makeState(buildApexSeed(), { loopCount: 2 })).emitted.find(
+            (e) => e.step === 8,
+        );
+        expect(quick.vibrato).toBe(false);
+    });
+
     it('clamps a note duration to the next sounding note (monophonic, no overlap)', () => {
         // A long held anchor (dur 8) at step 0 with the next anchor 2 steps later:
         // the lead is one voice, so step 0 must release by step 2 — not ring over it.

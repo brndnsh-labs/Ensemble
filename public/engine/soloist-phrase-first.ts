@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { getSoloistNote } from './soloist.js';
@@ -24,9 +25,10 @@ import { getSoloistNote } from './soloist.js';
  * window (its local peak) LANDS on a **money note** — a strong key tone a
  * third-to-sixth above — whenever it sounds, so the lead reaches a resolved
  * signature peak roughly once per cycle (~24 bars), not once per macro-form
- * (design §9). Build 2d adds the first expressive device — a quick scoop UP
- * INTO each peak's money note (a vocal/guitar "reach"), held off the body of the
- * line so the gesture reads because it's rare (design §10). Every
+ * (design §9). Build 2d adds expression reserved for each peak's money note — a
+ * quick scoop UP INTO it (a vocal/guitar "reach"), plus vibrato when the peak
+ * SUSTAINS (a held money note shimmers; a quick one stays clean) — held off the
+ * body of the line so the gestures read because they're rare (design §10). Every
  * emitted note's duration is clamped to the next note that sounds, so the
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
@@ -443,17 +445,24 @@ export function getSoloistNotePhraseFirst(
         }
     }
 
-    // --- Expression: reach INTO the signature peak (design §10, Build 2d) ---
-    // One expressive device, at the one moment that earns it: a quick scoop UP
-    // into each cycle's money note — the way a singer or guitarist reaches for a
-    // high target instead of landing on it cold. A negative `bendStartInterval`
-    // starts a whole-step below and glides up over ≤0.1s (synth-soloist.ts
-    // `scheduleSoloistBend`). Deliberately held OFF the body of the line:
-    // restraint is the point — the reach reads BECAUSE it's rare (~once per
-    // cycle, on the peak the ear is already listening for). Vibrato/dynamics on a
-    // held peak are the next slice, kept separate so this gesture auditions alone.
+    // --- Expression on the signature peak (design §10, Build 2d) ---
+    // Two gestures, both reserved for the cycle's money note — the one moment that
+    // earns ornament — and held OFF the body of the line, because the reach reads
+    // BECAUSE it's rare (~once per cycle, on the peak the ear already anticipates):
+    //   • Reach IN — a whole-step scoop UP into the note: a negative
+    //     `bendStartInterval` starts below and glides up over ≤0.1s
+    //     (synth-soloist.ts `scheduleSoloistBend`), the way a singer/guitarist
+    //     reaches for a high target instead of landing on it cold.
+    //   • Sing ON it — vibrato, but ONLY when the peak actually SUSTAINS (its
+    //     clamped duration is at least a beat): a held money note shimmers the way
+    //     a vocalist holds a climax, while a quick reach-and-go peak stays clean.
+    //     Gated on the post-clamp `durationSteps` so a peak shortened to fit the
+    //     next note never gets a vibrato it has no room to voice (~half the peaks
+    //     sustain, which keeps the device varied rather than a mechanical stamp).
     const PEAK_REACH_SEMITONES = -2; // whole-step scoop up into the money note
     const bendStartInterval = isApexStep ? PEAK_REACH_SEMITONES : 0;
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const vibrato = isApexStep && durationSteps >= ts.stepsPerBeat;
 
     phr.isResting = false; // @worker-mutation
     return {
@@ -462,7 +471,7 @@ export function getSoloistNotePhraseFirst(
         durationSteps,
         timingOffset: primary.timingOffset ?? 0,
         bendStartInterval,
-        vibrato: false,
+        vibrato,
         isDoubleStop: false,
     };
 }
