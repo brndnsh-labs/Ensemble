@@ -13,12 +13,19 @@ const CMAJ7 = { rootMidi: 60, intervals: [0, 4, 7, 10] }; // C E G Bb
 
 function makeState(
     seedNotes: any[],
-    { loopCount = 0, totalSteps = 64, loopLengthSteps = 64 } = {},
+    {
+        loopCount = 0,
+        totalSteps = 64,
+        loopLengthSteps = 64,
+        bpm = 120,
+        phrasingIntensity = 0.5,
+    } = {},
 ): any {
     return {
-        playback: { currentLoopCount: loopCount },
-        arranger: { totalSteps },
+        playback: { currentLoopCount: loopCount, bpm },
+        arranger: { totalSteps, key: 'C', isMinor: false },
         soloist: {
+            phrasingIntensity,
             session: {
                 seed: { notes: seedNotes, loopLengthSteps },
                 phrasing: { isResting: true },
@@ -101,6 +108,38 @@ describe('phrase-first soloist (Build 2a)', () => {
         const downbeat = emitted.find((e) => e.step === 0);
         expect(downbeat).toBeDefined();
         expect(downbeat.midi % 12).toBe(7); // G — a chord tone
+    });
+
+    // The anchor at step 4 (G=67) always sounds and is NOT a downbeat (bars are
+    // every 16 steps here), so the chord-tone snap leaves it alone — it isolates
+    // the development transposition. loopLengthSteps 64 → cycle period 3.
+    const pitchAtStep4 = (loopCount: number): number | undefined =>
+        run(makeState(buildSeed(), { loopCount })).emitted.find((e) => e.step === 4)?.midi;
+
+    it('develops the theme — sequences progressively higher across loops', () => {
+        // C major, theme note G: a diatonic third up = B (71), a fifth up = D (74).
+        expect(pitchAtStep4(0)).toBe(67); // head: stated verbatim
+        expect(pitchAtStep4(1)).toBe(71); // depth 1: reached up a third (same contour)
+        expect(pitchAtStep4(2)).toBe(74); // depth 2: cumulative — higher still
+    });
+
+    it('returns to the head on the cadence (the recognizable recurrence)', () => {
+        // period 3 → depth resets to 0 at loop 3: the idea comes home, verbatim.
+        expect(pitchAtStep4(3)).toBe(pitchAtStep4(0));
+    });
+
+    it('fills more at slow tempo to stay present (tempo-awareness, §7)', () => {
+        // A slow tune's bars are long in wall-clock, so it needs more notes per
+        // bar to read as present. Same seed/loop, only tempo differs.
+        const slow = run(makeState(buildSeed(), { loopCount: 1, bpm: 70 }));
+        const fast = run(makeState(buildSeed(), { loopCount: 1, bpm: 160 }));
+        expect(slow.emitted.length).toBeGreaterThan(fast.emitted.length);
+    });
+
+    it('states the theme more fully at higher phrasing intensity (the knob)', () => {
+        const spacious = run(makeState(buildSeed(), { loopCount: 1, phrasingIntensity: 0.1 }));
+        const present = run(makeState(buildSeed(), { loopCount: 1, phrasingIntensity: 1.0 }));
+        expect(present.emitted.length).toBeGreaterThan(spacious.emitted.length);
     });
 
     it('emits crash-safe, playable note objects', () => {
