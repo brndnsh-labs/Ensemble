@@ -5,6 +5,16 @@ import { ACTIONS } from './types.js';
 let deferredPrompt: any;
 let newWorker: ServiceWorker | null;
 
+// Flag an available update once a newly-installing worker reaches the
+// `installed` state while another worker still controls the page.
+function registerUpdateOnInstalled(worker: ServiceWorker): void {
+    worker.addEventListener('statechange', () => {
+        if (newWorker && newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
+        }
+    });
+}
+
 export function initPWA(): void {
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
@@ -46,15 +56,7 @@ export function initPWA(): void {
                 if (reg.installing) {
                     newWorker = reg.installing;
                     if (newWorker) {
-                        newWorker.addEventListener('statechange', () => {
-                            if (
-                                newWorker &&
-                                newWorker.state === 'installed' &&
-                                navigator.serviceWorker.controller
-                            ) {
-                                dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-                            }
-                        });
+                        registerUpdateOnInstalled(newWorker);
                     }
                 }
 
@@ -74,15 +76,7 @@ export function initPWA(): void {
                 reg.addEventListener('updatefound', () => {
                     newWorker = reg.installing;
                     if (newWorker) {
-                        newWorker.addEventListener('statechange', () => {
-                            if (
-                                newWorker &&
-                                newWorker.state === 'installed' &&
-                                navigator.serviceWorker.controller
-                            ) {
-                                dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-                            }
-                        });
+                        registerUpdateOnInstalled(newWorker);
                     }
                 });
             })
