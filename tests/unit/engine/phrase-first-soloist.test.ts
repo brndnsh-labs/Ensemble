@@ -201,6 +201,21 @@ describe('phrase-first soloist (Build 2a)', () => {
         }
     });
 
+    it('reaches INTO the peak — a scoop-up bend on the money note, never the body', () => {
+        // Build 2d expression (one device, one location): the apex note carries a
+        // negative bendStartInterval (start below, glide UP into the money note);
+        // every body note stays unbent. Restraint — the reach reads because it's
+        // rare. apex is the non-anchor ornament at step 8.
+        const { emitted } = run(makeState(buildApexSeed(), { loopCount: 2 }));
+        const apex = emitted.find((e) => e.step === 8);
+        expect(apex.bendStartInterval).toBeLessThan(0); // a reach UP into the peak
+        for (const e of emitted) {
+            if (e.step !== 8) {
+                expect(e.bendStartInterval ?? 0).toBe(0); // body of the line is unbent
+            }
+        }
+    });
+
     it('clamps a note duration to the next sounding note (monophonic, no overlap)', () => {
         // A long held anchor (dur 8) at step 0 with the next anchor 2 steps later:
         // the lead is one voice, so step 0 must release by step 2 — not ring over it.
