@@ -20,12 +20,11 @@ import { getSoloistNote } from './soloist.js';
  *
  * **Build status — 2c (apex reach):** on top of 2b (theme + breath + arc +
  * chord-tone landing + cumulative development with theme return), the climb now
- * has a *destination*: a session-fixed **money note** (the theme's apex lifted
- * to a strong key tone near the ceiling) that the theme's high point strains
- * toward across each cycle and LANDS on at the climax — the long-range pitch
- * goal that makes a solo feel composed (design §9). Every emitted note's
- * duration is clamped to the next note that sounds, so the monophonic lead
- * never overruns its successor. Still to come: op variety (inversion,
+ * has a *destination*: the form's single highest note (its one peak) LANDS on a
+ * **money note** — a strong key tone a third-to-sixth above — whenever it
+ * sounds, so the climax always resolves onto a curated target (design §9). Every
+ * emitted note's duration is clamped to the next note that sounds, so the
+ * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
  * weak beats, then full expression (bends/vibrato, sparingly). With no seed it
  * defers to the legacy engine so the lead is never silent-by-bug.
@@ -260,21 +259,27 @@ export function getSoloistNotePhraseFirst(
     const keyRootPc = KEY_PC[arranger.key] ?? 0;
     const keyIsMinor = Boolean(arranger.isMinor);
 
-    // --- Apex / money-note reach: one long-range pitch goal (design §9) ---
-    // A solo feels *composed* when its whole climb aims at a single high target.
-    // The "money note" is session-fixed: the theme's own apex lifted to a strong,
-    // resolved KEY tone (tonic or 5th) up near the register ceiling — derived from
-    // the idea, so it's the idea reaching its peak, not an arbitrary high note.
-    // The apex note strains toward it as the cycle climbs and LANDS on it at the
-    // climax (reachFraction → 1), then resets on the theme-return loop. A held
-    // tonic/5th ringing over the changes at the peak is idiomatic (pedal climax),
-    // so the apex deliberately keeps the money note rather than chord-snapping.
-    // Derive the money note BY CONSTRUCTION (not by free-snapping a raw target —
-    // a nearest-snap can land below the theme apex or above the ceiling, killing
-    // the reach): the highest strong key tone (tonic/5th) that sits a clear third
-    // or more above the theme apex and within the soloist ceiling (90 — the
-    // upper register is NOT clamped downstream, so it must hold here). If the apex
-    // is already so high that no strong tone fits, the reach is a no-op (apex stays).
+    // --- Apex / money note: the form's one climactic peak (design §9) ---
+    // The apex is the single highest seed note in the whole macro-form — by
+    // definition the solo's one peak. Whenever it sounds, it LANDS on the "money
+    // note": a strong, resolved KEY tone (tonic or 5th) a third-to-sixth above
+    // the theme apex, so the climax always resolves onto a curated target instead
+    // of an arbitrary tension tone. A held tonic/5th over the changes is the
+    // idiomatic pedal climax, so the apex keeps the money note (no chord-snap).
+    //
+    // The reach is driven by the apex's IDENTITY as the form peak, NOT by the
+    // loop-count development phase. (The first cut scaled the reach by
+    // `developmentDepth` — but the apex is a single fixed point in the 128-bar
+    // macro-form while depth cycles every ~24 bars, so the two are decoupled: the
+    // apex almost always sounded at a low-reach phase and landed on a near-by
+    // tension tone, e.g. the leading tone. Confirmed by a production-faithful
+    // probe across genres before this fix.)
+    //
+    // Derive the money note BY CONSTRUCTION (a nearest-snap can land below the
+    // apex or above the ceiling): the highest strong tone in (apex+3 … apex+9],
+    // capped at 90 — a clear but connected reach (≤ a sixth, no octave leaps),
+    // in-register (the high end is NOT clamped downstream). If none fits, accept
+    // the nearest strong tone just above; if still none, the apex keeps its pitch.
     const strongKeyPcs = new Set<number>([keyRootPc % 12, (keyRootPc + 7) % 12]);
     const highestStrongTone = (lo: number, hi: number): number => {
         for (let m = hi; m >= lo; m--) {
@@ -284,14 +289,14 @@ export function getSoloistNotePhraseFirst(
         }
         return -1;
     };
-    let moneyNote = highestStrongTone(themeApexMidi + 3, 88);
+    const reachCeil = Math.min(themeApexMidi + 9, 90);
+    let moneyNote = highestStrongTone(themeApexMidi + 3, reachCeil);
     if (moneyNote < 0) {
-        moneyNote = highestStrongTone(themeApexMidi + 1, 90); // apex near ceiling
+        moneyNote = highestStrongTone(themeApexMidi + 1, reachCeil); // apex near ceiling
     }
     if (moneyNote < 0) {
-        moneyNote = themeApexMidi; // no strong tone fits above → reach becomes a no-op
+        moneyNote = themeApexMidi; // no strong tone fits above → apex keeps its pitch
     }
-    const reachFraction = clamp01(developmentDepth / Math.max(1, cyclePeriod - 1));
 
     // Register fold for the developed body line, decided ONCE so every body note
     // shifts together (contour intact). The developed theme apex is the line's
@@ -304,21 +309,23 @@ export function getSoloistNotePhraseFirst(
     }
 
     // Will a note actually SOUND at this absolute step? Mirrors the live emit
-    // decision (anchors and the apex always sound; an ornament passes the same
-    // density gate) for every step WITHIN the current loop — across a loop seam
-    // the real future emit uses the next loop's depth/gate, so this is a close
-    // approximation there, bounded by `span` (a few steps). Used below to clamp a
-    // note's duration to the next note that sounds — a monophonic lead must not
-    // overrun its successor (the legacy engine clamps durations the same way;
-    // without it, held seed notes overlap the next note as development opens up).
+    // decision exactly (anchors and the apex always sound; an ornament passes the
+    // same density gate). The duration-clamp below only ever calls this for steps
+    // within the current arrangement loop — it stops at the loop boundary first,
+    // where the gate seed/depth change — so `loopCount` is constant across every
+    // call here and the prediction is exact. Used to clamp a note's duration to
+    // the next note that sounds: a monophonic lead must not overrun its successor
+    // (the legacy engine clamps durations the same way; without it, held seed
+    // notes overlap the next note as development opens the line up).
     const emitsAt = (absStep: number): boolean => {
         const sInLoop = ((absStep % loopLen) + loopLen) % loopLen;
         let present = false;
         let anchorHere = false;
+        // Match every seed note that lands on this step — INCLUDING pickups (whose
+        // negative step maps via the modulo to a high stepInLoop near the loop end),
+        // exactly as the live `here` filter does. Skipping them here falsely
+        // reported silence at the form tail and let a held note overrun the pickup.
         for (const n of seed.notes as any[]) {
-            if (n.step < 0) {
-                continue;
-            }
             if (((n.step % loopLen) + loopLen) % loopLen === sInLoop) {
                 present = true;
                 if (n.isAnchor) {
@@ -355,15 +362,13 @@ export function getSoloistNotePhraseFirst(
         ? Boolean(stepInfo.isDownbeat || stepInfo.isMeasureStart)
         : stepInChord === 0;
     let midi: number;
-    if (isApexStep && reachFraction > 0) {
-        // The apex is governed PURELY by the long-range goal: interpolate from the
-        // raw theme apex toward the money note, so the climax lands EXACTLY on the
-        // curated strong tone (reachFraction → 1) and grows monotonically without
-        // overshoot. It is NOT stacked on the uniform lift and NOT chord-snapped —
-        // a held tonic/5th ringing over the changes is the idiomatic pedal climax
-        // (design §9). At reachFraction 0 (the theme-return loops) this branch is
-        // skipped, so the apex is stated faithfully below like any theme note.
-        midi = Math.round(themeApexMidi + (moneyNote - themeApexMidi) * reachFraction);
+    if (isApexStep) {
+        // The apex IS the form's one peak, so it lands the money note whenever it
+        // sounds — the climax always resolves onto the curated strong tone. Driven
+        // by the apex's identity (not the loop-count phase, which is decoupled from
+        // its fixed form position — see above). Not chord-snapped: the held
+        // tonic/5th over the changes is the idiomatic pedal climax (design §9).
+        midi = moneyNote;
     } else {
         // Body of the line: parallel diatonic sequence (contour preserved),
         // climbing higher as the cycle develops, then landing chord tones on
@@ -381,7 +386,7 @@ export function getSoloistNotePhraseFirst(
 
     // --- Dynamics follow the arc: softer when sparse, fuller toward the peak ---
     // The money note also hits harder as it's reached — the climax has weight.
-    const apexBoost = isApexStep ? 0.1 * reachFraction : 0;
+    const apexBoost = isApexStep ? 0.12 : 0; // the climax peak carries weight
     const velocity = clamp01((primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost);
 
     // --- Clamp duration to the next note that sounds (monophonic lead) ---
@@ -392,6 +397,14 @@ export function getSoloistNotePhraseFirst(
     let durationSteps = primary.durationSteps ?? 2;
     const span = Math.ceil(durationSteps);
     for (let d = 1; d <= span; d++) {
+        // Never sustain across an arrangement-loop boundary: the gate seed and
+        // development depth change there, so the lookahead can't see the next
+        // loop's emit decision — clamp conservatively so a held note can't overrun
+        // a note in the next loop (removes the loop-seam overlap edge).
+        if (Math.floor((step + d) / totalSteps) !== Math.floor(step / totalSteps)) {
+            durationSteps = Math.min(durationSteps, d);
+            break;
+        }
         if (emitsAt(step + d)) {
             durationSteps = Math.min(durationSteps, d);
             break;

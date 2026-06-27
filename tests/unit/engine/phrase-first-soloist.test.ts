@@ -10,6 +10,7 @@ import { getSoloistNotePhraseFirst } from '../../../public/engine/soloist-phrase
 // legacy fallback path is never exercised here and no module mocks are needed.
 
 const CMAJ7 = { rootMidi: 60, intervals: [0, 4, 7, 10] }; // C E G Bb
+const STRONG_PCS = new Set([0, 7]); // C-major strong tones: tonic + 5th
 
 function makeState(
     seedNotes: any[],
@@ -101,9 +102,13 @@ describe('phrase-first soloist (Build 2a)', () => {
     });
 
     it('lands a chord tone on the downbeat (intentional resolution)', () => {
-        // Theme note F# (66) on the downbeat against Cmaj7 (C E G Bb) is NOT a
-        // chord tone; it must snap to the nearest one (G, 67).
-        const seed = [{ step: 0, midi: 66, isAnchor: true, durationSteps: 2, velocity: 0.8 }];
+        // A body theme note F# (66) on the downbeat against Cmaj7 (C E G Bb) is NOT
+        // a chord tone; it must snap to the nearest one (G, 67). A higher note at
+        // step 8 is the form apex, so step 0 stays a body note (not the apex peak).
+        const seed = [
+            { step: 0, midi: 66, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+            { step: 8, midi: 79, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+        ];
         const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
         const downbeat = emitted.find((e) => e.step === 0);
         expect(downbeat).toBeDefined();
@@ -158,34 +163,35 @@ describe('phrase-first soloist (Build 2a)', () => {
     const apexPitch = (loopCount: number): number | undefined =>
         run(makeState(buildApexSeed(), { loopCount })).emitted.find((e) => e.step === 8)?.midi;
 
-    it('reaches a fixed money note at the climax (the long-range goal)', () => {
-        // period 3 → peak depth 2. The apex strains up across the cycle and lands
-        // on the money note (a strong key tone: high C=84 in C major) at the climax.
-        expect(apexPitch(0)).toBe(76); // head: stated at natural height
-        const mid = apexPitch(1);
-        expect(mid).toBeGreaterThan(76); // mid-climb: partway up
-        expect(mid).toBeLessThan(84);
-        expect(apexPitch(2)).toBe(84); // climax: lands on the money note
-        expect(84 % 12).toBe(0); // …which is the tonic — a resolved, strong tone
+    it('lands the form apex on the money note — a strong tone — whenever it sounds', () => {
+        // The apex (E5=76) is the form's single peak; it lands on the money note (a
+        // strong key tone a third-to-sixth above: high C=84) EVERY time it sounds,
+        // driven by its identity as the peak — NOT by the loop-count phase (which
+        // is decoupled from the apex's fixed form position). So it is the money
+        // note at the head, mid-development, and the cycle climax alike.
+        for (const lc of [0, 1, 2, 3]) {
+            expect(apexPitch(lc)).toBe(84);
+        }
+        expect(84 % 12).toBe(0); // the tonic — a resolved, strong tone
     });
 
-    it('lands the climax on the money note without overshooting (P1 regression)', () => {
-        // High theme apex (G5=79): the uniform cycle lift ALONE would push the
-        // apex to D6 (86, the 9th — a weak tension on a C chord). The apex must
-        // instead be driven purely by the long-range reach and land on the
-        // curated strong tone (C6=84), a chord tone >= the theme apex.
+    it('the money note reaches a strong tone above the apex without octave leaps', () => {
+        // Regression for two coupled review findings: (a) the climax must land on a
+        // strong key tone, not a tension tone; (b) the reach is bounded to <= a
+        // sixth, so a LOW apex doesn't leap toward the ceiling. Low apex (C4=60):
+        // the money note is a strong tone a fifth up (G4=67), not a two-octave jump.
         const seed: any[] = [];
         for (let s = 0; s < 64; s += 4) {
             seed.push(
                 s === 8
-                    ? { step: 8, midi: 79, isAnchor: false, durationSteps: 2, velocity: 0.8 }
-                    : { step: s, midi: 67, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+                    ? { step: 8, midi: 60, isAnchor: false, durationSteps: 2, velocity: 0.8 }
+                    : { step: s, midi: 55, isAnchor: true, durationSteps: 2, velocity: 0.8 },
             );
         }
-        const climax = run(makeState(seed, { loopCount: 2 })).emitted.find((e) => e.step === 8);
-        expect(climax.midi).toBe(84); // C6 — the money note, NOT the 86 overshoot
-        expect(climax.midi % 12).toBe(0); // a strong key tone (tonic)
-        expect(climax.midi).toBeGreaterThanOrEqual(79); // never below the theme apex
+        const apex = run(makeState(seed, { loopCount: 2 })).emitted.find((e) => e.step === 8);
+        expect(STRONG_PCS.has(apex.midi % 12)).toBe(true); // a strong key tone (tonic/5th)
+        expect(apex.midi).toBeGreaterThanOrEqual(63); // a clear reach above the apex
+        expect(apex.midi).toBeLessThanOrEqual(69); // …but bounded — no octave leap
     });
 
     it('never gates out the apex — the money note always sounds', () => {
