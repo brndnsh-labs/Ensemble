@@ -338,7 +338,7 @@ export function generateRhythmPlan(
     _stepInfo: StepInfo | null = null,
     // why: epic-form-arrangement S6 — Chorus Evolution rhythm-side.
     // The pitch engine already reads `playback.currentLoopCount` per-tick
-    // (soloist-pitch-engine.ts:235, 861-877) to escalate device frequency
+    // (selectPitchAndDevices in soloist-pitch-engine.ts) to escalate device frequency
     // and SRDC phasing per loop. The rhythm engine had zero loop awareness:
     // every chorus emitted the same attack-grid, so the "Loop 0 Head / Loop
     // 1 Themed Improv / Loop 2+ Exploratory" arc in CLAUDE.md was only
@@ -545,7 +545,7 @@ export function generateRhythmPlan(
             // breath-mark, minus the breath-rest (responses don't take breaths
             // inside the skeleton; they paraphrase end-to-end). The pitch picker
             // reads `isPhraseEnd` to bias Response landings toward root/3rd/5th
-            // (see soloist-pitch-engine.ts:716 and :1110).
+            // (see selectPitchAndDevices in soloist-pitch-engine.ts).
             const isMidPhraseEnd =
                 !isLastInSkeleton &&
                 isSustained &&
@@ -635,12 +635,12 @@ export function generateRhythmPlan(
             const rhythmicDensity = _config.rhythmicDensity || 0.5;
             const densityScale = 0.5 + intensity * 1.0; // 0.5 to 1.5 multiplier
             // why: epic-form-arrangement S6 — +15% density per loop. Pitch engine
-            // already escalates devices +20%/loop (soloist-pitch-engine.ts:1004);
+            // already escalates devices +20%/loop (in selectPitchAndDevices);
             // rhythm side now mirrors. Loop 0 unchanged; Loop 2 → density ×1.30;
             // Loop 3 → ×1.45. Capped at loopCount=4 (×1.60) so unbounded loop
             // counts don't drive attackProb into permanent saturation — the
             // pitch engine clamps device boost at loopCount=3 in liveLoopLift
-            // (soloist-pitch-engine.ts:395); we follow the same ceiling spirit.
+            // (in selectPitchAndDevices's liveLoopLift); we follow the same ceiling spirit.
             // why placement: epic-coordination-consistency S5.a — multiplier applied
             // as final-stage post-multiplier on `attackProb` below (just before the
             // attack-jitter), NOT on `densityScale` here. Reason: four downstream

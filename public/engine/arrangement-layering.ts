@@ -91,7 +91,7 @@ export const OUTRO_MUTES: Readonly<Record<string, number>> = {
 /**
  * True iff a section label (already-lowercased OK) indicates an Intro section.
  * Substring match — mirrors `soloist.ts`'s `isOutro` (`label.includes('outro')`) and
- * `arranger-utils.ts:131-133` (`roleLabel = 'Intro'`).
+ * `unrollArrangement` in arranger-utils.ts (`roleLabel = 'Intro'`).
  */
 export function isIntroSectionLabel(label: string | undefined | null): boolean {
     if (!label) {

@@ -1046,8 +1046,8 @@ export function getBassNote(
             }
 
             // why: mirror dub style's velocity envelope so the fill lives in
-            // the same dynamic pocket as the riddim hits — dub at
-            // bass-styles.ts:973 scales the riddim's stored velocity by
+            // the same dynamic pocket as the riddim hits — the dub style
+            // handler in bass-styles.ts (tunedVel) scales the riddim's stored velocity by
             // (0.8 + intensity * 0.3) and jitters by (0.95 + rand * 0.1).
             // Without this mirror, the fill pops out as a different voice
             // (Epic 9 S2.b review P1 #4). The ×1.05 accent on top encodes
@@ -1063,7 +1063,7 @@ export function getBassNote(
                 reggaeFillVel,
             );
             // why: dub style adds (0.01 + intensity * 0.01) timing offset for
-            // the lazy reggae lay-back (bass-styles.ts:981). The fill is part
+            // the lazy reggae lay-back (the dub style handler in bass-styles.ts). The fill is part
             // of the same riddim conversation; without the offset it sits
             // rhythmically ahead of the surrounding hits and reads as a
             // different player. (Epic 9 S2.b review P1 #4.)

@@ -39,7 +39,7 @@ type Dispatch = (action: any, payload?: any) => void;
  *
  * why: the macro-arc ladder and `getSectionEnergy` both produce values that
  * cluster around 0.4–0.5 for low-energy windows, which sits BELOW the
- * Snare-vs-Sidestick gates in several genres (`grooves/funk.ts:195` at 0.3
+ * Snare-vs-Sidestick gates in several genres (funk's `applyOverrides` at 0.3
  * post-S8, neo-soul's INTENSITY_BANDS.LOW=0.35, disco's 0.35) and makes the
  * groove read as "polite rim-shot" where a real player would crack the snare.
  *
@@ -61,16 +61,17 @@ const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // why: disco is a high-energy genre by definition — four-on-the-floor
     // needs presence; 0.45 keeps the kick punching.
     Disco: 0.45,
-    // why: existing Rock/Metal floor preserved (was hard-coded at
-    // `conductor.ts:448-450` pre-S8).
+    // why: existing Rock/Metal floor preserved (was hard-coded in
+    // the `macroFloor` ladder pre-S8).
     Rock: 0.35,
     Metal: 0.35,
     // why: jazz and bossa legitimately operate quietly — sidestick comping
     // and brush ride ARE the genre identity at low intensity. Floor still
     // present so we don't bottom out at 0.1 (dead-air) on a moody chart.
     Jazz: 0.3,
-    // why: canonical `groove.genreFeel` is 'Bossa Nova' (see groove-engine.ts:34,
-    // drum-presets.ts:830) — 'Bossa' key alone would never match in production.
+    // why: canonical `groove.genreFeel` is 'Bossa Nova' (see the `strategies` table
+    // in groove-engine.ts and the 'Bossa Nova' preset key in drum-presets.ts) —
+    // 'Bossa' key alone would never match in production.
     'Bossa Nova': 0.3,
     // why: ska-punk's signature upbeat-crack (offbeat hat + snare-on-2-and-4) is
     // genre identity; without a floor the conductor can park bandIntensity below
@@ -85,7 +86,7 @@ const GENRE_INTENSITY_FLOORS: Record<string, number> = {
 
 /**
  * Amplitude of the ±jitter applied to `targetEnergy` during the session-timer
- * macro-arc (`conductor.ts:501`). The jitter adds `Math.random() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2`
+ * macro-arc (applied via `macroJitterPrng`). The jitter adds `Math.random() * MACRO_JITTER_RANGE - MACRO_JITTER_RANGE / 2`
  * so the realized target varies by ±MACRO_JITTER_RANGE/2 around the ladder value.
  *
  * why: 0.15 is wide enough for the band to breathe naturally between arc
@@ -587,7 +588,7 @@ export function checkSectionTransition(
                         fillPrng,
                     );
                     // why: #799 — mirror the seeded path's "Crash Contract"
-                    // (drum-seeder.ts:337) instead of an unconditional crash on
+                    // (`pendingCrash` in generateDrumFills) instead of an unconditional crash on
                     // every fallback fill: crash when energy is rising into the
                     // fill, OR when arriving at an energetic section (target >
                     // 0.4) — a structural section/loop downbeat still wants the

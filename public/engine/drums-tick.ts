@@ -258,14 +258,14 @@ export function runDrumTick(
 
         // --- Intro/Outro layering publication (epic-form-arrangement S5) ---
         // why: form-arranger.md P1 #4 — the arranger has Intro/Outro labels
-        // (unrollArrangement at arranger-utils.ts:131-133; form-analysis.ts:
-        // 99-104) but no engine reads them. Publish two bar-counter fields so
+        // (unrollArrangement in arranger-utils.ts assigns the roleLabel) but no
+        // engine reads them. Publish two bar-counter fields so
         // bass/chords/harmony can stay silent for the first N bars of an
         // intro (drums-only opening that LAYERS in) and the last N bars of
         // an outro (band thins out before the final cadence).
         //
-        // Source labels live on `chord.sectionLabel` (unroller sets this at
-        // arranger-utils.ts:161). Substring match — same vocabulary the
+        // Source labels live on `chord.sectionLabel` (unrollArrangement sets this
+        // via `sectionLabel: roleLabel`). Substring match — same vocabulary the
         // soloist already uses in `soloist.ts`'s `isOutro` check.
         //
         // Both fields default to -1 (sentinel "not in intro/outro section"),

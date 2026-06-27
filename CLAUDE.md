@@ -186,6 +186,7 @@ Scheduled work is tracked in **GitHub Project #2** ("Ensemble — Work"), **not*
 - Atomic state changes: batch related updates in a single `dispatch` where possible.
 - Semantic prop names: name props after their domain (`isTransportVisible`) rather than visual state (`isBlue`).
 - Fail fast in workers: validate payload shapes immediately when sending data to `logic-worker.ts`.
+- Cross-reference comments name a symbol (a function/`const`/interface like `isDepartureCategory`), never a `file.ts:NNNN` line number — line numbers rot on every edit above them, but a symbol name is easy to `grep` and survives.
 
 ## Active Product Direction
 

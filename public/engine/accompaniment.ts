@@ -1867,16 +1867,16 @@ interface AccompanimentCoordination {
     upcomingSectionFirstChord?: any;
     // why: needed to compute the anticipation step offset from the section boundary.
     sectionEnd?: number;
-    // why: epic-form-arrangement S3 — published by tick-logic chord-preamble
-    // (see tick-logic.ts:162). When ≥ 2, the accompaniment rotates one voicing
+    // why: epic-form-arrangement S3 — published by runDrumTick's chord-data
+    // preamble (via getSectionContext). When ≥ 2, the accompaniment rotates one voicing
     // inversion per phrase, seeded by (sectionId, occurrence, barIndex), so
     // Verse 2 sounds audibly different from Verse 1 without changing the chord
     // function. Default 1 matches createCoordinationContext / getSectionContext
     // no-sectionMap fallback so engines can safely gate on `> 1` without an
     // undefined check.
     sectionOccurrence?: number;
-    // why: epic-form-arrangement S4 — published by tick-logic chord-preamble
-    // (see tick-logic.ts:200). When true, the accompaniment plays a single
+    // why: epic-form-arrangement S4 — published by runDrumTick's chord-data
+    // preamble. When true, the accompaniment plays a single
     // root-position cadence voicing on beat 1 of the final bar and yields
     // silence on subsequent sub-beats so the chord rings out. Overrides
     // Imperfect Symmetry (the resolution gesture is more important than a
@@ -2420,7 +2420,7 @@ export function getAccompanimentNotes(
             const fifthInterval = intervals.find((i) => i === 6 || i === 7 || i === 8) ?? 7;
 
             // Bass-aware register floor (epic-coordination-consistency S1.a):
-            // mirrors harmonies.ts:627 — reserve a P5 of separation above the
+            // mirrors finalizeHarmonyNotes's safetyFloor — reserve a P5 of separation above the
             // bassist when bass is running so the strum cluster doesn't crash
             // the bass register when bass walks high. Country boom-chick has
             // its own R-5 in bass register above (1700-1726), but the band
@@ -2467,7 +2467,7 @@ export function getAccompanimentNotes(
                     // bass when bass is running, else 52). Keeps the country
                     // strum from crashing the bass register when the band
                     // bassist is grounded high. Mirrors the harmony-main-path
-                    // safetyFloor at harmonies.ts:627.
+                    // safetyFloor in finalizeHarmonyNotes.
                     if (cMin < strumFloor || cMax > 84) {
                         continue;
                     }
@@ -2804,7 +2804,7 @@ export function getAccompanimentNotes(
                 chordMidis.find((m: number) => pcs.includes(pcFromRoot(m))) ??
                 chord.rootMidi + fallbackInterval;
             // why: `startsWith('m') && !startsWith('maj')` is the codebase's
-            // canonical minor-quality predicate (chords-styles.ts:31) — a bare
+            // canonical minor-quality predicate (in getRootlessVoicing) — a bare
             // `/^m/` would wrongly flag maj7/maj9 as minor and synthesize a b3
             // fallback over a major chord.
             const clavQuality = chord.quality || '';

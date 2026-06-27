@@ -15,7 +15,7 @@ const HIGH_ENERGY_GUITAR_STYLES = new Set(['metal', 'scalar']);
  * Worst-case step span for each melodic device. Used by the pitch engine to gate
  * device firings against the rhythm plan: a 12-step `bluesLick` dropped onto a
  * planned phrase with attacks 3 steps apart silently buries 3-4 planned attacks
- * (the consumer at soloist.ts:1497 shifts them off as "step > stepTarget"). The
+ * (the consumer in getSoloistNote shifts them off as "step > stepTarget"). The
  * gate keeps long, phrase-substitute devices to positions where the plan has
  * room for them instead of letting them eat the rest of the phrase.
  *

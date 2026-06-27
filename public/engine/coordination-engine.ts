@@ -152,7 +152,7 @@ export function createCoordinationContext(
         // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318
         // readable-after: soloist producer (bass, chords, harmony can read this)
         avgSoloistMidi: 0,
-        // why: harmony's spectral-gap branch (harmonies.ts:535-540) needs a non-zero
+        // why: harmony's spectral-gap branch (in finalizeHarmonyNotes) needs a non-zero
         // soloist position on harmony-stab steps, but the soloist usually rests on those
         // steps. lastActiveSoloistMidi survives across ticks so the branch actually fires.
         // Seeded from caller carryover; updated in updateCoordinationContext('soloist').
