@@ -51,18 +51,25 @@ function simulate(genre: string, presetName: string) {
         return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
     };
 
-    // The theme apex — the form's single highest note — and where it sounds.
-    let themeApex = -1;
-    let apexStepInLoop = -1;
+    // Recurring signature peaks: the form is divided into development-cycle
+    // WINDOWS (~24 bars), each with its OWN local apex (its highest seed note).
+    // Mirror the engine's window math so we know where every peak should sound.
+    const cyclePeriod = Math.min(Math.max(3 + Math.floor(loopLen / 128), 3), 6);
+    const cycleLen = Math.max(cyclePeriod * total, total);
+    const apexByWindow = new Map<number, { midi: number; stepInLoop: number }>();
     for (const n of seed.notes) {
         if (n.step < 0) {
             continue;
         }
-        if (n.midi > themeApex) {
-            themeApex = n.midi;
-            apexStepInLoop = ((n.step % loopLen) + loopLen) % loopLen;
+        const sIL = ((n.step % loopLen) + loopLen) % loopLen;
+        const w = Math.floor(sIL / cycleLen);
+        const cur = apexByWindow.get(w);
+        if (!cur || n.midi > cur.midi) {
+            apexByWindow.set(w, { midi: n.midi, stepInLoop: sIL });
         }
     }
+    // The set of in-loop steps where SOME window peak should land its money note.
+    const apexSteps = new Set([...apexByWindow.values()].map((a) => a.stepInLoop));
 
     // Scan one full macro-form PLUS a margin: the form is cyclic, so the last
     // notes need a real successor (otherwise a linear scan reports a false
@@ -86,7 +93,7 @@ function simulate(genre: string, presetName: string) {
             emitted.push({ step: abs, midi: res.midi, dur: res.durationSteps });
         }
     }
-    return { emitted, themeApex, apexStepInLoop, loopLen, total };
+    return { emitted, apexByWindow, apexSteps, cycleLen, loopLen, total };
 }
 
 const GENRES = [
@@ -97,17 +104,22 @@ const GENRES = [
 
 describe('phrase-first soloist · musical critique', () => {
     for (const { genre, preset } of GENRES) {
-        it(`${genre}: apex lands a strong tone, line breathes, no self-overlap`, () => {
+        it(`${genre}: every cycle peak lands a strong tone, line breathes, no self-overlap`, () => {
             const sim = simulate(genre, preset);
 
-            // --- The apex (the form's one climactic peak) lands on a STRONG key
+            // --- Each development-cycle window's local peak lands on a STRONG key
             // tone (tonic/5th), not a tension tone — the regression the review
-            // caught. Found by its fixed position in the form, the way it sounds. ---
-            const apex = sim.emitted.find(
-                (e: any) =>
-                    ((e.step % sim.loopLen) + sim.loopLen) % sim.loopLen === sim.apexStepInLoop,
-            );
-            const apexPc = apex ? ((apex.midi % 12) + 12) % 12 : -1;
+            // caught, now asserted for EVERY recurring signature peak, not one
+            // global climax. A peak is checked at its fixed in-loop position. ---
+            const inLoop = (s: number) => ((s % sim.loopLen) + sim.loopLen) % sim.loopLen;
+            const peakPcs: { window: number; midi: number; pc: number }[] = [];
+            for (const [window, a] of sim.apexByWindow) {
+                const note = sim.emitted.find((e: any) => inLoop(e.step) === a.stepInLoop);
+                if (!note) {
+                    continue; // a peak whose step the seeder left unfilled — covered by the count check
+                }
+                peakPcs.push({ window, midi: note.midi, pc: ((note.midi % 12) + 12) % 12 });
+            }
 
             // --- Breath: the line rests; it's neither silent nor a constant stream. ---
             const inForm = sim.emitted.filter((e: any) => e.step < sim.loopLen);
@@ -126,13 +138,16 @@ describe('phrase-first soloist · musical critique', () => {
                 }
             }
 
+            const offTones = peakPcs.filter((p) => !STRONG_PCS.has(p.pc));
             console.log(
-                `[${genre}] themeApex=${sim.themeApex} apexMidi=${apex?.midi} pc=${apexPc} ` +
+                `[${genre}] windows=${sim.apexByWindow.size} peaksSounded=${peakPcs.length} ` +
+                    `offTones=${offTones.length} pcs=${peakPcs.map((p) => p.pc).join(',')} ` +
                     `density=${density.toFixed(2)} notes=${sim.emitted.length} overlaps=${overlaps} at=${overlapAt.join(',')}`,
             );
 
-            expect(apex, 'the form apex should sound').toBeDefined();
-            expect(STRONG_PCS.has(apexPc), `apex pc ${apexPc} must be tonic(0)/5th(7)`).toBe(true);
+            // The form has multiple cycles, so multiple peaks should recur and sound.
+            expect(peakPcs.length, 'cycle peaks should sound').toBeGreaterThan(1);
+            expect(offTones, `every cycle peak must land tonic(0)/5th(7)`).toHaveLength(0);
             expect(density).toBeGreaterThan(0.05); // it plays
             expect(density).toBeLessThan(0.9); // …but it breathes
             expect(overlaps).toBe(0);
