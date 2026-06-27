@@ -18,14 +18,17 @@ import { getSoloistNote } from './soloist.js';
  * .isResting` each tick (tick-logic publishes it to the coordination context so
  * bass/chords/harmony know whether the lead is breathing).
  *
- * **Build status — 2b (live development):** on top of 2a (theme + breath +
- * dramatic arc + chord-tone landing), the theme now *develops* — it sequences
- * progressively higher across loops (cumulative growth) and RETURNS to the head
- * on a cadence that scales with song length, so it stays recognizable rather
- * than wandering (design §6). Still to come: apex/money-note reach and op
- * variety (inversion, displacement), then voice-leading targeting, then full
- * expression (bends/vibrato, sparingly). With no seed it defers to the legacy
- * engine so the lead is never silent-by-bug.
+ * **Build status — 2c (apex reach):** on top of 2b (theme + breath + arc +
+ * chord-tone landing + cumulative development with theme return), the climb now
+ * has a *destination*: a session-fixed **money note** (the theme's apex lifted
+ * to a strong key tone near the ceiling) that the theme's high point strains
+ * toward across each cycle and LANDS on at the climax — the long-range pitch
+ * goal that makes a solo feel composed (design §9). Every emitted note's
+ * duration is clamped to the next note that sounds, so the monophonic lead
+ * never overruns its successor. Still to come: op variety (inversion,
+ * displacement), a stepwise run-up into the apex, voice-leading targeting on
+ * weak beats, then full expression (bends/vibrato, sparingly). With no seed it
+ * defers to the legacy engine so the lead is never silent-by-bug.
  */
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -179,7 +182,28 @@ export function getSoloistNotePhraseFirst(
         return null;
     }
 
-    const primary = here[0];
+    // --- Locate the theme's high point (its apex) for the money-note reach ---
+    // The single highest seed note in the loop is the theme's peak; the climax
+    // (§9) strains it toward a fixed target. Pickups (negative steps) are never
+    // the climax, so they're excluded. Computed from seed.notes only (loop-stable).
+    let themeApexMidi = -1;
+    let apexStepInLoop = -1;
+    for (const n of seed.notes as any[]) {
+        if (n.step < 0) {
+            continue;
+        }
+        if (n.midi > themeApexMidi) {
+            themeApexMidi = n.midi;
+            apexStepInLoop = ((n.step % loopLen) + loopLen) % loopLen;
+        }
+    }
+    const isApexStep = stepInLoop === apexStepInLoop;
+
+    // On the apex step, the note we develop is the highest one here (a double-stop
+    // could otherwise hand us a lower voice); elsewhere the first note is fine.
+    const primary = isApexStep
+        ? here.reduce((hi: any, n: any) => (n.midi > hi.midi ? n : hi), here[0])
+        : here[0];
     const isAnchor = here.some((n: any) => n?.isAnchor);
 
     // --- Dramatic arc → how active the lead is right now (0..1) ---
@@ -191,9 +215,6 @@ export function getSoloistNotePhraseFirst(
     const loopCount = playback.currentLoopCount ?? -1;
     const loopLift = Math.min(Math.max(loopCount, 0), 4) * 0.14; // builds over ~4 loops
     const totalSteps = arranger.totalSteps > 0 ? arranger.totalSteps : loopLen;
-    const arcPos =
-        totalSteps > 0 ? (((step % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
-    const formSwell = 0.25 * Math.sin(Math.PI * arcPos); // 0 at edges, peak mid-form
     // Tempo-awareness (design §7): breath is roughly constant in WALL-CLOCK, so a
     // slow tune's long bars read as too sparse at a fixed musical density — it
     // needs more notes per bar to feel as present. Fill more below ~120bpm. We do
@@ -205,8 +226,16 @@ export function getSoloistNotePhraseFirst(
     // phrasingIntensity (user slider, default 0.5) nudges how fully the theme is
     // stated: a "more present" ↔ "more spacious" knob layered on the arc.
     const intensityLift = ((soloist.phrasingIntensity ?? 0.5) - 0.5) * 0.3; // ±0.15
-    // 0.30 floor keeps the theme's bones audible even at the sparsest.
-    const activity = clamp01(0.3 + tempoFill + intensityLift + loopLift + formSwell);
+    // Activity (0..1) at any absolute step: a 0.30 floor (keeps the theme's bones
+    // audible) + the tempo/intensity/entrance lifts + the within-form swell (the
+    // only per-step term — peaks mid-form, settles at the edges). One definition
+    // so the duration-clamp lookahead below sees the SAME gate as the live emit.
+    const activityAt = (st: number): number => {
+        const ap =
+            totalSteps > 0 ? (((st % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
+        return clamp01(0.3 + tempoFill + intensityLift + loopLift + 0.25 * Math.sin(Math.PI * ap));
+    };
+    const activity = activityAt(step);
 
     // --- Motivic development: cumulative-but-anchored, with theme return ---
     // The idea GROWS across loops (the line sequences progressively higher) but
@@ -229,12 +258,61 @@ export function getSoloistNotePhraseFirst(
     const keyRootPc = KEY_PC[arranger.key] ?? 0;
     const keyIsMinor = Boolean(arranger.isMinor);
 
+    // --- Apex / money-note reach: one long-range pitch goal (design §9) ---
+    // A solo feels *composed* when its whole climb aims at a single high target.
+    // The "money note" is session-fixed: the theme's own apex lifted to a strong,
+    // resolved KEY tone (tonic or 5th) up near the register ceiling — derived from
+    // the idea, so it's the idea reaching its peak, not an arbitrary high note.
+    // The apex note strains toward it as the cycle climbs and LANDS on it at the
+    // climax (reachFraction → 1), then resets on the theme-return loop. A held
+    // tonic/5th ringing over the changes at the peak is idiomatic (pedal climax),
+    // so the apex deliberately keeps the money note rather than chord-snapping.
+    const strongKeyPcs = new Set<number>([keyRootPc % 12, (keyRootPc + 7) % 12]);
+    let moneyTarget = Math.min(themeApexMidi + 9, 86); // reach up toward the ceiling
+    if (moneyTarget < themeApexMidi + 3) {
+        moneyTarget = themeApexMidi + 3; // …but always clearly above the theme's peak
+    }
+    const moneyNote = snapToNearestPc(moneyTarget, strongKeyPcs);
+    const reachFraction = clamp01(developmentDepth / Math.max(1, cyclePeriod - 1));
+
+    // Will a note actually SOUND at this absolute step? Mirrors the live emit
+    // decision exactly: anchors and the apex always sound; an ornament passes the
+    // same density gate. Used below to clamp a note's duration to the next note
+    // that sounds — a monophonic lead must not overrun its successor (the legacy
+    // engine clamps durations the same way; without it, held seed notes overlap
+    // the next note as development opens the line up).
+    const emitsAt = (absStep: number): boolean => {
+        const sInLoop = ((absStep % loopLen) + loopLen) % loopLen;
+        let present = false;
+        let anchorHere = false;
+        for (const n of seed.notes as any[]) {
+            if (n.step < 0) {
+                continue;
+            }
+            if (((n.step % loopLen) + loopLen) % loopLen === sInLoop) {
+                present = true;
+                if (n.isAnchor) {
+                    anchorHere = true;
+                }
+            }
+        }
+        if (!present) {
+            return false;
+        }
+        if (anchorHere || sInLoop === apexStepInLoop) {
+            return true;
+        }
+        const g = scrambleHash(absStep * 7 + Math.max(loopCount, 0) * 131 + 17);
+        return g <= activityAt(absStep);
+    };
+
     // --- Breath via density gate ---
     // Anchors (the theme's structural skeleton) always sound — they ARE the
-    // melody. Non-anchor ornament notes only fill in as the arc opens up, so
-    // quiet passages stay spacious and energetic ones fill in. The gate is a
-    // deterministic per-(step,loop) hash so loops stay reproducible.
-    if (!isAnchor) {
+    // melody. The apex note is exempt too: the money note is the climax moment
+    // and must never be gated out. Non-anchor ornament notes only fill in as the
+    // arc opens up, so quiet passages stay spacious and energetic ones fill in.
+    // The gate is a deterministic per-(step,loop) hash so loops stay reproducible.
+    if (!isAnchor && !isApexStep) {
         const gate = scrambleHash(step * 7 + Math.max(loopCount, 0) * 131 + 17);
         if (gate > activity) {
             phr.isResting = true; // @worker-mutation
@@ -260,14 +338,37 @@ export function getSoloistNotePhraseFirst(
         midi = snapToNearestPc(midi, chordPcs);
     }
 
+    // The theme's apex strains toward the money note, landing on it at the climax.
+    // Interpolating from the (already developed) note keeps the climb continuous;
+    // this overrides any downbeat chord-snap so the long-range target stands.
+    if (isApexStep && reachFraction > 0 && moneyNote > midi) {
+        midi = Math.min(midi + Math.round((moneyNote - midi) * reachFraction), moneyNote);
+    }
+
     // --- Dynamics follow the arc: softer when sparse, fuller toward the peak ---
-    const velocity = clamp01((primary.velocity ?? 0.8) * (0.7 + 0.3 * activity));
+    // The money note also hits harder as it's reached — the climax has weight.
+    const apexBoost = isApexStep ? 0.1 * reachFraction : 0;
+    const velocity = clamp01((primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost);
+
+    // --- Clamp duration to the next note that sounds (monophonic lead) ---
+    // The lead is one voice: a note must release before the next one speaks.
+    // Scan forward only as far as this note would ring; the first sounding note
+    // caps the duration. Nothing sounding within the span → keep it full, so a
+    // held note still sustains across rests (sustain preserved, overlap removed).
+    let durationSteps = primary.durationSteps ?? 2;
+    const span = Math.ceil(durationSteps);
+    for (let d = 1; d <= span; d++) {
+        if (emitsAt(step + d)) {
+            durationSteps = Math.min(durationSteps, d);
+            break;
+        }
+    }
 
     phr.isResting = false; // @worker-mutation
     return {
         midi,
         velocity,
-        durationSteps: primary.durationSteps ?? 2,
+        durationSteps,
         timingOffset: primary.timingOffset ?? 0,
         bendStartInterval: 0,
         vibrato: false,

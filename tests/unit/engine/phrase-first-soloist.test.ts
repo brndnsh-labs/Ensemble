@@ -142,6 +142,62 @@ describe('phrase-first soloist (Build 2a)', () => {
         expect(present.emitted.length).toBeGreaterThan(spacious.emitted.length);
     });
 
+    // A theme whose lone high point (the apex) is a non-anchor ornament at step 8
+    // (E5=76), over plain anchors (G=67) elsewhere — isolates the money-note reach.
+    function buildApexSeed(): any[] {
+        const notes: any[] = [];
+        for (let s = 0; s < 64; s += 4) {
+            if (s === 8) {
+                notes.push({ step: 8, midi: 76, isAnchor: false, durationSteps: 2, velocity: 0.8 });
+            } else {
+                notes.push({ step: s, midi: 67, isAnchor: true, durationSteps: 2, velocity: 0.8 });
+            }
+        }
+        return notes;
+    }
+    const apexPitch = (loopCount: number): number | undefined =>
+        run(makeState(buildApexSeed(), { loopCount })).emitted.find((e) => e.step === 8)?.midi;
+
+    it('reaches a fixed money note at the climax (the long-range goal)', () => {
+        // period 3 → peak depth 2. The apex strains up across the cycle and lands
+        // on the money note (a strong key tone: high C=84 in C major) at the climax.
+        expect(apexPitch(0)).toBe(76); // head: stated at natural height
+        const mid = apexPitch(1);
+        expect(mid).toBeGreaterThan(76); // mid-climb: partway up
+        expect(mid).toBeLessThan(84);
+        expect(apexPitch(2)).toBe(84); // climax: lands on the money note
+        expect(84 % 12).toBe(0); // …which is the tonic — a resolved, strong tone
+    });
+
+    it('never gates out the apex — the money note always sounds', () => {
+        // Even though the apex is a non-anchor ornament at the sparsest loop.
+        for (const lc of [0, 1, 2]) {
+            expect(apexPitch(lc)).toBeDefined();
+        }
+    });
+
+    it('clamps a note duration to the next sounding note (monophonic, no overlap)', () => {
+        // A long held anchor (dur 8) at step 0 with the next anchor 2 steps later:
+        // the lead is one voice, so step 0 must release by step 2 — not ring over it.
+        const seed = [
+            { step: 0, midi: 67, isAnchor: true, durationSteps: 8, velocity: 0.8 },
+            { step: 2, midi: 69, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+        ];
+        const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
+        const first = emitted.find((e) => e.step === 0);
+        const second = emitted.find((e) => e.step === 2);
+        expect(first.durationSteps).toBe(2); // clamped from 8 → gap to the next note
+        expect(first.step + first.durationSteps).toBeLessThanOrEqual(second.step); // no overlap
+    });
+
+    it('preserves a long note that sustains into a rest (sustain, not truncation)', () => {
+        // Lone held note over a 16-step window: nothing sounds after it, so its
+        // full duration must survive — the clamp removes overlap, not sustain.
+        const seed = [{ step: 0, midi: 67, isAnchor: true, durationSteps: 8, velocity: 0.8 }];
+        const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
+        expect(emitted.find((e) => e.step === 0).durationSteps).toBe(8);
+    });
+
     it('emits crash-safe, playable note objects', () => {
         const { emitted } = run(makeState(buildSeed(), { loopCount: 3 }));
         for (const n of emitted) {
