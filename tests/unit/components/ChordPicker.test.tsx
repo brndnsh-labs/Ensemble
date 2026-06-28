@@ -100,6 +100,16 @@ describe('buildChordText', () => {
             // bV lands on pc 10 → Bb, not the key-default A#).
             expect(buildChordText(5, 'b', MAJ, 'name', 'E', false)).toBe('Bb');
         });
+
+        it('spells flat in a flat-minor key, sharp in a sharp-minor key (#845)', () => {
+            // A flat-minor key strips to a tonic (D, G) that lives in the *major*
+            // sharp set — the minor flag must keep it flat. D minor ♭VI = Bb (not
+            // A#); G minor ♭VI = Eb (not D#).
+            expect(buildChordText(6, '', MAJ, 'name', 'D', true)).toBe('Bb');
+            expect(buildChordText(6, '', MAJ, 'name', 'G', true)).toBe('Eb');
+            // A sharp-minor key still spells sharp: E minor ii° root = F# (not Gb).
+            expect(buildChordText(2, '', MIN, 'name', 'E', true)).toBe('F#m');
+        });
     });
 });
 
