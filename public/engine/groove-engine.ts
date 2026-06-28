@@ -21,7 +21,7 @@ import * as rock from './grooves/rock.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
-import { isInstrumentActiveAtStep } from './section-overrides.js';
+import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-overrides.js';
 
 const strategies: Record<string, any> = {
     Jazz: jazz,
@@ -506,6 +506,14 @@ export function applyGrooveOverrides(
         stepsPerBar,
         loopStep,
         drumComplexity: effectiveComplexity,
+        // #841: bar-stable intensity for MOTIF selection only — latched to this
+        // bar's downbeat instead of the live per-step ramping `bandIntensity`, so
+        // the motif (kick/snare/hat skeleton) can only change AT a bar line, never
+        // mid-bar (the drums-only "stutter"). Genres pass THIS to `getMotif`, but
+        // keep using the live `intensity` for everything that should track the
+        // ramp smoothly (velocity scaling, ghost-note roll probabilities). See
+        // `motifSelectionIntensity` for the reconstruction.
+        motifIntensity: motifSelectionIntensity(state, playback?.bandIntensity ?? 1.0, loopStep),
         // #806: per-loop motif-index ceiling for Chorus Evolution — genres clamp
         // their getMotif result to this so The Head stays simple and later loops
         // open up. Infinity (loop 2+) is a no-op clamp = full genre range.

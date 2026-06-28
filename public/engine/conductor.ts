@@ -10,7 +10,7 @@ import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
 import { deriveSectionSeed, stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
-import { effectiveTargetIntensity } from './section-overrides.js';
+import { effectiveTargetIntensity, RAMP_INTENSITY_MULTIPLIER } from './section-overrides.js';
 
 /**
  * Genres that get the lush hall reverb preset; everything else gets the tight
@@ -224,7 +224,10 @@ export function updateAutoConductor(state: EnsembleState, dispatch: Dispatch) {
         // per-measure rise at ≈+0.0625 — a musically natural swell rather than a step
         // change. Companion fixes from S8 — per-genre floors below + the drum-gate
         // sweep — still apply unchanged.
-        const multiplier = playback.bandIntensity > effectiveTarget ? 0.75 : 1.25;
+        const multiplier =
+            playback.bandIntensity > effectiveTarget
+                ? RAMP_INTENSITY_MULTIPLIER.down
+                : RAMP_INTENSITY_MULTIPLIER.up;
         let newIntensity =
             playback.bandIntensity +
             (playback.bandIntensity < effectiveTarget

@@ -69,7 +69,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         base;
 
     const activeMotif = Math.min(
-        getMotif(sectionSeed, drumComplexity, intensity),
+        getMotif(sectionSeed, drumComplexity, context.motifIntensity ?? intensity),
         motifCeiling ?? Number.POSITIVE_INFINITY,
     );
     // why: epic-1-compound-meter S16b — force motif 0 in compound meters.
