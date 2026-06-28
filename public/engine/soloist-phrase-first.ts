@@ -2,6 +2,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { getSoloistNote } from './soloist.js';
+import { chordTargetTones } from './soloist-pitch-engine.js';
 
 /**
  * Phrase-first soloist engine — Slice 1 of the soloist re-architecture
@@ -28,7 +29,16 @@ import { getSoloistNote } from './soloist.js';
  * (design §9). Build 2d adds expression as a lyrical FLURRY around each peak — a
  * whole-step scoop UP INTO the money note, lighter scoops on ~half the nearby
  * notes, and vibrato on any held note in the zone — clustered into a burst, with
- * the long stretch between peaks left clean so the flurries have space (§10). Every
+ * the long stretch between peaks left clean so the flurries have space (§10).
+ *
+ * **Build 3 (voice-leading — the keystone, §5):** the body of the line now plays
+ * THROUGH the changes. Strong beats (downbeat + bar midpoint) are TARGETS — a
+ * non-chord-tone there is pulled onto a guide tone (3rd/7th), while a note already
+ * on a chord tone is left as the melody states it; the weak step before a target
+ * steps diatonically INTO it (a leading tone), and a chord change on that beat is
+ * anticipated across the barline. Guide tones come from chord QUALITY (shared
+ * `chordTargetTones`), robust to rootless comp voicings. (Idiom-specific chromatic
+ * enclosures / bebop passing scales are a later slice — §8.) Every
  * emitted note's duration is clamped to the next note that sounds, so the
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
@@ -79,19 +89,13 @@ const DEPTH_DEGREES = [0, 2, 4, 5, 6];
  * clamped downstream (`enforceRegisterSlotting` only lifts notes below 52), so
  * the ceiling must be respected here, not deferred.
  */
-function diatonicTranspose(
-    midi: number,
-    degrees: number,
-    keyRootPc: number,
-    isMinor: boolean,
-): number {
-    if (degrees <= 0) {
-        return midi;
-    }
+function diatonicShift(midi: number, degrees: number, keyRootPc: number, isMinor: boolean): number {
     const steps = isMinor ? MINOR_STEPS : MAJOR_STEPS;
     const len = steps.length;
     const relPc = (((midi - keyRootPc) % 12) + 12) % 12;
-    // Index of the scale degree at or just below this pitch class.
+    // Index of the scale degree at or just below this pitch class. A non-scale
+    // source (e.g. a chromatic guide tone) snaps to the nearest degree below, so
+    // ±1 still lands a true scale neighbor — the diatonic step used for approaches.
     let idx = 0;
     for (let i = 0; i < len; i++) {
         if (steps[i] <= relPc) {
@@ -104,10 +108,92 @@ function diatonicTranspose(
     const octaveShift = Math.floor(targetIdx / len);
     const wrapped = ((targetIdx % len) + len) % len;
     const newRel = steps[wrapped] + octaveShift * 12;
-    // Pure contour-preserving transpose — register folding is applied to the
-    // developed line as ONE unit at the call site (a per-note fold here would
-    // invert the contour at the seam where adjacent notes straddle the ceiling).
+    // Pure contour-preserving shift — register folding is applied to the developed
+    // line as ONE unit at the call site (a per-note fold here would invert the
+    // contour at the seam where adjacent notes straddle the ceiling).
     return Math.round(midi - relPc + newRel);
+}
+
+function diatonicTranspose(
+    midi: number,
+    degrees: number,
+    keyRootPc: number,
+    isMinor: boolean,
+): number {
+    // Development only ever transposes UP; depth 0 (the theme return) is verbatim.
+    return degrees <= 0 ? midi : diatonicShift(midi, degrees, keyRootPc, isMinor);
+}
+
+/**
+ * The TRUE scale-tone neighbor of `midi` — above (`dir > 0`) or below (`dir < 0`).
+ * Unlike `diatonicShift(±1)`, this is correct when `midi` is CHROMATIC to the key
+ * (the common case for an approach target — a dominant ♭7, a secondary-dominant
+ * 3rd): the note a step below B♭ in C major is A (a whole step), not G. For a
+ * chromatic source the snap degree itself is already the lower neighbor; for a
+ * scale tone, step a full degree down. The upper neighbor is always the next
+ * degree up. This is what makes the weak-beat approach a real stepwise leading
+ * tone into the target rather than a leap.
+ */
+function diatonicNeighbor(midi: number, dir: number, keyRootPc: number, isMinor: boolean): number {
+    const steps = isMinor ? MINOR_STEPS : MAJOR_STEPS;
+    const len = steps.length;
+    const relPc = (((midi - keyRootPc) % 12) + 12) % 12;
+    let idx = 0;
+    let onDegree = false;
+    for (let i = 0; i < len; i++) {
+        if (steps[i] === relPc) {
+            idx = i;
+            onDegree = true;
+            break;
+        }
+        if (steps[i] < relPc) {
+            idx = i;
+        } else {
+            break;
+        }
+    }
+    const targetIdx = dir < 0 ? (onDegree ? idx - 1 : idx) : idx + 1;
+    const octaveShift = Math.floor(targetIdx / len);
+    const wrapped = ((targetIdx % len) + len) % len;
+    const newRel = steps[wrapped] + octaveShift * 12;
+    return Math.round(midi - relPc + newRel);
+}
+
+/**
+ * Land a note on a harmonic target: prefer a guide tone (3rd/7th) when one sits
+ * within reach of the developed pitch (so the line *outlines the changes* without
+ * wrenching the contour to grab a distant 3rd), else snap to the nearest
+ * functional chord tone. `guides`/`pillars` are absolute pitch classes from
+ * `chordTargetTones`. This is the §5 keystone: where you land defines the harmony.
+ */
+const GUIDE_REACH = 3; // semitones — a guide tone within a minor third is "in reach"
+function landOnTarget(midi: number, guides: number[], pillars: number[]): number {
+    // Leave the melody alone when it ALREADY lands a chord tone — a theme note on
+    // the 5th is doing its job; wrenching it to the 3rd would erode the tune.
+    // Only re-target strong beats that are currently NON-chord-tones (the ones
+    // that actually read as "wandering"), and when we do, prefer a guide tone.
+    const pc = ((midi % 12) + 12) % 12;
+    if (pillars.includes(pc)) {
+        return midi;
+    }
+    if (guides.length > 0) {
+        const g = snapToNearestPc(midi, new Set(guides));
+        if (Math.abs(g - midi) <= GUIDE_REACH) {
+            return g;
+        }
+    }
+    return pillars.length > 0 ? snapToNearestPc(midi, new Set(pillars)) : midi;
+}
+
+// A chord change between adjacent steps — root pitch-class or quality differs.
+// Used to anticipate the coming chord across the change (voice-lead through it).
+function chordChanged(a: any, b: any): boolean {
+    if (!a || !b) {
+        return false;
+    }
+    const ra = ((Math.round(a.rootMidi) % 12) + 12) % 12;
+    const rb = ((Math.round(b.rootMidi) % 12) + 12) % 12;
+    return ra !== rb || (a.quality || '') !== (b.quality || '');
 }
 
 /**
@@ -393,10 +479,58 @@ export function getSoloistNotePhraseFirst(
         }
     }
 
-    // --- Pitch: develop the theme, then LAND with intention on strong beats ---
-    const isDownbeat = stepInfo
-        ? Boolean(stepInfo.isDownbeat || stepInfo.isMeasureStart)
-        : stepInChord === 0;
+    // --- Pitch: develop the theme, then VOICE-LEAD through the changes (§5) ---
+    // The keystone grammar: *where you land matters more than what you run.* Strong
+    // beats are TARGETS — guide tones (the 3rd/7th that define the harmony); the
+    // weak step before a target is APPROACH material that steps INTO it; and a
+    // coming chord is anticipated across the change. So the body of the line
+    // outlines the harmony and sounds like it's GOING somewhere, not running over
+    // static chords. (The apex still owns its money note, below; idiom-specific
+    // chromatic enclosures / bebop passing scales are a later slice — §8.)
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const stepsPerBeat = ts.stepsPerBeat;
+    const stepsPerBar = ts.beats * stepsPerBeat;
+    const stepInBar = ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
+    // Strong beats = the downbeat and the bar's midpoint (beat 3 in 4/4): the two
+    // metrically strong points a phrase resolves onto.
+    const midBeatStep = Math.floor(ts.beats / 2) * stepsPerBeat;
+    const isStrongBeat = stepInBar === 0 || stepInBar === midBeatStep;
+    // The next strong beat ahead (beat 3 this bar, else the next downbeat).
+    const nextStrongStep =
+        stepInBar < midBeatStep
+            ? step + (midBeatStep - stepInBar)
+            : step + (stepsPerBar - stepInBar);
+
+    // The pitch a strong beat WILL land on — its developed contour note pulled onto
+    // a guide tone (or the apex's money note) — so an approach can lead into it.
+    // Re-derives the future note from the seed (a bounded one-point lookahead).
+    const strongTargetAt = (absStep: number, chord: any): number | null => {
+        const sIL = ((absStep % loopLen) + loopLen) % loopLen;
+        if (sIL === apexStepInLoop) {
+            return moneyNote;
+        }
+        // Use the FIRST seed note at that step — mirrors the live non-apex emit
+        // (`primary = here[0]`), so the predicted target matches what will sound
+        // (they'd diverge only on a double-stop). Approximations accepted for this
+        // bounded lookahead: it ignores the density gate (may aim at a step the
+        // gate rests) and re-develops at the CURRENT loop's depth (a next-bar
+        // target across a loop seam will actually voice at the next depth). Both
+        // are rare and only nudge an approach note by a scale step — harmless.
+        let p: any = null;
+        for (const n of seed.notes as any[]) {
+            if (((n.step % loopLen) + loopLen) % loopLen === sIL) {
+                p = n;
+                break;
+            }
+        }
+        if (!p || !chord) {
+            return null;
+        }
+        const dev = diatonicTranspose(p.midi, liftDegrees, keyRootPc, keyIsMinor) + bodyOctaveFold;
+        const { guides, pillars } = chordTargetTones(chord.rootMidi, chord.quality);
+        return landOnTarget(dev, guides, pillars);
+    };
+
     let midi: number;
     if (isApexStep) {
         // The apex IS the form's one peak, so it lands the money note whenever it
@@ -406,17 +540,39 @@ export function getSoloistNotePhraseFirst(
         // tonic/5th over the changes is the idiomatic pedal climax (design §9).
         midi = moneyNote;
     } else {
-        // Body of the line: parallel diatonic sequence (contour preserved),
-        // climbing higher as the cycle develops, then landing chord tones on
-        // strong beats so phrases resolve onto the harmony. The whole developed
-        // line is folded into register as ONE unit (bodyOctaveFold) so the seam
-        // never inverts the contour. (Weak-beat voice-leading is a later build.)
+        // Develop the theme (contour preserved, folded to register as one unit).
         midi = diatonicTranspose(primary.midi, liftDegrees, keyRootPc, keyIsMinor) + bodyOctaveFold;
-        if (isDownbeat) {
-            const root = ((currentChord.rootMidi % 12) + 12) % 12;
-            const intervals: number[] = currentChord.intervals || [0, 4, 7];
-            const chordPcs = new Set<number>(intervals.map((i) => (((root + i) % 12) + 12) % 12));
-            midi = snapToNearestPc(midi, chordPcs);
+        if (isStrongBeat) {
+            // LAND: pull a non-chord-tone strong beat onto a guide tone of the
+            // current chord (nearest functional tone if no guide is in reach);
+            // a note already on a chord tone is left as the melody states it.
+            const { guides, pillars } = chordTargetTones(
+                currentChord.rootMidi,
+                currentChord.quality,
+            );
+            midi = landOnTarget(midi, guides, pillars);
+        } else if (nextStrongStep - step <= Math.max(1, Math.floor(stepsPerBeat / 2))) {
+            // APPROACH: within the last eighth before a strong beat (the pickup 16th
+            // or the "and") step diatonically INTO that target — a leading tone that
+            // resolves onto the landing. Anticipation across a chord change is exact
+            // only at distance 1, where `nextChord` (the adjacent-step chord) IS the
+            // beat's chord; from the "and" two steps out the per-tick engine can't
+            // see a change landing on the beat, so it leads into the current chord —
+            // a bounded-lookahead approximation (the §4.4 phrase-span target layer
+            // would close it) that's rare and at most a scale-step off, never a leap.
+            const beatIsNextStep = nextStrongStep === step + 1;
+            const chordThere =
+                beatIsNextStep && chordChanged(currentChord, nextChord) ? nextChord : currentChord;
+            const target = strongTargetAt(nextStrongStep, chordThere);
+            if (target != null) {
+                // Place the approach a true scale step from the target, on the side
+                // the contour comes from, so it resolves into the target by step.
+                // `diatonicNeighbor` (not `diatonicShift`) so a CHROMATIC target —
+                // every dominant ♭7 — gets its real leading tone, not a third-leap.
+                const below = diatonicNeighbor(target, -1, keyRootPc, keyIsMinor);
+                const above = diatonicNeighbor(target, 1, keyRootPc, keyIsMinor);
+                midi = Math.abs(below - midi) <= Math.abs(above - midi) ? below : above;
+            }
         }
     }
 
@@ -477,7 +633,6 @@ export function getSoloistNotePhraseFirst(
             bendStartInterval = -1; // half-step scoop up
         }
     }
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
 
     phr.isResting = false; // @worker-mutation

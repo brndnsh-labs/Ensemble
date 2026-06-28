@@ -227,6 +227,50 @@ const FUNCTIONAL_PILLARS_BY_QUALITY: Record<ChordQualityClass, number> = {
     aug: pcMask(0, 4, 8),
 };
 
+// Guide tones — the 3rd and 7th, the notes that DEFINE a chord's quality and
+// function (major vs minor, dominant tension). Voice-leading targets these on
+// strong beats: landing on a guide tone is what makes a line "outline the
+// changes" rather than wander over them. Intervals above the root, per quality
+// class. A plain triad ('maj', 'sus', 'aug') has no functional 7th to target, so
+// only its characteristic tone is listed; the dominant/minor tritone pair (3 + b7)
+// is the workhorse for "through the changes" motion. Derived from chord QUALITY,
+// not the (often rootless) comp voicing — same rationale as the pillars above.
+const GUIDE_INTERVALS_BY_QUALITY: Record<ChordQualityClass, number[]> = {
+    maj: [4], // major 3rd (maj7's 7 is left to a later idiom slice)
+    min: [3, 10], // b3, b7
+    min6: [3, 9], // b3, 6
+    dom: [4, 10], // 3, b7 — the classic dominant tritone
+    alt: [4, 10],
+    halfdim: [3, 10], // b3, b7
+    dim: [3, 9], // b3, bb7
+    sus: [5], // no 3rd — the suspended 4 is the characteristic tone
+    aug: [4], // major 3rd
+};
+
+/**
+ * The harmonic targets of a chord as absolute pitch classes (0–11), derived from
+ * its QUALITY (robust to rootless comp voicings): `guides` are the 3rd/7th to aim
+ * strong beats at; `pillars` are the full functional chord-tone set (1/3/5/(b7…))
+ * to fall back to when no guide tone sits within reach. Shared by the phrase-first
+ * voice-leading layer; the legacy blues-bend resolution uses the same pillar table.
+ */
+export function chordTargetTones(
+    rootMidi: number,
+    quality: string | undefined,
+): { guides: number[]; pillars: number[] } {
+    const root = ((Math.round(rootMidi) % 12) + 12) % 12;
+    const cls = classifyChordQuality(quality);
+    const guides = GUIDE_INTERVALS_BY_QUALITY[cls].map((i) => (root + i) % 12);
+    const mask = FUNCTIONAL_PILLARS_BY_QUALITY[cls];
+    const pillars: number[] = [];
+    for (let i = 0; i < 12; i++) {
+        if (mask & (1 << i)) {
+            pillars.push((root + i) % 12);
+        }
+    }
+    return { guides, pillars };
+}
+
 // Base rarity penalty for chromatic neighbors of chord tones. Scaled by
 // per-style config.chromaticism so high-chromaticism profiles (bird 0.9,
 // coltrane 0.7, jazz 0.5, bossa 0.5, neo 0.6) admit neighbors freely while

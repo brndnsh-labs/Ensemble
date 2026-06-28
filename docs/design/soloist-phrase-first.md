@@ -99,6 +99,8 @@ This is **universal, not a bebop idiom** — Beck, King, Parker, and Miles all o
 
 Architecturally this is why the harmonic-target layer (§4.4) is first-class and sits *before* realization, and why the realizer (§4.5) is phrase-span / voice-leading aware rather than greedy-per-chord.
 
+**Implementation note (Build 3 — the universal core, shipped).** `getSoloistNotePhraseFirst`'s body-pitch block now realizes §5 within the per-tick engine: **strong beats** (the bar downbeat + midpoint — beat 3 in 4/4) are targets — a non-chord-tone there is pulled onto a **guide tone** (3rd/7th, within a minor third via `landOnTarget`) of the current chord, else the nearest functional pillar, while a note *already* on a chord tone is left as the melody states it (the theme is never wrenched). The **weak step before a strong beat** steps diatonically INTO that beat's target (a leading tone), and a chord change landing on that beat is **anticipated** across the barline (`chordChanged` → aim at the next chord's guide tone). Targets/pillars come from chord **quality** (`chordTargetTones`, shared with the legacy blues-bend pillars), robust to rootless comping. Critique-verified: 97–100% of strong beats land chord tones, 44–62% guide tones, across Jazz/Neo-Soul/Rock/Blues. *Deferred (the genuinely idiom-specific part — §8):* chromatic enclosures (approach from both sides), bebop passing-tone scales, per-genre approach **density**, and a true phrase-span target layer with full lookahead (today the approach uses a bounded one-point lookahead and `nextChord`).
+
 ---
 
 ## 6. How an idea grows — the recurrence (load-bearing)
