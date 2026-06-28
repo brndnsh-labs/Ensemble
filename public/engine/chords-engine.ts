@@ -43,8 +43,9 @@ function getAbsoluteDisplayNoteName(
     keyContext: string,
     accidentalHint: string = '',
     explicitNote: string = '',
+    keyIsMinor: boolean = false,
 ): string {
-    return spellPitchClass(pitchClass, keyContext, accidentalHint, explicitNote);
+    return spellPitchClass(pitchClass, keyContext, accidentalHint, explicitNote, keyIsMinor);
 }
 
 function ensurePitchClassAboveFloor(
@@ -812,6 +813,7 @@ function parseProgressionPart(
     key: string,
     timeSignature: string,
     initialMidis: number[],
+    keyIsMinor: boolean = false,
 ): { chords: Chord[]; finalMidis: number[] } {
     const { chords, groove } = state;
     const parsed: Chord[] = [];
@@ -870,6 +872,7 @@ function parseProgressionPart(
                         key,
                         bassAccidentalHint,
                         resolvedBass.noteMatch?.[1] || '',
+                        keyIsMinor,
                     );
                     bassNameNNS = (INTERVAL_TO_NNS as any)[bassInterval];
                     bassNameRom = (INTERVAL_TO_ROMAN as any)[bassInterval];
@@ -972,6 +975,7 @@ function parseProgressionPart(
                     key,
                     rootAccidentalHint,
                     noteMatch?.[1] || '',
+                    keyIsMinor,
                 );
 
                 const formatted = getFormattedChordNames(
@@ -1048,6 +1052,8 @@ export function validateProgression(
             const repeats = section.repeat || 1;
             const sectionKey = section.key || arranger.key;
             const sectionTS = section.timeSignature || arranger.timeSignature;
+            const sectionIsMinor =
+                typeof section.isMinor === 'boolean' ? section.isMinor : arranger.isMinor;
 
             for (let r = 0; r < repeats; r++) {
                 const { chords, finalMidis } = parseProgressionPart(
@@ -1056,13 +1062,13 @@ export function validateProgression(
                     sectionKey,
                     sectionTS,
                     lastMidis,
+                    sectionIsMinor,
                 );
                 const taggedChords = chords.map((c, idx) => ({
                     ...c,
                     sectionId: section.id,
                     sectionLabel: section.label,
-                    keyIsMinor:
-                        typeof section.isMinor === 'boolean' ? section.isMinor : arranger.isMinor,
+                    keyIsMinor: sectionIsMinor,
                     localIndex: idx,
                     repeatIndex: r,
                 }));

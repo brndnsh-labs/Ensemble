@@ -121,9 +121,11 @@ function buildNameRoot(
     const pitchClass = (((tonic + base + accidentalShift) % 12) + 12) % 12;
     // Spell key-aware so the editor matches the rendered chart: a chord picked in
     // a sharp key (E major → G#) spells with sharps, not Ab. An explicit b/# the
-    // user dialed in wins over the key context. Display/notation only — pitch is
-    // unchanged and a stored `Ab` still parses (#779).
-    return spellPitchClass(pitchClass, keyName, accidental);
+    // user dialed in wins over the key context. `keyIsMinor` keeps a flat-minor
+    // key (D/G minor) spelling flat instead of inheriting the major sharp set
+    // (#845). Display/notation only — pitch is unchanged and a stored `Ab` still
+    // parses (#779).
+    return spellPitchClass(pitchClass, keyName, accidental, '', keyIsMinor);
 }
 
 /**
