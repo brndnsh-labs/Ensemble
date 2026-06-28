@@ -32,6 +32,9 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         // bends/double-stops/pentatonic) — the idiomatic default. (#628 retired
         // the old 'shred' fast-lead profile; Rock owns the Rock/Metal lead voice.)
         soloist: 'rock',
+        // #856 — guitar-idiom lead: 2-voice so the double-stops are live on the
+        // synth lead too (not gated on installing the electric-guitar pack).
+        soloistMode: 'guitar',
     },
     Jazz: {
         swing: 60,
@@ -51,6 +54,8 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         chord: 'funk',
         bass: 'funk',
         soloist: 'funk',
+        // #856 — guitar-idiom lead: tasteful 2-voice chord-stab double-stops.
+        soloistMode: 'guitar',
         harmony: 'horns',
     },
     Disco: {
@@ -117,6 +122,8 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         // (space-over-flash: restBase 0.15, slide/run devices) rather than the
         // generic 'minimal' it used to fall through to.
         soloist: 'acoustic',
+        // #856 — guitar-idiom lead: fingerstyle double-stops on the synth lead too.
+        soloistMode: 'guitar',
         harmony: 'strings',
         meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
@@ -135,6 +142,8 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         chord: 'strum-country',
         bass: 'country',
         soloist: 'country',
+        // #856 — guitar-idiom lead: chicken-pickin' double-stops by default.
+        soloistMode: 'guitar',
         meters: ['4/4', '3/4'], // two-step · country waltz
     },
     Metal: {

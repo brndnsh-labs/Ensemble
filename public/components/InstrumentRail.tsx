@@ -89,16 +89,12 @@ function setGenre(genreName: string) {
     };
     dispatch(ACTIONS.SET_GENRE_FEEL, payload);
     syncWorker(ACTIONS.SET_GENRE_FEEL, payload);
-    // #567 — a genre may carry a default soloist phrasing mode (Neo-Soul → guitar,
-    // so its polyphony-gated quartal/double-stop color is live). Route it through the
-    // dedicated SET_SOLOIST_MODE action, NOT the SET_GENRE_FEEL payload: the worker's
-    // genre-feel delta only mirrors `groove`, while soloist mode crosses via this
-    // action's own delta. Only fires when the genre declares a mode, so other genres
-    // never reset the user's current mode.
-    if (config?.soloistMode) {
-        dispatch(ACTIONS.SET_SOLOIST_MODE, config.soloistMode);
-        syncWorker(ACTIONS.SET_SOLOIST_MODE, config.soloistMode);
-    }
+    // #856 — the soloist phrasing mode is now derived from the lead voice + genre
+    // by `resolveAutoVoices` (the SET_GENRE_FEEL effect), which respects the user's
+    // Auto/pin flag. The old #567 explicit `SET_SOLOIST_MODE` dispatch here is gone:
+    // it force-set the mode and would have overridden a user's pin. The derived
+    // mode dispatches from the effect, which the global subscriber syncs to the
+    // worker — so Neo-Soul → guitar still holds, via the genre fallback.
     saveCurrentState();
 }
 

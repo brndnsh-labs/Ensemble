@@ -72,6 +72,8 @@ export const soloist = deepSignal<SoloistState>({
     autoSound: true,
     preset: 'trumpet',
     mode: 'monophonic',
+    // #856 — Auto: phrasing mode follows the lead voice (guitar pack → guitar).
+    autoMode: true,
     style: 'smart',
     octave: 72,
     volume: 1.0,
@@ -478,6 +480,11 @@ export function instrumentReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SOLOIST_MODE:
             s.mode = resolveSoloistMode(action.payload);
+            return true;
+        case ACTIONS.SET_SOLOIST_AUTO_MODE:
+            // #856 — Auto vs pinned. When re-enabling Auto, state-effects
+            // re-derives `mode` from the lead voice + genre.
+            s.autoMode = !!action.payload;
             return true;
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap

@@ -1,6 +1,7 @@
 import { applyThemeToDom, setBpm } from './app-controller.js';
 import { TIME_SIGNATURES } from './config.js';
 import { autoVoiceForGenre } from './data/genre-sound-map.js';
+import { SMART_GENRES } from './data/smart-genres.js';
 import { validateProgression } from './engine/chords-engine.js';
 import {
     generateDrumFills,
@@ -12,6 +13,7 @@ import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.j
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { resolveSoloistStyle, STYLE_CONFIG } from './engine/soloist-config.js';
+import { deriveSoloistMode } from './engine/soloist-mode-policy.js';
 import { deriveSoloistHook, generateSessionSeed } from './engine/soloist-seeder.js';
 import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
@@ -56,6 +58,45 @@ export function resolveAutoVoices(
             dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: next, auto: true });
         }
     }
+    // #856 — after the soloist's voice is resolved, re-derive its phrasing mode
+    // (guitar pack → guitar). Runs even when the voice didn't change, so a
+    // synth-lead genre swap (Metal → Neo-Soul) still flips the genre fallback.
+    syncSoloistMode(stateMap, genre, dispatch);
+}
+
+/**
+ * Derive + apply the soloist's phrasing mode from its current lead voice and the
+ * active genre, when Auto (#856). No-op when the user has pinned the mode
+ * (`autoMode === false`) or when the derived mode already matches.
+ */
+function syncSoloistMode(
+    stateMap: EnsembleState,
+    genre: string | undefined,
+    dispatch: HandleEffectsContext['dispatch'],
+): void {
+    const sol = stateMap.soloist as { autoMode?: boolean; voice: InstrumentVoice; mode: string };
+    if (!sol?.autoMode) {
+        return;
+    }
+    const genreMode = genre ? SMART_GENRES[genre]?.soloistMode : undefined;
+    const next = deriveSoloistMode(sol.voice, genreMode);
+    if (next !== sol.mode) {
+        dispatch(ACTIONS.SET_SOLOIST_MODE, next);
+    }
+}
+
+/**
+ * #856 — derive the soloist phrasing mode once at startup. Genre/voice are
+ * hydrated directly (no `SET_GENRE_FEEL` fires on boot), so without this a
+ * loaded session keeps its persisted/default `mode` until the next genre change
+ * — leaving guitar genres stuck monophonic on load. Call after the worker + the
+ * state subscriber are live so the dispatched mode crosses to the worker.
+ */
+export function deriveSoloistModeOnBoot(
+    stateMap: EnsembleState,
+    dispatch: HandleEffectsContext['dispatch'],
+): void {
+    syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
 }
 
 /**
@@ -154,6 +195,12 @@ export function handleEffects(
             if (audio && payload?.module) {
                 syncBusReverbSend(stateMap, payload.module);
             }
+            // #856 — a manual soloist voice pick (auto !== true) re-derives the
+            // phrasing mode (pick a guitar pack → guitar). Auto-resolution's own
+            // dispatch (auto:true) is handled by resolveAutoVoices' end-call.
+            if (payload?.module === 'soloist' && payload.auto !== true) {
+                syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
+            }
             break;
         }
         case ACTIONS.SET_REVERB: {
@@ -229,7 +276,14 @@ export function handleEffects(
                 loadDrumPreset(payload.drum);
             }
             // #675 — auto-follow: Auto-mode lanes track the genre's mapped sound.
+            // (#856 — resolveAutoVoices also re-derives the soloist phrasing mode.)
             resolveAutoVoices(stateMap, payload.genreName, dispatch);
+            break;
+        }
+        case ACTIONS.SET_SOLOIST_AUTO_MODE: {
+            // #856 — re-enabling Auto immediately re-derives the phrasing mode
+            // from the current lead voice + genre (a pin is a no-op in the helper).
+            syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
             break;
         }
         case ACTIONS.SHOW_TOAST: {
