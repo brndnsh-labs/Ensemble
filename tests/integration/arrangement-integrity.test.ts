@@ -32,6 +32,19 @@ vi.mock('../../public/state.js', () => {
             profile: 'srv',
         },
     });
+    // Phrase-first performs a seeded theme (it rests without one); give it a small
+    // theme over the 16-step loop so the soloist lane stays active in the
+    // cross-lane coordination scan (epic #10 — mirrors production's synced seed).
+    mockSoloist.session.seed = {
+        loopLengthSteps: 16,
+        notes: [
+            { step: 0, midi: 67, durationSteps: 2, velocity: 0.8 },
+            { step: 4, midi: 71, durationSteps: 2, velocity: 0.8 },
+            { step: 8, midi: 67, durationSteps: 2, velocity: 0.8 },
+            { step: 12, midi: 64, durationSteps: 2, velocity: 0.8 },
+        ],
+    };
+    mockSoloist.session.phrasing.isResting = false;
     const mockBass = { enabled: true, lastFreq: 110 };
     const mockChords = { enabled: true, rhythmicMask: 0, style: 'smart' };
     const mockHarmony = { enabled: true, rhythmicMask: 0 };
@@ -57,7 +70,8 @@ vi.mock('../../public/state.js', () => {
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getHarmonyNotes } from '../../public/engine/harmonies.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired).
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../public/state.js';
 
 describe('Arrangement Integrity & Clutter Audit', () => {

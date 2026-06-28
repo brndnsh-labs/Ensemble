@@ -5,7 +5,10 @@ import { getAccompanimentNotes } from '../../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
-import { getSoloistNote } from '../../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired). The ska
+// soloist checks below are no-crash / co-activity smokes; the genre's real soloist
+// idiom is guarded by tests/standards/ska-punk-soloist-critique + shared-hook.
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../../public/state.js';
 import { getStepInfo } from '../../../public/utils.js';
 
