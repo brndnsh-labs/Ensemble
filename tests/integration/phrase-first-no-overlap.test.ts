@@ -36,7 +36,6 @@ describe('phrase-first soloist · monophonic duration (no overlap)', () => {
         const seed = generateSessionSeed(state, state.arranger, 'smart', 0.62);
         state.soloist.session.seed = seed;
         state.soloist.session.phrasing = { isResting: false };
-        state.soloist.phraseFirstSoloist = true;
 
         const total = state.arranger.totalSteps;
         const stepMap = state.arranger.stepMap;

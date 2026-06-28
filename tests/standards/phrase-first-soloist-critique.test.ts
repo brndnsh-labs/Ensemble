@@ -42,7 +42,6 @@ function simulate(genre: string, presetName: string) {
     const seed = generateSessionSeed(state, state.arranger, 'smart', 0.62, 'CRITIQUE_SEED');
     state.soloist.session.seed = seed;
     state.soloist.session.phrasing = { isResting: false };
-    state.soloist.phraseFirstSoloist = true;
 
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
