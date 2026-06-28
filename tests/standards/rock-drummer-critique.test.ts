@@ -264,4 +264,60 @@ describe('Rock Drummer Critique', () => {
         );
         expect(openRatio).toBeLessThan(0.25);
     });
+
+    it('should fire the half-time snare on beat 3 only for motif 2 (#795)', () => {
+        // Motif 2 ("Half-time Feel") relocates the backbeat to beat 3 (step 8)
+        // alone, leaving beats 2 & 4 (steps 4, 12) free of the strong snare — that
+        // displacement IS the feel. Before the fix this branch was byte-identical to
+        // the normal 2&4 backbeat, so it produced a standard backbeat (zero such bars).
+        //
+        // Force motif 2 deterministically: `sectionSeed` is per-section (stable across
+        // a run). Map every step to a section 'A' and pin its seed to 0.35 — at
+        // intensity 0.9 (tier 3) pickBySeed(0.35, …) → motif 2. `currentLoopCount: 2`
+        // lifts the Chorus-Evolution motif ceiling (loop 0 clamps to motif ≤ 1, so
+        // motif 2 only exists once the kit has "opened up" — #806).
+        const numBars = 16;
+        const performance = simulatePerformance(numBars, {
+            playback: { bandIntensity: 0.9, currentLoopCount: 2 },
+            arranger: {
+                timeSignature: '4/4',
+                stepMap: [{ start: 0, end: numBars * 16, chord: { sectionId: 'A' } }],
+            },
+            groove: {
+                genreFeel: 'Rock',
+                lastDrumPreset: 'Rock',
+                instruments: [],
+                sectionSeedMap: { A: 0.35 },
+            },
+        });
+
+        let halfTimeBars = 0;
+        performance.forEach((bar) => {
+            let strongBeat3 = false;
+            let strongBackbeat = false;
+            bar.forEach((stepData) => {
+                const snare = stepData.instruments.Snare;
+                if (!snare || snare.velocity < 1.1) {
+                    return;
+                }
+                if (stepData.loopStep === 8) {
+                    strongBeat3 = true;
+                }
+                if (stepData.loopStep === 4 || stepData.loopStep === 12) {
+                    strongBackbeat = true;
+                }
+            });
+            if (strongBeat3 && !strongBackbeat) {
+                halfTimeBars++;
+            }
+        });
+
+        console.log(
+            `[Rock Half-time Motif 2] beat-3-only bars (no 2&4 backbeat): ${halfTimeBars}/${numBars}`,
+        );
+        // With motif 2 forced, every non-turnaround bar is half-time. Floor at 12/16
+        // keeps headroom for the occasional turnaround-fill bar that adds a beat-4
+        // snare, while proving the displaced backbeat fires (old branch yielded 0).
+        expect(halfTimeBars).toBeGreaterThan(12);
+    });
 });
