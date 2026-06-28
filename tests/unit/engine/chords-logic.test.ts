@@ -435,4 +435,45 @@ describe('Chords & Voicing Logic', () => {
             expect(intervals).toEqual([0, 4, 7, 14]);
         });
     });
+
+    describe('#780 — 6/9, 7sus4, add2 qualities (no silent-major fallback)', () => {
+        it('parses the compound qualities instead of the bare prefix', () => {
+            expect(getChordDetails('6/9').quality).toBe('6/9');
+            expect(getChordDetails('6/9').is7th).toBe(false); // 6/9 has no 7th
+            expect(getChordDetails('7sus4').quality).toBe('7sus4');
+            expect(getChordDetails('7sus4').is7th).toBe(true); // suspended dominant
+            expect(getChordDetails('add2').quality).toBe('add2');
+        });
+
+        it('6/9 intervals carry the 6th and 9th (1 3 5 6 9)', () => {
+            const intervals = getIntervals(getState(), '6/9', false, 'standard', 'Rock', false);
+            expect(intervals).toContain(9); // major 6th
+            expect(intervals).toContain(14); // 9th
+            expect(intervals).toEqual([0, 4, 7, 9, 14]);
+        });
+
+        it('7sus4 has a perfect 4th, no 3rd, and a ♭7', () => {
+            const intervals = getIntervals(getState(), '7sus4', true, 'standard', 'Rock', false);
+            expect(intervals).toContain(5); // perfect 4th
+            expect(intervals).not.toContain(4); // no major 3rd
+            expect(intervals).toContain(10); // ♭7
+        });
+
+        it('add2 carries the added 2nd', () => {
+            const intervals = getIntervals(getState(), 'add2', false, 'standard', 'Rock', false);
+            expect(intervals).toContain(2); // major 2nd
+        });
+
+        it('C6/9 parses end-to-end as one chord, not "C6 over a 9 bass"', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'C6/9', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+            // The whole token is one chord — the slash is notation, not a bass split.
+            expect(arranger.progression).toHaveLength(1);
+            expect(arranger.progression[0].absName).toBe('C6/9');
+            // 1 3 5 6 9 — five distinct voiced pitches, no dropped/orphaned bass.
+            expect(arranger.progression[0].freqs.length).toBe(5);
+        });
+    });
 });

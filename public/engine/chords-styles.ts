@@ -205,10 +205,16 @@ export function getIntervals(
             intervals = [0, 4, 7, 11];
         } else if (quality === 'sus4') {
             intervals = [0, 5, 7];
+        } else if (quality === '7sus4') {
+            intervals = [0, 5, 7, 10]; // 1 4 5 b7 — suspended dominant
         } else if (quality === 'sus2') {
             intervals = [0, 2, 7];
         } else if (quality === 'add9') {
             intervals = [0, 4, 7, 14];
+        } else if (quality === 'add2') {
+            intervals = [0, 2, 4, 7]; // 1 2 3 5 — added 2nd in the same octave (vs add9)
+        } else if (quality === '6/9') {
+            intervals = [0, 4, 7, 9, 14]; // 1 3 5 6 9 — the lush 6/9 color
         } else if (quality === '6') {
             intervals = [0, 4, 7, 9];
         } else if (quality === 'm6') {
