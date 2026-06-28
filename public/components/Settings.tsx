@@ -80,7 +80,6 @@ export function Settings() {
 
     const masterVolume = useEnsembleState((s) => s.playback.masterVolume);
     const complexity = useEnsembleState((s) => s.playback.complexity);
-    const phraseFirstSoloist = useEnsembleState((s) => s.soloist.phraseFirstSoloist);
 
     let complexityLabel = 'Low';
     if (complexity > 0.33) {
@@ -351,25 +350,6 @@ export function Settings() {
                                             );
                                         }}
                                         ariaValueText={complexityLabel}
-                                    />
-                                </SettingRow>
-
-                                <SettingRow
-                                    label="Phrase-first lead (beta)"
-                                    description="Experimental soloist engine: states a theme and develops it with intentional phrasing and breath. Off uses the current engine."
-                                    id="phraseFirstSoloistCheck"
-                                >
-                                    <Toggle
-                                        id="phraseFirstSoloistCheck"
-                                        checked={phraseFirstSoloist}
-                                        onChange={(val) => {
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'soloist',
-                                                param: 'phraseFirstSoloist',
-                                                value: val,
-                                            });
-                                            saveCurrentState();
-                                        }}
                                     />
                                 </SettingRow>
 

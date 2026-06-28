@@ -11,7 +11,6 @@ import {
 } from './coordination-engine.js';
 import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
-import { getSoloistNote } from './soloist.js';
 import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
 
@@ -108,13 +107,11 @@ export function generateNotesForStep(
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
             const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
-            // Parallel phrase-first engine, gated by the user-facing flag. Both
-            // share an identical signature + session-state contract, so the
-            // post-call block below works unchanged either way.
-            const soloistFn = soloist.phraseFirstSoloist
-                ? getSoloistNotePhraseFirst
-                : getSoloistNote;
-            soloResult = soloistFn(
+            // Phrase-first is THE soloist engine (the beta toggle was retired once
+            // it became the default). It self-delegates to the legacy generator
+            // during the brief pre-seed window (no session seed yet), so the
+            // legacy path stays reachable as an internal fallback.
+            soloResult = getSoloistNotePhraseFirst(
                 state,
                 chord || null,
                 nextChordData?.chord || null,

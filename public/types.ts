@@ -877,12 +877,6 @@ export interface SoloistState {
     /** Whether tracking motifs is enabled. */
     readonly motifTracking: boolean;
     /**
-     * Experimental: route generation through the parallel phrase-first engine
-     * (`soloist-phrase-first.ts`) instead of the legacy `getSoloistNote`.
-     * User-facing toggle (Settings → Performance Engine). Default false.
-     */
-    readonly phraseFirstSoloist: boolean;
-    /**
      * User-pinned Greats profile (e.g. 'evans', 'bird'). When non-null and
      * present in the active genre's `INFLUENCE_POOLS` pool, the soloist
      * sticky-retains this profile across section boundaries instead of
@@ -1421,7 +1415,6 @@ export type ActionPayloadUpdateSB = Partial<{
     doubleStopProb: number;
     tradeMode: string;
     motifTracking: boolean;
-    phraseFirstSoloist: boolean;
     pinnedProfile: string | null;
     sessionSeed: SoloistSessionSeed | null;
     soloistHook: SoloistHookLane | null;

@@ -64,7 +64,6 @@ export function saveCurrentState(): void {
             volume: soloist.volume,
             reverb: soloist.reverb,
             mode: soloist.mode,
-            phraseFirstSoloist: soloist.phraseFirstSoloist,
         },
         harmony: {
             enabled: harmony.enabled,

@@ -82,9 +82,6 @@ export const soloist = deepSignal<SoloistState>({
     doubleStopProb: 1.0,
     tradeMode: 'manual',
     motifTracking: false,
-    // Experimental phrase-first soloist engine (Settings → Performance Engine).
-    // false = legacy getSoloistNote. See docs/design/soloist-phrase-first.md.
-    phraseFirstSoloist: false,
     // why: Epic 12 S3 — user-pinned Greats profile. `null` keeps the
     // historical 80%-section-boundary auto-rotation; non-null sticky-retains
     // the chosen profile across boundaries (see soloist.ts rotation site).
@@ -214,7 +211,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
     motifTracking: { kind: 'config', key: 'motifTracking' },
-    phraseFirstSoloist: { kind: 'config', key: 'phraseFirstSoloist' },
     pinnedProfile: { kind: 'config', key: 'pinnedProfile' },
 
     // --- Session (top-level) ---
