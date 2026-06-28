@@ -81,6 +81,25 @@ describe('buildChordText', () => {
             // C major, #VII = semitone 12 = 0 = C
             expect(buildChordText(7, '#', MAJ, 'name', 'C', false)).toBe('C');
         });
+
+        it('spells sharp in a sharp key, flat in a flat key (#779)', () => {
+            // Pitch class 8 spelled both ways by key context — the editor now
+            // matches how the rendered chart already spells these roots.
+            // E major iii = G# (sharp key); Eb major IV = Ab (flat key).
+            expect(buildChordText(3, '', MAJ, 'name', 'E', false)).toBe('G#');
+            expect(buildChordText(4, '', MAJ, 'name', 'Eb', false)).toBe('Ab');
+            // Whole E-major triad set reads with sharps, not Gb/Ab/Db.
+            expect(buildChordText(2, '', MIN, 'name', 'E', false)).toBe('F#m');
+            expect(buildChordText(6, '', M7, 'name', 'E', false)).toBe('C#m7');
+        });
+
+        it('lets an explicit accidental win over the key context (#779)', () => {
+            // Explicit '#' in flat-defaulting C major still spells sharp...
+            expect(buildChordText(4, '#', MAJ, 'name', 'C', false)).toBe('F#');
+            // ...and an explicit 'b' borrowed into a sharp key stays flat (E major
+            // bV lands on pc 10 → Bb, not the key-default A#).
+            expect(buildChordText(5, 'b', MAJ, 'name', 'E', false)).toBe('Bb');
+        });
     });
 });
 
