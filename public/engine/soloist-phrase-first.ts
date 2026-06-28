@@ -1,7 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
-import { getSoloistNote } from './soloist.js';
 import { guitarDoubleStopVoice } from './soloist-devices.js';
 import { allowsSoloistPolyphony } from './soloist-mode-policy.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
@@ -225,12 +224,16 @@ export function getSoloistNotePhraseFirst(
     currentChord: any,
     nextChord: any,
     step: number,
-    prevFreq: number | null,
-    octave: number,
+    // prevFreq/octave/stepInChord/coordination/stepInfo are vestigial: they exist
+    // only to keep the positional call contract with tick-logic (the signature was
+    // copied from the now-retired legacy `getSoloistNote`, epic #10). Phrase-first
+    // derives these from `state`/its own structure and never reads the params.
+    _prevFreq: number | null,
+    _octave: number,
     style: string,
-    stepInChord: number,
-    coordination: any = {},
-    stepInfo: any = null,
+    _stepInChord: number,
+    _coordination: any = {},
+    _stepInfo: any = null,
 ): any {
     const { playback, soloist, arranger } = state;
 
@@ -239,23 +242,19 @@ export function getSoloistNotePhraseFirst(
         return null;
     }
 
-    // Build 2a only knows how to perform a stated theme. Without a seed (the
-    // brief pre-seed window, or a genre that produced none) defer to the proven
-    // legacy engine so the soloist is never silent-by-bug.
+    // Phrase-first performs a stated theme. The seed is generated synchronously
+    // on play (state-effects `regenerateSessionSeeds`) before the first tick, and
+    // `generateSessionSeed` only yields an empty `notes` array in degenerate cases
+    // — no stepMap / no sectionMap / totalSteps === 0 (soloist-seeder), i.e. an
+    // empty chart with nothing to solo over. So a missing seed means there is no
+    // music to play against: rest. (#861 — this branch replaced a delegation to
+    // the legacy `getSoloistNote` engine, retired in epic #10; a guard test in
+    // tests/standards proves every canonical genre seeds non-empty for a real
+    // chart, so this rest path is unreachable in normal playback.)
     const seed = soloist.session.seed;
     if (!seed?.notes?.length) {
-        return getSoloistNote(
-            state,
-            currentChord,
-            nextChord,
-            step,
-            prevFreq,
-            octave,
-            style,
-            stepInChord,
-            coordination,
-            stepInfo,
-        );
+        (soloist.session.phrasing as Mutable<typeof soloist.session.phrasing>).isResting = true; // @worker-mutation
+        return null;
     }
 
     const phr = soloist.session.phrasing as Mutable<typeof soloist.session.phrasing>;

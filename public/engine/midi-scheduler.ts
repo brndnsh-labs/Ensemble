@@ -19,14 +19,6 @@ export function startMidiTransport(_state: EnsembleState, time: number): void {
     sendMIDITransport('start', time);
 }
 
-export function dispatchMidiCountInSoloist(state: EnsembleState, res: any, time: number): void {
-    const { midi } = state;
-    if (!midi) {
-        return;
-    }
-    sendMIDINote(midi.soloistChannel, res.midi, res.velocity, time, res.duration || 0.25);
-}
-
 export function dispatchMidiDrum(
     state: EnsembleState,
     soundName: string,

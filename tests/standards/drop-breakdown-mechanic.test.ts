@@ -56,8 +56,10 @@ const bassSpy = vi.fn(() => ({ midi: 40, freq: 82.41, velocity: 0.8, durationSte
 const accompSpy = vi.fn(() => [{ midi: 64, freq: 329.63, velocity: 0.6, durationSteps: 4 }]);
 const harmonySpy = vi.fn(() => [{ midi: 67, freq: 392.0, velocity: 0.5, durationSteps: 4 }]);
 
-vi.mock('../../public/engine/soloist.js', () => ({
-    getSoloistNote: (...a: any[]) => soloistSpy(...a),
+// Mock THE production soloist producer (tick-logic calls getSoloistNotePhraseFirst,
+// not the retired legacy getSoloistNote; epic #10).
+vi.mock('../../public/engine/soloist-phrase-first.js', () => ({
+    getSoloistNotePhraseFirst: (...a: any[]) => soloistSpy(...a),
 }));
 vi.mock('../../public/engine/bass-engine.js', () => ({
     getBassNote: (...a: any[]) => bassSpy(...a),

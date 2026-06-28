@@ -4,7 +4,6 @@ import type { EnsembleState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
-    getFrequency,
     getMidi,
     getStepInfo,
     getStepsPerMeasure,
@@ -49,7 +48,6 @@ import {
     dispatchMidiBass,
     dispatchMidiChordNote,
     dispatchMidiChordSustain,
-    dispatchMidiCountInSoloist,
     dispatchMidiDrum,
     dispatchMidiHarmonyNote,
     dispatchMidiSoloist,
@@ -61,7 +59,6 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
-import { getSoloistNote } from './soloist.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed, killActiveVoices } from './synth-utils.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
@@ -459,7 +456,7 @@ function advanceCountIn(state: EnsembleState): void {
 }
 
 function scheduleCountIn(state: EnsembleState, beat: number, time: number): void {
-    const { playback, arranger, soloist, vizState } = state;
+    const { playback, arranger } = state;
     if (!playback.audio) {
         return;
     }
@@ -501,70 +498,9 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
     };
     osc.start(time);
     osc.stop(time + 0.1);
-
-    // --- Soloist Pick-up Support ---
-    const pickupStep = (beat - ts.beats) * ts.stepsPerBeat;
-    const firstChord: any = arranger.stepMap?.[0]?.chord || {
-        rootMidi: 60,
-        scale: [0, 2, 4, 5, 7, 9, 11],
-        intervals: [0, 4, 7],
-    };
-    const pickupStepInfo = getStepInfo(
-        pickupStep,
-        ts,
-        arranger.measureMap || ([] as any),
-        signatures,
-    );
-
-    const soloistNote = getSoloistNote(
-        state,
-        firstChord,
-        firstChord,
-        pickupStep,
-        soloist.audio.lastFreq as any,
-        soloist.octave,
-        soloist.style as any,
-        0,
-        { sectionStart: 0, sectionEnd: arranger.totalSteps || 0, bypassRhythm: false },
-        pickupStepInfo,
-    );
-
-    if (soloistNote) {
-        const results = Array.isArray(soloistNote) ? soloistNote : [soloistNote];
-        const pickupStepSec = secondsPerStepFor(playback.bpm);
-        results.forEach((res: any, voiceIndex: number) => {
-            const freq = res.freq || getFrequency(res.midi);
-            // convert step count to seconds via the canonical step duration.
-            const duration = (res.durationSteps || 4) * pickupStepSec;
-
-            playSoloNote(
-                state,
-                freq,
-                time,
-                duration,
-                res.velocity,
-                res.bendStartInterval || 0,
-                soloist.style,
-                false,
-                res.vibrato,
-                humanizeSeed(pickupStep, 'soloist', voiceIndex),
-                res.expression,
-            );
-            dispatchMidiCountInSoloist(state, res, time);
-            if (vizState.enabled) {
-                const { name, octave } = midiToNote(res.midi);
-                queueVisualizerNoteEvent(playback, {
-                    track: 'soloist',
-                    midi: res.midi,
-                    time,
-                    velocity: res.velocity,
-                    duration,
-                    noteName: name,
-                    octave,
-                });
-            }
-        });
-    }
+    // (The soloist count-in pick-up was retired in #860 — the legacy
+    // `getSoloistNote` engine's last real-time caller. The count-in is now just
+    // the metronome click above; the soloist enters on the downbeat.)
 }
 
 function advanceGlobalStep(state: EnsembleState): void {

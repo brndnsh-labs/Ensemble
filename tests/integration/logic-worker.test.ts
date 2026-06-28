@@ -166,6 +166,20 @@ describe('Logic Worker Integration', () => {
         state.soloist.enabled = true;
         state.soloist.style = 'rock';
         state.playback.bandIntensity = 1.0; // High intensity to ensure notes are generated
+        // Phrase-first (the live soloist engine) performs a seeded theme; without
+        // a seed it rests (epic #10, #861 — replaced the legacy no-seed fallback).
+        // Production syncs the seed to the worker on play; mirror that with a
+        // minimal theme so the buffer actually fills.
+        state.soloist.session.seed = {
+            loopLengthSteps: 16,
+            notes: [
+                { step: 0, midi: 67, durationSteps: 2, velocity: 0.8 },
+                { step: 4, midi: 64, durationSteps: 2, velocity: 0.8 },
+                { step: 8, midi: 67, durationSteps: 2, velocity: 0.8 },
+                { step: 12, midi: 71, durationSteps: 2, velocity: 0.8 },
+            ],
+        };
+        state.soloist.session.phrasing.isResting = false;
 
         mockPostMessage.mockClear();
         self.onmessage({
