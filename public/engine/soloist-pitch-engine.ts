@@ -302,10 +302,11 @@ function pushUniqueDevice(devices: string[], device: string | null | undefined):
  * the top device is N× as likely as the worst while every candidate keeps a
  * non-zero chance (variety is preserved — this is a bias, not a hard sort).
  *
- * Exported so the device-selection critique test can measure the distribution
- * deterministically with an injected RNG.
+ * Module-private: its only external consumer was a device-selection critique test
+ * retired in epic #10 (#863). Still used internally by the legacy device picker
+ * (selectPitchAndDevices) until that path is deleted in #865.
  */
-export function pickByRank<T>(ranked: T[], random: () => number = Math.random): T | null {
+function pickByRank<T>(ranked: T[], random: () => number = Math.random): T | null {
     if (ranked.length === 0) {
         return null;
     }

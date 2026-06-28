@@ -1,173 +1,144 @@
 // @ts-nocheck
-/* eslint-disable */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/engine/soloist.js';
-import { getState } from '../../public/state.js';
+// Soloist musicality & thematic integrity critique — PRODUCTION-FAITHFUL on the
+// live engine (getSoloistNotePhraseFirst). Rerouted from the retired legacy
+// getSoloistNote (epic #10, #863). Real dispatch-built state, a real seed, an
+// absolute advancing step with currentLoopCount per loop (mirrors scheduler-core),
+// scanned across a full macro-form over a jazz progression.
+//
+// What this guards: the live line RESOLVES ONTO CHORD TONES — phrase-first's §5
+// voice-leading keystone pulls strong-beat notes onto guide/functional chord
+// tones (landOnTarget), and the developed body stays in-key. And it stays inside
+// a sane register.
+//
+// DROPPED (dark on phrase-first): the legacy "Conclusion vs Departure" SRDC
+// asymmetry test mutated `soloist.srdcState` and measured a LIVE per-tick
+// chord-tone re-bias. Phrase-first bakes SRDC structure into the SEED at
+// generation time and never reads a live `srdcState` per tick, so that
+// asymmetry is not a live behavior here — the assertion is intentionally
+// dropped, not loosened. (dark; re-added by #869/#870 if a live SRDC tilt is ported)
+import { describe, expect, it } from 'vitest';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 
-const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
+function buildState(presetName: string) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+    dispatch(ACTIONS.SET_KEY, 'C');
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: 'Jazz' });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart', mode: 'monophonic' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, 0.6);
+    dispatch(ACTIONS.SET_BPM, 120);
+    const state = getState();
+    const preset = CHORD_PRESETS.find((p) => p.name === presetName);
+    state.arranger.key = 'C';
+    state.arranger.isMinor = false;
+    state.arranger.sections = preset.sections.map((s, i) => ({ ...s, id: `p-${i}` }));
+    validateProgression(state);
+    return state;
+}
 
-// Define mockState in a way that vi.mock can capture it
-const { testState } = vi.hoisted(() => ({
-    testState: {
-        playback: { bandIntensity: 0.5, bpm: 120, complexity: 0.5, intent: {}, lyricalBias: 0.5 },
-        groove: { genreFeel: 'Jazz', pocket: 0 },
-        soloist: makeSoloistMock({
-            enabled: true,
-            style: 'smart',
-            mode: 'monophonic',
-            octave: 64,
-            sessionSteps: 0,
-            currentPhraseSteps: 0,
-            notesInPhrase: 0,
-            srdcState: 'Conclusion',
-            isResting: false,
-            motifBuffer: [],
-            thematicSeed: [],
-            thematicSeedRoot: 0,
-            isReplayingMotif: false,
-            isReplayingSeed: false,
-            busySteps: 0,
-            pitchHistory: [],
-            lastInterval: 0,
-            stagnationCount: 0,
-            phraseContext: {
-                role: 'call',
-                skeleton: [],
-                lastInterval: null,
-                profile: 'srv',
-            },
-        }),
-        harmony: { enabled: false },
-        arranger: { timeSignature: '4/4' },
-    },
-}));
+function simulate(presetName = 'Jazz Blues') {
+    const state = buildState(presetName);
+    const seed = generateSessionSeed(state, state.arranger, 'smart', 0.6, 'MUSICALITY_CRITIQUE');
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = false;
 
-vi.mock('../../public/state.js', () => ({
-    stateMap: testState,
-    getState: () => testState,
-    dispatch: vi.fn(),
-}));
+    const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (s: number) => {
+        const w = ((s % total) + total) % total;
+        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+    };
 
-describe('Soloist Musicality & Thematic Integrity', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        testState.playback.bandIntensity = 0.5;
-    });
-
-    it('should statistically resolve to chord tones in the Conclusion phase', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
-        const chordTones = [0, 4, 7, 11];
-
-        // Simulate a conclusion phase by using a high iteration count
-        // and checking for chord tone bias
-        let chordToneHits = 0;
-        let totalNotes = 0;
-        // Engine returns null on many steps (rests / busy-step gating); push
-        // iterations high enough that totalNotes lands ~150+ for a tight CI.
-        const iterations = 800;
-
-        for (let i = 0; i < iterations; i++) {
-            const note = getSoloistNote(getState(), chord, chord, i, null, 64, 'scalar', i % 16);
-            if (note) {
-                totalNotes++;
-                const primary = Array.isArray(note) ? note[0] : note;
-                if (chordTones.includes(primary.midi % 12)) {
-                    chordToneHits++;
-                }
+    const notes: any[] = [];
+    for (let abs = 0; abs < loopLen * 3 + 64; abs++) {
+        state.playback.currentLoopCount = Math.floor(abs / total);
+        const chord = chordAt(abs);
+        const res = getSoloistNotePhraseFirst(
+            state,
+            chord,
+            chordAt(abs + 1),
+            abs,
+            null,
+            state.soloist.octave,
+            'smart',
+            abs % 16,
+            {},
+            { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
+        );
+        if (!res || !chord) {
+            continue;
+        }
+        for (const n of Array.isArray(res) ? res : [res]) {
+            if (typeof n.midi === 'number') {
+                notes.push({
+                    midi: n.midi,
+                    chord,
+                    isStrongBeat: abs % 16 === 0 || abs % 16 === 8,
+                });
             }
         }
+    }
+    return notes;
+}
 
-        const ratio = chordToneHits / totalNotes;
-        console.log(
-            `[Soloist Conclusion] Chord-tone ratio: ${(ratio * 100).toFixed(1)}% over ${totalNotes} notes (Target: >55%, random baseline 33%)`,
-        );
-        // Chord [0,4,7,11] = 4 of 12 chromatic pitches → 33% uniform-random
-        // baseline. With srdcState='Conclusion' and the SRDC-aware chord-tone
-        // multiplier (soloist-pitch-engine.ts), engine delivers ~70-82% over
-        // sample runs. Threshold 0.55 is 22pt above random and ~14pt below
-        // the worst observed Conclusion rate.
-        expect(ratio).toBeGreaterThan(0.55);
+const isChordTone = (n: any) => {
+    const rel = (((n.midi - n.chord.rootMidi) % 12) + 12) % 12;
+    return (n.chord.intervals ?? []).some((iv: number) => ((iv % 12) + 12) % 12 === rel);
+};
+
+describe('Soloist Musicality & Thematic Integrity (phrase-first)', () => {
+    it('resolves the line onto chord tones, hardest on strong beats (voice-leading)', () => {
+        const notes = simulate('Jazz Blues');
+        expect(notes.length).toBeGreaterThan(80);
+
+        const strong = notes.filter((n) => n.isStrongBeat);
+        expect(strong.length).toBeGreaterThan(20);
+
+        const overallShare = notes.filter(isChordTone).length / notes.length;
+        const strongShare = strong.filter(isChordTone).length / strong.length;
+
+        console.log('\n--- SOLOIST MUSICALITY CRITIQUE (phrase-first) ---');
+        console.log(`notes=${notes.length} strong=${strong.length}`);
+        console.log(`[Overall chord-tone share] ${(overallShare * 100).toFixed(1)}%`);
+        console.log(`[Strong-beat chord-tone]   ${(strongShare * 100).toFixed(1)}%`);
+        console.log('--------------------------------------------\n');
+
+        // Baseline: a jazz 7th chord covers 4 of 12 chromatic pitch classes →
+        // 33% uniform-random chord-tone rate. Live phrase-first lands 59.8%
+        // overall and 85.0% on strong beats (the §5 voice-leading keystone pulls
+        // downbeat/midpoint notes onto guide/functional chord tones). Deterministic
+        // (seeded scrambleHash; identical across runs).
+        // Overall: 0.50 is 17pp above the 33% baseline with ~10pp live headroom.
+        expect(overallShare).toBeGreaterThan(0.5);
+        // Strong beats: 0.72 is 39pp above baseline with ~13pp live headroom —
+        // this is the real claim, the line RESOLVES where it matters metrically.
+        expect(strongShare).toBeGreaterThan(0.72);
+        // And it resolves HARDER on strong beats than overall (the voice-leading
+        // asymmetry): live gap is 25.2pp; >0.10 guards the asymmetry with headroom.
+        expect(strongShare - overallShare).toBeGreaterThan(0.1);
     });
 
-    it('should resolve to chord tones harder in Conclusion than in Departure', () => {
-        // The phase-aware multiplier in soloist-pitch-engine.ts pushes
-        // chord-tone weight up in Conclusion (×1.5) and down in Departure
-        // (×0.7). Real soloists lean home at the end of a section and
-        // explore extensions during chorus/bridge — this test pins that
-        // asymmetry. Closes Open finding #1 in docs/archive/MUSICAL_AUDIT.md.
-        const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
-        const chordTones = [0, 4, 7, 11];
-        const iterations = 800;
-
-        // Clear the SRV profile for this test so phase tilt isn't competing
-        // with a profile that also favors chord tones. SRDC bias is the only
-        // signal we want this test to measure.
-        const originalProfile = testState.soloist.session.currentPhrase.context.profile;
-        testState.soloist.session.currentPhrase.context.profile = null;
-
-        const measure = (phase: string): { ratio: number; count: number } => {
-            testState.soloist.srdcState = phase;
-            let chordToneHits = 0;
-            let totalNotes = 0;
-            for (let i = 0; i < iterations; i++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord,
-                    chord,
-                    i,
-                    null,
-                    64,
-                    'scalar',
-                    i % 16,
-                );
-                if (note) {
-                    totalNotes++;
-                    const primary = Array.isArray(note) ? note[0] : note;
-                    if (chordTones.includes(primary.midi % 12)) {
-                        chordToneHits++;
-                    }
-                }
-            }
-            return { ratio: chordToneHits / totalNotes, count: totalNotes };
-        };
-
-        const conclusion = measure('Conclusion');
-        const departure = measure('Departure');
-        // Restore the surrounding test state for any later it() blocks.
-        testState.soloist.srdcState = 'Conclusion';
-        testState.soloist.session.currentPhrase.context.profile = originalProfile;
-
-        console.log(
-            `[Soloist SRDC] Conclusion: ${(conclusion.ratio * 100).toFixed(1)}% (${conclusion.count}), ` +
-                `Departure: ${(departure.ratio * 100).toFixed(1)}% (${departure.count}), ` +
-                `gap: ${((conclusion.ratio - departure.ratio) * 100).toFixed(1)}pt`,
-        );
-
-        // Both phases stay above the 33% random baseline (the engine still
-        // prefers chord tones overall — real soloists ground occasionally
-        // even during a chorus), but Conclusion should clear Departure by a
-        // documented margin. The gap is the musical claim: Conclusion
-        // resolves; Departure explores. Across 10 sample runs at 800
-        // iterations: Conclusion landed 75-86%, Departure landed 43-59%,
-        // gap 18.5-43pt. Threshold 0.10 is well below the worst observed.
-        expect(conclusion.count).toBeGreaterThan(80);
-        expect(departure.count).toBeGreaterThan(80);
-        expect(conclusion.ratio).toBeGreaterThan(0.55);
-        expect(departure.ratio).toBeGreaterThan(0.33);
-        expect(conclusion.ratio - departure.ratio).toBeGreaterThan(0.1);
-    });
-
-    it('should generate notes within a consistent range', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7, 11], beats: 4 };
-        const iterations = 100;
-
-        for (let i = 0; i < iterations; i++) {
-            const note = getSoloistNote(getState(), chord, chord, i, null, 64, 'scalar', i % 16);
-            if (note) {
-                const primary = Array.isArray(note) ? note[0] : note;
-                expect(primary.midi).toBeGreaterThanOrEqual(40);
-                expect(primary.midi).toBeLessThanOrEqual(100);
-            }
+    it('keeps every note inside the soloist register', () => {
+        const notes = simulate('Jazz Blues');
+        // Register contract (coordination-engine): soloist priority 60-90, clamp
+        // only below MIDI 52; the engine caps the apex money note at 90 and folds
+        // the developed body under 88. Live range is min=55 max=87 — assert the
+        // contract bounds [52, 90] so a regression that lets the line fly out of
+        // register (octave-fold bug, runaway apex reach) fails loudly.
+        for (const n of notes) {
+            expect(n.midi).toBeGreaterThanOrEqual(52);
+            expect(n.midi).toBeLessThanOrEqual(90);
         }
+        const lo = Math.min(...notes.map((n) => n.midi));
+        const hi = Math.max(...notes.map((n) => n.midi));
+        console.log(`[Register] min=${lo} max=${hi}`);
+        expect(lo).toBeGreaterThanOrEqual(52);
+        expect(hi).toBeLessThanOrEqual(90);
     });
 });

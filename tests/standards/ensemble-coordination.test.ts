@@ -4,7 +4,7 @@
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getHarmonyNotes } from '../../public/engine/harmonies.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
@@ -141,11 +141,29 @@ describe('Ensemble Coordination Contract', () => {
         });
 
         it('Soloist coordination context allows for structural flares', () => {
-            // This test verifies the context is accepted and accessible
+            // This test verifies the LIVE soloist engine (getSoloistNotePhraseFirst,
+            // epic #10 reroute from the retired legacy getSoloistNote) accepts the
+            // coordination context and executes against a seeded session without
+            // throwing. Phrase-first rests (returns null) unless a session seed is
+            // present, so we install a small theme + clear isResting to keep the lane
+            // active. Not a density/metric claim — soloist musicality is guarded by
+            // tests/standards/soloist-*-critique; this is a coordination-contract
+            // smoke test for one lane.
             const chord = { rootMidi: 60, intervals: [0, 4, 7] };
             const context = { isMeasureEnd: true };
-            const _note = getSoloistNote(
-                getState(),
+            const state = getState();
+            state.soloist.session.seed = {
+                loopLengthSteps: 16,
+                notes: [
+                    { step: 0, midi: 67, durationSteps: 2, velocity: 0.8 },
+                    { step: 4, midi: 71, durationSteps: 2, velocity: 0.8 },
+                    { step: 8, midi: 67, durationSteps: 2, velocity: 0.8 },
+                    { step: 12, midi: 64, durationSteps: 2, velocity: 0.8 },
+                ],
+            };
+            state.soloist.session.phrasing.isResting = false;
+            const note = getSoloistNotePhraseFirst(
+                state,
                 chord,
                 null,
                 12,
@@ -159,9 +177,10 @@ describe('Ensemble Coordination Contract', () => {
                 },
             );
 
-            // We don't assert density here due to randomness,
-            // but we ensure the function executes with the new context without error.
-            expect(true).toBe(true);
+            // Phrase-first returns either a rest (null) or a note/double-stop
+            // (object/array) — never a primitive or undefined. Shape guard that the
+            // call completed with the coordination context accepted.
+            expect(note === null || typeof note === 'object').toBe(true);
         });
     });
 

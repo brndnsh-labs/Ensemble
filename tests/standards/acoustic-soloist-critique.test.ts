@@ -1,339 +1,224 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// @ts-nocheck
+// Acoustic soloist idiom critique — PRODUCTION-FAITHFUL on the live engine
+// (getSoloistNotePhraseFirst). Rerouted from the retired legacy getSoloistNote
+// (epic #10, #863). Real dispatch-built state, a real seed, an absolute advancing
+// step with currentLoopCount per loop (mirrors scheduler-core), scanned across a
+// full macro-form over an I-IV-vi-V major-key pop/ballad progression — the
+// bread-and-butter singer-songwriter acoustic home.
+//
+// What this guards: the acoustic lead is diatonic singer-songwriter material
+// (low chromaticism over major chords), sits in a centered/low register, and
+// breathes (sparse, short audible phrases). Device assertions (the legacy
+// slide/run allowlist) were DROPPED — phrase-first notes have NO .device field;
+// those gestures are produced only by the retired legacy engine and are tracked
+// for porting in #869/#870. Double-stop RATE is guarded by
+// phrase-first-double-stop-critique.
+import { describe, expect, it } from 'vitest';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
-import { getState } from '../../public/state.js';
-import { getStepInfo } from '../../public/utils.js';
-import { makeSoloistMock } from '../utils/mock-soloist.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-    dispatch: vi.fn(),
-}));
-
-vi.mock('../../public/config.js', () => ({
-    TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4 },
-    },
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-}));
-
-interface SoloChord {
-    rootMidi: number;
-    quality: string;
-    intervals: number[];
-    beats: number;
+function buildState(presetName: string) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+    dispatch(ACTIONS.SET_KEY, 'C');
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: 'Acoustic' });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart', mode: 'guitar' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, 0.6);
+    dispatch(ACTIONS.SET_BPM, 92);
+    const state = getState();
+    const preset = CHORD_PRESETS.find((p) => p.name === presetName);
+    state.arranger.key = 'C';
+    state.arranger.isMinor = false;
+    state.arranger.sections = preset.sections.map((s, i) => ({ ...s, id: `p-${i}` }));
+    validateProgression(state);
+    return state;
 }
 
-interface CapturedNote {
-    bar: number;
-    step: number;
-    primaryMidi: number;
-    device: string;
-    chordRoot: number;
-    chordQuality: string;
-}
+function simulate(presetName = 'Pop (Standard)', intensity = 0.6) {
+    const state = buildState(presetName);
+    const seed = generateSessionSeed(
+        state,
+        state.arranger,
+        'smart',
+        intensity,
+        'ACOUSTIC_CRITIQUE',
+    );
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = false;
 
-describe('Soloist Acoustic Critique', () => {
-    let soloistState: any;
-
-    const makeState = (bandIntensity: number, complexity: number) => ({
-        playback: {
-            bandIntensity,
-            bpm: 92,
-            complexity,
-            intent: {},
-            lyricalBias: 0.4,
-            currentLoopCount: 1,
-        },
-        groove: { genreFeel: 'Acoustic', pocket: 0 },
-        soloist: soloistState,
-        harmony: { enabled: false },
-        arranger: { timeSignature: '4/4' },
-    });
-
-    beforeEach(() => {
-        vi.restoreAllMocks();
-
-        soloistState = makeSoloistMock({
-            enabled: true,
-            // Explicit 'acoustic' STYLE_CONFIG profile (soloist-config.ts:489 —
-            // restBase 0.15, phraseActiveBeats 12, allowedDevices ['slide','run']).
-            //
-            // Routing note (see the resolution-guard test below): since #592 the
-            // Acoustic *genre* in smart mode plays exactly this profile
-            // (SMART_GENRES.Acoustic.soloist = 'acoustic') — it used to fall
-            // through to the generic 'minimal'. So this critique now guards what
-            // a user actually hears for the Acoustic genre.
-            style: 'acoustic',
-            mode: 'guitar',
-            octave: 64,
-            sessionSteps: 0,
-            currentPhraseSteps: 0,
-            notesInPhrase: 0,
-            srdcState: 'Statement',
-            qaState: 'Question',
-            isResting: true,
-            motifBuffer: [],
-            thematicSeed: [],
-            thematicSeedRoot: 0,
-            isReplayingMotif: false,
-            isReplayingSeed: false,
-            busySteps: 0,
-            pitchHistory: [],
-            lastInterval: 0,
-            stagnationCount: 0,
-            deviceBuffer: [],
-            lastFreq: 0,
-            currentCell: null,
-            phraseContext: {
-                role: 'call',
-                skeleton: [],
-                lastInterval: null,
-                profile: 'acoustic',
-            },
-        });
-
-        getState.mockReturnValue(makeState(0.6, 0.5));
-    });
-
-    const simulatePerformance = (
-        numBars: number,
-        intensity: number,
-    ): { notes: CapturedNote[]; totalSteps: number } => {
-        getState.mockReturnValue(makeState(intensity, 0.5));
-        const notes: CapturedNote[] = [];
-        // I-IV-vi-V singer-songwriter progression in C (C-F-Am-G) — the
-        // bread-and-butter acoustic-ballad loop. Mixes major and the relative
-        // minor so the harness exercises both branches of the chord-scale; the
-        // diatonic/chromatic metric below measures only the major-chord bars,
-        // each relative to its own root.
-        const C: SoloChord = { rootMidi: 60, quality: 'major', intervals: [0, 4, 7], beats: 4 };
-        const F: SoloChord = { rootMidi: 65, quality: 'major', intervals: [0, 4, 7], beats: 4 };
-        const Am: SoloChord = { rootMidi: 57, quality: 'm', intervals: [0, 3, 7], beats: 4 };
-        const G: SoloChord = { rootMidi: 55, quality: 'major', intervals: [0, 4, 7], beats: 4 };
-        const progression = [C, F, Am, G, C, F, G, C];
-
-        let lastFreq = 0;
-        let totalSteps = 0;
-        for (let bar = 0; bar < numBars; bar++) {
-            const chord = progression[bar % progression.length];
-            for (let step = 0; step < 16; step++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord,
-                    chord,
-                    bar * 16 + step,
-                    lastFreq,
-                    64,
-                    'acoustic',
-                    step,
-                    {},
-                    // Real getStepInfo so the engine's beat/backbeat/offbeat lanes
-                    // see live step metadata (smell-e guard: a hand-rolled stepInfo
-                    // would silence the rhythm planner's lanes).
-                    getStepInfo(bar * 16 + step, {
-                        beats: 4,
-                        stepsPerBeat: 4,
-                        grouping: [4],
-                        backbeat: [1, 3],
-                    }),
-                );
-                totalSteps++;
-                if (note) {
-                    const arr = Array.isArray(note) ? note : [note];
-                    const primary = arr[arr.length - 1];
-                    lastFreq = (primary as any).frequency || 0;
-                    notes.push({
-                        bar,
-                        step: bar * 16 + step,
-                        primaryMidi: primary.midi,
-                        device: (primary as any).device || 'none',
-                        chordRoot: chord.rootMidi,
-                        chordQuality: chord.quality,
-                    });
-                }
-                soloistState.session.sessionSteps++;
-            }
-        }
-        return { notes, totalSteps };
+    const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (s: number) => {
+        const w = ((s % total) + total) % total;
+        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
     };
 
-    // Segment the emitted notes into audible phrases: a silent gap of >= one
-    // beat (4 steps at 4/4 16ths) between successive attacks is a phrase
-    // boundary. This is the LISTENER's notion of a phrase — a contiguous run of
-    // notes bounded by a breath. (It is deliberately NOT the engine's internal
-    // `phraseCount`, which only ticks on a full rest-state wake and groups
-    // several gapped clusters into one window; see the phrase finding in the
-    // critique report below.)
-    const phraseLengths = (notes: CapturedNote[], gapSteps: number): number[] => {
-        const lengths: number[] = [];
-        let run = 0;
-        let prevStep = Number.NEGATIVE_INFINITY;
-        for (const n of notes) {
-            if (run > 0 && n.step - prevStep >= gapSteps) {
-                lengths.push(run);
-                run = 0;
-            }
-            run++;
-            prevStep = n.step;
+    const notes: any[] = [];
+    const attackSteps: number[] = [];
+    let scannedSteps = 0;
+    for (let abs = 0; abs < loopLen * 3 + 64; abs++) {
+        state.playback.currentLoopCount = Math.floor(abs / total);
+        const chord = chordAt(abs);
+        if (!chord) {
+            continue;
         }
-        if (run > 0) {
+        scannedSteps++;
+        const res = getSoloistNotePhraseFirst(
+            state,
+            chord,
+            chordAt(abs + 1),
+            abs,
+            null,
+            state.soloist.octave,
+            'smart',
+            abs % 16,
+            {},
+            { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
+        );
+        if (!res) {
+            continue;
+        }
+        let emitted = false;
+        for (const n of Array.isArray(res) ? res : [res]) {
+            if (typeof n.midi === 'number') {
+                emitted = true;
+                notes.push({
+                    step: abs,
+                    midi: n.midi,
+                    chordRoot: chord.rootMidi,
+                    quality: chord.quality,
+                });
+            }
+        }
+        if (emitted) {
+            attackSteps.push(abs);
+        }
+    }
+    return { notes, attackSteps, scannedSteps };
+}
+
+// Segment attack steps into audible phrases: a silent gap of >= one beat (4
+// steps at 4/4 16ths) between successive attacks is a phrase boundary — the
+// LISTENER's notion of a phrase, a contiguous run of notes bounded by a breath.
+function phraseLengths(steps: number[], gapSteps: number): number[] {
+    const lengths: number[] = [];
+    let run = 0;
+    let prevStep = Number.NEGATIVE_INFINITY;
+    for (const s of steps) {
+        if (run > 0 && s - prevStep >= gapSteps) {
             lengths.push(run);
+            run = 0;
         }
-        return lengths;
-    };
+        run++;
+        prevStep = s;
+    }
+    if (run > 0) {
+        lengths.push(run);
+    }
+    return lengths;
+}
 
-    it('should pass an idiom critique for a 256-bar Acoustic soloist performance', () => {
-        const numBars = 256;
-        const { notes, totalSteps } = simulatePerformance(numBars, 0.6);
+describe('Soloist Acoustic Critique (phrase-first)', () => {
+    it('keeps the acoustic lead diatonic, low/centered, and breathing over a major-key progression', () => {
+        const { notes, attackSteps, scannedSteps } = simulate('Pop (Standard)', 0.6);
+        expect(notes.length).toBeGreaterThan(50);
 
-        // (1) HIGH REST / SPACE RATIO ------------------------------------------
-        const restRatio = 1 - notes.length / totalSteps;
+        // (1) REST / SPACE RATIO — fraction of scanned steps with NO attack.
+        const restRatio = 1 - attackSteps.length / scannedSteps;
 
-        // (2) SHORT PHRASES (listener-facing, one-beat breath = boundary) ------
-        const phrases = phraseLengths(notes, 4);
+        // (2) SHORT, BREATHING PHRASES (one-beat breath = boundary).
+        const phrases = phraseLengths(attackSteps, 4);
         const maxPhrase = Math.max(...phrases);
         const avgPhrase = phrases.reduce((a, b) => a + b, 0) / phrases.length;
         const phrasesOver12 = phrases.filter((l) => l > 12).length;
 
-        // (3) LOW CHROMATICISM over major chords -------------------------------
-        // Hard-coded diatonic-major collection (NOT re-derived from the engine's
-        // theory-scales lookup — that would be smell-a).
+        // (3) LOW CHROMATICISM over major chords. Hard-coded diatonic-major
+        // collection (NOT the engine's own scale lookup — that would be a
+        // tautology).
         const DIATONIC_MAJOR = new Set([0, 2, 4, 5, 7, 9, 11]);
         let majNotes = 0;
         let chromaticOnMaj = 0;
         for (const n of notes) {
-            if (n.chordQuality === 'major') {
+            if (n.quality === 'major') {
                 majNotes++;
-                const rel = (n.primaryMidi - n.chordRoot + 120) % 12;
+                const rel = (n.midi - n.chordRoot + 120) % 12;
                 if (!DIATONIC_MAJOR.has(rel)) {
                     chromaticOnMaj++;
                 }
             }
         }
         const chromaticShare = chromaticOnMaj / majNotes;
-        // Uniform-chromatic out-of-scale baseline: 5 of the 12 PCs lie outside
-        // the diatonic-major collection → 5/12 = 0.4167.
-        const CHROMATIC_BASELINE = (12 - DIATONIC_MAJOR.size) / 12; // 0.4167
+        // Uniform-chromatic out-of-scale baseline: 5 of 12 PCs lie outside the
+        // diatonic-major collection → 5/12 = 0.4167.
+        const CHROMATIC_BASELINE = (12 - DIATONIC_MAJOR.size) / 12;
 
-        // (4) DEVICE SET RESTRICTED TO slide / run -----------------------------
-        const devices: Record<string, number> = {};
-        for (const n of notes) {
-            devices[n.device] = (devices[n.device] || 0) + 1;
-        }
-        // The discriminating claim: count every attack carrying a device that is
-        // NOT in {slide, run, none}. The acoustic config's allowedDevices is
-        // exactly ['slide','run']; 'none' is a plain (device-free) attack. Any
-        // other device firing (graceNote, enclosure, bluesCurl, …) would mean a
-        // cross-cutting leak.
-        const ALLOWED = new Set(['slide', 'run', 'none']);
-        const offProfileDeviceCount = Object.entries(devices)
-            .filter(([d]) => !ALLOWED.has(d))
-            .reduce((sum, [, c]) => sum + c, 0);
-        const slideCount = devices.slide || 0;
-        const runCount = devices.run || 0;
-
-        // (5) CENTERED / LOW REGISTER ------------------------------------------
-        const midis = notes.map((n) => n.primaryMidi);
+        // (4) CENTERED / LOW REGISTER.
+        const midis = notes.map((n) => n.midi);
         const minMidi = Math.min(...midis);
         const maxMidi = Math.max(...midis);
         const avgMidi = midis.reduce((a, b) => a + b, 0) / midis.length;
 
-        // --- DEVICE-SET ROBUSTNESS: re-measure at high intensity. Devices are
-        // intensity-gated; if the slide/run restriction is real it must hold as
-        // intensity rises (a leak that only appears at high energy would slip
-        // past a single-intensity check).
-        const hi = simulatePerformance(numBars, 0.9);
-        const hiDevices: Record<string, number> = {};
-        for (const n of hi.notes) {
-            hiDevices[n.device] = (hiDevices[n.device] || 0) + 1;
-        }
-        const hiOffProfile = Object.entries(hiDevices)
-            .filter(([d]) => !ALLOWED.has(d))
-            .reduce((sum, [, c]) => sum + c, 0);
+        console.log('\n--- ACOUSTIC SOLOIST CRITIQUE (phrase-first) ---');
+        console.log(`notes=${notes.length}, majNotes=${majNotes}, scanned=${scannedSteps}`);
+        console.log(`[Rest / Space Ratio]   ${(restRatio * 100).toFixed(1)}%`);
+        console.log(
+            `[Phrase len (1-beat)]  max ${maxPhrase}, avg ${avgPhrase.toFixed(2)}, >12: ${phrasesOver12}`,
+        );
+        console.log(
+            `[Chromatic Share /maj] ${(chromaticShare * 100).toFixed(2)}% (baseline ${(CHROMATIC_BASELINE * 100).toFixed(1)}%)`,
+        );
+        console.log(`[Register min/avg/max] ${minMidi} / ${avgMidi.toFixed(1)} / ${maxMidi}`);
+        console.log('------------------------------------------------\n');
 
-        console.log('\n--- ACOUSTIC SOLOIST CRITIQUE REPORT ---');
-        console.log(`[Rest / Space Ratio]      ${(restRatio * 100).toFixed(1)}% (Target: >0.65)`);
-        console.log(
-            `[Phrase len (1-beat gap)] max ${maxPhrase}, avg ${avgPhrase.toFixed(2)} (Target: max<=12)`,
-        );
-        console.log(`[Phrases > 12 notes]      ${phrasesOver12} (Target: ==0)`);
-        console.log(
-            `[Chromatic Share /maj]    ${(chromaticShare * 100).toFixed(2)}% (Target: <0.10; baseline ${CHROMATIC_BASELINE.toFixed(3)})`,
-        );
-        console.log(`[Devices fired]           ${JSON.stringify(devices)}`);
-        console.log(
-            `[Off-profile devices]     ${offProfileDeviceCount} @0.6 / ${hiOffProfile} @0.9 (Target: ==0; slide/run only)`,
-        );
-        console.log(`[slide / run counts]      slide ${slideCount} / run ${runCount} (Target: >0)`);
-        console.log(
-            `[Register min/avg/max]    ${minMidi} / ${avgMidi.toFixed(1)} / ${maxMidi} (Target: floor>=52, ceil<=90)`,
-        );
-        console.log('----------------------------------------\n');
+        // Deterministic — seeded scrambleHash; stable across runs. Thresholds
+        // carry fixed headroom, not a flake band.
 
-        // The soloist generation path is fully seeded (scrambleHash over
-        // step/section/loop), so every metric below is deterministic to the last
-        // digit across runs (verified identical across 30 runs during
-        // calibration). Thresholds therefore carry fixed headroom, not a flake
-        // band.
-
-        // (1) HIGH REST RATIO. The acoustic profile's restBase 0.15 plus its low
-        // rhythmicDensity (0.6) yields a very sparse line: engine delivers 80.0%
-        // rest steps over 256 bars at intensity 0.6. >0.65 sits ~15pp below the
-        // engine's output and well clear of a "busy" line (a dense soloist would
-        // run <50% rest). This is the literal "space over flash" claim.
+        // (1) HIGH REST RATIO. The acoustic line breathes — live phrase-first
+        // delivers 77.9% rest steps over a 3-loop macro-form at intensity 0.6. A
+        // busy/dense soloist would run <50% rest, so >0.65 sits ~13pp below the
+        // engine's output and well clear of a busy line. This is the "space over
+        // flash" claim.
         expect(restRatio).toBeGreaterThan(0.65);
 
-        // (2) SHORT PHRASES. Measured listener-facing (one-beat-breath) phrases:
-        // engine delivers max 7 notes, avg ~1.9. The named claim is "~<=12 notes
-        // per phrase"; the engine never produces a phrase longer than 7, so the
-        // <=12 ceiling holds with 5-note headroom and ZERO phrases exceed 12.
-        // NB: this uses the audible-phrase definition deliberately — see the
-        // phraseActiveBeats finding documented in the report. phraseActiveBeats
-        // 12 is a beat-scaled active-DURATION seed, not a hard note cap.
+        // (2) SHORT, BREATHING PHRASES. Live audible-phrase max is 9 notes, avg
+        // ~1.65. The named claim is "~<=12 notes per phrase"; the engine never
+        // produces a phrase longer than 9, so <=12 holds with 3-note headroom and
+        // ZERO phrases exceed 12.
         expect(maxPhrase).toBeLessThanOrEqual(12);
         expect(phrasesOver12).toBe(0);
 
         // (3) LOW CHROMATICISM. Acoustic is diatonic singer-songwriter material;
-        // out-of-scale notes over major chords run ~1.8%. Uniform-chromatic
-        // out-of-scale baseline is 0.417, so the engine sits ~40pp BELOW random
-        // — the opposite direction from baseline, which is the point. <0.10
-        // guards a regression that lets the line wander chromatic, with ~8pp
-        // headroom over the engine's 1.8%, and the explicit < baseline assertion
-        // prevents a sub-baseline pass (smell-b).
+        // live out-of-scale share over major chords is 6.54%. Uniform-chromatic
+        // out-of-scale baseline is 0.4167, so the engine sits ~35pp BELOW random —
+        // the opposite direction from baseline, which is the point. <0.10 guards a
+        // regression that lets the line wander chromatic (~3.5pp headroom over the
+        // live 6.54%), and the explicit < baseline assertion prevents a
+        // sub-baseline pass.
         expect(chromaticShare).toBeLessThan(0.1);
         expect(chromaticShare).toBeLessThan(CHROMATIC_BASELINE);
 
-        // (4) DEVICE SET RESTRICTED TO slide / run. The discriminating claim.
-        // Engine fires ZERO off-profile devices at intensity 0.6 AND at 0.9 —
-        // only slide, run, and plain (none) attacks appear. (The head-bypass
-        // device-injection path that can leak graceNote/enclosure requires a
-        // recorded session seed, which an early-session acoustic part does not
-        // have, so it never engages here.) Asserting an exact 0 count, plus that
-        // both named devices actually fire (so this isn't "no devices at all").
-        expect(offProfileDeviceCount).toBe(0);
-        expect(hiOffProfile).toBe(0);
-        expect(slideCount).toBeGreaterThan(0);
-        expect(runCount).toBeGreaterThan(0);
-
-        // (5) CENTERED / LOW REGISTER. The acoustic register profile centers low
-        // (liveCenter 66, liveFloor 60, liveCeiling 88). Engine delivers
-        // min 60 / avg ~71.8 / max 86 over 256 bars. Assertions pin the line
-        // inside the soloist register slot (52-90) and confirm it stays low/
-        // centered (floor >= 58, mean below the slot midpoint of 71, ceiling
-        // <= 90 — never climbing into a screaming-lead register).
-        expect(minMidi).toBeGreaterThanOrEqual(58);
+        // (4) CENTERED / LOW REGISTER. Live line runs min 52 / avg ~69.7 / max 88.
+        // minMidi >= 52 pins the line at/above the soloist register-slot floor
+        // (enforceRegisterSlotting clamps the soloist below MIDI 52 — this guards
+        // that clamp stays applied). maxMidi <= 90 keeps it under the slot ceiling
+        // (never climbing into a screaming-lead register; 2pt headroom over 88).
+        // avg < 74 keeps the line centered-LOW (below the 71-midpoint-ish center,
+        // ~4pt headroom over 69.7) — the warm acoustic-guitar register, not a
+        // bright soaring lead.
+        expect(minMidi).toBeGreaterThanOrEqual(52);
         expect(maxMidi).toBeLessThanOrEqual(90);
         expect(avgMidi).toBeLessThan(74);
     });
 
-    // why: style-resolution guard (the reggae dead-profile / Rock->shred class
-    // of bug). This pins the routing so a future change can't silently make this
-    // critique test the wrong thing. Since #592 the Acoustic GENRE in smart mode
-    // resolves to the 'acoustic' soloist profile (SMART_GENRES.Acoustic.soloist =
-    // 'acoustic') — the tailored profile this critique exercises is now what a
-    // user actually hears. If that edge flips, this guard fails loudly.
-    // (The full cross-genre table lives in soloist-routing-guard.test.ts.)
+    // why: style-resolution guard (the reggae dead-profile / Rock->shred class of
+    // bug). Pins routing so a future change can't silently make this critique test
+    // the wrong thing. Does not touch the engine — kept verbatim (#592/#628).
     it('resolves Acoustic genre/style to the documented soloist profiles', () => {
         // Smart mode + Acoustic feel -> 'acoustic' (the SMART_GENRES routing — the
         // profile a user actually hears for the Acoustic genre, post-#592).
