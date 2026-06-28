@@ -271,6 +271,92 @@ export class ExportProcessor {
     }
 
     /**
+     * Render a soloist bend-and-release gesture (#744/#747 `expression.bend`)
+     * into the `.mid` so the blues "cry" survives export — without it a stem
+     * keeps the bent note dead-flat. The audio voice ramps frequency
+     * continuously; MIDI pitch bend is a *stepped* controller, so we approximate
+     * the glide with a short linear series of pitch-bend events. Linear in bend
+     * value is linear in pitch (an even glide), matching the renderer. Bend
+     * range is 2 semitones (`setPitchBendRange`), so a peak of `s` semitones is
+     * `(s/2)·8192`, positive = up (the gesture always bends up to a pillar).
+     * Hold the written pitch until `onsetFrac`, ramp up to the peak at
+     * `peakFrac`, then ramp back to centre by `releaseFrac` (or, for a held
+     * bend with no release, by the note's end) so the shared channel is always
+     * reset to centre (0) for the next note. Steps that collapse onto one pulse are
+     * skipped, so a fast bend on a short note stays cheap.
+     */
+    emitBendGesture(
+        track: MidiTrack,
+        channel: number,
+        bend: {
+            peakSemitones?: number;
+            onsetFrac?: number;
+            peakFrac?: number;
+            releaseFrac?: number;
+        },
+        noteStartS: number,
+        noteEndS: number,
+    ): void {
+        const peakSemis = bend?.peakSemitones ?? 0;
+        const durS = noteEndS - noteStartS;
+        if (!(peakSemis > 0) || !(durS > 0)) {
+            return;
+        }
+        const frac = (v: number | undefined, fallback: number) =>
+            Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : fallback;
+        // Map semitones to bend value; +8191 is MIDI's max positive (14-bit is
+        // -8192..+8191), so a full whole-step peak lands one unit shy of nominal —
+        // inaudible. Clamp so a >whole-step peak can't overflow the 2-semitone range.
+        const peakVal = Math.min(8191, Math.round(Math.min(1, peakSemis / 2) * 8192));
+        const onsetFrac = frac(bend.onsetFrac, 0.12);
+        const peakFrac = Math.max(onsetFrac + 0.01, frac(bend.peakFrac, 0.4));
+        // releaseFrac present → reset to centre there; held bend (omitted) → by note end.
+        const releaseFrac = Number.isFinite(bend.releaseFrac)
+            ? Math.max(peakFrac + 0.01, frac(bend.releaseFrac, 0.85))
+            : 1;
+        const onsetS = noteStartS + onsetFrac * durS;
+        const peakS = noteStartS + peakFrac * durS;
+        const releaseS = noteStartS + releaseFrac * durS;
+
+        // Centre the channel at the note's onset (clears any leftover bend), then
+        // ramp through the gesture polyline, always ending at centre (0).
+        track.pitchBend(Math.max(0, this.toPulses(noteStartS)), channel, 0);
+        const waypoints: Array<[number, number]> = [
+            [onsetS, 0],
+            [peakS, peakVal],
+            [releaseS, 0],
+        ];
+        const STEPS = 10;
+        let lastPulse = -1;
+        let lastVal = 0;
+        for (let seg = 0; seg < waypoints.length - 1; seg++) {
+            const [t0, v0] = waypoints[seg];
+            const [t1, v1] = waypoints[seg + 1];
+            for (let i = 0; i <= STEPS; i++) {
+                if (seg > 0 && i === 0) {
+                    continue; // shared endpoint already emitted by the previous segment
+                }
+                const f = i / STEPS;
+                const pulse = Math.max(0, this.toPulses(t0 + (t1 - t0) * f));
+                if (pulse === lastPulse) {
+                    continue;
+                }
+                lastVal = Math.round(v0 + (v1 - v0) * f);
+                track.pitchBend(pulse, channel, lastVal);
+                lastPulse = pulse;
+            }
+        }
+        // Guarantee the channel ends at centre: if the down-ramp collapsed onto an
+        // already-emitted pulse (a note too short for the step grid), the dedup can
+        // drop the closing 0 and leave the channel bent for the next note. Force it
+        // at the next free pulse — unreachable at the picker's durationSteps>=4 gate,
+        // but cheap insurance that no export can play sharp after a bend.
+        if (lastVal !== 0) {
+            track.pitchBend(lastPulse + 1, channel, 0);
+        }
+    }
+
+    /**
      * Writes global MIDI CC automation (Expression and Tension) to tracks.
      */
     _writeAutomationToTracks(_globalStep: number, stepTimeS: number, stepInfo: StepInfo): void {
@@ -390,6 +476,13 @@ export class ExportProcessor {
                 if (res.bendStartInterval) {
                     const resetTimeS = Math.min(endTimeS, noteTimeS + 0.05);
                     track.pitchBend(this.toPulses(resetTimeS), channel, 0);
+                }
+
+                // Bend-and-release "cry" (#744/#747) — only the soloist carries it,
+                // and the picker gates it on bendStartInterval === 0 so the two
+                // never co-occur. Render the full glide so the .mid keeps the cry.
+                if (moduleName === 'soloist' && res.expression?.bend) {
+                    this.emitBendGesture(track, channel, res.expression.bend, noteTimeS, endTimeS);
                 }
 
                 if (moduleName === 'soloist') {
@@ -788,6 +881,17 @@ export class ExportProcessor {
                 if (n.module === 'soloist' && n.bendStartInterval) {
                     const resetTimeS = Math.min(endTimeS, resTimeS + offsetS + 0.05);
                     track.pitchBend(this.toPulses(resetTimeS), channel, 0);
+                }
+
+                // Bend-and-release "cry" on a resolution-buffer soloist note (#744/#747).
+                if (n.module === 'soloist' && n.expression?.bend) {
+                    this.emitBendGesture(
+                        track,
+                        channel,
+                        n.expression.bend,
+                        resTimeS + offsetS,
+                        endTimeS,
+                    );
                 }
 
                 track.noteOff(this.toPulses(endTimeS), channel, finalMidi);
