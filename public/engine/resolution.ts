@@ -247,8 +247,36 @@ export function generateResolutionNotes(
             const soloMidi = soloOctave + (soloPC % 12);
             const baseVel = isLast ? 0.68 : 0.7;
             const vel = getFinalVel(baseVel);
+
+            // Closing gesture (#830): after a whole song of singing, the lead used
+            // to JUMP to a bare held tonic — a flat-footed sign-off next to how
+            // melodic it's become. On a graceful (ritardando) ending it now plays a
+            // short stepwise turn that resolves INTO the final note — a 3-2-1
+            // descent (♭3-2-1 in minor) landing on the tonic the way a singer lands
+            // a last phrase, two quick pickups leading onto the final downbeat where
+            // the band arrives. BUTTON genres keep the single tight tonic hit — a
+            // melodic turn would fight their hard, metronomic cut.
+            if (isLast && ritardandoAmount > 0) {
+                const grace = (60.0 / bpm) * 0.4; // ~an eighth ahead of the landing
+                const pushPickup = (m: number, t: number, v: number): void => {
+                    const pv = getFinalVel(v);
+                    notes.push({
+                        midi: m,
+                        freq: getFrequency(m),
+                        velocity: pv,
+                        midiVelocity: Math.round(pv * 127),
+                        durationSteps: 2,
+                        module: 'soloist',
+                        step,
+                        timingOffset: Math.max(0, t),
+                    });
+                };
+                pushPickup(soloMidi + (isMinor ? 3 : 4), time - grace * 2, 0.6); // 3 …
+                pushPickup(soloMidi + 2, time - grace, 0.64); // … 2 …
+            }
+
             notes.push({
-                midi: soloMidi,
+                midi: soloMidi, // … 1 — the tonic landing, held + vibrato'd as the band arrives
                 freq: getFrequency(soloMidi),
                 velocity: vel,
                 midiVelocity: Math.round(vel * 127),
