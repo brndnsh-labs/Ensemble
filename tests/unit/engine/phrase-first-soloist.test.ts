@@ -101,10 +101,11 @@ describe('phrase-first soloist (Build 2a)', () => {
         expect(rests).toBe(15);
     });
 
-    it('lands a chord tone on the downbeat (intentional resolution)', () => {
-        // A body theme note F# (66) on the downbeat against Cmaj7 (C E G Bb) is NOT
-        // a chord tone; it must snap to the nearest one (G, 67). A higher note at
-        // step 8 is the form apex, so step 0 stays a body note (not the apex peak).
+    it('lands a GUIDE tone on the downbeat (voice-leading §5)', () => {
+        // A body theme note F# (66) on the downbeat against Cmaj7 is NOT a chord
+        // tone, so the strong beat re-targets it — and prefers a GUIDE tone (the
+        // 3rd, E=64) over the nearer 5th, because guide tones define the harmony.
+        // A higher note at step 8 is the form apex, so step 0 stays a body note.
         const seed = [
             { step: 0, midi: 66, isAnchor: true, durationSteps: 2, velocity: 0.8 },
             { step: 8, midi: 79, isAnchor: true, durationSteps: 2, velocity: 0.8 },
@@ -112,7 +113,62 @@ describe('phrase-first soloist (Build 2a)', () => {
         const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
         const downbeat = emitted.find((e) => e.step === 0);
         expect(downbeat).toBeDefined();
-        expect(downbeat.midi % 12).toBe(7); // G — a chord tone
+        expect(downbeat.midi % 12).toBe(4); // E — the major 3rd, a guide tone
+    });
+
+    it('leaves a strong-beat note that already lands a chord tone alone', () => {
+        // The theme states G (67, the 5th) on the downbeat over Cmaj7 — already a
+        // chord tone, so voice-leading must NOT wrench it to the 3rd; the tune wins.
+        const seed = [
+            { step: 0, midi: 67, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+            { step: 8, midi: 79, isAnchor: true, durationSteps: 2, velocity: 0.8 },
+        ];
+        const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
+        expect(emitted.find((e) => e.step === 0).midi % 12).toBe(7); // G — left as stated
+    });
+
+    it('approaches a chromatic guide tone (the dominant ♭7) BY STEP, not a leap', () => {
+        // Regression for the review's voice-leading bug: a naive diatonic shift
+        // approaches a CHROMATIC target (the ♭7 of a dominant — B♭ over C7 in C
+        // major) from a minor third below (G), discarding the true leading tone.
+        // The fix (`diatonicNeighbor`) steps from A, a whole step. Setup: a 16-step
+        // bar over C7. The downbeat note A (69) is NOT a C7 chord tone, so it snaps
+        // to the nearest guide — B♭ (the chromatic ♭7); the pickup at step 15 must
+        // resolve INTO that landing by step. A note at step 8 is the apex elsewhere.
+        const C7 = { rootMidi: 60, quality: '7', intervals: [0, 4, 7, 10] };
+        const seed = [
+            { step: 0, midi: 69, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+            { step: 8, midi: 84, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+            { step: 15, midi: 67, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+        ];
+        const state = makeState(seed, { loopLengthSteps: 16, totalSteps: 16 });
+        const emitted: any[] = [];
+        for (let step = 0; step < 16; step++) {
+            const isBar = step % 16 === 0;
+            const res = getSoloistNotePhraseFirst(
+                state,
+                C7,
+                C7,
+                step,
+                null,
+                72,
+                'smart',
+                step % 16,
+                {},
+                {
+                    isDownbeat: isBar,
+                    isMeasureStart: isBar,
+                },
+            );
+            if (res) {
+                emitted.push({ step, ...res });
+            }
+        }
+        const landing = emitted.find((e) => e.step === 0);
+        const approach = emitted.find((e) => e.step === 15);
+        expect(landing.midi % 12).toBe(10); // B♭ — the chromatic ♭7, a guide tone
+        expect(Math.abs(approach.midi - landing.midi)).toBeLessThanOrEqual(2); // resolves BY STEP
+        expect(approach.midi % 12).toBe(9); // A — the true leading tone, not G (a third below)
     });
 
     // The anchor at step 4 (G=67) always sounds and is NOT a downbeat (bars are

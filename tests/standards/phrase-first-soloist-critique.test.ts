@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { chordTargetTones } from '../../public/engine/soloist-pitch-engine.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
@@ -90,7 +91,12 @@ function simulate(genre: string, presetName: string) {
             { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
         );
         if (res) {
-            emitted.push({ step: abs, midi: res.midi, dur: res.durationSteps });
+            emitted.push({
+                step: abs,
+                midi: res.midi,
+                dur: res.durationSteps,
+                chord: chordAt(abs),
+            });
         }
     }
     return { emitted, apexByWindow, apexSteps, cycleLen, loopLen, total };
@@ -163,6 +169,92 @@ describe('phrase-first soloist · musical critique', () => {
             expect(density).toBeGreaterThan(0.05); // it plays
             expect(density).toBeLessThan(0.9); // …but it breathes
             expect(overlaps).toBe(0);
+        });
+
+        it(`${genre}: strong beats land chord tones, with guide tones outlining the changes`, () => {
+            const sim = simulate(genre, preset);
+            // Voice-leading (§5): strong beats (downbeat + bar midpoint) are
+            // TARGETS — they should land functional chord tones, and a healthy
+            // share should be GUIDE tones (3rd/7th) that actually define the
+            // harmony, not just roots/5ths. (Strong beat = step 0 or 8 of the
+            // 16-step bar, matching the engine's stepsPerBar=16, midBeat=8.)
+            let strong = 0;
+            let chordTones = 0;
+            let guideTones = 0;
+            for (const e of sim.emitted as any[]) {
+                if (e.step >= sim.loopLen || !e.chord) {
+                    continue;
+                }
+                const sib = e.step % 16;
+                if (sib !== 0 && sib !== 8) {
+                    continue;
+                }
+                strong++;
+                const pc = ((e.midi % 12) + 12) % 12;
+                const { guides, pillars } = chordTargetTones(e.chord.rootMidi, e.chord.quality);
+                if (pillars.includes(pc)) {
+                    chordTones++;
+                }
+                if (guides.includes(pc)) {
+                    guideTones++;
+                }
+            }
+            const chordRate = chordTones / Math.max(1, strong);
+            const guideRate = guideTones / Math.max(1, strong);
+
+            // --- Weak-beat APPROACH resolves BY STEP into the landing (§5) ---
+            // The landing stats above only sample strong beats; this measures the
+            // OTHER half — the approach mechanism on weak beats. A note in the
+            // pickup right before a strong beat should resolve INTO that landing by
+            // a true scale step (≤2 semitones), not a leap. This is the assertion
+            // that guards `diatonicNeighbor` against the chromatic-target minor-
+            // third-leap bug the review caught (invisible to the landing stats).
+            // Apex notes are excluded — the money-note peak is a deliberate reach,
+            // not an approach.
+            const apexSet = sim.apexSteps as Set<number>;
+            let approaches = 0;
+            let byStep = 0;
+            const inForm2 = (sim.emitted as any[]).filter((e) => e.step < sim.loopLen);
+            for (let i = 0; i < inForm2.length - 1; i++) {
+                const a = inForm2[i];
+                const b = inForm2[i + 1];
+                const bStrong = b.step % 16 === 0 || b.step % 16 === 8;
+                const aWeak = a.step % 16 !== 0 && a.step % 16 !== 8;
+                const gap = b.step - a.step;
+                if (!bStrong || !aWeak || gap < 1 || gap > 2) {
+                    continue; // the engine's approach window is the last eighth (≤2 steps)
+                }
+                if (apexSet.has(((a.step % sim.loopLen) + sim.loopLen) % sim.loopLen)) {
+                    continue; // a reach off the peak isn't an approach
+                }
+                approaches++;
+                if (Math.abs(b.midi - a.midi) <= 2) {
+                    byStep++;
+                }
+            }
+            const stepRate = byStep / Math.max(1, approaches);
+
+            console.log(
+                `[${genre}] strongBeats=${strong} chordTone=${(chordRate * 100).toFixed(0)}% ` +
+                    `guideTone=${(guideRate * 100).toFixed(0)}% approaches=${approaches} ` +
+                    `byStep=${(stepRate * 100).toFixed(0)}%`,
+            );
+            // The vast majority of strong beats outline the harmony (observed
+            // 97-100%; this guards that voice-leading is active on strong beats —
+            // raw contour notes would drop it well below)…
+            expect(chordRate).toBeGreaterThan(0.9);
+            // …guide tones (3rd/7th) appear on a healthy share, above the random-
+            // among-chord-tones baseline (~33% maj / 50% dom) — the line prefers
+            // the harmony-defining tones, not just roots/5ths (observed 44-62%)…
+            expect(guideRate).toBeGreaterThan(0.4);
+            // …and weak-beat approaches resolve INTO the landing BY STEP, not by a
+            // leap — the leading-tone mechanism. Observed 70-93%; the shortfall from
+            // 100% is the bounded one-point lookahead (a distance-2 "and" before a
+            // chord change, or a gated target) — at most a scale-step off, never the
+            // minor-third leap the chromatic-target bug produced (which dropped this
+            // well below the threshold, especially on dominant-heavy Blues).
+            expect(approaches).toBeGreaterThan(5); // the mechanism actually fires
+            expect(stepRate).toBeGreaterThan(0.6);
         });
     }
 });
