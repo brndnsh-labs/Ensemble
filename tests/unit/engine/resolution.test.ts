@@ -155,4 +155,48 @@ describe('Resolution Logic', () => {
         expect(bassNotes.length).toBe(2);
         expect(bassNotes[1].midiVelocity).toBeLessThanOrEqual(bassNotes[0].midiVelocity);
     });
+
+    it('gives the lead a stepwise sign-off into the tonic on a graceful ending (#830)', () => {
+        // A ritardando genre (Jazz) ends with a short turn resolving INTO the final
+        // tonic, not a bare held root — the closing gesture. The last two soloist
+        // notes step onto the tonic (pc 0) by a scale step.
+        const arranger = { key: 'C', isMinor: false };
+        const groove = { genreFeel: 'Jazz' };
+        const notes = generateResolutionNotes(
+            { playback: { bandIntensity: 0.5 }, groove },
+            0,
+            arranger,
+            { soloist: true },
+            120,
+            groove,
+            { octave: 72 },
+        );
+        const solo = notes
+            .filter((n) => n.module === 'soloist')
+            .sort((a, b) => a.timingOffset - b.timingOffset);
+        expect(solo.length).toBeGreaterThan(2); // a phrase, not a lone tonic
+        const last = solo[solo.length - 1];
+        const penult = solo[solo.length - 2];
+        expect(last.midi % 12).toBe(0); // lands on the tonic (C)
+        expect(Math.abs(last.midi - penult.midi)).toBeLessThanOrEqual(2); // resolves BY STEP
+    });
+
+    it('keeps a single tight tonic hit on a BUTTON ending (no melodic turn)', () => {
+        // Rock/Funk/Metal end on a hard metronomic cut — a melodic sign-off would
+        // fight it, so the lead keeps the lone tonic.
+        const arranger = { key: 'C', isMinor: false };
+        const groove = { genreFeel: 'Rock' };
+        const notes = generateResolutionNotes(
+            { playback: { bandIntensity: 0.5 }, groove },
+            0,
+            arranger,
+            { soloist: true },
+            120,
+            groove,
+            { octave: 72 },
+        );
+        const solo = notes.filter((n) => n.module === 'soloist');
+        expect(solo.length).toBe(1);
+        expect(solo[0].midi % 12).toBe(0); // the tonic
+    });
 });
