@@ -1270,7 +1270,6 @@ export function scheduleHarmonies(
                 isLegato,
                 isBloom,
                 isLatched,
-                isArp,
             } = n;
             const playTime = time + (timingOffset || 0);
             const m = noteMidi || getMidi(freq);
@@ -1294,7 +1293,6 @@ export function scheduleHarmonies(
                     !!isLegato,
                     !!isBloom,
                     !!isLatched,
-                    !!isArp,
                 );
                 dispatchMidiHarmonyNote(state, m, finalVel, playTime, duration);
 

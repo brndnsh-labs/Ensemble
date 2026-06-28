@@ -384,7 +384,6 @@ function playHarmonyNoteNew(
     isLegato = false,
     isBloom = false,
     isLatched = false,
-    isArp = false,
 ) {
     const { playback, harmony, groove } = state;
     // Reject non-finite AND non-positive freq — see the doc comment above.
@@ -421,9 +420,7 @@ function playHarmonyNoteNew(
 
     // Pitch-aware stealing — crossfade a same-MIDI voice for non-legato hits.
     const retriggerProfile =
-        !isLegato && midi !== null && !isArp
-            ? stealHarmonyPitchVoice(state, midi, playTime, style)
-            : null;
+        !isLegato && midi !== null ? stealHarmonyPitchVoice(state, midi, playTime, style) : null;
 
     // Polyphonic limit (max 3 voices).
     if (harmony.activeVoices.length >= 3) {
@@ -528,7 +525,7 @@ function playHarmonyNoteNew(
 
         // Square key-click transient. Skipped when finalVol is 0 — the click
         // ramp is exponential and would throw from a zero anchor.
-        if (!retriggerProfile?.suppressClick && finalVol > 0 && !isArp) {
+        if (!retriggerProfile?.suppressClick && finalVol > 0) {
             const click = playback.audio.createOscillator();
             const clickGain = playback.audio.createGain();
             click.type = 'square';
@@ -818,21 +815,14 @@ function playHarmonyNoteNew(
     const attackFloor = retriggerProfile?.attackFloor || 0.005;
     let attack = Math.max(attackFloor, baseAttack - finalVol * 0.15);
     let release = style === 'horns' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
-    // Acoustic fingerpick (#561): a fast plucked onset that rings down from the
-    // peak (decay handled by the release below), not the strings pad swell.
-    if (isArp) {
-        attack = Math.max(attackFloor, 0.008);
-        release = 0.18;
-    }
     // Pad styles settle ~20% below the attack peak over a 0.35 s decay. The
     // 'horns' section (S3) gets a fast 60 ms decay to ~92% — a gentle "tiny
     // swell": the stab pops to the peak then settles slightly, brass-like,
     // rather than sitting flat. The settle is kept shallow so stabs in rapid
     // succession stay even in level. Plucks/organ hold at the peak (decay
     // 0 — AR).
-    const decay = isArp ? 0 : style === 'horns' ? 0.06 : isFastAttack ? 0 : 0.35;
-    const sustainLevel =
-        finalVol * (isArp ? 1.0 : style === 'horns' ? 0.92 : isFastAttack ? 1.0 : 0.8);
+    const decay = style === 'horns' ? 0.06 : isFastAttack ? 0 : 0.35;
+    const sustainLevel = finalVol * (style === 'horns' ? 0.92 : isFastAttack ? 1.0 : 0.8);
 
     // isBloom — a harmonic-bloom hit on a soloist anchor. A swell-in attack
     // completes the gesture. MAX of a 20% bump and a +5 ms additive bump so
@@ -870,7 +860,7 @@ function playHarmonyNoteNew(
     // reaches its peak. The max() guarantees attack→decay always complete; a
     // long note still sustains at `sustainLevel` in the gap between `decayEnd`
     // and the release.
-    const releaseStart = isArp ? attackEnd : Math.max(decayEnd, playTime + duration - release);
+    const releaseStart = Math.max(decayEnd, playTime + duration - release);
     gain.gain.setValueAtTime(0, playTime);
     gain.gain.linearRampToValueAtTime(finalVol, attackEnd);
     if (decay > 0) {
@@ -898,11 +888,9 @@ function playHarmonyNoteNew(
     // `osc.stop()` clips it into a click. Give pads 4 release time constants
     // past the release start (~1.8% of peak remaining). Fast styles keep the
     // original tail — their releases are already short.
-    const stopTime = isArp
-        ? playTime + duration + 0.6
-        : isFastAttack
-          ? playTime + duration + 0.5
-          : Math.max(playTime + duration + 0.5, releaseStart + release * 4);
+    const stopTime = isFastAttack
+        ? playTime + duration + 0.5
+        : Math.max(playTime + duration + 0.5, releaseStart + release * 4);
     osc1.stop(stopTime);
     osc2.stop(stopTime);
     if (sub) {
