@@ -62,17 +62,44 @@ function dispatchSoloSynth(...args: Parameters<typeof playSoloNoteCurrent>): voi
 // hard previous-note cutoff can follow if auditioning shows overlap.
 /**
  * Default lead vibrato for the sampled soloist (#744 Slice 1). ~5.5 Hz / ±18c
- * mirrors the synth voice's pitch-vibrato depth (`createVibrato`), but the rate
- * jitter is **deterministic** (seeded `scrambleHash`, per the project's
- * deterministic-phrasing rule) rather than the synth side's `Math.random` — so
- * looped playback and tests reproduce, and repeated held notes still don't
- * phase-lock into a machine tremolo. The depth fades in after the attack so the
- * note's onset stays clean. Per-instrument idiom tuning is deferred to Slice 3.
+ * mirrors the synth voice's pitch-vibrato depth (`createVibrato`) — a horn/
+ * steel-string-leaning default.
  */
-function leadVibrato(noteSeed: number): SampleVibrato {
+const DEFAULT_LEAD_VIBRATO = { depthCents: 18, rateHz: 5.5 } as const;
+
+/**
+ * Per-pack lead-vibrato idiom (#744 Slice 3 / #745). The classical nylon
+ * guitar's left-hand vibrato is a gentle, slow oscillation — distinctly
+ * narrower and slower than a horn or steel-string lead — so on the soft
+ * fingerstyle tone the default ±18c/5.5Hz reads as seasick rather than
+ * expressive. Nylon gets a subtler profile; every other pack keeps the
+ * default. Keyed by the bare pack id (`source.packId`, prefix already
+ * stripped), mirroring `gainForPack` / `toneTiltForPack`.
+ */
+const LEAD_VIBRATO_BY_PACK: Record<string, { depthCents: number; rateHz: number }> = {
+    // Narrower (~⅔ the depth) and slower — a classical-guitar finger vibrato,
+    // not a blues bend-wobble. Heard on the bossa/acoustic nylon lead.
+    'nylon-guitar': { depthCents: 11, rateHz: 4.6 },
+};
+
+/**
+ * Build the sampled-soloist vibrato spec for a pack (#744). The rate jitter is
+ * **deterministic** (seeded `scrambleHash`, per the project's deterministic-
+ * phrasing rule) rather than the synth side's `Math.random` — so looped
+ * playback and tests reproduce, and repeated held notes still don't phase-lock
+ * into a machine tremolo. The depth fades in after the attack so the note's
+ * onset stays clean.
+ */
+export function leadVibrato(noteSeed: number, packId?: string): SampleVibrato {
+    const profile = (packId && LEAD_VIBRATO_BY_PACK[packId]) || DEFAULT_LEAD_VIBRATO;
     // ±6% rate jitter, kept independent of any other per-note draw via the XOR.
     const jitter = 1 + (scrambleHash(noteSeed ^ 0x5f356495) - 0.5) * 0.12;
-    return { depthCents: 18, rateHz: 5.5 * jitter, delay: 0.12, ramp: 0.3 };
+    return {
+        depthCents: profile.depthCents,
+        rateHz: profile.rateHz * jitter,
+        delay: 0.12,
+        ramp: 0.3,
+    };
 }
 
 /**
@@ -136,7 +163,7 @@ function playSampledSolo(
         duration,
         // The engine flags vibrato on sustained notes (durationSteps >= a beat);
         // the synth voice already renders it, the sampled seam now does too (#744).
-        vibrato: vibrato ? leadVibrato(noteSeed) : undefined,
+        vibrato: vibrato ? leadVibrato(noteSeed, packId) : undefined,
         // Bend-in (bendStartInterval) and/or bend-and-release (expression.bend),
         // now rendered on the sampled seam too — full pitch-gesture parity (#744).
         bend: toSampleBend(bendStartInterval, expression),
