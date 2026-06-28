@@ -2,6 +2,8 @@ import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { getSoloistNote } from './soloist.js';
+import { guitarDoubleStopVoice } from './soloist-devices.js';
+import { allowsSoloistPolyphony } from './soloist-mode-policy.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
 
 /**
@@ -636,7 +638,7 @@ export function getSoloistNotePhraseFirst(
     const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
 
     phr.isResting = false; // @worker-mutation
-    return {
+    const lead = {
         midi,
         velocity,
         durationSteps,
@@ -645,4 +647,48 @@ export function getSoloistNotePhraseFirst(
         vibrato,
         isDoubleStop: false,
     };
+
+    // --- Guitar-mode double-stop PUNCTUATION (#856) ---
+    // Phrase-first is melody-first, so a double-stop is an ACCENT, not a texture
+    // (legacy `getSoloistNote` made them a frequent device; here they're sparse).
+    // Add a harmony voice only on a structural punctuation note — the apex money
+    // note, or a phrase-landing anchor on a strong beat — and only when the lead
+    // is a chord tone (so the harmony lands cleanly) and the note rings (≥ a
+    // beat). The harmony holds while the lead keeps its own bend/vibrato (matches
+    // the legacy "the cry belongs to the lead voice" rule). Gated guitar-mode
+    // only, sparse by a per-(step,loop) hash. The voice itself is chord-aware
+    // (`guitarDoubleStopVoice` → the same scorer the legacy path uses).
+    if (allowsSoloistPolyphony(soloist.mode)) {
+        const pc = (((midi - currentChord.rootMidi) % 12) + 12) % 12;
+        const isChordTone = (currentChord.intervals ?? []).some(
+            (iv: number) => ((iv % 12) + 12) % 12 === pc,
+        );
+        const isPunctuation = isApexStep || (isAnchor && isStrongBeat);
+        if (
+            isPunctuation &&
+            isChordTone &&
+            durationSteps >= stepsPerBeat &&
+            scrambleHash(step * 17 + Math.max(loopCount, 0) * 5 + 9) < 0.6
+        ) {
+            const harmonyMidi = guitarDoubleStopVoice(currentChord, midi, style);
+            if (harmonyMidi !== null) {
+                // Harmony first, lead last — tick-logic updates lastFreq from the
+                // non-double-stop voice (the lead), matching the legacy ordering.
+                return [
+                    {
+                        midi: harmonyMidi,
+                        velocity: velocity * 0.9,
+                        durationSteps,
+                        timingOffset: lead.timingOffset,
+                        bendStartInterval: 0,
+                        vibrato: false,
+                        isDoubleStop: true,
+                    },
+                    lead,
+                ];
+            }
+        }
+    }
+
+    return lead;
 }
