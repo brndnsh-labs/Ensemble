@@ -86,40 +86,55 @@ describe('Reggae Drummer Critique', () => {
         return history;
     };
 
-    it('should implement "One Drop" feel at low intensity', () => {
-        const performance = simulatePerformance(16, { playback: { bandIntensity: 0.3 } });
+    it('should implement a true "One Drop" at low intensity (kick + rim on beat 3 only)', () => {
+        // A true One Drop drops beats 1, 2 & 4 entirely and lands a single kick+rim
+        // unison on beat 3 (step 8) — the genre-defining "drop". (#794, replacing the
+        // old assertion that One Drop was a kick+snare backbeat on 2 & 4.)
+        const numBars = 16;
+        const performance = simulatePerformance(numBars, { playback: { bandIntensity: 0.3 } });
 
-        let kickOnDownbeat = 0;
-        let kickOnBackbeat = 0;
+        let kickOnDownbeat = 0; // beat 1 (step 0) — the "hole"
+        let kickOnBackbeat = 0; // beats 2 & 4 — must be empty
         let snareOnBackbeat = 0;
-        let backbeatCount = 0;
+        let kickOnBeat3 = 0; // step 8 — the drop
+        let rimOnBeat3 = 0;
 
         performance.forEach((bar) => {
             bar.forEach((stepData) => {
+                if (stepData.isDownbeat && stepData.instruments.Kick) {
+                    kickOnDownbeat++;
+                }
                 if (stepData.isBackbeat && stepData.isBeatStart) {
-                    backbeatCount++;
                     if (stepData.instruments.Kick) {
                         kickOnBackbeat++;
                     }
-                    if (stepData.instruments.Snare) {
+                    if (stepData.instruments.Snare || stepData.instruments.Sidestick) {
                         snareOnBackbeat++;
                     }
-                } else if (stepData.isDownbeat) {
+                }
+                if (stepData.loopStep === 8) {
                     if (stepData.instruments.Kick) {
-                        kickOnDownbeat++;
+                        kickOnBeat3++;
+                    }
+                    // The rim is a cross-stick (Sidestick); Snare guards a louder variant.
+                    if (stepData.instruments.Sidestick || stepData.instruments.Snare) {
+                        rimOnBeat3++;
                     }
                 }
             });
         });
 
         console.log(
-            `[Reggae Critique] Kick on Downbeat: ${kickOnDownbeat}, Kick/Snare on Backbeat: ${kickOnBackbeat}/${snareOnBackbeat}`,
+            `[Reggae One Drop] beat-1 kicks: ${kickOnDownbeat}, 2&4 kick/snare: ${kickOnBackbeat}/${snareOnBackbeat}, ` +
+                `beat-3 kick/rim: ${kickOnBeat3}/${rimOnBeat3} over ${numBars} bars`,
         );
 
-        // One Drop: No kick on 1, Kick and Snare TOGETHER on backbeat
+        // Beats 1, 2 & 4 carry no kick/snare; a single kick+rim unison on beat 3 every bar.
         expect(kickOnDownbeat).toBe(0);
-        expect(kickOnBackbeat).toBe(backbeatCount);
-        expect(snareOnBackbeat).toBe(backbeatCount);
+        expect(kickOnBackbeat).toBe(0);
+        expect(snareOnBackbeat).toBe(0);
+        expect(kickOnBeat3).toBe(numBars);
+        expect(rimOnBeat3).toBe(numBars);
     });
 
     it('should preserve One Drop beat-1 silence at intensity 0.5 (entropy floor)', () => {

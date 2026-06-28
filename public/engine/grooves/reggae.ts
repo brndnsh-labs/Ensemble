@@ -50,6 +50,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isPulseStart,
         isBeatStart,
         isBackbeat,
+        beatIndex,
+        isCompound,
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
@@ -78,8 +80,18 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         shouldPlay = false;
 
         if (activeMotif === 0) {
-            // One Drop: Kick only on the backbeat
-            if (isBackbeat && isBeatStart) {
+            // True One Drop: a single kick on the felt secondary pulse, in unison with
+            // the rim — beats 1, 2 & 4 carry NO kick. This is the genre-defining
+            // "drop": the bass roots here too (One Drop riddim = step 8), so kick +
+            // bass + rim land together. In 4/4 that pulse is beat 3 (beatIndex===2);
+            // previously this fired on beats 2 & 4 (a generic backbeat), neither
+            // sparse nor authentic (#794). In compound/odd meters the felt-2 is the
+            // backbeat group (e.g. 6/8 mStep 6) — keep the existing `isBackbeat` drop.
+            if (isCompound) {
+                if (isBackbeat) {
+                    shouldPlay = true;
+                }
+            } else if (beatIndex === 2 && isBeatStart) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
@@ -121,8 +133,20 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
     } else if (context.inst.name === 'Snare') {
         shouldPlay = false;
 
-        // Universal Reggae Backbeat
-        if (isBackbeat && isBeatStart) {
+        // Reggae backbeat — motif-aware. The true One Drop (motif 0) places a single
+        // cross-stick rim on the felt-2 pulse in unison with the kick (the "drop"),
+        // leaving beats 2 & 4 empty — the hat and bass carry the pulse. In 4/4 that's
+        // beat 3 (beatIndex===2); in compound/odd meters it's the backbeat group, so
+        // reuse `isBackbeat` there. Every other riddim keeps the 2 & 4 cross-stick
+        // backbeat (#794).
+        const oneDropRimHere = isCompound ? isBackbeat : beatIndex === 2 && isBeatStart;
+        if (activeMotif === 0) {
+            if (oneDropRimHere) {
+                shouldPlay = true;
+                soundName = 'Sidestick'; // rim — a one drop is a soft cross-stick, not a full snare
+                velocity = scaleVelocity(1.2, intensity, 0.1);
+            }
+        } else if (isBackbeat && isBeatStart) {
             shouldPlay = true;
             soundName = intensity > 0.7 ? 'Snare' : 'Sidestick';
             velocity = scaleVelocity(1.2, intensity, 0.1);

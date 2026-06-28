@@ -66,7 +66,7 @@ describe('Reggae Groove Integrity', () => {
         // (via the shared sweep arranger) rather than replaying the old formula.
         const seedMock = { ...mockState, arranger: sectionSweepArranger(256) };
 
-        it('should play One Drop: Kick only on backbeat for Motif 0', () => {
+        it('should play a true One Drop: Kick on beat 3 only for Motif 0 (#794)', () => {
             getState.mockReturnValue(seedMock);
             const section = findSectionForMotif(0, 'Reggae');
             expect(section).toBeGreaterThanOrEqual(0);
@@ -77,7 +77,8 @@ describe('Reggae Groove Integrity', () => {
                 const absStep = section * 16 + step;
                 const result = applyGrooveOverrides(getState(), createParams(absStep, 'Kick'));
 
-                if (info.isBeatStart && info.isBackbeat) {
+                // True One Drop: a single kick on beat 3 (beatIndex===2), beats 1/2/4 empty.
+                if (info.beatIndex === 2 && info.isBeatStart) {
                     expect(result.shouldPlay).toBe(true);
                 } else {
                     expect(result.shouldPlay).toBe(false);
