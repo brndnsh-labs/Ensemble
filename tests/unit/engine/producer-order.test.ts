@@ -7,9 +7,11 @@
 // If someone reorders the producers (e.g. harmony before soloist), this test
 // fails because `coordination.soloistMidi` will be 0 when getHarmonyNotes runs.
 //
-// Strategy: mock getSoloistNote to return a deterministic non-zero midi=72 so the
-// test is isolated from the full soloist-engine stack. Spy on getHarmonyNotes to
-// capture the coordination object it receives. Assert coordination.soloistMidi > 0.
+// Strategy: mock getSoloistNotePhraseFirst (THE production soloist producer —
+// tick-logic calls it, not the retired legacy getSoloistNote; epic #10) to return
+// a deterministic non-zero midi=72 so the test is isolated from the full
+// soloist-engine stack. Spy on getHarmonyNotes to capture the coordination object
+// it receives. Assert coordination.soloistMidi > 0.
 //
 // Source: docs/audit/harmony-coordination.md P1 #10;
 //         docs/audit/epic-coordination-contract.md S6.
@@ -29,8 +31,8 @@ let harmonyCoordinationArg: any = null;
 // why: sidesteps the full soloist engine so a change there can't mask a
 // reordering regression. We only need the producer to have written
 // coordination.soloistMidi before harmony runs.
-vi.mock('../../../public/engine/soloist.js', () => ({
-    getSoloistNote: vi.fn(() => ({
+vi.mock('../../../public/engine/soloist-phrase-first.js', () => ({
+    getSoloistNotePhraseFirst: vi.fn(() => ({
         midi: 72,
         freq: 523.25,
         velocity: 0.7,
