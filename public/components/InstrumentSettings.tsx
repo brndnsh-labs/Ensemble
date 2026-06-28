@@ -9,6 +9,7 @@ import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { packsForInstrument } from '../data/sound-packs.js';
 import { isPackInstalled } from '../engine/instrument-registry.js';
+import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
@@ -316,16 +317,31 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
                             <SettingRow
                                 label="Phrasing Mode"
                                 id="soloistModeSelect"
-                                description="Single-note lead, or chord-aware guitar voicings."
+                                description={
+                                    state.autoMode
+                                        ? `Auto — follows the lead voice (now ${
+                                              resolveSoloistMode(state.mode) === 'guitar'
+                                                  ? 'Guitar'
+                                                  : 'Monophonic'
+                                          }). A guitar pack adds chord-aware double-stops.`
+                                        : 'Pinned. Single-note lead, or chord-aware guitar double-stops.'
+                                }
                             >
-                                <Select
-                                    id="soloistModeSelect"
-                                    value={state.mode || 'monophonic'}
+                                <ButtonGroup
+                                    className="soloist-phrasing-mode"
+                                    value={state.autoMode ? 'auto' : resolveSoloistMode(state.mode)}
                                     onChange={(val) => {
-                                        dispatch(ACTIONS.SET_SOLOIST_MODE, val);
+                                        const v = String(val);
+                                        if (v === 'auto') {
+                                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, true);
+                                        } else {
+                                            dispatch(ACTIONS.SET_SOLOIST_MODE, v);
+                                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
+                                        }
                                         saveCurrentState();
                                     }}
                                     options={[
+                                        { value: 'auto', label: 'Auto' },
                                         { value: 'monophonic', label: 'Monophonic' },
                                         { value: 'guitar', label: 'Guitar' },
                                     ]}

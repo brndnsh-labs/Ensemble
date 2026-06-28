@@ -856,6 +856,9 @@ export interface SoloistState {
     readonly preset: string;
     /** The soloist mode ('monophonic' or 'guitar'; unknown values normalize to monophonic). */
     readonly mode: string;
+    /** #856 — Auto phrasing mode: when true, `mode` is derived from the lead
+     *  voice + genre (guitar pack → guitar). An explicit pick pins it (false). */
+    readonly autoMode: boolean;
     /** Optional playing style (e.g. 'jazz', 'blues', 'smart'). */
     readonly style?: string;
     /** Base MIDI octave. */
@@ -1482,6 +1485,7 @@ export interface ActionPayloadMap {
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
+    SET_SOLOIST_AUTO_MODE: string;
     SET_SONG_SEED: string;
     SET_SEED_RANDOMIZE: boolean;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
@@ -1563,6 +1567,7 @@ export const ACTIONS = {
     SET_VOLUME: 'SET_VOLUME',
     SET_REVERB: 'SET_REVERB',
     SET_SOLOIST_MODE: 'SET_SOLOIST_MODE',
+    SET_SOLOIST_AUTO_MODE: 'SET_SOLOIST_AUTO_MODE',
     SET_SONG_SEED: 'SET_SONG_SEED',
     SET_SEED_RANDOMIZE: 'SET_SEED_RANDOMIZE',
     SET_INSTRUMENT_VOICE: 'SET_INSTRUMENT_VOICE',

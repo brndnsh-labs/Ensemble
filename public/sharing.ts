@@ -30,6 +30,7 @@ function compressBandSettings(options: ShareOptions = {}): string {
             v: parseFloat(soloist.volume.toFixed(2)),
             r: parseFloat(soloist.reverb.toFixed(2)),
             m: soloist.mode,
+            am: soloist.autoMode ? 1 : 0,
             sd: arranger.seed || '',
         },
         b: {

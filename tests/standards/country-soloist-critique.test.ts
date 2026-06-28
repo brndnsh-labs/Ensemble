@@ -176,6 +176,15 @@ describe('Soloist Country Critique', () => {
         let dsClassifiable = 0;
         let dsThirdSixth = 0;
 
+        // #855: consonance of the harmonized double-stop voice. Pre-fix the
+        // chickenPick (3rd) and 6th stacks picked maj/min quality by coin-flip,
+        // so the harmony voice landed on a chromatic (out-of-scale) note ~half
+        // the time when the wrong quality was chosen. The chord-aware chooser
+        // now lands it on a chord tone, varying maj/min by the melody note.
+        // Measured over MAJOR-chord double-stops: every voice's PC ∈ diatonic.
+        let dsNotesOnMaj = 0;
+        let dsNotesDiatonicOnMaj = 0;
+
         const devices: Record<string, number> = {};
 
         for (const n of notes) {
@@ -204,6 +213,15 @@ describe('Soloist Country Critique', () => {
                 if (THIRD_SIXTH.has(iv)) {
                     dsThirdSixth++;
                 }
+                // #855: per-voice consonance over major chords.
+                if (n.chordQuality === 'major') {
+                    for (const m of n.midis) {
+                        dsNotesOnMaj++;
+                        if (DIATONIC_MAJOR.has((m - n.chordRoot + 120) % 12)) {
+                            dsNotesDiatonicOnMaj++;
+                        }
+                    }
+                }
             }
         }
 
@@ -212,6 +230,7 @@ describe('Soloist Country Critique', () => {
         const chromaticShare = chromaticOnMaj / majChordNotes;
         const doubleStopRate = doubleStopAttacks / notes.length;
         const thirdSixthShare = dsClassifiable ? dsThirdSixth / dsClassifiable : 0;
+        const dsConsonanceShare = dsNotesOnMaj ? dsNotesDiatonicOnMaj / dsNotesOnMaj : 0;
 
         const countryBendShareHi = (devices.countryBend || 0) / notes.length;
         const chickenPickShareHi = (devices.chickenPick || 0) / notes.length;
@@ -252,6 +271,9 @@ describe('Soloist Country Critique', () => {
         );
         console.log(
             `[DS 3rd/6th Share]        ${(thirdSixthShare * 100).toFixed(1)}% (Target: >0.65; baseline ${THIRD_SIXTH_BASELINE.toFixed(3)})`,
+        );
+        console.log(
+            `[DS Consonance /maj]      ${(dsConsonanceShare * 100).toFixed(1)}% (Target: >0.88; pre-#855 coin-flip 80.0%)`,
         );
         console.log(
             `[countryBend @0.85]       ${(countryBendShareHi * 100).toFixed(2)}% (Target: >0.025)`,
@@ -299,6 +321,14 @@ describe('Soloist Country Critique', () => {
         expect(doubleStopRate).toBeGreaterThan(0.3);
         expect(thirdSixthShare).toBeGreaterThan(0.65);
         expect(thirdSixthShare).toBeGreaterThan(THIRD_SIXTH_BASELINE);
+
+        // (b2) #855 DOUBLE-STOP CONSONANCE. The harmonized voice must stay
+        // diatonic to the chord. Pre-fix the chickenPick 3rd and the 6th stack
+        // chose maj/min quality by coin-flip, so every voice's PC was in-scale
+        // only 80.0% of the time over major chords; the chord-aware chooser
+        // lifts it to ~93.5%. >0.88 sits ~5.5pp below the engine output and 8pp
+        // above the coin-flip baseline, so a regression to the coin-flip fails.
+        expect(dsConsonanceShare).toBeGreaterThan(0.88);
 
         // (c) countryBend / chickenPick FIRE AT INTENSITY. Engine at 0.85:
         // countryBend ~5.4% share, chickenPick ~4.8% share. At 0.20: countryBend

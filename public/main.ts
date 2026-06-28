@@ -19,7 +19,7 @@ import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-contro
 import { maybeShowPackInstallNudge } from './pack-nudge.js';
 import { initPWA } from './pwa.js';
 import { dispatch, getState, subscribe } from './state.js';
-import { handleEffects } from './state-effects.js';
+import { deriveSoloistModeOnBoot, handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
 import type { Mutable } from './types.js';
 import { mountComponents } from './ui-root.jsx';
@@ -187,6 +187,11 @@ function init() {
             handleEffects(action, payload, stateMap, context);
         });
         syncWorker();
+
+        // #856 — derive the soloist phrasing mode now that the worker + subscriber
+        // are live. No SET_GENRE_FEEL fires on boot, so guitar genres would
+        // otherwise stay monophonic until the next genre change.
+        deriveSoloistModeOnBoot(getState(), dispatch);
 
         // Signal to E2E tests that hydration and mounting are complete
         document.documentElement.dataset.hydrated = 'true';

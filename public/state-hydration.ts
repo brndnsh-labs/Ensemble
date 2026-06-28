@@ -287,6 +287,12 @@ export function hydrateState(): void {
                           ? 'guitar'
                           : 'monophonic',
                 ),
+                // #856 — Auto phrasing mode. Pre-#856 saves have no `autoMode`;
+                // default to Auto so they pick up voice-derived guitar mode.
+                autoMode:
+                    typeof savedState.soloist.autoMode === 'boolean'
+                        ? savedState.soloist.autoMode
+                        : true,
             });
         }
         if (savedState.harmony) {
@@ -506,6 +512,8 @@ export function loadFromUrl(): void {
                         ? clamp(band.s.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist)
                         : INSTRUMENT_REVERB_DEFAULTS.soloist,
                     mode: resolveSoloistMode(band.s.m || soloist.mode),
+                    // #856 — older share URLs have no `am`; default to Auto.
+                    autoMode: band.s.am === undefined ? true : !!band.s.am,
                 });
                 if (typeof band.s.sd === 'string') {
                     Object.assign(arranger, { seed: band.s.sd });

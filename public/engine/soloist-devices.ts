@@ -65,6 +65,36 @@ function getChordMask(currentChord: any): number {
 }
 
 /**
+ * Pick a double-stop interval whose harmonized voice stays consonant with the
+ * chord, instead of a coin-flip between major/minor interval qualities. `base`
+ * is the lead pitch; `candidates` are signed semitone offsets in preference
+ * order, major-quality first by convention (e.g. `[9, 8]` = major-then-minor
+ * 6th above, `[4, 3]` = major-then-minor 3rd above). Returns the first
+ * candidate that lands the harmony voice on a chord tone — so the chosen
+ * quality VARIES naturally with the melody note (a 3rd above the chord root is
+ * major, a 3rd above the chord 3rd is minor), which is exactly the diatonic
+ * country-harmony idiom. If neither candidate is a chord tone, falls back to the
+ * interval matching the chord's own third quality (minor chord → the last/minor
+ * candidate) so the stack still colors with the harmony. Why: a randomly-chosen
+ * maj/min 3rd or 6th over a chord of the opposite quality reads as a wrong-note
+ * clash — the country chickenPick (3rds) and 6th double-stops. #855.
+ */
+function consonantDoubleStopInterval(base: number, candidates: number[], chord: any): number {
+    const mask = getChordMask(chord);
+    const root = (((chord?.rootMidi ?? 0) % 12) + 12) % 12;
+    for (const iv of candidates) {
+        const interval = ((((base + iv) % 12) + 12) % 12) - root;
+        const pc = (interval + 12) % 12;
+        if ((mask >> pc) & 1) {
+            return iv;
+        }
+    }
+    const quality = chord?.quality || 'major';
+    const isMinor = quality.startsWith('m') && !quality.startsWith('maj');
+    return isMinor ? candidates[candidates.length - 1] : candidates[0];
+}
+
+/**
  * Generates a sequence of notes for a specific melodic device.
  * @param deviceType - The ID of the device to generate (e.g., 'bluesLick', 'run').
  * @param ctx - Context object containing necessary state for generation.
@@ -336,8 +366,10 @@ export function generateMelodicDevice(deviceType: string, ctx: any): any[] | nul
             ],
         ];
     } else if (deviceType === 'chickenPick') {
-        // #617: seeded chickenPick double-stop interval (was Math.random).
-        const dsInt = scrambleHash(pickerSeedBase + 63) < 0.5 ? 3 : 4;
+        // #855: chord-aware 3rd above (was a seeded maj/min coin-flip that could
+        // stack the wrong-quality third over the chord). Major-first preference;
+        // the chooser lands the harmony on a chord tone, varying maj/min by note.
+        const dsInt = consonantDoubleStopInterval(selectedMidi, [4, 3], targetChord);
         deviceBuffer = [
             [
                 {
@@ -976,6 +1008,29 @@ function selectGuitarSupportMidi(options: GuitarSupportMidiOptions): number {
 }
 
 /**
+ * #856 — a single chord-aware harmony voice a 3rd/6th BELOW `leadMidi` for a
+ * guitar-mode double-stop, scored by the same `selectGuitarSupportMidi` selector
+ * the legacy polyphony path uses (chord-tone preference + genre interval
+ * palette). Returns null if it can't place a voice strictly below the lead.
+ * Used by the phrase-first engine to add sparse double-stop punctuation —
+ * phrase-first builds single notes, so this is its only double-stop source.
+ */
+export function guitarDoubleStopVoice(
+    currentChord: any,
+    leadMidi: number,
+    activeStyle: string,
+    supportRole = 'accent',
+): number | null {
+    const midi = selectGuitarSupportMidi({
+        currentChord,
+        activeStyle,
+        selectedMidi: leadMidi,
+        supportHint: { role: supportRole, sustainBias: 0.7 },
+    });
+    return Number.isFinite(midi) && midi < leadMidi ? midi : null;
+}
+
+/**
  * Generates additional notes for double stops based on style and mode.
  */
 export function generateExtraNotes(ctx: any) {
@@ -1005,8 +1060,10 @@ export function generateExtraNotes(ctx: any) {
         } else if (supportRole === 'sustain') {
             supportDurationScale = 0.76 + sustainBias * 0.12;
         }
-        // #617: seeded double-stop interval pick (was Math.random).
-        const dsInt = [8, 9][Math.floor(scrambleHash(pickerSeedBase + 66) * 2)];
+        // #855: chord-aware 6th above (was a seeded maj/min coin-flip that could
+        // stack the wrong-quality sixth over the chord). Major-first preference;
+        // the chooser lands the harmony on a chord tone, varying maj/min by note.
+        const dsInt = consonantDoubleStopInterval(selectedMidi, [9, 8], currentChord);
         extraNotes.push({
             midi: selectedMidi + dsInt,
             velocity: (0.5 + effectiveIntensity * 0.6) * 0.95,
