@@ -160,6 +160,20 @@ export function requestResolution(step: number): void {
     }
 }
 
+// The SET_PARAM / SET_STYLE / SET_VOLUME / SET_OCTAVE deltas all write a *partial*
+// of one module's slice, keyed by a runtime module name carried on the payload.
+// Funnel that one unavoidable dynamic-key write through here so the call sites stay
+// cast-free and the key is narrowed to the synced module set (`keyof EnsembleState`)
+// in a single place. The written object is identical to the old inline assignment —
+// worker delta payloads are byte-for-byte unchanged (#816).
+function setModuleDelta(
+    data: Partial<Record<keyof EnsembleState, unknown>>,
+    module: keyof EnsembleState,
+    patch: Record<string, unknown>,
+): void {
+    data[module] = patch;
+}
+
 export function syncWorker(action?: string, payload?: any): void {
     if (!timerWorker) {
         return;
@@ -201,7 +215,7 @@ export function syncWorker(action?: string, payload?: any): void {
             break;
         case 'SET_PARAM':
             if (payload.module) {
-                (data as any)[payload.module] = { [payload.param]: payload.value };
+                setModuleDelta(data, payload.module, { [payload.param]: payload.value });
             }
             break;
         case 'UPDATE_CONDUCTOR_DECISION':
@@ -214,17 +228,17 @@ export function syncWorker(action?: string, payload?: any): void {
             break;
         case 'SET_STYLE':
             if (payload.module) {
-                (data as any)[payload.module] = { style: payload.style };
+                setModuleDelta(data, payload.module, { style: payload.style });
             }
             break;
         case 'SET_VOLUME':
             if (payload.module) {
-                (data as any)[payload.module] = { volume: payload.value };
+                setModuleDelta(data, payload.module, { volume: payload.value });
             }
             break;
         case 'SET_OCTAVE':
             if (payload.module) {
-                (data as any)[payload.module] = { octave: payload.value };
+                setModuleDelta(data, payload.module, { octave: payload.value });
             }
             break;
         case 'SET_MIDI_CONFIG':
