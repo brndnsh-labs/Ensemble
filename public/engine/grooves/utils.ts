@@ -43,6 +43,13 @@ export interface GrooveContext {
     // Optional: production (groove-engine) always sets it; partial test mocks
     // that exercise a specific motif omit it and the clamp falls back to no cap.
     motifCeiling?: number;
+    // #841: bar-stable intensity for MOTIF selection — latched to this bar's
+    // downbeat so the motif index can't flip mid-bar as `bandIntensity` ramps
+    // (the drums-only "stutter"). Genres pass this to `getMotif` instead of the
+    // live `intensity`. Optional: production (groove-engine) always sets it;
+    // bare test contexts that call a strategy directly omit it and fall back to
+    // the live `intensity`, preserving the legacy single-value behavior.
+    motifIntensity?: number;
     orchestration: { rideVoice?: string; snareVoice?: string } | null;
     barIndex: number;
     isFirstStepOfNewBar: boolean;
