@@ -253,13 +253,16 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         shouldPlay = false;
 
         if (activeMotif === 2) {
-            if (isBackbeat) {
+            // Half-time Feel: relocate the backbeat to beat 3 only (beatIndex===2),
+            // halving the snare against the unchanged kick pulse — that displacement
+            // IS the feel. Previously this branch was byte-identical to the normal
+            // 2&4 backbeat below, so "Half-time Feel" just played a standard
+            // backbeat (#795).
+            if (beatIndex === 2 && isBeatStart) {
                 shouldPlay = true;
             }
-        } else {
-            if (isBackbeat) {
-                shouldPlay = true;
-            }
+        } else if (isBackbeat) {
+            shouldPlay = true;
         }
 
         if (shouldPlay) {
