@@ -97,7 +97,9 @@ export function getChordDetails(symbol: string): ChordDetails {
         // why: △/^/ma/ma7 are common jazz shorthand for major-7; they must appear BEFORE the bare
         // 'm' and '7' alternatives so leftmost-match picks the correct maj7-family suffix.
         // Extended ma9/ma11/ma13 and △9 follow the same pattern for consistency.
-        /(maj7#11|maj7#5|maj7\+|maj7|maj9|maj11|maj13|maj|ma13|ma11|ma9|ma7|ma|M7#5|M7\+|M7|△9|△7|△|\^7|\^|m13|m11|m9|m7b5|m7|m6|min|m|dim7|dim|o7|o|°7|°|7#5|7\+|7aug|aug7|aug|\+7|\+|-|ø7|ø|h7|7b5|sus4|sus2|add9|7alt|7b13|7#11|7b9|7#9|7|alt|13|11|9|6|5)/,
+        // why: 6/9, 7sus4, add2 are listed before their shorter prefixes (6, sus4/7, add9-adjacent)
+        // so leftmost-match resolves the compound quality, not the bare 6 / 7 / sus4 (#780).
+        /(maj7#11|maj7#5|maj7\+|maj7|maj9|maj11|maj13|maj|ma13|ma11|ma9|ma7|ma|M7#5|M7\+|M7|△9|△7|△|\^7|\^|m13|m11|m9|m7b5|m7|m6|min|m|dim7|dim|o7|o|°7|°|7#5|7\+|7aug|aug7|aug|\+7|\+|-|ø7|ø|h7|7b5|7sus4|sus4|sus2|add9|add2|7alt|7b13|7#11|7b9|7#9|7|alt|13|11|9|6\/9|6|5)/,
     );
     const suffix = suffixMatch ? suffixMatch[1] : '';
 
@@ -165,12 +167,23 @@ export function getChordDetails(symbol: string): ChordDetails {
         is7th = true;
     } else if (suffix.includes('aug') || suffix === '+') {
         quality = 'aug';
+    } else if (suffix === '7sus4') {
+        quality = '7sus4';
+        is7th = true;
     } else if (suffix === 'sus4') {
         quality = 'sus4';
     } else if (suffix === 'sus2') {
         quality = 'sus2';
     } else if (suffix === 'add9') {
         quality = 'add9';
+    } else if (suffix === 'add2') {
+        quality = 'add2';
+        is7th = false; // add2 = added 2nd color, no 7th
+    } else if (suffix === '6/9') {
+        quality = '6/9';
+        // 6/9 = major triad + 6th + 9th. No 7th — override the includes('9')
+        // heuristic so it isn't misclassified as a dominant (rootless guard) (#780).
+        is7th = false;
     } else if (suffix === '7alt' || suffix === 'alt') {
         quality = '7alt';
     } else if (suffix === '7b13') {
@@ -696,6 +709,10 @@ export function getFormattedChordNames(
         absSuffix = 'sus4';
         nnsSuffix = 'sus4';
         romSuffix = 'sus4';
+    } else if (quality === '7sus4') {
+        absSuffix = '7sus4';
+        nnsSuffix = '7sus4';
+        romSuffix = '7sus4';
     } else if (quality === 'sus2') {
         absSuffix = 'sus2';
         nnsSuffix = 'sus2';
@@ -704,6 +721,14 @@ export function getFormattedChordNames(
         absSuffix = 'add9';
         nnsSuffix = 'add9';
         romSuffix = 'add9';
+    } else if (quality === 'add2') {
+        absSuffix = 'add2';
+        nnsSuffix = 'add2';
+        romSuffix = 'add2';
+    } else if (quality === '6/9') {
+        absSuffix = '6/9';
+        nnsSuffix = '6/9';
+        romSuffix = '6/9';
     } else if (quality === '6') {
         absSuffix = '6';
         nnsSuffix = '6';
@@ -841,7 +866,16 @@ function parseProgressionPart(
         chordTokens.forEach((token) => {
             if (token.trim().length > 0) {
                 const part = token.trim();
-                const [chordPart, bassPart] = part.split('/');
+                const slashParts = part.split('/');
+                let chordPart = slashParts[0];
+                let bassPart: string | undefined = slashParts[1];
+                // `6/9` is a chord *quality* (major triad + 6th + 9th), not a slash
+                // bass — the `/` is notation, not "C6 over a 9th bass". Recombine
+                // before the bass branch below mistakes the `9` for a bass note (#780).
+                if (bassPart === '9' && /6$/.test(chordPart)) {
+                    chordPart = part;
+                    bassPart = undefined;
+                }
 
                 const { rootMidi, rootPart, romanMatch, nnsMatch, noteMatch } = resolveChordRoot(
                     chordPart,
