@@ -9,6 +9,7 @@ import {
 import type { Chord, ChordNamePart, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
+import { spellPitchClass } from './note-spelling.js';
 import { transposeChordText } from './transpose.js';
 import { getBassSpaceFloor, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
@@ -17,8 +18,6 @@ export type { Chord, ChordNamePart, FormattedChordNames };
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
-const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const SHARP_FRIENDLY_KEYS = new Set(['G', 'D', 'A', 'E', 'B', 'F#', 'C#']);
 
 export interface ChordDetails {
     quality: string;
@@ -45,17 +44,7 @@ function getAbsoluteDisplayNoteName(
     accidentalHint: string = '',
     explicitNote: string = '',
 ): string {
-    if (accidentalHint === '#' || explicitNote.includes('#')) {
-        return SHARP_NOTE_ORDER[pitchClass];
-    }
-    if (accidentalHint === 'b' || explicitNote.includes('b')) {
-        return (KEY_ORDER as any)[pitchClass];
-    }
-
-    const tonic = (keyContext || '').replace(/m$/, '');
-    return SHARP_FRIENDLY_KEYS.has(tonic)
-        ? SHARP_NOTE_ORDER[pitchClass]
-        : (KEY_ORDER as any)[pitchClass];
+    return spellPitchClass(pitchClass, keyContext, accidentalHint, explicitNote);
 }
 
 function ensurePitchClassAboveFloor(

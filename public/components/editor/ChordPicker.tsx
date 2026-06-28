@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../../config.js';
+import { spellPitchClass } from '../../engine/note-spelling.js';
 
 /**
  * Tap-a-chord picker. Pops up when a chord cell is tapped in the locked
@@ -118,7 +119,11 @@ function buildNameRoot(
     const base = offsets[degree - 1] ?? 0;
     const accidentalShift = accidental === 'b' ? -1 : accidental === '#' ? 1 : 0;
     const pitchClass = (((tonic + base + accidentalShift) % 12) + 12) % 12;
-    return KEY_ORDER[pitchClass];
+    // Spell key-aware so the editor matches the rendered chart: a chord picked in
+    // a sharp key (E major → G#) spells with sharps, not Ab. An explicit b/# the
+    // user dialed in wins over the key context. Display/notation only — pitch is
+    // unchanged and a stored `Ab` still parses (#779).
+    return spellPitchClass(pitchClass, keyName, accidental);
 }
 
 /**
