@@ -7,7 +7,9 @@ import { getAccompanimentNotes } from '../../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
-import { getSoloistNote } from '../../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired). Used here
+// as a no-crash / sane-velocity smoke across the full preset×genre matrix.
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../../public/engine/soloist-phrase-first.js';
 import { getScaleForChord } from '../../../public/engine/theory-scales.js';
 import { getState } from '../../../public/state.js';
 

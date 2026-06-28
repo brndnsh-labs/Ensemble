@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired). No-crash
+// smoke in odd meters; real odd-meter soloist idiom lives in
+// tests/standards/compound-soloist-phrasing-critique.
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -100,7 +103,6 @@ describe('Odd-Meter Authenticity Integration', () => {
             60,
             'bird',
             0,
-            false,
             coordination,
             info44,
         );
@@ -113,7 +115,6 @@ describe('Odd-Meter Authenticity Integration', () => {
             60,
             'bird',
             0,
-            false,
             coordination,
             info34,
         );
