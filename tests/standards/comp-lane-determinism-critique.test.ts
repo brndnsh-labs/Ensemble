@@ -142,12 +142,15 @@ function runPass(genreFeel: string, chordStyle: string, currentLoopCount: number
 }
 
 // checkVariation: whether the seeded GHOST gate is the dominant onset source so
-// "bars vary" is a valid non-tautology proxy. strum-country + Funk surface their
-// ghost gates audibly. Neo-Soul's onset is driven by a locked comp cell
-// (updateRhythmicIntent regenerates + locks it), so its rhythm is deterministic
-// by design and its ghost contribution doesn't surface in this minimal harness —
-// the seeded ghost gate (compDraw 22) is the same proven pattern as Funk's, so
-// determinism (guards 1+3) is the meaningful check there.
+// "bars vary" is a valid non-tautology proxy. Funk surfaces its ghost gate audibly.
+// Neo-Soul's onset is driven by a locked comp cell (updateRhythmicIntent regenerates
+// + locks it), so its rhythm is deterministic by design and its ghost contribution
+// doesn't surface in this minimal harness. strum-country is ALSO regular-by-design as
+// of #877: country boom-chicka is a metronomic REGULAR subdivision (chicka on every
+// &, identical every bar) — the old per-step hash scatter that made bars vary was the
+// bug, not the idiom. So country's bars SHOULD be identical; its specific pattern is
+// guarded positively by country-piano-critique ('regular, bar-stable subdivision'),
+// and determinism here is the meaningful check (guards 1/2/4/5), not bar-variation.
 // lockLoopToLoop: the lane's onsets are purely picker-keyed off the IN-LOOP bar
 // with no cross-loop rotation counter (Funk/Bossa) or sticky retention that
 // straddles the loop boundary (the STICKY_GENRES) — so loop N+1 must reproduce
@@ -163,7 +166,10 @@ const LANES: {
         name: 'strum-country',
         genreFeel: 'Country',
         chordStyle: 'strum-country',
-        checkVariation: true,
+        // #877: country boom-chicka is regular-by-design (identical every bar) — the
+        // bar-variation proxy no longer applies; the pattern is pinned positively in
+        // country-piano-critique. Determinism + loop-lock (1/2/4/5) are the checks here.
+        checkVariation: false,
         lockLoopToLoop: true,
     },
     {
