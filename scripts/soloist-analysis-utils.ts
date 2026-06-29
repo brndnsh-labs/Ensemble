@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
-import { getSoloistNote } from '../public/engine/soloist.js';
 import { resolveSoloistStyle, STYLE_CONFIG } from '../public/engine/soloist-config.js';
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../public/engine/soloist-phrase-first.js';
 import { deriveSoloistHook, generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';

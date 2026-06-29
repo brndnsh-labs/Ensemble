@@ -5,7 +5,7 @@ import { TIME_SIGNATURES } from '../public/config.js';
 import { getAccompanimentNotes } from '../public/engine/accompaniment.js';
 import { getBassNote } from '../public/engine/bass-engine.js';
 import { validateProgression } from '../public/engine/chords-engine.js';
-import { getSoloistNote } from '../public/engine/soloist.js';
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';

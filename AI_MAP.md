@@ -44,8 +44,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/engine/soloist.ts` | Melodic soloist generation logic (Main). | `getSoloistNote` |
-| `public/engine/soloist-phrase-first.ts` | Parallel phrase-first soloist engine, flag-gated (WIP re-architecture). | `getSoloistNotePhraseFirst` |
+| `public/engine/soloist-phrase-first.ts` | The soloist engine — phrase-first, theme-driven (the legacy `soloist.ts` was retired in epic #10). | `getSoloistNotePhraseFirst` |
+| `public/engine/soloist-session.ts` | Soloist per-playback state reset (relocated from the retired `soloist.ts`). | `resetSoloistState` |
 | `public/engine/soloist-seeder.ts` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
 | `public/engine/bass-engine.ts` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |

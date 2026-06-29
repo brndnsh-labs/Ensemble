@@ -631,18 +631,9 @@ const GENRE_STYLE_MAPPING: Record<string, string> = {
     Metal: 'metal',
 };
 
-/**
- * Collective pools of stylistic influences for each genre.
- * The soloist randomly "channels" one of these for the duration of a section.
- */
-export const INFLUENCE_POOLS: Record<string, string[]> = {
-    rock: ['gilmour', 'slash', 'hendrix', 'evh', 'beck'],
-    jazz: ['bird', 'evans', 'coltrane', 'miles'],
-    bird: ['bird', 'evans', 'coltrane', 'miles'],
-    blues: ['srv', 'monk', 'armstrong', 'miles'],
-    neo: ['miles', 'srv'], // Cross-genre influences
-    funk: ['srv', 'slash'],
-};
+// INFLUENCE_POOLS (per-genre "channeled greats" pools) removed in epic #10 — it
+// was read only by the retired legacy soloist engine. Phrase-first does not model
+// per-section influence channeling.
 
 export interface SoloistIntent {
     maxIntensity: number;

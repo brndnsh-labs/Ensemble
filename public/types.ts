@@ -880,14 +880,11 @@ export interface SoloistState {
     /** Whether tracking motifs is enabled. */
     readonly motifTracking: boolean;
     /**
-     * User-pinned Greats profile (e.g. 'evans', 'bird'). When non-null and
-     * present in the active genre's `INFLUENCE_POOLS` pool, the soloist
-     * sticky-retains this profile across section boundaries instead of
-     * re-rolling at the default 80% rotation gate (see soloist.ts §
-     * "Structural Influence Rotation"). When null (default), section
-     * boundaries auto-rotate as before. When set but off-pool for the
-     * current genre, falls back to auto-rotation and warns once.
-     * Epic 12 S3.
+     * User-pinned Greats profile (e.g. 'evans', 'bird'). Drove the retired legacy
+     * soloist engine's per-section influence rotation; the live phrase-first engine
+     * does not model influence channeling, so this field is currently inert pending
+     * a state-cleanup pass (#866). Retained for now to avoid touching persisted
+     * session / share-URL payloads. Epic 12 S3 (legacy); epic #10 retirement.
      */
     readonly pinnedProfile: string | null;
 

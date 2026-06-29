@@ -129,51 +129,37 @@ describe('Hip Hop Soloist Critique', () => {
         expect(resolveSoloistStyle('smart', 'Hip Hop')).not.toBe('neo');
     });
 
-    it('outlines the chord changes — chord-following lifts harmonic alignment', () => {
+    it('outlines the chord changes — voice-led chord-tone alignment, not a verbatim loop', () => {
         const p = hookProfile();
-        console.log('\n--- HIP HOP LIVING-HOOK REPORT ---');
+        console.log('\n--- HIP HOP SOLOIST REPORT (phrase-first) ---');
         console.log(`[hook length]          ${p.hookLen} (2 bars × 16)`);
-        console.log(
-            `[anchor chord-tone]    snapped ${(p.emitAnchorChordRate * 100).toFixed(1)}%  vs  raw ${(p.rawAnchorChordRate * 100).toFixed(1)}%  (Target: lift >0.05)`,
-        );
         console.log(
             `[all chord-tone]       ${(p.allChordToneRate * 100).toFixed(1)}% (Target: >0.55)`,
         );
         console.log(
-            `[period pitch rep]     ${(p.periodPitchRep * 100).toFixed(1)}% (Target: 0.40–0.90; was 1.0 verbatim)`,
+            `[period pitch rep]     ${(p.periodPitchRep * 100).toFixed(1)}% (Target: <0.90 — not verbatim)`,
         );
         console.log(`[notes/loop]           ${JSON.stringify(p.loopNotes)}`);
-        console.log(`[ghosts/loop]          ${JSON.stringify(p.loopGhosts)}`);
         console.log('----------------------------------\n');
 
         expect(p.hookLen).toBe(32);
-        // (2) CHORD-FOLLOWING, proven by LIFT (not the snap's own tautology): the
-        // snapped anchors align to the chord under them MORE than the raw carved
-        // hook would over these moving chords. A static verbatim hook = zero lift.
-        expect(p.emitAnchorChordRate).toBeGreaterThan(p.rawAnchorChordRate + 0.05);
-        expect(p.emitAnchorChordRate).toBeGreaterThan(0.9);
-        // The whole line stays harmonic (chord + scale tones), not just anchors.
-        // Random-floor over a 4-note chord set is ~0.33.
+        // Phrase-first voice-leads to the chord under it, so the whole line stays
+        // harmonic (chord + scale tones) — well above the ~0.33 random floor over a
+        // 4-note chord set. This IS the live engine's "outlines the changes".
         expect(p.allChordToneRate).toBeGreaterThan(0.55);
-    });
-
-    it('breathes — recognizable but NOT a verbatim copy-paste loop', () => {
-        const p = hookProfile();
-        // (3) THE WINDOW. period pitch repetition BELOW the old verbatim 1.0 (it
-        // varies as chords move + ornament grows) yet not collapsed to random (the
-        // rhythm/contour skeleton still recurs). Engine: ~0.76.
+        // Not a verbatim copy-paste loop (the old failure mode was periodPitchRep
+        // 1.0). Phrase-first sits far lower (~0.14) because it DEVELOPS the theme
+        // each loop rather than replaying it.
         expect(p.periodPitchRep).toBeLessThan(0.9);
-        expect(p.periodPitchRep).toBeGreaterThan(0.4);
-    });
 
-    it('builds over loops — ornament grows, loop 0 stays clean', () => {
-        const p = hookProfile();
-        // (4) GUARDS THE ORNAMENT PATH (which is dead unless graces ride the
-        // sustains). Loop 0 states the hook clean (no ghosts); later loops add soft
-        // graces, so note density grows. Engine: notes 89→125, ghosts 0→15→23→33.
-        expect(p.loopGhosts[0] || 0).toBe(0); // loop 0 clean
-        expect(p.loopGhosts[3] || 0).toBeGreaterThan(p.loopGhosts[1] || 0); // graces grow
-        expect(p.loopNotes[3] || 0).toBeGreaterThan(p.loopNotes[0] || 0); // busier later
+        // DROPPED (epic #10 — legacy "living hook" mechanism #555, dark on the live
+        // engine): the anchor-snap LIFT metric (emitAnchorChordRate vs raw hook —
+        // phrase-first emits no `isAnchor` flag), the recurring-hook recognizability
+        // window (periodPitchRep >0.4 — phrase-first develops to ~0.14, the
+        // "hooks wash out under SRDC development" behavior), and the ghost-grace /
+        // monotonic-densify "builds over loops" guard (phrase-first emits no
+        // sub-0.36 ghost graces and grows via pitch development, not density). The
+        // recurring hip-hop HOOK character is a genuine phrase-first PORT CANDIDATE.
     });
 
     it('stays a coherent, non-empty melodic line (regression guard)', () => {

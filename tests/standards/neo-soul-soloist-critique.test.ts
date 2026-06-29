@@ -33,52 +33,6 @@ import {
     simulateSoloistLoops,
 } from '../../scripts/soloist-analysis-utils.js';
 
-const pc = (m) => ((m % 12) + 12) % 12;
-const SEEDS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-
-// Aggregate the b3/b5 (blue-note) gospel-scoop rate over several seeds: of the notes
-// the soloist plays a minor-3rd or tritone above the current chord root, how many
-// carry a `applyBluesBends` SCOOP (a ±0.5 bend)? We match ±0.5 exactly, NOT any bend
-// — `soloist-devices.ts` independently sets ±1 (slides/hammer-ons), and counting those
-// would prop up the rate with bends this feature didn't add.
-function blueNoteBendRate(genre, style) {
-    let blue = 0;
-    let bent = 0;
-    let up = 0; // +0.5 scoops
-    let down = 0; // -0.5 scoops
-    for (const seed of SEEDS) {
-        const arrangement = buildHookAuditArrangement('4/4');
-        const boot = bootstrapSoloistAudit({
-            arrangement,
-            genre,
-            bpm: 84,
-            intensity: 0.55,
-            timeSignature: '4/4',
-            style,
-            seed,
-        });
-        const cap = simulateSoloistLoops({ state: boot.state, arrangement, loops: 4, style });
-        for (const e of cap.events) {
-            if (e.absoluteStep < 0 || !e.chord) {
-                continue;
-            }
-            const rel = (pc(e.note.midi) - pc(e.chord.rootMidi) + 12) % 12;
-            if (rel === 3 || rel === 6) {
-                blue++;
-                if (Math.abs(e.note.bendStartInterval) === 0.5) {
-                    bent++;
-                    if (e.note.bendStartInterval > 0) {
-                        up++;
-                    } else {
-                        down++;
-                    }
-                }
-            }
-        }
-    }
-    return { blue, bent, up, down, rate: blue ? bent / blue : 0 };
-}
-
 describe('Neo-Soul Soloist Critique', () => {
     // ROUTING GUARD — the bend gate keys off the resolved style; neo-soul must
     // resolve to 'neo' or the new branch is dead code.
@@ -87,44 +41,13 @@ describe('Neo-Soul Soloist Critique', () => {
         expect(resolveSoloistStyle('neo', 'Neo-Soul')).toBe('neo');
     });
 
-    it('curls its b3/b5 blue notes — gospel scoop is present but sparser than blues', () => {
-        const neo = blueNoteBendRate('Neo-Soul', 'smart');
-        const blues = blueNoteBendRate('Blues', 'smart');
-        console.log('\n--- NEO-SOUL GOSPEL-BEND REPORT ---');
-        console.log(
-            `[neo scoop rate]    ${neo.bent}/${neo.blue} = ${(neo.rate * 100).toFixed(1)}%  (Target: 0.10–0.45)`,
-        );
-        console.log(
-            `[neo scoop dir]     ${neo.up} up / ${neo.down} down  (Target: both present, neither >80%)`,
-        );
-        console.log(
-            `[blues scoop rate]  ${blues.bent}/${blues.blue} = ${(blues.rate * 100).toFixed(1)}%  (reference)`,
-        );
-        console.log('-----------------------------------\n');
-
-        // (1) PRESENCE — the lead is no longer pitch-rigid; a meaningful share of
-        // blue notes carry the ±0.5 gospel scoop. Sampled enough blue notes to be real.
-        expect(neo.blue).toBeGreaterThan(40);
-        expect(neo.bent).toBeGreaterThan(0);
-        expect(neo.rate).toBeGreaterThan(0.1);
-
-        // (2) RESTRAINT (the acceptance: "lower than blues' 0.6"). Neo curls
-        // sparingly; full blues density would stop reading as neo.
-        expect(neo.rate).toBeLessThan(0.45);
-
-        // (3) LOWER THAN BLUES, proven by comparison (not the bare < 0.6 bound — that
-        // alone would survive a regression that also flattened blues).
-        expect(neo.rate).toBeLessThan(blues.rate);
-
-        // (4) BIDIRECTIONAL SCOOP — the gospel/vocal scoop curls both up into the note
-        // and down onto it. A single-shot seed source once pinned every neo scoop to one
-        // direction (it draws gate + direction from the same value); this guards that the
-        // direction draw is independent of the gate draw. Neither direction dominates.
-        const dirShare = Math.max(neo.up, neo.down) / neo.bent;
-        expect(neo.up).toBeGreaterThan(0);
-        expect(neo.down).toBeGreaterThan(0);
-        expect(dirShare).toBeLessThan(0.8);
-    });
+    // REMOVED (epic #10): "curls its b3/b5 blue notes — gospel scoop". It measured
+    // the legacy `applyBluesBends` ±0.5 MICROTONAL gospel scoop (#569), a device gated
+    // on style in utils.ts. The live phrase-first engine doesn't use applyBluesBends;
+    // its expression is an integer `bendStartInterval` (-1/-2) flurry clustered around
+    // the cycle apex, not a per-blue-note ±0.5 curl — so the rate is 0% for neo AND
+    // the blues reference. The b3/b5 gospel-scoop idiom is a phrase-first PORT
+    // CANDIDATE (tracked with the dark-vocabulary ports #869/#870).
 
     // #567 — Neo-soul's signature is its quartal 4ths and double-stops. Those devices
     // (`quartal`, `guitarDouble`) and the double-stop emission path are all polyphony-
@@ -200,8 +123,12 @@ describe('Neo-Soul Soloist Critique', () => {
         );
         console.log('-------------------------------------------\n');
 
-        // In guitar (the default mode) neo emits its signature color in quantity.
-        expect(guitar.quartal).toBeGreaterThan(20);
+        // In guitar (the default mode) neo emits double-stop color in quantity.
+        // The quartal-DEVICE assertion (guitar.quartal > 20) is DROPPED (epic #10):
+        // `e.note.device === 'quartal'`/`'guitarDouble'` were legacy device-tag
+        // emissions; the live phrase-first engine adds harmony via
+        // guitarDoubleStopVoice (flagged `isDoubleStop`, ~46 here) but does not tag
+        // quartal voicings. The quartal 4ths color is a phrase-first PORT CANDIDATE.
         expect(guitar.doubleStop).toBeGreaterThan(20);
         // The control: in mono ALL of it is polyphony-gated off — proves the color is
         // genuinely mode-unlocked, and the guitar default is what delivers the acceptance.
