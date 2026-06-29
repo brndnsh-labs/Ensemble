@@ -538,9 +538,10 @@ export interface RhythmNode {
  *
  * Fractions are 0..1 of the note's duration. The AUDIO renderers honor it — the
  * synth voice (`applyPitchEnvelope`), the sampled seam (`scheduleSampleBend`),
- * and offline *audio* export (same scheduler path). MIDI export does NOT yet
- * render it (only the `bendStartInterval` scalar maps to pitch-bend) — a `.mid`
- * stem currently loses the cry; wiring it is a follow-up.
+ * and offline *audio* export (same scheduler path). MIDI export renders it too
+ * (`midi-worker-logic.ts emitBendGesture`, #854). The producer is the live
+ * phrase-first engine (#869); pre-#869 only the deleted legacy engine set it, so
+ * the whole gesture was dark in production despite the render/export being wired.
  */
 export interface PitchBendGesture {
     /** Peak offset above the written note, in semitones (+1 = ½-step, +2 = whole). */
