@@ -121,9 +121,11 @@ function regenerateSessionSeeds(
     );
 
     // #555 — hook lane: for hook-driven profiles (Hip Hop), carve a short verbatim
-    // hook out of the head so the worker can loop it. Gated on the resolved
-    // profile's `hookLoop`, so non-hook genres dispatch a null hook (and the
-    // replay short-circuit in getSoloistNote stays a no-op for them).
+    // hook out of the head. Gated on the resolved profile's `hookLoop`, so non-hook
+    // genres dispatch a null hook. NOTE: the legacy replay consumer (in the retired
+    // getSoloistNote engine) is gone — the live phrase-first engine does not loop a
+    // hook, so this lane is currently inert, retained as the #870 living-hook port
+    // reference.
     const resolvedStyle = resolveSoloistStyle(soloist.style || 'smart', groove.genreFeel);
     const profile = STYLE_CONFIG[resolvedStyle];
     let soloistHook = null;

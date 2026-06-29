@@ -849,41 +849,8 @@ export function calculateTimingOffset(
     return finalOffset;
 }
 
-/**
- * Applies blues bend styling to a note.
- *
- * `random` is an injectable PRNG (Epic 12 S1) — soloist-only consumer; the
- * soloist passes a `scrambleHash`-derived seeded source so the bend direction
- * is deterministic. Defaults to `Math.random` for any future caller.
- *
- * It MUST yield an independent value per call (a stream, not a single-shot
- * constant): the neo path draws twice — once to gate the bend, once for its
- * direction — and a constant source would force the direction (the second
- * `< 0.5` draw is implied true whenever the `< 0.3` gate passes), pinning every
- * neo scoop to one direction.
- */
-export function applyBluesBends(
-    primary: any,
-    activeStyle: string,
-    currentChord: any,
-    random: () => number = Math.random,
-): void {
-    // blues and neo-soul both borrow the gospel/blues b3/b5 vocal scoop, at different
-    // densities: blues bends *every* blue note (the scoop is the idiom), neo-soul curls
-    // them sparingly — at full blues density it stops reading as neo and starts reading
-    // as blues.
-    if (activeStyle === 'blues' || activeStyle === 'neo') {
-        const relativeInterval =
-            ((primary.midi % 12) - ((currentChord.rootMidi || 0) % 12) + 12) % 12;
-        if ((relativeInterval === 3 || relativeInterval === 6) && primary.bendStartInterval === 0) {
-            if (activeStyle === 'blues') {
-                // every blue note scoops; 0.6 = down-scoop directional bias (unchanged).
-                primary.bendStartInterval = random() < 0.6 ? -0.5 : 0.5;
-            } else if (random() < 0.3) {
-                // neo-soul: ~30% of blue notes curl (by-ear starting point, verify-by-ear);
-                // symmetric scoop direction (half up to the note, half down).
-                primary.bendStartInterval = random() < 0.5 ? -0.5 : 0.5;
-            }
-        }
-    }
-}
+// applyBluesBends (the blues/neo ±0.5 gospel b3/b5 vocal scoop) removed in
+// epic #10/#866 — its only caller was the retired legacy picker. The live
+// phrase-first engine uses an integer `bendStartInterval` flurry around the apex,
+// not this per-blue-note microtonal scoop. The gospel-scoop idiom is a tracked
+// #870 PORT CANDIDATE (recoverable from git history if/when it's ported).

@@ -291,7 +291,7 @@ export function createCoordinationContext(
         // coordination context rather than letting harmonies.ts reach into soloist.session.*
         // directly keeps the contract surface honest and ensures mocked tests exercise the
         // same code paths as production. (Source: harmony-coordination.md P0 #5, S4.)
-        // writer: tick-logic.ts (soloist producer block, after getSoloistNote)
+        // writer: tick-logic.ts (soloist producer block, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (any consumer that runs after soloist)
         // Default `true` matches state.soloist.session.phrasing.isResting's boot value
         // in public/state/instruments.ts, so harmony doesn't see a false "busy" signal
@@ -317,7 +317,7 @@ export function createCoordinationContext(
         // Both are worker-internal — computed worker-side from the soloist
         // session each tick and consumed only by the harmony producer that runs
         // later in the same tick — so they do NOT need main↔worker sync.
-        // writer: soloist producer (tick-logic.ts, after getSoloistNote)
+        // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (harmony can read this)
         soloistSharedHookBuffer: [] as SoloistHook[],
         soloistSeed: null as SoloistSessionSeed | null,

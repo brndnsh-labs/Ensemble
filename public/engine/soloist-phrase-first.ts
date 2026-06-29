@@ -6,20 +6,20 @@ import { allowsSoloistPolyphony } from './soloist-mode-policy.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
 
 /**
- * Phrase-first soloist engine — Slice 1 of the soloist re-architecture
+ * Phrase-first soloist engine — THE soloist engine
  * (docs/design/soloist-phrase-first.md).
  *
- * Runs as a PARALLEL path to the legacy `getSoloistNote`, selected per-tick in
- * `tick-logic.ts` by the user-facing `soloist.phraseFirstSoloist` flag
- * (Settings → Performance Engine). Keeping it parallel means the legacy engine
- * stays the default and `main` remains shippable while this is built up
- * incrementally and auditioned by ear, one layer at a time.
+ * `tick-logic.ts` calls this every tick. It began as a parallel, flag-gated path
+ * built up layer-by-layer alongside the old `getSoloistNote`; once it became the
+ * default the toggle was retired, and epic #10 (#865) DELETED the legacy engine
+ * outright — this is now the only soloist generator.
  *
- * **Contract (matches `getSoloistNote`):** same argument list, returns
- * `null` | a note object (`{ midi, velocity, durationSteps, timingOffset, … }`,
- * `freq` is derived downstream), and it maintains `soloist.session.phrasing
- * .isResting` each tick (tick-logic publishes it to the coordination context so
- * bass/chords/harmony know whether the lead is breathing).
+ * **Contract:** `null` | a note object (`{ midi, velocity, durationSteps,
+ * timingOffset, … }`, `freq` is derived downstream), and it maintains
+ * `soloist.session.phrasing.isResting` each tick (tick-logic publishes it to the
+ * coordination context so bass/chords/harmony know whether the lead is breathing).
+ * The positional argument list is inherited from the retired `getSoloistNote` (some
+ * params are vestigial — see the signature).
  *
  * **Build status — 2c (apex reach + recurring peaks):** on top of 2b (theme +
  * breath + arc + chord-tone landing + cumulative development with theme return),
@@ -44,7 +44,8 @@ import { chordTargetTones } from './soloist-pitch-engine.js';
  * monophonic lead never overruns its successor. Still to come: op variety (inversion,
  * displacement), a stepwise run-up into the apex, voice-leading targeting on
  * weak beats, then full expression (bends/vibrato, sparingly). With no seed it
- * defers to the legacy engine so the lead is never silent-by-bug.
+ * rests (returns null) — a guard test proves every canonical genre seeds non-empty
+ * for a real chart, so that rest path is unreachable in normal playback.
  */
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);

@@ -68,10 +68,11 @@ export interface StyleConfig {
     chromaticism: number;
     seedTriplets: SeedTriplets;
     motivicResponse: MotivicResponse;
-    // #555 — hook-lane opt-in. When `hookLoop` is true the soloist captures a
-    // short window of the head (`hookBars` bars, default 2) and replays it
-    // near-verbatim every bar (Hip Hop). Absent/false on every other profile, so
-    // the hook short-circuit in getSoloistNote is a no-op for them.
+    // #555 — hook-lane opt-in (legacy). When `hookLoop` is true the carve in
+    // state-effects captures a short window of the head (`hookBars` bars, default 2).
+    // The retired getSoloistNote engine replayed it near-verbatim every bar (Hip Hop);
+    // the live phrase-first engine does not consume the hook lane, so this is inert —
+    // the #870 living-hook port reference.
     hookLoop?: boolean;
     hookBars?: number;
 }
@@ -635,47 +636,9 @@ const GENRE_STYLE_MAPPING: Record<string, string> = {
 // was read only by the retired legacy soloist engine. Phrase-first does not model
 // per-section influence channeling.
 
-export interface SoloistIntent {
-    maxIntensity: number;
-    thematicAnchorScale: number;
-    phrasingBridgeProb: number;
-    syncopationBias: number;
-    embellishmentProb: number;
-    stationaryScale: number;
-}
-
-/**
- * Soloist Intent Behaviors
- * Maps intensity ranges to specific performance "intentions".
- * These allow the soloist to "dissolve" the melody or bridge gaps
- * based on musical intent rather than rigid intensity cliffs.
- */
-export const SOLOIST_INTENTS: Record<string, SoloistIntent> = {
-    CONSERVATIVE: {
-        maxIntensity: 0.35,
-        thematicAnchorScale: 1.0, // Stick strictly to theme
-        phrasingBridgeProb: 0.0, // Always respect structural breaths
-        syncopationBias: 0.0, // Prefer downbeats (style-adjusted)
-        embellishmentProb: 0.2, // Minimal turns/slides
-        stationaryScale: 1.0, // Strong focus on repeating hooks
-    },
-    CONVERSATIONAL: {
-        maxIntensity: 0.75,
-        thematicAnchorScale: 0.7, // Start introducing variations
-        phrasingBridgeProb: 0.5, // Sometimes push through 8-measure gaps
-        syncopationBias: 0.6, // Moderate syncopation
-        embellishmentProb: 0.5, // Active phrasing
-        stationaryScale: 0.5, // Occasional repetition
-    },
-    EXPLORATORY: {
-        maxIntensity: 1.0,
-        thematicAnchorScale: 0.3, // Theme is a secondary anchor
-        phrasingBridgeProb: 0.9, // Usually push through boundaries
-        syncopationBias: 1.0, // Aggressive off-beats
-        embellishmentProb: 0.9, // High-energy runs/flurries
-        stationaryScale: 0.1, // Minimal repetition, favor motion
-    },
-};
+// SoloistIntent + SOLOIST_INTENTS (intensity→"intention" behavior table) removed in
+// epic #10/#866 — read only by the retired legacy picker (selectPitchAndDevices).
+// Phrase-first drives intensity through its own arc/development model.
 
 export interface RegisterProfile {
     seedFloor: number;
