@@ -26,7 +26,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         'hookRetentionProb',
         'doubleStopProb',
         'tradeMode',
-        'motifTracking',
         'seed',
     ]);
 

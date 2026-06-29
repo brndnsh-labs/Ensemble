@@ -877,16 +877,10 @@ export interface SoloistState {
     readonly doubleStopProb: number;
     /** Mode for trading fours ('manual', 'auto'). */
     readonly tradeMode: string;
-    /** Whether tracking motifs is enabled. */
-    readonly motifTracking: boolean;
-    /**
-     * User-pinned Greats profile (e.g. 'evans', 'bird'). Drove the retired legacy
-     * soloist engine's per-section influence rotation; the live phrase-first engine
-     * does not model influence channeling, so this field is currently inert pending
-     * a state-cleanup pass (#866). Retained for now to avoid touching persisted
-     * session / share-URL payloads. Epic 12 S3 (legacy); epic #10 retirement.
-     */
-    readonly pinnedProfile: string | null;
+    // `motifTracking` and `pinnedProfile` were removed in #866 — both were inert
+    // after the legacy soloist engine's retirement (epic #10). Old persisted /
+    // share-URL payloads carrying them are dropped on load via the deprecated-key
+    // skip in `applySoloistPayload` (state/instruments.ts).
 
     // === Engine runtime (per-playback, transient) ===
     readonly session: SoloistSession;
@@ -1414,8 +1408,6 @@ export type ActionPayloadUpdateSB = Partial<{
     hookRetentionProb: number;
     doubleStopProb: number;
     tradeMode: string;
-    motifTracking: boolean;
-    pinnedProfile: string | null;
     sessionSeed: SoloistSessionSeed | null;
     soloistHook: SoloistHookLane | null;
     sessionSteps: number;

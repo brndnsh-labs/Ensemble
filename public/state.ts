@@ -98,12 +98,6 @@ export function getSyncState() {
             phrasingIntensity: soloist.phrasingIntensity,
             tradeMode: soloist.tradeMode,
             hookRetentionProb: soloist.hookRetentionProb,
-            // why: Epic 12 S3 — the rotation gate at soloist.ts §
-            // "Structural Influence Rotation" reads this on the worker side
-            // to decide sticky-retain vs. auto-rotation. Must travel with
-            // the initial snapshot AND every delta (UPDATE_SB / SET_PARAM
-            // handle the delta path generically).
-            pinnedProfile: soloist.pinnedProfile,
             session: {
                 sessionSteps: soloist.session.sessionSteps,
                 seed: soloist.session.seed,

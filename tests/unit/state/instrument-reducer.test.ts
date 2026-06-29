@@ -128,6 +128,23 @@ describe('Instrument Reducer', () => {
         expect(soloist.session.tension).toBe(0.5);
     });
 
+    it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
+        // An old persisted session / share-URL carries the inert legacy fields
+        // removed in #866. They must be silently dropped on load — NOT written
+        // back onto state via applySoloistPayload's unknown-key fall-through.
+        instrumentReducer({
+            type: ACTIONS.UPDATE_SB,
+            payload: {
+                pinnedProfile: 'evans',
+                motifTracking: true,
+                tension: 0.42, // a live key alongside them still applies
+            },
+        });
+        expect(soloist.session.tension).toBe(0.42);
+        expect((soloist as Record<string, unknown>).pinnedProfile).toBeUndefined();
+        expect((soloist as Record<string, unknown>).motifTracking).toBeUndefined();
+    });
+
     it('should return false for unknown actions', () => {
         const result = instrumentReducer({ type: 'UNKNOWN_ACTION', payload: {} });
         expect(result).toBe(false);
