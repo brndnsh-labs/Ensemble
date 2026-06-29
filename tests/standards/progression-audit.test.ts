@@ -92,7 +92,12 @@ vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() }
 
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired). Same
+// positional contract, so the call sites below are unchanged; a real session seed
+// is generated per template (below) so the engine actually plays rather than
+// resting on a missing seed.
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo, getStepsPerMeasure } from '../../public/utils.js';
@@ -141,6 +146,18 @@ describe('Progression Audit: Verifying All Library Presets', () => {
             // Validate Progression
             validateProgression(getState());
             expect(arranger.progression.length).toBeGreaterThan(0);
+
+            // Generate a real session seed so the phrase-first engine performs a
+            // theme instead of resting on a missing seed (epic #10). Deterministic
+            // (fixed seed string) so the no-crash sweep is reproducible.
+            soloist.session.seed = generateSessionSeed(
+                getState(),
+                arranger,
+                'smart',
+                0.6,
+                `AUDIT_${template.name}`,
+            );
+            soloist.session.phrasing.isResting = false;
 
             // Audit Harmonic Cohesion: Accompanist vs Soloist
             // We specifically check if 'Rich' density extensions clash with the soloist's scale
