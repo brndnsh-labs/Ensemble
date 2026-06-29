@@ -83,11 +83,6 @@ export const soloist = deepSignal<SoloistState>({
     hookRetentionProb: 0.5,
     doubleStopProb: 1.0,
     tradeMode: 'manual',
-    motifTracking: false,
-    // why: Epic 12 S3 — user-pinned Greats profile. `null` keeps the
-    // historical 80%-section-boundary auto-rotation; non-null sticky-retains
-    // the chosen profile across boundaries (see soloist.ts rotation site).
-    pinnedProfile: null,
 
     // === Engine runtime ===
     session: {
@@ -212,8 +207,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     hookRetentionProb: { kind: 'config', key: 'hookRetentionProb' },
     doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
-    motifTracking: { kind: 'config', key: 'motifTracking' },
-    pinnedProfile: { kind: 'config', key: 'pinnedProfile' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
@@ -272,13 +265,26 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
 };
 
 /**
+ * Soloist payload keys that were removed in #866 after the legacy engine's
+ * retirement (epic #10). Old persisted sessions / share-URLs may still carry
+ * them; we drop them on load rather than letting the unknown-key fall-through
+ * resurrect them as stray top-level fields. Compat shim — keep entries here so
+ * stale payloads load cleanly.
+ */
+const DEPRECATED_SOLOIST_KEYS = new Set(['motifTracking', 'pinnedProfile']);
+
+/**
  * Apply a flat-keyed soloist payload to the nested state shape. Unknown keys
  * are written to the top level (preserves the legacy `instrumentStateMap[mod][param] = v`
- * behavior that some tests and scripts rely on for ad-hoc fields).
+ * behavior that some tests and scripts rely on for ad-hoc fields), except
+ * deprecated keys (see `DEPRECATED_SOLOIST_KEYS`), which are silently dropped.
  */
 function applySoloistPayload(target: typeof soloist, payload: Record<string, unknown>): void {
     const t = target as Mutable<typeof target>;
     for (const flatKey of Object.keys(payload)) {
+        if (DEPRECATED_SOLOIST_KEYS.has(flatKey)) {
+            continue;
+        }
         const route = SOLOIST_FIELD_ROUTES[flatKey];
         if (!route) {
             (t as any)[flatKey] = payload[flatKey];
@@ -378,11 +384,7 @@ export function instrumentReducer(action: Action): boolean {
             s.mode = 'monophonic';
             s.complexity = 0.5;
             s.tradeMode = 'manual';
-            s.motifTracking = false;
             s.phrasingIntensity = 0.5;
-            // why: Epic 12 S3 — keep historical auto-rotation as the post-
-            // reset default; a user re-pins via UPDATE_SB after reset.
-            s.pinnedProfile = null;
             // Reset engine runtime to a fresh session.
             const session = s.session as Mutable<typeof s.session>;
             const phr = session.phrasing as Mutable<typeof session.phrasing>;
