@@ -178,6 +178,63 @@ describe('Country Piano Critique', () => {
         expect(strumsWithDoubledRoot).toBe(8);
     });
 
+    // why: #877 — the offbeat "chicka" pickups were placed by a per-step hash gate
+    // (`compDraw(21) < intensity*0.6`) firing full strums on a DIFFERENT scattered
+    // ~half of the 16ths every bar. Deterministic but arrhythmic — it read as a
+    // random spray of chords over the boom-chick rather than a country strum. The
+    // fix anchors the chicka to a REGULAR subdivision: the & of each beat (steps
+    // 2,6,10,14), plus the "a" 16th (3,7,11,15) only at higher drive. This guards
+    // (a) regularity — pickups land only on the &/a, never the "e"; and (b)
+    // bar-stability — the pattern is identical every bar (the direct anti-scatter
+    // assertion). A chicka pickup is a SHORT (durationSteps 0.5) offbeat strum.
+    it('places the boom-chicka pickups on a regular, bar-stable subdivision (no scatter)', () => {
+        const cmaj = {
+            rootMidi: 48,
+            quality: 'maj',
+            intervals: [0, 4, 7],
+            freqs: [130.81, 164.81, 196.0],
+            sectionId: 'A',
+        };
+        const chickaStepsPerBar = (intensity: number, bars: number): string[] => {
+            mockState.playback.bandIntensity = intensity;
+            const events = simulateBars(cmaj, bars);
+            const out: string[] = [];
+            for (let bar = 0; bar < bars; bar++) {
+                const steps = events
+                    .filter((e) => Math.floor(e.step / 16) === bar)
+                    .filter(
+                        (e) =>
+                            e.measureStep % 4 !== 0 && // offbeat (not a beat)
+                            e.notes.some((n) => n.durationSteps === 0.5), // a short pickup strum
+                    )
+                    .map((e) => e.measureStep)
+                    .sort((a, b) => a - b);
+                out.push(steps.join(','));
+            }
+            return out;
+        };
+
+        // Default-ish drive (0.4): the signature boom-CHICKA — chicka on every & only.
+        const low = chickaStepsPerBar(0.4, 6);
+        expect(low[0]).toBe('2,6,10,14'); // the &s, never the e (1,5,9,13) or a (3,7,11,15)
+        // Bar-stable: IDENTICAL every bar (the old hash scatter varied bar-to-bar).
+        for (const bar of low) {
+            expect(bar).toBe('2,6,10,14');
+        }
+
+        // High drive (0.7): the "a" 16th joins for a train beat — still regular + stable.
+        const hi = chickaStepsPerBar(0.7, 4);
+        for (const bar of hi) {
+            expect(bar).toBe('2,3,6,7,10,11,14,15');
+        }
+
+        // Very low drive (0.15): bare boom-chick, no chicka at all (room to breathe).
+        const bare = chickaStepsPerBar(0.15, 3);
+        for (const bar of bare) {
+            expect(bar).toBe('');
+        }
+    });
+
     // why: P0-1 catch — sus chords are DEFINED by the absence of the 3rd.
     // The previous implementation fell back to a major 3rd when no 3 or 4
     // was found in intervals, silently re-voicing Dsus4 as a D-major triad.

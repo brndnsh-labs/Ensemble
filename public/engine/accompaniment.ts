@@ -2340,12 +2340,25 @@ export function getAccompanimentNotes(
         const isBass = isBeatStart && intBeat % 2 === 0;
         const isStrum = isBeatStart && intBeat % 2 !== 0;
 
-        // Train Beat / Bluegrass 16th fills (ghost strums on offbeats)
-        // why: epic-1-compound-meter S3 — `measureStep % 4 !== 0` was a
-        //      hardcoded 4/4 "not a beat" gate. Using `!isBeatStart` reads the
-        //      actual time-signature config, so this stays correct even when
-        //      strum-country is played in non-4/4 time signatures.
-        const isGhost = !isBeatStart && compDraw(21) < intensity * 0.6;
+        // Steady boom-CHICKA chord pickups (#877). Country/bluegrass rhythm guitar
+        // is metronomic: a light, short chord "chicka" on the & of each beat
+        // (`isOffbeat`), with the "a" 16th (`isAOfBeat`) added only at higher drive
+        // for a train-beat feel. This is a REGULAR subdivision, deterministic by the
+        // grid, so the pattern is identical every bar and the groove LOCKS.
+        // why: the old gate `!isBeatStart && compDraw(21) < intensity*0.6` fired full
+        //      chord strums on a hash-scattered ~half of ALL 16th positions — a
+        //      different scatter every bar. Deterministic (seeded) but rhythmically
+        //      arrhythmic: it read as a random spray of chords over the boom-chick,
+        //      not a country strum. Anchoring to the &/a subdivisions is the idiom.
+        //      `stepInfo.isOffbeat`/`isAOfBeat` are time-signature-aware (getStepInfo),
+        //      so this stays correct in 3/4 country-waltz too.
+        // Intensity grades the FEEL, not random placement: at/below ~0.2 = bare
+        //   boom-chick (sparse), ~0.2-0.6 = boom-CHICKA (chicka on every &) — the
+        //   signature, live at the default intensity (0.35) — and >0.6 adds the "a"
+        //   16th for a driving train beat.
+        const isGhost =
+            (!!stepInfo?.isOffbeat && intensity > 0.2) ||
+            (!!stepInfo?.isAOfBeat && intensity > 0.6);
 
         if (isBass) {
             // why: strict R-5 — country boom-chick is a deterministic idiom
