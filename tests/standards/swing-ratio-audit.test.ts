@@ -1,0 +1,149 @@
+// @ts-nocheck
+// SWING RATIO AUDIT — the oracle for the per-genre swing model.
+//
+// Ensemble's swing engine (`calculateStepDuration`, groove-engine.ts) is sound: it
+// maps a 0–100 `swing` knob linearly onto a tempo-preserving offset, anchored at the
+// musically-correct endpoints — swing 0 = straight (1.000:1), swing 100 = a perfect
+// 2:1 triplet. The risk was never the formula; it was the per-genre VALUES drifting
+// on vibes with nothing to catch a mis-dial (e.g. Country shipped swing:60 on the
+// 16th grid = a 1.5:1 laid-back-SIXTEENTHS lurch, wrong for a two-step).
+//
+// This test codifies the intended swing FEEL per genre as a measured onset-ratio band
+// + the grid (sub) it lives on, and asserts the live engine produces it ON THE 4/4
+// (16th-resolution, stepsPerBeat===4) grid — the path the canonical genre presets run.
+// It is the reference table made executable: change a genre's swing/sub out of its
+// idiomatic band and this fails. Bands carry headroom (the values are deterministic
+// functions of swing/sub), not a flake margin.
+//
+// SCOPE: the engine also has a compound-meter (stepsPerBeat===3, e.g. 6/8 / 12/8)
+// swing branch that is self-flagged approximate in groove-engine.ts ("simple offset
+// for now"). Blues/Jazz advertise those meters, so their swing there runs an
+// untested, rougher redistribution. Validating/​improving the compound-meter swing
+// feel is tracked separately (#877 swing follow-ups), not asserted here.
+//
+// Ratio reference: 1.000 straight · ~1.1 light lilt · ~1.2 laid-back pocket ·
+// ~1.5 medium swing · ~1.86 hard shuffle · 2.000 triplet (the swing=100 limit).
+import { describe, expect, it } from 'vitest';
+import { GENRE_NAMES, SMART_GENRES } from '../../public/data/smart-genres.js';
+import { calculateStepDuration } from '../../public/engine/groove-engine.js';
+
+// expectedSub: the grid the genre's swing should live on (only asserted for genres
+//   that actually swing — at swing 0 the sub is inaudible). '8th' = swung eighths
+//   (jazz/shuffle/country lilt); '16th' = laid-back sixteenths (funk/hip-hop/neo).
+// band: [min, max] inclusive on the ACTIVE ratio (the ratio on `expectedSub`).
+const SWING_SPEC: Record<
+    string,
+    { swung: boolean; expectedSub?: string; band: [number, number]; note: string }
+> = {
+    Rock: { swung: false, band: [1.0, 1.0], note: 'straight rock' },
+    Disco: { swung: false, band: [1.0, 1.0], note: 'straight four-on-the-floor' },
+    Bossa: { swung: false, band: [1.0, 1.0], note: 'straight 16ths (the clave is even)' },
+    Metal: { swung: false, band: [1.0, 1.0], note: 'straight, driving' },
+    'Ska-Punk': { swung: false, band: [1.0, 1.0], note: 'straight upstrokes' },
+    Acoustic: { swung: true, expectedSub: '8th', band: [1.05, 1.2], note: 'light 8th lilt' },
+    Funk: { swung: true, expectedSub: '16th', band: [1.05, 1.2], note: 'light laid-back 16ths' },
+    Reggae: { swung: true, expectedSub: '16th', band: [1.05, 1.25], note: 'gentle one-drop swing' },
+    Country: {
+        swung: true,
+        expectedSub: '8th',
+        band: [1.12, 1.35],
+        note: 'light 8th-note two-step lilt — NOT a heavy swing, and NOT on the 16th grid',
+    },
+    'Hip Hop': { swung: true, expectedSub: '16th', band: [1.1, 1.3], note: 'boom-bap 16th pocket' },
+    'Neo-Soul': {
+        swung: true,
+        expectedSub: '16th',
+        band: [1.15, 1.32],
+        note: 'signature laid-back 16ths',
+    },
+    Jazz: { swung: true, expectedSub: '8th', band: [1.4, 1.65], note: 'medium 8th swing' },
+    Blues: { swung: true, expectedSub: '8th', band: [1.72, 2.0], note: 'hard 8th shuffle' },
+};
+
+function ratios(swing: number, swingSub: string) {
+    const ts = { stepsPerBeat: 4 }; // 16th-resolution grid (4 steps per beat)
+    const d = [0, 1, 2, 3].map((s) => calculateStepDuration(s, 120, ts, { swing, swingSub }));
+    return {
+        // ratio of a swung 16th PAIR (sub:'16th') vs a swung 8th PAIR (sub:'8th').
+        ratio16: d[0] / d[1],
+        ratio8: (d[0] + d[1]) / (d[2] + d[3]),
+    };
+}
+
+describe('Swing ratio audit (per-genre oracle)', () => {
+    it('covers every canonical genre', () => {
+        // Guards the canon ↔ spec from drifting: a new genre must get a swing band.
+        for (const g of GENRE_NAMES) {
+            expect(SWING_SPEC[g], `missing swing spec for genre "${g}"`).toBeDefined();
+        }
+        expect(Object.keys(SWING_SPEC).length).toBe(GENRE_NAMES.length);
+    });
+
+    it('every genre swing ratio sits in its idiomatic band', () => {
+        const report: string[] = [];
+        for (const g of GENRE_NAMES) {
+            const sg = SMART_GENRES[g];
+            const swing = sg.swing ?? 0;
+            const sub = sg.sub ?? '16th';
+            const spec = SWING_SPEC[g];
+            const r = ratios(swing, sub);
+            const active = sub === '16th' ? r.ratio16 : r.ratio8;
+            report.push(
+                `${g.padEnd(10)} swing=${String(swing).padStart(3)} sub=${sub.padEnd(4)} ` +
+                    `ratio=${active.toFixed(3)} band=[${spec.band[0]},${spec.band[1]}] — ${spec.note}`,
+            );
+
+            if (!spec.swung) {
+                // Deliberately straight — assert no swing at all (the dial is 0).
+                expect(active, `${g} should be straight`).toBe(1.0);
+                continue;
+            }
+            // Swung genres: on the right GRID, and the active ratio in its band.
+            expect(sub, `${g} should swing on the ${spec.expectedSub} grid`).toBe(spec.expectedSub);
+            expect(
+                active,
+                `${g} ratio ${active.toFixed(3)} outside ${JSON.stringify(spec.band)}`,
+            ).toBeGreaterThanOrEqual(spec.band[0]);
+            expect(
+                active,
+                `${g} ratio ${active.toFixed(3)} outside ${JSON.stringify(spec.band)}`,
+            ).toBeLessThanOrEqual(spec.band[1]);
+        }
+        console.log(`\n=== SWING RATIO AUDIT ===\n${report.join('\n')}\n`);
+    });
+
+    it('the swing engine is anchored at the musically-correct endpoints', () => {
+        // The contract that makes the 0–100 knob trustworthy, asserted directly so a
+        // refactor of calculateStepDuration that breaks the model is caught here.
+        const ts = { stepsPerBeat: 4 };
+        const straight = [0, 1, 2, 3].map((s) =>
+            calculateStepDuration(s, 120, ts, { swing: 0, swingSub: '8th' }),
+        );
+        // swing 0 → every step equal (straight).
+        expect(straight[0]).toBeCloseTo(straight[1], 10);
+        expect(straight[0]).toBeCloseTo(straight[2], 10);
+
+        // swing 100 → a perfect 2:1 triplet on BOTH grids, tempo preserved.
+        const r100_8 = ratios(100, '8th');
+        const r100_16 = ratios(100, '16th');
+        expect(r100_8.ratio8).toBeCloseTo(2.0, 6);
+        expect(r100_16.ratio16).toBeCloseTo(2.0, 6);
+
+        // Tempo preservation: a full beat (4 steps) sums to 4× the straight step,
+        // regardless of swing — swing redistributes, never drifts the pulse.
+        for (const [swing, sub] of [
+            [60, '8th'],
+            [90, '8th'],
+            [30, '16th'],
+        ] as const) {
+            const beat = [0, 1, 2, 3].reduce(
+                (acc, s) => acc + calculateStepDuration(s, 120, ts, { swing, swingSub: sub }),
+                0,
+            );
+            expect(beat, `beat duration drifted at swing ${swing}/${sub}`).toBeCloseTo(
+                4 * straight[0],
+                8,
+            );
+        }
+    });
+});
