@@ -111,9 +111,11 @@ describe('Bossa Soloist Critique', () => {
 
         // DROPPED (epic #10 — live phrase-first engine):
         //  - "longer-held": the legacy `sustainProb`/`maxSustainSteps` bias widened
-        //    bossa's mean duration above jazz. Phrase-first clamps every duration to
-        //    the next sounding note, so bossa (3.6) sits ≈ jazz (3.8), NOT longer —
-        //    the claim is false on this engine.
+        //    bossa's mean duration to >1.04× jazz. That bias is gone — phrase-first
+        //    clamps every duration to the next sounding note, so bossa and jazz mean
+        //    durations sit within ~±4% of each other and the bias-specific 1.04×
+        //    margin no longer holds (the assertion was designed to fail without the
+        //    legacy bias). The lyrical-sustain character is a PORT CANDIDATE.
         //  - "more 6/9 color": phrase-first lands the 6/9 at ~14.6% vs jazz ~14.3% —
         //    a 0.3pp tie, not a differentiation; asserting it would mislabel a
         //    non-effect. Bossa's lyrical sustain + 6/9-targeting are PORT CANDIDATES.

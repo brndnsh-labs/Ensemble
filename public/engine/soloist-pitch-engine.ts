@@ -303,8 +303,11 @@ function pushUniqueDevice(devices: string[], device: string | null | undefined):
  * non-zero chance (variety is preserved — this is a bias, not a hard sort).
  *
  * Module-private: its only external consumer was a device-selection critique test
- * retired in epic #10 (#863). Still used internally by the legacy device picker
- * (selectPitchAndDevices) until that path is deleted in #865.
+ * retired in epic #10 (#863). Still used internally by `selectPitchAndDevices`,
+ * the legacy picker — which became production-dead when #865 deleted the legacy
+ * `getSoloistNote` engine but is retained while two tests still drive it directly
+ * (soloist-pitch-deep, soloist-srdc-restatement-echo); removing that picker + its
+ * test consumers is a tracked follow-up cleanup.
  */
 function pickByRank<T>(ranked: T[], random: () => number = Math.random): T | null {
     if (ranked.length === 0) {

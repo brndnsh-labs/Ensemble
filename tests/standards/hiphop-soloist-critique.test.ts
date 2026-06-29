@@ -153,8 +153,11 @@ describe('Hip Hop Soloist Critique', () => {
         expect(p.periodPitchRep).toBeLessThan(0.9);
 
         // DROPPED (epic #10 — legacy "living hook" mechanism #555, dark on the live
-        // engine): the anchor-snap LIFT metric (emitAnchorChordRate vs raw hook —
-        // phrase-first emits no `isAnchor` flag), the recurring-hook recognizability
+        // engine): the anchor-snap LIFT metric (emitAnchorChordRate vs raw hook).
+        // Phrase-first DOES consume `isAnchor` internally (it reads it off the seed),
+        // but it does not propagate an `isAnchor` flag onto its EMITTED note object,
+        // so this test's `emitAnchor` count is 0 and the lift ratio has no
+        // denominator on the live engine. Also dropped: the recurring-hook recognizability
         // window (periodPitchRep >0.4 — phrase-first develops to ~0.14, the
         // "hooks wash out under SRDC development" behavior), and the ghost-grace /
         // monotonic-densify "builds over loops" guard (phrase-first emits no
