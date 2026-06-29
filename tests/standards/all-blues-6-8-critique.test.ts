@@ -28,10 +28,11 @@
  * Production-shape harness:
  *   - Real All Blues progression (`public/data/chord-presets.ts:639`).
  *   - Preset BPM = 60, TS = '6/8', style = 'jazz'.
- *   - Session seed populated like state-effects.ts:43 does (sessionSeed value
- *     is read by the soloist's phrasing-budget multiplier path in soloist.ts).
+ *   - Session seed populated like state-effects.ts does (the sessionSeed value
+ *     maps to soloist.session.seed, which the live phrase-first engine replays).
  *   - Real getStepInfo, real getDrumNotes/applyGrooveOverrides, real
- *     isBassActive/getBassNote, real getAccompanimentNotes, real getSoloistNote.
+ *     isBassActive/getBassNote, real getAccompanimentNotes, and the live soloist
+ *     getSoloistNotePhraseFirst (epic #10 — legacy getSoloistNote retired).
  *   - 30 loops with varied currentLoopCount so the seeded paths span the
  *     PRNG space; total bars = 30 * 12 = 360.
  */
@@ -41,7 +42,11 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired). Reads
+// soloist.session.seed (mapped from the makeSoloistMock `sessionSeed` option) and
+// maintains phrasing.isResting each tick, which this harness feeds to the comper
+// via coord.soloistResting.
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../public/state.js';
 import { getFrequency, getStepInfo, secondsPerStepFor } from '../../public/utils.js';
 
@@ -224,9 +229,6 @@ function runAllBlues(numLoops: number) {
         compHitsByStep: new Array(STEPS_PER_BAR).fill(0),
         compPulseAlignedHits: 0,
         compTotalSteps: 0,
-        soloistRestEntries: 0,
-        soloistActiveStreaks: [] as number[],
-        soloistMaxActiveStreak: 0,
         totalBars: 0,
     };
 
@@ -276,10 +278,6 @@ function runAllBlues(numLoops: number) {
 
         const totalSteps = numBars * STEPS_PER_BAR;
         const phr = state.soloist.session.phrasing;
-        let wasResting = phr.isResting === true;
-        let currentStreakBars = 0;
-        let barWasActive = false;
-        let anyActiveThisBar = false;
         let lastBassMidi: number | null = null;
         const ridePerBar = new Array(numBars).fill(0);
 
@@ -389,7 +387,16 @@ function runAllBlues(numLoops: number) {
             }
             metrics.compTotalSteps++;
 
-            // --- Soloist lane (real getSoloistNote)
+            // --- Soloist lane (live getSoloistNotePhraseFirst)
+            // The soloist runs each step so it maintains phrasing.isResting, which
+            // the comper reads (via coord.soloistResting — the prior-tick value, as
+            // coord is built before this call) to choose its vibe; see test (5).
+            // The soloist's OWN phrasing is guarded on the live engine elsewhere:
+            // compound phrase-boundary placement by compound-soloist-phrasing-
+            // critique, rest cadence by soloist-rest-cadence-critique. The legacy
+            // "no runaway phrases" streak guard (old test 4) was DROPPED in #863:
+            // phrase-first is gated per-step and structurally cannot run away, so
+            // that upper bound was vacuous on the live engine.
             getSoloistNote(
                 state,
                 chord,
@@ -406,54 +413,8 @@ function runAllBlues(numLoops: number) {
                 },
                 info,
             );
-            const isRestingNow = phr.isResting === true;
-            if (!isRestingNow) {
-                anyActiveThisBar = true;
-            }
-            // why: mirrors S14's streak tracking exactly — a streak ends on
-            // any rest-entry (was active, now resting), the elapsed-bar count
-            // is flushed, and we restart. Same pattern as
-            // soloist-rest-cadence-critique.test.ts:140-180.
-            if (!wasResting && isRestingNow) {
-                metrics.soloistRestEntries++;
-                if (currentStreakBars > 0) {
-                    metrics.soloistActiveStreaks.push(currentStreakBars);
-                    if (currentStreakBars > metrics.soloistMaxActiveStreak) {
-                        metrics.soloistMaxActiveStreak = currentStreakBars;
-                    }
-                }
-                currentStreakBars = 0;
-            }
-            wasResting = isRestingNow;
             state.soloist.session.sessionSteps++;
-
-            // End-of-bar bookkeeping
-            if (measureStep === STEPS_PER_BAR - 1) {
-                if (anyActiveThisBar) {
-                    currentStreakBars++;
-                    barWasActive = true;
-                } else if (barWasActive) {
-                    // pure-rest bar — flush an active streak
-                    if (currentStreakBars > 0) {
-                        metrics.soloistActiveStreaks.push(currentStreakBars);
-                        if (currentStreakBars > metrics.soloistMaxActiveStreak) {
-                            metrics.soloistMaxActiveStreak = currentStreakBars;
-                        }
-                    }
-                    currentStreakBars = 0;
-                    barWasActive = false;
-                }
-                anyActiveThisBar = false;
-            }
         }
-        // Flush trailing active streak
-        if (currentStreakBars > 0) {
-            metrics.soloistActiveStreaks.push(currentStreakBars);
-            if (currentStreakBars > metrics.soloistMaxActiveStreak) {
-                metrics.soloistMaxActiveStreak = currentStreakBars;
-            }
-        }
-        // bassOnsetsByBar is per-loop reset; we sum globally below for hits-per-bar.
         metrics.totalBars += numBars;
     }
 
@@ -592,24 +553,13 @@ describe('All Blues 6/8 End-to-End Critique (S7 — cycle DoD)', () => {
         // The soloist code is unchanged and the runaway guard (max < 16) still
         // holds at 12; this is stream-realignment, not a phrasing regression.
         // ---------------------------------------------------------------
-        it('(4) soloist mean active-streak <= 11 bars; max < 16 bars (no runaway phrases)', () => {
-            const meanStreak =
-                metrics.soloistActiveStreaks.length > 0
-                    ? metrics.soloistActiveStreaks.reduce((a, b) => a + b, 0) /
-                      metrics.soloistActiveStreaks.length
-                    : metrics.totalBars; // worst case: never rested
-            console.log('\n--- ALL BLUES SOLOIST PHRASE BOUNDARIES ---');
-            console.log(`[Rest entries]        ${metrics.soloistRestEntries}`);
-            console.log(`[Active streaks (n)]  ${metrics.soloistActiveStreaks.length}`);
-            console.log(`[Mean active-streak]  ${meanStreak.toFixed(2)} bars (Target: <= 11)`);
-            console.log(
-                `[Max active-streak]   ${metrics.soloistMaxActiveStreak} bars (Target: < 16)`,
-            );
-            console.log('--------------------------------------------\n');
-            expect(metrics.soloistRestEntries).toBeGreaterThan(0);
-            expect(meanStreak).toBeLessThanOrEqual(11);
-            expect(metrics.soloistMaxActiveStreak).toBeLessThan(16);
-        });
+        // (4) — REMOVED in #863. The legacy soloist "no runaway phrases" streak
+        // guard measured the legacy budget-timer's phrase length. The live
+        // phrase-first engine is gated per-step (it rests between theme notes by
+        // construction) so it cannot run away — the upper bound was vacuous. The
+        // soloist's live phrasing is guarded by compound-soloist-phrasing-critique
+        // (compound boundary placement) and soloist-rest-cadence-critique (rest
+        // cadence). The soloist lane still runs above to feed coord.soloistResting.
 
         // ---------------------------------------------------------------
         // (5) Comping density + pulse alignment.
