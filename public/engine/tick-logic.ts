@@ -159,8 +159,8 @@ export function generateNotesForStep(
             // isResting and notesInPhrase (harmony-coordination.md P0 #5). Publishing
             // these through the coordination context keeps the contract surface honest:
             // mocked tests and production code both exercise the same harmony branches.
-            // Written here (after getSoloistNote) so session state reflects this tick's
-            // final phrasing decisions before harmony runs.
+            // Written here (after getSoloistNotePhraseFirst) so session state reflects
+            // this tick's final phrasing decisions before harmony runs.
             // writer: soloist producer (these lines); readable-after: soloist producer (bass, chords, harmony)
             coordination.soloistResting = Boolean(soloist.session.phrasing.isResting);
             coordination.soloistNotesInPhrase = soloist.session.currentPhrase.notesInPhrase ?? 0;

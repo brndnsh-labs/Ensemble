@@ -8,8 +8,8 @@
  * constructively into an audible arc across loops.
  *
  * Shape: hold + lift + peak + release. Final loop drops to ~0.95 of the section's
- * targetEnergy. The soloist's separate monotonic chorus-evolution boost (`+ loopCount *
- * 0.05` in `getSoloistNote`) preserves the Epic 3 head→themed→exploratory signal
+ * targetEnergy. The soloist's separate monotonic chorus-evolution boost (the per-loop
+ * `loopLift` in `getSoloistNotePhraseFirst`) preserves the Epic 3 head→themed→exploratory signal
  * — note that it partially compensates for the release dip, so the soloist's effective
  * intensity tracks the arc with a slight late-loop lift rather than climaxing over a
  * thinning bed (one shared bandIntensity channel can't do both simultaneously; a true
