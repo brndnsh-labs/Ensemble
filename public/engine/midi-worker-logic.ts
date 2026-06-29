@@ -16,7 +16,7 @@ import {
     writeString,
 } from './midi-utils.js';
 import { generateResolutionNotes } from './resolution.js';
-import { resetSoloistState } from './soloist.js';
+import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
 import { getChordAtStep } from './worker-utils.js';
 

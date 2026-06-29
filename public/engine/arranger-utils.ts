@@ -33,10 +33,10 @@ export interface SectionContext {
 
 /**
  * Modulo helper that handles negative steps and non-positive loop lengths
- * defensively. Used by both `getSectionContext` and the soloist's recall /
- * head-step helpers — kept here so the soloist doesn't keep its own copy.
+ * defensively. File-local since epic #10 retired the legacy soloist engine (its
+ * last external importer); still used by `getSectionContext` below.
  */
-export function normalizeLoopStep(step: number, loopLength: number): number {
+function normalizeLoopStep(step: number, loopLength: number): number {
     if (!Number.isFinite(loopLength) || loopLength <= 0) {
         return step;
     }

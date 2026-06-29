@@ -6,7 +6,7 @@ import { createCoordinationContext } from './engine/coordination-engine.js';
 import { clearHarmonyMemory } from './engine/harmonies.js';
 import { handleExport, isExporting, setOnExportEnd } from './engine/midi-worker-logic.js';
 import { generateResolutionNotes } from './engine/resolution.js';
-import { resetSoloistState } from './engine/soloist.js';
+import { resetSoloistState } from './engine/soloist-session.js';
 import { fillBuffers } from './engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from './engine/worker-orchestrator.js';
 import { recursiveSafeSync, resetCursors } from './engine/worker-utils.js';
