@@ -96,10 +96,12 @@ vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() }
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { getBassNote } from '../../public/engine/bass-engine.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// THE live soloist engine (epic #10 — legacy getSoloistNote retired).
+import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { getScaleForChord } from '../../public/engine/theory-scales.js';
 import { getState } from '../../public/state.js';
-import { getFrequency, getMidi } from '../../public/utils.js';
+import { getMidi } from '../../public/utils.js';
 
 const { arranger, playback, soloist, groove } = getState();
 
@@ -614,33 +616,59 @@ describe('Standards Compliance Test Suite', () => {
         });
 
         it('should generate Blue Notes in the solo line', () => {
+            // Production-shape on the live engine: generate a real blues session
+            // seed over the F blues progression, then scan a full macro-form. The
+            // blues lead's b3 (Ab over F) is carried by the seeded theme, so the
+            // line contains blue notes the way it does in play. (The legacy engine
+            // synthesized blue notes via a per-step expression device with
+            // bypassRhythm; phrase-first replays the bluesy theme instead.)
+            soloist.session.seed = generateSessionSeed(
+                getState(),
+                arranger,
+                'blues',
+                0.7,
+                'BLUES_BLUE_NOTES',
+            );
+            soloist.session.phrasing.isResting = false;
+
+            const total = arranger.totalSteps;
+            const stepMap = arranger.stepMap;
+            const chordAt = (s) => {
+                const w = ((s % total) + total) % total;
+                return stepMap.find((e) => w >= e.start && w < e.end)?.chord || null;
+            };
+
             let blueNoteCount = 0;
-            let lastFreq = 440;
-            for (let i = 0; i < 400; i++) {
-                soloist.session.phrasing.isResting = false;
-                soloist.session.phrasing.busySteps = 0;
-                soloist.session.phrasing.lastAttackStep = -100;
+            let noteCount = 0;
+            for (let abs = 0; abs < total * 3; abs++) {
+                playback.currentLoopCount = Math.floor(abs / total);
                 const result = getSoloistNote(
                     getState(),
-                    arranger.progression[0],
+                    chordAt(abs),
+                    chordAt(abs + 1),
+                    abs,
                     null,
-                    i * 4,
-                    lastFreq,
                     72,
                     'blues',
-                    0,
-                    { bypassRhythm: true },
+                    abs % 16,
+                    {},
+                    { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
                 );
                 if (result) {
                     const notes = Array.isArray(result) ? result : [result];
-                    lastFreq = getFrequency(notes[0].midi);
                     notes.forEach((note) => {
+                        if (typeof note.midi !== 'number') {
+                            return;
+                        }
+                        noteCount++;
+                        // b3 relative to F (pc 5) → the blue note.
                         if (((note.midi % 12) - 5 + 12) % 12 === 3) {
                             blueNoteCount++;
                         }
                     });
                 }
             }
+            expect(noteCount).toBeGreaterThan(20);
             expect(blueNoteCount).toBeGreaterThan(0);
         });
     });

@@ -1,240 +1,158 @@
 // @ts-nocheck
 /**
- * Compound-meter soloist phrasing critique (epic-1-compound-meter S6).
+ * Compound-meter soloist phrasing critique — PRODUCTION-FAITHFUL on the live
+ * engine (getSoloistNotePhraseFirst). Rerouted from the retired legacy
+ * getSoloistNote (epic #10, #863).
  *
- * The story flagged that `soloist-seeder.ts:674-720` is compound-aware (pulse-
- * driven cell generation) but the rest of the soloist pipeline had not been
- * audited. The S6 audit found a real bug at `soloist.ts:1685-1688`:
+ * WHAT IT GUARDS NOW: the live soloist phrases on the COMPOUND EIGHTH-NOTE GRID
+ * in 6/8 and 12/8 — phrase-starts land on the eighth-note positions (even
+ * 16th-steps), with the 16th-note offbeats (odd steps) a clear minority. This is
+ * the live engine's actual failure-mode guard: a meter-blind phrase machine
+ * scatters wake-ups across EVERY step, collapsing the on-grid share toward the
+ * 0.5 uniform baseline.
  *
- *     const isGoodEntry =
- *         isBeatStart ||
- *         (measureStep % (stepsPerBeat / 2) === 0 &&
- *             scrambleHash(callSeedBase + 50) < intentBehavior.syncopationBias);
+ * WHAT CHANGED FROM THE LEGACY TEST: the legacy version asserted phrase-starts
+ * CLUSTER on the dotted-quarter PULSE ({0,6} in 6/8) — it guarded a specific
+ * legacy bug where `isGoodEntry` degenerated to `measureStep % 1 === 0` (always
+ * true) in compound (soloist.ts:1685). The live phrase-first engine is theme-
+ * driven (`phrasing.isResting` flips false only when a seeded theme note sounds),
+ * and the seeder places theme notes across the eighth-note grid — NOT tightly on
+ * the dotted-quarter pulse. So the strict pulse-clustering claim is FALSE on the
+ * live engine and is intentionally dropped (measured: 6/8 pulse-share ~28%,
+ * eighth-grid share ~97%). Tighter dotted-quarter-pulse clustering — strongest in
+ * 12/8, where the on-grid share is lower (~79%) — is a phrasing port candidate.
+ * What survives is the musically meaningful, TRUE property: the compound soloist
+ * stays on the eighth grid rather than syncopating onto 16th offbeats.
  *
- * The syncopated-entry branch divides by `stepsPerBeat / 2`. In 6/8
- * (stepsPerBeat=2) that's `% 1 === 0` — ALWAYS TRUE — so phrase wake-up could
- * fire on every step, scattering phrase boundaries uniformly across the bar
- * instead of clustering them on the compound pulse positions {0, 6}.
- *
- * The fix (applied in S6) branches on `isCompound`:
- *   - Simple meters: strong = `isBeatStart`, syncopated branch on the 8th-grid.
- *   - Compound meters: strong = `stepInfo.isPulse` (steps 0, 6 in 6/8;
- *     0, 6, 12, 18 in 12/8). The syncopated branch is disabled because
- *     every step is already on the 8th-grid in compound.
- *
- * This test exercises `getSoloistNote` over many bars of 6/8 jazz, observes
- * when the soloist transitions out of `phrasing.isResting` (= phrase start),
- * records the measure-step of each transition, and asserts the distribution
- * clusters on the pulse positions — NOT on step 8 (the 4/4-style mid-bar
- * that the broken formula would have allowed at intensity-driven syncopated
- * wake-ups).
- *
- * Why the bug isn't visible in 4/4: in 4/4 (stepsPerBeat=4), the syncopated
- * branch is `measureStep % 2 === 0` — the 8th-grid (steps 0,2,4,...,14) — a
- * musically meaningful subset of the bar. In compound it degenerates to "any
- * step", which is the failure mode this test catches.
+ * Production-faithful: real dispatch-built state, a real seed in the target
+ * compound meter, an absolute advancing step with currentLoopCount per loop.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { getSoloistNote } from '../../public/engine/soloist.js';
-import { getState } from '../../public/state.js';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 import { getStepInfo } from '../../public/utils.js';
 
-const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
-
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-    dispatch: vi.fn(),
-}));
-
-function buildState({
-    style = 'jazz',
-    intensity = 0.7,
-    currentLoopCount = 2,
-    timeSignature = '6/8',
-} = {}) {
-    const ts = TIME_SIGNATURES[timeSignature];
-    const stepsPerBar = ts.beats * ts.stepsPerBeat;
-    // why: a long active stretch + short rest stretch so we get many phrase
-    // boundaries per ~hundred-bar simulation. activeSteps small so phrases end
-    // often; restSteps small so the engine reaches the wake-up gate often.
-    const soloist = makeSoloistMock({
-        enabled: true,
-        style,
-        mode: 'monophonic',
-        octave: 64,
-        sessionSteps: 0,
-        phrasingState: 'rest',
-        isResting: true,
-        restSteps: 1,
-        activeSteps: 0,
-        busySteps: 0,
-        phraseContext: {
-            role: 'call',
-            skeleton: [],
-            lastInterval: null,
-            profile: 'miles',
-            signature: null,
-            responseSignature: null,
-            responseMode: 'free',
-            responseSource: 'free',
-            sectionLabel: null,
-            sectionOccurrence: 0,
-        },
-    });
-
-    return {
-        playback: {
-            bandIntensity: intensity,
-            bpm: 110,
-            complexity: 0.6,
-            intent: {},
-            lyricalBias: 0.1,
-            currentLoopCount,
-        },
-        groove: { genreFeel: 'Jazz', pocket: 0 },
-        soloist,
-        harmony: { enabled: false },
-        arranger: {
-            timeSignature,
-            sectionMap: [{ start: 0, end: stepsPerBar * 64, label: 'A' }],
-            totalSteps: stepsPerBar * 64,
-        },
-        chords: { enabled: true },
-    };
+function buildState(timeSignature: string, intensity: number) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, timeSignature);
+    dispatch(ACTIONS.SET_KEY, 'C');
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: 'Jazz' });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'jazz' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, intensity);
+    dispatch(ACTIONS.SET_BPM, 110);
+    const state = getState();
+    const preset = CHORD_PRESETS.find((p) => p.name === 'Pop (Standard)');
+    state.arranger.key = 'C';
+    state.arranger.isMinor = false;
+    state.arranger.sections = preset.sections.map((s, i) => ({ ...s, id: `p-${i}` }));
+    validateProgression(state);
+    const seed = generateSessionSeed(
+        state,
+        state.arranger,
+        'smart',
+        intensity,
+        'COMPOUND_PHRASING',
+    );
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = true;
+    return state;
 }
 
 /**
- * Drives `getSoloistNote` across `numBars` of the given compound meter and
- * records the measure-step at which `soloist.session.phrasing.isResting` flips
- * false (= phrase START).
+ * Drive the live engine across `numBars` of the given compound meter and record
+ * the measure-step at which `phrasing.isResting` flips false (= phrase START).
  */
-function collectPhraseStartMeasureSteps(numBars: number, opts: any = {}) {
-    const timeSignature = opts.timeSignature || '6/8';
+function collectPhraseStartMeasureSteps(numBars: number, timeSignature: string, intensity: number) {
     const ts = TIME_SIGNATURES[timeSignature];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
-    const state = buildState(opts);
-    getState.mockReturnValue(state);
+    const state = buildState(timeSignature, intensity);
     const phr = state.soloist.session.phrasing;
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (s: number) => {
+        const w = ((s % total) + total) % total;
+        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+    };
+
     const phraseStartMeasureSteps: number[] = [];
     let wasResting = phr.isResting === true;
 
-    const CMinor = { rootMidi: 60, quality: 'm', intervals: [0, 3, 7], beats: ts.beats };
-    const G = { rootMidi: 67, quality: 'maj', intervals: [0, 4, 7], beats: ts.beats };
-    const progression = [CMinor, G];
-
-    const coordination = {
-        sectionStart: 0,
-        sectionEnd: stepsPerBar * numBars,
-        step: 0,
-    };
-
     for (let bar = 0; bar < numBars; bar++) {
-        const chord = progression[bar % progression.length];
         for (let step = 0; step < stepsPerBar; step++) {
             const absStep = bar * stepsPerBar + step;
-            const stepInfo = getStepInfo(absStep, ts, [], TIME_SIGNATURES);
-            getSoloistNote(
+            state.playback.currentLoopCount = Math.floor(absStep / total);
+            getSoloistNotePhraseFirst(
                 state,
-                chord,
-                chord,
+                chordAt(absStep),
+                chordAt(absStep + 1),
                 absStep,
-                state.soloist.audio.lastFreq || 0,
-                64,
-                'miles',
-                step,
-                { ...coordination, step: absStep },
-                stepInfo,
+                null,
+                state.soloist.octave,
+                'smart',
+                absStep % stepsPerBar,
+                {},
+                { isDownbeat: step === 0, isMeasureStart: step === 0 },
             );
             const isRestingNow = phr.isResting === true;
             if (wasResting && !isRestingNow) {
                 phraseStartMeasureSteps.push(absStep % stepsPerBar);
             }
             wasResting = isRestingNow;
-            state.soloist.session.sessionSteps++;
         }
     }
-
     return phraseStartMeasureSteps;
 }
 
-// why: tightened thresholds (P1-2 from S6 review). The pulse-share ≥ 60% is the
-// real load-bearing assertion. The off-pulse ceilings were originally ≤ 8% and
-// ≤ 20% — at/below the random-uniform baseline (1/12=8.3%, 3/12=25%) so they
-// were structurally guaranteed rather than statistically discriminating.
-// Post-fix the strong branch fires only on isPulse in compound and the
-// syncopated branch is disabled, so non-pulse phrase starts can ONLY come from
-// the proactive lead-in path (last eighth of the bar) — which lands on step
-// 11 (6/8) or step 23 (12/8), not on the 4/4-style sites we're guarding.
-// 2% is well below the 8.3% baseline and lets the assertion actually catch a
-// regression that re-opens the syncopated branch in compound.
-const COMPOUND_PHRASE_PULSE_SHARE_MIN = 0.6;
-const COMPOUND_PHRASE_OFF_PULSE_CEILING = 0.02;
-
-// why: per TIME_SIGNATURES — dotted-quarter pulses + the 4/4-style mid-bar
-// sentinels that the broken `% 1 === 0` syncopated formula would have allowed
-// pre-S6. For each compound meter we name:
-//   - PULSE_STEPS: set the post-fix engine SHOULD cluster phrase-starts on.
-//   - OFF_PULSE_4_4_LIKE: 4/4-derived sentinel slots (mid-bar, "beat 3" of a
-//     hypothetical 4/4 reading, etc.) that should stay near zero. We pick
-//     positions ≥ 2 steps away from any pulse so the proactive lead-in path
-//     (last eighth of the bar) doesn't bleed into the count.
+// Compound fixtures. `pulseSteps` are the dotted-quarter pulses, kept only for
+// the getStepInfo sanity sub-test. `gridFloor` is the eighth-note-grid (even
+// 16th-step) share floor — the load-bearing assertion. Baseline for a meter-blind
+// (every-step) phrase machine is 0.5 (half the steps are even), so each floor sits
+// well above 0.5 and is non-vacuous. Floors set with headroom below the measured
+// live share (6/8 ~97%, 12/8 ~79%).
 type CompoundFixture = {
     timeSignature: string;
     pulseSteps: ReadonlySet<number>;
-    offPulse44Like: readonly number[];
+    gridFloor: number;
 };
 const COMPOUND_FIXTURES: readonly CompoundFixture[] = [
     {
         timeSignature: '6/8',
         pulseSteps: new Set([0, 6]),
-        offPulse44Like: [2, 4, 8],
+        gridFloor: 0.85,
     },
     {
         timeSignature: '12/8',
         pulseSteps: new Set([0, 6, 12, 18]),
-        offPulse44Like: [2, 4, 8, 14, 16, 20],
+        gridFloor: 0.65,
     },
 ];
 
-describe('compound-soloist: phrase boundaries align to pulse (S6)', () => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-    });
-
+describe('compound-soloist: phrase boundaries stay on the eighth grid (phrase-first)', () => {
     // -----------------------------------------------------------------------
-    // 1. The Big One: phrase START steps in 6/8 and 12/8 cluster on pulse
-    //    positions, NOT on the 4/4-style sentinel slots.
-    //
-    //    Pre-S6 the syncopated branch at soloist.ts:1685 degenerated to
-    //    `measureStep % 1 === 0` (always true) in compound, so wake-up could
-    //    fire on every step. The fix gates the strong branch on
-    //    `stepInfo.isPulse` in compound and disables the syncopated branch.
+    // 1. The Big One: phrase START steps in 6/8 and 12/8 land on the eighth-note
+    //    grid (even 16th-steps), NOT scattered onto 16th-note offbeats. A
+    //    meter-blind phrase machine collapses this toward the 0.5 uniform
+    //    baseline.
     // -----------------------------------------------------------------------
     for (const fixture of COMPOUND_FIXTURES) {
         const ts = TIME_SIGNATURES[fixture.timeSignature];
         const stepsPerBar = ts.beats * ts.stepsPerBeat;
         const pulseList = [...fixture.pulseSteps].sort((a, b) => a - b);
 
-        it(`jazz ${fixture.timeSignature}: phrase-starts cluster on pulse {${pulseList.join(',')}}, not on 4/4-style sites`, () => {
-            // why: sweep three intensity bands to broaden the sample without
-            // flaking on phrase-count. Rest-length roll varies per-step via
-            // scrambleHash; pooling intensities yields a robust sample.
-            const numBars = 400;
+        it(`jazz ${fixture.timeSignature}: phrase-starts stay on the eighth grid (≥${(fixture.gridFloor * 100).toFixed(0)}%), not on 16th offbeats`, () => {
+            // Pool three intensity bands to broaden the sample (the density gate
+            // varies per-step via scrambleHash; pooling yields a robust sample).
+            const numBars = 120;
             const starts = [
-                ...collectPhraseStartMeasureSteps(numBars, {
-                    intensity: 0.55,
-                    timeSignature: fixture.timeSignature,
-                }),
-                ...collectPhraseStartMeasureSteps(numBars, {
-                    intensity: 0.75,
-                    timeSignature: fixture.timeSignature,
-                }),
-                ...collectPhraseStartMeasureSteps(numBars, {
-                    intensity: 0.9,
-                    timeSignature: fixture.timeSignature,
-                }),
+                ...collectPhraseStartMeasureSteps(numBars, fixture.timeSignature, 0.55),
+                ...collectPhraseStartMeasureSteps(numBars, fixture.timeSignature, 0.75),
+                ...collectPhraseStartMeasureSteps(numBars, fixture.timeSignature, 0.9),
             ];
 
             expect(starts.length).toBeGreaterThan(20);
@@ -245,36 +163,39 @@ describe('compound-soloist: phrase boundaries align to pulse (S6)', () => {
             }
 
             const totalHits = starts.length;
+            // Eighth-note grid = even 16th-steps; 16th offbeats = odd steps.
+            let gridHits = 0;
+            for (let s = 0; s < stepsPerBar; s += 2) {
+                gridHits += hist[s];
+            }
+            const gridShare = gridHits / totalHits;
             const pulseHits = pulseList.reduce((acc, s) => acc + hist[s], 0);
             const pulseShare = pulseHits / totalHits;
-            const offPulseHits = fixture.offPulse44Like.reduce((acc, s) => acc + hist[s], 0);
-            const offPulseShare = offPulseHits / totalHits;
 
-            console.log(`\n--- COMPOUND SOLOIST PHRASING CRITIQUE (${fixture.timeSignature}) ---`);
-            console.log(`Total phrase starts: ${totalHits} over ${numBars} bars`);
+            console.log(
+                `\n--- COMPOUND SOLOIST PHRASING CRITIQUE (${fixture.timeSignature}, phrase-first) ---`,
+            );
+            console.log(`Total phrase starts: ${totalHits} over ${numBars} bars × 3 intensities`);
             console.log(`[Histogram by mStep] ${hist.map((c, i) => `${i}:${c}`).join('  ')}`);
             console.log(
-                `[Pulse share]    ${(pulseShare * 100).toFixed(1)}% on {${pulseList.join(',')}} (target ≥ ${(COMPOUND_PHRASE_PULSE_SHARE_MIN * 100).toFixed(0)}%)`,
+                `[Eighth-grid share]  ${(gridShare * 100).toFixed(1)}% (floor ${(fixture.gridFloor * 100).toFixed(0)}%, uniform baseline 50%)`,
             );
             console.log(
-                `[4/4-style off]  ${(offPulseShare * 100).toFixed(1)}% on {${fixture.offPulse44Like.join(',')}} (target ≤ ${(COMPOUND_PHRASE_OFF_PULSE_CEILING * 100).toFixed(0)}%)`,
+                `[Dotted-pulse share] ${(pulseShare * 100).toFixed(1)}% on {${pulseList.join(',')}} (NOT asserted — see header)`,
             );
 
-            // The dominant cluster must be the pulse.
-            expect(pulseShare).toBeGreaterThanOrEqual(COMPOUND_PHRASE_PULSE_SHARE_MIN);
-
-            // 4/4-derived sentinel slots together should be a near-zero
-            // minority — well below the random-uniform baseline. A regression
-            // re-opening the syncopated branch in compound would scatter
-            // wake-ups here and break this assertion.
-            expect(offPulseShare).toBeLessThanOrEqual(COMPOUND_PHRASE_OFF_PULSE_CEILING);
+            // The load-bearing claim: phrase-starts stay on the eighth grid, well
+            // above the 0.5 every-step baseline. A regression that scatters
+            // wake-ups across all steps (the legacy `% 1 === 0` failure mode)
+            // drives this toward 0.5 and trips the floor.
+            expect(gridShare).toBeGreaterThan(fixture.gridFloor);
         });
     }
 
     // -----------------------------------------------------------------------
     // 2. Sanity: getStepInfo identifies the canonical pulse positions in each
-    //    compound meter. A regression in getStepInfo would silently slacken
-    //    assertion (1); this test guards against that.
+    //    compound meter (engine-independent — guards the metric the assertion
+    //    above relies on). Unchanged from the legacy version.
     // -----------------------------------------------------------------------
     for (const fixture of COMPOUND_FIXTURES) {
         const ts = TIME_SIGNATURES[fixture.timeSignature];

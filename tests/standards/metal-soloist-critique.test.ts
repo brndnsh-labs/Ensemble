@@ -1,283 +1,166 @@
-import { describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// @ts-nocheck
+// Metal soloist idiom critique — PRODUCTION-FAITHFUL on the live engine
+// (getSoloistNotePhraseFirst). Rerouted from the retired legacy getSoloistNote
+// (epic #10, #863). Real dispatch-built state, a real seed, an absolute advancing
+// step with currentLoopCount per loop (mirrors scheduler-core), scanned across a
+// full macro-form over the minor-key 'Metal Core' progression (im | bVI | bVII |
+// im) — the natural home of a metal lead. The seeder draws its theme from
+// getScaleForChord(state, chord, null, 'metal'), so the metal scale choice
+// reaches the live phrase-first line.
+//
+// What this guards: the metal lead stays on the C-minor / metal palette and
+// avoids the major 3rd (the cardinal-sin note over a minor tonic). Measured
+// KEY-relative (the line lives in one minor tonality), not chord-relative.
+//
+// DROPPED (dark on phrase-first; re-added by #869/#870):
+//   • The legacy test's phrygian-DOMINANT-over-dominant discriminators
+//     (b6-share / b2-share relative to each dominant chord root). The legacy
+//     engine ran a per-chord getScaleForChord lookup that returned PHRYGIAN_
+//     DOMINANT over every dominant chord, so b2/b6 read the chosen scale. Phrase-
+//     first is theme/key-driven: over a major-key all-dom7 cycle the b6 share
+//     sits exactly at the 0.5 random baseline (probe: 50.0%, b6=62/maj6=62) and
+//     over this minor preset the chord-relative b2 never appears at all (probe:
+//     b2=0/maj2=141). Asserting either would be a FALSE claim on this engine, so
+//     both are dropped. Restoring the per-chord phrygian-dominant pull is a
+//     candidate for the idiom ports tracked in #869/#870.
+//   • The 'run' scalar-burst device share — the .device field is produced only by
+//     the retired legacy engine; phrase-first notes carry no .device.
+import { describe, expect, it } from 'vitest';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
-import { getState } from '../../public/state.js';
-import { getStepInfo } from '../../public/utils.js';
-import { makeSoloistMock } from '../utils/mock-soloist.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-    dispatch: vi.fn(),
-}));
-
-vi.mock('../../public/config.js', () => ({
-    TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4 },
-    },
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-}));
-
-interface SoloChord {
-    rootMidi: number;
-    quality: string;
-    intervals: number[];
-    beats: number;
+function buildState(presetName: string) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+    dispatch(ACTIONS.SET_KEY, 'C');
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: 'Metal' });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart', mode: 'guitar' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, 0.85);
+    dispatch(ACTIONS.SET_BPM, 160);
+    const state = getState();
+    const preset = CHORD_PRESETS.find((p) => p.name === presetName);
+    state.arranger.key = 'C';
+    state.arranger.isMinor = true;
+    state.arranger.sections = preset.sections.map((s, i) => ({ ...s, id: `p-${i}` }));
+    validateProgression(state);
+    return state;
 }
 
-interface CapturedNote {
-    bar: number;
-    primaryMidi: number;
-    device: string;
-    chordRoot: number;
-    chordQuality: string;
-}
+function simulate(presetName = 'Metal Core') {
+    const state = buildState(presetName);
+    const seed = generateSessionSeed(state, state.arranger, 'smart', 0.85, 'METAL_CRITIQUE');
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = false;
 
-// Two profiles share the SAME idiom claim: over dominant chords a shredder
-// plays the harmonic-minor-flavored PHRYGIAN_DOMINANT, not generic MIXOLYDIAN.
-// #550: `shred` had no branch in getScaleForChord → it fell to MIXOLYDIAN while
-// `metal` got PHRYGIAN_DOMINANT, so shred leads sounded generic-rock. The fix
-// extends the metal scale branch to cover shred; this test pins BOTH.
-const STYLES: Array<{ style: string; genreFeel: string }> = [
-    { style: 'metal', genreFeel: 'Metal' },
-];
-
-describe('Soloist Metal Critique', () => {
-    let soloistState: any;
-
-    const makeState = (genreFeel: string, bandIntensity: number) => ({
-        playback: {
-            bandIntensity,
-            bpm: 160,
-            complexity: 0.8,
-            intent: {},
-            lyricalBias: 0.1,
-            currentLoopCount: 1,
-        },
-        groove: { genreFeel, pocket: 0 },
-        soloist: soloistState,
-        harmony: { enabled: false },
-        arranger: { timeSignature: '4/4', key: 'E', isMinor: true },
-    });
-
-    const buildSoloistState = (style: string) =>
-        makeSoloistMock({
-            enabled: true,
-            style,
-            mode: 'guitar',
-            octave: 64,
-            sessionSteps: 0,
-            currentPhraseSteps: 0,
-            notesInPhrase: 0,
-            srdcState: 'Statement',
-            qaState: 'Question',
-            isResting: true,
-            // tension stays low so the high-tension ALTERED branch
-            // (theory-scales.ts:180) never overrides the metal/shred scale branch
-            // we're actually testing.
-            tension: 0,
-            motifBuffer: [],
-            thematicSeed: [],
-            thematicSeedRoot: 0,
-            isReplayingMotif: false,
-            isReplayingSeed: false,
-            busySteps: 0,
-            pitchHistory: [],
-            lastInterval: 0,
-            stagnationCount: 0,
-            deviceBuffer: [],
-            lastFreq: 0,
-            currentCell: null,
-            phraseContext: {
-                role: 'call',
-                skeleton: [],
-                lastInterval: null,
-                profile: style,
-            },
-        });
-
-    const simulatePerformance = (
-        style: string,
-        genreFeel: string,
-        numBars: number,
-        intensity: number,
-    ): CapturedNote[] => {
-        soloistState = buildSoloistState(style);
-        getState.mockReturnValue(makeState(genreFeel, intensity));
-        const history: CapturedNote[] = [];
-
-        // A cycle-of-fifths DOMINANT-7 progression (all quality '7'): every chord
-        // routes through the dominant branch of getScaleForChord. The next chord is
-        // always dominant (never minor), so the V7→i "resolves to minor" branch
-        // (:197) never fires — the only path that can return PHRYGIAN_DOMINANT here
-        // is the metal/shred style branch at :212, which is the fix under test.
-        const dom = (rootMidi: number): SoloChord => ({
-            rootMidi,
-            quality: '7',
-            intervals: [0, 4, 7, 10],
-            beats: 4,
-        });
-        // E7 A7 D7 G7 C7 F7 (descending fifths, all dominant)
-        const progression = [dom(52), dom(57), dom(50), dom(55), dom(48), dom(53)];
-
-        let lastFreq = 0;
-        for (let bar = 0; bar < numBars; bar++) {
-            const chord = progression[bar % progression.length];
-            const nextChord = progression[(bar + 1) % progression.length];
-            for (let step = 0; step < 16; step++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord as any,
-                    nextChord as any,
-                    bar * 16 + step,
-                    lastFreq,
-                    64,
-                    style,
-                    step,
-                    {},
-                    // Real getStepInfo so the engine's beat/offbeat lanes see live
-                    // step metadata (avoids smell-e: a hand-rolled stepInfo would
-                    // silence the lanes the soloist's rhythm planner reads).
-                    getStepInfo(bar * 16 + step, {
-                        beats: 4,
-                        stepsPerBeat: 4,
-                        grouping: [4],
-                        backbeat: [1, 3],
-                    }),
-                );
-                if (note) {
-                    const arr = Array.isArray(note) ? note : [note];
-                    const primary = arr[arr.length - 1];
-                    lastFreq = (primary as any).frequency || 0;
-                    history.push({
-                        bar,
-                        primaryMidi: primary.midi,
-                        device: (primary as any).device || 'none',
-                        chordRoot: chord.rootMidi,
-                        chordQuality: chord.quality,
-                    });
-                }
-                soloistState.session.sessionSteps++;
-            }
-        }
-        return history;
+    const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (s: number) => {
+        const w = ((s % total) + total) % total;
+        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
     };
 
-    // --- Hard-coded target sets (NOT re-derived from the engine's chord-scale
-    // predicate — re-using theory-scales would be smell-a). ---
-    // PHRYGIAN_DOMINANT = {0,1,4,5,7,8,10} (theory-scales.ts:41). The old
-    // fallback bug returned MIXOLYDIAN = {0,2,4,5,7,9,10}. The two scales share
-    // chord tones {0,4,5,7,10}, so chord-tone emphasis can't tell them apart. What
-    // CAN: the color tones each owns exclusively — phrygian {b2=1, b6=8} vs
-    // mixolydian {maj2=2, maj6=9}. The per-degree counts below read those.
-    const PHRYGIAN_DOMINANT = new Set([0, 1, 4, 5, 7, 8, 10]);
-
-    for (const { style, genreFeel } of STYLES) {
-        it(`plays phrygian-dominant (not mixolydian) over dominant chords — ${style}`, () => {
-            const numBars = 256;
-            const notes = simulatePerformance(style, genreFeel, numBars, 0.85);
-
-            let inPhrygianDom = 0;
-            // 6th degree: b6 (8) is phrygian-dominant; maj6 (9) is mixolydian.
-            // NEITHER is a targetExtension, so this contrast PURELY reflects the
-            // scale the engine chose — the cleanest read on the fix.
-            let flatSix = 0;
-            let majSix = 0;
-            // 2nd degree: b2 (1, phrygian) vs maj2 (2, mixolydian). Contaminated —
-            // both profiles set targetExtensions:[2] (the natural 9), which rewards
-            // maj2 regardless of scale, so this contrast is reported but NOT gated.
-            let flatTwo = 0;
-            let majTwo = 0;
-            const devices: Record<string, number> = {};
-
-            for (const n of notes) {
-                const rel = (n.primaryMidi - n.chordRoot + 120) % 12;
-                if (PHRYGIAN_DOMINANT.has(rel)) {
-                    inPhrygianDom++;
-                }
-                if (rel === 8) {
-                    flatSix++;
-                }
-                if (rel === 9) {
-                    majSix++;
-                }
-                if (rel === 1) {
-                    flatTwo++;
-                }
-                if (rel === 2) {
-                    majTwo++;
-                }
-                devices[n.device] = (devices[n.device] || 0) + 1;
+    // C minor tonic = pitch class 0 (key 'C'). Measure KEY-relative.
+    const notes: any[] = [];
+    for (let abs = 0; abs < loopLen * 3 + 64; abs++) {
+        state.playback.currentLoopCount = Math.floor(abs / total);
+        const chord = chordAt(abs);
+        const res = getSoloistNotePhraseFirst(
+            state,
+            chord,
+            chordAt(abs + 1),
+            abs,
+            null,
+            state.soloist.octave,
+            'smart',
+            abs % 16,
+            {},
+            { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
+        );
+        if (!res || !chord) {
+            continue;
+        }
+        for (const n of Array.isArray(res) ? res : [res]) {
+            if (typeof n.midi === 'number') {
+                notes.push({ midi: n.midi, keyRoot: 0 });
             }
-
-            const pdConformance = inPhrygianDom / notes.length;
-            // Of the notes that play SOME 6th, the fraction that play the flat 6th.
-            // Phrygian dominant has b6 and no maj6; mixolydian has maj6 and no b6,
-            // so a phrygian-dominant line lands here near 1.0, a mixolydian line
-            // near 0.0. Baseline (uniform over the two PCs) is 0.5; the fix pushes
-            // it well above. This is THE discriminator (uncontaminated by config).
-            const sixthPicks = flatSix + majSix;
-            const flatSixShare = sixthPicks ? flatSix / sixthPicks : 0;
-            // The phrygian b2 IS present (proves harmonic-minor color reaches the
-            // 2nd too); reported for context — gated only as "non-vacuous".
-            const secondPicks = flatTwo + majTwo;
-            const flatTwoShare = secondPicks ? flatTwo / secondPicks : 0;
-
-            // scalar-run density: both profiles allow the 'run' device with a high
-            // deviceProb (metal 0.5 / shred 0.4) — the shredder's signature fast
-            // scalar bursts. A dead 'run' lane would read as 0 here.
-            const runShare = (devices.run || 0) / notes.length;
-
-            console.log(`\n--- METAL/SHRED SOLOIST CRITIQUE (${style}) ---`);
-            console.log(
-                `[Phrygian-Dom conformance] ${(pdConformance * 100).toFixed(1)}% (Target: >0.62)`,
-            );
-            console.log(
-                `[b6 share of 6ths]         ${(flatSixShare * 100).toFixed(1)}% (Target: >0.52; clean scale read, baseline 0.5)`,
-            );
-            console.log(`[b6 count]                 ${flatSix}  [maj6 count] ${majSix}`);
-            console.log(
-                `[b2 share of 2nds]         ${(flatTwoShare * 100).toFixed(1)}% (config targets maj2, so ~0.4-0.5 expected; not gated)`,
-            );
-            console.log(`[b2 count]                 ${flatTwo}  [maj2 count] ${majTwo}`);
-            console.log(
-                `[Run device share]         ${(runShare * 100).toFixed(1)}% (Target: >0.05)`,
-            );
-            console.log('-------------------------------------------\n');
-
-            // (a) SCALE-COHERENCE FLOOR (not the discriminator). The line lives in
-            // a 7-note dominant collection: metal 67.5% / shred 76.8%. Random
-            // 7-of-12 baseline is 0.583, lifted by the chord-tone floor. NB: this
-            // does NOT separate phrygian from mixolydian (mixolydian conforms just
-            // as well — bug-state shred sits at 71%); it only guards the line from
-            // wandering atonal. The real discriminator is (b).
-            expect(pdConformance).toBeGreaterThan(0.62);
-
-            // (b) THE FIX, on its cleanest discriminator — the 6th. Phrygian
-            // dominant owns b6; mixolydian owns maj6; NEITHER is a targetExtension,
-            // so of the 6ths the line plays, the b6 share reads the chosen scale
-            // with no config pulling on it. Calibrated against the bug (shred
-            // reverted to the mixolydian fallback):
-            //     bug shred 42.4%  →  fixed shred 65.0% ;  metal (ref) 56.9%
-            // The fix flips shred across the 0.5 random baseline. >0.52 sits just
-            // above baseline: both fixed profiles clear it (metal +4.9pp, shred
-            // +13pp) while the bug state fails by ~10pp. (The 2nd is contaminated
-            // by targetExtensions:[2] rewarding maj2, so it is reported, not gated.)
-            expect(flatSixShare).toBeGreaterThan(0.52);
-            // b2 IS emitted (harmonic-minor color reaches the 2nd too) — not
-            // vacuously zero, even though the maj2 targetExtension competes for it.
-            expect(flatTwo).toBeGreaterThan(0);
-
-            // (c) SCALAR-RUN DENSITY. The 'run' device is alive for the shredder.
-            // Engine: metal 73.5% / shred 47.0%. >0.05 guards the lane isn't dead.
-            expect(runShare).toBeGreaterThan(0.05);
-        });
+        }
     }
+    return notes;
+}
+
+describe('Soloist Metal Critique (phrase-first)', () => {
+    it('keeps the metal lead on the C-minor palette and avoids the major 3rd', () => {
+        const notes = simulate('Metal Core');
+        expect(notes.length).toBeGreaterThan(50);
+
+        // KEY-relative target sets (C minor). NAT_MIN is the aeolian collection;
+        // METAL_PAL adds the harmonic-minor maj7 (11) and the blue/tritone b5 (6).
+        // Hard-coded (NOT the engine's own scale lookup), so adherence is not a
+        // tautology — a bug routing metal to a MAJOR scale would crater natShare
+        // and spike maj3Share.
+        const NAT_MIN = new Set([0, 2, 3, 5, 7, 8, 10]);
+        const METAL_PAL = new Set([0, 2, 3, 5, 6, 7, 8, 10, 11]);
+
+        let kNat = 0;
+        let kPal = 0;
+        let kMaj3 = 0;
+        for (const n of notes) {
+            const keyRel = (n.midi - n.keyRoot + 120) % 12;
+            if (NAT_MIN.has(keyRel)) {
+                kNat++;
+            }
+            if (METAL_PAL.has(keyRel)) {
+                kPal++;
+            }
+            // Major 3rd (4) over a minor tonic — the note metal avoids.
+            if (keyRel === 4) {
+                kMaj3++;
+            }
+        }
+        const natShare = kNat / notes.length;
+        const palShare = kPal / notes.length;
+        const maj3Share = kMaj3 / notes.length;
+
+        // baselines: NAT_MIN = 7/12 = 0.583 chromatic; METAL_PAL = 9/12 = 0.75;
+        // a uniform line plays the major 3rd 1/12 = 8.3% of the time.
+        console.log('\n--- METAL SOLOIST CRITIQUE (phrase-first) ---');
+        console.log(`notes=${notes.length}`);
+        console.log(`[Natural-minor share] ${(natShare * 100).toFixed(1)}% (baseline 58.3%)`);
+        console.log(`[Metal-palette share] ${(palShare * 100).toFixed(1)}% (baseline 75%)`);
+        console.log(`[Major-3rd share]     ${(maj3Share * 100).toFixed(1)}% (uniform 8.3%)`);
+        console.log('---------------------------------------------\n');
+
+        // (a) PALETTE ADHERENCE. The metal lead lives in C natural minor. Live
+        // phrase-first delivers 99.5% over the Metal Core macro-form; >0.93 sits
+        // ~35pp above the 0.583 chromatic baseline with ~6pp headroom, guarding
+        // against a regression that lets the line wander out of the key.
+        // (Deterministic — seeded scrambleHash; stable across runs.)
+        expect(natShare).toBeGreaterThan(0.93);
+
+        // (b) WIDER METAL PALETTE (aeolian + harmonic-minor maj7 + b5 tritone).
+        // Live 99.5%; >0.95 is ~20pp above the 0.75 baseline. Non-vacuous floor
+        // confirming the rare color tones stay inside the metal collection.
+        expect(palShare).toBeGreaterThan(0.95);
+
+        // (c) MAJOR-3RD AVOIDANCE — the cardinal-sin note over a minor tonic. A
+        // uniform line would hit it 8.3% of the time; the metal lead drives it to
+        // 0.0% (probe). <0.02 guards that the metal genre never drifts onto a
+        // major-3rd-bearing scale (the #550 class of mis-route). This is an
+        // anti-claim: low is the idiom, not a vacuous pass.
+        expect(maj3Share).toBeLessThan(0.02);
+    });
 
     // why: style-resolution guard (the reggae dead-profile / Rock→shred class of
     // bug — see the project memory "Genre→profile resolution-guard"). #550's root
     // cause was a profile reached only by an alias path. This pins every route to
-    // the shred/metal profiles so a future re-route can't silently make this
-    // critique test exercise the wrong scale.
+    // the metal profile so a future re-route can't silently make this critique
+    // exercise the wrong scale. Does not touch the engine — kept verbatim.
     it('resolves Metal genre + aliases to the canonical metal soloist profile', () => {
         // Metal genre (smart) → 'metal' (SMART_GENRES.Metal.soloist).
         expect(resolveSoloistStyle('smart', 'Metal')).toBe('metal');

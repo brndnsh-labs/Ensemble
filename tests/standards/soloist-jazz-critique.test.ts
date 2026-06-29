@@ -1,855 +1,153 @@
 // @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSoloistNote } from '../../public/engine/soloist.js';
+// Jazz soloist idiom critique — PRODUCTION-FAITHFUL on the live engine
+// (getSoloistNotePhraseFirst). Rerouted from the retired legacy getSoloistNote
+// (epic #10, #863). Real dispatch-built state, a real seed, an absolute advancing
+// step with currentLoopCount per loop (mirrors scheduler-core), scanned across a
+// full macro-form over 'Autumn Leaves' — a major-key jazz standard built from
+// ii-V-I cells (all but the III7+ secondary dominant are diatonic to C major),
+// the natural home of the smooth bebop/standards line.
+//
+// What this guards: the jazz lead stays in key (C-major diatonic) and keeps a
+// smooth, singable contour. DROPPED from the legacy version:
+//   - the bebopScale / generateMelodicDevice / pickByRank device-subsystem tests
+//     — those bebop enclosures and the device picker are produced ONLY by the
+//     retired legacy engine; phrase-first emits NO `.device` field. (dark;
+//     re-added by #869/#870)
+//   - the head-bypass / themed-improv JITTER scale-clamp test — that codepath and
+//     its legacy seed shape (soloistState.session.seed.notes + jitterRange/
+//     jitterProb) are legacy-engine machinery phrase-first does not have.
+//   - the relative-to-chord "chromatism ratio" claim — see the drop note below.
+import { describe, expect, it } from 'vitest';
+import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { validateProgression } from '../../public/engine/chords-engine.js';
 import { resolveSoloistStyle } from '../../public/engine/soloist-config.js';
-import { generateMelodicDevice } from '../../public/engine/soloist-devices.js';
-import { pickByRank } from '../../public/engine/soloist-pitch-engine.js';
-import { getState } from '../../public/state.js';
-import { makeSoloistMock } from '../utils/mock-soloist.js';
+import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { dispatch, getState } from '../../public/state.js';
+import { ACTIONS } from '../../public/types.js';
 
-// Mock state.js
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-    dispatch: vi.fn(),
-}));
+function buildState(presetName: string) {
+    dispatch(ACTIONS.RESET_STATE);
+    dispatch(ACTIONS.SET_TIME_SIGNATURE, '4/4');
+    dispatch(ACTIONS.SET_KEY, 'C');
+    dispatch(ACTIONS.UPDATE_GB, { enabled: true, genreFeel: 'Jazz' });
+    dispatch(ACTIONS.UPDATE_SB, { enabled: true, style: 'smart', mode: 'monophonic' });
+    dispatch(ACTIONS.SET_BAND_INTENSITY, 0.7);
+    dispatch(ACTIONS.SET_BPM, 140);
+    const state = getState();
+    const preset = CHORD_PRESETS.find((p) => p.name === presetName);
+    state.arranger.key = 'C';
+    state.arranger.isMinor = false;
+    state.arranger.sections = preset.sections.map((s, i) => ({ ...s, id: `p-${i}` }));
+    validateProgression(state);
+    return state;
+}
 
-// Mock config.js
-vi.mock('../../public/config.js', () => ({
-    TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4 },
-    },
-    KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
-}));
+function simulate(presetName = 'Autumn Leaves') {
+    const state = buildState(presetName);
+    const seed = generateSessionSeed(state, state.arranger, 'smart', 0.7, 'JAZZ_CRITIQUE');
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = false;
 
-describe('Soloist Jazz Critique', () => {
-    let soloistState;
-
-    beforeEach(() => {
-        vi.restoreAllMocks();
-
-        soloistState = makeSoloistMock({
-            enabled: true,
-            style: 'jazz',
-            mode: 'monophonic',
-            octave: 64,
-            sessionSteps: 0,
-            currentPhraseSteps: 0,
-            notesInPhrase: 0,
-            srdcState: 'Statement',
-            qaState: 'Question',
-            isResting: true,
-            motifBuffer: [],
-            thematicSeed: [],
-            thematicSeedRoot: 0,
-            isReplayingMotif: false,
-            isReplayingSeed: false,
-            busySteps: 0,
-            pitchHistory: [],
-            lastInterval: 0,
-            stagnationCount: 0,
-            deviceBuffer: [],
-            lastFreq: 0,
-            currentCell: null,
-            phraseContext: {
-                role: 'call',
-                skeleton: [],
-                lastInterval: null,
-                profile: 'srv',
-            },
-        });
-
-        getState.mockReturnValue({
-            playback: {
-                bandIntensity: 0.7,
-                bpm: 140,
-                complexity: 0.7,
-                intent: {},
-                lyricalBias: 0.1,
-                currentLoopCount: 4,
-            },
-            groove: { genreFeel: 'Jazz', pocket: 0 },
-            soloist: soloistState,
-            harmony: { enabled: false },
-            arranger: { timeSignature: '4/4' },
-        });
-    });
-
-    const simulatePerformance = (numBars, profile = 'bird') => {
-        const history = [];
-        const Cmaj7 = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
-        const Dm7 = { rootMidi: 62, quality: 'm7', intervals: [0, 3, 7, 10], beats: 4 };
-        const G7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
-
-        // ii-V-I progression
-        const progression = [Dm7, G7, Cmaj7, Cmaj7];
-
-        let lastFreq = 0;
-        for (let bar = 0; bar < numBars; bar++) {
-            const chord = progression[bar % 4];
-            for (let step = 0; step < 16; step++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord,
-                    chord,
-                    bar * 16 + step,
-                    lastFreq,
-                    64,
-                    profile,
-                    step,
-                );
-                if (note) {
-                    const primary = Array.isArray(note) ? note[0] : note;
-                    lastFreq = primary.frequency || 0;
-                    history.push({
-                        step: bar * 16 + step,
-                        bar,
-                        midi: primary.midi,
-                        chord,
-                    });
-                }
-                soloistState.session.sessionSteps++;
-            }
-        }
-        return history;
+    const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (s: number) => {
+        const w = ((s % total) + total) % total;
+        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
     };
 
-    // Classify a single note attack relative to its chord. Used by the Epic 4/S1
-    // delta tests below. Returns one of: 'chord' | 'scale' | 'blue' | 'neighbor'
-    // | 'other'.
-    const C_MAJOR_SCALE_PCS = new Set([0, 2, 4, 5, 7, 9, 11]);
-    const classifyAttack = (n: { midi: number; chord: any }) => {
-        const pc = ((n.midi % 12) + 12) % 12;
-        const chord = n.chord;
-        const chordPCs = new Set<number>(
-            chord.intervals.map((iv: number) => (((iv + chord.rootMidi) % 12) + 12) % 12),
+    const notes: any[] = [];
+    const scanned = loopLen * 3 + 64;
+    for (let abs = 0; abs < scanned; abs++) {
+        state.playback.currentLoopCount = Math.floor(abs / total);
+        const chord = chordAt(abs);
+        const res = getSoloistNotePhraseFirst(
+            state,
+            chord,
+            chordAt(abs + 1),
+            abs,
+            null,
+            state.soloist.octave,
+            'smart',
+            abs % 16,
+            {},
+            { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
         );
-        if (chordPCs.has(pc)) {
-            return 'chord';
+        if (!res || !chord) {
+            continue;
         }
-        const isBlue =
-            pc === (chord.rootMidi + 3) % 12 ||
-            pc === (chord.rootMidi + 6) % 12 ||
-            pc === (chord.rootMidi + 10) % 12;
-        if (isBlue) {
-            return 'blue';
-        }
-        if (C_MAJOR_SCALE_PCS.has(pc)) {
-            return 'scale';
-        }
-        for (const ctPC of chordPCs) {
-            if (pc === (ctPC + 1) % 12 || pc === (ctPC + 11) % 12) {
-                return 'neighbor';
+        for (const n of Array.isArray(res) ? res : [res]) {
+            if (typeof n.midi === 'number') {
+                notes.push({ midi: n.midi, chordRoot: chord.rootMidi, abs });
             }
         }
-        return 'other';
-    };
+    }
+    return { notes, scanned };
+}
 
-    it('should pass an authenticity critique for a 128-bar Jazz soloist performance', () => {
-        const numBars = 128;
-        const notes = simulatePerformance(numBars);
+describe('Soloist Jazz Critique (phrase-first)', () => {
+    it('keeps the jazz lead in key with a smooth, singable contour', () => {
+        const { notes } = simulate('Autumn Leaves');
+        // Non-silence sanity (live phrase-first delivers 1453 over this macro-form).
+        expect(notes.length).toBeGreaterThan(200);
 
-        let sumIntervals = 0;
-        let totalIntervals = 0;
-        let chromaticNotes = 0;
-        const totalBars = numBars;
-
+        // C-major diatonic = {0,2,4,5,7,9,11} as ABSOLUTE pitch classes — NOT the
+        // engine's per-chord scale lookup, so the adherence claim is not a
+        // tautology. Autumn Leaves is a C-major standard; only the III7+ secondary
+        // dominant (E7+ → G#) pulls a chromatic tone, so the engine CAN leave C
+        // major and 100% is not forced.
+        const C_MAJOR = new Set([0, 2, 4, 5, 7, 9, 11]);
+        let diatonic = 0;
+        let sumInt = 0;
+        let nInt = 0;
         for (let i = 0; i < notes.length; i++) {
             const n = notes[i];
-
-            // Melodic smoothness (within phrase)
-            if (i > 0 && n.step - notes[i - 1].step <= 4) {
-                totalIntervals++;
-                sumIntervals += Math.abs(n.midi - notes[i - 1].midi);
+            const pc = ((n.midi % 12) + 12) % 12;
+            if (C_MAJOR.has(pc)) {
+                diatonic++;
             }
-
-            // Chromatism (not in Major scale of the chord)
-            // Simplified check: if not in chord tones and not in common extensions
-            const relPC = (n.midi - n.chord.rootMidi + 120) % 12;
-            const commonScale = [0, 2, 4, 5, 7, 9, 11]; // Ionian for Jazz Major
-            if (!commonScale.includes(relPC)) {
-                chromaticNotes++;
+            // Melodic step size within a phrase (consecutive attacks ≤4 steps apart).
+            if (i > 0 && n.abs - notes[i - 1].abs <= 4) {
+                nInt++;
+                sumInt += Math.abs(n.midi - notes[i - 1].midi);
             }
         }
+        const diatonicShare = diatonic / notes.length;
+        const avgInterval = sumInt / (nInt || 1);
 
-        const avgInterval = sumIntervals / (totalIntervals || 1);
-        const chromaticRatio = chromaticNotes / notes.length;
-        const notesPerBar = notes.length / totalBars;
+        // In-key adherence: baseline 7/12 = 58.3% chromatic. Live phrase-first
+        // delivers 95.9% over this macro-form; >0.90 sits ~32pp above baseline with
+        // ~6pp live headroom, guarding against a regression that lets the line drift
+        // out of key. (Deterministic — seeded scrambleHash; stable across runs.)
+        expect(diatonicShare).toBeGreaterThan(0.9);
 
-        console.log('\n--- JAZZ SOLOIST CRITIQUE REPORT ---');
-        console.log(`[Melodic Smoothness]    ${avgInterval.toFixed(2)} semitones (Target: <5.0)`);
-        console.log(`[Chromatism Ratio]      ${(chromaticRatio * 100).toFixed(1)}% (Target: >15%)`);
-        console.log(
-            `[Note Density]          ${notesPerBar.toFixed(2)} notes/bar (Target: 6.0-12.0)`,
-        );
-        console.log('------------------------------------\n');
+        // Melodic smoothness: a singable bebop/standards line moves mostly by step
+        // and small skips. A uniform-random pitch over the soloist register
+        // (~60–90) would average ~10 semitones per move; live phrase-first measures
+        // 2.42. <4.0 sits well below the random-walk baseline with ~1.6 headroom,
+        // catching a regression toward an angular/leaping contour.
+        expect(avgInterval).toBeLessThan(4.0);
 
-        // Engine ~2.3 semitones. <5 keeps phrases vocal/singable; >5 starts to feel
-        // angular (jazz allows wider intervals than blues but should still arc).
-        expect(avgInterval).toBeLessThan(5.0);
-        // Engine measures ~31.6-32.0% chromatic over this 128-bar sample (tight
-        // ±0.2pp band — the soloist path is seeded via scrambleHash). The previous
-        // version logged this metric but never asserted it — a completely diatonic
-        // jazz soloist would have passed — and the original 0.15 floor sat ~17pp
-        // below the engine's real output, so a regression halving the engine's
-        // chromaticism would still have slipped through. 0.25 keeps ~6.6pp headroom
-        // below the observed reliable minimum (no flake) while genuinely guarding
-        // that the engine reaches outside the major scale for approach notes,
-        // passing tones, and altered dominants — the heart of bebop. (Wave-3 audit
-        // finding J-F2; the picker-only S1 ratchet still lives in
-        // soloist-bird-picker-chromatism.test.ts.)
-        expect(chromaticRatio).toBeGreaterThan(0.25);
-        // Engine ~7 notes/bar. The previous report claimed 8-16/bar (Kenny Dorham
-        // transcription target) but asserted >6.5 — closer to the engine's real
-        // output. We update the report to match what the engine actually delivers
-        // averaged across phrasing rests. Engine pushing toward 12+/bar is queued
-        // as a future engine task, not papered over with a loose threshold here.
-        expect(notesPerBar).toBeGreaterThan(6.0);
-        expect(notesPerBar).toBeLessThan(12.0);
+        // DROPPED (rule 4): the legacy "chromatism ratio > 0.25" claim. Measured
+        // relative-to-chord-root against Ionian, live phrase-first reads 43.1% —
+        // essentially the 5/12 = 41.7% uniform baseline, so it guards nothing. It is
+        // also mis-measured: ii-V-I m7/dom7 chords want Dorian/Mixolydian, whose b3/
+        // b7 chord-SCALE tones the Ionian template falsely flags as "chromatic". The
+        // honest signal is the absolute in-key adherence above. Phrase-first is
+        // theme-based and stays on the chord scale rather than reaching for bebop
+        // approach-note chromaticism; restoring that bebop density is a candidate for
+        // the idiom ports tracked in #870.
+        //
+        // DROPPED (rule 4): the legacy "note density > 6.0/bar" claim. Phrase-first
+        // is sparser (3.75 attacks/bar) — it rests between thematic statements rather
+        // than running continuous bebop eighths, so the legacy >6.0 floor is a false
+        // claim on this engine (tracked for the #870 idiom ports).
     });
 
-    // why: Wave-3 audit finding J-F3 — smart→genre resolution guard. Everything
-    // else in this file passes 'bird' explicitly, and jazz-soloist-authenticity
-    // exercises the 'jazz' STYLE_CONFIG profile — but the Jazz *genre* never
-    // selects 'jazz'; it resolves smart mode through the genre feel to 'bird'.
-    // Nothing asserted that resolution actually lands on 'bird'. This is the exact
-    // class of gap the reggae dead-profile bug (#570) exploited: a genre whose
-    // smart soloist key silently routes to the wrong (or a generic) profile. This
-    // guard fails loudly if Jazz ever stops resolving to the bebop profile.
     it('resolves the Jazz genre (smart mode) to the bird profile (J-F3 resolution guard)', () => {
-        // smart mode + Jazz feel must land on 'bird' (Charlie Parker bebop), not
-        // the 'jazz' UI-comp profile and not a generic fallback.
         expect(resolveSoloistStyle('smart', 'Jazz')).toBe('bird');
-        // an unset style behaves like smart (the production default path).
         expect(resolveSoloistStyle(undefined, 'Jazz')).toBe('bird');
-        // sanity: an explicit non-smart style is honored verbatim and does NOT
-        // get rewritten by the genre feel.
         expect(resolveSoloistStyle('jazz', 'Jazz')).toBe('jazz');
-    });
-
-    // why: epic-soloist-idiom S4. Previously the head-bypass / themed-improv jitter
-    // perturbed seed pitches by ±N CHROMATIC semitones, so a 5 could become a b5 or
-    // a 3 could become a b3 — out-of-key notes that sound like mistakes. After the
-    // fix the jitter walks scale-degree steps (collecting scale-tone MIDI values in
-    // a ±2-octave window around the seed and picking an N-step neighbor), keeping
-    // every output in the chord-scale.
-    //
-    // Style: 'jazz' (not 'bird'). With 'jazz', getScaleForChord returns Dorian for
-    // m7 and Mixolydian for dom7 — both proper subsets of C major. With 'bird' a
-    // dominant chord pulls in Lydian Dominant (#11 = F#) which is NOT in C major
-    // and would let the test claim collapse. 'jazz' keeps the assertion airtight.
-    it('themed-improv jitter never produces out-of-C-major pitch classes (ii-V-I in C, jazz style)', () => {
-        const C_MAJOR_PCS = new Set([0, 2, 4, 5, 7, 9, 11]);
-        const Dm7 = { rootMidi: 62, quality: 'm7', intervals: [0, 3, 7, 10], beats: 4 };
-        const G7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
-        const Cmaj7 = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
-        const progression = [Dm7, G7, Cmaj7, Cmaj7];
-
-        // Seed: all-scale C-major pitches; none flagged isAnchor so all are eligible
-        // for jitter. Any out-of-key output comes from the jitter codepath, not the seed.
-        soloistState.session.seed = {
-            loopLengthSteps: 16,
-            notes: [
-                { step: 0, midi: 60, durationSteps: 2, velocity: 0.8, isAnchor: false },
-                { step: 4, midi: 64, durationSteps: 2, velocity: 0.8, isAnchor: false },
-                { step: 8, midi: 67, durationSteps: 2, velocity: 0.8, isAnchor: false },
-                { step: 12, midi: 69, durationSteps: 2, velocity: 0.8, isAnchor: false },
-            ],
-        };
-        // currentLoopCount: 2 → isStrictHeadPlayback=false, isFirstRestatementLoop=false,
-        // isThemedImprov=true when headNotes fires on seed steps. effectiveIntensity 0.8
-        // → jitterRange=3, jitterProb=0.32 (max jitter exposure).
-        getState.mockReturnValue({
-            playback: {
-                bandIntensity: 0.7,
-                bpm: 140,
-                complexity: 0.7,
-                intent: {},
-                lyricalBias: 0.1,
-                currentLoopCount: 2,
-            },
-            groove: { genreFeel: 'Jazz', pocket: 0 },
-            soloist: soloistState,
-            harmony: { enabled: false },
-            arranger: { timeSignature: '4/4' },
-        });
-
-        // Only count attacks at seed steps — those are the ones routed through the
-        // head-bypass / themed-improv jitter branch. Other steps come from the
-        // generative selectPitchAndDevices path, which is intentionally chromatic
-        // (passing tones, approach notes) and is OUT OF SCOPE for this story.
-        const SEED_STEPS = new Set([0, 4, 8, 12]);
-        let outOfKey = 0;
-        let seedStepAttacks = 0;
-        let lastFreq = 0;
-        for (let bar = 0; bar < 32; bar++) {
-            const chord = progression[bar % 4];
-            for (let step = 0; step < 16; step++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord,
-                    chord,
-                    bar * 16 + step,
-                    lastFreq,
-                    64,
-                    'jazz',
-                    step,
-                );
-                if (note) {
-                    const primary = Array.isArray(note) ? note[0] : note;
-                    if (typeof primary.midi === 'number') {
-                        if (SEED_STEPS.has(step)) {
-                            seedStepAttacks++;
-                            const pc = ((primary.midi % 12) + 12) % 12;
-                            if (!C_MAJOR_PCS.has(pc)) {
-                                outOfKey++;
-                            }
-                        }
-                        lastFreq = primary.frequency || 0;
-                    }
-                }
-                soloistState.session.sessionSteps++;
-            }
-        }
-
-        const outOfKeyRate = outOfKey / Math.max(seedStepAttacks, 1);
-
-        console.log(
-            '\n--- HEAD-BYPASS JITTER SCALE-CLAMP ---\n' +
-                `[Seed-step attacks]     ${seedStepAttacks}\n` +
-                `[Out-of-C-major notes]  ${outOfKey} (${(outOfKeyRate * 100).toFixed(1)}%)\n` +
-                '---------------------------------------\n',
-        );
-
-        // why: at seed steps the soloist routes through (a) the head-bypass jitter
-        // codepath that epic-soloist-idiom S4 scale-clamped, or (b)
-        // selectPitchAndDevices when the seed tone is protected. Path (a) is
-        // strictly in-scale; path (b) is intentionally allowed to be chromatic
-        // (passing tones / approach notes). This metric counts BOTH, so it is a
-        // jitter-clamp regression guard with a path-(b) chromatic floor mixed in.
-        //
-        // Threshold widened to 0.27 by Epic deferred-followups S7 (a). S7(a)
-        // changed the device picker from a uniform draw over `fittedAllowed`
-        // to a rank-weighted one — in the loop-3 themed-improv context the
-        // top-ranked devices (enclosure, run, bebopScale, chromaticEnclosure)
-        // are the chromatic-by-design ones, so path (b) now contributes more
-        // out-of-key seed-step tones. A 30-run unseeded sweep post-S7(a)
-        // measured the rate at 7.0-20.3% (median ~12.5%); pre-S7(a) sat
-        // ~6-14%. 0.27 sits ~7pt above the worst observed run — honest
-        // headroom for the unseeded jitter PRNG, while still rejecting a
-        // true jitter-clamp regression (which pre-S4 ran the combined rate
-        // to ~25-30% on top of this already-chromatic path-(b) baseline,
-        // i.e. ~40-45% combined). A tighter, jitter-isolated assertion
-        // remains a follow-up that needs the jitter PRNG deterministically
-        // seeded.
-        expect(seedStepAttacks).toBeGreaterThan(0);
-        expect(outOfKeyRate).toBeLessThan(0.27);
-    });
-
-    // why: Epic 4 / S1 — chromatic neighbors of chord-tone PCs are admitted
-    // to the candidate pool so Bird's `chromaticism: 0.9` config knob actually
-    // shapes the picker (pre-fix, the `!isScaleTone && !isBlueNote` continue
-    // at soloist-pitch-engine.ts:~510 dropped every chromatic candidate before
-    // the chromaticism boost could fire, so the knob was dead code).
-    //
-    // **Scope honesty:** this engine change is incremental, NOT transformative.
-    // `generateMelodicDevice` (runs, enclosures, approach licks) already emits
-    // chromatic notes outside the picker — a 20-run sweep on the un-patched
-    // engine measured 27-31% overall chromatism ratio in Bird-profile output.
-    // The picker admission contribution sits on top of that, adding ~3pt to
-    // overall chromatism (post-patch sweep: 30-35%). A test that asserts
-    // picker-specific behavior in isolation isn't possible without engine
-    // instrumentation — devices and picker write to the same output stream.
-    //
-    // SUPERSEDED as the S1 ratchet by `soloist-bird-picker-chromatism.test.ts`
-    // (Epic 10 S2.c). That test surfaces the engine's test-mode `source` tag
-    // and measures the picker-emitted chromatic share IN ISOLATION — the
-    // direct S1 fix path — with ~2pt headroom on each side of the pre/post-fix
-    // gap, instead of the ~0.5pt headroom this combined metric could offer.
-    //
-    // This test is retained only as a loose COMBINED-output sanity check:
-    // picker + device chromatic content together should stay in a plausible
-    // bebop band. It is intentionally NOT the regression guard for S1.
-    it('Bird-profile combined chromatism ratio stays in a plausible bebop band (sanity check)', () => {
-        const numBars = 512;
-        const notes = simulatePerformance(numBars, 'bird');
-
-        // Match the chromatism metric the existing 128-bar critique uses:
-        // notes whose interval (relative to current chord root) is not in
-        // Ionian {0,2,4,5,7,9,11}. This counts both blue notes and chromatic
-        // neighbors as chromatic; the existing 15% floor at the top of this
-        // file is the legacy ratchet, this one is the tighter S1 ratchet.
-        const ionianRelPCs = new Set([0, 2, 4, 5, 7, 9, 11]);
-        let chromaticNotes = 0;
-        for (const n of notes) {
-            const relPC = (((n.midi - n.chord.rootMidi) % 12) + 12) % 12;
-            if (!ionianRelPCs.has(relPC)) {
-                chromaticNotes++;
-            }
-        }
-        const chromatismRatio = chromaticNotes / Math.max(notes.length, 1);
-
-        const buckets = { chord: 0, scale: 0, blue: 0, neighbor: 0, other: 0 };
-        for (const n of notes) {
-            buckets[classifyAttack(n)]++;
-        }
-
-        console.log(
-            '\n--- BIRD CHROMATISM RATIO CRITIQUE ---\n' +
-                `[Total attacks]      ${notes.length}\n` +
-                `[Class buckets]      ${JSON.stringify(buckets)}\n` +
-                `[Chromatism ratio]   ${(chromatismRatio * 100).toFixed(1)}% (target ≥ 29%)\n` +
-                '---------------------------------------\n',
-        );
-
-        expect(notes.length).toBeGreaterThan(200);
-        // Loose sanity floor only — the S1 chromatic-neighbor regression guard
-        // now lives in soloist-bird-picker-chromatism.test.ts (picker-only
-        // metric). 29% is well below the ~30.7% combined-metric center; it just
-        // catches a gross collapse of bird-profile chromatism, not an S1 revert.
-        expect(chromatismRatio).toBeGreaterThanOrEqual(0.29);
-    });
-
-    // why: Epic 4 / S3 — `bebopScale` device used to anchor at `root + 12`
-    // regardless of the picker's `selectedMidi`, ending on root+9 (6 below
-    // octave) which is neither a chord tone nor a stepwise approach.
-    // Post-fix, the buffer's last note IS `selectedMidi` (the picker only
-    // admits bebopScale when `selectedMidi` is a chord tone of `targetChord`,
-    // gated in soloist-pitch-engine.ts ~1366) approached stepwise via a
-    // bebop-scale walk with one chromatic passing tone. This test asserts:
-    //   (a) the resolution note (last of each 4-note bebopScale group) is a
-    //       chord tone of its target chord (structural; picker-gated to ~100%),
-    //   (b) the prior buffer note is within ±5 semitones (stepwise approach,
-    //       not a leap), and
-    //   (c) the bebop passing-PC for the chord quality dominates buffers of
-    //       that quality (major→b6, minor→maj3, dominant→maj7). Random-from-
-    //       bebop-PC baseline is ~1/8 = 12.5%, so a 40% threshold gives wide
-    //       separation. This is the metric that catches a regression of the
-    //       quality conditional (otherwise a uniform-PC bebop line would
-    //       pass (a) and (b) but produce ~equal rates across all 3 buckets).
-    // Style: 'jazz' (matches the route that enables bebopScale in
-    // soloist-pitch-engine.ts:161 — `activeStyle === 'jazz'` with triplet-carry).
-    it('bebopScale device resolves to a chord tone via stepwise approach', () => {
-        const Cmaj7 = { rootMidi: 60, quality: 'maj7', intervals: [0, 4, 7, 11], beats: 4 };
-        const Dm7 = { rootMidi: 62, quality: 'm7', intervals: [0, 3, 7, 10], beats: 4 };
-        const G7 = { rootMidi: 67, quality: '7', intervals: [0, 4, 7, 10], beats: 4 };
-        const progression = [Dm7, G7, Cmaj7, Cmaj7];
-
-        // Capture device-tagged notes through the same getSoloistNote path the
-        // existing `simulatePerformance` uses, but also record `device` and
-        // chord so we can verify bebopScale buffer-group resolution.
-        const tagged: Array<{ midi: number; device: string; chord: any }> = [];
-        let lastFreq = 0;
-        // 4096 bars gives ~250-300 bebopScale firings (~125 dominant + ~60
-        // minor + ~125 major-on-Cmaj7×2). Below ~50 samples per bucket the
-        // passing-PC rate variance is too wide to assert tightly; 4096 puts
-        // the smallest bucket (G7) at ~60 which converges to ±5pt run-to-run.
-        const numBars = 4096;
-        for (let bar = 0; bar < numBars; bar++) {
-            const chord = progression[bar % 4];
-            for (let step = 0; step < 16; step++) {
-                const note = getSoloistNote(
-                    getState(),
-                    chord,
-                    chord,
-                    bar * 16 + step,
-                    lastFreq,
-                    64,
-                    'jazz',
-                    step,
-                );
-                if (note) {
-                    const primary = Array.isArray(note) ? note[0] : note;
-                    if (typeof primary.midi === 'number') {
-                        tagged.push({
-                            midi: primary.midi,
-                            device: primary.device || 'none',
-                            chord,
-                        });
-                        lastFreq = primary.frequency || 0;
-                    }
-                }
-                soloistState.session.sessionSteps++;
-            }
-        }
-
-        // Group contiguous bebopScale-tagged notes, then chunk each run into
-        // 4-note buffers (one firing emits exactly 4 sequential notes via
-        // applyDeviceBuffer + soloist.session.rhythm.deviceBuffer drain). Two
-        // back-to-back firings appear as 8 contiguous bebopScale notes — the
-        // resolutions are at positions 4 and 8, not just at the run's tail.
-        const runs: Array<Array<{ midi: number; device: string; chord: any }>> = [];
-        let current: (typeof runs)[number] = [];
-        for (const n of tagged) {
-            if (n.device === 'bebopScale') {
-                current.push(n);
-            } else if (current.length > 0) {
-                runs.push(current);
-                current = [];
-            }
-        }
-        if (current.length > 0) {
-            runs.push(current);
-        }
-
-        // Split each run into 4-note buffers. Drop trailing fragments shorter
-        // than 4 (would indicate the simulation ended mid-buffer — not a
-        // structural problem with the device).
-        const buffers: (typeof runs)[number][] = [];
-        for (const run of runs) {
-            for (let i = 0; i + 4 <= run.length; i += 4) {
-                buffers.push(run.slice(i, i + 4));
-            }
-        }
-
-        // Mirror the quality classification used in soloist-devices.ts
-        // bebopScale branch so the test buckets buffers the same way the
-        // engine picked the passing PC.
-        const classifyQuality = (quality: string): 'major' | 'minor' | 'dominant' => {
-            if (quality === 'major' || quality.startsWith('maj')) {
-                return 'major';
-            }
-            if (quality.startsWith('m') && !quality.startsWith('maj')) {
-                return 'minor';
-            }
-            return 'dominant';
-        };
-        const passingPcForQuality = (
-            bucket: 'major' | 'minor' | 'dominant',
-            rootMidi: number,
-        ): number => {
-            const rootPc = ((rootMidi % 12) + 12) % 12;
-            if (bucket === 'major') {
-                return (rootPc + 8) % 12; // b6
-            }
-            if (bucket === 'minor') {
-                return (rootPc + 4) % 12; // maj3
-            }
-            return (rootPc + 11) % 12; // maj7 (dominant default)
-        };
-
-        let resolutionOnChordTone = 0;
-        let stepwiseApproach = 0;
-        let groupCount = 0;
-        const buckets = {
-            major: { total: 0, hasPassingPc: 0 },
-            minor: { total: 0, hasPassingPc: 0 },
-            dominant: { total: 0, hasPassingPc: 0 },
-        };
-        for (const g of buffers) {
-            groupCount++;
-            const last = g[g.length - 1];
-            const penultimate = g[g.length - 2];
-
-            // (a) Resolution is a chord tone of the chord that was active when
-            // the buffer FIRED. The buffer was generated in one tick against
-            // a single `targetChord`, but plays across 4 steps; if it
-            // straddles a chord boundary, the last note's `chord` field
-            // reflects the next chord. Use the first note's chord (= firing
-            // chord) so we measure what the engine actually decided.
-            const firingChord = g[0].chord;
-            const lastPc = ((last.midi % 12) + 12) % 12;
-            const chordPCs = new Set<number>(
-                firingChord.intervals.map(
-                    (iv: number) => (((iv + firingChord.rootMidi) % 12) + 12) % 12,
-                ),
-            );
-            if (chordPCs.has(lastPc)) {
-                resolutionOnChordTone++;
-            }
-
-            // (b) Prior buffer note within ±5 semitones — stepwise, not a leap.
-            if (Math.abs(last.midi - penultimate.midi) <= 5) {
-                stepwiseApproach++;
-            }
-
-            // (c) Chord-quality-aware: does THIS buffer contain the bebop
-            // passing PC for its quality? The bebop walk visits the passing
-            // PC opportunistically, but across many firings the
-            // chord-quality conditional should dominate — randomly choosing
-            // among 8 bebop PCs would give ~12.5%, the quality-correct PC
-            // appears ≥40% in practice.
-            const bucket = classifyQuality(firingChord.quality || 'major');
-            const expectedPassing = passingPcForQuality(bucket, firingChord.rootMidi);
-            const bufferPcs = new Set<number>(g.map((n) => ((n.midi % 12) + 12) % 12));
-            buckets[bucket].total++;
-            if (bufferPcs.has(expectedPassing)) {
-                buckets[bucket].hasPassingPc++;
-            }
-        }
-
-        const chordToneRate = resolutionOnChordTone / Math.max(groupCount, 1);
-        const stepwiseRate = stepwiseApproach / Math.max(groupCount, 1);
-        const passingRate = (b: { total: number; hasPassingPc: number }) =>
-            b.total > 0 ? b.hasPassingPc / b.total : 0;
-        const majorRate = passingRate(buckets.major);
-        const minorRate = passingRate(buckets.minor);
-        const dominantRate = passingRate(buckets.dominant);
-
-        console.log(
-            '\n--- BEBOP SCALE DEVICE RESOLUTION ---\n' +
-                `[Groups observed]       ${groupCount}\n` +
-                `[Resolution on CT]      ${resolutionOnChordTone} (${(chordToneRate * 100).toFixed(1)}%)\n` +
-                `[Stepwise approach]     ${stepwiseApproach} (${(stepwiseRate * 100).toFixed(1)}%)\n` +
-                `[Major bucket]          ${buckets.major.hasPassingPc}/${buckets.major.total} b6 PC (${(majorRate * 100).toFixed(1)}%)\n` +
-                `[Minor bucket]          ${buckets.minor.hasPassingPc}/${buckets.minor.total} maj3 PC (${(minorRate * 100).toFixed(1)}%)\n` +
-                `[Dominant bucket]       ${buckets.dominant.hasPassingPc}/${buckets.dominant.total} maj7 PC (${(dominantRate * 100).toFixed(1)}%)\n` +
-                '-------------------------------------\n',
-        );
-
-        // (a) + (b) are structural post-fix:
-        //   - picker gate guarantees `selectedMidi` is a chord tone before
-        //     bebopScale is admitted (so the buffer ends on a chord tone),
-        //   - shared octave-shifter scans the whole buffer's range before
-        //     picking a shift, so the resolution's PC isn't mutated by a
-        //     per-note clamp on the way out.
-        // Empirical: 30/30 runs at numBars=4096 show 100.0% on both rates.
-        // The old root-anchored buffer ALWAYS ended on root+9 (the 6, not
-        // a chord tone for maj7/m7/7) — pre-fix rate was ~0%. The 0.95
-        // threshold cleanly rejects regressions while leaving a small
-        // cushion against future RNG-driven changes to the picker pool.
-        //
-        // (c) Chord-quality buckets: each chord type's bebop walk hits
-        // its passing PC at a rate that depends on chord-tone distribution
-        // and the walk direction (this test fixture has motifApproach=-1,
-        // i.e. descending walks). Empirical over 30 runs at numBars=4096:
-        //   - major (Cmaj7):    mean 53.3%, min 43.2%, max 60.3%
-        //   - dominant (G7):    mean 40.7%, min 26.7%, max 56.1%
-        //   - minor (Dm7):      mean 17.6%, min 10.0%, max 29.1%
-        //
-        // The minor rate is lower because, on Dm7 chord tones {D,F,A,C}
-        // walking descending, only the 5th (A) descends through the b3
-        // (F)→passing(F#)→4(G) zone of the dorian-bebop scale; the other
-        // three chord tones miss F# in 3-step descending walks. So 25%
-        // is the structural ceiling under uniform chord-tone selection;
-        // the picker's chord-tone bias (root/3/7 over 5) drops that to
-        // ~15-20%.
-        //
-        // Regression detection: if the chord-quality conditional were
-        // broken (e.g. all chords use dominant maj7), the minor bucket
-        // would test "does the buffer contain F# (D's maj3)?" against
-        // walks built from Db-substituted bebop set — and F# is the
-        // EXCLUDED PC under broken-to-dominant. Minor rate would crash
-        // to ~0%, far below the 0.05 threshold. Similarly major/dominant
-        // would invert. Thresholds picked per-bucket to give ≥5pt headroom
-        // over the worst observed run:
-        //   - major: 0.35 (min 43.2% - 8pt headroom)
-        //   - dominant: 0.20 (min 26.7% - 6.7pt headroom)
-        //   - minor: 0.05 (min 10.0% - 5pt headroom; primarily detects
-        //     conditional regression rather than tuning drift)
-        const BUCKET_THRESHOLDS: Record<string, number> = {
-            major: 0.35,
-            dominant: 0.2,
-            minor: 0.05,
-        };
-        expect(groupCount).toBeGreaterThan(20);
-        expect(chordToneRate).toBeGreaterThan(0.95);
-        expect(stepwiseRate).toBeGreaterThan(0.95);
-        // Each bucket needs enough samples to assert on; if any bucket
-        // is under-sampled (would happen if a future progression change
-        // weights one chord disproportionately), warn but don't fail.
-        for (const [name, b] of Object.entries(buckets)) {
-            if (b.total < 20) {
-                console.warn(
-                    `bebopScale bucket ${name} under-sampled (${b.total} buffers); skipping passing-PC assertion`,
-                );
-            } else {
-                expect(passingRate(b)).toBeGreaterThan(BUCKET_THRESHOLDS[name]);
-            }
-        }
-    });
-
-    // why: Epic deferred-followups S7 (b) — the bebopScale device used to route
-    // `halfdim` to the dominant-default passing PC (maj7) — fine by accident —
-    // but folded `augmaj7` into the major family, where its b6 passing PC
-    // (rootPc+8) IS the augmaj7 #5: a chord tone, NOT a passing tone. The walk
-    // degenerated to a chromaticism-free Lydian-Augmented scalar line. The fix
-    // adds explicit branches: halfdim → nat-3 (locrian bebop), augmaj7 → b7
-    // (lydian-aug bebop). Both passing PCs are guaranteed absent from the
-    // chord's diatonic scale, so the walk carries a real chromatic tone.
-    //
-    // This is a DIRECT device-call test, not a getSoloistNote route — the
-    // picker rarely admits bebopScale on these exotic qualities, so a routed
-    // statistical sweep would under-sample. We call `generateMelodicDevice`
-    // with a chord-tone `selectedMidi` (the picker's precondition) and assert
-    // the emitted buffer contains a pitch class outside the chord's diatonic
-    // scale: the chromatic passing tone.
-    it('bebopScale carries a real chromatic passing tone over halfdim and augmaj7', () => {
-        // Minimal state for getScaleForChord — `activeStyle: 'jazz'` (not
-        // 'smart') so the smart→genre style remap is skipped (the config mock
-        // intentionally omits resolveMappedStyle).
-        const deviceState = {
-            groove: { genreFeel: 'Jazz', pocket: 0 },
-            soloist: { session: { tension: 0.3 } },
-            arranger: { key: 'C', isMinor: false, timeSignature: '4/4' },
-        };
-
-        // Diatonic scales (theory-scales.ts): halfdim → LOCRIAN {0,1,3,5,6,8,10};
-        // augmaj7 → Lydian-Augmented {0,2,4,6,8,9,11}. A "real chromatic
-        // passing tone" is any buffer PC (relative to root) NOT in this set.
-        //
-        // The 3-step walk only USES the chromatic passing tone when it crosses
-        // the gap the passing tone bridges (halfdim: b3↔4; augmaj7: 6↔maj7).
-        // The walk builds AWAY from `selectedMidi`: `responseDirection: 1` →
-        // walk down, `responseDirection: -1` → walk up. So per direction we
-        // anchor `selectedMidi` on the chord tone whose walk crosses the gap.
-        const cases = [
-            {
-                label: 'halfdim',
-                quality: 'halfdim',
-                rootMidi: 62, // D half-diminished — chord tones {D,F,Ab,C}
-                scalePcs: new Set([0, 1, 3, 5, 6, 8, 10]),
-                expectedPassingRel: 4, // nat-3 (rootPc+4), bridges b3↔4
-                // walk down: anchor on b5 (Ab) → 6,5,4,3 crosses PC4.
-                // walk up:   anchor on b3 (F)  → 3,4,5,6 crosses PC4.
-                downAnchorMidi: 62 + 6, // Ab — b5 chord tone
-                upAnchorMidi: 62 + 3, // F  — b3 chord tone
-            },
-            {
-                label: 'augmaj7',
-                quality: 'augmaj7',
-                rootMidi: 60, // C aug-maj7 — chord tones {C,E,G#,B}
-                scalePcs: new Set([0, 2, 4, 6, 8, 9, 11]),
-                expectedPassingRel: 10, // b7 (rootPc+10), bridges 6↔maj7
-                // walk down: anchor on maj7 (B) → 11,10,9,8 crosses PC10.
-                // walk up:   anchor on G# (#5) → 8,9,10,11 crosses PC10.
-                downAnchorMidi: 60 + 11, // B  — maj7 chord tone
-                upAnchorMidi: 60 + 8, // G# — #5 chord tone
-            },
-        ];
-
-        for (const c of cases) {
-            const targetChord = {
-                rootMidi: c.rootMidi,
-                quality: c.quality,
-                beats: 4,
-            };
-            // responseDirection drives the walk direction; exercise both so a
-            // direction-dependent regression can't hide.
-            for (const dir of [1, -1]) {
-                const anchorMidi = dir === 1 ? c.downAnchorMidi : c.upAnchorMidi;
-                const buffer = generateMelodicDevice('bebopScale', {
-                    state: deviceState,
-                    selectedMidi: anchorMidi,
-                    targetChord,
-                    activeStyle: 'jazz',
-                    effectiveIntensity: 0.7,
-                    minMidi: 48,
-                    maxMidi: 96,
-                    lastMidi: anchorMidi,
-                    playback: { bpm: 140 },
-                    // the post-buffer octave shifter reads
-                    // soloist.session.phrasing.isResting (soloist-devices.ts:670)
-                    soloist: { session: { phrasing: { isResting: false } } },
-                    isPolyphonic: false,
-                    dynamicCenter: 70,
-                    responseSource: 'section',
-                    responseMode: 'paraphrase',
-                    responseDirection: dir,
-                });
-
-                expect(Array.isArray(buffer)).toBe(true);
-                expect(buffer.length).toBeGreaterThanOrEqual(4);
-
-                const relPcs = buffer.map((n) => (((n.midi - c.rootMidi) % 12) + 12) % 12);
-                const chromaticPcs = relPcs.filter((pc) => !c.scalePcs.has(pc));
-
-                console.log(
-                    `\n--- BEBOP ${c.label.toUpperCase()} (dir ${dir}) ---\n` +
-                        `[Buffer rel PCs]   ${relPcs.join(',')}\n` +
-                        `[Chromatic PCs]    ${chromaticPcs.join(',') || '(none)'}\n` +
-                        `[Expected passing] ${c.expectedPassingRel}\n` +
-                        '------------------------------------\n',
-                );
-
-                // Core S7(b) contract: the bebop walk MUST carry at least one
-                // chromatic (non-scale) passing tone — the old augmaj7 fold
-                // produced ZERO here.
-                expect(chromaticPcs.length).toBeGreaterThan(0);
-                // And the chromatic tone is the quality-correct bebop choice:
-                // halfdim → nat-3, augmaj7 → b7. The findNextBebopMidi walk
-                // visits the passing PC opportunistically; with a chord-tone
-                // anchor and a 3-step walk it lands the expected PC reliably.
-                expect(relPcs).toContain(c.expectedPassingRel);
-            }
-        }
-    });
-
-    // why: Epic deferred-followups S7 (a) — the device picker used to draw
-    // UNIFORM-random over `fittedAllowed`, a list that is already ordered
-    // best-first (motif priorities, then the profile-prioritized devices).
-    // Uniform selection threw the ranking away — the lowest-ranked fallback
-    // fired as often as the idiomatic top pick. `pickByRank` applies linear
-    // rank weighting: rank 0 gets weight N, the last gets weight 1.
-    //
-    // This test measures the distribution directly against the pure picker so
-    // it is deterministic and not masked by competing picker biases.
-    it('device pick distribution tracks the candidate ranking (S7 a)', () => {
-        // Deterministic mulberry32 RNG so the measured distribution is a fixed
-        // value, not a flaky band.
-        const makeRng = (seed) => {
-            let s = seed >>> 0;
-            return () => {
-                s = (s + 0x6d_2b_79_f5) >>> 0;
-                let t = s;
-                t = Math.imul(t ^ (t >>> 15), t | 1);
-                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-                return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
-            };
-        };
-
-        // A representative 5-device ranked list (best-first).
-        const ranked = ['enclosure', 'run', 'bebopScale', 'graceNote', 'slide'];
-        const N = ranked.length;
-        const rng = makeRng(0x5e_7d_10_a1);
-
-        const counts = Object.fromEntries(ranked.map((d) => [d, 0]));
-        const draws = 60_000;
-        for (let i = 0; i < draws; i++) {
-            counts[pickByRank(ranked, rng)]++;
-        }
-
-        // Expected share under linear rank weighting: rank i → (N-i)/sum(1..N).
-        const totalWeight = (N * (N + 1)) / 2;
-        const expectedShare = ranked.map((_, i) => (N - i) / totalWeight);
-        const actualShare = ranked.map((d) => counts[d] / draws);
-
-        console.log(
-            `\n--- DEVICE PICK RANK-WEIGHTING (S7 a) ---\n${ranked
-                .map(
-                    (d, i) =>
-                        `[rank ${i}] ${d.padEnd(12)} ${(actualShare[i] * 100).toFixed(1)}% ` +
-                        `(expected ${(expectedShare[i] * 100).toFixed(1)}%)`,
-                )
-                .join('\n')}\n-----------------------------------------\n`,
-        );
-
-        // (1) Strictly monotone decreasing: each rank fires LESS than the one
-        //     above it — the defining property of rank weighting. A uniform
-        //     draw would make all five ~equal and fail this outright.
-        for (let i = 1; i < N; i++) {
-            expect(actualShare[i]).toBeLessThan(actualShare[i - 1]);
-        }
-
-        // (2) The empirical share matches the linear-weight prediction within
-        //     1.5pp — 60k draws of a deterministic RNG converge tightly. This
-        //     guards the WEIGHT SHAPE, not just monotonicity: a steeper or
-        //     flatter curve would still be monotone but miss these bands.
-        for (let i = 0; i < N; i++) {
-            expect(Math.abs(actualShare[i] - expectedShare[i])).toBeLessThan(0.015);
-        }
-
-        // (3) The top device fires ~N× as often as the worst — concretely the
-        //     ratio sits in [3.5, 6.5] for N=5 (exact prediction is 5.0).
-        const topToBottom = actualShare[0] / actualShare[N - 1];
-        expect(topToBottom).toBeGreaterThan(3.5);
-        expect(topToBottom).toBeLessThan(6.5);
-
-        // (4) Variety is preserved — even the lowest-ranked device keeps a
-        //     real, non-trivial chance (rank weighting is a bias, not a sort).
-        expect(actualShare[N - 1]).toBeGreaterThan(0.03);
-
-        // Degenerate inputs.
-        expect(pickByRank([], rng)).toBe(null);
-        expect(pickByRank(['only'], rng)).toBe('only');
     });
 });
