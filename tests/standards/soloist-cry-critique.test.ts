@@ -113,8 +113,8 @@ describe('Soloist cry — bend-and-release (#869)', () => {
             // The vocal arc: leave the pitch, peak, then release back down.
             expect(b.onsetFrac).toBeLessThan(b.peakFrac);
             expect(b.peakFrac).toBeLessThan(b.releaseFrac);
-            // Only on a note with room to bend up and release (sustained ≥ 1.5 beats).
-            expect(c.durationSteps).toBeGreaterThanOrEqual(Math.ceil(1.5 * STEPS_PER_BEAT));
+            // Only on a note with room to bend up and release (sustained ≥ 1.25 beats).
+            expect(c.durationSteps).toBeGreaterThanOrEqual(Math.ceil(1.25 * STEPS_PER_BEAT));
             // The cry owns the lead voice — never stacked on an entry-scoop.
             expect(c.bendStartInterval || 0).toBe(0);
         }

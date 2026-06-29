@@ -666,7 +666,11 @@ export function getSoloistNotePhraseFirst(
     let expression: SoloistExpression | undefined;
     const cryStyle = resolveSoloistStyle(style, state.groove?.genreFeel);
     const cryGenre = cryStyle === 'blues' || cryStyle === 'rock';
-    const cryRings = durationSteps >= Math.ceil(1.5 * stepsPerBeat);
+    // ≥ 1.25 beats — a held note with room to bend up and release. Deliberately
+    // NOT down at 1 beat: the duration histogram cliffs there (quarter notes
+    // dominate the line), so including them would spray the cry into a constant
+    // warble instead of a lean-into-the-note gesture.
+    const cryRings = durationSteps >= Math.ceil(1.25 * stepsPerBeat);
     if (
         cryGenre &&
         cryRings &&
@@ -674,7 +678,9 @@ export function getSoloistNotePhraseFirst(
         !inFlurry &&
         !vibrato &&
         bendStartInterval === 0 &&
-        scrambleHash(step * 19 + Math.max(loopCount, 0) * 11 + 5) < 0.5
+        // Most eligible held notes cry (a blues player leans into them); the hash
+        // keeps a little variation so it doesn't read as mechanically every-note.
+        scrambleHash(step * 19 + Math.max(loopCount, 0) * 11 + 5) < 0.85
     ) {
         // Nearest chord tone (guide or pillar) 1–2 semitones above the written
         // note is the bend's destination; prefer the closer (½-step blue bend over
