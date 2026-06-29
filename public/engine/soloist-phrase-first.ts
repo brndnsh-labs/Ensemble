@@ -2,7 +2,7 @@ import { TIME_SIGNATURES } from '../config.js';
 import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveSoloistStyle } from './soloist-config.js';
-import { guitarDoubleStopVoice } from './soloist-devices.js';
+import { consonantDoubleStopInterval, guitarDoubleStopVoice } from './soloist-devices.js';
 import { allowsSoloistPolyphony } from './soloist-mode-policy.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
 
@@ -626,6 +626,11 @@ export function getSoloistNotePhraseFirst(
     //     gets a vibrato it has no room to voice.
     const EXPRESSIVE_RADIUS = 12; // steps each side of the peak (~¾ bar) = flurry zone
     const inFlurry = Math.abs(stepInLoop - apexStepInLoop) <= EXPRESSIVE_RADIUS;
+    // `style` arrives raw (often 'smart'); resolve to the genre profile once — the
+    // same resolution the seeder does — and reuse it for every genre-gated device
+    // below (cry, country grace-slide, country chicken-pick) or those gates would
+    // never fire in production.
+    const resolvedStyle = resolveSoloistStyle(style, state.groove?.genreFeel);
     let bendStartInterval = 0;
     if (isApexStep) {
         bendStartInterval = -2; // whole-step reach UP into the money note
@@ -637,6 +642,33 @@ export function getSoloistNotePhraseFirst(
         }
     }
     const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
+
+    // --- Country "grace slide": a quick down-slide grace into the note (#870) ---
+    // The legacy `graceSlide` device — a country/pedal-steel finger-slide where the
+    // note is approached from a semitone ABOVE and slides down into pitch (positive
+    // `bendStartInterval` starts above and glides down, synth-soloist `startFreq`).
+    // It's the lyrical complement to the apex's up-reach, so country gets BOTH
+    // gestures. Kept sparse and STRUCTURAL per the §10 restraint lesson (devices
+    // punctuate, they don't tic): country only, never on the apex/flurry notes
+    // (those own their scoop), only on a note with no bend of its own — and only
+    // when the note is a CHORD TONE, so the slide reads as an approach-to-resolution
+    // (you slide down INTO a harmony note, the country arrival idiom) rather than a
+    // random per-note dapple. A per-(step,loop) hash keeps it sparse within that set.
+    const graceIsChordTone = (currentChord.intervals ?? []).some(
+        (iv: number) => ((iv % 12) + 12) % 12 === (((midi - currentChord.rootMidi) % 12) + 12) % 12,
+    );
+    if (
+        resolvedStyle === 'country' &&
+        !isApexStep &&
+        !inFlurry &&
+        bendStartInterval === 0 &&
+        graceIsChordTone &&
+        // sparse within the chord-tone-arrival set — a player's lyrical lean into the
+        // landing note, not a slide on every arrival (cf. the cry's restraint, #869).
+        scrambleHash(step * 29 + Math.max(loopCount, 0) * 17 + 4) < 0.1
+    ) {
+        bendStartInterval = 1; // half-step grace slide DOWN into the note
+    }
 
     // --- Expressive "cry": bend-and-release on a sustained note (#869) ---
     // The complement to the entry-scoop (`bendStartInterval`): where the scoop
@@ -661,11 +693,8 @@ export function getSoloistNotePhraseFirst(
     //   • sparse, gated by a per-(step,loop) hash so it punctuates rather than tics.
     // Coexists with the double-stop punctuation below by design — the legacy rule is
     // "the cry belongs to the lead voice": the harmony holds while the lead bends.
-    // `style` arrives raw (often 'smart'); resolve to the genre profile first — the
-    // same resolution the seeder does — or the gate would never fire in production.
     let expression: SoloistExpression | undefined;
-    const cryStyle = resolveSoloistStyle(style, state.groove?.genreFeel);
-    const cryGenre = cryStyle === 'blues' || cryStyle === 'rock';
+    const cryGenre = resolvedStyle === 'blues' || resolvedStyle === 'rock';
     // ≥ 1.25 beats — a held note with room to bend up and release. Deliberately
     // NOT down at 1 beat: the duration histogram cliffs there (quarter notes
     // dominate the line), so including them would spray the cry into a constant
@@ -716,6 +745,56 @@ export function getSoloistNotePhraseFirst(
         isDoubleStop: false,
     };
 
+    // --- Country "chicken-pick": the 3rd-above snap double-stop (#870) ---
+    // The defining country lead idiom (Brent Mason / Albert Lee): a bright, snappy
+    // double-stop where a chord-aware 3rd ABOVE the lead is plucked with it — the
+    // "chicken-pickin'" pop. Distinct from the generic guitar double-stop below
+    // (which prefers a 6th BELOW the lead): here the harmony sits a 3rd above, the
+    // accent is sharper, and the snap doesn't need a long ring. Country takes this
+    // path instead of the generic 6th. Gated to phrase-first's structural accents
+    // (apex money note / strong-beat phrase anchor) and chord tones, sparse per the
+    // §10 restraint lesson so it punctuates rather than machine-guns every note.
+    // `consonantDoubleStopInterval([4,3])` is the same chord-aware scorer the legacy
+    // chickenPick used — major-3rd first, minor-3rd when the chord asks for it.
+    if (allowsSoloistPolyphony(soloist.mode) && resolvedStyle === 'country') {
+        const pc = (((midi - currentChord.rootMidi) % 12) + 12) % 12;
+        const isChordTone = (currentChord.intervals ?? []).some(
+            (iv: number) => ((iv % 12) + 12) % 12 === pc,
+        );
+        const isPunctuation = isApexStep || (isAnchor && isStrongBeat);
+        if (
+            isPunctuation &&
+            isChordTone &&
+            scrambleHash(step * 23 + Math.max(loopCount, 0) * 13 + 7) < 0.55
+        ) {
+            // 3rd above, chord-aware (chord tone preferred so the snap rings clean).
+            const thirdInt = consonantDoubleStopInterval(midi, [4, 3], currentChord);
+            if (thirdInt > 0) {
+                // Harmony first, lead last — tick-logic reads lastFreq from the
+                // non-double-stop voice (the lead). The 3rd snaps a touch brighter
+                // than the lead, the country "pop"; both keep the lead's own bend.
+                // The snap is PERCUSSIVE — chicken-pickin' is a short popped attack,
+                // not a sustained 3rd (the legacy device hard-set durationSteps:1).
+                // Phrase-first owns the lead's rhythm, so we shorten only the harmony
+                // POP (≤ half a beat) and let the lead ring as the phrase decided —
+                // the snapped 3rd over a singing lead, the right hybrid-picking sound.
+                const popSteps = Math.max(1, Math.min(durationSteps, Math.floor(stepsPerBeat / 2)));
+                return [
+                    {
+                        midi: midi + thirdInt,
+                        velocity: Math.min(1, velocity * 1.05),
+                        durationSteps: popSteps,
+                        timingOffset: lead.timingOffset,
+                        bendStartInterval: 0,
+                        vibrato: false,
+                        isDoubleStop: true,
+                    },
+                    lead,
+                ];
+            }
+        }
+    }
+
     // --- Guitar-mode double-stop PUNCTUATION (#856) ---
     // Phrase-first is melody-first, so a double-stop is an ACCENT, not a texture
     // (legacy `getSoloistNote` made them a frequent device; here they're sparse).
@@ -725,8 +804,9 @@ export function getSoloistNotePhraseFirst(
     // beat). The harmony holds while the lead keeps its own bend/vibrato (matches
     // the legacy "the cry belongs to the lead voice" rule). Gated guitar-mode
     // only, sparse by a per-(step,loop) hash. The voice itself is chord-aware
-    // (`guitarDoubleStopVoice` → the same scorer the legacy path uses).
-    if (allowsSoloistPolyphony(soloist.mode)) {
+    // (`guitarDoubleStopVoice` → the same scorer the legacy path uses). Country is
+    // handled above by its own 3rd-above chicken-pick — it never falls to the 6th.
+    if (allowsSoloistPolyphony(soloist.mode) && resolvedStyle !== 'country') {
         const pc = (((midi - currentChord.rootMidi) % 12) + 12) % 12;
         const isChordTone = (currentChord.intervals ?? []).some(
             (iv: number) => ((iv % 12) + 12) % 12 === pc,

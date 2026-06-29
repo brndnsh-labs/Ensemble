@@ -45,7 +45,11 @@ function getChordMask(currentChord: any): number {
  * maj/min 3rd or 6th over a chord of the opposite quality reads as a wrong-note
  * clash — the country chickenPick (3rds) and 6th double-stops. #855.
  */
-function consonantDoubleStopInterval(base: number, candidates: number[], chord: any): number {
+export function consonantDoubleStopInterval(
+    base: number,
+    candidates: number[],
+    chord: any,
+): number {
     const mask = getChordMask(chord);
     const root = (((chord?.rootMidi ?? 0) % 12) + 12) % 12;
     for (const iv of candidates) {
