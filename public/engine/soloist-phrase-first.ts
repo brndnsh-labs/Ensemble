@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
-import type { EnsembleState, Mutable } from '../types.js';
+import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
+import { resolveSoloistStyle } from './soloist-config.js';
 import { guitarDoubleStopVoice } from './soloist-devices.js';
 import { allowsSoloistPolyphony } from './soloist-mode-policy.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
@@ -637,6 +638,66 @@ export function getSoloistNotePhraseFirst(
     }
     const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
 
+    // --- Expressive "cry": bend-and-release on a sustained note (#869) ---
+    // The complement to the entry-scoop (`bendStartInterval`): where the scoop
+    // bends UP INTO a note at onset, the cry lets a SUSTAINED note speak, then
+    // bends it UP to a chord tone mid-ring and releases back — the vocal "cry" of
+    // a blues/rock lead (B.B. King). Kept rare and structural per the §10 restraint
+    // lesson (phrase-first sounds great BECAUSE it's sparse; devices punctuate,
+    // they don't tic):
+    //   • blues / rock only — the vocal string-bend idioms (country has its own
+    //     bend, #870; jazz/bossa/funk don't cry; metal leans on runs over the cry);
+    //   • on a SUSTAINED note (≥ 1.5 beats) — the held phrase-ender a player leans
+    //     into and cries. Sustain, not downbeat, is the right structural signal:
+    //     phrase-first lands strong beats on short guide tones and saves the long
+    //     rings for phrase ends (often off the beat) — that held note IS the cry's
+    //     home. The big apex reach owns its own expression, so exclude the apex and
+    //     its flurry (those notes already vibrato/scoop) — the cry lives in the
+    //     long stretches BETWEEN peaks, spreading expression across the form.
+    //   • only when the note has no entry scoop of its own (the cry owns the lead).
+    //   • targeting a real chord tone 1–2 semitones above (the b7→root whole-step
+    //     or a ½-step blue bend), so the cry always resolves to harmony — which
+    //     also makes it naturally selective;
+    //   • sparse, gated by a per-(step,loop) hash so it punctuates rather than tics.
+    // Coexists with the double-stop punctuation below by design — the legacy rule is
+    // "the cry belongs to the lead voice": the harmony holds while the lead bends.
+    // `style` arrives raw (often 'smart'); resolve to the genre profile first — the
+    // same resolution the seeder does — or the gate would never fire in production.
+    let expression: SoloistExpression | undefined;
+    const cryStyle = resolveSoloistStyle(style, state.groove?.genreFeel);
+    const cryGenre = cryStyle === 'blues' || cryStyle === 'rock';
+    const cryRings = durationSteps >= Math.ceil(1.5 * stepsPerBeat);
+    if (
+        cryGenre &&
+        cryRings &&
+        !isApexStep &&
+        !inFlurry &&
+        !vibrato &&
+        bendStartInterval === 0 &&
+        scrambleHash(step * 19 + Math.max(loopCount, 0) * 11 + 5) < 0.5
+    ) {
+        // Nearest chord tone (guide or pillar) 1–2 semitones above the written
+        // note is the bend's destination; prefer the closer (½-step blue bend over
+        // the whole-step) so the cry resolves tightly. No tone within reach → no
+        // cry (keeps it grounded and sparse rather than forcing a bend to nowhere).
+        const { guides, pillars } = chordTargetTones(currentChord.rootMidi, currentChord.quality);
+        const targets = new Set([...guides, ...pillars]);
+        let peakSemitones = 0;
+        for (const up of [1, 2]) {
+            if (targets.has((midi + up) % 12)) {
+                peakSemitones = up;
+                break;
+            }
+        }
+        if (peakSemitones > 0) {
+            // Let the note speak first, cry up to the tone, then release back down
+            // before it ends — the vocal arc, not a static detune.
+            expression = {
+                bend: { peakSemitones, onsetFrac: 0.35, peakFrac: 0.62, releaseFrac: 0.85 },
+            };
+        }
+    }
+
     phr.isResting = false; // @worker-mutation
     const lead = {
         midi,
@@ -645,6 +706,7 @@ export function getSoloistNotePhraseFirst(
         timingOffset: primary.timingOffset ?? 0,
         bendStartInterval,
         vibrato,
+        expression,
         isDoubleStop: false,
     };
 
