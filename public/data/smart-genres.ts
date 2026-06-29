@@ -136,7 +136,14 @@ const GENRE_OVERRIDES: Record<string, GenreOverride> = {
         harmony: 'strings',
     },
     Country: {
-        swing: 60,
+        // A country two-step is a STRAIGHT-to-light-shuffle 8th feel (the boom-chick),
+        // not a heavy swing. It previously ran swing:60 on the *16th* grid (default
+        // sub) → a 1.5:1 laid-back-SIXTEENTHS pocket (hip-hop/neo-soul territory) that
+        // lurched against the two-step. Move it to the 8th grid where every other
+        // swung genre lives, with a light lilt (30 → ~1.22:1 8th ratio) — a hair of
+        // country bounce, not the Jazz/Blues shuffle. See swing-ratio-audit.test.ts.
+        swing: 30,
+        sub: '8th',
         drum: 'Country (Two-Step)',
         feel: 'Country',
         chord: 'strum-country',
