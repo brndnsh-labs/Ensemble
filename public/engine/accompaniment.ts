@@ -2356,9 +2356,18 @@ export function getAccompanimentNotes(
         //   boom-chick (sparse), ~0.2-0.6 = boom-CHICKA (chicka on every &) — the
         //   signature, live at the default intensity (0.35) — and >0.6 adds the "a"
         //   16th for a driving train beat.
+        // Tempo-aware density (#877): the "a" 16th fills only have room at a
+        //   relaxed-to-moderate tempo. Above a brisk two-step (~130 BPM) 16th-note
+        //   strums blur into a frantic wash — a real picker keeps the boom-chicka
+        //   EIGHTHS and drops the 16th fills as tempo climbs (the freight-train feel
+        //   IS steady 8ths, not 16ths). The & chicka stays at every tempo: it's the
+        //   genre's core identity, not a busyness lever.
+        // (the ?? 120 is only a test-mock fallback; production always sets bpm,
+        //  default 100 — both sides of 130 are exercised by country-piano-critique.)
+        const roomFor16ths = (playback.bpm ?? 120) <= 130;
         const isGhost =
             (!!stepInfo?.isOffbeat && intensity > 0.2) ||
-            (!!stepInfo?.isAOfBeat && intensity > 0.6);
+            (!!stepInfo?.isAOfBeat && intensity > 0.6 && roomFor16ths);
 
         if (isBass) {
             // why: strict R-5 — country boom-chick is a deterministic idiom

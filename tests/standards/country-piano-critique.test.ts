@@ -222,11 +222,29 @@ describe('Country Piano Critique', () => {
             expect(bar).toBe('2,6,10,14');
         }
 
-        // High drive (0.7): the "a" 16th joins for a train beat — still regular + stable.
+        // High drive (0.7) at a relaxed tempo: the "a" 16th joins for a train
+        // beat — still regular + stable. (mock has no bpm → engine reads 120,
+        // which is room for the 16ths.)
         const hi = chickaStepsPerBar(0.7, 4);
         for (const bar of hi) {
             expect(bar).toBe('2,3,6,7,10,11,14,15');
         }
+
+        // why (#877): tempo-aware density — at a fast tempo (>130 BPM) the 16th "a"
+        // fills blur into a frantic wash, so even at HIGH drive the lane drops to the
+        // boom-chicka 8ths (the freight-train feel is steady 8ths, not 16ths). The &
+        // chicka itself stays — it's the genre identity, not a busyness lever.
+        mockState.playback.bpm = 160;
+        const fastHi = chickaStepsPerBar(0.7, 4);
+        for (const bar of fastHi) {
+            expect(bar).toBe('2,6,10,14'); // 8ths only — the "a" fills dropped out
+        }
+        // And the signature boom-CHICKA still locks at the fast tempo + default drive.
+        const fastLow = chickaStepsPerBar(0.4, 4);
+        for (const bar of fastLow) {
+            expect(bar).toBe('2,6,10,14');
+        }
+        mockState.playback.bpm = undefined;
 
         // Very low drive (0.15): bare boom-chick, no chicka at all (room to breathe).
         const bare = chickaStepsPerBar(0.15, 3);
