@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { onSectionUpdate } from '../arranger-controller.js';
 import type { Section } from '../state/arranger.js';
 import { useEnsembleState } from '../ui-bridge.js';
+import type { SectionCardHandle } from './SectionCard.js';
 import { SectionCard } from './SectionCard.jsx';
 
 export function Arranger() {
@@ -11,7 +12,7 @@ export function Arranger() {
         lastInteractedSectionId: s.arranger.lastInteractedSectionId,
     }));
 
-    const sectionRefs = useRef<Record<string, any>>({});
+    const sectionRefs = useRef<Record<string, SectionCardHandle | null>>({});
 
     useEffect(() => {
         if (lastInteractedSectionId) {
@@ -73,37 +74,31 @@ export function Arranger() {
         }
     });
 
+    const renderSectionCard = (section: Section) => {
+        const index = sections.findIndex((s: Section) => s.id === section.id);
+        return (
+            <SectionCard
+                key={section.id}
+                ref={(el: SectionCardHandle | null) => {
+                    sectionRefs.current[section.id] = el;
+                }}
+                section={section}
+                index={index}
+                totalSections={sections.length}
+            />
+        );
+    };
+
     return (
         <Fragment>
             {groupedSections.map((group) => {
                 if (group.length === 1) {
-                    const section = group[0];
-                    const index = sections.findIndex((s: Section) => s.id === section.id);
-                    return (
-                        <SectionCard
-                            key={section.id}
-                            ref={(el: any) => (sectionRefs.current[section.id] = el)}
-                            section={section}
-                            index={index}
-                            totalSections={sections.length}
-                        />
-                    );
+                    return renderSectionCard(group[0]);
                 }
 
                 return (
                     <div class="section-group" key={`group-${group[0].id}`}>
-                        {group.map((section) => {
-                            const index = sections.findIndex((s: Section) => s.id === section.id);
-                            return (
-                                <SectionCard
-                                    key={section.id}
-                                    ref={(el: any) => (sectionRefs.current[section.id] = el)}
-                                    section={section}
-                                    index={index}
-                                    totalSections={sections.length}
-                                />
-                            );
-                        })}
+                        {group.map((section) => renderSectionCard(section))}
                     </div>
                 );
             })}
