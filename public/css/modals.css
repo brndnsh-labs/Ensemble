@@ -1923,8 +1923,10 @@ input[type="range"] {
     text-align: center;
 }
 
-.section-repeat-input:focus {
+.section-repeat-input:focus-visible {
     outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
+    border-radius: var(--radius-sm);
 }
 
 .section-key-select,

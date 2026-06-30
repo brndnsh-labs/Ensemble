@@ -259,8 +259,10 @@ input[type="number"] {
     font-weight: bold;
 }
 
-input[type="number"]:focus {
+input[type="number"]:focus-visible {
     outline: none;
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
+    border-radius: var(--radius-sm);
 }
 
 button {
