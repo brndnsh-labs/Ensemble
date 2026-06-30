@@ -6,7 +6,7 @@ import { sectionAtStep } from '../engine/section-overrides.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, type InstrumentModule } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import type { StyleObject } from '../ui-types.js';
 import { syncWorker } from '../worker-client.js';
@@ -18,11 +18,9 @@ import { useModalA11y } from './use-modal-a11y.js';
 
 const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
 
-type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
-
 interface StudioInstrumentConfig {
     id: string;
-    module: StudioInstrumentModule;
+    module: InstrumentModule;
     label: string;
     icon: IconName;
     summary: string;

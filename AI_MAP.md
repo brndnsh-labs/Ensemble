@@ -49,7 +49,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/soloist-seeder.ts` | Dynamic Head (Seed Melody) generation logic. | `generateSessionSeed` |
 | `public/engine/bass-engine.ts` | Bass line generation & genre resolution. | `isBassActive`, `getBassNote` |
 | `public/engine/accompaniment.ts` | Chord comping and rhythmic backing. | `getAccompanimentNotes`, `compingState` |
-| `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails`, `getScaleForChord` |
+| `public/engine/chords-engine.ts` | Chord parsing and harmonic analysis. | `getChordDetails` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles (style/rhythm/voicing). | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile` |

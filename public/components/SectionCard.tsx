@@ -63,7 +63,7 @@ interface SectionCardProps {
     totalSections: number;
 }
 
-interface SectionCardHandle {
+export interface SectionCardHandle {
     scrollIntoView: (options?: ScrollIntoViewOptions) => void;
     focusInput: () => void;
 }
