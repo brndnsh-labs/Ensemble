@@ -205,7 +205,7 @@ export function runDrumTick(
 
         // --- Section-occurrence publication (epic-form-arrangement S2) ---
         // why: Imperfect Symmetry for repeat passes. The soloist already derives this
-        // value via `getSectionContext` from its SRDC path (soloist.ts); we publish
+        // value via `getSectionContext` from its SRDC path (arranger-utils.ts); we publish
         // the same lookup onto the coordination context here so bass/drums/accomp
         // producers can diverge Verse 2 from Verse 1 without re-walking sectionMap.
         // Default 1 was already written by createCoordinationContext — we overwrite
@@ -218,7 +218,7 @@ export function runDrumTick(
 
         // --- Final-measure publication (epic-form-arrangement S4) ---
         // why: form-arranger.md P1 #6 — only the soloist senses the form's end
-        // today (`soloist.ts` derives a per-section `isLastSectionMeasure`). Bass,
+        // today (derives a per-section `isLastSectionMeasure`). Bass,
         // chords, harmony, and drums hit the loop boundary cold. Publish a clear
         // band-wide "this is the final bar of a song-mode playback that is
         // ending" signal so:
@@ -266,7 +266,7 @@ export function runDrumTick(
         //
         // Source labels live on `chord.sectionLabel` (unrollArrangement sets this
         // via `sectionLabel: roleLabel`). Substring match — same vocabulary the
-        // soloist already uses in `soloist.ts`'s `isOutro` check.
+        // soloist already uses in its `isOutro` check.
         //
         // Both fields default to -1 (sentinel "not in intro/outro section"),
         // so engines can gate cleanly:

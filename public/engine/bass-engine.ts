@@ -679,7 +679,7 @@ export function getBassNote(
     // --- Final-Bar Resolution Cascade (epic-form-arrangement S4) ---
     // why: form-arranger.md P1 #6 — when song-mode playback is ending, the band
     // should land together on the form's final downbeat. Today only the soloist
-    // senses the form's end (`soloist.ts` SRDC `conclusion` phase); the bass hits
+    // senses the form's end (SRDC `conclusion` phase); the bass hits
     // the loop boundary cold. On the final bar, play the tonic on beat 1 with
     // sustained duration (held through the bar) and emit nothing on subsequent
     // sub-beats — the "and we're done" gesture.

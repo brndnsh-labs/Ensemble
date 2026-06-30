@@ -84,7 +84,7 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 - `public/worker-client.ts` — main-thread bridge; sends full snapshots (`getSyncState()`) or deltas (`syncWorker()`).
 - `public/logic-worker.ts` — orchestrates note generation, buffer fills, resolution handling, MIDI export.
 - `public/engine/scheduler-core.ts` — real-time scheduler consuming worker buffers; timing is based on `playback.audio.currentTime`, not UI clocks.
-- Musical engines: `soloist.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (15+ genre strategies).
+- Musical engines: `soloist-phrase-first.ts`, `bass-engine.ts`, `accompaniment.ts`, `chords-engine.ts`, `harmonies.ts`, `grooves/` (13 genre strategies).
 
 ### Visualizer Pipeline (separate OffscreenCanvas worker)
 

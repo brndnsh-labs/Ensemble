@@ -28,7 +28,7 @@ Miss any one and the worker silently runs on a snapshot from before the change. 
 
 ## What to read
 
-- **The diff first.** Anything under `public/state/`, `public/state.ts`, `public/worker-client.ts`, `public/logic-worker.ts`, `public/worker-types.ts`, `public/types.ts`, or any engine module the worker imports (`public/engine/soloist.ts`, `bass-engine.ts`, `harmonies.ts`, `accompaniment.ts`, `chords-engine.ts`, `tick-logic.ts`, etc.).
+- **The diff first.** Anything under `public/state/`, `public/state.ts`, `public/worker-client.ts`, `public/logic-worker.ts`, `public/worker-types.ts`, `public/types.ts`, or any engine module the worker imports (`public/engine/soloist-phrase-first.ts`, `bass-engine.ts`, `harmonies.ts`, `accompaniment.ts`, `chords-engine.ts`, `tick-logic.ts`, etc.).
 - **`public/state.ts:40`** — `getSyncState()`. Inspect what the snapshot includes for each mirrored slice. Pay attention to spread patterns (`...slice`) vs. explicit field lists — spread captures new fields automatically, explicit lists do not.
 - **`public/worker-client.ts:163`** — `syncWorker()`. Inspect how deltas are decided. If it just re-runs `getSyncState()`, full snapshot is shipped on every dispatch (correct but expensive). If it ships a partial keyed on the action, the partial must include every field the action could have touched.
 - **`public/logic-worker.ts:50`** — `case WORKER_MSG.SYNC_STATE` handler. Inspect how the incoming payload is applied to the worker's local signal copies. Spread vs. explicit assignment matters here too.

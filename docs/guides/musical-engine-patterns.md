@@ -33,7 +33,7 @@ Look for any of the five per test file, then verify the engine against the *name
 
 When you want an engine to shape its output based on musical structure (phrase position, section position, loop count, role), the proven recipe:
 
-1. **Planner / scheduler derives the structural fact** in the layer that already knows it. Phrase-end markers belong in the rhythm planner (`soloist-rhythm-engine.ts`) because it builds the phrase; SRDC phase belongs in the plan-build site (`soloist.ts:preparePhraseResponseContext`) because it already calls `getSectionContext`. Don't try to re-derive structure at the picker layer.
+1. **Planner / scheduler derives the structural fact** in the layer that already knows it. Phrase-end markers belong in the rhythm planner (`soloist-rhythm-engine.ts`) because it builds the phrase; SRDC phase belongs in the plan-build site that already calls `getSectionContext` (`public/engine/arranger-utils.ts`). Don't try to re-derive structure at the picker layer.
 
 2. **Attach the fact to the work unit.** Phrase-end marks ride on the rhythm node (`isPhraseEnd: true`). SRDC phase rides on the phrase context (`phrase.context.srdcState`). The work unit is the unit of musical thought; the structural fact should travel with it.
 
