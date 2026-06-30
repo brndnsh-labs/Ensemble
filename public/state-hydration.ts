@@ -85,6 +85,11 @@ function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
 
 function decompressBandSettings(str: string): any {
     try {
+        // Bound untrusted `bnd` share-URL input before decode/parse to prevent
+        // memory exhaustion — mirrors the 100KB cap in decompressSections (utils.ts).
+        if (!str || typeof str !== 'string' || str.length > 102400) {
+            return null;
+        }
         const json = decodeBase64Unicode(str);
         return JSON.parse(json);
     } catch (e) {

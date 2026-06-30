@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadFromUrl } from '../../../public/state-hydration.js';
 import { ACTIONS } from '../../../public/types.js';
 
-const { dispatchSpy, mockState } = vi.hoisted(() => {
+const { dispatchSpy, decodeSpy, mockState } = vi.hoisted(() => {
     return {
         dispatchSpy: vi.fn(),
+        decodeSpy: vi.fn(),
         mockState: {
             arranger: { key: 'C', timeSignature: '4/4', notation: 'roman', sections: [] },
             groove: { genreFeel: 'Rock', lastSmartGenre: 'Rock', instruments: [] },
@@ -27,6 +28,19 @@ vi.mock('../../../public/state.js', () => ({
 vi.mock('../../../public/app-controller.js', () => ({
     applyTheme: vi.fn(),
 }));
+
+// Preserve real utils; wrap decodeBase64Unicode in a spy so we can assert the
+// `bnd` size-cap short-circuits BEFORE the (expensive) decode attempt.
+vi.mock('../../../public/utils.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../public/utils.js')>();
+    return {
+        ...actual,
+        decodeBase64Unicode: (s: string) => {
+            decodeSpy(s);
+            return actual.decodeBase64Unicode(s);
+        },
+    };
+});
 
 describe('Security: URL Parameter Validation', () => {
     beforeEach(() => {
@@ -137,5 +151,26 @@ describe('Security: URL Parameter Validation', () => {
         window.location.search = '?key=<script>';
         loadFromUrl();
         expect(mockState.arranger.key).toBe('C');
+    });
+
+    it('caps oversized bnd parameter before decoding (prevents memory-exhaustion DoS)', () => {
+        decodeSpy.mockClear();
+        // > 102400-char cap (mirrors decompressSections). Without the guard this
+        // would be base64-decoded + JSON.parsed before failing — the DoS surface.
+        const oversized = 'A'.repeat(102401);
+        window.location.search = `?bnd=${oversized}`;
+        expect(() => loadFromUrl()).not.toThrow();
+        // The cap must short-circuit ahead of the decode, not merely fail at JSON.parse.
+        expect(decodeSpy).not.toHaveBeenCalledWith(oversized);
+    });
+
+    it('still decodes a within-limit bnd parameter', () => {
+        decodeSpy.mockClear();
+        // Under the cap: decode IS attempted (then parse fails → null), proving the
+        // guard rejects only oversized input, not all `bnd` values.
+        const withinLimit = 'A'.repeat(100);
+        window.location.search = `?bnd=${withinLimit}`;
+        loadFromUrl();
+        expect(decodeSpy).toHaveBeenCalledWith(withinLimit);
     });
 });
