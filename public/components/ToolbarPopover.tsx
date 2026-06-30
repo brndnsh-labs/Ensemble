@@ -163,6 +163,29 @@ export function ToolbarPopover({
         };
     }, [align, isOpen]);
 
+    const panelContent = (
+        <div
+            ref={panelRef}
+            id={panelId}
+            class={[
+                'workspace-toolbar-panel',
+                'workspace-toolbar-panel--fixed',
+                panelClassName,
+                isOpen ? 'is-open' : '',
+            ]
+                .filter(Boolean)
+                .join(' ')}
+            role="dialog"
+            aria-label={panelLabel}
+            aria-hidden={!isOpen}
+            style={panelStyle}
+            onBlurCapture={handleFocusExit}
+            onClick={(event) => event.stopPropagation()}
+        >
+            {typeof children === 'function' ? children({ closePopover, isOpen }) : children}
+        </div>
+    );
+
     return (
         <>
             <div
@@ -194,54 +217,9 @@ export function ToolbarPopover({
                     {triggerContent}
                 </button>
             </div>
-            {typeof document !== 'undefined' && document.body ? (
-                createPortal(
-                    <div
-                        ref={panelRef}
-                        id={panelId}
-                        class={[
-                            'workspace-toolbar-panel',
-                            'workspace-toolbar-panel--fixed',
-                            panelClassName,
-                            isOpen ? 'is-open' : '',
-                        ]
-                            .filter(Boolean)
-                            .join(' ')}
-                        role="dialog"
-                        aria-label={panelLabel}
-                        aria-hidden={!isOpen}
-                        style={panelStyle}
-                        onBlurCapture={handleFocusExit}
-                        onClick={(event) => event.stopPropagation()}
-                    >
-                        {typeof children === 'function'
-                            ? children({ closePopover, isOpen })
-                            : children}
-                    </div>,
-                    document.body,
-                )
-            ) : (
-                <div
-                    ref={panelRef}
-                    id={panelId}
-                    class={[
-                        'workspace-toolbar-panel',
-                        'workspace-toolbar-panel--fixed',
-                        panelClassName,
-                        isOpen ? 'is-open' : '',
-                    ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    role="dialog"
-                    aria-label={panelLabel}
-                    aria-hidden={!isOpen}
-                    style={panelStyle}
-                    onBlurCapture={handleFocusExit}
-                    onClick={(event) => event.stopPropagation()}
-                >
-                    {typeof children === 'function' ? children({ closePopover, isOpen }) : children}
-                </div>
-            )}
+            {typeof document !== 'undefined' && document.body
+                ? createPortal(panelContent, document.body)
+                : panelContent}
         </>
     );
 }
