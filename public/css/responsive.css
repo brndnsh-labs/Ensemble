@@ -69,7 +69,12 @@
         padding: 0.82rem;
         padding-bottom: calc(0.82rem + env(safe-area-inset-bottom));
         transform: none;
-        animation: workspaceStudioSurfaceMobileIn 180ms ease-out;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .workspace-studio-surface--modal {
+            animation: workspaceStudioSurfaceMobileIn 180ms ease-out;
+        }
     }
 
     .workspace-studio-surface-body {

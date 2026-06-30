@@ -57,9 +57,13 @@ body.modal-open {
     color: var(--text-color);
     display: flex;
     flex-direction: column;
+}
 
+@media (prefers-reduced-motion: no-preference) {
     /* Default Entrance */
-    animation: modal-in var(--anim-normal) var(--anim-ease) forwards;
+    .settings-content {
+        animation: modal-in var(--anim-normal) var(--anim-ease) forwards;
+    }
 }
 
 .closing .settings-content {
@@ -1875,8 +1879,10 @@ input[type="range"] {
         box-shadow var(--anim-normal);
 }
 
-.section-prog-input.mutated {
-    animation: mutated-pulse 1s var(--anim-ease);
+@media (prefers-reduced-motion: no-preference) {
+    .section-prog-input.mutated {
+        animation: mutated-pulse 1s var(--anim-ease);
+    }
 }
 
 @keyframes mutated-pulse {
