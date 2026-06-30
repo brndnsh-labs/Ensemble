@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import { dispatch, getState } from '../state.js';
-import { ACTIONS, type InstrumentVoice } from '../types.js';
+import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
 const { playback } = getState();
@@ -15,17 +15,16 @@ import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
 import { ButtonGroup, Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
 
-type StudioInstrumentModule = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 type InstrumentAudioControl = 'volume' | 'reverb';
 
-function getInstrumentState(module: StudioInstrumentModule) {
+function getInstrumentState(module: InstrumentModule) {
     return useEnsembleState((s) => {
         const key = module === 'groove' ? 'groove' : module;
         return (s as any)[key];
     });
 }
 
-function getModuleName(module: StudioInstrumentModule) {
+function getModuleName(module: InstrumentModule) {
     return module === 'groove'
         ? 'drum'
         : module === 'chords'
@@ -35,7 +34,7 @@ function getModuleName(module: StudioInstrumentModule) {
             : module;
 }
 
-function getInstrumentSpecificTitle(module: StudioInstrumentModule) {
+function getInstrumentSpecificTitle(module: InstrumentModule) {
     return module === 'groove'
         ? 'Feel & Actions'
         : module === 'chords' || module === 'harmony'
@@ -44,7 +43,7 @@ function getInstrumentSpecificTitle(module: StudioInstrumentModule) {
 }
 
 function updateInstrumentAudio(
-    module: StudioInstrumentModule,
+    module: InstrumentModule,
     type: InstrumentAudioControl,
     val: string | number,
 ) {
@@ -72,7 +71,7 @@ function updateInstrumentAudio(
 }
 
 interface InstrumentMixerStripProps {
-    module: StudioInstrumentModule;
+    module: InstrumentModule;
     accent?: string;
     iconName?: IconName;
     label?: string;
@@ -158,7 +157,7 @@ export function InstrumentMixerStrip({
  * Renders only for instruments that actually have packs; pack *management*
  * (install/remove) lives in the gear's Packs tab.
  */
-function InstrumentSoundSource({ module }: { module: StudioInstrumentModule }) {
+function InstrumentSoundSource({ module }: { module: InstrumentModule }) {
     const { voice, autoSound } = useEnsembleState((s) => {
         const m = (s as any)[module];
         return { voice: m.voice as InstrumentVoice, autoSound: m.autoSound as boolean };
@@ -221,7 +220,7 @@ function InstrumentSoundSource({ module }: { module: StudioInstrumentModule }) {
 }
 
 interface InstrumentSpecificSettingsProps {
-    module: StudioInstrumentModule;
+    module: InstrumentModule;
 }
 
 export function InstrumentSpecificSettings({ module }: InstrumentSpecificSettingsProps) {
