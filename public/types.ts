@@ -671,10 +671,14 @@ export interface SoloistPhraseContext {
     sectionLabel: string | null;
     sectionOccurrence: number;
     /**
-     * SRDC arc position (Statement / Restatement / Departure / Conclusion).
-     * Derived per phrase from sectionContext + section labels in soloist.ts
-     * (`deriveSrdcPhase`). Read by the pitch picker to bias chord-tone weight
-     * — Conclusion lifts, Departure depresses. Lowercase canonical form.
+     * SRDC arc position (Statement / Restatement / Departure / Conclusion),
+     * derived per phrase from sectionContext + section labels. Lowercase
+     * canonical form. Used to drive a chord-tone-weight pitch bias in the
+     * legacy soloist picker (Conclusion lifts, Departure depresses); that
+     * picker was deleted with epic #10 and the bias is currently
+     * unimplemented in the phrase-first engine (re-port tracked in #891).
+     * The only live consumer today is the `=== 'restatement'` motif-echo
+     * gate in `soloist-rhythm-engine.ts`.
      */
     srdcState: SrdcPhase;
     /**
@@ -837,8 +841,11 @@ export interface SoloistAudio {
 
 /**
  * SRDC arc position — Statement / Restatement / Departure / Conclusion.
- * Lowercase canonical form. Derived per phrase by `deriveSrdcPhase` in
- * soloist.ts and read by the pitch picker to bias chord-tone weight.
+ * Lowercase canonical form. Originally derived per phrase to bias the
+ * legacy picker's chord-tone weight; that picker was deleted with epic #10
+ * and the bias is currently unimplemented in the phrase-first engine
+ * (re-port tracked in #891). The only live consumer today is the
+ * `=== 'restatement'` motif-echo gate in `soloist-rhythm-engine.ts`.
  */
 export type SrdcPhase = 'statement' | 'restatement' | 'departure' | 'conclusion';
 
@@ -891,11 +898,13 @@ export interface SoloistState {
 
     /**
      * @test-only Top-level SRDC-phase override. Production never writes this —
-     * the canonical phase lives at `session.currentPhrase.context.srdcState`
-     * (written every tick by `deriveSrdcPhase`). The pitch picker reads this
-     * top-level slot FIRST (see `selectPitchAndDevices` in
-     * soloist-pitch-engine.ts) so critique tests can pin a phase on the mock
-     * without it being clobbered by per-tick production writes.
+     * the canonical phase lives at `session.currentPhrase.context.srdcState`.
+     * This override slot fed the legacy picker's chord-tone-weight pitch
+     * bias, which was deleted with epic #10; that bias is currently
+     * unimplemented in the phrase-first engine (re-port tracked in #891), so
+     * this field has no live reader today. Left in place for the dropped
+     * legacy critique test's shape (see soloist-musicality.test.ts) and any
+     * future re-port.
      */
     readonly srdcState?: SrdcPhase;
 }
