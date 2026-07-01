@@ -163,7 +163,7 @@ const CHORD_CMAJ7 = {
     sectionId: 'sec-outro',
 };
 
-function makeGuitarChordsTickState(voice: InstrumentVoice) {
+function makeGuitarChordsTickState(voice: InstrumentVoice, genre = 'Rock') {
     return {
         arranger: {
             totalSteps: FORM_STEPS,
@@ -205,6 +205,7 @@ function makeGuitarChordsTickState(voice: InstrumentVoice) {
         harmony: { enabled: false, style: 'smart', complexity: 0.5, lastMidis: [] },
         groove: {
             enabled: false,
+            genreFeel: genre,
             measures: 1,
             instruments: [],
             fillActive: false,
@@ -291,5 +292,88 @@ describe('Power-chord voicing — played freq through generateNotesForStep (#698
         // A grand-piano Cmaj7 cadence keeps its third (E, pc 4) — proof the
         // power-chord reduction did NOT fire for a non-guitar voice.
         expect(playedPcs.has(4), 'grand cadence should retain the major third').toBe(true);
+    });
+
+    it('Metal drops the power chord to the E2 chug register (still no third)', () => {
+        // Metal + crunch guitar → the reduction anchors to E2 (MIDI 40) and uses
+        // the relaxed 'chords-guitar-low' slot, so the chug sits DOWN in the bass
+        // register instead of riding the ~E3 chords floor. (Brandon's ear, #698.)
+        const state = makeGuitarChordsTickState(
+            'pack:electric-guitar-rhythm' as InstrumentVoice,
+            'Metal',
+        );
+        getState.mockReturnValue(state);
+        const cursors = {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+
+        const { notes } = generateNotesForStep(state, FINAL_DOWNBEAT, cursors, {
+            includeSoloist: false,
+            includeBass: false,
+            includeChords: true,
+            includeHarmony: false,
+            includeDrums: false,
+        });
+
+        const chordNotes = notes.filter(
+            (n: any) => n.module === 'chords' && !n.muted && n.freq > 0,
+        );
+        expect(chordNotes.length).toBeGreaterThanOrEqual(2);
+
+        const playedMidis = chordNotes.map((n: any) =>
+            Math.round(69 + 12 * Math.log2(n.freq / 440)),
+        );
+        const lowest = Math.min(...playedMidis);
+
+        // The lowest voice must sit in the E2 octave [40, 51] — well below the
+        // standard chords floor (52). A regression that lost the low-anchor would
+        // land it at ~E3 (60) and fail here.
+        expect(lowest, `metal chug too high: lowest=${lowest}`).toBeGreaterThanOrEqual(40);
+        expect(lowest, `metal chug not dropped: lowest=${lowest}`).toBeLessThanOrEqual(51);
+        // Ceiling still enforced by 'chords-guitar-low' (max 72).
+        expect(Math.max(...playedMidis)).toBeLessThanOrEqual(72);
+        // Still a power chord — no third in the PLAYED pitch.
+        for (const m of playedMidis) {
+            const pc = ((m % 12) + 12) % 12;
+            expect(pc === 0 || pc === 7, `played pc ${pc} is not root/fifth`).toBe(true);
+        }
+    });
+});
+
+describe('Power-chord low-anchor (Metal chug placement, #698)', () => {
+    it('relocates the whole voicing to the E2 octave, preserving root/fifth pcs', () => {
+        // A Cmaj7 comp voicing sitting at ~E3-E4 (60-71) → anchored to E2 (40).
+        const src = [60, 64, 67, 71].map((midi) => ({ midi }));
+        const out = applyPowerChordVoicing(src, 60, 40);
+        const lowest = Math.min(...out.map((n) => n.midi));
+        // Lowest note lands in [40, 51] (the E2 octave).
+        expect(lowest).toBeGreaterThanOrEqual(40);
+        expect(lowest).toBeLessThanOrEqual(51);
+        // Whole-octave shift only → still root(0)/fifth(7) pcs, no third.
+        for (const n of out) {
+            const pc = ((n.midi % 12) + 12) % 12;
+            expect(pc === 0 || pc === 7).toBe(true);
+        }
+    });
+
+    it('is a no-op anchor when omitted (Rock/other keep native ~E3 register)', () => {
+        const src = [60, 64, 67].map((midi) => ({ midi }));
+        const withAnchor = Math.min(
+            ...applyPowerChordVoicing(
+                src.map((n) => ({ ...n })),
+                60,
+                40,
+            ).map((n) => n.midi),
+        );
+        const noAnchor = Math.min(
+            ...applyPowerChordVoicing(
+                src.map((n) => ({ ...n })),
+                60,
+            ).map((n) => n.midi),
+        );
+        // Anchored drops an octave; un-anchored stays put.
+        expect(noAnchor).toBeGreaterThanOrEqual(52);
+        expect(withAnchor).toBeLessThan(noAnchor);
     });
 });

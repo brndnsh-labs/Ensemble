@@ -1917,11 +1917,18 @@ interface AccompanimentCoordination {
  * comps or the synth fallback. Pitch-only: the comp's rhythm, note count, and
  * strum stagger are preserved, so only the harmony is reduced.
  *
+ * `lowAnchorMidi` (optional): after snapping, octave-shift the WHOLE voicing so
+ * its lowest note lands in `[lowAnchorMidi, lowAnchorMidi+11]` — for Metal's low
+ * palm-muted chug (root ~E2/40), which deliberately drops into the bass register
+ * (that overlap IS the metal idiom). Omitted → the voicing keeps its native
+ * register (Rock/other guitar power chords sit at ~E3, which reads right there).
+ *
  * Mutates and returns `notes` (the tick-logic consumer works on the same array).
  */
 export function applyPowerChordVoicing<T extends { midi: number }>(
     notes: T[],
     rootMidi: number,
+    lowAnchorMidi?: number,
 ): T[] {
     if (notes.length === 0 || !Number.isFinite(rootMidi)) {
         return notes;
@@ -1949,6 +1956,30 @@ export function applyPowerChordVoicing<T extends { midi: number }>(
         const dFifth = pcDelta(pc, fifthPc);
         // Nearest allowed tone; tie → root (the stronger anchor under drive).
         n.midi = midi + (Math.abs(dRoot) <= Math.abs(dFifth) ? dRoot : dFifth);
+    }
+    // Low-anchor (Metal chug): relocate the whole cluster to the E2 octave,
+    // preserving its internal root/fifth spread. Whole-octave shifts only, so
+    // pitch classes are untouched. Guard against a non-finite floor.
+    if (Number.isFinite(lowAnchorMidi as number)) {
+        const finite = notes.filter((n) => Number.isFinite(n.midi));
+        if (finite.length > 0) {
+            const anchor = lowAnchorMidi as number;
+            const lowest = Math.min(...finite.map((n) => Math.round(n.midi)));
+            let shift = 0;
+            while (lowest + shift >= anchor + 12) {
+                shift -= 12; // too high → drop an octave
+            }
+            while (lowest + shift < anchor) {
+                shift += 12; // below the floor → lift an octave
+            }
+            if (shift !== 0) {
+                for (const n of notes) {
+                    if (Number.isFinite(n.midi)) {
+                        n.midi = Math.round(n.midi) + shift;
+                    }
+                }
+            }
+        }
     }
     return notes;
 }

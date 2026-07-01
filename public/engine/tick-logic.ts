@@ -15,6 +15,11 @@ import { isPowerChordChordsVoice } from './instrument-registry.js';
 import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
 
+// #698 — Metal's crunch power chords anchor to E2 (MIDI 40), the standard-tuning
+// low-E chug, dropping into the bass register on purpose (bass doubles the root).
+// Paired with the 'chords-guitar-low' register slot in coordination-engine.
+const METAL_POWER_CHORD_ANCHOR = 40;
+
 export interface TickCursors {
     mainCursor: { index: number; sectionIndex: number };
     lookaheadCursor: { index: number; sectionIndex: number };
@@ -245,14 +250,25 @@ export function generateNotesForStep(
             // #698 — crunch rhythm-guitar chords play POWER CHORDS: reduce the
             // comp voicing to root+5(+oct) before register slotting so distorted
             // triads don't mud up. Pitch-only + gated on the synced voice, so it
-            // never touches the piano/organ comps or the synth fallback.
-            if (isPowerChordChordsVoice(state.chords.voice)) {
-                applyPowerChordVoicing(chordNotes, chord.rootMidi);
+            // never touches the piano/organ comps or the synth fallback. On METAL
+            // the chug drops an octave to E2 (`METAL_POWER_CHORD_ANCHOR`) and uses a
+            // relaxed register slot ('chords-guitar-low') so it stays down in the
+            // bass register — that overlap is the metal idiom. Rock/other guitar
+            // power chords keep the standard chords slot (~E3), which reads right.
+            const powerChords = isPowerChordChordsVoice(state.chords.voice);
+            const metalLowChug = powerChords && state.groove.genreFeel === 'Metal';
+            if (powerChords) {
+                applyPowerChordVoicing(
+                    chordNotes,
+                    chord.rootMidi,
+                    metalLowChug ? METAL_POWER_CHORD_ANCHOR : undefined,
+                );
             }
+            const chordsSlot = metalLowChug ? 'chords-guitar-low' : 'chords';
             for (let i = 0; i < chordNotes.length; i++) {
                 const n = chordNotes[i];
                 // Enforce Contract: Register Slotting
-                n.midi = enforceRegisterSlotting('chords', n.midi, coordination);
+                n.midi = enforceRegisterSlotting(chordsSlot, n.midi, coordination);
 
                 // Recompute freq from the SNAPPED + CLAMPED midi, ALWAYS — mirror
                 // the harmony lane's B8 fix (#709). The scheduler plays `freq`, not

@@ -505,6 +505,15 @@ export function enforceRegisterSlotting(
             // Chords/Harmony: 52 to 84 (when Bass is present/active)
             return smoothOctaveClamp(midi, 52, 84, targetMidi);
 
+        case 'chords-guitar-low':
+            // #698 — the crunch rhythm guitar on METAL plays power chords an octave
+            // low (the E2 palm-muted chug), deliberately entering the bass register.
+            // That overlap IS the metal idiom — the bass doubles/supports the
+            // guitar's low root. A relaxed floor (40 = E2) so slotting keeps the
+            // chug down instead of pulling it back to the standard chords slot; the
+            // ceiling (72) stays sane so octave doublings don't fly off the top.
+            return smoothOctaveClamp(midi, 40, 72, targetMidi);
+
         case 'soloist':
             // Soloist: Priority 60 to 90, but has free range.
             // We clamp if it's hitting bass frequencies (now raised to 52).
