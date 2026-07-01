@@ -39,7 +39,8 @@ export const GENRE_SOUND_MAP: Readonly<
     //   • hammond  → tonewheel-organ genres (reggae bubble, blues/gospel, the
     //                2-tone ska skank that pairs with the horns)
     //   • clavinet → funk's percussive plucked comp
-    //   • synth    → Metal (no acoustic-keys idiom → keep the synth)
+    //   • electric-guitar-rhythm → Metal's crunch power chords (#698)
+    //   • grand    → Rock (stays the piano; users can override to the guitar)
     // harmony — the section answering the changes (horns vs. string pad vs. synth).
     // soloist — three real leads, each only where idiomatic (everything else keeps
     //   the synth lead — one voice on every genre would wear thin):
@@ -63,7 +64,11 @@ export const GENRE_SOUND_MAP: Readonly<
         soloist: 'pack:electric-guitar-clean',
         groove: 'pack:acoustic-kit',
     },
-    Metal: { harmony: 'pack:horns-section' },
+    // Metal — crunch rhythm guitar on the chords (#698): the chords engine
+    // reduces to power chords (root+5+oct) under this voice, since distorted
+    // triads mud up. Rock keeps the grand piano (Brandon's call — stay close to
+    // today's default; users can hand-override to the guitar).
+    Metal: { chords: 'pack:electric-guitar-rhythm', harmony: 'pack:horns-section' },
     'Ska-Punk': {
         chords: 'pack:hammond-organ',
         harmony: 'pack:horns-section',
@@ -121,7 +126,6 @@ export const GENRE_SOUND_MAP: Readonly<
     'Neo-Soul': { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
     // Hip Hop — Rhodes keys (#655); groove stays the synth kit (programmed beats).
     'Hip Hop': { chords: 'pack:rhodes' },
-    // Metal chords — no acoustic-keys idiom → synth pad.
 };
 
 /**

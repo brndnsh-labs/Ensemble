@@ -78,6 +78,10 @@ export function getSyncState() {
             enabled: chords.enabled,
             volume: chords.volume,
             rhythmicMask: chords.rhythmicMask,
+            // #698 — the chords voice now drives NOTE GENERATION (power-chord
+            // voicing for the crunch rhythm-guitar pack), so the worker needs it.
+            // Previously voice was a main-thread-only audio-routing concern.
+            voice: chords.voice,
         },
         bass: {
             style: bass.style,

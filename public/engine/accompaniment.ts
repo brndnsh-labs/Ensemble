@@ -1902,6 +1902,58 @@ interface AccompanimentCoordination {
 }
 
 /**
+ * Reduce a comp voicing to a POWER CHORD in place (#698). Every emitted chord
+ * note is snapped to the nearest tone of the power-chord set — root or perfect
+ * fifth (pitch-classes `{rootPc, rootPc+7}`; the octave shares the root's class)
+ * — by the *smallest* semitone move (≤6, so the note stays in its register and
+ * the voicing's rough shape/spread survives). Thirds, sevenths, and extensions
+ * all collapse onto root/fifth, so **no third survives**.
+ *
+ * Why: a distorted electric guitar plays power chords precisely because major/
+ * minor *thirds* clash under drive (the third beating against the root/fifth
+ * turns to mud through the distortion). Full triads through the crunch rhythm pack sound
+ * wrong; root+5(+oct) is the idiom. Gated in `tick-logic` on the crunch rhythm
+ * guitar being the *loaded* chords voice — so it never touches the piano/organ
+ * comps or the synth fallback. Pitch-only: the comp's rhythm, note count, and
+ * strum stagger are preserved, so only the harmony is reduced.
+ *
+ * Mutates and returns `notes` (the tick-logic consumer works on the same array).
+ */
+export function applyPowerChordVoicing<T extends { midi: number }>(
+    notes: T[],
+    rootMidi: number,
+): T[] {
+    if (notes.length === 0 || !Number.isFinite(rootMidi)) {
+        return notes;
+    }
+    const rootPc = (((rootMidi % 12) + 12) % 12) | 0;
+    const fifthPc = (rootPc + 7) % 12;
+    // signed distance (semitones, in [-6, 6]) to move pitch-class `from` → `to`.
+    const pcDelta = (from: number, to: number): number => {
+        let d = (((to - from) % 12) + 12) % 12;
+        if (d > 6) {
+            d -= 12;
+        }
+        return d;
+    };
+    for (const n of notes) {
+        if (!Number.isFinite(n.midi)) {
+            continue;
+        }
+        const midi = Math.round(n.midi);
+        const pc = (((midi % 12) + 12) % 12) | 0;
+        if (pc === rootPc || pc === fifthPc) {
+            continue; // already a power-chord tone — leave it (and its octave) put
+        }
+        const dRoot = pcDelta(pc, rootPc);
+        const dFifth = pcDelta(pc, fifthPc);
+        // Nearest allowed tone; tie → root (the stronger anchor under drive).
+        n.midi = midi + (Math.abs(dRoot) <= Math.abs(dFifth) ? dRoot : dFifth);
+    }
+    return notes;
+}
+
+/**
  * Main entry point for generating accompaniment notes.
  * Returns an array of standardized Note Objects.
  *

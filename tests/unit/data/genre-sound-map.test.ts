@@ -55,8 +55,9 @@ describe('genre → sound map (#675)', () => {
             Blues: 'pack:hammond-organ',
             'Ska-Punk': 'pack:hammond-organ',
             Funk: 'pack:clavinet',
-            // Metal keeps the synth keyboard (no acoustic-keys idiom).
-            Metal: 'synth',
+            // Metal — crunch rhythm guitar power chords (#698). Rock stays the
+            // grand (Brandon's call: close to today's default, users can override).
+            Metal: 'pack:electric-guitar-rhythm',
         };
 
         it('maps every canonical genre to its decided chords voice (installed)', () => {

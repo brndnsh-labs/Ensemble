@@ -279,6 +279,35 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         reverbSend: 1.2,
     },
     {
+        id: 'electric-guitar-rhythm',
+        name: 'Rhythm Electric (Crunch)',
+        description:
+            'A crunchy rhythm electric — power chords / driven strums for Rock & Metal chords.',
+        attribution:
+            'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
+        approxSizeMB: 0.7,
+        instruments: ['chords'],
+        // Rhythm-guitar CHORDS voice (#698). Same 13 crunch zones as the driven
+        // LEAD pack (electric-guitar-driven) — a distinct catalog id so the chord
+        // seat calibrates independently of the lead seat (`gain`/`reverbSend` are
+        // per-pack-id). The chords engine reduces its voicings to POWER CHORDS
+        // (root+5+oct) when this voice is active — distorted triads mud up (the
+        // thirds clash under drive), which is the whole reason a guitar plays
+        // power chords (`applyPowerChordVoicing`, tick-logic gate).
+        // GAIN calibrated 2026-07-01 via `mix-report --calibrate-pack=chords:electric-guitar-rhythm`
+        // (RMS-match to the synth chords baseline). Suggested 4.157× (mean Δ 0.33
+        // dB across rock/blues/jazz/funk); seated at 4.2×. The pack reads +481 Hz
+        // brighter than the synth chords — a candidate darkening `toneTiltDb`, left
+        // for the ear-lock on ensembletest. Ear-lock on ensembletest.
+        gain: 4.2,
+        // Amp-sim tone, no recorded room — lift the send so it shares the band's
+        // space (mirrors the driven lead). By-ear start.
+        reverbSend: 1.2,
+        // A re-voice for a tighter, more mid-focused RHYTHM crunch (the shared
+        // zones are voiced for a LEAD) is a by-ear follow-up — re-bake from the
+        // clean source like the driven lead. This first cut reuses the lead crunch.
+    },
+    {
         id: 'strings-ensemble',
         name: 'String Ensemble',
         description: 'A sampled violin-ensemble pad — real sustained strings for the harmony.',
