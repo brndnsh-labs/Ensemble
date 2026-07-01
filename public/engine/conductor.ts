@@ -312,6 +312,18 @@ export function checkSectionTransition(
                     ),
                 );
             }
+            // #796: apply the per-genre intensity floor on the LIVE seeded path too.
+            // `GENRE_INTENSITY_FLOORS` was previously read only in the
+            // targetEnergy-undefined fallback branch, which the seeded window makes
+            // unreachable — so funk/disco/neo-soul/ska verses rode below their genre
+            // floor and never crossed their signature drum gates (e.g. funk's 0.5
+            // 16th-hat shimmer). Applied AFTER the loop-arc multiplier so the floor is a
+            // hard minimum the arc-release can't sink below, mirroring the fallback's
+            // late-stage `GENRE_INTENSITY_FLOORS` clamp.
+            const genreFloor = GENRE_INTENSITY_FLOORS[groove.genreFeel];
+            if (genreFloor !== undefined) {
+                targetEnergy = Math.max(genreFloor, targetEnergy);
+            }
             // why: when the upcoming measure falls inside a section with a
             // `targetIntensity` override, size the per-tick stepSize to close
             // that gap (not the orchestration-map target). Without this, an
@@ -629,6 +641,19 @@ export function checkSectionTransition(
                                     ),
                             ),
                         );
+                    }
+                    // #796: floor the seeded TRANSITION emission too — the paired
+                    // seeded dispatch site. The mid-section seeded path is floored
+                    // above, but a verse that begins AT a section boundary reaches
+                    // *this* dispatch with its raw seeded `energyLevel` (the
+                    // GENRE_INTENSITY_FLOORS clamp lives only in the undefined-
+                    // targetEnergy fallback branch), so without this it lands below
+                    // the genre floor on the downbeat and funk's 0.5 shimmer gate
+                    // never trips. Applied after the loop-arc multiplier so the floor
+                    // stays a hard minimum the arc can't sink below.
+                    const genreFloor = GENRE_INTENSITY_FLOORS[groove.genreFeel];
+                    if (genreFloor !== undefined) {
+                        arcedTarget = Math.max(genreFloor, arcedTarget);
                     }
                     const overrideTarget = effectiveTargetIntensity(
                         state,
