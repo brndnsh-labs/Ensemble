@@ -59,16 +59,46 @@ staging push; prod is the gated awake-only call) and §4 (gates).
    Green when the live hash equals the Built REV. That one call proves the build
    deployed, nginx is serving it over the edge (200), and the bundle is current. A
    **stale hash** = rsync didn't land or an edge/browser cache is in front — not an
-   app issue (there's no app). Done — hand back.
+   app issue (there's no app).
 
-4. **Report** one line: Built REV + that the live asset hash matches. Nothing more
-   unless asked.
+4. **Check-in — what to test (the point of a test deploy).** The session is headless
+   (no audio/display), so *Brandon* is the ear/eyes — hand him a tight, per-change
+   checklist instead of a bare SHA. **Derive it, don't invent it:**
+   - **What shipped** = the delta the deploy already printed (`git log <live>..HEAD`,
+     the `📦`/`🆕` lines). For each shipped issue, pull its **Acceptance** field
+     (`gh issue view <n>` — Acceptance *is* "what should be true now") and its **Track**.
+   - **Frame each item by Track** (one line each — what changed → how to verify):
+     *musical* → by ear (what to listen for); *synth* → A/B the voice; *UI* → what to
+     look at / interact with; *bundle* or **pure-internal/parity** (worker/export,
+     types, coordination with no audible surface) → "nothing to eyeball — here's the
+     **regression** to watch for" (name the thing that would break if it went wrong).
+   - Keep it to the shipped change(s). No generic "click around" filler.
+
+   **Verdict — only when there's an observable surface** (per Brandon's pref): if any
+   shipped item is *musical / synth / UI* (or the diff touched an audible/visible path),
+   ask via **AskUserQuestion**: **Works** · **Something's off** · **Haven't checked**.
+   - **Works** → note it; hand back.
+   - **Haven't checked** → leave the checklist; hand back (he'll eyeball later).
+   - **Something's off** → **capture, then ask** (his pref): write down exactly what's
+     wrong (his notes + the shipped delta/PR), *then* offer **file a regression issue
+     (via `/intake` classification) · fix-forward · revert** and act on the pick. A
+     post-merge "off" is a regression — don't let it evaporate.
+
+   If **nothing observable** (pure-internal/parity), **skip the verdict menu** — print
+   the checklist + the regression-to-watch line and hand back. (Honors "keep test light":
+   no forced tap when there's nothing to see.)
+
+5. **Report** one line: Built REV + that the live asset hash matches, then the check-in
+   (checklist, and the verdict outcome if one was asked). Nothing more unless asked.
 
 ## Autonomous use (pipeline)
 Per DOCTRINE §6, `/deploy-test` **may run unattended after a merge to `main`** — test
 is a private box and the deploy is non-destructive (static rsync, no DB, no users).
 When invoked that way: deploy `main`'s HEAD with `--quiet`, run the step-3 hash
-confirm, and report the SHA. **Prod is never automatic** — see `/deploy-prod`.
+confirm, and report the SHA. **Skip the step-4 verdict menu** (no one is awake to
+answer) — but still **emit the derived checklist** as text so it lands in the morning
+report / smoke-test list (this is exactly what `/nightly` folds in). **Prod is never
+automatic** — see `/deploy-prod`.
 
 ## Troubleshooting (only when the confirm fails)
 - **Hash stale but rsync reported success** → edge/browser cache. `index.html` should
