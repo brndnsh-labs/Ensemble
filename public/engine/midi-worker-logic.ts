@@ -551,6 +551,11 @@ export class ExportProcessor {
                 includeChords: this.includedTracks.includes('chords'),
                 includeHarmony: this.includedTracks.includes('harmonies'),
                 includeDrums: this.includedTracks.includes('drums'),
+                // #842: MIDI export ramps `bandIntensity` per step via
+                // `applyWorkerTransition` against only a stale default conductor, so
+                // bar-latch the drum-motif intensity to stop the exported motif
+                // flipping mid-bar.
+                noLiveConductor: true,
             },
             // Thread sticky soloist position across ticks so the exported harmony track
             // matches live playback's spectral-gap behavior. Step paired so consumers
@@ -982,6 +987,11 @@ export class ExportProcessor {
             (harmony as Mutable<typeof harmony>).enabled = this.prevStates.harmony; // @worker-mutation
             (groove as Mutable<typeof groove>).enabled = this.prevStates.groove; // @worker-mutation
             (playback as Mutable<typeof playback>).bandIntensity = this.prevStates.intensity; // @worker-mutation
+            // #842: the export shares this worker `state`, so clear the bar-latched
+            // motif intensity too — symmetric with the bandIntensity restore above.
+            // Otherwise a live fill resuming mid-bar after an export would read the
+            // export's last-bar latch as authoritative until the next bar line.
+            (playback as Mutable<typeof playback>).motifBarIntensity = undefined; // @worker-mutation
             (soloist as Mutable<typeof soloist>).mode = this.prevStates.mode; // @worker-mutation
             (soloist.session as Mutable<typeof soloist.session>).sessionSteps =
                 this.prevStates.sessionSteps; // @worker-mutation

@@ -52,6 +52,12 @@ export interface GenerateNotesOptions {
     includeSoloist?: boolean;
     includeHarmony?: boolean;
     includeDrums?: boolean;
+    // #842: true on the conductor-less generators (logic worker + MIDI export),
+    // where `state.conductor` is a stale default rather than the live ramp source.
+    // Routes drum-motif selection through the bar-downbeat latch in `runDrumTick`
+    // instead of the (stale) conductor reconstruction. Omitted (false) on the
+    // live/audio-export paths, which keep the #841 reconstruction.
+    noLiveConductor?: boolean;
 }
 
 export interface GenerateNotesResult {
@@ -83,7 +89,7 @@ export function generateNotesForStep(
     // returned `coordination`/`chordData`/`stepInfo`/`ts` are the SAME objects
     // the lane sections below read — preserving byte-identical output and the
     // load-bearing publication ordering.
-    const drumTick = runDrumTick(state, step, cursors, carryover);
+    const drumTick = runDrumTick(state, step, cursors, carryover, options.noLiveConductor);
     const { coordination, chordData, stepInfo, ts, dropMuteActive, drumHits } = drumTick;
 
     // The drum-only path honors `isInstrumentActiveAtStep` gating internally; the

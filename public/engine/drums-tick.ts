@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../form-analysis.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { getStepInfo, isSectionTurnaround } from '../utils.js';
 import { isIntroSectionLabel, isOutroSectionLabel } from './arrangement-layering.js';
 import { getSectionContext } from './arranger-utils.js';
@@ -54,6 +54,13 @@ export function runDrumTick(
     step: number,
     cursors: TickCursors,
     carryover: CoordinationCarryover | null = null,
+    // #842: set by the CONDUCTOR-LESS callers (logic worker + MIDI export). Those
+    // paths carry a *default* `state.conductor` slice (present but never synced /
+    // driven — `form:null`, `stepSize:0.0005`), so `motifSelectionIntensity` can't
+    // tell them apart from the live main-thread audio path by truthiness. This flag
+    // makes the distinction explicit: when true, latch the bar-downbeat intensity
+    // for bar-stable motif selection instead of trusting the stale conductor ramp.
+    noLiveConductor = false,
 ): DrumTickResult {
     const { arranger, groove, playback } = state;
 
@@ -70,6 +77,23 @@ export function runDrumTick(
 
     const chordData = getChordAtStep(step, arranger, cursors.mainCursor);
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
+
+    // #842: bar-latch the motif-selection intensity on the CONDUCTOR-LESS paths
+    // (MIDI export + logic worker). `motifSelectionIntensity` keeps the drum motif
+    // skeleton bar-stable by reconstructing the bar downbeat from the conductor's
+    // ramp — but those paths carry only a *default* `state.conductor` (present but
+    // never driven), so the reconstruction runs on a stale `stepSize` and the motif
+    // still flips mid-bar: the pre-#841 stutter, and (for the worker Kick/Snare
+    // probes that bass locks to) a kit-vs-prediction divergence in ramp-crossing
+    // bars. `noLiveConductor` marks those paths explicitly (truthiness of
+    // `state.conductor` can't — it's always present). Snapshot the live intensity
+    // AT the bar downbeat and hold it for the bar; `motifSelectionIntensity` then
+    // treats the latched value as authoritative. The main-thread audio path and
+    // WAV export (both with a live/cloned conductor) never set the flag, never
+    // latch, and keep the exact #841 reconstruction — byte-identical.
+    if (noLiveConductor && stepInfo?.isMeasureStart) {
+        (playback as Mutable<typeof playback>).motifBarIntensity = playback.bandIntensity; // @worker-mutation
+    }
 
     // 1. Context Assembly (Anchor: Groove)
     const coordination = createCoordinationContext(step, stepInfo as any, carryover);
