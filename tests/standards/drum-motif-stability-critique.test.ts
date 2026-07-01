@@ -22,7 +22,7 @@
 // not the UI/preset labels — the wrong keys silently fall through to motif 0.
 
 import { describe, expect, it } from 'vitest';
-import { generateDrumsForStep } from '../../public/engine/drums-tick.js';
+import { generateDrumsForStep, runDrumTick } from '../../public/engine/drums-tick.js';
 import { getDrumMotif } from '../../public/engine/groove-engine.js';
 import {
     motifSelectionIntensity,
@@ -228,8 +228,12 @@ function makeState(genreFeel, bandIntensity, step, { withConductor }) {
             autoIntensity: true,
             step,
         },
-        // withConductor=false models the conductor-less paths (worker/export) and
-        // the pre-fix behavior: the latch can't reconstruct, so motif tracks live.
+        // withConductor=false + this per-step-FRESH-state harness models the
+        // pre-fix behavior (no conductor to reconstruct AND no state carried across
+        // steps, so the #842 bar-latch never persists) — used as the "motif tracks
+        // live" contrast baseline. The REAL conductor-less paths carry state across
+        // steps and ARE bar-stable; that is pinned in the '#842' block below with a
+        // persistent state.
         conductor: withConductor ? { stepSize: 0.04, targetIntensity: 0.98 } : undefined,
     };
 }
@@ -282,6 +286,147 @@ describe('#841 — every genre consumes the bar-latched motif (real drum path)',
             expect(latched, `${genre} latched==live → motifIntensity not consumed`).not.toBe(live);
         });
     }
+});
+
+// ---------------------------------------------------------------------------
+// #842 — the conductor-less paths (MIDI export + logic worker) are bar-stable too.
+//
+// #841 latched the motif to the bar downbeat on the main-thread audio path by
+// RECONSTRUCTING the downbeat from the conductor ramp. The export and worker paths
+// carry only a *default* `state.conductor` slice (PRESENT — matching `getState()`
+// — but never synced/driven, `form:null` / `stepSize:0.0005`), so the
+// reconstruction ran on a stale ramp and the motif still flipped mid-bar (export:
+// silent in the rendered MIDI; worker: the Kick/Snare probe bass locks to diverging
+// from the audible kit in ramp-crossing bars). Truthiness of `state.conductor`
+// can't tell those paths from the live one — so `runDrumTick` takes an explicit
+// `noLiveConductor` flag (set by the worker + MIDI-export callers) and, when true,
+// latches the downbeat `bandIntensity` into `playback.motifBarIntensity`, which
+// `motifSelectionIntensity` then reads as authoritative.
+//
+// These tests model the PRODUCTION shape: a present-but-stale default conductor
+// (NOT `conductor: undefined`, which the worker/export never produce) driven through
+// the real `noLiveConductor` flag, over a SINGLE PERSISTENT state that carries
+// across the bar as the real ticks do. `noLiveConductor:false` reproduces the
+// pre-#842 behavior (reconstruction on the stale stepSize → motif tracks live).
+// ---------------------------------------------------------------------------
+
+// The worker/export base state (`getState()`) carries a present-but-never-driven
+// default conductor. Mirror it exactly so the tests exercise what production runs.
+const STALE_DEFAULT_CONDUCTOR = { targetIntensity: 0.35, stepSize: 0.0005, form: null };
+
+function driveConductorlessBar(genreFeel, barStart, perStep, { noLiveConductor = true } = {}) {
+    const state = makeState(genreFeel, barStart, 0, { withConductor: false });
+    state.conductor = { ...STALE_DEFAULT_CONDUCTOR }; // present, like the real worker/export
+    const cursors = {
+        mainCursor: { index: 0, sectionIndex: 0 },
+        lookaheadCursor: { index: 0, sectionIndex: 0 },
+    };
+    const motifBarIntensities = [];
+    const kickPattern = [];
+    const snarePattern = [];
+    for (let s = 0; s < SPB; s++) {
+        state.playback.bandIntensity = Math.min(0.98, barStart + perStep * s);
+        state.playback.step = s;
+        const { coordination } = runDrumTick(state, s, cursors, null, noLiveConductor);
+        motifBarIntensities.push(state.playback.motifBarIntensity);
+        kickPattern.push(coordination.kickHit ? 1 : 0);
+        snarePattern.push(coordination.snareHit ? 1 : 0);
+    }
+    return { motifBarIntensities, kickPattern, snarePattern };
+}
+
+describe('#842 — conductor-less paths latch the motif at the bar downbeat', () => {
+    // A wide ramp 0.30 -> ~0.94 that crosses the rock motif tiers within the bar —
+    // guarantees the motif WOULD move if it tracked the live per-step intensity.
+    const barStart = 0.3;
+    const perStep = (0.94 - barStart) / (SPB - 1);
+
+    it('runDrumTick latches motifBarIntensity at the downbeat for the whole bar (real flag)', () => {
+        const { motifBarIntensities } = driveConductorlessBar('Rock', barStart, perStep);
+        // Every step of the bar selects its motif from the SAME (downbeat) intensity,
+        // even as the live bandIntensity ramps across the tier boundaries — and even
+        // though state.conductor is PRESENT (a stale default). The flag, not the
+        // conductor's absence, is what drives the latch.
+        expect([...new Set(motifBarIntensities)]).toEqual([barStart]);
+    });
+
+    it('the stale default conductor does NOT latch without the flag (pre-#842 shape)', () => {
+        // Guards the P0 the naive `!state.conductor` gate hit: with a present-but-stale
+        // conductor and the flag off, nothing latches — the field stays undefined and
+        // selection falls through to the (stale) reconstruction. This is the exact
+        // production shape that made the first attempt a no-op.
+        const { motifBarIntensities } = driveConductorlessBar('Rock', barStart, perStep, {
+            noLiveConductor: false,
+        });
+        expect(motifBarIntensities.every((mi) => mi === undefined)).toBe(true);
+    });
+
+    it('TEETH: without the latch the live ramp WOULD cross a motif tier mid-bar', () => {
+        // Prove the ramp genuinely moves the motif — so the constant motifBarIntensity
+        // above is doing real work, not sitting on a flat stretch of the tier table.
+        const seed = 0.7;
+        const first = getDrumMotif(seed, 'Rock', 0.8, barStart);
+        const last = getDrumMotif(
+            seed,
+            'Rock',
+            0.8,
+            Math.min(0.94, barStart + perStep * (SPB - 1)),
+        );
+        expect(first).not.toBe(last);
+    });
+
+    it('the bar-latched motif is constant while the pre-fix live motif flips', () => {
+        const seed = 0.7;
+        const { motifBarIntensities } = driveConductorlessBar('Rock', barStart, perStep);
+        const latchedMotifs = motifBarIntensities.map((mi) => getDrumMotif(seed, 'Rock', 0.8, mi));
+        expect(new Set(latchedMotifs).size).toBe(1); // bar-stable
+
+        // Pre-fix: motif selected from the live per-step intensity → flips within the bar.
+        const liveMotifs = [];
+        for (let s = 0; s < SPB; s++) {
+            const live = Math.min(0.94, barStart + perStep * s);
+            liveMotifs.push(getDrumMotif(seed, 'Rock', 0.8, live));
+        }
+        expect(new Set(liveMotifs).size).toBeGreaterThan(1); // flapped
+    });
+
+    it('worker Kick/Snare probe matches a bar held at the downbeat (bass locks to the right kit)', () => {
+        // The probe (`coordination.kickHit`) is what kick-lock bass styles read on the
+        // worker. With the latch, the ramping bar's probe pattern equals the reference
+        // bar held at the downbeat intensity — i.e. it tracks the AUDIBLE (bar-stable)
+        // kit, not a mid-bar-flipped ghost.
+        const ramped = driveConductorlessBar('Rock', barStart, perStep);
+        const reference = driveConductorlessBar('Rock', barStart, 0); // held at downbeat
+        expect(ramped.kickPattern).toEqual(reference.kickPattern);
+        expect(ramped.snarePattern).toEqual(reference.snarePattern);
+
+        // TEETH: the pre-fix path (present stale conductor, flag OFF → reconstruction
+        // tracks live) diverges from that reference — the exact kit-vs-prediction
+        // mismatch #842 fixes.
+        const preFix = driveConductorlessBar('Rock', barStart, perStep, { noLiveConductor: false });
+        const kickDiverges = preFix.kickPattern.some((v, i) => v !== reference.kickPattern[i]);
+        const snareDiverges = preFix.snarePattern.some((v, i) => v !== reference.snarePattern[i]);
+        expect(kickDiverges || snareDiverges).toBe(true);
+    });
+
+    it('the latched scratch field survives the real worker sync merge (Object.assign)', () => {
+        // The fix depends on `getSyncState` NOT enumerating `motifBarIntensity` and the
+        // worker merging deltas via `Object.assign` (not whole-object replace). Simulate
+        // a mid-bar sync: a `{ bandIntensity }` delta must leave the latch intact, or the
+        // motif would flip on the next synced step. Cheap guard for the scratch contract.
+        const state = makeState('Rock', barStart, 0, { withConductor: false });
+        state.conductor = { ...STALE_DEFAULT_CONDUCTOR };
+        const cursors = {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+        runDrumTick(state, 0, cursors, null, true); // downbeat → latches
+        const latched = state.playback.motifBarIntensity;
+        expect(latched).toBe(barStart);
+        // A worker delta only ever carries explicit keys (never motifBarIntensity):
+        Object.assign(state.playback, { bandIntensity: 0.9 });
+        expect(state.playback.motifBarIntensity).toBe(latched); // preserved across sync
+    });
 });
 
 describe('#841 — the motif still OPENS UP across a section, just at bar lines', () => {

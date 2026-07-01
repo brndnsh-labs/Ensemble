@@ -87,17 +87,20 @@ export const RAMP_INTENSITY_MULTIPLIER = { up: 1.25, down: 0.75 } as const;
  * target, so a residual flip is rare and lands at the section's energy plateau,
  * not on every crossing. A vast improvement over the per-step flip.
  *
- * Main-thread only — reads `state.conductor` (unsynced to the worker, see
- * `effectiveTargetIntensity`). The live AUDIO path (`scheduler-core.scheduleDrums`)
- * runs main-thread with the conductor present, so this is where the latch lands.
- * Falls back to the live `bandIntensity` when the conductor is absent or
- * auto-intensity is off. That fallback is exactly bar-stable for MANUAL intensity
- * (no per-step ramp) and for the worker's drum-coordination probes. It is NOT a
- * full fix for the auto-intensity MIDI-export path, which ramps `bandIntensity`
- * per step in a conductor-less worker (`tick-logic.applyWorkerTransition`) with a
- * *different* (linear) ramp shape — exported MIDI can still flip motif mid-bar.
- * Tracked as a follow-up; reconstructing it needs the export ramp's own model,
- * not the conductor's.
+ * The conductor reconstruction is main-thread only — it reads `state.conductor`
+ * (unsynced to the worker, see `effectiveTargetIntensity`). The live AUDIO path
+ * (`scheduler-core.scheduleDrums`) runs main-thread with the conductor present, so
+ * that is where this exact reconstruction lands.
+ *
+ * The conductor-less paths (MIDI export + logic worker, #842) carry only a stale
+ * DEFAULT `state.conductor` (present, so truthiness can't flag them; `stepSize`
+ * never driven, so the reconstruction above would run on garbage). Those paths set
+ * `noLiveConductor` in `runDrumTick`, which latches the bar-downbeat intensity into
+ * `playback.motifBarIntensity`; when set, that value is read FIRST here and is
+ * authoritative. It is only ever written on those paths, so the live audio / WAV
+ * export paths never see it and keep this exact reconstruction. Net: the exported
+ * MIDI motif no longer flips mid-bar, and the worker Kick/Snare probes bass locks
+ * to match the audible (bar-stable) kit. See the latch site in `runDrumTick`.
  */
 export function motifSelectionIntensity(
     state: EnsembleState,
@@ -109,7 +112,16 @@ export function motifSelectionIntensity(
     // so the fallback is byte-identical to the genre's own `intensity`, even in
     // tests that drive intensity through the options bag and not the state snapshot).
     const cur = currentIntensity;
-    // No per-step ramp to undo: manual intensity, or no conductor (worker/tests).
+    // #842: the conductor-less paths (logic worker + MIDI export) latch the
+    // bar-downbeat intensity into `motifBarIntensity` (in `runDrumTick`, gated on
+    // their `noLiveConductor` flag). When set it is authoritative — it already IS
+    // the bar-stable value, and those paths' `state.conductor` is a stale default
+    // that would mislead the reconstruction below. Only ever written on those
+    // paths, so the live audio / WAV-export paths never see it and fall through.
+    if (state?.playback?.motifBarIntensity != null) {
+        return state.playback.motifBarIntensity;
+    }
+    // No conductor ramp to invert, or manual intensity: use the live value.
     if (!state?.playback?.autoIntensity || !state?.conductor) {
         return cur;
     }

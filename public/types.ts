@@ -1112,6 +1112,19 @@ export interface GlobalContext {
     readonly wakeLock: WakeLockSentinel | null;
     /** Global band intensity/energy level (0.0 - 1.0). */
     readonly bandIntensity: number;
+    /**
+     * #842: the bar-DOWNBEAT `bandIntensity` a drum motif should be selected from,
+     * latched on the CONDUCTOR-LESS paths (MIDI export + logic worker). Those paths
+     * carry a stale default `state.conductor`, so instead of reconstructing the
+     * downbeat from a live ramp (the main-thread audio path) they set
+     * `noLiveConductor` in `runDrumTick`, which snapshots `bandIntensity` at each
+     * bar downbeat here; `motifSelectionIntensity` reads it as authoritative —
+     * keeping the motif skeleton bar-stable (a real drummer changes patterns only
+     * at a bar line). Worker-scratch: written per-tick with `@worker-mutation`,
+     * never synced or persisted (recomputed every bar), so the live-conductor paths
+     * never see it.
+     */
+    readonly motifBarIntensity?: number;
     /** Global complexity level (0.0 - 1.0). */
     readonly complexity: number;
     /** Whether the intensity automatically drifts over time. */

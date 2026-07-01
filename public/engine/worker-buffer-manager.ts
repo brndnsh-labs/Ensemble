@@ -81,6 +81,10 @@ export function fillBuffers(
                 includeChords: chordsActive && step >= workerContext.cbBufferHead,
                 includeHarmony: harmonyActive && step >= workerContext.hbBufferHead,
                 includeDrums: false, // Drums are handled by synth-drums in live engine
+                // #842: the worker has only a stale default conductor, so bar-latch
+                // the drum-motif intensity (the Kick/Snare probe bass locks to must
+                // match the audible kit, which is bar-stable on the main thread).
+                noLiveConductor: true,
             },
             // Thread sticky soloist position across ticks so harmony can read it on
             // stab steps where the soloist itself is resting. Paired with step so
