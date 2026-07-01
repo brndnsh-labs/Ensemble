@@ -96,6 +96,30 @@ export function resolveInstrumentSource(voice: InstrumentVoice): ResolvedSource 
 }
 
 /**
+ * Chords packs whose voicing reduces to POWER CHORDS (#698) — a crunch rhythm
+ * guitar, where distorted triads mud up so the engine drops to root+5(+oct).
+ * A `Set` so a future clean-skank / drop-tuned crunch pack joins in one place.
+ */
+const POWER_CHORD_CHORDS_PACKS = new Set(['electric-guitar-rhythm']);
+
+/**
+ * Whether the (chords) `voice` is a crunch rhythm-guitar pack whose comp should
+ * be reduced to power chords in the note generator (`applyPowerChordVoicing`).
+ *
+ * NOTE: a *voice-selection* test, NOT a pack-loaded one — this runs in the logic
+ * WORKER, which never holds the decoded sample buffers (those live on the main
+ * thread). The synced `chords.voice` string is the worker's only signal. In the
+ * auto-follow path the voice is only this pack when it's actually installed
+ * (`autoVoiceForGenre` returns `synth` otherwise), so the common case stays
+ * consistent; a manual pick of an uninstalled pack briefly voices power-chord
+ * *synth* until install — a benign transient.
+ */
+export function isPowerChordChordsVoice(voice: InstrumentVoice): boolean {
+    const packId = packIdFromVoice(voice);
+    return packId !== null && POWER_CHORD_CHORDS_PACKS.has(packId);
+}
+
+/**
  * S3 (loader): register one decoded buffer for a pack/zone key. Successive
  * registrations under the same key *append* — that's how a round-robin zone
  * (#657) accumulates its alternates, in manifest order (primary url first, then

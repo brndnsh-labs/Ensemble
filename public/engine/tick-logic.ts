@@ -1,7 +1,7 @@
 import { getJamMacroArc } from '../form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { binarySearchMap, getFrequency, getMidi } from '../utils.js';
-import { getAccompanimentNotes } from './accompaniment.js';
+import { applyPowerChordVoicing, getAccompanimentNotes } from './accompaniment.js';
 import { getBassNote, isBassActive } from './bass-engine.js';
 import {
     type CoordinationCarryover,
@@ -11,8 +11,14 @@ import {
 } from './coordination-engine.js';
 import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
+import { isPowerChordChordsVoice } from './instrument-registry.js';
 import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
+
+// #698 — Metal's crunch power chords anchor to E2 (MIDI 40), the standard-tuning
+// low-E chug, dropping into the bass register on purpose (bass doubles the root).
+// Paired with the 'chords-guitar-low' register slot in coordination-engine.
+const METAL_POWER_CHORD_ANCHOR = 40;
 
 export interface TickCursors {
     mainCursor: { index: number; sectionIndex: number };
@@ -241,14 +247,38 @@ export function generateNotesForStep(
                 stepInfo,
                 coordination,
             );
+            // #698 — crunch rhythm-guitar chords play POWER CHORDS: reduce the
+            // comp voicing to root+5(+oct) before register slotting so distorted
+            // triads don't mud up. Pitch-only + gated on the synced voice, so it
+            // never touches the piano/organ comps or the synth fallback. On METAL
+            // the chug drops an octave to E2 (`METAL_POWER_CHORD_ANCHOR`) and uses a
+            // relaxed register slot ('chords-guitar-low') so it stays down in the
+            // bass register — that overlap is the metal idiom. Rock/other guitar
+            // power chords keep the standard chords slot (~E3), which reads right.
+            const powerChords = isPowerChordChordsVoice(state.chords.voice);
+            const metalLowChug = powerChords && state.groove.genreFeel === 'Metal';
+            if (powerChords) {
+                applyPowerChordVoicing(
+                    chordNotes,
+                    chord.rootMidi,
+                    metalLowChug ? METAL_POWER_CHORD_ANCHOR : undefined,
+                );
+            }
+            const chordsSlot = metalLowChug ? 'chords-guitar-low' : 'chords';
             for (let i = 0; i < chordNotes.length; i++) {
                 const n = chordNotes[i];
                 // Enforce Contract: Register Slotting
-                n.midi = enforceRegisterSlotting('chords', n.midi, coordination);
+                n.midi = enforceRegisterSlotting(chordsSlot, n.midi, coordination);
 
-                if (!n.freq) {
-                    n.freq = getFrequency(n.midi);
-                }
+                // Recompute freq from the SNAPPED + CLAMPED midi, ALWAYS — mirror
+                // the harmony lane's B8 fix (#709). The scheduler plays `freq`, not
+                // `midi`; the power-chord reduction (#698) and register slotting
+                // both move `midi` after a comp lane may have preloaded `freq` (the
+                // final-cadence lane sets `freq: getFrequency(midi)`). A stale
+                // pre-change freq (the old `!n.freq` guard) would sound the
+                // un-reduced/pre-clamp pitch — e.g. a full distorted triad on the
+                // exposed resolution chord, exactly the mud power chords avoid.
+                n.freq = getFrequency(n.midi);
                 notesToMain.push({ ...n, step, module: 'chords' });
             }
             updateCoordinationContext(coordination, 'chords', chordNotes);

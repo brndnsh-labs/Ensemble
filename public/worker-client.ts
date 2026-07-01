@@ -236,6 +236,15 @@ export function syncWorker(action?: string, payload?: any): void {
                 setModuleDelta(data, payload.module, { volume: payload.value });
             }
             break;
+        case 'SET_INSTRUMENT_VOICE':
+            // #698 — the chords voice drives NOTE GENERATION now (power-chord
+            // voicing for the crunch rhythm guitar), so forward the changed lane's
+            // voice to the worker live. The genre auto-follow effect dispatches
+            // this per-lane on a genre change too, so this covers manual + auto.
+            if (payload?.module) {
+                setModuleDelta(data, payload.module, { voice: payload.voice });
+            }
+            break;
         case 'SET_OCTAVE':
             if (payload.module) {
                 setModuleDelta(data, payload.module, { octave: payload.value });
