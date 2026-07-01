@@ -981,4 +981,118 @@ describe('Conductor Arc Critique (S7)', () => {
             expect(fills.length).toBe(0);
         });
     });
+
+    // ---------------------------------------------------------------------
+    // 6. #796 — per-genre intensity FLOOR applies on the LIVE seeded path.
+    //
+    //    `GENRE_INTENSITY_FLOORS` (conductor.ts) was previously read ONLY in
+    //    the targetEnergy-undefined fallback macro-arc — a branch the ~128-bar
+    //    seeded orchestration window makes unreachable during normal playback.
+    //    So a funk verse seeded at a low energyLevel rode BELOW funk's 0.45
+    //    floor (and below funk's 0.5 16th-hat "chicka" shimmer gate), and the
+    //    signature funk pocket never cracked. The floor is now also clamped
+    //    onto the seeded targetEnergy (conductor.ts, live seeded path).
+    //
+    //    Idiom under test (music-theory fact, not a tuning knob): a floored
+    //    genre's auto-intensity never sits below its genre floor during seeded
+    //    playback — while the floor stays a FLOOR (it lifts a quiet verse, it
+    //    never clamps an already-hot one down).
+    // ---------------------------------------------------------------------
+    describe('genre intensity floor on the live seeded path (#796)', () => {
+        // Drive checkSectionTransition's SEEDED branch (autoIntensity +
+        // orchestrationMap present) at the start of section A's FIRST measure
+        // (currentStep=0 -> measureEnd=16, still inside A: no transition, so the
+        // only targetIntensity write is the seeded one under test). The
+        // upcoming-measure orchestration lookup (seedTimelineStep+16 = 16)
+        // resolves to the single map entry's `energyLevel`. loopLimit=0 keeps
+        // the loop-arc multiplier out so we isolate the floor.
+        function seededTargetIntensity(genreFeel: string, energyLevel: number): number | undefined {
+            const state: any = makeMockState();
+            state.groove.genreFeel = genreFeel;
+            state.groove.lastDrumPreset = genreFeel;
+            state.playback.loopLimit = 0;
+            state.groove.seedTimelineStartStep = 0;
+            state.groove.orchestrationMap = [{ start: 0, end: TOTAL_STEPS, energyLevel }];
+
+            const dispatched: Array<{ type: string; payload: any }> = [];
+            const dispatch = (type: string, payload: any) => {
+                dispatched.push({ type, payload });
+            };
+            checkSectionTransition(state, 0, STEPS_PER_MEASURE, dispatch);
+
+            const write = [...dispatched]
+                .reverse()
+                .find(
+                    (d) =>
+                        d.type === ACTIONS.UPDATE_CONDUCTOR_STATE &&
+                        d.payload?.targetIntensity !== undefined,
+                );
+            return write?.payload?.targetIntensity;
+        }
+
+        // Funk floor is 0.45. A verse seeded at 0.30 (below the floor AND below
+        // funk's 0.5 shimmer gate) must be lifted so the pocket cracks.
+        it('funk verse seeded below its floor is lifted to the 0.45 floor', () => {
+            const raw = 0.3;
+            const lifted = seededTargetIntensity('Funk', raw) ?? 0;
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — GENRE FLOOR (#796) ---');
+            console.log(`[Genre]              Funk (floor 0.45)`);
+            console.log(`[Seeded energyLevel] ${raw.toFixed(2)} (below floor + shimmer gate)`);
+            console.log(`[Realized target]    ${lifted.toFixed(3)}`);
+            console.log(
+                `[Pre-fix behavior]   ${raw.toFixed(3)} (floor never applied on seeded path)`,
+            );
+            console.log('----------------------------------------------------\n');
+            // 0.45 is funk's GENRE_INTENSITY_FLOORS value (independent literal —
+            // not read from the constant, so this pins the idiom, not the config).
+            expect(lifted).toBeGreaterThanOrEqual(0.45 - 1e-9);
+        });
+
+        // The floor is a FLOOR, not a clamp: an already-hot seeded energy
+        // (0.70 > 0.45) passes through untouched — no ceiling side-effect.
+        it('funk energy already above the floor passes through unchanged', () => {
+            expect(seededTargetIntensity('Funk', 0.7) ?? 0).toBeCloseTo(0.7, 6);
+        });
+
+        // PAIRED SITE — a verse that begins AT a section boundary reaches the
+        // *seeded transition* emission (the second dispatch in the same call),
+        // which fires AFTER the mid-section one, so its value is the one that
+        // wins. Drive a genuine A->B boundary (currentStep=16 -> measureEnd=32)
+        // with a below-floor seeded energy and assert the LAST-winning
+        // targetIntensity still respects the floor. This case dispatches an
+        // un-floored 0.30 (below the floor + funk's shimmer gate) before the
+        // paired-site fix, so it guards the exact transition scenario #796
+        // targets — a quiet funk verse dropping in on a section downbeat.
+        it('funk verse beginning at a section boundary is floored too (paired seeded site)', () => {
+            const state: any = makeMockState();
+            state.groove.genreFeel = 'Funk';
+            state.groove.lastDrumPreset = 'Funk';
+            state.playback.loopLimit = 0;
+            state.groove.seedTimelineStartStep = 0;
+            state.groove.orchestrationMap = [{ start: 0, end: TOTAL_STEPS, energyLevel: 0.3 }];
+            // step 16 = start of A's last measure; measureEnd=32 = A->B boundary
+            // (both sections non-seamless in makeMockState), so shouldFill fires
+            // and the seeded transition path dispatches last.
+            const { targetIntensity } = runTransitionAtProgress(0.5, { mockState: state });
+            console.log('\n--- CONDUCTOR ARC CRITIQUE — GENRE FLOOR @ BOUNDARY (#796) ---');
+            console.log(`[Genre]              Funk (floor 0.45), seeded energyLevel 0.30`);
+            console.log(
+                `[Transition target]  ${(targetIntensity ?? 0).toFixed(3)} (paired seeded site)`,
+            );
+            console.log('-------------------------------------------------------------\n');
+            expect(targetIntensity ?? 0).toBeGreaterThanOrEqual(0.45 - 1e-9);
+        });
+
+        // Neo-Soul (0.40) and Disco (0.45) are floored too — the fix is not
+        // funk-specific. A quiet Neo-Soul verse rides its Dilla-pocket floor.
+        it('neo-soul verse seeded below its floor is lifted to the 0.40 floor', () => {
+            expect(seededTargetIntensity('Neo-Soul', 0.25) ?? 0).toBeGreaterThanOrEqual(0.4 - 1e-9);
+        });
+
+        // A genre with NO floor entry (Acoustic is not in GENRE_INTENSITY_FLOORS)
+        // rides its raw seeded energy — quiet stays quiet, no spurious lift.
+        it('a genre without a floor entry rides its raw seeded energy', () => {
+            expect(seededTargetIntensity('Acoustic', 0.2) ?? 0).toBeCloseTo(0.2, 6);
+        });
+    });
 });
