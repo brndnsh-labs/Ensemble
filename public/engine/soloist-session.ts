@@ -18,7 +18,6 @@ export function resetSoloistState(state: EnsembleState): void {
     const phrasing = session.phrasing as Mutable<typeof session.phrasing>;
     const memory = session.memory as Mutable<typeof session.memory>;
     const currentPhrase = session.currentPhrase as Mutable<typeof session.currentPhrase>;
-    const rhythm = session.rhythm as Mutable<typeof session.rhythm>;
     const context = currentPhrase.context as Mutable<typeof currentPhrase.context>;
 
     session.sessionSteps = 0;
@@ -52,8 +51,6 @@ export function resetSoloistState(state: EnsembleState): void {
     memory.sectionRecall = {};
     memory.sectionRecallLoop = null;
     memory.formArcRecall = {};
-
-    rhythm.deviceBuffer = [];
 
     // why: the `audio` runtime carries cross-call voice-leading state —
     // `lastMidiPlayed` feeds the pitch engine's interval decision. A reset that

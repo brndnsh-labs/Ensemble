@@ -536,28 +536,6 @@ export interface SoloistExpression {
 }
 
 /**
- * A short-lived musical "event" buffered for a future step — e.g. a chromatic
- * fall, a grace note pair, a banjo roll. Produced by `soloist-devices.ts` and
- * popped by the pitch engine.
- *
- * Some devices produce double-stop pairs; those are represented as
- * `SoloistDeviceEvent[]` (a tuple of simultaneous notes) inside the buffer.
- */
-export interface SoloistDeviceEvent {
-    midi: number;
-    velocity: number;
-    durationSteps: number;
-    style: string;
-    /** Device kind tag stamped by `soloist-devices.ts` (e.g. 'quartal', 'graceNote'). */
-    device?: string;
-    bendStartInterval?: number;
-    isDoubleStop?: boolean;
-}
-
-/** Single event or a double-stop pair. */
-export type SoloistBufferedEvent = SoloistDeviceEvent | SoloistDeviceEvent[];
-
-/**
  * Short-term note memory the soloist uses to decide upcoming pitch direction,
  * detect repetition, and build signatures. Pushed each time a note is committed.
  */
@@ -725,27 +703,6 @@ export interface SoloistMemory {
 }
 
 /**
- * Device/embellishment buffer sub-slice for the soloist.
- *
- * The former `plan` (`RhythmNode[]`) and `entropy` fields were removed in #929 —
- * their producer (`generateRhythmPlan` in the legacy `soloist-rhythm-engine.ts`)
- * was deleted in #926 and nothing in the live phrase-first engine read them.
- *
- * `deviceBuffer` / `embellishmentBuffer` survive because live paths still
- * reference them — the offline clone in `audio-export.ts` reads `deviceBuffer`,
- * and `resetSoloistState` clears it. (They are also listed in the worker
- * protection list `WORKER_MANAGED_KEYS`, but under a wrong-path `'soloist.audio'`
- * entry that is currently inert.) No producer populates either buffer today, so
- * they may be a further removal candidate — see FOLLOWUPS.
- */
-export interface SoloistRhythm {
-    /** Buffer of melodic devices (bends, grace notes, rolls) queued for upcoming steps. */
-    readonly deviceBuffer: SoloistBufferedEvent[];
-    /** Buffer of melodic embellishments queued for upcoming steps. */
-    readonly embellishmentBuffer: SoloistBufferedEvent[];
-}
-
-/**
  * Melodic-contour tracker used by the pitch engine to bias the next note's
  * direction. Updated each commit.
  */
@@ -780,7 +737,6 @@ export interface SoloistSession {
     readonly phrasing: SoloistPhrasing;
     readonly currentPhrase: SoloistCurrentPhrase;
     readonly memory: SoloistMemory;
-    readonly rhythm: SoloistRhythm;
     readonly contour: SoloistContour;
 }
 
@@ -1353,7 +1309,6 @@ export type ActionPayloadUpdateHB = Partial<HarmonyState>;
  *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
  *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
  *   `sharedHookBuffer`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
- *   `deviceBuffer`, `embellishmentBuffer`,
  *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
  *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
  *   `lastNoteEnd`.
@@ -1403,8 +1358,6 @@ export type ActionPayloadUpdateSB = Partial<{
     sectionRecall: Record<string, SectionRecallEntry>;
     sectionRecallLoop: number | null;
     formArcRecall: Record<string, FormArcEntry>;
-    deviceBuffer: SoloistBufferedEvent[];
-    embellishmentBuffer: SoloistBufferedEvent[];
     melodicTrend: string;
     direction: number;
     contourSteps: number;

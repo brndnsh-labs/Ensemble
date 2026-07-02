@@ -133,10 +133,6 @@ export const soloist = deepSignal<SoloistState>({
             sectionRecallLoop: null,
             formArcRecall: {},
         },
-        rhythm: {
-            deviceBuffer: [],
-            embellishmentBuffer: [],
-        },
         contour: {
             trend: 'Static',
             direction: 1,
@@ -186,7 +182,6 @@ type SoloistFieldRoute =
     | { kind: 'phrasing'; key: string }
     | { kind: 'currentPhrase'; key: string }
     | { kind: 'memory'; key: string }
-    | { kind: 'rhythm'; key: string }
     | { kind: 'contour'; key: string }
     | { kind: 'audio'; key: string };
 
@@ -239,10 +234,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     sectionRecall: { kind: 'memory', key: 'sectionRecall' },
     sectionRecallLoop: { kind: 'memory', key: 'sectionRecallLoop' },
     formArcRecall: { kind: 'memory', key: 'formArcRecall' },
-
-    // --- Rhythm ---
-    deviceBuffer: { kind: 'rhythm', key: 'deviceBuffer' },
-    embellishmentBuffer: { kind: 'rhythm', key: 'embellishmentBuffer' },
 
     // --- Contour ---
     melodicTrend: { kind: 'contour', key: 'trend' },
@@ -301,9 +292,6 @@ function applySoloistPayload(target: typeof soloist, payload: Record<string, unk
                 break;
             case 'memory':
                 (t.session.memory as any)[route.key] = value;
-                break;
-            case 'rhythm':
-                (t.session.rhythm as any)[route.key] = value;
                 break;
             case 'contour':
                 (t.session.contour as any)[route.key] = value;
@@ -386,7 +374,6 @@ export function instrumentReducer(action: Action): boolean {
             const cp = session.currentPhrase as Mutable<typeof session.currentPhrase>;
             const cpCtx = cp.context as Mutable<typeof cp.context>;
             const mem = session.memory as Mutable<typeof session.memory>;
-            const rhy = session.rhythm as Mutable<typeof session.rhythm>;
             const con = session.contour as Mutable<typeof session.contour>;
             session.seed = null;
             session.hook = null;
@@ -424,8 +411,6 @@ export function instrumentReducer(action: Action): boolean {
             mem.sectionRecall = {};
             mem.sectionRecallLoop = null;
             mem.formArcRecall = {};
-            rhy.deviceBuffer = [];
-            rhy.embellishmentBuffer = [];
             con.trend = 'Static';
             con.direction = 1;
             con.steps = 0;

@@ -434,9 +434,6 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 },
                                 motifBuffer: [...(liveState.soloist.motifBuffer || [])],
                                 pitchHistory: [...(liveState.soloist.pitchHistory || [])],
-                                deviceBuffer: [
-                                    ...(liveState.soloist.session.rhythm.deviceBuffer || []),
-                                ],
                                 phraseContext: {
                                     ...(liveState.soloist.session.currentPhrase.context || {}),
                                 },

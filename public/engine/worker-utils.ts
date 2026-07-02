@@ -29,7 +29,7 @@ const WORKER_MANAGED_KEYS: Record<string, string[]> = {
         'isYielding',
         'lastAttackStep',
     ],
-    'soloist.audio': ['lastMidiPlayed', 'lastRenderedFreq', 'embellishmentBuffer', 'deviceBuffer'],
+    'soloist.audio': ['lastMidiPlayed', 'lastRenderedFreq'],
     bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
     harmony: ['motifBuffer', 'lastMidis'],
     groove: ['fillSteps', 'fillActive', 'fillStartStep', 'fillLength', 'pendingCrash', 'snareMask'],

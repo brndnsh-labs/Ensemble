@@ -76,12 +76,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
             sectionRecallLoop: null,
             formArcRecall: {},
         },
-        rhythm: {
-            plan: [],
-            entropy: 0,
-            deviceBuffer: [],
-            embellishmentBuffer: [],
-        },
         contour: {
             trend: 'Static',
             direction: 1,
@@ -180,12 +174,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         },
         formArcRecall: (v) => {
             session.memory.formArcRecall = v as any;
-        },
-        deviceBuffer: (v) => {
-            session.rhythm.deviceBuffer = v as any;
-        },
-        embellishmentBuffer: (v) => {
-            session.rhythm.embellishmentBuffer = v as any;
         },
         melodicTrend: (v) => {
             session.contour.trend = v as any;

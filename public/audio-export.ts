@@ -196,7 +196,6 @@ function cloneStateForRender(liveState: any): any {
             },
             motifBuffer: [...(liveState.soloist.motifBuffer || [])],
             pitchHistory: [...(liveState.soloist.pitchHistory || [])],
-            deviceBuffer: [...(liveState.soloist.session.rhythm.deviceBuffer || [])],
             phraseContext: { ...(liveState.soloist.session.currentPhrase.context || {}) },
         },
         harmony: {

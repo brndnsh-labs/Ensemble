@@ -21,7 +21,6 @@ vi.mock('../../../public/state.js', () => {
             busySteps: 0,
             sessionSteps: 1000,
             motifBuffer: [],
-            deviceBuffer: [],
             phraseContext: {
                 role: 'call',
                 skeleton: [],
