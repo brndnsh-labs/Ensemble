@@ -1,6 +1,6 @@
 # Soloist Re-Architecture — Phrase-First, Vocalist↔Improviser
 
-**Status:** Design proposal v2 (not yet implemented). Source-of-truth body for the planned *Soloist* epic.
+**Status:** Design proposal v2 — Slices 0/1 partially implemented (Build 2b/2c/3 shipped; see per-section "Implementation note" callouts). Remaining sections are still proposal. Source-of-truth body for the planned *Soloist* epic.
 **Date:** 2026-06-27
 **Goal:** A lead player that sounds like a tasteful session musician — composed but improvisational, idiomatic per genre, and *evolving over the course of a song* the way a great vocalist or a Beck/Satriani-style melodic player does.
 
