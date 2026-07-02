@@ -464,9 +464,34 @@ export function ChordVisualizer() {
                                                             gridColumn: `${measureIndex + 1}`,
                                                             gridRow: '1',
                                                         }}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-label={
+                                                            measure.sectionId
+                                                                ? 'Open section editor'
+                                                                : 'Open measure editor'
+                                                        }
                                                         onClick={() =>
                                                             openSectionEditor(measure.sectionId)
                                                         }
+                                                        onKeyDown={(e) => {
+                                                            // Nested ChordCard buttons have their
+                                                            // own click/keyboard activation — only
+                                                            // react when the box itself is the
+                                                            // event target, not a bubbled descendant.
+                                                            if (e.target !== e.currentTarget) {
+                                                                return;
+                                                            }
+                                                            if (
+                                                                e.key === 'Enter' ||
+                                                                e.key === ' '
+                                                            ) {
+                                                                e.preventDefault();
+                                                                openSectionEditor(
+                                                                    measure.sectionId,
+                                                                );
+                                                            }
+                                                        }}
                                                     >
                                                         {measure.chords.map(
                                                             (chord: LeadSheetChord) => (
