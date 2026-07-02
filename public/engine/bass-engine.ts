@@ -266,7 +266,15 @@ export function getBassNote(
     const comfortMin = 28; // Low E
     const comfortMax = 51; // Standard ceiling
 
-    const isSectionStart = context && step === context.sectionStart;
+    // #923 — context.sectionStart is already loop-relative (getChordAtStep wraps
+    // targetStep by arranger.totalSteps before deriving it), but `step` here is
+    // the raw monotonic global transport counter, which never resets on a loop
+    // boundary (scheduler-core.ts's LOOP_BOUNDARY only notifies the worker, it
+    // doesn't zero playback.step). Comparing them unwrapped means this only
+    // ever matches during the very first lap of playback — wrap `step` first,
+    // same pattern #921/#922 applied to barIndex.
+    const wrappedStepForSectionStart = arranger.totalSteps > 0 ? step % arranger.totalSteps : step;
+    const isSectionStart = context && wrappedStepForSectionStart === context.sectionStart;
     const allowSubRange = isDownbeat || isSectionStart;
 
     const clampAndNormalize = (
