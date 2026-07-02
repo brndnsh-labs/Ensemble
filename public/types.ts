@@ -497,8 +497,14 @@ export interface FormArcEntry {
 }
 
 /**
- * A planned rhythmic event produced by `generateRhythmPlan()` (and consumed by
- * the pitch engine to decide what to play at that step).
+ * A planned rhythmic event for the soloist `rhythm` state sub-slice.
+ *
+ * NOTE (#926): its former producer (`generateRhythmPlan` in the legacy
+ * `soloist-rhythm-engine.ts`) was deleted as orphaned after the phrase-first
+ * migration. This type and the `rhythm` sub-slice fields that use it
+ * (`SoloistRhythm.plan`, `rhythmPlan`) are currently initialized/reset but
+ * never read by the live phrase-first engine — a deeper dead-code island
+ * tracked as its own follow-up.
  *
  * Two kinds of node share the field set: response-derived (carrying
  * `responseSource` etc.) and seed-derived (carrying `seedNote` / `responseSource:
@@ -650,8 +656,8 @@ export interface SoloistPhraseContext {
      * phrase can paraphrase the call's shape.
      *
      * Entry shape evolved with the role-skeleton-response fix (epic-soloist-idiom S5):
-     *  - Legacy: plain `number` = `stepTarget - phraseStartStep` (offset only). The response
-     *    branch in soloist-rhythm-engine used to emit `durationSteps: 1` for every entry,
+     *  - Legacy: plain `number` = `stepTarget - phraseStartStep` (offset only). The legacy
+     *    soloist engine's response branch used to emit `durationSteps: 1` for every entry,
      *    flattening "long-long-short-short" call shapes into "tick-tick-tick-tick" replies.
      *  - Current: `SkeletonNode = { stepOffset, durationSteps, velocity, isStrongBeat }` so
      *    the response can mirror duration shape AND velocity contour, not just attack
@@ -677,8 +683,10 @@ export interface SoloistPhraseContext {
      * legacy soloist picker (Conclusion lifts, Departure depresses); that
      * picker was deleted with epic #10 and the bias is currently
      * unimplemented in the phrase-first engine (re-port tracked in #891).
-     * The only live consumer today is the `=== 'restatement'` motif-echo
-     * gate in `soloist-rhythm-engine.ts`.
+     * Its last remaining reader (the `=== 'restatement'` motif-echo gate in
+     * the legacy soloist-rhythm-engine) was deleted as orphaned in #926, so
+     * `srdcState` now has no live reader — part of the dead soloist `rhythm`
+     * sub-slice tracked for removal in the #926 follow-up.
      */
     srdcState: SrdcPhase;
     /**
@@ -844,8 +852,11 @@ export interface SoloistAudio {
  * Lowercase canonical form. Originally derived per phrase to bias the
  * legacy picker's chord-tone weight; that picker was deleted with epic #10
  * and the bias is currently unimplemented in the phrase-first engine
- * (re-port tracked in #891). The only live consumer today is the
- * `=== 'restatement'` motif-echo gate in `soloist-rhythm-engine.ts`.
+ * (re-port tracked in #891). Its last remaining reader (the
+ * `=== 'restatement'` motif-echo gate in the legacy soloist-rhythm-engine)
+ * was deleted as orphaned in #926, so the type now has no live reader —
+ * part of the dead soloist `rhythm` sub-slice tracked for removal in the
+ * #926 follow-up.
  */
 export type SrdcPhase = 'statement' | 'restatement' | 'departure' | 'conclusion';
 

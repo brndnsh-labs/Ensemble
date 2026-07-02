@@ -36,7 +36,7 @@ export interface StyleConfig {
     // steps. Renamed from `maxNotesPerPhrase` (which read like a per-phrase note
     // ceiling but never capped note count — the acoustic profile runs ~13.6
     // notes/phrase against an old value of 12). Contrast `minNotesPerPhrase`
-    // below, which IS a genuine note-count floor (soloist-rhythm-engine.ts).
+    // below, which IS a genuine note-count floor.
     phraseActiveBeats: number;
     minNotesPerPhrase: number;
     doubleStopProb: number;
