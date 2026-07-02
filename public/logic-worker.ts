@@ -77,6 +77,7 @@ function processMessage(type: string, data: any, startTime: number): void {
                     recursiveSafeSync(soloist, syncData.soloist, 'soloist');
                     recursiveSafeSync(harmony, syncData.harmony, 'harmony');
                     recursiveSafeSync(groove, syncData.groove, 'groove');
+                    recursiveSafeSync(midi, syncData.midi, 'midi');
                     if (syncData.playback) {
                         Object.assign(playback, syncData.playback);
                     }

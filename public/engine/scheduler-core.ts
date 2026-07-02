@@ -1,5 +1,15 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
+import {
+    buildArrangerSyncPayload,
+    buildBassSyncPayload,
+    buildChordsSyncPayload,
+    buildGrooveSyncPayload,
+    buildHarmonySyncPayload,
+    buildMidiSyncPayload,
+    buildPlaybackSyncPayload,
+    buildSoloistSyncPayload,
+} from '../state.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -1417,72 +1427,16 @@ function syncAndFlushWorker(
     step: number,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { arranger, chords, bass, soloist, harmony, groove, playback } = state;
+    const { arranger, chords, bass, soloist, harmony, groove, playback, midi } = state;
     const syncData = {
-        arranger: {
-            progression: arranger.progression,
-            stepMap: arranger.stepMap,
-            sectionMap: arranger.sectionMap,
-            totalSteps: arranger.totalSteps,
-            key: arranger.key,
-            isMinor: arranger.isMinor,
-            timeSignature: arranger.timeSignature,
-            grouping: arranger.grouping,
-        },
-        chords: {
-            style: chords.style,
-            octave: chords.octave,
-            density: chords.density,
-            enabled: chords.enabled,
-            volume: chords.volume,
-        },
-        bass: {
-            style: bass.style,
-            octave: bass.octave,
-            enabled: bass.enabled,
-            lastFreq: bass.lastFreq,
-            volume: bass.volume,
-        },
-        soloist: {
-            style: soloist.style,
-            octave: soloist.octave,
-            enabled: soloist.enabled,
-            lastFreq: soloist.audio.lastFreq,
-            volume: soloist.volume,
-            mode: soloist.mode,
-        },
-        harmony: {
-            style: harmony.style,
-            octave: harmony.octave,
-            enabled: harmony.enabled,
-            volume: harmony.volume,
-            complexity: harmony.complexity,
-        },
-        groove: {
-            genreFeel: groove.genreFeel,
-            lastDrumPreset: groove.lastDrumPreset,
-            enabled: groove.enabled,
-            volume: groove.volume,
-            measures: groove.measures,
-            swing: groove.swing,
-            swingSub: groove.swingSub,
-            instruments: groove.instruments.map((i: any) => ({
-                name: i.name,
-                steps: [...i.steps],
-                muted: i.muted,
-            })),
-        },
-        playback: {
-            bpm: playback.bpm,
-            bandIntensity: playback.bandIntensity,
-            complexity: playback.complexity,
-            autoIntensity: playback.autoIntensity,
-            practiceMode: playback.practiceMode,
-            songMode: playback.songMode,
-            sessionTimer: playback.sessionTimer,
-            sessionStartTime: playback.sessionStartTime,
-            isEndingPending: playback.isEndingPending,
-        },
+        arranger: buildArrangerSyncPayload(arranger),
+        chords: buildChordsSyncPayload(chords),
+        bass: buildBassSyncPayload(bass),
+        soloist: buildSoloistSyncPayload(soloist),
+        harmony: buildHarmonySyncPayload(harmony),
+        groove: buildGrooveSyncPayload(groove),
+        playback: buildPlaybackSyncPayload(playback),
+        midi: buildMidiSyncPayload(midi),
     };
 
     chords.buffer.clear();

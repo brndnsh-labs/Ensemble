@@ -33,6 +33,10 @@ const WORKER_MANAGED_KEYS: Record<string, string[]> = {
     bass: ['lastFreq', 'busySteps', 'lastMidiPlayed'],
     harmony: ['motifBuffer', 'lastMidis'],
     groove: ['fillSteps', 'fillActive', 'fillStartStep', 'fillLength', 'pendingCrash', 'snareMask'],
+    // #906 — rhythmicMask is written only inside the worker (accompaniment.ts's
+    // updateRhythmicIntent, `// @worker-mutation`); the main thread never sets it,
+    // so a sync must not stomp it with the main thread's stale/default copy.
+    chords: ['rhythmicMask'],
 };
 
 // --- LOGIC CURSORS ---
