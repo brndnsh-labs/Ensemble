@@ -65,7 +65,11 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:e2e
 
-      - uses: actions/upload-artifact@v7
+      # Pinned to @v3 on Forgejo: upload-artifact@v4+ uses the @actions/artifact
+      # v2 protocol, which this Forgejo build (gitea-1.22) rejects with
+      # GHESNotSupportedError. @v3 uses the older artifact API Forgejo supports.
+      # (The GitHub workflow keeps @v7.)
+      - uses: actions/upload-artifact@v3
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
