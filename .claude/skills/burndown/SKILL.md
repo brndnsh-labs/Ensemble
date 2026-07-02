@@ -78,8 +78,8 @@ If an item *almost* qualifies but has one catch, it's **out** — leave it for a
 - **The filter is conservative by design.** Excluding a safe-ish item costs throughput; including an
   unsafe one costs trust. Exclude when unsure — even a `burndown`-labelled item if the diff turns
   sensitive mid-cycle.
-- Auto-merge only, only for filter-passing items with green CI, via §6's guard — **never
-  `gh pr merge --auto`**.
+- Auto-merge only, only for filter-passing items with green CI, via §6's guard — **never bypass it
+  with a direct merge**.
 - Prod deploy is **never** part of `/burndown` (always Brandon's `scripts/deploy.sh prod`).
 - Honor the 5-item check-in and the >30-min-per-cycle guard from `/cycle`.
 

@@ -20,8 +20,8 @@ vs `backlog` label split); the re-run gates are §4.
    | Triage | Criteria | Action |
    |---|---|---|
    | **Fix now (DEFAULT)** | Any finding about the diff under review — P0, P1, **or a bounded P2** (mechanical, or small/localized). The default, not the exception. | patch inline this turn |
-   | **Escalate to Brandon** | A real finding that (a) needs a design call, or (b) is large / cross-cutting / would balloon the diff | stop; surface it; on his nod open a **`finding` issue** (`gh issue create --label finding,area:<x>` + add to the board) and/or recommend `/implement #<n>` with a fix-focused prompt — **never silently shelve a real finding** |
-   | **Backlog** | A genuinely *new* idea/feature surfaced during review — not a flaw in this code | open a **`backlog` issue** (`gh issue create --label backlog,area:<x>`, add to the board) — pipeline, not debt |
+   | **Escalate to Brandon** | A real finding that (a) needs a design call, or (b) is large / cross-cutting / would balloon the diff | stop; surface it; on his nod open a **`finding` issue** (`node scripts/forgejo.mjs issue create --title T --body B --label finding --label area:<x>`) and/or recommend `/implement #<n>` with a fix-focused prompt — **never silently shelve a real finding** |
+   | **Backlog** | A genuinely *new* idea/feature surfaced during review — not a flaw in this code | open a **`backlog` issue** (`node scripts/forgejo.mjs issue create --title T --body B --label backlog --label area:<x>`) — pipeline, not debt |
 
    **Bias to fix now.** Deferring a real finding to a list is the thing we're eliminating — open
    `finding` issues should trend to *empty*. A fix genuinely too big to do in-cycle is an

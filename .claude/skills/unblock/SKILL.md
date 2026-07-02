@@ -1,6 +1,6 @@
 ---
 name: unblock
-description: Batch the decisions Brandon owes so they get cleared in one sitting. Reads the GitHub Project for the highest-leverage blocked-on-Brandon items (scheduled stories with Status Needs-decision/Needs-ear + backlog issues carrying a needs-ear/needs-decision caveat label), restates each in plain English, and presents them as an AskUserQuestion menu — one question per item, recommended option first. Read-only to present; applies his picks (promote to Ready / close / capture). Plan-first. The decision-first companion to /next.
+description: Batch the decisions Brandon owes so they get cleared in one sitting. Reads the Forgejo tracker (issues + labels) for the highest-leverage blocked-on-Brandon items (scheduled stories with Status Needs-decision/Needs-ear + backlog issues carrying a needs-ear/needs-decision caveat label), restates each in plain English, and presents them as an AskUserQuestion menu — one question per item, recommended option first. Read-only to present; applies his picks (promote to Ready / close / capture). Plan-first. The decision-first companion to /next.
 ---
 
 # /unblock — clear the decisions Brandon owes, in one sitting
@@ -10,13 +10,13 @@ trivially decidable (plain English + a recommendation), then apply his calls.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §1
 (Status model — the scheduled-story-vs-caveat-label distinction is load-bearing), §2 (Labels —
-finding/backlog/burndown), §3 (fields to set on a promote), §7 (gh-project mechanics + the **batch**
+finding/backlog/burndown), §3 (fields to set on a promote), §7 (Forgejo REST mechanics + the **batch**
 rule for the writes). **Why it's separate from `/next`:** `/next` is Ready-first (the blocked pile is
 a side note); `/unblock` is decision-first — the blocked pile **is** the job.
 
 ## What counts as "blocked on Brandon"
 
-From the Project ∩ open issues (§7), join by number:
+From the open issues (§7):
 1. **Scheduled stories** with Status **`Needs-decision`** or **`Needs-ear`** (§1).
 2. **Backlog issues** carrying a **`needs-decision`** / **`needs-ear`** *caveat label* — status-less
    ideas that need his input before they can even be scheduled (the Status-vs-caveat distinction is §1).
@@ -27,11 +27,11 @@ them** ("3 new from last night's scout — a11y lens") so the morning pass clear
 
 ## Workflow
 
-1. **Gather** the blocked set (both classes). gh unreachable → say so and stop (§7).
+1. **Gather** the blocked set (both classes). Forgejo unreachable → say so and stop (§7).
 2. **Pick ~5** — decidable in one sitting. Priority: scheduled **Needs-decision** first (they block
    buildable work), then **Needs-ear**, then high-leverage backlog caveats. After `/nightly`, float
    `scout`-labelled finds to the top of their tier. If >5 qualify, say how many remain.
-3. **Read each issue** (`gh issue view <n> --json title,body,labels`) and restate as:
+3. **Read each issue** (`node scripts/forgejo.mjs issue view <n>`) and restate as:
    ```
    ### <n>. <plain-English title>   ( Needs-decision | Needs-ear · story | idea )
    **What it is:** <1–2 plain sentences — the gist at a glance>
@@ -51,16 +51,17 @@ them** ("3 new from last night's scout — a11y lens") so the morning pass clear
      verifiable, small), offer a **"Promote to Ready + mark for /burndown"** variant (tags it
      `burndown`).
 5. **Stop — read-only so far.** No edits until he picks.
-6. **On his answers, apply them** (the only writing step). **Collect every Project Status/field change
-   across ALL picks into one batch file → a single `node scripts/gh-project.mjs batch
-   /tmp/unblock-writes.json`** — never loop single-op writes (§7 rate-limit). REST changes
-   (`gh issue edit`/`comment`/`close`/`--add-label`) are fine per-item. Per pick:
+6. **On his answers, apply them** (the only writing step). **Collect every Status/field change
+   across ALL picks into one batch file → a single `node scripts/forgejo-project.mjs batch
+   /tmp/unblock-writes.json`** — never loop single-op writes (§7). REST changes
+   (`forgejo.mjs issue edit`/`comment`/`close`/`--add-label`) are fine per-item. Per pick:
    - **Scope/design decision that unblocks a story** → queue `Status=Ready` + the missing fields (§3),
      and edit the issue body to **record the decision**. "+ /burndown" variant → also
-     `gh issue edit <n> --add-label burndown`.
+     `node scripts/forgejo.mjs issue edit <n> --add-label burndown`.
    - **Needs-ear verdict** → apply ("good enough" → close; "needs work" → keep + note; "promote" →
      queue Status=Ready).
-   - **"Not worth doing"** → `gh issue close <n> --comment "<one-line why>"`.
+   - **"Not worth doing"** → `node scripts/forgejo.mjs issue comment <n> --body "<one-line why>"`
+     then `node scripts/forgejo.mjs issue close <n>`.
    - **A new follow-up the decision spawns** → capture as a `backlog`/`finding` issue (§2).
    - **"Skip / decide later"** → leave untouched; resurfaces next `/unblock`.
    Apply the one `batch` after assembling all entries.

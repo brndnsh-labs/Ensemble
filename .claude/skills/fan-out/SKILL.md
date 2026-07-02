@@ -1,6 +1,6 @@
 ---
 name: fan-out
-description: Implement 3-5 Ensemble work stories in parallel. Loads each issue's context from the board, verifies file-disjointness (no two stories edit the same file), determines the right agent + model per story, sets each Status → In progress, and presents a batch plan before spawning. Plan-first — does not spawn until confirmed. Use for disjoint batches; do NOT use for stories that share a hot file (coordination-engine.ts, tick-logic.ts). Usage `/fan-out #<n1> #<n2> #<n3>...`.
+description: Implement 3-5 Ensemble work stories in parallel. Loads each issue's context from the tracker, verifies file-disjointness (no two stories edit the same file), determines the right agent + model per story, sets each Status → In progress, and presents a batch plan before spawning. Plan-first — does not spawn until confirmed. Use for disjoint batches; do NOT use for stories that share a hot file (coordination-engine.ts, tick-logic.ts). Usage `/fan-out #<n1> #<n2> #<n3>...`.
 ---
 
 # /fan-out #<n…> — parallel implementation batch
@@ -16,7 +16,7 @@ policy, §7 (the **batch** rule for the Status writes). The procedure below is j
 
 1. **Parse the issue refs.** `#<n>` each. Require at least 2; warn over 5 (diminishing returns +
    context pressure + a large post-batch review diff).
-2. **Load each issue's context** (§7 read + `gh issue view`): Why/Touches/Acceptance, Track, Agent,
+2. **Load each issue's context** (§7 read + `forgejo.mjs issue view`): Why/Touches/Acceptance, Track, Agent,
    Model, Size, Review lens, files-touched (from Touches). Confirm each is **pickable** (§1).
 3. **Verify file-disjointness.**
    - Build the set of files-touched per story. Any file in two stories' sets is a conflict — **do not
@@ -26,7 +26,7 @@ policy, §7 (the **batch** rule for the Status writes). The procedure below is j
 4. **Pick agent + model per story** (§3) — from the Agent/Model fields, sanity-checked against Track +
    Touches. Different models in one batch is fine.
 5. **Set each Status → In progress** in **one batch call** (§7):
-   `node scripts/gh-project.mjs batch /tmp/fanout-status.json` (one `{issue,field:"Status",value:"In
+   `node scripts/forgejo-project.mjs batch /tmp/fanout-status.json` (one `{issue,field:"Status",value:"In
    progress"}` per story) — never a loop of single writes.
 6. **Branch** (§9) — a shared batch branch is fine for a disjoint set (`git checkout -b <batch-slug>`).
 7. **Present the batch plan:**
@@ -49,7 +49,7 @@ policy, §7 (the **batch** rule for the Status writes). The procedure below is j
 10. **Independently re-verify** (§3) — re-run the §4 gates + each story's Track DoD **yourself** on the
     combined tree; an agent's "green" is a claim.
 11. **Present the batch report:** ✅/⚠️ per story (with the re-verified gate status), combined diff
-    stat, and any Blocked ones. Roll a Blocked story's Status back to `Ready` (§7) so the board doesn't
+    stat, and any Blocked ones. Roll a Blocked story's Status back to `Ready` (§7) so the tracker doesn't
     strand it In-progress.
 12. **Suggest `/review`** on the combined diff.
 

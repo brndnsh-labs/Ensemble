@@ -66,7 +66,7 @@ staging push; prod is the gated awake-only call) and §4 (gates).
    checklist instead of a bare SHA. **Derive it, don't invent it:**
    - **What shipped** = the delta the deploy already printed (`git log <live>..HEAD`,
      the `📦`/`🆕` lines). For each shipped issue, pull its **Acceptance** field
-     (`gh issue view <n>` — Acceptance *is* "what should be true now") and its **Track**.
+     (`node scripts/forgejo.mjs issue view <n>` — Acceptance *is* "what should be true now") and its **Track**.
    - **Frame each item by Track** (one line each — what changed → how to verify):
      *musical* → by ear (what to listen for); *synth* → A/B the voice; *UI* → what to
      look at / interact with; *bundle* or **pure-internal/parity** (worker/export,

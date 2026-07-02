@@ -82,7 +82,7 @@ as in an attended `/burndown`. The standing go removes the *checkpoint pauses*, 
 
 - **The safe filter (§5) is unchanged and conservative.** Excluding a safe-ish item costs throughput;
   including an unsafe one costs trust — exclude when unsure.
-- **Auto-merge = §6's poll-then-merge guard only, never `gh pr merge --auto`** (no server-side
+- **Auto-merge = §6's poll-then-merge guard only, never `--auto`** (no server-side
   required checks here, so `--auto` can land before gates finish).
 - **Prod is never touched.** The standard finish deploys to **test** (step 3); `/nightly` never runs
   `deploy.sh prod`. Promoting to prod is always Brandon's explicit, awake decision.

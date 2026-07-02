@@ -3,18 +3,17 @@ name: done
 description: Ship an Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) merge it once CI is green; a judgment-call story's PR (synth/by-ear/destructive) is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n> [...]`. Use after /review (+ /patch) pass clean.
 ---
 
-# /done #<n> — ship a story (GitHub-backed, auto-merge model)
+# /done #<n> — ship a story (Forgejo-backed, auto-merge model)
 
 Goal: commit the reviewed work, push, open a PR that closes the issue, and land it — auto-merging a
 safe story (CI-gated) or leaving a judgment-call PR for Brandon.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill leans
 on §4 Gates (incl. Track DoD), §5 Judgment calls (the safe-vs-brake split — synth/by-ear/destructive),
-§6 Merge guard (the poll-then-merge bash, never `--auto`, set-Shipped-then-sync-main), §8 Commit & PR
+§6 Merge guard (the poll-then-merge bash, never `--auto`, sync-main), §8 Commit & PR
 conventions, §9 Branch policy. The procedure below is just the ordering.
 
-**Done = the issue is closed** (§1) — `Closes #<n>` does it on merge, and the enabled "Item
-closed → Status: Shipped" Project workflow flips the board field automatically (§1/§6/§7). No
+**Done = the issue is closed** (§1) — `Closes #<n>` does it on merge (§1/§6/§7). No
 explicit status write, no markdown tracker to touch.
 
 ## Workflow
@@ -41,8 +40,8 @@ explicit status write, no markdown tracker to touch.
 10. **Post a one-line issue comment** linking the PR.
 11. **Land it — the auto-merge decision (§5 + §6):**
     - **Safe story** (Track musical/bundle, CI green, none of §5's always-brake classes) → run the
-      **poll-then-merge guard in the background** (§6), then `node scripts/gh-project.mjs status <n>
-      "Shipped"`, sync local main + prune the branch. The issue auto-closes.
+      **poll-then-merge guard in the background** (§6), then sync local main + prune the branch. The
+      issue auto-closes.
     - **Judgment-call story** (Track `synth` / by-ear / destructive data op / state-or-worker-contract
       design call, or anything Brandon should *see*) → **leave the PR open**, Status stays In review
       (or Needs-ear for synth awaiting audition), report "ready for your merge: <url>" + *why* it's
@@ -57,5 +56,5 @@ explicit status write, no markdown tracker to touch.
 - **Unrelated drift in the diff:** surface; stage selectively (§8 — never `-A`).
 - **Whole epic (milestone) done:** note it; suggest a VISION/docs shipped note — don't auto-restructure
   (milestone progress reflects it automatically).
-- **Issue didn't close after merge** (a `Closes #<n>` typo / non-default base): `gh issue close <n>`
-  (the "Item closed → Shipped" workflow then flips the board). A **closed issue is "done"** regardless.
+- **Issue didn't close after merge** (a `Closes #<n>` typo / non-default base): `node scripts/forgejo.mjs
+  issue close <n>`. A **closed issue is "done"** regardless.

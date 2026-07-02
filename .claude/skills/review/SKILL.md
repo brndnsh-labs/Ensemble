@@ -9,14 +9,14 @@ Goal: pick the right reviewers for what changed, run them, present consolidated 
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is the
 detailed expansion of §3 (Track → Reviewers) and routes on §5's sensitive-diff classes (destructive
-data ops / state-or-worker-contract design calls / by-ear). §7 covers the `gh-project.mjs status`
+data ops / state-or-worker-contract design calls / by-ear). §7 covers the `forgejo-project.mjs status`
 write.
 
 ## Workflow
 
 1. **Survey the diff.** `git status` + `git diff --stat`. Empty diff → say so and stop. If an issue #
    is in context (from `/implement` or `/cycle`), mark it **In review** —
-   `node scripts/gh-project.mjs status <n> "In review"` (best-effort; skip for a standalone review).
+   `node scripts/forgejo-project.mjs status <n> "In review"` (best-effort; skip for a standalone review).
 2. **Route reviewers** (rows are additive — union them, run each once):
 
    | If the diff touches... | Run |

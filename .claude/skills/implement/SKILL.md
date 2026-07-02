@@ -1,24 +1,24 @@
 ---
 name: implement
-description: Implement a single Ensemble work story from its GitHub issue. Reads the spec from the issue body + Project fields (Track/Agent/Model/Size), picks the executor (musical-engine-implementer for engine code, critique-test-author for test-only deliverables, synth-implementer for audio/DSP, claude for UI, orchestrator-inline for opus/small/finicky), sets Status → In progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
+description: Implement a single Ensemble work story from its Forgejo issue. Reads the spec from the issue body + routing labels (Track/Agent/Model/Size), picks the executor (musical-engine-implementer for engine code, critique-test-author for test-only deliverables, synth-implementer for audio/DSP, claude for UI, orchestrator-inline for opus/small/finicky), sets Status → In progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
 ---
 
-# /implement #<n> — ship a single story (GitHub-backed)
+# /implement #<n> — ship a single story (Forgejo-backed)
 
 Goal: load one issue's context, pick agent + model, present a plan, build on confirmation, report.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill leans
-on §1 Tracker & readiness (pickability), §3 Fields & routing (Track → executor + reviewer; re-verify
+on §1 Tracker & readiness (pickability), §3 Routing labels (Track → executor + reviewer; re-verify
 agent claims), §4 Gates (incl. the Track-specific DoD), §9 Branch policy. The procedure below is just
 the ordering.
 
 ## Workflow
 
 1. **Parse the issue ref** — `#<n>` (or a bare number).
-2. **Read the issue + its fields:**
-   - `gh issue view <n> --json title,body,labels,milestone,state,url` — Why / Touches / Acceptance
+2. **Read the issue + its labels:**
+   - `node scripts/forgejo.mjs issue view <n>` — Why / Touches / Acceptance
      (body), `area:*` labels, epic (milestone).
-   - Its Project fields (§7 read) — **Status, Track, Model, Size, Agent, Review lens**.
+   - Its routing labels (§7 read) — **Status, Track, Model, Size, Agent, Review lens**.
    - The relevant `CLAUDE.md` sections (always § Musical Logic & Generative Standards for a musical
      story; § Coordination if context fields involved; § State for state writes; § synth notes for a
      synth story) + the matching `feedback_*` memory note (final-stage multiplier, deterministic
@@ -31,7 +31,7 @@ the ordering.
    `musical-engine-implementer` (or `critique-test-author` if the test IS the deliverable); Track
    `synth` → `synth-implementer`; UI → `claude`; finicky state/worker/hydration → `orchestrator-inline`.
 5. **Pick the model** (§3) — Model field (`sonnet`/`opus`); default opus. Pass to the Agent tool.
-6. **Set Status → In progress:** `node scripts/gh-project.mjs status <n> "In progress"`.
+6. **Set Status → In progress:** `node scripts/forgejo-project.mjs status <n> "In progress"`.
 7. **Branch check** (§9) — if on `main`, branch first (`git checkout -b <short-slug>`); reuse an epic
    branch if one exists. Never build on `main`.
 8. **Present the plan:**
@@ -72,4 +72,4 @@ the ordering.
   blocks `/done` (§4).
 - **Gates red:** report; don't hand off to `/review` against a broken build.
 - **Build abandoned (not handed to /review):** roll Status back to `Ready`
-  (`node scripts/gh-project.mjs status <n> "Ready"`) so the board doesn't strand it In-progress.
+  (`node scripts/forgejo-project.mjs status <n> "Ready"`) so the Status label doesn't strand it In-progress.

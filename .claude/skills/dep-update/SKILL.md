@@ -1,29 +1,31 @@
 ---
 name: dep-update
-description: Batch dependency update workflow. Runs npm update, validates, commits, closes all open Dependabot PRs, and prunes stale branches. Weekly hygiene — call when Dependabot PRs have accumulated or when running a scheduled update pass.
+description: Batch dependency update workflow. Runs npm update, validates (audit + typecheck + tests), and commits the lockfile in one local pass. Weekly hygiene — call for a scheduled dependency refresh. (Forgejo has no Dependabot; this is a purely local update pass — there are no dependency PRs to reconcile.)
 ---
 
-# /dep-update — batch dependency update and Dependabot cleanup
+# /dep-update — batch dependency update
 
-Goal: bring all packages to their latest semver-compatible versions in one local commit, then close the now-redundant Dependabot PRs and clean up stale branches. Faster and safer than merging PRs one-by-one (they'd conflict).
+Goal: bring all packages to their latest semver-compatible versions in one local commit, validated by
+the gates. Local-only — Forgejo has no Dependabot, so there are no dependency PRs or bot branches to
+close or prune; this skill just refreshes the lockfile and proves the suite still passes.
 
 ## Workflow
 
 ### 1. Survey
 
 Run in parallel:
-- `gh pr list --author "app/dependabot" --state open --json number,title,headRefName`
 - `npm outdated`
 - `npm audit`
 
-Report: how many Dependabot PRs are open, which packages are outdated, and any security advisories. Note if any outdated package is a **major-version bump** — those need extra scrutiny (breaking changes) and may need a separate targeted install rather than `npm update`.
+Report: which packages are outdated and any security advisories. Note if any outdated package is a
+**major-version bump** — those need extra scrutiny (breaking changes) and may need a separate targeted
+install rather than `npm update`.
 
 ### 2. Present the plan
 
 ```
 ## dep-update plan
 
-**Open Dependabot PRs:** <N> (will be closed after commit)
 **Packages to update:** <list from npm outdated>
 **Security advisories:** <none | list>
 **Major-version bumps:** <none | list — flag for extra scrutiny>
@@ -35,8 +37,6 @@ Report: how many Dependabot PRs are open, which packages are outdated, and any s
 4. npm test
 5. Fix any stale test expectations if tests fail
 6. Commit (package-lock.json + any test fixes)
-7. Close <N> Dependabot PRs
-8. Prune stale remote branches
 
 Proceed?
 ```
@@ -96,44 +96,18 @@ git commit -m "chore(deps): batch dependency updates via npm update
 
 <list of notable bumps>
 
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
 
 Never `git add -A`. Never `--no-verify`.
 
-### 8. Close Dependabot PRs
-
-```bash
-gh pr close <n1> <n2> ... \
-  --comment "Closing — handled via batch local npm update on main (commit <hash>)."
-```
-
-Get the commit hash from `git rev-parse --short HEAD`.
-
-### 9. Prune stale branches
-
-```bash
-git fetch --prune
-git branch -r | grep dependabot
-```
-
-GitHub auto-deletes branches when PRs are closed if auto-delete is enabled. After `--prune`, any remaining dependabot branches from **already-closed** PRs can be deleted:
-
-```bash
-git push origin --delete <branch-name>
-```
-
-Do not delete branches that belong to still-open PRs (rare, but possible if a PR was left open intentionally).
-
-### 10. Verify and report
+### 8. Verify and report
 
 ```
 ## dep-update done
 
 **Updated:** <N packages>
 **Advisories resolved:** <N | none | 1 remaining (needs --force, flagged)>
-**Dependabot PRs closed:** <list>
-**Branches pruned:** <list | none — GitHub auto-cleaned>
 **Test fixes:** <none | list of files + what changed>
 
 npm outdated now returns: <nothing | any remaining intentional holds>
@@ -141,8 +115,8 @@ npm outdated now returns: <nothing | any remaining intentional holds>
 
 ## Edge cases
 
-- **No open Dependabot PRs:** still run `npm update` — the local lock may have drifted even if GitHub hasn't created PRs yet.
-- **cspell major bump (9→10):** cspell PRs often lag behind `package.json` changes. Check if `package.json` already declares the new major before treating the PR as live work.
+- **Lockfile drift with nothing outdated:** still run `npm update` — the local lock may have drifted from a hand-edit or a partial install even when `npm outdated` is clean.
+- **cspell major bump (9→10):** check if `package.json` already declares the new major before treating it as live work.
 - **A package can't update within its semver range:** usually means `package.json` is pinned to an older range. Widen the range if safe, or leave it and note it in the report.
 - **`npm test` times out:** run vitest directly (`npx vitest run`) to isolate which file is hanging before re-running the full suite.
 
@@ -152,4 +126,3 @@ npm outdated now returns: <nothing | any remaining intentional holds>
 - Never `--no-verify` on hooks.
 - Never `npm audit fix --force` without explicit user direction.
 - Never auto-push — user runs `git push` themselves.
-- Don't close a Dependabot PR until after the commit is made and verified.

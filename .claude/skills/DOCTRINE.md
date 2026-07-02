@@ -11,35 +11,34 @@ that used to restate it. The skills hold only their *unique* procedure.
 
 ## §1 Tracker & readiness
 
-The tracker is **GitHub Project #2** (`brndnsh` → "Ensemble — Work",
-<https://github.com/users/brndnsh/projects/2>). A **story = an issue**: its **body** holds Why /
-Touches / Acceptance; its **Project fields** hold routing (§3). The `docs/audit/` and
+The tracker is the **Forgejo repo's issues** (`brandon/Ensemble` on
+<https://git.brndn.zip> — LAN/WG-only). A **story = an issue**: its **body** holds Why /
+Touches / Acceptance; its **labels** hold routing (§3). The `docs/audit/` and
 `docs/synth-audit/` trees are a **frozen archive** of the markdown-tracked cycles — *not* the
-live tracker; never read them as current. **Milestones = epics.**
+live tracker; never read them as current. **Milestones = epics** (native Forgejo milestones).
 
-**The Status field is for *scheduled* work** (an issue scoped into an epic). Backlog ideas stay
-status-less.
+**Labels are the source of truth**; any board/project *view* is eyes-only — no skill writes it.
+**The `status/*` label is for *scheduled* work** (an issue scoped into an epic). Backlog ideas
+stay status-less.
 
-| Status | Meaning | Pipeline action |
+| `status/*` | Meaning | Pipeline action |
 | --- | --- | --- |
-| **Ready** | scoped + pickable | `/next` ranks & picks; `/implement`/`/cycle` build |
-| **In progress** | being built | don't re-pick |
-| **In review** | built, under review / PR open | don't re-pick |
-| **Needs-decision** | blocked on a Brandon call | `/unblock` surfaces; **don't build** |
-| **Needs-ear** | blocked on Brandon's ear (listen pass / A/B audition) | `/unblock` tees up; **don't build past the gate** |
-| **Blocked** | blocked on a dependency | skip; name the blocker |
-| **Shipped** | issue closed (set on merge) | done |
-| **(no Status)** + `backlog`/`finding` | the idea pile, not a scheduled story | triage/scope to Ready first; don't pick |
+| **ready** | scoped + pickable | `/next` ranks & picks; `/implement`/`/cycle` build |
+| **in-progress** | being built | don't re-pick |
+| **in-review** | built, under review / PR open | don't re-pick |
+| **needs-decision** | blocked on a Brandon call | `/unblock` surfaces; **don't build** |
+| **needs-ear** | blocked on Brandon's ear (listen pass / A/B audition) | `/unblock` tees up; **don't build past the gate** |
+| **blocked** | blocked on a dependency | skip; name the blocker |
+| **(no status/\*)** + `backlog`/`finding` | the idea pile, not a scheduled story | triage/scope to ready first; don't pick |
 
-**Ranking Ready** (`/next`): milestone (a real numbered epic > a "candidate epic" / no
-milestone), then Size (S < M < L), then issue number. Model is *not* a ranking factor.
+**Ranking ready** (`/next`): milestone (a real numbered epic > a "candidate epic" / no
+milestone), then `size/*` (s < m < l), then issue number. `model/*` is *not* a ranking factor.
 
-**Board auto-flip IS configured** (confirmed firing 2026-06-20 via #631). GitHub's built-in
-**"Item closed → Status: Shipped"** workflow is enabled in the Project (UI-only, not
-CLI/API-configurable), so closing an issue — which `Closes #<n>` does on merge — **auto-sets
-`Status: Shipped`**. The pipeline no longer writes Shipped itself; the workflow owns that field.
-A **closed issue is the source-of-truth "done"** regardless of the board field, so even if the
-workflow is ever toggled off, nothing downstream breaks (the board just lags reality).
+**A closed issue is "done" — there is no "Shipped" state.** `Closes #<n>` on merge closes the
+issue, and closed *is* the source-of-truth done (DOCTRINE dropped the old "Shipped" board field —
+Forgejo has no closed→field automation, and a closed issue already says it). The pipeline doesn't
+mark done; it just lets the close speak. Clear any lingering `status/*` on close if you like, but
+nothing downstream reads it once the issue is closed.
 
 ## §2 Labels
 
@@ -62,16 +61,23 @@ workflow is ever toggled off, nothing downstream breaks (the board just lags rea
   genuinely-subjective work where no critique test can assert the idiom). Pairs with `burndown`.
 - **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock` can surface last
   night's finds freshest-first.
-- **`area:*`** — surface tags inferring the executor when Agent is unset: `area:soloist`,
+- **`area:*`** — surface tags inferring the executor when `agent/*` is unset: `area:soloist`,
   `area:bass`, `area:drums`, `area:chords`, `area:harmony`, `area:groove`, `area:synth`,
   `area:state`, `area:worker`, `area:ui`, `area:infra`.
-- **`track:*`** is **not** a label — the **Track field** (§3) owns musical/synth/bundle/ui.
+- **Routing namespaces** — `status/*`, `track/*`, `model/*`, `size/*`, `agent/*`, `lens/*` are
+  **single-select label groups** that carry the routing formerly held by Project fields (§3). Each
+  namespace holds at most one label per issue; **set them via `scripts/forgejo-project.mjs`, never
+  by hand** — it enforces the one-per-namespace rule and preserves the workflow labels above.
+  `track/*` (musical|synth|bundle|ui) is the load-bearing one (§3).
 
-## §3 Fields & routing
+## §3 Routing labels
 
-**Fields** (single-select; note **`Review lens`** has a space in its key):
-- **Track** — `musical` | `synth` | `bundle` | `ui`. **The load-bearing routing field** — it picks
-  the Definition of Done and the reviewer set (below). The tracks differ on their DoD:
+**Routing namespaces** (single-select label groups, written via `scripts/forgejo-project.mjs
+set-field <n> "<Field>" "<Value>"` — the Field name maps to the namespace: Track→`track/*`,
+Model→`model/*`, Size→`size/*`, Agent→`agent/*`, "Review lens"→`lens/*`, Status→`status/*`):
+- **Track** (`track/*`) — `musical` | `synth` | `bundle` | `ui`. **The load-bearing routing
+  namespace** — it picks the Definition of Done and the reviewer set (below). The tracks differ
+  on their DoD:
   - **musical** → gated by a **critique test** in `tests/standards/` (statistical ranges, an
     automated oracle). Most musical stories are fully auto-mergeable on green; when the change is
     audible, ship it `verify-by-ear` (auto-merge on green + a 🎧 listen checklist — §5). Only
@@ -87,14 +93,14 @@ workflow is ever toggled off, nothing downstream breaks (the board just lags rea
     `/code-review`. Auto-mergeable on green (same safe posture as `bundle`). When a `ui` change
     routes audible voices (e.g. a sound-source picker), pair it with `verify-by-ear` for a 🎧 pass —
     but routing already-approved voices is **not** a `synth` Needs-ear hard stop.
-- **Model** — `sonnet` | `opus` (default **opus** — standing call: spawn agents on opus).
-  **Model does not gate autonomy** (§5) — it only picks the executor's model.
-- **Size** — S | M | L.
-- **Agent** — the executor (below).
-- **Review lens** — `music-theory` | `synth-graph` | `state-discipline` | `worker-contract` |
-  `bundle-hygiene` | `code-review` | `both`.
+- **Model** (`model/*`) — `sonnet` | `opus` (default **opus** — standing call: spawn agents on
+  opus). **Model does not gate autonomy** (§5) — it only picks the executor's model.
+- **Size** (`size/*`) — `s` | `m` | `l`.
+- **Agent** (`agent/*`) — the executor (below).
+- **Review lens** (`lens/*`) — `music-theory` | `synth-graph` | `state-discipline` |
+  `worker-contract` | `bundle-hygiene` | `code-review` | `both`.
 
-**Executors** (the Agent field, sanity-checked against what the issue touches):
+**Executors** (the `agent/*` label, sanity-checked against what the issue touches):
 - **`musical-engine-implementer`** — generative engine behavior: bass, drums, soloist,
   harmonies, chords, accompaniment, coordination, conductor, arranger (`public/engine/**`,
   `public/state/**` engine slices). Follows the repo's musical patterns (final-stage multiplier,
@@ -216,23 +222,19 @@ The pipeline pushes + opens PRs. **Auto-merge SAFE stories** (none of §5's alwa
 AND green CI); **a judgment-call story's PR is left open for Brandon's manual merge** (Status stays
 In review, or Needs-ear for synth; report "ready for your merge: <url>" + why).
 
-This repo has **no server-side required checks** (branch protection is unconfigured, verified
-2026-06-18), so **`gh pr merge --auto` merges *immediately* with nothing to wait on — NEVER use
-it**. The **poll-then-merge guard IS the enforcement**, run in the **background** (the poll +
-`--watch` take minutes; a foreground `sleep` is harness-blocked):
+Forgejo Actions has **no server-side auto-merge-on-green**, so — exactly as on GitHub — the
+**poll-then-merge guard IS the enforcement**. One script owns it, run in the **background** (the
+poll takes minutes; a foreground `sleep` is harness-blocked):
 ```bash
-# 1. Wait for the run to REGISTER (gh pr checks --watch errors "no checks reported" if run
-#    before any check exists, instead of waiting).
-until [ "$(gh pr view <pr> --json statusCheckRollup --jq '.statusCheckRollup | length')" -gt 0 ]; do sleep 5; done
-# 2. Block until checks FINISH; --fail-fast exits non-zero the moment one fails. Watch ALL
-#    checks (test + e2e), NOT --required (there are none server-side). The && is the guard.
-gh pr checks <pr> --watch --fail-fast && gh pr merge <pr> --squash --delete-branch
+# Waits for CI to REGISTER + FINISH on the PR's head sha, then merges (squash + delete branch)
+# ONLY if the combined commit-status is `success`; on failure it prints each failing check's run
+# URL and exits non-zero. Add --dry-run to poll + decide without merging.
+node scripts/forgejo-merge.mjs <pr> &
 ```
-After a safe merge: the **"Item closed → Status: Shipped"** Project workflow flips the board field
-automatically (§1) — no explicit status write needed. Just **sync local main** (`git checkout main
-&& git fetch origin && git reset --hard origin/main`) and prune the branch. (If you ever spot a
-merged-but-not-Shipped item, the workflow was toggled off — `node scripts/gh-project.mjs status <n>
-"Shipped"` is the manual fallback.)
+The gate is the verified `GET /commits/{sha}/status` endpoint (combined `state` + per-job
+`statuses[]` — the `gh statusCheckRollup` replacement). After a safe merge, `Closes #<n>` already
+closed the issue = done (§1 — no Shipped field to set). Just **sync local main** (`git checkout main
+&& git fetch origin && git reset --hard origin/main`) and prune the branch.
 
 **Deploy (static-file app).** Ensemble ships as **static files on nginx behind Caddy** —
 `vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app server, no DB,
@@ -256,29 +258,26 @@ accurate regardless of who deployed last or from where) and **after** to verify 
 bundle landed. To check the pending set by hand: curl the origin's `index.<rev>.js`, strip any
 dirty `-<sig>` suffix, and `git log <rev>..HEAD`.
 
-## §7 gh-project mechanics
+## §7 Tracker mechanics (Forgejo REST)
 
-- **Read the board:** `gh project item-list 2 --owner brndnsh --limit 600 --format json` (each item:
-  `content.{number,title,body,url,type}`, `status`, `track`, `size`, `model`, `agent`,
-  `review lens`, `milestone.title`, `labels`). **Always pass `--limit` (board has ~57 items, default
-  cap is 30)** — without it, recent issues silently fall off the result and read as "not on board".
-  Single-selects flatten to the option name
-  (absent/`None` when unset). Intersect with `gh issue list --state open` on `number` to keep only
-  open issues (a closed item can linger on the board until archived; this also catches an open
-  issue **not yet on the board**, e.g. an `inbox` capture).
-- **Write a field:** `node scripts/gh-project.mjs status <n> "<Status>"` or
-  `set-field <n> "<Field>" "<Value>"` (e.g. `set-field 12 Track synth`).
-- **Bulk writes:** **always** `node scripts/gh-project.mjs batch <file.json>` — a *single*
-  memoized call. Never loop single-op writes: each refetches the 500-item list and drains the
-  5000 pt/hr GraphQL quota. REST-side changes (`gh issue edit`/`comment`/`close`/`--add-label`)
-  are fine per-item.
-- **Add an off-board issue:** `gh project item-add 2 --owner brndnsh --url <url>` (or the helper's
-  `ensure <n>`).
-- **UI workflows (not CLI-configurable):** **"Item closed → Status: Shipped"** is **enabled** and
-  owns the Shipped field (§1/§6 — confirmed 2026-06-20). Do NOT also enable "Item added → Status:
-  Ready": Status is for *scheduled* work, and auto-Ready-on-add would mis-mark raw `inbox`/`backlog`
-  captures (let `/intake` set Ready deliberately).
-- **gh offline/unauthed:** say so and stop — don't fall back to the frozen markdown as current.
+The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`, token at
+`~/.config/forgejo/token`). **No `tea` CLI, no `gh`** — two thin scripts wrap the surface:
+
+- **Read the tracker:** `node scripts/forgejo.mjs list [--open] [--label <l>] [--milestone <m>]`
+  → issues as JSON (`number`, `title`, `body`, `url`, `state`, `labels[]`, `milestone`). The
+  `status/track/size/model/agent/lens` routing is read straight off `labels[]` (filter by the
+  namespace prefix). No pagination footgun like the old board's 30-item default — the script pages
+  to completion. A closed issue is done (§1); pass `--open` to a picking skill.
+- **Write a routing label:** `node scripts/forgejo-project.mjs status <n> "<Status>"` or
+  `set-field <n> "<Field>" "<Value>"` (e.g. `set-field 12 Track synth`) — enforces one-per-namespace.
+- **Bulk writes:** **always** `node scripts/forgejo-project.mjs batch <file.json>` (array of
+  `{issue, field, value}`) — it groups by issue and does one GET + one PUT per issue. Cheaper and
+  atomic; never loop single-op writes.
+- **Issue/PR ops:** `node scripts/forgejo.mjs issue create|comment|close|edit ...` and
+  `pr create ...` (see the script's `--help`). `Closes #<n>` in a PR body auto-closes on merge, same
+  as GitHub.
+- **Forgejo unreachable:** both scripts **exit 3** and say so — a skill must **stop**, not fall back
+  to the frozen markdown or a cached list as current.
 
 ## §8 Commit & PR conventions
 
@@ -289,13 +288,14 @@ dirty `-<sig>` suffix, and `git log <rev>..HEAD`.
   ```
 - **`git add <explicit paths>` — never `-A` / `.`**. Never `--no-verify`; never amend; never
   **force**-push.
-- **PR:** `gh pr create --base main`, a rich "what shipped + which findings were actioned"
-  narrative as the body, **with `Closes #<n>`**, title = the Conventional-Commit subject. PR bodies
-  end with:
+- **PR:** `node scripts/forgejo.mjs pr create --base main --head <branch>` (after `git push`), a
+  rich "what shipped + which findings were actioned" narrative as the body, **with `Closes #<n>`**,
+  title = the Conventional-Commit subject. PR bodies end with:
   ```
   🤖 Generated with [Claude Code](https://claude.com/claude-code)
   ```
-- Post a one-line issue comment linking the PR; the narrative lives in the PR body.
+- Post a one-line issue comment linking the PR (`forgejo.mjs issue comment <n> ...`); the narrative
+  lives in the PR body.
 
 ## §9 Branch policy
 
@@ -303,4 +303,4 @@ dirty `-<sig>` suffix, and `git log <rev>..HEAD`.
   build on `main`; `/implement` branches (`git checkout -b <short-slug>`), reusing an epic branch
   if one exists.
 - **Minor tooling / skills / docs edits → straight to `main`**, no branch/PR (`.claude/skills/*`,
-  `scripts/gh-project.mjs`, ops notes, `docs/*` that aren't story deliverables).
+  `scripts/forgejo*.mjs`, ops notes, `docs/*` that aren't story deliverables).

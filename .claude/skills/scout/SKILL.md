@@ -1,13 +1,13 @@
 ---
 name: scout
-description: Discovery-driven finder for the overnight loop — sweeps the codebase through ONE lens (a11y · security · perf · hygiene · context), triages what it finds, and files the worth-keeping candidates as well-formed GitHub Project items (via /intake's classification), `burndown`-tagging the build-verifiable mechanical ones and shaping the rest as one-question `Needs-decision`s (fix pre-drafted) so /unblock can clear them into next-loop burndown fuel. Read-only over code: it FINDS and FILES, it never fixes or merges. The discovery companion to /burndown (which consumes). Usage `/scout <a11y|security|perf|hygiene|context>` (bare = rotate by day).
+description: Discovery-driven finder for the overnight loop — sweeps the codebase through ONE lens (a11y · security · perf · hygiene · context), triages what it finds, and files the worth-keeping candidates as well-formed Forgejo issues (via /intake's classification), `burndown`-tagging the build-verifiable mechanical ones and shaping the rest as one-question `Needs-decision`s (fix pre-drafted) so /unblock can clear them into next-loop burndown fuel. Read-only over code: it FINDS and FILES, it never fixes or merges. The discovery companion to /burndown (which consumes). Usage `/scout <a11y|security|perf|hygiene|context>` (bare = rotate by day).
 ---
 
 # /scout — find tomorrow's safe work tonight
 
 Goal: when the vetted backlog is exhausted, the overnight loop still has something useful to do —
 **discover** candidate work and file it as triaged issues Brandon approves over coffee. The
-**discovery half**: every other skill *consumes* the Project (`/burndown` grinds, `/cycle` builds);
+**discovery half**: every other skill *consumes* the tracker (`/burndown` grinds, `/cycle` builds);
 `/scout` *generates* candidates from the code itself.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Scout files
@@ -41,9 +41,9 @@ the codebase is clean on that lens is a **success** — say so and stop. Don't m
 
 ## Dedup first — always
 
-Before filing, **search open issues for a twin** — `gh issue list --state open --search "<keywords>"`
-+ a title skim. Re-filing what's tracked turns the loop into spam. Twin exists → skip (or one
-`gh issue comment` if your finding sharpens it). Unsure if two findings are the same → file once.
+Before filing, **search open issues for a twin** — `node scripts/forgejo.mjs list --open`
++ a title/keyword skim. Re-filing what's tracked turns the loop into spam. Twin exists → skip (or one
+`node scripts/forgejo.mjs issue comment` if your finding sharpens it). Unsure if two findings are the same → file once.
 
 ## Shape every finding for the queue — the scout → unblock → burndown chain
 
@@ -166,10 +166,10 @@ cost. Two faces of one failure: **doc↔code drift** and **undocumented load-bea
    classification (Track + labels + fields + readiness verdict), and *why it's safe or not* for
    `burndown`. Under a standing overnight go (`/nightly`), proceed without waiting; interactively, get
    Brandon's nod first.
-6. **File** — for each survivor, `/intake`'s write step: `gh issue create` with labels, then **one**
-   `node scripts/gh-project.mjs batch /tmp/scout-fields.json` for ALL Project fields (never a loop —
+6. **File** — for each survivor, `/intake`'s write step: `node scripts/forgejo.mjs issue create` with labels, then **one**
+   `node scripts/forgejo-project.mjs batch /tmp/scout-fields.json` for ALL routing fields (never a loop —
    §7). Conservative `burndown` tagging. **Always stamp `--label scout`** so `/unblock` surfaces last
-   night's finds freshest-first. gh unreachable → say so and stop.
+   night's finds freshest-first. Forgejo unreachable → say so and stop.
 7. **Report** — what was filed (links + Status/whether `burndown`), what was found but not filed (dups,
    below-the-cut, "clean on this lens"), and which items are grind-ready vs waiting on Brandon.
 

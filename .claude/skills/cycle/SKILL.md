@@ -41,7 +41,7 @@ Read the issue's **Track** field; it sets the loop's tail:
   a judgment-call PR for Brandon. A **synth** issue halts at the listening gate. `--deploy` runs
   `scripts/deploy.sh test` after the merge.
 - **`/cycle #<n> approved`** — finalize a synth issue whose audition you've now signed off: run §6's
-  merge + set Shipped, then continue.
+  merge (`Closes #<n>` closes the issue = done), then continue.
 - **`/cycle next`** — runs `/next` first, then cycles whatever Ready issue it picks.
 - **`/cycle next --until-blocked`** — after each `/done`, auto-`/next` and continue. **Stops on:** a
   judgment call (§5 — incl. a synth listening gate or a PR left un-merged) · no Ready issue left ·
@@ -74,7 +74,7 @@ Read the issue's **Track** field; it sets the loop's tail:
    | implement | gates + Track DoD green when **the orchestrator re-runs them itself** (§4) | gates red, agent Blocked, or a spawned "green" that doesn't reproduce (§3) |
    | review | findings all P1/P2 mechanical | any P0, or a finding contradicts a memory note (§5) |
    | patch | gates green | gates red, a fix needs a design call |
-   | done | safe story (musical/bundle): §6 poll-then-merge → Shipped | CI red / conflict / hook failure that isn't a trivial retry · **synth → HALT at the listening gate** · **judgment-call class → PR left open for Brandon** |
+   | done | safe story (musical/bundle): §6 poll-then-merge → closed (`Closes #<n>` = done) | CI red / conflict / hook failure that isn't a trivial retry · **synth → HALT at the listening gate** · **judgment-call class → PR left open for Brandon** |
    | deploy-test | deploy + verify green | deploy non-zero, external check fails after retries |
 
 6. **On `--until-blocked`, after `/done` (and optional deploy):**
@@ -111,7 +111,7 @@ park. The open **`finding` issues must not grow** as a cycle side effect.
 ## Safety
 
 Same as `/done` (§6 + §8): never `git add -A`, never `--no-verify`, never **force**-push, never amend,
-**never `gh pr merge --auto`** (use §6's poll-then-merge guard). Never override a pause gate without
+**never bypass §6's poll-then-merge guard** (`node scripts/forgejo-merge.mjs <pr> &`). Never override a pause gate without
 explicit direction this turn. Never auto-merge a synth story past the listening gate. Don't accept
 "looks fine" from a reviewer without parsing findings — empty findings is valid, *missing* findings
 (timeout/error) is a failure.
@@ -123,4 +123,4 @@ explicit direction this turn. Never auto-merge a synth story past the listening 
   Brandon's ear; the chain stops (or continues with non-synth Ready work only if still clearly clean).
 - **Last story of an epic ships under `--until-blocked`:** stop with the retrospective.
 - **Reviewer fails (timeout/none):** pause-worthy; don't auto-`/done` unreviewed.
-- **Project / `gh` unreachable (§7):** stop; don't fabricate a story.
+- **Forgejo unreachable (§7):** stop; don't fabricate a story.

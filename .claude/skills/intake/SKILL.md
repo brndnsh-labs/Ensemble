@@ -1,12 +1,12 @@
 ---
 name: intake
-description: The front door to the backlog — turn a plain-English idea into an actionable, fully-classified GitHub Project item. Interviews Brandon ONE question at a time (quick back-and-forth, plain English) until the issue is genuinely implementable, then drafts it, sets the Project fields (Status/Track/Size/Model/Agent/Review lens) + labels, and tags the safe ones `burndown` so the autonomous loop can pick them up. Plan-first — always shows the shaped issue before writing. The capture companion to /unblock (decisions) and /burndown (grind), and the inverse of /wrap-up (ideas→backlog). Usage `/intake <the idea>` (or bare, and it'll ask).
+description: The front door to the backlog — turn a plain-English idea into an actionable, fully-classified Forgejo issue. Interviews Brandon ONE question at a time (quick back-and-forth, plain English) until the issue is genuinely implementable, then drafts it, sets the routing fields (Status/Track/Size/Model/Agent/Review lens) + labels, and tags the safe ones `burndown` so the autonomous loop can pick them up. Plan-first — always shows the shaped issue before writing. The capture companion to /unblock (decisions) and /burndown (grind), and the inverse of /wrap-up (ideas→backlog). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
 
 # /intake — turn an idea into actionable, classified backlog
 
 Goal: stop good ideas from evaporating or landing as vague one-liners. `/intake` is the **capture
-verb**: every other skill *reads* the GitHub Project (`/next` picks, `/cycle` builds, `/unblock`
+verb**: every other skill *reads* the Forgejo tracker (`/next` picks, `/cycle` builds, `/unblock`
 decides, `/burndown` grinds); this one *writes* a well-formed item into it from a plain-English idea.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Classification
@@ -39,7 +39,7 @@ first) — never to fire several at once.
 1. **Hear the idea.** If bare, ask what's on his mind. If it carried text, restate it in one plain
    sentence to align before digging.
 
-2. **Dedup first** (read-only). `gh issue list --state open --search "<keywords>"` + a title skim.
+2. **Dedup first** (read-only). `node scripts/forgejo.mjs list --open` + a title/keyword skim.
    If a twin exists, surface it: *"We already have #N — extend that, or is yours different?"* Never
    file a duplicate; extending an existing issue is often right.
 
@@ -53,7 +53,7 @@ first) — never to fire several at once.
    - **Decision / ear dependency** — open design question, or only-his-ear call? → `Needs-decision` /
      `Needs-ear`, not `Ready` (step 4).
 
-4. **Classify — infer, then confirm in one light pass.** Map to the Project's real fields + labels:
+4. **Classify — infer, then confirm in one light pass.** Map to the tracker's real fields + labels:
    - **Track** — `musical` (generative engine behavior) · `synth` (audio/DSP voices) · `bundle`
      (size/dead-code). The Track sets the DoD + reviewer (§3).
    - **`area:*` label** — `soloist · bass · drums · chords · harmony · groove · synth · state ·
@@ -81,7 +81,7 @@ first) — never to fire several at once.
    - **Title** — crisp, imperative.
    - **Body** — *symptom/why* (grounded), *acceptance* (verifiable, Track-appropriate), *scope /
      non-goals*, *notes* (related issues/memories `[[…]]`).
-   - **Classification** — Track + labels + Project fields, each with a half-line of why.
+   - **Classification** — Track + labels + routing fields, each with a half-line of why.
    - **Readiness verdict** — *"Ready + `burndown`-safe — the grinder can take it hands-off"* /
      *"Ready for a human `/cycle`"* / *"Needs your decision on X → Needs-decision"* / *"Parked in the
      inbox until shaped."*
@@ -90,11 +90,13 @@ first) — never to fire several at once.
 
 6. **Create + classify** (the only writing step):
    ```
-   gh issue create --title "<title>" --body "<body>" \
+   node scripts/forgejo.mjs issue create --title "<title>" --body "<body>" \
      --label "area:<x>" --label "<backlog|finding>" \
      [--label burndown] [--label needs-decision|needs-ear] [--milestone "<epic>"]
    ```
-   Then set ALL Project fields in **one `batch` call** (`batch` auto-adds to the board):
+   (A long, multi-section body → pass `--body @-` and pipe it on stdin, or `--body @file`.)
+   Then set ALL routing fields in **one `batch` call** (§7 — no board to add to; the issue existing
+   is enough):
    ```
    cat > /tmp/intake-fields.json <<JSON
    [
@@ -106,10 +108,10 @@ first) — never to fire several at once.
      { "issue": <n>, "field": "Review lens", "value": "<…>" }
    ]
    JSON
-   node scripts/gh-project.mjs batch /tmp/intake-fields.json
+   node scripts/forgejo-project.mjs batch /tmp/intake-fields.json
    ```
-   Drop the Status line if no Status applies (a status-less backlog item is correct). gh unreachable
-   → say so and stop (§7).
+   Drop the Status line if no Status applies (a status-less backlog item is correct). Forgejo
+   unreachable → say so and stop (§7).
 
 7. **Report.** Created issue(s) + links, each Status, and what's now actionable: `Ready`+`burndown`
    → "`/burndown` can grind these"; `Ready` (human) → "`/cycle next` when you want it";
@@ -118,9 +120,10 @@ first) — never to fire several at once.
 ## Batch mode
 
 Several ideas at once → run each through the same loop (dedup → quick interview → classify → confirm
-→ create), crisp exchanges. **Field-writes go in ONE `batch` at the very end** — `gh issue create`
-each first (collecting numbers), accumulate every `{issue,field,value}` into one
-`/tmp/intake-fields.json`, run `node scripts/gh-project.mjs batch` once (§7 rate-limit).
+→ create), crisp exchanges. **Field-writes go in ONE `batch` at the very end** — `node
+scripts/forgejo.mjs issue create` each first (collecting numbers), accumulate every
+`{issue,field,value}` into one `/tmp/intake-fields.json`, run `node scripts/forgejo-project.mjs
+batch` once (§7 batch rule).
 
 ## Guardrails
 
