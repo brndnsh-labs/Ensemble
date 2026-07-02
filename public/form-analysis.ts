@@ -11,7 +11,10 @@ const SECTION_ENERGY_MAP: Record<string, number> = {
     drop: 1.0,
     bridge: 0.6,
     solo: 0.8,
-    outro: 0.4,
+    // An outro winds *down* — it should sit below the intro (0.4), not match it.
+    // Only bites the getSectionEnergy fallback; the role path corrects energy on
+    // its own. (#800)
+    outro: 0.3,
     breakdown: 0.3,
 };
 

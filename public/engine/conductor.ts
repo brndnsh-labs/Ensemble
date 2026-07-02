@@ -127,7 +127,10 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     // Harmonies follow the complexity signal for activity level.
     let targetHbComplexity = complexity;
 
-    // If Song Mode is active and we are in the last 30 seconds, push for a "Final Build"
+    // Song Mode ending: in the last 30s, floor harmony complexity high so the
+    // outro's harmonic activity fills in. Note this bumps harmony density ONLY —
+    // the end-of-song tempo ritardando is a separate, per-genre mechanism in
+    // engine/resolution.ts, not a full build here. (#800)
     if (playback.songMode && playback.isEndingPending) {
         targetHbComplexity = Math.max(targetHbComplexity, 0.85);
     }
