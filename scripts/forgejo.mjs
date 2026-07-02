@@ -43,7 +43,9 @@ const PAGE = 50;
 
 function token() {
     const t = process.env.FORGEJO_TOKEN ?? readFileSync(TOKEN_FILE, 'utf8').trim();
-    if (!t) throw new Error(`empty token (${TOKEN_FILE})`);
+    if (!t) {
+        throw new Error(`empty token (${TOKEN_FILE})`);
+    }
     return t;
 }
 
@@ -65,9 +67,14 @@ async function api(method, path, body) {
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch (e) {
-        fail(`Forgejo unreachable (${method} ${path}): ${e.message} — stopping; do NOT treat cached state as current`, 3);
+        fail(
+            `Forgejo unreachable (${method} ${path}): ${e.message} — stopping; do NOT treat cached state as current`,
+            3,
+        );
     }
-    if (res.status === 204) return null;
+    if (res.status === 204) {
+        return null;
+    }
     const text = await res.text();
     let data = null;
     if (text) {
@@ -77,7 +84,9 @@ async function api(method, path, body) {
             /* keep raw text for the error message */
         }
     }
-    if (!res.ok) fail(`${method} ${path} → ${res.status}: ${data?.message ?? text.slice(0, 200)}`);
+    if (!res.ok) {
+        fail(`${method} ${path} → ${res.status}: ${data?.message ?? text.slice(0, 200)}`);
+    }
     return data;
 }
 
@@ -91,9 +100,13 @@ function parseArgs(argv) {
         const a = argv[i];
         if (a.startsWith('--')) {
             const key = a.slice(2);
-            const val = argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true;
-            if (flags[key] === undefined) flags[key] = val;
-            else flags[key] = [].concat(flags[key], val); // repeated → array
+            const val =
+                argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true;
+            if (flags[key] === undefined) {
+                flags[key] = val;
+            } else {
+                flags[key] = [].concat(flags[key], val); // repeated → array
+            }
         } else {
             positional.push(a);
         }
@@ -105,9 +118,15 @@ const asArray = (v) => (v === undefined ? [] : [].concat(v));
 
 // --body "@path" / "@-" (stdin) → contents, mirroring gh -F.
 function readBody(v) {
-    if (typeof v !== 'string') return v;
-    if (v === '@-') return readFileSync(0, 'utf8');
-    if (v.startsWith('@')) return readFileSync(v.slice(1), 'utf8');
+    if (typeof v !== 'string') {
+        return v;
+    }
+    if (v === '@-') {
+        return readFileSync(0, 'utf8');
+    }
+    if (v.startsWith('@')) {
+        return readFileSync(v.slice(1), 'utf8');
+    }
     return v;
 }
 
@@ -119,7 +138,9 @@ async function labelId(name) {
         _labels = new Map(list.map((l) => [l.name, l.id]));
     }
     const id = _labels.get(name);
-    if (id === undefined) fail(`no label "${name}" (have ${[..._labels.keys()].length} labels)`);
+    if (id === undefined) {
+        fail(`no label "${name}" (have ${[..._labels.keys()].length} labels)`);
+    }
     return id;
 }
 let _milestones;
@@ -129,7 +150,9 @@ async function milestoneId(title) {
         _milestones = new Map(list.map((m) => [m.title, m.id]));
     }
     const id = _milestones.get(title);
-    if (id === undefined) fail(`no milestone "${title}" (have: ${[..._milestones.keys()].join(', ')})`);
+    if (id === undefined) {
+        fail(`no milestone "${title}" (have: ${[..._milestones.keys()].join(', ')})`);
+    }
     return id;
 }
 
@@ -147,17 +170,23 @@ function slimIssue(i) {
 }
 
 async function listIssues(flags) {
-    const state = flags.open ? 'open' : (flags.state && flags.state !== true ? flags.state : 'open');
+    const state = flags.open ? 'open' : flags.state && flags.state !== true ? flags.state : 'open';
     const labels = asArray(flags.label).filter((x) => x !== true);
     const qs = new URLSearchParams({ type: 'issues', state, limit: String(PAGE) });
-    if (labels.length) qs.set('labels', labels.join(','));
-    if (flags.milestone && flags.milestone !== true) qs.set('milestones', flags.milestone);
+    if (labels.length) {
+        qs.set('labels', labels.join(','));
+    }
+    if (flags.milestone && flags.milestone !== true) {
+        qs.set('milestones', flags.milestone);
+    }
     const out = [];
     for (let page = 1; ; page++) {
         qs.set('page', String(page));
         const batch = await api('GET', `${R}/issues?${qs}`);
         out.push(...batch);
-        if (batch.length < PAGE) break;
+        if (batch.length < PAGE) {
+            break;
+        }
     }
     console.log(JSON.stringify(out.map(slimIssue), null, 2));
 }
@@ -169,43 +198,73 @@ async function issueCmd(sub, rest) {
         case 'list':
             return listIssues(flags);
         case 'view': {
-            if (!n) fail('usage: issue view <n>');
+            if (!n) {
+                fail('usage: issue view <n>');
+            }
             console.log(JSON.stringify(slimIssue(await api('GET', `${R}/issues/${n}`)), null, 2));
             return;
         }
         case 'create': {
-            if (!flags.title || flags.title === true) fail('usage: issue create --title T [--body B] [--label L]... [--milestone M]');
+            if (!flags.title || flags.title === true) {
+                fail('usage: issue create --title T [--body B] [--label L]... [--milestone M]');
+            }
             const payload = { title: flags.title, body: flags.body ? readBody(flags.body) : '' };
             const labels = asArray(flags.label).filter((x) => x !== true);
-            if (labels.length) payload.labels = await Promise.all(labels.map(labelId));
-            if (flags.milestone && flags.milestone !== true) payload.milestone = await milestoneId(flags.milestone);
+            if (labels.length) {
+                payload.labels = await Promise.all(labels.map(labelId));
+            }
+            if (flags.milestone && flags.milestone !== true) {
+                payload.milestone = await milestoneId(flags.milestone);
+            }
             const issue = await api('POST', `${R}/issues`, payload);
             console.log(`created #${issue.number}: ${issue.html_url}`);
             return;
         }
         case 'edit': {
-            if (!n) fail('usage: issue edit <n> [--title T] [--body B] [--add-label L]... [--remove-label L]... [--milestone M]');
+            if (!n) {
+                fail(
+                    'usage: issue edit <n> [--title T] [--body B] [--add-label L]... [--remove-label L]... [--milestone M]',
+                );
+            }
             const patch = {};
-            if (flags.title && flags.title !== true) patch.title = flags.title;
-            if (flags.body) patch.body = readBody(flags.body);
-            if (flags.milestone && flags.milestone !== true) patch.milestone = await milestoneId(flags.milestone);
-            if (Object.keys(patch).length) await api('PATCH', `${R}/issues/${n}`, patch);
+            if (flags.title && flags.title !== true) {
+                patch.title = flags.title;
+            }
+            if (flags.body) {
+                patch.body = readBody(flags.body);
+            }
+            if (flags.milestone && flags.milestone !== true) {
+                patch.milestone = await milestoneId(flags.milestone);
+            }
+            if (Object.keys(patch).length) {
+                await api('PATCH', `${R}/issues/${n}`, patch);
+            }
             for (const name of asArray(flags['remove-label']).filter((x) => x !== true)) {
                 await api('DELETE', `${R}/issues/${n}/labels/${await labelId(name)}`);
             }
             const add = asArray(flags['add-label']).filter((x) => x !== true);
-            if (add.length) await api('POST', `${R}/issues/${n}/labels`, { labels: await Promise.all(add.map(labelId)) });
+            if (add.length) {
+                await api('POST', `${R}/issues/${n}/labels`, {
+                    labels: await Promise.all(add.map(labelId)),
+                });
+            }
             console.log(`edited #${n}`);
             return;
         }
         case 'comment': {
-            if (!n || !flags.body) fail('usage: issue comment <n> --body B');
-            const c = await api('POST', `${R}/issues/${n}/comments`, { body: readBody(flags.body) });
+            if (!n || !flags.body) {
+                fail('usage: issue comment <n> --body B');
+            }
+            const c = await api('POST', `${R}/issues/${n}/comments`, {
+                body: readBody(flags.body),
+            });
             console.log(`commented on #${n}: ${c.html_url}`);
             return;
         }
         case 'close': {
-            if (!n) fail('usage: issue close <n>');
+            if (!n) {
+                fail('usage: issue close <n>');
+            }
             await api('PATCH', `${R}/issues/${n}`, { state: 'closed' });
             console.log(`closed #${n}`);
             return;
@@ -235,17 +294,47 @@ async function prCmd(sub, rest) {
         case 'list': {
             const state = flags.state && flags.state !== true ? flags.state : 'open';
             const prs = await api('GET', `${R}/pulls?state=${state}&limit=${PAGE}`);
-            console.log(JSON.stringify(prs.map((p) => ({ number: p.number, title: p.title, state: p.state, url: p.html_url, head: p.head?.ref })), null, 2));
+            console.log(
+                JSON.stringify(
+                    prs.map((p) => ({
+                        number: p.number,
+                        title: p.title,
+                        state: p.state,
+                        url: p.html_url,
+                        head: p.head?.ref,
+                    })),
+                    null,
+                    2,
+                ),
+            );
             return;
         }
         case 'view': {
-            if (!n) fail('usage: pr view <n>');
+            if (!n) {
+                fail('usage: pr view <n>');
+            }
             const p = await api('GET', `${R}/pulls/${n}`);
-            console.log(JSON.stringify({ number: p.number, title: p.title, state: p.state, url: p.html_url, head: p.head?.ref, merged: p.merged, mergeable: p.mergeable }, null, 2));
+            console.log(
+                JSON.stringify(
+                    {
+                        number: p.number,
+                        title: p.title,
+                        state: p.state,
+                        url: p.html_url,
+                        head: p.head?.ref,
+                        merged: p.merged,
+                        mergeable: p.mergeable,
+                    },
+                    null,
+                    2,
+                ),
+            );
             return;
         }
         case 'close': {
-            if (!n) fail('usage: pr close <n>');
+            if (!n) {
+                fail('usage: pr close <n>');
+            }
             await api('PATCH', `${R}/pulls/${n}`, { state: 'closed' });
             console.log(`closed PR #${n}`);
             return;
@@ -260,10 +349,14 @@ const [cmd, sub, ...rest] = process.argv.slice(2);
 if (cmd === 'list') {
     await listIssues(parseArgs([sub, ...rest].filter((x) => x !== undefined)).flags);
 } else if (cmd === 'issue') {
-    if (!sub) fail('usage: issue <list|view|create|edit|comment|close> ...');
+    if (!sub) {
+        fail('usage: issue <list|view|create|edit|comment|close> ...');
+    }
     await issueCmd(sub, rest);
 } else if (cmd === 'pr') {
-    if (!sub) fail('usage: pr <create|list|view|close> ...');
+    if (!sub) {
+        fail('usage: pr <create|list|view|close> ...');
+    }
     await prCmd(sub, rest);
 } else {
     fail('usage: forgejo.mjs <list|issue|pr> ...');

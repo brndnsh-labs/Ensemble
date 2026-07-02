@@ -55,7 +55,9 @@ const FIELD_NS = {
 
 function token() {
     const t = process.env.FORGEJO_TOKEN ?? readFileSync(TOKEN_FILE, 'utf8').trim();
-    if (!t) throw new Error(`empty token (${TOKEN_FILE})`);
+    if (!t) {
+        throw new Error(`empty token (${TOKEN_FILE})`);
+    }
     return t;
 }
 
@@ -79,9 +81,14 @@ async function api(method, path, body) {
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch (e) {
-        fail(`Forgejo unreachable (${method} ${path}): ${e.message} — stopping; do NOT treat cached board state as current`, 3);
+        fail(
+            `Forgejo unreachable (${method} ${path}): ${e.message} — stopping; do NOT treat cached board state as current`,
+            3,
+        );
     }
-    if (res.status === 204) return null;
+    if (res.status === 204) {
+        return null;
+    }
     const text = await res.text();
     let data = null;
     if (text) {
@@ -112,7 +119,9 @@ async function labels() {
 // namespace and the specific option both exist.
 async function resolveLabel(field, value) {
     const ns = FIELD_NS[field];
-    if (!ns) fail(`unknown field "${field}" (have: ${Object.keys(FIELD_NS).join(', ')})`);
+    if (!ns) {
+        fail(`unknown field "${field}" (have: ${Object.keys(FIELD_NS).join(', ')})`);
+    }
     const slug = String(value).trim().toLowerCase().replace(/\s+/g, '-');
     const name = `${ns}/${slug}`;
     const map = await labels();
@@ -152,25 +161,36 @@ async function setField(issueNum, field, value) {
     }
     const { ns, name, id } = await resolveLabel(field, value);
     const current = await issueLabels(issueNum);
-    if (current.some((l) => l.id === id) && !current.some((l) => l.name.startsWith(`${ns}/`) && l.id !== id)) {
+    if (
+        current.some((l) => l.id === id) &&
+        !current.some((l) => l.name.startsWith(`${ns}/`) && l.id !== id)
+    ) {
         console.log(`#${issueNum}: ${field} already ${value}`);
         return;
     }
     const next = applyOp(current, ns, { id, name });
-    await putLabels(issueNum, next.map((l) => l.id));
+    await putLabels(
+        issueNum,
+        next.map((l) => l.id),
+    );
     console.log(`#${issueNum}: ${field} → ${name}`);
 }
 
 async function clearField(issueNum, field) {
     const ns = FIELD_NS[field];
-    if (!ns) fail(`unknown field "${field}" (have: ${Object.keys(FIELD_NS).join(', ')})`);
+    if (!ns) {
+        fail(`unknown field "${field}" (have: ${Object.keys(FIELD_NS).join(', ')})`);
+    }
     const current = await issueLabels(issueNum);
     if (!current.some((l) => l.name.startsWith(`${ns}/`))) {
         console.log(`#${issueNum}: ${field} already clear`);
         return;
     }
     const next = applyOp(current, ns, null);
-    await putLabels(issueNum, next.map((l) => l.id));
+    await putLabels(
+        issueNum,
+        next.map((l) => l.id),
+    );
     console.log(`#${issueNum}: ${field} cleared`);
 }
 
@@ -188,7 +208,9 @@ async function runBatch(file) {
     } catch (e) {
         fail(`could not read batch file "${file}": ${e.message}`);
     }
-    if (!Array.isArray(queue)) fail('batch file must be a JSON array of { issue, field, value }');
+    if (!Array.isArray(queue)) {
+        fail('batch file must be a JSON array of { issue, field, value }');
+    }
 
     // Group by issue so we GET + PUT each issue's labels exactly once.
     const byIssue = new Map();
@@ -197,7 +219,9 @@ async function runBatch(file) {
         if (Number.isNaN(n)) {
             fail(`bad entry (no issue#): ${JSON.stringify(entry)}`);
         }
-        if (!byIssue.has(n)) byIssue.set(n, []);
+        if (!byIssue.has(n)) {
+            byIssue.set(n, []);
+        }
         byIssue.get(n).push(entry);
     }
 
@@ -213,7 +237,10 @@ async function runBatch(file) {
                     ok++;
                     continue;
                 }
-                if (entry.field === 'Status' && String(entry.value).trim().toLowerCase() === 'shipped') {
+                if (
+                    entry.field === 'Status' &&
+                    String(entry.value).trim().toLowerCase() === 'shipped'
+                ) {
                     working = applyOp(working, 'status', null);
                     touched = true;
                     console.log(`#${issueNum}: Status "Shipped" retired → cleared status/*`);
@@ -226,7 +253,12 @@ async function runBatch(file) {
                 console.log(`#${issueNum}: ${entry.field} → ${name}`);
                 ok++;
             }
-            if (touched) await putLabels(issueNum, working.map((l) => l.id));
+            if (touched) {
+                await putLabels(
+                    issueNum,
+                    working.map((l) => l.id),
+                );
+            }
         } catch (e) {
             failures.push(`#${issueNum}: ${e.message}`);
         }
@@ -241,7 +273,9 @@ async function runBatch(file) {
 const [cmd, arg, a, b] = process.argv.slice(2);
 
 if (cmd === 'batch') {
-    if (!arg) fail('usage: forgejo-project.mjs batch <file.json>');
+    if (!arg) {
+        fail('usage: forgejo-project.mjs batch <file.json>');
+    }
     await runBatch(arg);
 } else {
     const issueNum = Number(arg);
@@ -250,15 +284,21 @@ if (cmd === 'batch') {
     }
     switch (cmd) {
         case 'status':
-            if (!a) fail('usage: status <issue#> "<Status>"');
+            if (!a) {
+                fail('usage: status <issue#> "<Status>"');
+            }
             await setField(issueNum, 'Status', a);
             break;
         case 'set-field':
-            if (!a || b === undefined) fail('usage: set-field <issue#> "<Field>" "<Value>"');
+            if (!a || b === undefined) {
+                fail('usage: set-field <issue#> "<Field>" "<Value>"');
+            }
             await setField(issueNum, a, b);
             break;
         case 'clear':
-            if (!a) fail('usage: clear <issue#> "<Field>"');
+            if (!a) {
+                fail('usage: clear <issue#> "<Field>"');
+            }
             await clearField(issueNum, a);
             break;
         case 'ensure':

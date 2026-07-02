@@ -40,7 +40,9 @@ const FINISH_TIMEOUT = Number(process.env.FJ_FINISH_TIMEOUT_SECS ?? 2400);
 
 function token() {
     const t = process.env.FORGEJO_TOKEN ?? readFileSync(TOKEN_FILE, 'utf8').trim();
-    if (!t) throw new Error(`empty token (${TOKEN_FILE})`);
+    if (!t) {
+        throw new Error(`empty token (${TOKEN_FILE})`);
+    }
     return t;
 }
 
@@ -81,7 +83,9 @@ async function api(method, path, body) {
 // `status` (Forgejo/gitea quirk), and target_url is repo-relative.
 async function combinedStatus(sha) {
     const r = await api('GET', `/repos/${OWNER}/${REPO}/commits/${sha}/status`);
-    if (!r.ok) done(`status ${sha}: ${r.status} ${r.data?.message ?? r.text.slice(0, 200)}`, 1);
+    if (!r.ok) {
+        done(`status ${sha}: ${r.status} ${r.data?.message ?? r.text.slice(0, 200)}`, 1);
+    }
     return r.data;
 }
 
@@ -103,15 +107,22 @@ async function pollToTerminal(sha) {
         if (!registered) {
             if (n > 0) {
                 registered = true;
-                console.log(`forgejo-merge: CI registered (${n} check${n > 1 ? 's' : ''}) — ${summarize(s)}`);
+                console.log(
+                    `forgejo-merge: CI registered (${n} check${n > 1 ? 's' : ''}) — ${summarize(s)}`,
+                );
             } else if (elapsed > REGISTER_TIMEOUT) {
                 done(`no checks registered for ${sha} after ${REGISTER_TIMEOUT}s`, 2);
             }
         }
         // `pending` with zero statuses = not registered yet; keep waiting.
-        if (registered && s.state !== 'pending') return s;
+        if (registered && s.state !== 'pending') {
+            return s;
+        }
         if (registered && elapsed > FINISH_TIMEOUT) {
-            done(`checks did not finish for ${sha} after ${FINISH_TIMEOUT}s — last: ${summarize(s)}`, 2);
+            done(
+                `checks did not finish for ${sha} after ${FINISH_TIMEOUT}s — last: ${summarize(s)}`,
+                2,
+            );
         }
         await sleep(POLL_SECS * 1000);
     }
@@ -119,11 +130,17 @@ async function pollToTerminal(sha) {
 
 async function mergePr(prNum, { dryRun } = {}) {
     const pr = await api('GET', `/repos/${OWNER}/${REPO}/pulls/${prNum}`);
-    if (!pr.ok) done(`PR #${prNum}: ${pr.status} ${pr.data?.message ?? pr.text.slice(0, 200)}`, 1);
-    if (pr.data.merged) done(`PR #${prNum} already merged — nothing to do`, 0);
+    if (!pr.ok) {
+        done(`PR #${prNum}: ${pr.status} ${pr.data?.message ?? pr.text.slice(0, 200)}`, 1);
+    }
+    if (pr.data.merged) {
+        done(`PR #${prNum} already merged — nothing to do`, 0);
+    }
     const sha = pr.data.head?.sha;
     const branch = pr.data.head?.ref;
-    if (!sha) done(`PR #${prNum} has no head sha`, 1);
+    if (!sha) {
+        done(`PR #${prNum} has no head sha`, 1);
+    }
     console.log(`forgejo-merge: PR #${prNum} (${branch}) @ ${sha.slice(0, 8)} — waiting for CI`);
 
     const s = await pollToTerminal(sha);
@@ -132,34 +149,51 @@ async function mergePr(prNum, { dryRun } = {}) {
         const failed = (s.statuses ?? []).filter((c) => c.status !== 'success');
         console.error(`forgejo-merge: CI ${s.state} — NOT merging PR #${prNum}`);
         for (const c of failed) {
-            const url = c.target_url ? (c.target_url.startsWith('http') ? c.target_url : WEB + c.target_url) : '';
+            const url = c.target_url
+                ? c.target_url.startsWith('http')
+                    ? c.target_url
+                    : WEB + c.target_url
+                : '';
             console.error(`  ✗ ${c.context}: ${c.status}${url ? ` → ${url}` : ''}`);
         }
         process.exit(1);
     }
 
-    if (dryRun) done(`CI success — would merge PR #${prNum} (squash + delete ${branch}) [dry-run]`, 0);
+    if (dryRun) {
+        done(`CI success — would merge PR #${prNum} (squash + delete ${branch}) [dry-run]`, 0);
+    }
 
     const m = await api('POST', `/repos/${OWNER}/${REPO}/pulls/${prNum}/merge`, {
         Do: 'squash',
         delete_branch_after_merge: true,
     });
     // Forgejo returns 200 (body) or 204 (empty) on a successful merge.
-    if (!m.ok) done(`merge PR #${prNum} failed: ${m.status} ${m.data?.message ?? m.text.slice(0, 200)}`, 1);
+    if (!m.ok) {
+        done(
+            `merge PR #${prNum} failed: ${m.status} ${m.data?.message ?? m.text.slice(0, 200)}`,
+            1,
+        );
+    }
     done(`merged PR #${prNum} (squash) + deleted ${branch}`, 0);
 }
 
 const [cmd, arg] = process.argv.slice(2);
 
 if (cmd === 'poll') {
-    if (!arg) done('usage: forgejo-merge.mjs poll <sha>', 1);
+    if (!arg) {
+        done('usage: forgejo-merge.mjs poll <sha>', 1);
+    }
     console.log(summarize(await combinedStatus(arg)));
 } else if (cmd === 'watch') {
-    if (!arg) done('usage: forgejo-merge.mjs watch <sha>', 1);
+    if (!arg) {
+        done('usage: forgejo-merge.mjs watch <sha>', 1);
+    }
     const s = await pollToTerminal(arg);
     done(`terminal: ${summarize(s)}`, s.state === 'success' ? 0 : 1);
 } else {
     const prNum = Number(cmd);
-    if (Number.isNaN(prNum)) done('usage: forgejo-merge.mjs <pr#> [--dry-run] | poll <sha> | watch <sha>', 1);
+    if (Number.isNaN(prNum)) {
+        done('usage: forgejo-merge.mjs <pr#> [--dry-run] | poll <sha> | watch <sha>', 1);
+    }
     await mergePr(prNum, { dryRun: arg === '--dry-run' });
 }
