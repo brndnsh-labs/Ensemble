@@ -35,6 +35,14 @@ interface CompingState {
     //      whenever a structural hit or a fresh chord makes a new statement.
     statementVoicingMidis: number[];
     statementChordKey: string | null;
+    // why: #766 restate-vs-ring — when a statement decides to RING through the next
+    //      offbeat answer (sustain instead of re-attack), it records the absolute
+    //      step of that answer here so the later per-step call suppresses the
+    //      re-attack. `ringSuppressChordKey` guards it so a chord change between the
+    //      statement and the answer cancels a stale ring. `-1` / null = no pending
+    //      ring. Consumed (cleared) on the marked step.
+    ringSuppressStep: number;
+    ringSuppressChordKey: string | null;
     // why: epic-deterministic-phrasing S1 — counter incremented every time the
     //      STICKY (Funk) cell-bank picker fires (initial pick + each rotation).
     //      Used as the phrase-index input to the cell-bank hash so cell choice
@@ -70,6 +78,8 @@ export const compingState: CompingState = {
     lastVoicingMidis: [],
     statementVoicingMidis: [],
     statementChordKey: null,
+    ringSuppressStep: -1,
+    ringSuppressChordKey: null,
     funkRotationIndex: 0,
     bossaRotationIndex: 0,
 };
@@ -598,6 +608,15 @@ function selectSupportiveVoicing(
 // their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
 // stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
 const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
+
+// why (#766): genres whose comp may RING a hit through the next answer (sustain
+// instead of re-attack). A subset of SUSTAINED_COMP_GENRES: Bossa Nova is
+// deliberately EXCLUDED — its identity is a steady partido-alto ostinato of
+// syncopated attacks, and tying through an interior attack blurs that pulse. This
+// mirrors Bossa's exclusion from PHRASE_END_THIN_GENRES (the 2026-05-23 Epic 12 S4
+// decision: Bossa's "breath comes from the cells themselves, not a separate gate").
+// Jazz/Blues/Acoustic are idiomatic sustain-through comps.
+const RING_THROUGH_GENRES = new Set(['Jazz', 'Blues', 'Acoustic']);
 
 /**
  * Move a single voice to the nearest NEIGHBORING chord tone (a small melodic step
@@ -1560,6 +1579,10 @@ function updateRhythmicIntent(
         // answer if it happens to share the prior chord's root+quality.
         compingState.statementChordKey = null;
         compingState.statementVoicingMidis = [];
+        // #766 — drop any pending ring-through across a section boundary; the marked
+        // answer step belongs to the old section's chord.
+        compingState.ringSuppressStep = -1;
+        compingState.ringSuppressChordKey = null;
     }
 
     if (step < compingState.lockedUntil) {
@@ -3227,6 +3250,22 @@ export function getAccompanimentNotes(
         isHit = isBeatStart;
     }
 
+    // #766 restate-vs-ring — a prior statement decided to sustain THROUGH this hit
+    // (see the ring block near the emission site): suppress the re-attack so the
+    // held voicing keeps ringing instead of re-striking. The marker is consumed on
+    // its target step either way, so a stale ring whose chord changed just clears.
+    if (compingState.ringSuppressStep === step) {
+        if (
+            isHit &&
+            RING_THROUGH_GENRES.has(genre) &&
+            compingState.ringSuppressChordKey === `${chord.rootMidi}:${chord.quality}`
+        ) {
+            isHit = false; // the statement is still sounding — no gap
+        }
+        compingState.ringSuppressStep = -1;
+        compingState.ringSuppressChordKey = null;
+    }
+
     if (isHit) {
         const isDownbeat = stepInfo ? stepInfo.isBeatStart : measureStep % ts.stepsPerBeat === 0;
         const isStructural = stepInfo
@@ -3580,9 +3619,78 @@ export function getAccompanimentNotes(
         // breathes instead of re-striking the same notes. Sustained-comp genres
         // only; the percussive-identity lanes early-return well before here.
         if (SUSTAINED_COMP_GENRES.has(genre) && finalVoicingMidis.length > 0) {
+            // Capture the statement key BEFORE the economy updates it, so we can
+            // tell whether THIS hit is the statement (the ring is decided on
+            // statements only — see below).
+            const priorStatementKey = compingState.statementChordKey;
             const emitMidis = applyPerHitEconomy(finalVoicingMidis, chord, isStructural, compDraw);
             if (emitMidis.length > 0) {
                 voicing = emitMidis.map((midi) => getFrequency(midi));
+            }
+
+            // #766 restate-vs-ring — the most spacious human breath: instead of
+            // re-attacking the next offbeat answer, sometimes let THIS statement
+            // ring THROUGH it. We can't lengthen a note already emitted on a prior
+            // per-step call, so the decision is made HERE, on the statement: extend
+            // this voicing's duration to cover the next answer hit and mark that
+            // step so its call suppresses the re-attack (the chord is still sounding,
+            // so no gap). Ring is the EXCEPTION (~1 in 4 statements) — a limp comp
+            // is worse than a busy one (#715/#766 note). The #707 clamp below caps
+            // the extension, so a ring can never overrun the chord boundary.
+            const ringChordKey = `${chord.rootMidi}:${chord.quality}`;
+            const emittedStatement = isStructural || ringChordKey !== priorStatementKey;
+            // Intensity gate: ring is a breath WITHIN an active comp — when the band
+            // is driving, letting a chord sustain instead of re-striking reads as
+            // relaxed confidence. At low intensity the comp is already spacious
+            // (sparse plucks), so dropping a hit there just thins it toward limp —
+            // the exact failure #766 warns against. Only ring at moderate+ intensity.
+            if (
+                RING_THROUGH_GENRES.has(genre) &&
+                emittedStatement &&
+                intensity >= 0.4 &&
+                compDraw(377) < 0.25
+            ) {
+                const spb = ts.stepsPerBeat;
+                const groupStride = (ts.grouping?.[0] || ts.beats) * spb;
+                const isArp = chords.style === 'arp';
+                // Steps left in THIS chord — never scan into the next chord (whose
+                // downbeat must not be suppressed).
+                const stepsToEnd = chord.beats * spb - stepInChord;
+                const mNow = ((measureStep % spm) + spm) % spm;
+                // Find the next hit to ring through (suppressOff) and the one after
+                // it (releaseOff), so the statement releases as the next REAL hit
+                // lands rather than ringing the whole chord out.
+                let suppressOff = -1;
+                let releaseOff = -1;
+                for (let d = 1; d < stepsToEnd; d++) {
+                    const ms = (mNow + d) % spm;
+                    const hitAhead = isArp ? ms % spb === 0 : compingState.currentCell[ms] === 1;
+                    if (!hitAhead) {
+                        continue;
+                    }
+                    if (suppressOff < 0) {
+                        // Preserve the pulse: in the block-comp genres never ring
+                        // through a strong-beat (group-start) hit — only an offbeat
+                        // answer. Arp is pluck-per-beat, so a held pluck through the
+                        // next beat IS the idiom there; allow it.
+                        if (!isArp && ms % groupStride === 0) {
+                            break;
+                        }
+                        suppressOff = d;
+                    } else {
+                        releaseOff = d;
+                        break;
+                    }
+                }
+                if (suppressOff > 0) {
+                    // Ring to the next real hit (or the chord end if it's the last),
+                    // plus a hair of overlap so there's no micro-gap before the
+                    // re-attack. #707 clamps this to the chord boundary next.
+                    const ringSteps = (releaseOff > 0 ? releaseOff : stepsToEnd) + 0.5;
+                    durationSteps = Math.max(durationSteps, ringSteps);
+                    compingState.ringSuppressStep = step + suppressOff;
+                    compingState.ringSuppressChordKey = ringChordKey;
+                }
             }
         }
 
