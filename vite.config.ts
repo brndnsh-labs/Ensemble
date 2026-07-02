@@ -144,7 +144,7 @@ export default defineConfig({
         preact(),
         copyStaticAssets(),
         visualizer({
-            filename: 'dist/stats.html',
+            filename: 'stats.html',
             template: 'treemap',
             gzipSize: true,
             brotliSize: true,
