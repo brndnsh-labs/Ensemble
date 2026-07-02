@@ -337,23 +337,37 @@ export function switchToRelativeKey(): void {
  * @staged Wired to the engine + persistence; awaits the Phase B SectionHeaderStrip
  * UI to expose it to users.
  */
-export function setSectionIntensity(id: string, value: number | undefined): void {
+/**
+ * Look up a section by id, hand its current value + a mutable copy of the
+ * sections array to `mutate` (which replaces `newSections[index]`), then
+ * commit + refresh. No-ops if `id` isn't found. Shared by the per-section
+ * setters below, which otherwise duplicate this find/guard/commit shape.
+ */
+function withSection(
+    id: string,
+    mutate: (current: Section, newSections: Section[], index: number) => void,
+): void {
     const { arranger } = getState();
     const index = arranger.sections.findIndex((s: Section) => s.id === id);
     if (index === -1) {
         return;
     }
     const newSections = [...arranger.sections];
-    const current = newSections[index];
-    if (value === undefined) {
-        const { targetIntensity: _omit, ...rest } = current;
-        newSections[index] = rest;
-    } else {
-        newSections[index] = { ...current, targetIntensity: Math.max(0, Math.min(1, value)) };
-    }
+    mutate(newSections[index], newSections, index);
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
     refreshArrangerUI();
+}
+
+export function setSectionIntensity(id: string, value: number | undefined): void {
+    withSection(id, (current, newSections, index) => {
+        if (value === undefined) {
+            const { targetIntensity: _omit, ...rest } = current;
+            newSections[index] = rest;
+        } else {
+            newSections[index] = { ...current, targetIntensity: Math.max(0, Math.min(1, value)) };
+        }
+    });
 }
 
 /**
@@ -368,30 +382,22 @@ export function setSectionInstrumentEnabled(
     instrument: SectionInstrumentKey,
     enabled: boolean | undefined,
 ): void {
-    const { arranger } = getState();
-    const index = arranger.sections.findIndex((s: Section) => s.id === id);
-    if (index === -1) {
-        return;
-    }
-    const newSections = [...arranger.sections];
-    const current = newSections[index];
-    const nextInstruments: Partial<Record<SectionInstrumentKey, boolean>> = {
-        ...(current.instruments || {}),
-    };
-    if (enabled === undefined) {
-        delete nextInstruments[instrument];
-    } else {
-        nextInstruments[instrument] = enabled;
-    }
-    if (Object.keys(nextInstruments).length === 0) {
-        const { instruments: _omit, ...rest } = current;
-        newSections[index] = rest;
-    } else {
-        newSections[index] = { ...current, instruments: nextInstruments };
-    }
-    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: newSections });
-    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'isDirty', value: true });
-    refreshArrangerUI();
+    withSection(id, (current, newSections, index) => {
+        const nextInstruments: Partial<Record<SectionInstrumentKey, boolean>> = {
+            ...(current.instruments || {}),
+        };
+        if (enabled === undefined) {
+            delete nextInstruments[instrument];
+        } else {
+            nextInstruments[instrument] = enabled;
+        }
+        if (Object.keys(nextInstruments).length === 0) {
+            const { instruments: _omit, ...rest } = current;
+            newSections[index] = rest;
+        } else {
+            newSections[index] = { ...current, instruments: nextInstruments };
+        }
+    });
 }
 
 /**
