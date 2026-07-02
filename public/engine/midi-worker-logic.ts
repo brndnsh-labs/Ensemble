@@ -676,7 +676,7 @@ export class ExportProcessor {
                 const soundName = hit.soundName as any;
                 const instName = (hit.inst as any).name;
                 const name = soundName || instName;
-                let midi = (DRUM_MAP as any)[soundName] || (DRUM_MAP as any)[instName];
+                let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
 
                 if (midi) {
                     midi += (this.state.midi.drumsOctave || 0) * 12;
@@ -687,39 +687,39 @@ export class ExportProcessor {
                 if (!midi) {
                     if (name.includes('Tom')) {
                         if (name.includes('High')) {
-                            midi = (DRUM_MAP as any)['High Tom'];
+                            midi = DRUM_MAP['High Tom'];
                         } else if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any)['Low Tom'];
+                            midi = DRUM_MAP['Low Tom'];
                         } else {
-                            midi = (DRUM_MAP as any)['Mid Tom'];
+                            midi = DRUM_MAP['Mid Tom'];
                         }
                     } else if (name.includes('Agogo')) {
                         if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any)['Low Agogo'];
+                            midi = DRUM_MAP['Low Agogo'];
                         } else {
-                            midi = (DRUM_MAP as any)['High Agogo'];
+                            midi = DRUM_MAP['High Agogo'];
                         }
                     } else if (name.includes('Bongo')) {
                         // why: S8(d) — DRUM_MAP keys are suffix-first
                         // (`Bongo<Variant>`), matching Agogo/Cowbell.
                         if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any).BongoLow;
+                            midi = DRUM_MAP.BongoLow;
                         } else {
-                            midi = (DRUM_MAP as any).BongoHigh;
+                            midi = DRUM_MAP.BongoHigh;
                         }
                     } else if (name.includes('Conga')) {
                         // why: S8(d) — DRUM_MAP keys are suffix-first
                         // (`Conga<Variant>`), matching Agogo/Cowbell.
                         if (name.includes('Low')) {
-                            midi = (DRUM_MAP as any).CongaLow;
+                            midi = DRUM_MAP.CongaLow;
                         } else if (name.includes('Open')) {
-                            midi = (DRUM_MAP as any).CongaOpen;
+                            midi = DRUM_MAP.CongaOpen;
                         } else if (name.includes('Mute')) {
-                            midi = (DRUM_MAP as any).CongaMute;
+                            midi = DRUM_MAP.CongaMute;
                         } else if (name.includes('Slap')) {
-                            midi = (DRUM_MAP as any).CongaSlap;
+                            midi = DRUM_MAP.CongaSlap;
                         } else {
-                            midi = (DRUM_MAP as any).CongaHigh;
+                            midi = DRUM_MAP.CongaHigh;
                         }
                     } else if (name.includes('Cowbell')) {
                         // why: live drum engine (playDrumSoundCurrent's Cowbell block) emits
@@ -729,11 +729,11 @@ export class ExportProcessor {
                         // while still rendering in audio. GM has only one cowbell
                         // note (56), so high/low both map to it — the per-voice
                         // pitch shift is a synth-side effect, not a MIDI feature.
-                        midi = (DRUM_MAP as any).Cowbell;
+                        midi = DRUM_MAP.Cowbell;
                     } else if (name.includes('Brush')) {
                         // why: any 'Brush'-named variant routes to the bare
                         // Brush mapping (Side Stick 37) — see midi-constants.ts.
-                        midi = (DRUM_MAP as any).Brush;
+                        midi = DRUM_MAP.Brush;
                     }
                 }
 
@@ -901,7 +901,7 @@ export class ExportProcessor {
 
                 track.noteOff(this.toPulses(endTimeS), channel, finalMidi);
             } else if (n.module === 'groove' && n.name) {
-                let midi = (DRUM_MAP as any)[n.name];
+                let midi = DRUM_MAP[n.name];
                 if (midi) {
                     midi += (this.state.midi.drumsOctave || 0) * 12;
                     midi = Math.max(0, Math.min(127, midi));
