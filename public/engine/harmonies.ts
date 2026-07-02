@@ -659,6 +659,95 @@ function playHornSectionMode(context: HarmonyContext): HarmonyBehavior | null {
 }
 
 /**
+ * Per-genre voicing override — the final voicing stage of `finalizeHarmonyNotes`.
+ * Three genre signatures replace the running voicing after the comping taste-rules
+ * have run (Rock harmonized twin-3rds/6ths #557, Country pedal-steel add6 #560,
+ * Metal power chord #558). Centralized here so the "override wins" semantics are
+ * discoverable in one place rather than scattered through the pipeline.
+ *
+ * Applied SEQUENTIALLY (not early-return) to preserve the original apply-order:
+ * each genre's guard is mutually exclusive in practice (one profile flag per
+ * genre), but keeping the sequential form means the output is identical even if a
+ * profile ever set two flags — the last matching branch wins, exactly as before.
+ *
+ * `pedalSteel` / `powerChord` are computed by the caller (it also needs them for
+ * density scaling + the power-chord inversion bypass), so they're passed in rather
+ * than recomputed.
+ */
+function applyGenreVoicingOverride(
+    intervals: number[],
+    ctx: {
+        profile: ReturnType<typeof resolveHarmonyProfile>;
+        chord: Chord;
+        isBloom: boolean;
+        isLatched: boolean;
+        isTensionChord: boolean;
+        bandIntensity: number;
+        step: number;
+        pedalSteel: boolean;
+        powerChord: boolean;
+    },
+): number[] {
+    const { profile, chord, isBloom, isLatched, isTensionChord, bandIntensity, step } = ctx;
+    let result = intervals;
+
+    // --- ROCK: harmonized twin-guitar 3rds/6ths (#557) ---
+    // why: rock harmony is a parallel 2-voice line tracking the chord — the
+    // Thin Lizzy / Maiden / Allmans harmonized-guitar signature — not a triadic
+    // pad. Diatonic 3rds (3rd+5th) and 6ths (3rd+upper-root) alternate per bar
+    // (seeded → reproducible) for the singable twin-guitar weave; at high band
+    // intensity it thickens to a power-5th double (+ octave on the biggest
+    // hits) for the wall-of-guitar push. Applied at the final voicing stage so
+    // the comping taste-rules above don't dissolve the parallel-harmony intent.
+    // Bloom/latch tutti highlights keep their fuller stack (they're deliberate
+    // accents, not the steady harmonized line).
+    // Tension chords keep their guide-tone voicing — a bare power-5th / 3rd-dyad
+    // would erase the 3rd/7th/alterations that define a 7b9-type color.
+    if (profile.voicing?.harmonizedThirds && !isBloom && !isLatched && !isTensionChord) {
+        const harmonizedThird = chordThirdIsMinor(chord) ? 3 : 4;
+        if (profile.voicing.powerDoubling && bandIntensity > 0.7) {
+            result = bandIntensity > 0.85 ? [0, 7, 12] : [0, 7];
+        } else {
+            const useSixth = scrambleHash(chord.rootMidi * 100 + Math.floor(step / 16)) < 0.45;
+            result = useSixth ? [harmonizedThird, 12] : [harmonizedThird, 7];
+        }
+    }
+
+    // --- COUNTRY: pedal-steel 6/9 color (#560) ---
+    // why: country harmony already plays a sustained string pad (Sea mode), so
+    // the audit's "1&3 stabs" premise was stale — what's missing is the
+    // pedal-steel CHARACTER. The steel's signature sweetener is the added major
+    // 6th (an add6 / 6-9 voicing); voice major chords as root–3rd–6th so the
+    // pad reads as pedal steel rather than a generic triad. The slow volume-
+    // pedal swell envelope itself is a synth-track follow-up; this is the pitch
+    // color only. Minor/other qualities keep their triad (a m6 reads jazzy, not
+    // country).
+    if (ctx.pedalSteel) {
+        const ci = chord.intervals || [];
+        // Only a plain major triad (no minor 3rd, no 7th) takes the add6 — a 7th
+        // chord keeps its b7/maj7 color rather than losing it to the 6th.
+        const isPlainMajor =
+            ci.includes(4) && !ci.includes(3) && !ci.includes(10) && !ci.includes(11);
+        if (isPlainMajor) {
+            result = [0, 4, 9];
+        }
+    }
+
+    // --- METAL: power-chord + octave doubling (#558) ---
+    // why: metal harmony is the chugging power chord — root, 5th, octave, no 3rd
+    // — heavy at every intensity (unlike rock, which only reaches a power-5th at
+    // high intensity and is otherwise a harmonized-3rd line). Dropping the 3rd
+    // is the point: the power chord is quality-neutral, which is exactly the
+    // metal sound over both major and minor roots. Tension chords keep their
+    // guide tones rather than collapsing to a bare 5th.
+    if (ctx.powerChord) {
+        result = [0, 7, 12];
+    }
+
+    return result;
+}
+
+/**
  * Final Note Generation logic (Voicing, Transposition, Offset).
  */
 function finalizeHarmonyNotes(
@@ -782,61 +871,25 @@ function finalizeHarmonyNotes(
     // bassMidi is 0/undefined (bass not running or producer order has not yet fired).
     const safetyFloor = Math.max(52, (coordination.bassMidi || 0) + 7);
 
-    // --- ROCK: harmonized twin-guitar 3rds/6ths (#557) ---
-    // why: rock harmony is a parallel 2-voice line tracking the chord — the
-    // Thin Lizzy / Maiden / Allmans harmonized-guitar signature — not a triadic
-    // pad. Diatonic 3rds (3rd+5th) and 6ths (3rd+upper-root) alternate per bar
-    // (seeded → reproducible) for the singable twin-guitar weave; at high band
-    // intensity it thickens to a power-5th double (+ octave on the biggest
-    // hits) for the wall-of-guitar push. Applied at the final voicing stage so
-    // the comping taste-rules above don't dissolve the parallel-harmony intent.
-    // Bloom/latch tutti highlights keep their fuller stack (they're deliberate
-    // accents, not the steady harmonized line).
-    // Tension chords keep their guide-tone voicing — a bare power-5th / 3rd-dyad
-    // would erase the 3rd/7th/alterations that define a 7b9-type color.
-    if (profile.voicing?.harmonizedThirds && !isBloom && !isLatched && !isTensionChord) {
-        const harmonizedThird = chordThirdIsMinor(chord) ? 3 : 4;
-        if (profile.voicing.powerDoubling && playback.bandIntensity > 0.7) {
-            intervals = playback.bandIntensity > 0.85 ? [0, 7, 12] : [0, 7];
-        } else {
-            const useSixth = scrambleHash(chord.rootMidi * 100 + Math.floor(step / 16)) < 0.45;
-            intervals = useSixth ? [harmonizedThird, 12] : [harmonizedThird, 7];
-        }
-    }
-
-    // --- COUNTRY: pedal-steel 6/9 color (#560) ---
-    // why: country harmony already plays a sustained string pad (Sea mode), so
-    // the audit's "1&3 stabs" premise was stale — what's missing is the
-    // pedal-steel CHARACTER. The steel's signature sweetener is the added major
-    // 6th (an add6 / 6-9 voicing); voice major chords as root–3rd–6th so the
-    // pad reads as pedal steel rather than a generic triad. The slow volume-
-    // pedal swell envelope itself is a synth-track follow-up; this is the pitch
-    // color only. Minor/other qualities keep their triad (a m6 reads jazzy, not
-    // country).
+    // --- PER-GENRE VOICING OVERRIDES (Rock/Country/Metal) ---
+    // The final voicing stage: three genre signatures may replace the running
+    // voicing. `pedalSteel` / `powerChord` are needed again below (density scaling
+    // + the power-chord inversion bypass), so compute them here and thread them
+    // through applyGenreVoicingOverride. See that helper for the per-genre why.
     const pedalSteel =
         !!profile.voicing?.pedalSteelSwell && !isBloom && !isLatched && !isTensionChord;
-    if (pedalSteel) {
-        const ci = chord.intervals || [];
-        // Only a plain major triad (no minor 3rd, no 7th) takes the add6 — a 7th
-        // chord keeps its b7/maj7 color rather than losing it to the 6th.
-        const isPlainMajor =
-            ci.includes(4) && !ci.includes(3) && !ci.includes(10) && !ci.includes(11);
-        if (isPlainMajor) {
-            intervals = [0, 4, 9];
-        }
-    }
-
-    // --- METAL: power-chord + octave doubling (#558) ---
-    // why: metal harmony is the chugging power chord — root, 5th, octave, no 3rd
-    // — heavy at every intensity (unlike rock, which only reaches a power-5th at
-    // high intensity and is otherwise a harmonized-3rd line). Dropping the 3rd
-    // is the point: the power chord is quality-neutral, which is exactly the
-    // metal sound over both major and minor roots. Tension chords keep their
-    // guide tones rather than collapsing to a bare 5th.
     const powerChord = !!profile.voicing?.powerChord && !isBloom && !isLatched && !isTensionChord;
-    if (powerChord) {
-        intervals = [0, 7, 12];
-    }
+    intervals = applyGenreVoicingOverride(intervals, {
+        profile,
+        chord,
+        isBloom: !!isBloom,
+        isLatched: !!isLatched,
+        isTensionChord,
+        bandIntensity: playback.bandIntensity,
+        step,
+        pedalSteel,
+        powerChord,
+    });
 
     // Polyphony Scaling: Bloom hits are thicker. Manually slice intervals to control density.
     let targetIntervals = intervals;
@@ -950,19 +1003,20 @@ function finalizeHarmonyNotes(
         targetOctave += 12;
     }
 
-    let currentMidis = getBestInversion(
-        activeState,
-        chord.rootMidi,
-        targetIntervals,
-        harmony.lastMidis,
-        {
-            anchor: targetOctave,
-            min: safetyFloor,
-            max: 100,
-            style: styleConfig.rhythmicStyle,
-            quality: chord.quality,
-        },
-    );
+    // why (#728): for a power chord the inversion solve below is dead computation
+    // — the `if (powerChord)` block rebuilds `currentMidis` from scratch and the
+    // result is never read in between, and getBestInversion is pure (no lastMidis
+    // side-effect), so skipping it is behavior-preserving. Metal took this branch
+    // every tick; now it doesn't run the solver only to discard it.
+    let currentMidis = powerChord
+        ? []
+        : getBestInversion(activeState, chord.rootMidi, targetIntervals, harmony.lastMidis, {
+              anchor: targetOctave,
+              min: safetyFloor,
+              max: 100,
+              style: styleConfig.rhythmicStyle,
+              quality: chord.quality,
+          });
 
     // Power chord: build root-5th-octave directly, anchored low in the harmony
     // slot. getBestInversion voice-leads octave-equivalent tones (0 and 12)
