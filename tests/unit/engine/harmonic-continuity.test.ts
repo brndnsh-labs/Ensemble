@@ -10,7 +10,8 @@ const { makeSoloistMock } = await vi.hoisted(
 );
 
 // Mock state
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../public/state.js', async (importOriginal) => {
+    const actual = await importOriginal();
     const mockPlayback = {
         audio: { currentTime: 0 },
         isPlaying: true,
@@ -81,6 +82,7 @@ vi.mock('../../../public/state.js', () => {
     };
 
     return {
+        ...actual,
         ...mockStateMap,
         stateMap: mockStateMap,
         getState: () => mockStateMap,

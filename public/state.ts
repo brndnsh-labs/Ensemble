@@ -6,7 +6,19 @@ import { midi, midiReducer } from './state/midi.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
 import { vizReducer, vizState } from './state/visualizer.js';
-import type { Action, ActionPayloadMap, EnsembleState } from './types.js';
+import type {
+    Action,
+    ActionPayloadMap,
+    ArrangerState,
+    BassState,
+    ChordState,
+    EnsembleState,
+    GlobalContext,
+    GrooveState,
+    HarmonyState,
+    MidiState,
+    SoloistState,
+} from './types.js';
 
 /** @deprecated Use EnsembleState directly */
 export type StateMap = EnsembleState;
@@ -33,6 +45,155 @@ export function getState(): EnsembleState {
     return stateMap;
 }
 
+// --- Worker sync payload builders ---
+// One builder per module, shared by the full-snapshot sync (getSyncState, below)
+// and the hard-flush sync (syncAndFlushWorker in engine/scheduler-core.ts). Add a
+// newly-worker-relevant field here ONCE and both call sites pick it up — the two
+// used to be independently hand-maintained and drifted (#906; see the #698
+// chords-voice/note-generation sync bug this class of gap already caused).
+
+export function buildPlaybackSyncPayload(playback: GlobalContext) {
+    return {
+        isPlaying: playback.isPlaying,
+        step: playback.step,
+        bpm: playback.bpm,
+        bandIntensity: playback.bandIntensity,
+        complexity: playback.complexity,
+        autoIntensity: playback.autoIntensity,
+        practiceMode: playback.practiceMode,
+        sessionTimer: playback.sessionTimer,
+        sessionStartTime: playback.sessionStartTime,
+        modals: {},
+        intent: playback.intent,
+        conductorVelocity: playback.conductorVelocity,
+        songMode: playback.songMode,
+        isEndingPending: playback.isEndingPending,
+        currentLoopCount: playback.currentLoopCount,
+    };
+}
+
+export function buildArrangerSyncPayload(arranger: ArrangerState) {
+    return {
+        progression: arranger.progression,
+        stepMap: arranger.stepMap,
+        sectionMap: arranger.sectionMap,
+        totalSteps: arranger.totalSteps,
+        key: arranger.key,
+        isMinor: arranger.isMinor,
+        timeSignature: arranger.timeSignature,
+        grouping: arranger.grouping,
+        sections: arranger.sections,
+        measureMap: arranger.measureMap,
+        seed: arranger.seed,
+    };
+}
+
+export function buildChordsSyncPayload(chords: ChordState) {
+    return {
+        style: chords.style,
+        octave: chords.octave,
+        density: chords.density,
+        enabled: chords.enabled,
+        volume: chords.volume,
+        rhythmicMask: chords.rhythmicMask,
+        // #698 — the chords voice now drives NOTE GENERATION (power-chord
+        // voicing for the crunch rhythm-guitar pack), so the worker needs it.
+        // Previously voice was a main-thread-only audio-routing concern.
+        voice: chords.voice,
+    };
+}
+
+export function buildBassSyncPayload(bass: BassState) {
+    return {
+        style: bass.style,
+        octave: bass.octave,
+        enabled: bass.enabled,
+        lastFreq: bass.lastFreq,
+        volume: bass.volume,
+    };
+}
+
+export function buildSoloistSyncPayload(soloist: SoloistState) {
+    return {
+        // Wire shape mirrors the local SoloistState layout (config flat at
+        // top; engine-runtime fields under `session` / `audio`) so the
+        // worker can apply it with `recursiveSafeSync` directly.
+        style: soloist.style,
+        octave: soloist.octave,
+        enabled: soloist.enabled,
+        volume: soloist.volume,
+        mode: soloist.mode,
+        phrasingIntensity: soloist.phrasingIntensity,
+        tradeMode: soloist.tradeMode,
+        hookRetentionProb: soloist.hookRetentionProb,
+        session: {
+            sessionSteps: soloist.session.sessionSteps,
+            seed: soloist.session.seed,
+            // #555 — verbatim hook lane: read-only replay state captured
+            // main-thread next to `seed`; crosses to the worker exactly like it.
+            hook: soloist.session.hook,
+        },
+        audio: {
+            lastFreq: soloist.audio.lastFreq,
+        },
+    };
+}
+
+export function buildHarmonySyncPayload(harmony: HarmonyState) {
+    return {
+        style: harmony.style,
+        octave: harmony.octave,
+        enabled: harmony.enabled,
+        volume: harmony.volume,
+        reverb: harmony.reverb,
+        complexity: harmony.complexity,
+        pocketOffset: harmony.pocketOffset,
+    };
+}
+
+export function buildGrooveSyncPayload(groove: GrooveState) {
+    return {
+        enabled: groove.enabled,
+        genreFeel: groove.genreFeel,
+        swing: groove.swing,
+        swingSub: groove.swingSub,
+        humanize: groove.humanize,
+        pocket: groove.pocket,
+        sectionSeedMap: groove.sectionSeedMap,
+        lastDrumPreset: groove.lastDrumPreset,
+        fillActive: groove.fillActive,
+        variations: groove.variations,
+        measures: groove.measures,
+        orchestrationMap: groove.orchestrationMap,
+        fillMap: groove.fillMap,
+        accentMap: groove.accentMap,
+        seedTimelineStartStep: groove.seedTimelineStartStep,
+        instruments: groove.instruments.map((i: any) => ({
+            name: i.name,
+            steps: [...i.steps],
+            muted: i.muted,
+        })),
+    };
+}
+
+export function buildMidiSyncPayload(midi: MidiState) {
+    return {
+        enabled: midi.enabled,
+        chordsChannel: midi.chordsChannel,
+        bassChannel: midi.bassChannel,
+        soloistChannel: midi.soloistChannel,
+        harmonyChannel: midi.harmonyChannel,
+        drumsChannel: midi.drumsChannel,
+        latency: midi.latency,
+        chordsOctave: midi.chordsOctave,
+        bassOctave: midi.bassOctave,
+        soloistOctave: midi.soloistOctave,
+        harmonyOctave: midi.harmonyOctave,
+        drumsOctave: midi.drumsOctave,
+        velocitySensitivity: midi.velocitySensitivity,
+    };
+}
+
 /**
  * Creates a worker-safe, raw snapshot of the global state.
  * Strips deepSignal proxies and filters for necessary worker properties.
@@ -41,124 +202,14 @@ export function getSyncState() {
     const { playback, arranger, chords, bass, soloist, harmony, groove, midi } = stateMap;
 
     return {
-        playback: {
-            isPlaying: playback.isPlaying,
-            step: playback.step,
-            bpm: playback.bpm,
-            bandIntensity: playback.bandIntensity,
-            complexity: playback.complexity,
-            autoIntensity: playback.autoIntensity,
-            practiceMode: playback.practiceMode,
-            sessionTimer: playback.sessionTimer,
-            sessionStartTime: playback.sessionStartTime,
-            modals: {},
-            intent: playback.intent,
-            conductorVelocity: playback.conductorVelocity,
-            songMode: playback.songMode,
-            isEndingPending: playback.isEndingPending,
-            currentLoopCount: playback.currentLoopCount,
-        },
-        arranger: {
-            progression: arranger.progression,
-            stepMap: arranger.stepMap,
-            sectionMap: arranger.sectionMap,
-            totalSteps: arranger.totalSteps,
-            key: arranger.key,
-            isMinor: arranger.isMinor,
-            timeSignature: arranger.timeSignature,
-            grouping: arranger.grouping,
-            sections: arranger.sections,
-            measureMap: arranger.measureMap,
-            seed: arranger.seed,
-        },
-        chords: {
-            style: chords.style,
-            octave: chords.octave,
-            density: chords.density,
-            enabled: chords.enabled,
-            volume: chords.volume,
-            rhythmicMask: chords.rhythmicMask,
-            // #698 — the chords voice now drives NOTE GENERATION (power-chord
-            // voicing for the crunch rhythm-guitar pack), so the worker needs it.
-            // Previously voice was a main-thread-only audio-routing concern.
-            voice: chords.voice,
-        },
-        bass: {
-            style: bass.style,
-            octave: bass.octave,
-            enabled: bass.enabled,
-            lastFreq: bass.lastFreq,
-            volume: bass.volume,
-        },
-        soloist: {
-            // Wire shape mirrors the local SoloistState layout (config flat at
-            // top; engine-runtime fields under `session` / `audio`) so the
-            // worker can apply it with `recursiveSafeSync` directly.
-            style: soloist.style,
-            octave: soloist.octave,
-            enabled: soloist.enabled,
-            volume: soloist.volume,
-            mode: soloist.mode,
-            phrasingIntensity: soloist.phrasingIntensity,
-            tradeMode: soloist.tradeMode,
-            hookRetentionProb: soloist.hookRetentionProb,
-            session: {
-                sessionSteps: soloist.session.sessionSteps,
-                seed: soloist.session.seed,
-                // #555 — verbatim hook lane: read-only replay state captured
-                // main-thread next to `seed`; crosses to the worker exactly like it.
-                hook: soloist.session.hook,
-            },
-            audio: {
-                lastFreq: soloist.audio.lastFreq,
-            },
-        },
-        harmony: {
-            style: harmony.style,
-            octave: harmony.octave,
-            enabled: harmony.enabled,
-            volume: harmony.volume,
-            reverb: harmony.reverb,
-            complexity: harmony.complexity,
-            pocketOffset: harmony.pocketOffset,
-        },
-        groove: {
-            enabled: groove.enabled,
-            genreFeel: groove.genreFeel,
-            swing: groove.swing,
-            swingSub: groove.swingSub,
-            humanize: groove.humanize,
-            pocket: groove.pocket,
-            sectionSeedMap: groove.sectionSeedMap,
-            lastDrumPreset: groove.lastDrumPreset,
-            fillActive: groove.fillActive,
-            variations: groove.variations,
-            measures: groove.measures,
-            orchestrationMap: groove.orchestrationMap,
-            fillMap: groove.fillMap,
-            accentMap: groove.accentMap,
-            seedTimelineStartStep: groove.seedTimelineStartStep,
-            instruments: groove.instruments.map((i: any) => ({
-                name: i.name,
-                steps: [...i.steps],
-                muted: i.muted,
-            })),
-        },
-        midi: {
-            enabled: midi.enabled,
-            chordsChannel: midi.chordsChannel,
-            bassChannel: midi.bassChannel,
-            soloistChannel: midi.soloistChannel,
-            harmonyChannel: midi.harmonyChannel,
-            drumsChannel: midi.drumsChannel,
-            latency: midi.latency,
-            chordsOctave: midi.chordsOctave,
-            bassOctave: midi.bassOctave,
-            soloistOctave: midi.soloistOctave,
-            harmonyOctave: midi.harmonyOctave,
-            drumsOctave: midi.drumsOctave,
-            velocitySensitivity: midi.velocitySensitivity,
-        },
+        playback: buildPlaybackSyncPayload(playback),
+        arranger: buildArrangerSyncPayload(arranger),
+        chords: buildChordsSyncPayload(chords),
+        bass: buildBassSyncPayload(bass),
+        soloist: buildSoloistSyncPayload(soloist),
+        harmony: buildHarmonySyncPayload(harmony),
+        groove: buildGrooveSyncPayload(groove),
+        midi: buildMidiSyncPayload(midi),
     };
 }
 
