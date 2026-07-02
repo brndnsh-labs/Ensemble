@@ -74,7 +74,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/chord-quality-sets.ts` | Dependency-free leaf of shared chord-quality classification Sets (keeps cross-engine const imports from dragging heavy lanes into a chunk). | `ALTERED_HOOK_QUALITIES` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
-| `public/engine/soloist-devices.ts` | Melodic embellishments (Enclosures, Runs). | `applySoloistDevice` |
 | `public/engine/grooves/` | Directory of 15+ genre-specific drum strategies. | `jazz.ts`, `rock.ts`, `funk.ts`, etc. |
 
 ## Engine Core (Internal)
