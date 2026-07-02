@@ -623,10 +623,23 @@ export function getBassNote(
     //   Math.random() in withOctaveJump with a (barIndex, sectionStart)-seeded
     //   hash and restrict firing to structural downbeats (bar 1 of a section
     //   or section start), per CLAUDE.md § Deterministic phrasing.
-    // `barIndex` and `isBeatStartLocal` reuse the values computed earlier
-    // (barIndexEarly, isBeatStartEarly) for Imperfect Symmetry. `scrambleHash`
-    // is the shared mulberry32 declared above the result() wrapper.
-    const barIndex = barIndexEarly;
+    // `isBeatStartLocal` reuses the value computed earlier (isBeatStartEarly)
+    // for Imperfect Symmetry. `scrambleHash` is the shared mulberry32 declared
+    // above the result() wrapper.
+    //
+    // #921 — barIndex (unlike barIndexEarly, which Imperfect Symmetry needs as
+    // the TRUE global bar count to distinguish Verse 2 from Verse 4) seeds a
+    // per-loop hash gate (the octave-jump trigger/direction below, and the
+    // walking-line seedBit parity pick that reuses this same `barIndex`), so it
+    // must be loop-relative or "deterministic" only holds at a fixed absolute
+    // step, not loop-to-loop — the same defect #910 fixed in the neo-soul
+    // upbeat-chatter branch. Mirrors calculatePocketOffset's established
+    // inLoopStep pattern (groove-engine.ts).
+    const inLoopStepForBarIndex =
+        arranger.totalSteps > 0
+            ? (((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps) | 0
+            : step;
+    const barIndex = Math.floor(inLoopStepForBarIndex / stepsPerMeasure);
     const sectionSeedInt =
         typeof context?.sectionStart === 'number' ? Math.abs(context.sectionStart) | 0 : 0;
     const isBeatStartLocal = isBeatStartEarly;
