@@ -497,40 +497,6 @@ export interface FormArcEntry {
 }
 
 /**
- * A planned rhythmic event for the soloist `rhythm` state sub-slice.
- *
- * NOTE (#926): its former producer (`generateRhythmPlan` in the legacy
- * `soloist-rhythm-engine.ts`) was deleted as orphaned after the phrase-first
- * migration. This type and the `rhythm` sub-slice fields that use it
- * (`SoloistRhythm.plan`, `rhythmPlan`) are currently initialized/reset but
- * never read by the live phrase-first engine — a deeper dead-code island
- * tracked as its own follow-up.
- *
- * Two kinds of node share the field set: response-derived (carrying
- * `responseSource` etc.) and seed-derived (carrying `seedNote` / `responseSource:
- * 'seed'`). Optional fields cover the union.
- */
-export interface RhythmNode {
-    stepTarget: number;
-    velocity: number;
-    isStrongBeat: boolean;
-    durationSteps: number;
-    isSustained: boolean;
-    vibrato: boolean;
-    /** Omitted by several producers; consumers use `|| null` fallbacks. */
-    tripletPlacement?: 't1' | 't2' | null;
-    /** Omitted by several producers; consumers use `|| 0` fallbacks. */
-    timingOffset?: number;
-    responseEntryTarget?: boolean;
-    responseCadenceTarget?: boolean;
-    responseSource?: 'section' | 'form' | 'recent' | 'seed' | 'free';
-    responsePitchClass?: number;
-    responseDirection?: number;
-    /** Present on seed-derived nodes. */
-    seedNote?: SeedNote;
-}
-
-/**
  * A pitch bend-and-release gesture on a soloist note (#744 Slice 2) — the
  * expressive "cry" of a blues lead: the written note bends UP to a peak and
  * (optionally) releases back down to it.
@@ -611,8 +577,8 @@ export interface RecentSoloistNote {
  * harmony in `harmonies.ts`) to echo soloist hooks.
  *
  * Current production consumers match on `step` only. `sourcePhase` is carried
- * for tests + future phase-aware consumers (no cost — the producer derives
- * srdcState upstream regardless). If a future genre wants pitch-aware
+ * for tests + future phase-aware consumers (no cost — the producer derives the
+ * SRDC phase upstream regardless). If a future genre wants pitch-aware
  * latching (e.g. tuning the horn-stab to the soloist's anchor pitch), add
  * `midi`/`pitchClass` back explicitly — they were trimmed in the 2026-05-26
  * micro-sweep because no consumer read them.
@@ -676,19 +642,6 @@ export interface SoloistPhraseContext {
     responseSource: 'free' | 'form' | 'seed' | 'section' | 'recent';
     sectionLabel: string | null;
     sectionOccurrence: number;
-    /**
-     * SRDC arc position (Statement / Restatement / Departure / Conclusion),
-     * derived per phrase from sectionContext + section labels. Lowercase
-     * canonical form. Used to drive a chord-tone-weight pitch bias in the
-     * legacy soloist picker (Conclusion lifts, Departure depresses); that
-     * picker was deleted with epic #10 and the bias is currently
-     * unimplemented in the phrase-first engine (re-port tracked in #891).
-     * Its last remaining reader (the `=== 'restatement'` motif-echo gate in
-     * the legacy soloist-rhythm-engine) was deleted as orphaned in #926, so
-     * `srdcState` now has no live reader — part of the dead soloist `rhythm`
-     * sub-slice tracked for removal in the #926 follow-up.
-     */
-    srdcState: SrdcPhase;
     /**
      * The just-finished Statement phrase's signature, captured when the
      * current phrase derives to `restatement` and the prior phrase was a
@@ -772,14 +725,20 @@ export interface SoloistMemory {
 }
 
 /**
- * Rhythm-planning sub-slice — the planned events the soloist will play this
- * phrase, plus the buffers from device/embellishment selection.
+ * Device/embellishment buffer sub-slice for the soloist.
+ *
+ * The former `plan` (`RhythmNode[]`) and `entropy` fields were removed in #929 —
+ * their producer (`generateRhythmPlan` in the legacy `soloist-rhythm-engine.ts`)
+ * was deleted in #926 and nothing in the live phrase-first engine read them.
+ *
+ * `deviceBuffer` / `embellishmentBuffer` survive because live paths still
+ * reference them — the offline clone in `audio-export.ts` reads `deviceBuffer`,
+ * and `resetSoloistState` clears it. (They are also listed in the worker
+ * protection list `WORKER_MANAGED_KEYS`, but under a wrong-path `'soloist.audio'`
+ * entry that is currently inert.) No producer populates either buffer today, so
+ * they may be a further removal candidate — see FOLLOWUPS.
  */
 export interface SoloistRhythm {
-    /** Planned rhythmic phrase. */
-    readonly plan: RhythmNode[];
-    /** Entropy level of the current rhythm (mutated at section boundaries). */
-    readonly entropy: number;
     /** Buffer of melodic devices (bends, grace notes, rolls) queued for upcoming steps. */
     readonly deviceBuffer: SoloistBufferedEvent[];
     /** Buffer of melodic embellishments queued for upcoming steps. */
@@ -847,19 +806,6 @@ export interface SoloistAudio {
     readonly lastNoteEnd: number;
 }
 
-/**
- * SRDC arc position — Statement / Restatement / Departure / Conclusion.
- * Lowercase canonical form. Originally derived per phrase to bias the
- * legacy picker's chord-tone weight; that picker was deleted with epic #10
- * and the bias is currently unimplemented in the phrase-first engine
- * (re-port tracked in #891). Its last remaining reader (the
- * `=== 'restatement'` motif-echo gate in the legacy soloist-rhythm-engine)
- * was deleted as orphaned in #926, so the type now has no live reader —
- * part of the dead soloist `rhythm` sub-slice tracked for removal in the
- * #926 follow-up.
- */
-export type SrdcPhase = 'statement' | 'restatement' | 'departure' | 'conclusion';
-
 export interface SoloistState {
     // === Configuration (user-settable, persisted) — flat at the top of the
     // slice to preserve persistence / hydration / UI / worker-sync compat.
@@ -906,18 +852,6 @@ export interface SoloistState {
 
     // === Main-thread synth / voice tracking ===
     readonly audio: SoloistAudio;
-
-    /**
-     * @test-only Top-level SRDC-phase override. Production never writes this —
-     * the canonical phase lives at `session.currentPhrase.context.srdcState`.
-     * This override slot fed the legacy picker's chord-tone-weight pitch
-     * bias, which was deleted with epic #10; that bias is currently
-     * unimplemented in the phrase-first engine (re-port tracked in #891), so
-     * this field has no live reader today. Left in place for the dropped
-     * legacy critique test's shape (see soloist-musicality.test.ts) and any
-     * future re-port.
-     */
-    readonly srdcState?: SrdcPhase;
 }
 
 export interface HarmonyState {
@@ -1419,7 +1353,7 @@ export type ActionPayloadUpdateHB = Partial<HarmonyState>;
  *   `lastAttackStep`, `phraseStartStep`, `phraseLoopCount`, `phraseSectionLabel`,
  *   `phraseSectionOccurrence`, `notesInPhrase`, `phraseContext`, `recentNotes`,
  *   `sharedHookBuffer`, `sectionRecall`, `sectionRecallLoop`, `formArcRecall`,
- *   `rhythmPlan`, `rhythmicEntropy`, `deviceBuffer`, `embellishmentBuffer`,
+ *   `deviceBuffer`, `embellishmentBuffer`,
  *   `melodicTrend`, `direction`, `contourSteps`, `activeVoices`, `buffer`,
  *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
  *   `lastNoteEnd`.
@@ -1469,8 +1403,6 @@ export type ActionPayloadUpdateSB = Partial<{
     sectionRecall: Record<string, SectionRecallEntry>;
     sectionRecallLoop: number | null;
     formArcRecall: Record<string, FormArcEntry>;
-    rhythmPlan: RhythmNode[];
-    rhythmicEntropy: number;
     deviceBuffer: SoloistBufferedEvent[];
     embellishmentBuffer: SoloistBufferedEvent[];
     melodicTrend: string;

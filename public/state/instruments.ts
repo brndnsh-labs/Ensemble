@@ -123,7 +123,6 @@ export const soloist = deepSignal<SoloistState>({
                 responseSource: 'free',
                 sectionLabel: null,
                 sectionOccurrence: 0,
-                srdcState: 'statement',
                 restatementEcho: null,
             },
         },
@@ -135,8 +134,6 @@ export const soloist = deepSignal<SoloistState>({
             formArcRecall: {},
         },
         rhythm: {
-            plan: [],
-            entropy: 0,
             deviceBuffer: [],
             embellishmentBuffer: [],
         },
@@ -244,8 +241,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     formArcRecall: { kind: 'memory', key: 'formArcRecall' },
 
     // --- Rhythm ---
-    rhythmPlan: { kind: 'rhythm', key: 'plan' },
-    rhythmicEntropy: { kind: 'rhythm', key: 'entropy' },
     deviceBuffer: { kind: 'rhythm', key: 'deviceBuffer' },
     embellishmentBuffer: { kind: 'rhythm', key: 'embellishmentBuffer' },
 
@@ -423,15 +418,12 @@ export function instrumentReducer(action: Action): boolean {
             cpCtx.responseSource = 'free';
             cpCtx.sectionLabel = null;
             cpCtx.sectionOccurrence = 0;
-            cpCtx.srdcState = 'statement';
             cpCtx.restatementEcho = null;
             mem.recentNotes = [];
             mem.sharedHookBuffer = [];
             mem.sectionRecall = {};
             mem.sectionRecallLoop = null;
             mem.formArcRecall = {};
-            rhy.plan = [];
-            rhy.entropy = 0;
             rhy.deviceBuffer = [];
             rhy.embellishmentBuffer = [];
             con.trend = 'Static';
