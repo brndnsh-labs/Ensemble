@@ -54,7 +54,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles (style/rhythm/voicing). | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile` |
 | `public/engine/soloist-config.ts` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
-| `public/engine/soloist-devices.ts` | Melodic embellishment and run algorithms. | `generateMelodicDevice` |
+| `public/engine/soloist-devices.ts` | Melodic embellishment and run algorithms. | `consonantDoubleStopInterval`, `guitarDoubleStopVoice` |
 | `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
 | `public/engine/fills.ts` | Procedural drum fill generation. | `generateProceduralFill` |
 | `public/engine/conductor.ts` | Global intensity and coordination logic. | `applyConductor`, `updateAutoConductor` |
