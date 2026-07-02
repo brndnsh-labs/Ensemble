@@ -10,7 +10,7 @@ If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth,
 - `.claude/skills/bundle-cycle/SKILL.md` — per-story workflow (pick → implement → measure → review → commit).
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
 - `.size-limit.json` — current budgets (baselines, not targets — see below).
-- `package.json` — `npm run build:size` (size-limit), `npm run knip` (unused exports), `npm run build` (emits `dist/stats.html`).
+- `package.json` — `npm run build:size` (size-limit), `npm run knip` (unused exports), `npm run build` (emits `stats.html` at the repo root).
 
 ## Budgets are baselines, not targets
 
@@ -66,7 +66,7 @@ Workflow: knip finding → grep for the symbol name AND any string literal that 
 
 ## Import-trace bundle work
 
-When tracing why N KB of a chunk is in code that should belong somewhere else (worker code in main, modal code in boot), open `dist/stats.html` (emitted on every `npm run build`).
+When tracing why N KB of a chunk is in code that should belong somewhere else (worker code in main, modal code in boot), open `stats.html` at the repo root (emitted on every `npm run build`).
 
 Pattern: one small symbol — a 4-element `Set`, a single function — can be the only thing pulling a 40 KB file into the chunk's consumer tree. The fix is rarely a big refactor; it's usually:
 
