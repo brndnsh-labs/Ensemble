@@ -451,7 +451,23 @@ export function getBassNote(
     // overrides the hash only when one direction is out of range.
     //
     // Source: docs/audit/form-arranger.md P1 #7; docs/audit/epic-form-arrangement.md S2.
-    const barIndexEarly = Math.floor(step / stepsPerMeasure);
+    //
+    // #924 — barIndexEarly (and phraseIndex/barInPhrase below) must be
+    // loop-relative, not the raw monotonic global step. The #921/#922 diff
+    // assumed Imperfect Symmetry needed the TRUE global bar count to
+    // distinguish Verse 2 from Verse 4, but that distinction is already
+    // carried independently by `sectionOccurrence` (getSectionContext wraps
+    // step by totalFormSteps internally). barIndexEarly's only actual
+    // consumers are phraseIndex/barInPhrase, baked into the target-beat hash
+    // below — left unwrapped, "same phrase → same target beat" (this file's
+    // own documented contract, see targetSeed below) only holds within a
+    // single pass of the arrangement, not lap-to-lap on a looped playback.
+    // Wrap it the same way #921/#922 wrapped barIndex for withOctaveJump.
+    const inLoopStepForBarIndex =
+        arranger.totalSteps > 0
+            ? (((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps) | 0
+            : step;
+    const barIndexEarly = Math.floor(inLoopStepForBarIndex / stepsPerMeasure);
     const isBeatStartEarly = stepInfo?.isBeatStart ?? step % ts.stepsPerBeat === 0;
     const isSoloistBusyEarly = (soloist.session.phrasing.busySteps || 0) > 0;
     const sectionOccurrence: number = context?.stepCoordination?.sectionOccurrence ?? 1;
@@ -635,19 +651,10 @@ export function getBassNote(
     // for Imperfect Symmetry. `scrambleHash` is the shared mulberry32 declared
     // above the result() wrapper.
     //
-    // #921 — barIndex (unlike barIndexEarly, which Imperfect Symmetry needs as
-    // the TRUE global bar count to distinguish Verse 2 from Verse 4) seeds a
-    // per-loop hash gate (the octave-jump trigger/direction below, and the
-    // walking-line seedBit parity pick that reuses this same `barIndex`), so it
-    // must be loop-relative or "deterministic" only holds at a fixed absolute
-    // step, not loop-to-loop — the same defect #910 fixed in the neo-soul
-    // upbeat-chatter branch. Mirrors calculatePocketOffset's established
-    // inLoopStep pattern (groove-engine.ts).
-    const inLoopStepForBarIndex =
-        arranger.totalSteps > 0
-            ? (((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps) | 0
-            : step;
-    const barIndex = Math.floor(inLoopStepForBarIndex / stepsPerMeasure);
+    // #921/#924 — barIndex reuses barIndexEarly directly: both are now the
+    // same loop-relative bar count (see the #924 comment where barIndexEarly
+    // is defined), so there's a single wrap computed once, not two.
+    const barIndex = barIndexEarly;
     const sectionSeedInt =
         typeof context?.sectionStart === 'number' ? Math.abs(context.sectionStart) | 0 : 0;
     const isBeatStartLocal = isBeatStartEarly;
