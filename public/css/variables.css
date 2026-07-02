@@ -55,7 +55,7 @@
     /* Warm neutral ramp (dark → light) */
     --base03: #14110d; /* deepest warm ink — app background */
     --base02: #1e1813; /* espresso — panels */
-    --base01: #5e5346; /* warm muted — hairlines, de-emphasized text */
+    --base01: #8c7c65; /* warm muted — hairlines, de-emphasized text; 4.65:1 vs --bg-color (WCAG AA) */
     --base00: #7d7060;
     --base0: #a2937c; /* secondary text on dark */
     --base1: #d8cbb2; /* primary text on dark — warm bone */
