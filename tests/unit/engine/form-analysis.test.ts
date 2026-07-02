@@ -10,6 +10,10 @@ describe('Form Analysis Engine', () => {
             expect(getSectionEnergy('Dropping the beat')).toBe(1.0);
         });
 
+        it('winds the outro below the intro (an outro should decay, not match the opener) — #800', () => {
+            expect(getSectionEnergy('Outro')).toBeLessThan(getSectionEnergy('Intro'));
+        });
+
         it('should return default energy for unknown labels', () => {
             expect(getSectionEnergy('Unknown')).toBe(0.5);
             expect(getSectionEnergy(null)).toBe(0.5);
