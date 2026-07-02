@@ -114,15 +114,14 @@ Prefer **deterministic, seeded motif generation** (`barIndex`, `sectionId`) over
 
 ### Weight-based selectors: final-stage multipliers win
 
-For any weight-based picker (e.g. `selectPitchAndDevices` in `soloist-pitch-engine.ts`), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line. Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.); scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
+For any weight-based picker (e.g. the pitch-weighting block in `getBassNote` in `bass-engine.ts`), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line. Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.); scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
 
 ### Dynamic Head / Chorus Evolution (Soloist)
 
-The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, Restatement, Departure, Conclusion) at playback start. Loop behavior:
+The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, Restatement, Departure, Conclusion) at playback start. The live mechanism (`getSoloistNotePhraseFirst` in `soloist-phrase-first.ts`, see `docs/design/soloist-phrase-first.md` §6/§9 for the full design):
 
-- **Loop 0 (The Head):** strict Head adherence, `survivalProb = 1.0`, Imperfect Symmetry (30% motivic drift in cloned measures to avoid mechanical looping).
-- **Loop 1 (Conversational):** Themed Improv — pitch jitter, Gap-Fill (generative notes between theme hits), Sequencing (transposed motifs); effective intensity +0.05.
-- **Loop 2+ (Exploratory):** Progressive Ornamentation (+20%/loop), Fatigue Decay (shorter rests), Common Tone Reward (pedal-point bias across chord changes).
+- **Loop 0 (The Head):** strict Head adherence, Imperfect Symmetry (30% motivic drift in cloned measures to avoid mechanical looping).
+- **Loop 1+:** `loopLift` (0.14/loop, capped at 4 loops) layers onto `intensityLift`/`tempoFill`; a per-step sine-swell `activityAt` shapes note density across the loop. `developmentDepth`/`DEPTH_DEGREES` drives cyclical diatonic transposition of the whole line, keyed to `loopCount` so pitch only shifts at a loop boundary (never mid-phrase) — with periodic theme-return (`depth 0` = verbatim head) and one apex/money-note peak per cycle.
 
 ### Coordination & Register Slotting
 
