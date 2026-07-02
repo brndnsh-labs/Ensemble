@@ -30,7 +30,6 @@ const BOSSA_CLAVE_CYCLE_STEPS_4_4 = 32;
 export const BOSSA_OFFBEAT_CELL_STEPS_4_4: readonly number[] = [6, 10, 14];
 
 const SON_CLAVE_SET_4_4 = new Set(BOSSA_CLAVE_STEPS_4_4);
-const OFFBEAT_CELL_SET_4_4 = new Set(BOSSA_OFFBEAT_CELL_STEPS_4_4);
 
 function isFourFourSixteenthGrid(stepsPerBeat: number, stepsPerBar: number): boolean {
     return stepsPerBeat === 4 && stepsPerBar === 16;
@@ -40,8 +39,8 @@ function isFourFourSixteenthGrid(stepsPerBeat: number, stepsPerBar: number): boo
  * True when `step` (absolute, on the song's step grid) lands on a son-clave stroke.
  * Only defined for the 4/4 16th grid — bossa's dominant meter; returns `false` otherwise
  * so callers fall back to generic positional logic rather than mis-mapping onto an odd
- * meter. (The son clave is the documented spine; for lead accenting prefer the offbeat
- * cells — see `isBossaOffbeatCellStep`.)
+ * meter. (The son clave is the documented spine; for lead accenting the offbeat cells
+ * `BOSSA_OFFBEAT_CELL_STEPS_4_4` are the idiomatic target.)
  */
 export function isBossaClaveStep(step: number, stepsPerBeat: number, stepsPerBar: number): boolean {
     if (!isFourFourSixteenthGrid(stepsPerBeat, stepsPerBar)) {
@@ -51,21 +50,4 @@ export function isBossaClaveStep(step: number, stepsPerBeat: number, stepsPerBar
         ((step % BOSSA_CLAVE_CYCLE_STEPS_4_4) + BOSSA_CLAVE_CYCLE_STEPS_4_4) %
         BOSSA_CLAVE_CYCLE_STEPS_4_4;
     return SON_CLAVE_SET_4_4.has(pos);
-}
-
-/**
- * True when `step` lands on a bossa offbeat clave cell (&-of-2 / &-of-3 / &-of-4 within
- * the bar) — the lead's accent target that locks to the partido-alto comp. Only defined
- * for the 4/4 16th grid; `false` otherwise.
- */
-export function isBossaOffbeatCellStep(
-    step: number,
-    stepsPerBeat: number,
-    stepsPerBar: number,
-): boolean {
-    if (!isFourFourSixteenthGrid(stepsPerBeat, stepsPerBar)) {
-        return false;
-    }
-    const stepInBar = ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
-    return OFFBEAT_CELL_SET_4_4.has(stepInBar);
 }

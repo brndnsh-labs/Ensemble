@@ -93,9 +93,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/groove-engine.ts` | Rhythmic patterns and micro-timing. | `getDrumMotif`, `calculatePocketOffset` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers shared across engines. | `scrambleHash`, `stringHash33`, `stringHash31` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
-| `public/engine/clave.ts` | Canonical bossa son-clave spine + the offbeat clave cells (&-of-2/3/4) the lead accents. | `BOSSA_CLAVE_STEPS_4_4`, `isBossaOffbeatCellStep`, `isBossaClaveStep` |
+| `public/engine/clave.ts` | Canonical bossa son-clave spine + the offbeat clave cells (&-of-2/3/4) the lead accents. | `BOSSA_CLAVE_STEPS_4_4`, `BOSSA_OFFBEAT_CELL_STEPS_4_4`, `isBossaClaveStep` |
 | `public/engine/soloist-pitch-engine.ts` | Chord-target-tones helper (guide/pillar tones by chord quality) for the phrase-first realizer; legacy `selectPitchAndDevices` picker removed in epic #10/#866. | `chordTargetTones` |
-| `public/engine/soloist-rhythm-engine.ts` | Melodic rhythm planning and phrasing. | `generateRhythmPlan` |
 | `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
