@@ -18,7 +18,7 @@
 //   node scripts/forgejo.mjs issue view <n>
 //   node scripts/forgejo.mjs issue create --title T [--body B] [--label L]... [--milestone M]
 //   node scripts/forgejo.mjs issue edit <n> [--title T] [--body B] [--add-label L]... [--remove-label L]... [--milestone M]
-//   node scripts/forgejo.mjs issue comment <n> --body B
+//   node scripts/forgejo.mjs issue comment <n> "<text>"   (or --body B / @file / @-)
 //   node scripts/forgejo.mjs issue close <n>
 //   node scripts/forgejo.mjs pr create --head BRANCH [--base main] --title T [--body B]
 //   node scripts/forgejo.mjs pr list [--state open|closed|all]
@@ -252,11 +252,14 @@ async function issueCmd(sub, rest) {
             return;
         }
         case 'comment': {
-            if (!n || !flags.body) {
-                fail('usage: issue comment <n> --body B');
+            // Body via a positional shorthand (`comment <n> "<text>"` — the common one-liner
+            // everyone reaches for) OR `--body B` / `--body @file` / `--body @-`.
+            const raw = flags.body && flags.body !== true ? flags.body : positional[1];
+            if (!n || raw === undefined) {
+                fail('usage: issue comment <n> "<text>"  (or --body B | @file | @-)');
             }
             const c = await api('POST', `${R}/issues/${n}/comments`, {
-                body: readBody(flags.body),
+                body: readBody(raw),
             });
             console.log(`commented on #${n}: ${c.html_url}`);
             return;

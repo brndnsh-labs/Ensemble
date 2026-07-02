@@ -18,7 +18,7 @@ mapping for porting a work-loop skill off `gh`. Read the (already-migrated) `DOC
 | `gh issue view <n> --json …` | `node scripts/forgejo.mjs issue view <n>` (JSON: number,title,state,url,labels,milestone,body) |
 | `gh issue create --title T --body B --label L` | `node scripts/forgejo.mjs issue create --title T --body B --label L [--milestone M]` |
 | `gh issue edit <n> --add-label L` / `--title` / `--body` | `node scripts/forgejo.mjs issue edit <n> [--add-label L] [--remove-label L] [--title T] [--body B] [--milestone M]` |
-| `gh issue comment <n> --body B` | `node scripts/forgejo.mjs issue comment <n> --body B` |
+| `gh issue comment <n> --body B` | `node scripts/forgejo.mjs issue comment <n> "<text>"` (positional; or `--body B` / `@file` / `@-`) |
 | `gh issue close <n>` | `node scripts/forgejo.mjs issue close <n>` |
 | `gh pr create --base main --title T --body B` | `git push -u origin <branch>` then `node scripts/forgejo.mjs pr create --head <branch> --base main --title T --body B` |
 | `gh pr list` | `node scripts/forgejo.mjs pr list [--state open\|closed\|all]` |
@@ -54,6 +54,14 @@ No board, no 30-item pagination default, no GraphQL quota. A **closed issue is d
 - **Unreachable → STOP.** All three scripts exit **3** and print `unreachable` on a connection
   failure. A skill must stop and say so — never fall back to the frozen markdown or a cached list.
 - **`brndnsh`/`github.com` URLs → `git.brndn.zip/brandon/Ensemble`.**
+
+## Filing note (validated on the first real cycle)
+
+**Review-carved issues arrive with ZERO routing labels — by design.** An "out of scope" observation
+from one story that becomes its own `finding`/`backlog` issue is filed with no `track/`, `model/`,
+`size/`, or `agent/` label. Routing is decided by the **picking** skill at `/cycle` time (from what
+the diff actually touches), NOT at filing time. Don't document the pipeline as "every issue arrives
+pre-routed" — a bare `finding`/`backlog` with no namespace labels is correct, not an oversight.
 
 ## What must NOT change
 
