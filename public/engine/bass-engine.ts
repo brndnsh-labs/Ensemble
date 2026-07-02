@@ -835,15 +835,37 @@ export function getBassNote(
             return result(getFrequency(baseRoot), 0.9, 1.15 + intensity * 0.1);
         }
         if (isUpbeat) {
+            // why: base 20% upbeat-chatter floor, +40% at full band intensity and
+            // +30% at full arrangement complexity — Neo-Soul's between-the-anchors
+            // fills should thicken with both energy and busyness, not fire at a
+            // flat rate regardless of context.
             const hitProb = 0.2 + intensity * 0.4 + (playback.complexity || 0.5) * 0.3;
-            if (Math.random() < hitProb && !isSoloistBusy) {
-                const rand = Math.random();
+            // why: CLAUDE.md "Deterministic phrasing" — seed off the IN-LOOP step
+            // (not the monotonic global `step`), mirroring calculatePocketOffset's
+            // established pattern in groove-engine.ts, so this repeats loop-to-loop
+            // instead of just being reproducible at a fixed absolute step (was bare
+            // Math.random(), diverging bar-to-bar on every replay).
+            const inLoopStep =
+                arranger.totalSteps > 0
+                    ? (((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps) |
+                      0
+                    : step;
+            const hitHash = scrambleHash(inLoopStep * 0x9e3779b1 + sectionSeedInt * 0x85ebca77);
+            if (hitHash < hitProb && !isSoloistBusy) {
+                const pitchHash = scrambleHash(hitHash * 0xffffffff + 0x27d4eb2d);
                 let note = baseRoot;
                 let isGhost = false;
                 let dur = 0.4;
-                if (rand > 0.7) {
+                // why: top 30% of the draw — a 5th above root (a "reaching" upper
+                // neighbor); next 30% (only when complexity > 0.6, i.e. a busier
+                // arrangement) — a scale-degree passing tone (2nd if diatonic, else
+                // the b7); remaining share — a muted ghost note (rhythmic chatter
+                // with no clear pitch, the Neo-Soul pocket's default): 40% when
+                // complexity > 0.6, 70% otherwise (the passing-tone band falls
+                // through to ghost when the complexity gate isn't met).
+                if (pitchHash > 0.7) {
                     note = baseRoot + 7;
-                } else if (rand > 0.4 && (playback.complexity || 0.5) > 0.6) {
+                } else if (pitchHash > 0.4 && (playback.complexity || 0.5) > 0.6) {
                     note = scale.includes(2) ? baseRoot + 2 : baseRoot + 10;
                     dur = 0.2;
                 } else {
