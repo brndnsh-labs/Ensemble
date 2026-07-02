@@ -42,7 +42,6 @@ vi.mock('../../public/state.js', () => {
                 },
             },
             currentPhraseSteps: 10,
-            srdcState: 'Statement',
         }),
         groove: { enabled: true, genreFeel: 'Jazz' },
         conductor: {

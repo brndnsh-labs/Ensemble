@@ -181,12 +181,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         formArcRecall: (v) => {
             session.memory.formArcRecall = v as any;
         },
-        rhythmPlan: (v) => {
-            session.rhythm.plan = v as any;
-        },
-        rhythmicEntropy: (v) => {
-            session.rhythm.entropy = v as any;
-        },
         deviceBuffer: (v) => {
             session.rhythm.deviceBuffer = v as any;
         },
