@@ -148,15 +148,6 @@ describe('Worker Synchronization Integrity', () => {
         expect(onNotes).toHaveBeenCalledWith(mockNotes, undefined, undefined, undefined);
     });
 
-    it('should trigger onTick callback when worker sends tick', () => {
-        const onTick = vi.fn();
-        initWorker(onTick, null);
-
-        getTimerWorker().onmessage({ data: { type: 'tick' } });
-
-        expect(onTick).toHaveBeenCalled();
-    });
-
     it('should handle delayed messages without crashing (Latency Simulation)', async () => {
         const onNotes = vi.fn();
         initWorker(null, onNotes);

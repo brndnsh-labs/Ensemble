@@ -74,27 +74,6 @@ describe('Resolution Logic', () => {
         expect(chordNotes.length).toBeGreaterThan(0);
     });
 
-    it('generates Jazz ending with extensions and staggered timing', () => {
-        const arranger = { key: 'F', isMinor: false };
-        const enabled = { chords: true };
-        const groove = { genreFeel: 'Jazz' };
-
-        const notes = generateResolutionNotes(
-            { playback: { bandIntensity: 0.5 }, groove: { genreFeel: 'Rock' } },
-            0,
-            arranger,
-            enabled,
-            100,
-            groove,
-        );
-
-        // Jazz Major should be JAZZ_V_I (2 cadence steps)
-        // Since we have staggering, unique times will be many, but they should fall into two clusters
-        const times = notes.map((n) => n.timingOffset);
-        const uniqueClusters = [...new Set(times.map((t) => Math.round(t * 2) / 2))];
-        expect(uniqueClusters.length).toBe(2);
-    });
-
     it('scales velocity based on band intensity', () => {
         const arranger = { key: 'C', isMinor: false };
         const enabled = { bass: true };

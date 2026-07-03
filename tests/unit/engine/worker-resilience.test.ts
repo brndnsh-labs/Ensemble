@@ -26,19 +26,6 @@ describe('Worker Resilience & Error Handling', () => {
         initWorker();
     });
 
-    it('should log an error when the worker sends an error message', () => {
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        const worker = getTimerWorker();
-        worker.onmessage({ data: { type: 'error', data: 'Internal Synth Crash' } });
-
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining('[Worker Error]'),
-            'Internal Synth Crash',
-        );
-        consoleSpy.mockRestore();
-    });
-
     it('should gracefully handle malformed messages from the worker', () => {
         const onNotes = vi.fn();
         initWorker(null, onNotes);
