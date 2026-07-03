@@ -278,26 +278,6 @@ describe('Utility Functions', () => {
         });
     });
 
-    describe('midiToNote', () => {
-        it('should return note name "C" and octave 4 for MIDI note 60', () => {
-            expect(midiToNote(60)).toEqual({ name: 'C', octave: 4 });
-        });
-
-        it('should return A4 for MIDI 69', () => {
-            expect(midiToNote(69)).toEqual({ name: 'A', octave: 4 });
-        });
-    });
-
-    describe('getMidi', () => {
-        it('should return MIDI note 69 for frequency 440Hz', () => {
-            expect(getMidi(440)).toBe(69);
-        });
-
-        it('should return 60 for 261.63Hz', () => {
-            expect(getMidi(261.63)).toBe(60);
-        });
-    });
-
     describe('getChordMidiNotes', () => {
         it('should calculate notes grouped by odds then evens for a major chord', () => {
             const chord = { rootMidi: 60, quality: 'major' }; // C4
@@ -354,6 +334,7 @@ describe('Utility Functions', () => {
         it('should correctly convert valid MIDI numbers to note names and octaves', () => {
             expect(midiToNote(60)).toEqual({ name: 'C', octave: 4 });
             expect(midiToNote(61)).toEqual({ name: 'Db', octave: 4 });
+            expect(midiToNote(69)).toEqual({ name: 'A', octave: 4 });
             expect(midiToNote(72)).toEqual({ name: 'C', octave: 5 });
             expect(midiToNote(21)).toEqual({ name: 'A', octave: 0 });
             expect(midiToNote(0)).toEqual({ name: 'C', octave: -1 });

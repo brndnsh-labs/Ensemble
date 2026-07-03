@@ -173,13 +173,4 @@ describe('Worker Synchronization Integrity', () => {
 
         expect(onNotes).toHaveBeenCalledWith(mockNotes, undefined, undefined, undefined);
     });
-
-    it('should not throw if called before worker is initialized', () => {
-        lastWorkerInstance = null;
-        // Reset the local timerWorker in the module is hard without re-importing
-        // but we can test the 'if (!timerWorker) return;' line.
-        // For a true test of this, we'd need to not call initWorker() in this test.
-
-        // (Testing this specifically might require more complex module mocking)
-    });
 });

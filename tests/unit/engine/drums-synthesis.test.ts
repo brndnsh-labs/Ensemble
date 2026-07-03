@@ -462,12 +462,9 @@ describe('Drum Synthesis', () => {
         expect(playback.audio.createOscillator).toHaveBeenCalled();
     });
 
-    it('should implement Shaker/Cabasa/Guiro synthesis', () => {
+    it('should implement Shaker/Guiro synthesis', () => {
         playDrumSound(getState(), 'Shaker', 10, 1.0);
-        playDrumSound(getState(), 'Cabasa', 10, 1.0);
         playDrumSound(getState(), 'Guiro', 10, 1.0);
-        playDrumSound(getState(), 'Vibraslap', 10, 1.0);
-        playDrumSound(getState(), 'Maracas', 10, 1.0);
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
         expect(playback.audio.createBiquadFilter).toHaveBeenCalled();

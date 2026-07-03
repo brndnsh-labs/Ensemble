@@ -488,30 +488,6 @@ describe('Scheduler Core System', () => {
             scheduleGlobalEvent(getState(), 0, 0);
             expect(groove.snareMask).toBeGreaterThan(0);
         });
-
-        it('should handle MIDI automation (lines 1144-1153)', () => {
-            midi.enabled = true;
-            midi.selectedOutputId = 'mock-output';
-            soloist.session.tension = 0.5;
-
-            // Step 0 is Beat Start
-            scheduleGlobalEvent(getState(), 0, 0);
-        });
-
-        it('should handle turnaround logic (lines 1210-1225)', () => {
-            arranger.sectionMap = [
-                { start: 0, end: 32 }, // 2 measures (32 steps in 4/4)
-            ];
-
-            // Step 0-15: Not turnaround
-            // Step 16-31: Is turnaround (second measure)
-
-            // Mock scheduleDrums to verify if isTurnaround is passed
-            // Since we imported it from scheduler-core, it's hard to mock internal calls.
-            // But we hit the lines for coverage anyway.
-            scheduleGlobalEvent(getState(), 16, 1.0);
-            // This should hit measuresInSection > 1 && barInSection === 1 branch
-        });
     });
 
     describe('Visual Scheduling', () => {

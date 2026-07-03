@@ -102,21 +102,4 @@ describe('Resolution Musicality: Final Button Overhaul', () => {
         const midis = chordNotes.map((n) => n.midi % 12);
         expect(midis).toContain(10);
     });
-
-    it('should only trigger resolution at chorus boundaries', () => {
-        const state = getState();
-
-        state.arranger.totalSteps = 64; // 4 measures
-        state.playback.loopLimit = 2;
-        state.playback.isPlaying = true;
-        state.playback.step = 63; // Almost at end of 1st loop
-
-        // Simulate one step to wrap around
-        // Note: We can't easily run the real scheduler here due to worker dependencies,
-        // but we can verify the state logic if we were to mock the dispatch.
-        // For now, we'll rely on the unit-level check of the condition.
-        const triggerCondition = (step, totalSteps) => step > 0 && step % totalSteps === 0;
-        expect(triggerCondition(64, 64)).toBe(true);
-        expect(triggerCondition(32, 64)).toBe(false);
-    });
 });

@@ -274,15 +274,6 @@ describe('Export and Resolution Logic Validation', () => {
         });
     });
 
-    it('should handle muted property by reducing velocity in resolution', () => {
-        handleResolution(getState(), 0);
-        const noteMsg = capturedMessages.find((m) => m.type === 'notes');
-        // Bass doesn't always have velocity reduction logic in resolution.js anymore,
-        // but midiVelocity should still be reasonable.
-        const bass = noteMsg.notes.find((n) => n.module === 'bass');
-        expect(bass.midiVelocity).toBeLessThanOrEqual(127);
-    });
-
     it('should include Harmony module in resolution', () => {
         handleResolution(getState(), 0);
 

@@ -113,13 +113,5 @@ describe('Bass Engine - Disco', () => {
             expect(result.midi).toBe(48); // C3 (36 + 12)
             spy.mockRestore();
         });
-
-        it('should handle range clamping correctly for octaves', () => {
-            // Verify standard octave behavior works.
-            const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
-            const result = getBassNote(getState(), chordC, null, 0.5, null, 36, 'disco', 0, 2, 2);
-            expect(result.midi).toBe(48);
-            spy.mockRestore();
-        });
     });
 });

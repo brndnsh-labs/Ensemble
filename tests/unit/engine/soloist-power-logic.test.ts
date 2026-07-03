@@ -76,10 +76,4 @@ describe('Soloist Power Logic', () => {
         // We want it OFF (Gray), so it should reset to 'manual'.
         expect(state.soloist.tradeMode).toBe('manual');
     });
-
-    it('should maintain tradeMode if we are just toggling enabled state within the "game"', () => {
-        // This test defines if we want the power button to act as a kill switch or a "yield" button.
-        // User said: "If it's turned off, it shouldn't appear yellow".
-        // This implies they want it DEAD.
-    });
 });

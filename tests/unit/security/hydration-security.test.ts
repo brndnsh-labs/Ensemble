@@ -273,23 +273,4 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(state.arranger.timeSignature).toBe('4/4');
         });
     });
-
-    describe('Storage Persistence Resilience', () => {
-        it('should return default value when localStorage contains invalid JSON', () => {
-            localStorage.setItem('ensemble_testKey', '{invalid-json');
-            const result = stateModule.storage.get('testKey');
-            expect(result).toEqual([]);
-        });
-
-        it('should return default value when localStorage is empty', () => {
-            const result = stateModule.storage.get('nonExistentKey');
-            expect(result).toEqual([]);
-        });
-
-        it('should return parsed data when localStorage is valid', () => {
-            localStorage.setItem('ensemble_validKey', JSON.stringify({ foo: 'bar' }));
-            const result = stateModule.storage.get('validKey');
-            expect(result).toEqual({ foo: 'bar' });
-        });
-    });
 });

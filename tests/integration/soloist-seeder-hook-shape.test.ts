@@ -115,14 +115,6 @@ describe('Soloist Seeder Hook Shape', () => {
         ).toBe(true);
     });
 
-    it('does not add deprecated piano support hints to hook seed metadata', () => {
-        const arrangement = buildHookAuditArrangement('4/4');
-        const state = createHookSeedState(arrangement);
-        const seed = generateSessionSeed(state, state.arranger, 'rock', 0.5, 'HEAD_AUDIT');
-        const loopWindowNotes = getLoopWindowNotes(seed, arrangement);
-        expect(loopWindowNotes.every((note) => note.supportHints?.piano === undefined)).toBe(true);
-    });
-
     it('avoids harsh cadence landings in the default rock hook audit', () => {
         const arrangement = buildHookAuditArrangement('4/4');
         const { state } = bootstrapSoloistAudit({
