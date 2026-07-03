@@ -1,7 +1,7 @@
 import { KEY_ORDER } from '../config.js';
 import type { ArrangerState } from '../state/arranger.js';
 import type { EnsembleState } from '../types.js';
-import { getFrequency } from '../utils.js';
+import { getFrequency, normalizeKey } from '../utils.js';
 import { getBestInversion, getIntervals } from './chords-engine.js';
 
 /**
@@ -70,6 +70,96 @@ const GENRE_MAP: Record<string, GenreConfig> = {
     Reggae: { profile: 'BUTTON', ritardando: 0.0 },
 };
 
+// --- #830: infer the tune's TRUE tonal center from the progression's cadence ----
+// The cadence engine used to land on the NOTATED key's degree-0 (`arranger.key` +
+// `isMinor`), which is wrong whenever a chart is written relative to one tonic but
+// cadences to another — the relative-minor case (Autumn Leaves is notated in the
+// relative major, `isMinor:false`, but resolves home to vi) and modal charts. The
+// fix reads `arranger.progression` — a flat array of already-parsed chords each
+// carrying an ABSOLUTE `rootMidi` and a canonical `quality` (chords-engine.ts) — so
+// keyShift and relative-minor notation are already resolved for us. It works
+// identically for presets and arbitrary user-typed charts.
+
+// Canonical dominant-seventh qualities our parser emits (major-3rd + ♭7). A chord of
+// one of these FUNCTIONS as a dominant — its presence a P5 above a chord is the
+// evidence that that chord is a tonicized arrival (`aug` also covers aug7 / 7#5,
+// which collapse to quality 'aug' with is7th — a dominant ♯5, e.g. Autumn Leaves' III7+).
+const DOMINANT_QUALITIES = new Set([
+    '7',
+    '9',
+    '11',
+    '13',
+    '7alt',
+    '7b13',
+    '7#11',
+    '7b9',
+    '7#9',
+    '7sus4',
+]);
+// Minor-family qualities → the landing tonic is voiced minor.
+// (the parser collapses m7 → 'minor', so 'm7' is intentionally absent.)
+const MINOR_QUALITIES = new Set(['minor', 'm6', 'm9', 'm11', 'm13', 'halfdim', 'dim']);
+
+function isDominantChord(c: any): boolean {
+    return DOMINANT_QUALITIES.has(c.quality) || (c.quality === 'aug' && c.is7th === true);
+}
+
+/**
+ * Resolve where the ending cadence should land, as `{ keyIndex, isMinor }`, from the
+ * progression's own cadence — feeding the ENTIRE gesture below (anchor register, the
+ * V→I degrees, the tonic landing, and the soloist's landing PC + 3-2-1 pickup mode).
+ *
+ * A chord is treated as the true tonic if EITHER:
+ *   (a) its root already IS the local key tonic (blues I7, All Blues G7, every
+ *       Imaj7/i ending) — mode taken from the final chord's own quality; OR
+ *   (b) it is a tonicized ARRIVAL: preceded by its own dominant a P5 above it,
+ *       scanning back past REPEATS of the final chord (guard 2 — Autumn Leaves ends
+ *       `…III7+ | vi7 | vi7`, so the duplicate vi7 must be skipped to see III7+),
+ *       and the approach must be dominant-QUALITY (guard 1 — a plain I a P5 above IV
+ *       must NOT read as a cadence, so a plagal IV ending keeps landing on I).
+ * Otherwise (half-cadence on V, plagal IV, deceptive vi, borrowed iv, sus) → resolve
+ * to the established LOCAL tonic (the final section's key/mode, so a modulating chart
+ * lands in the key it ended in), preserving mode.
+ */
+function inferResolutionTonic(
+    progression: any[],
+    fallbackKeyIndex: number,
+    fallbackIsMinor: boolean,
+): { keyIndex: number; isMinor: boolean } {
+    if (!progression || progression.length === 0) {
+        return { keyIndex: fallbackKeyIndex, isMinor: fallbackIsMinor };
+    }
+    const final = progression[progression.length - 1];
+    const finalPC = (((final.rootMidi % 12) + 12) % 12) as number;
+    // Established local tonic for the fallback = the FINAL section's key/mode.
+    const localKeyIndex = KEY_ORDER.indexOf(normalizeKey(final.key));
+    const localTonicPC = localKeyIndex >= 0 ? localKeyIndex : fallbackKeyIndex;
+    const localIsMinor = typeof final.keyIsMinor === 'boolean' ? final.keyIsMinor : fallbackIsMinor;
+    const finalQualityIsMinor = MINOR_QUALITIES.has(final.quality);
+
+    // (a) The chart already ended ON its local tonic root.
+    if (finalPC === ((localTonicPC % 12) + 12) % 12) {
+        return { keyIndex: finalPC, isMinor: finalQualityIsMinor };
+    }
+
+    // (b) The final chord is a tonicized arrival (preceded by its own dominant).
+    for (let i = progression.length - 2; i >= 0; i--) {
+        const prev = progression[i];
+        const prevPC = ((prev.rootMidi % 12) + 12) % 12;
+        if (prevPC === finalPC) {
+            continue; // skip repeats of the final chord (guard 2)
+        }
+        // A dominant sits a P5 above its tonic → (final - dom) mod 12 === 5.
+        if ((finalPC - prevPC + 12) % 12 === 5 && isDominantChord(prev)) {
+            return { keyIndex: finalPC, isMinor: finalQualityIsMinor };
+        }
+        break; // first differing chord isn't final's dominant → not a tonic arrival
+    }
+
+    // (c) Not a tonic arrival → land on the established local tonic, mode preserved.
+    return { keyIndex: localTonicPC, isMinor: localIsMinor };
+}
+
 export function generateResolutionNotes(
     state: EnsembleState,
     step: number,
@@ -95,8 +185,20 @@ export function generateResolutionNotes(
     const getStagger = (maxMs = RESOLUTION_STAGGER): number => Math.random() * maxMs;
 
     const resolutionKey = arranger.key || 'C';
-    const isMinor = arranger.isMinor;
-    const keyIndex = KEY_ORDER.indexOf(resolutionKey);
+    const notatedKeyIndex = KEY_ORDER.indexOf(normalizeKey(resolutionKey));
+    // #830: resolve onto the tune's TRUE tonal center (from the progression's
+    // cadence) rather than the notated key's degree-0. The resolved {keyIndex,isMinor}
+    // feed the ENTIRE cadence below — anchor register, V→I degrees, the tonic
+    // landing, and the soloist's landing PC + 3-2-1 pickup mode — so the whole
+    // gesture transposes as one (e.g. Autumn Leaves lands on vi/minor, not the
+    // relative-major I, while 12-bar blues still resolves V7→I).
+    const resolved = inferResolutionTonic(
+        arranger.progression as any[],
+        notatedKeyIndex >= 0 ? notatedKeyIndex : 0,
+        arranger.isMinor,
+    );
+    const keyIndex = resolved.keyIndex;
+    const isMinor = resolved.isMinor;
 
     const cadenceSteps = CADENCE_PROFILES[config.profile] || CADENCE_PROFILES.BUTTON;
     const ritardandoAmount = config.ritardando;

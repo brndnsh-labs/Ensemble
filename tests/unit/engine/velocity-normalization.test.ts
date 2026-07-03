@@ -67,6 +67,16 @@ vi.mock('../../../public/state.js', () => {
 
 vi.mock('../../../public/config.js', () => ({
     KEY_ORDER: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
+    // why: utils.ts `normalizeKey` (now reached transitively via resolution.ts's
+    // ending-tonic inference, #830) reads ENHARMONIC_MAP — the mock must export it
+    // or normalizeKey throws on `undefined[key]` and the export path never emits.
+    ENHARMONIC_MAP: {
+        'C#': 'Db',
+        'D#': 'Eb',
+        'F#': 'Gb',
+        'G#': 'Ab',
+        'A#': 'Bb',
+    },
     TIME_SIGNATURES: {
         '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' },
     },
