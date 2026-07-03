@@ -790,6 +790,77 @@ export function getSoloistNotePhraseFirst(
         isDoubleStop: false,
     };
 
+    // --- Country "bend" double-stop: the oblique pedal-steel bend (#870) ---
+    // The signature country/pedal-steel move (Roy Nichols, Brent Mason, Albert Lee):
+    // on a SUSTAINED landing note, a chord-tone 3rd ABOVE the held lead BENDS UP into
+    // pitch (from a semitone below) while the lead rings underneath — the crying
+    // oblique bend, one voice held and the other bending to meet the harmony.
+    //
+    // It lives in the SAME structural home as the blues/rock "cry" above: the long,
+    // held phrase-ENDERS (not the short apex/strong-beat accents — phrase-first lands
+    // strong beats on short guide tones and saves the long rings for phrase ends). The
+    // cry is blues/rock only and explicitly leaves country's sustained notes open
+    // ("country has its own bend, #870"); this IS that bend, as a double-stop rather
+    // than a single-voice cry. The chicken-pick snap below owns country's short
+    // punctuation notes, so the two barely overlap — and where they could, this block
+    // runs first and RETURNS, so the snap behavior stays unchanged.
+    //
+    // The bend sits on the HARMONY voice (bendStartInterval -1 = start a semitone
+    // below, glide UP into pitch — the sign convention the grace-slide comment above
+    // documents), so the lead keeps its own melody/rhythm and the double-stop still
+    // lands a clean 3rd above: countryBend and the chicken-pick are BOTH 3rd-snaps
+    // (dsThirdShare stays 1), and it's the bend + the full-duration ring that tell
+    // them apart. §10 restraint (country is the tightest expr lane): gated to a
+    // sustained (≥1.25-beat), between-peaks chord tone via its own per-(step,loop)
+    // hash, and only when the lead carries no bend of its own (bendStartInterval 0 —
+    // no grace-slide to fight).
+    if (allowsSoloistPolyphony(soloist.mode) && resolvedStyle === 'country') {
+        const pc = (((midi - currentChord.rootMidi) % 12) + 12) % 12;
+        const isChordTone = (currentChord.intervals ?? []).some(
+            (iv: number) => ((iv % 12) + 12) % 12 === pc,
+        );
+        // ≥ 1.25 beats — a held phrase-ender with room to bend up INTO and sustain,
+        // the same sustain floor the cry uses. Excludes the apex/flurry (those own
+        // their own reach/scoop), matching the cry's between-peaks placement.
+        const cbRings = durationSteps >= Math.ceil(1.25 * stepsPerBeat);
+        if (
+            !isApexStep &&
+            !inFlurry &&
+            isChordTone &&
+            cbRings &&
+            bendStartInterval === 0 &&
+            // Sparse — a lyrical landing gesture on a subset of the held chord-tone
+            // enders. Its own hash stream (tag 10) stays independent of the chicken-
+            // pick's (tag 7) and the cry's (tag 5/6).
+            scrambleHash(step * 37 + Math.max(loopCount, 0) * 19 + 10) < 0.5
+        ) {
+            const thirdInt = consonantDoubleStopInterval(midi, [4, 3], currentChord);
+            if (thirdInt > 0) {
+                // Unlike the cry, we deliberately DON'T gate `!vibrato`: the cry bends
+                // the lead itself, so vibrato would cannibalize it — but here the bend
+                // is on the HARMONY voice, so a vibrato'd held lead (≥2-beat country
+                // notes get vibrato) beneath the up-bending 3rd composes rather than
+                // competes (a lovely pedal-steel-under-vibrato sound), not a conflict.
+                // Harmony first, lead last (tick-logic reads lastFreq from the lead).
+                // The 3rd-above harmony bends UP into pitch (-1) and RINGS the full
+                // note with the lead — the sustained oblique bend, vs the chicken-
+                // pick's short popped 3rd.
+                return [
+                    {
+                        midi: midi + thirdInt,
+                        velocity: Math.min(1, velocity * 1.1),
+                        durationSteps,
+                        timingOffset: lead.timingOffset,
+                        bendStartInterval: -1,
+                        vibrato: false,
+                        isDoubleStop: true,
+                    },
+                    lead,
+                ];
+            }
+        }
+    }
+
     // --- Country "chicken-pick": the 3rd-above snap double-stop (#870) ---
     // The defining country lead idiom (Brent Mason / Albert Lee): a bright, snappy
     // double-stop where a chord-aware 3rd ABOVE the lead is plucked with it — the

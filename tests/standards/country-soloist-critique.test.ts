@@ -8,12 +8,16 @@
 //
 // What this guards: the country lead stays on its major-pentatonic / diatonic
 // palette and keeps chromaticism low, AND the ported legacy country devices fire
-// idiomatically (#870): the chicken-pick (a chord-aware 3rd-ABOVE snap double-stop
-// on structural accents) and the grace-slide (a +1 down-slide grace into the note).
-// Both are country-gated — a contrast pass proves they don't leak into Rock (which
-// uses the generic 6th-below double-stop, not the 3rd snap). countryBend / banjoRoll
-// and the misc ornaments remain tracked under the #870 umbrella. The bend "cry" is
-// blues/rock only (#869, soloist-cry-critique).
+// idiomatically (#870): the chicken-pick (a chord-aware 3rd-ABOVE STATIC snap
+// double-stop on structural accents), the countryBend (the same 3rd-above voice but
+// BENDING UP into pitch and ringing on a sustained phrase-ender — the oblique pedal-
+// steel bend), and the grace-slide (a +1 down-slide grace into the note). All three
+// are country-gated — a contrast pass proves they don't leak into Rock (which uses
+// the generic 6th-below double-stop, not the 3rd snap). banjoRoll was evaluated and
+// deferred (a 4-note roll reads as a banjo/rhythm texture, not a lead device, and
+// stacks onto country's already-tightest §10 expression budget — see #870). The bend
+// "cry" is blues/rock only (#869, soloist-cry-critique); countryBend is its country
+// analogue, which is why the cry gate leaves country's sustained notes open.
 import { describe, expect, it } from 'vitest';
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
@@ -22,6 +26,8 @@ import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-fi
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
+
+const STEPS_PER_BEAT = 4; // 4/4, 16 steps/bar
 
 function buildState(presetName: string, genreFeel = 'Country') {
     dispatch(ACTIONS.RESET_STATE);
@@ -88,6 +94,7 @@ function simulate(presetName = 'Country Standard', genreFeel = 'Country') {
                 chordQuality: chord.quality,
                 isDoubleStop: !!n.isDoubleStop,
                 bendStartInterval: n.bendStartInterval ?? 0,
+                durationSteps: n.durationSteps ?? 0,
                 // interval above the lead, for double-stop voices only (else 0)
                 intervalAboveLead: n.isDoubleStop ? n.midi - lead.midi : 0,
             });
@@ -167,41 +174,61 @@ describe('Soloist Country Critique (phrase-first)', () => {
         expect(chromaticShare).toBeLessThan(CHROMATIC_BASELINE);
     });
 
-    it('fires the chicken-pick (3rd-above snap) and grace-slide devices, country-gated', () => {
+    it('fires the chicken-pick snap, the countryBend oblique bend, and the grace-slide, country-gated', () => {
         const country = simulate('Country Standard', 'Country');
         const rock = simulate('Country Standard', 'Rock');
 
-        // --- Chicken-pick: a chord-aware 3rd ABOVE the lead, on structural notes. ---
+        // --- All country double-stops are a chord-aware 3rd ABOVE the lead. ---
         const ds = country.filter((n) => n.isDoubleStop);
         const thirdsAbove = ds.filter(
             (n) => n.intervalAboveLead === 3 || n.intervalAboveLead === 4,
         );
-        // Every country double-stop should be a chicken-pick 3rd-snap (country never
-        // falls to the generic 6th-below), so the ones we see are 3rds above.
+        // Every country double-stop should be a 3rd-above (country never falls to the
+        // generic 6th-below), whether it's a chicken-pick snap or a countryBend.
         const dsThirdShare = ds.length ? thirdsAbove.length / ds.length : 0;
-        const chickenRate = thirdsAbove.length / country.length;
+        const thirdRate = thirdsAbove.length / country.length;
+
+        // Two 3rd-above devices, told apart by the harmony voice's bend (#870):
+        //   • chicken-pick — a STATIC snap (bendStartInterval 0), short pop on
+        //     structural accents.
+        //   • countryBend  — the harmony voice BENDS UP into pitch (bendStartInterval
+        //     -1) and RINGS the full note: the oblique pedal-steel bend on a
+        //     sustained phrase-ender.
+        const chickenSnaps = thirdsAbove.filter((n) => n.bendStartInterval === 0);
+        const countryBends = thirdsAbove.filter((n) => n.bendStartInterval === -1);
+        const chickenRate = chickenSnaps.length / country.length;
+        const countryBendRate = countryBends.length / country.length;
 
         // --- Grace-slide: a +1 down-slide grace into the lead note. ---
         const graceSlides = country.filter((n) => !n.isDoubleStop && n.bendStartInterval === 1);
         const graceRate = graceSlides.length / country.length;
 
-        // --- Gate contrast: Rock gets the generic 6th-BELOW, never the 3rd-snap or
-        //     the +1 grace (rock scoops are negative bendStartInterval). ---
+        // --- Gate contrast: Rock gets the generic 6th-BELOW, never the 3rd-snap, the
+        //     countryBend up-bend, or the +1 grace (rock scoops are its own gesture). ---
         const rockThirdsAbove = rock.filter(
             (n) => n.isDoubleStop && (n.intervalAboveLead === 3 || n.intervalAboveLead === 4),
         );
+        const rockUpBendDS = rock.filter((n) => n.isDoubleStop && n.bendStartInterval === -1);
         const rockGrace = rock.filter((n) => !n.isDoubleStop && n.bendStartInterval === 1);
 
         console.log('--- Country device Critique Report ---');
         console.log(
-            `chicken-pick: ${thirdsAbove.length} 3rd-snaps / ${country.length} notes ` +
-                `(${(chickenRate * 100).toFixed(1)}%); ${dsThirdShare * 100}% of ${ds.length} double-stops are 3rds-above`,
+            `chicken-pick (static snap): ${chickenSnaps.length} / ${country.length} notes ` +
+                `(${(chickenRate * 100).toFixed(1)}%)`,
+        );
+        console.log(
+            `countryBend (oblique up-bend): ${countryBends.length} / ${country.length} notes ` +
+                `(${(countryBendRate * 100).toFixed(1)}%); durations=${[...new Set(countryBends.map((n) => n.durationSteps))].sort((a, b) => a - b).join(',')} steps`,
+        );
+        console.log(
+            `all 3rd-above: ${thirdsAbove.length} (${(thirdRate * 100).toFixed(1)}%); ` +
+                `${dsThirdShare * 100}% of ${ds.length} double-stops are 3rds-above`,
         );
         console.log(
             `grace-slide: ${graceSlides.length} / ${country.length} notes (${(graceRate * 100).toFixed(1)}%)`,
         );
         console.log(
-            `rock gate-contrast: ${rockThirdsAbove.length} 3rd-snaps, ${rockGrace.length} +1 grace-slides (both must be 0)`,
+            `rock gate-contrast: ${rockThirdsAbove.length} 3rd-snaps, ${rockUpBendDS.length} up-bend double-stops, ${rockGrace.length} +1 grace-slides (all must be 0)`,
         );
 
         // The path is fully seeded (scrambleHash over step/loop), so these counts are
@@ -209,24 +236,42 @@ describe('Soloist Country Critique (phrase-first)', () => {
         // not a flake band.
 
         // (a) Chicken-pick FIRES — the defining country snap, re-established after the
-        //     legacy delete. Observed 55 snaps / 1395 notes (3.9%) on structural
-        //     accents; >25 guards a regression that silences it, with ~30 headroom.
-        expect(thirdsAbove.length).toBeGreaterThan(25);
-        // ...but stays PUNCTUATION, not a texture (§10): a ceiling guards against a
-        //     regression dropping the isPunctuation gate and machine-gunning the snap
-        //     onto every chord tone. Observed 3.9%; <0.10 keeps it a structural accent.
+        //     legacy delete. Observed 69 static snaps / 1440 notes; >25 guards a
+        //     regression that silences it, with ~40 headroom. Splitting out the
+        //     static-snap count (bend 0) pins it independently of the countryBend so
+        //     one device can't silently substitute for the other.
+        expect(chickenSnaps.length).toBeGreaterThan(25);
+        // ...and stays PUNCTUATION, not a texture (§10): observed 4.8%; <0.10 keeps
+        //     the snap a structural accent.
         expect(chickenRate).toBeLessThan(0.1);
-        // (b) Every country double-stop IS the 3rd-snap — country never falls to the
-        //     generic 6th-below (the whole point of routing it to its own device).
+        // (b) countryBend FIRES — the oblique pedal-steel up-bend, ported from the
+        //     legacy device (#870). Observed 24 up-bend double-stops / 1440 notes
+        //     (1.7%); >10 guards it firing, with headroom.
+        expect(countryBends.length).toBeGreaterThan(10);
+        // ...stays SPARSE per §10 (country is the tightest expr lane) — a lyrical
+        //     landing gesture, not every held note. Observed 1.7%; <0.06 ceiling.
+        expect(countryBendRate).toBeLessThan(0.06);
+        // ...and RINGS: it's a sustained bend (≥1.25 beats = 5 steps in 4/4), not a
+        //     short pop — the whole point is the held oblique bend. Every countryBend
+        //     harmony voice sustains.
+        for (const n of countryBends) {
+            expect(n.durationSteps).toBeGreaterThanOrEqual(Math.ceil(1.25 * STEPS_PER_BEAT));
+        }
+        // (c) Every country double-stop IS a 3rd-above — country never falls to the
+        //     generic 6th-below (the whole point of routing it to its own devices).
+        //     countryBend preserves this: it's a 3rd-snap that bends, not a new shape.
         expect(dsThirdShare).toBe(1);
-        // (c) Grace-slide FIRES but stays SPARSE per the §10 restraint lesson — a
-        //     down-slide INTO chord-tone arrivals, not a tic. Observed 98 / 1395 notes
-        //     (7.0%); >40 guards it firing while <0.10 keeps it from going mechanical.
+        // (d) Grace-slide FIRES but stays SPARSE per the §10 restraint lesson — a
+        //     down-slide INTO chord-tone arrivals, not a tic. Observed ~7.9%
+        //     (114/1440); >40 guards it firing while <0.10 keeps it from going
+        //     mechanical.
         expect(graceSlides.length).toBeGreaterThan(40);
         expect(graceRate).toBeLessThan(0.1);
-        // (d) Both devices stay COUNTRY-GATED — zero leak into Rock (which resolves to
-        //     'shred' and takes the generic 6th-below double-stop, not the 3rd snap).
+        // (e) All three devices stay COUNTRY-GATED — zero leak into Rock (which
+        //     resolves to 'shred' and takes the generic 6th-below double-stop, never
+        //     the 3rd snap, the up-bend double-stop, or the +1 grace).
         expect(rockThirdsAbove.length).toBe(0);
+        expect(rockUpBendDS.length).toBe(0);
         expect(rockGrace.length).toBe(0);
     });
 
