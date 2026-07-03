@@ -340,7 +340,14 @@ export function getSoloistNotePhraseFirst(
     //   • within-form swell: a gentle rise toward the middle of each form pass
     //     and a settle at its edges, so every pass breathes as an arc.
     const loopCount = playback.currentLoopCount ?? -1;
-    const loopLift = Math.min(Math.max(loopCount, 0), 4) * 0.14; // builds over ~4 loops
+    // #858: front-load the entrance ramp so early loops open up SOONER. The prior
+    // linear 0.14/loop meant loops 0-1 read as timid before the line "let loose"
+    // (owner audition during #857). A concave curve reaches the SAME loop-4 ceiling
+    // (~0.56) but rises faster through loops 1-2 — ease in quickly, then plateau —
+    // so first impressions aren't thin while the great-sounding later loops (which
+    // already saturate the gate) stay untouched. Curve: [0, .24, .37, .47, .56].
+    const lc = Math.min(Math.max(loopCount, 0), 4);
+    const loopLift = 0.56 * (lc / 4) ** 0.6;
     // Tempo-awareness (design §7): breath is roughly constant in WALL-CLOCK, so a
     // slow tune's long bars read as too sparse at a fixed musical density — it
     // needs more notes per bar to feel as present. Fill more below ~120bpm. We do
@@ -352,14 +359,18 @@ export function getSoloistNotePhraseFirst(
     // phrasingIntensity (user slider, default 0.5) nudges how fully the theme is
     // stated: a "more present" ↔ "more spacious" knob layered on the arc.
     const intensityLift = ((soloist.phrasingIntensity ?? 0.5) - 0.5) * 0.3; // ±0.15
-    // Activity (0..1) at any absolute step: a 0.30 floor (keeps the theme's bones
+    // Activity (0..1) at any absolute step: a floor (keeps the theme's bones
     // audible) + the tempo/intensity/entrance lifts + the within-form swell (the
     // only per-step term — peaks mid-form, settles at the edges). One definition
     // so the duration-clamp lookahead below sees the SAME gate as the live emit.
+    // #858: floor lifted 0.30 → 0.34 so even the entrance/edges read a touch more
+    // present. It's self-limiting where it should be — late-loop peaks already
+    // clamp to 1.0, so the bump only lifts early loops and form edges (exactly the
+    // "timid opening" the owner flagged), a no-op where the line already saturates.
     const activityAt = (st: number): number => {
         const ap =
             totalSteps > 0 ? (((st % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
-        return clamp01(0.3 + tempoFill + intensityLift + loopLift + 0.25 * Math.sin(Math.PI * ap));
+        return clamp01(0.34 + tempoFill + intensityLift + loopLift + 0.25 * Math.sin(Math.PI * ap));
     };
     const activity = activityAt(step);
 
@@ -635,13 +646,25 @@ export function getSoloistNotePhraseFirst(
     if (isApexStep) {
         bendStartInterval = -2; // whole-step reach UP into the money note
     } else if (inFlurry) {
-        // ~half the flurry notes get a lighter scoop — varied per (step, loop) so
+        // ~most flurry notes get a lighter scoop — varied per (step, loop) so
         // the cluster reads as lyrical phrasing, not every note bent identically.
-        if (scrambleHash(step * 13 + Math.max(loopCount, 0) * 7 + 3) < 0.5) {
+        // #859: raised 0.5 → 0.6 — pros lean into the scoop more than "half"; a
+        // denser flurry sounds lusher without turning into a mechanical trill (the
+        // flurry zone itself is still the rare-and-spaced restraint mechanism, §10).
+        if (scrambleHash(step * 13 + Math.max(loopCount, 0) * 7 + 3) < 0.6) {
             bendStartInterval = -1; // half-step scoop up
         }
     }
-    const vibrato = inFlurry && durationSteps >= ts.stepsPerBeat;
+    // #859: a genuinely LONG held note (≥2 beats) sings with vibrato even OUTSIDE
+    // the flurry zone — a player vibratos any real sustain, not only near the peak.
+    // Kept to long notes so it stays a sustain gesture, not a per-note tic. Excluded
+    // for blues/rock outside the flurry: there the held-note expression is the "cry"
+    // (bend-and-release) below, which owns those sustains — adding vibrato would
+    // cannibalize it. Inside the flurry, ALL genres already vibrato ≥1-beat notes.
+    const cryGenre = resolvedStyle === 'blues' || resolvedStyle === 'rock';
+    const vibrato =
+        (inFlurry && durationSteps >= ts.stepsPerBeat) ||
+        (!inFlurry && !cryGenre && durationSteps >= 2 * ts.stepsPerBeat);
 
     // --- Country "grace slide": a quick down-slide grace into the note (#870) ---
     // The legacy `graceSlide` device — a country/pedal-steel finger-slide where the
@@ -665,7 +688,9 @@ export function getSoloistNotePhraseFirst(
         graceIsChordTone &&
         // sparse within the chord-tone-arrival set — a player's lyrical lean into the
         // landing note, not a slide on every arrival (cf. the cry's restraint, #869).
-        scrambleHash(step * 29 + Math.max(loopCount, 0) * 17 + 4) < 0.1
+        // #859: 0.1 → 0.13 (modest — country stacks the slide onto its expr rate,
+        // the tightest lane against the §10 <30% guard).
+        scrambleHash(step * 29 + Math.max(loopCount, 0) * 17 + 4) < 0.13
     ) {
         bendStartInterval = 1; // half-step grace slide DOWN into the note
     }
@@ -694,7 +719,7 @@ export function getSoloistNotePhraseFirst(
     // Coexists with the double-stop punctuation below by design — the legacy rule is
     // "the cry belongs to the lead voice": the harmony holds while the lead bends.
     let expression: SoloistExpression | undefined;
-    const cryGenre = resolvedStyle === 'blues' || resolvedStyle === 'rock';
+    // cryGenre computed above (shared with the vibrato gate) — blues/rock only.
     // ≥ 1.25 beats — a held note with room to bend up and release. Deliberately
     // NOT down at 1 beat: the duration histogram cliffs there (quarter notes
     // dominate the line), so including them would spray the cry into a constant
@@ -709,7 +734,10 @@ export function getSoloistNotePhraseFirst(
         bendStartInterval === 0 &&
         // Most eligible held notes cry (a blues player leans into them); the hash
         // keeps a little variation so it doesn't read as mechanically every-note.
-        scrambleHash(step * 19 + Math.max(loopCount, 0) * 11 + 5) < 0.85
+        // #859: 0.85 → 0.9 — leaning a touch further into the blues cry (already the
+        // most-loved device per the #857 audition); the eligibility gate (sustained,
+        // between-peaks, no scoop) still keeps it a punctuation, not a warble.
+        scrambleHash(step * 19 + Math.max(loopCount, 0) * 11 + 5) < 0.9
     ) {
         // Nearest chord tone (guide or pillar) 1–2 semitones above the written
         // note is the bend's destination; prefer the closer (½-step blue bend over
@@ -765,7 +793,10 @@ export function getSoloistNotePhraseFirst(
         if (
             isPunctuation &&
             isChordTone &&
-            scrambleHash(step * 23 + Math.max(loopCount, 0) * 13 + 7) < 0.55
+            // #859: 0.55 → 0.68 — the chicken-pick snap is a signature country lead
+            // sound; a bit more of it on the (already-rare) punctuation notes reads
+            // as idiomatic, not busy (still gated to apex / strong-beat anchors).
+            scrambleHash(step * 23 + Math.max(loopCount, 0) * 13 + 7) < 0.68
         ) {
             // 3rd above, chord-aware (chord tone preferred so the snap rings clean).
             const thirdInt = consonantDoubleStopInterval(midi, [4, 3], currentChord);
@@ -816,7 +847,11 @@ export function getSoloistNotePhraseFirst(
             isPunctuation &&
             isChordTone &&
             durationSteps >= stepsPerBeat &&
-            scrambleHash(step * 17 + Math.max(loopCount, 0) * 5 + 9) < 0.6
+            // #859: 0.6 → 0.72 — more of the structural punctuation notes get the
+            // harmony 6th. Still an ACCENT (gated to apex / strong-beat anchors on
+            // ringing chord tones), just a fuller one, closer to how a guitarist
+            // reaches for double-stops on the landing notes of a phrase.
+            scrambleHash(step * 17 + Math.max(loopCount, 0) * 5 + 9) < 0.72
         ) {
             const harmonyMidi = guitarDoubleStopVoice(currentChord, midi, style);
             if (harmonyMidi !== null) {
