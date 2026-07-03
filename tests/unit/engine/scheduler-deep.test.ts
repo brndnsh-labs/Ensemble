@@ -40,6 +40,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     playDrumSound: vi.fn(),
     updateSustain: vi.fn(),
     killHarmonyNote: vi.fn(),
+    releaseHarmonyVoicing: vi.fn(),
 }));
 
 vi.mock('../../../public/midi-controller.js', () => ({

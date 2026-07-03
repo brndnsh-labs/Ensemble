@@ -20,7 +20,7 @@ import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
 import { killAllPianoNotes, playNote, updateSustain } from './synth-chords.js';
 import { killDrumNote, playDrumSound } from './synth-drums.js';
-import { killHarmonyNote, playHarmonyNote } from './synth-harmonies.js';
+import { killHarmonyNote, playHarmonyNote, releaseHarmonyVoicing } from './synth-harmonies.js';
 import { killSoloistNote, playSoloNote } from './synth-soloist.js';
 
 export {
@@ -34,6 +34,7 @@ export {
     playHarmonyNote,
     playNote,
     playSoloNote,
+    releaseHarmonyVoicing,
     updateSustain,
 };
 

@@ -36,6 +36,7 @@ vi.mock('../../../public/engine/synth-drums.js', () => ({
 }));
 vi.mock('../../../public/engine/synth-harmonies.js', () => ({
     killHarmonyNote: vi.fn(),
+    releaseHarmonyVoicing: vi.fn(),
     playHarmonyNote: vi.fn(),
 }));
 vi.mock('../../../public/engine/synth-soloist.js', () => ({

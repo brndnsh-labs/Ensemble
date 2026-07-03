@@ -216,8 +216,13 @@ describe('Harmony legato chain — scheduler + synth integration (Epic 10 S3.g)'
 
         // The release fade-to-zero must be scheduled at the future onset (10.3),
         // not at currentTime (10.0). Pre-#710 there was no call at 10.3.
-        const fadeCalls = gainParam.setTargetAtTime.mock.calls.filter((c) => c[0] === 0);
-        expect(fadeCalls.length).toBeGreaterThan(0);
-        expect(fadeCalls.some((c) => Math.abs(c[1] - scheduledOnset) < 1e-6)).toBe(true);
+        // #934 — the release is now click-free: a `linearRampToValueAtTime` to
+        // EXACTLY 0 (the #601 retirement), anchored at the onset, reaching 0 at
+        // onset+fade — replacing the shared `setTargetAtTime` blanket kill.
+        const rampToZero = gainParam.linearRampToValueAtTime.mock.calls.filter((c) => c[0] === 0);
+        expect(rampToZero.length).toBeGreaterThan(0);
+        // Reaches 0 just past the future onset (≈10.35), never near currentTime.
+        expect(rampToZero.some((c) => c[1] > scheduledOnset)).toBe(true);
+        expect(rampToZero.every((c) => c[1] > audio.currentTime)).toBe(true);
     });
 });

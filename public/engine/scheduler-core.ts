@@ -42,12 +42,12 @@ import { generateDrumsForStep } from './drums-tick.js';
 import {
     initAudio,
     killAllNotes,
-    killHarmonyNote,
     playBassNote,
     playDrumSound,
     playHarmonyNote,
     playNote,
     playSoloNote,
+    releaseHarmonyVoicing,
     restoreGains,
     updateSustain,
 } from './engine.js';
@@ -70,7 +70,7 @@ import {
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
-import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed, killActiveVoices } from './synth-utils.js';
+import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
 type Dispatch = (action: any, payload?: any) => void;
@@ -1140,14 +1140,19 @@ export function scheduleHarmonies(
         // step → seconds via the canonical step duration for harmony pads/stabs.
         const stepSecHarmony = secondsPerStepFor(playback.bpm);
 
-        // If any note in this step is a chord start or movement,
-        // clear previous voices once before scheduling the new ones.
-        // why: pad-mode legato (epic-harmony-polish S1) — when at least one note
-        // is a legato continuation, the blanket kill would choke voices that
-        // should be held across the chord change. Instead, kill only voices
-        // whose MIDI is NOT in the incoming legato set; voices in that set are
-        // extended in-place by playHarmonyNote. When no legato notes are present
-        // the original kill-all behavior is preserved.
+        // If any note in this step is a chord start, release the previous
+        // voicing before scheduling the new one.
+        // why: pad-mode legato (epic-harmony-polish S1) — a note that is a
+        // legato continuation must be HELD across the chord change, not choked.
+        // So we release only the voices whose MIDI is NOT in the incoming legato
+        // set; voices in that set are extended in-place by playHarmonyNote. With
+        // no legato notes the set is empty and every voice is released (the
+        // former kill-all path). #934 — the release + `activeVoices` pruning now
+        // live in `releaseHarmonyVoicing` (synth-harmonies owns the lifecycle);
+        // it retires each voice through its own click-free handle instead of the
+        // shared blanket `killActiveVoices`. B11 (#710) — released at the new
+        // chord's onset (`time`), not `currentTime` (the scheduler runs
+        // ~200-400ms ahead), for a smooth fade into the change.
         const starter = notes.find((n: any) => n.isChordStart);
         if (starter) {
             const legatoMidis = new Set<number>();
@@ -1159,37 +1164,7 @@ export function scheduleHarmonies(
                     }
                 }
             }
-            if (legatoMidis.size > 0 && state.harmony.activeVoices) {
-                const fade = starter.killFade || 0.05;
-                // B11 (#710) — schedule the release at the new chord's onset
-                // (`time`), not `currentTime`. The scheduler runs ~200-400ms ahead
-                // of playback, so killing at currentTime cut the prior pad early
-                // instead of a smooth fade into the change (chords use `time` at
-                // the activeChordVoices release above).
-                const killTime = time;
-                const survivors: any[] = [];
-                const toKill: any[] = [];
-                for (const v of state.harmony.activeVoices) {
-                    if (v.midi !== null && legatoMidis.has(v.midi)) {
-                        survivors.push(v);
-                    } else {
-                        toKill.push(v);
-                    }
-                }
-                if (toKill.length > 0) {
-                    // killActiveVoices clears the array in-place; pass a local
-                    // copy so survivors are not also wiped.
-                    killActiveVoices(toKill, killTime, fade);
-                }
-                // Rebuild activeVoices in-place to retain only survivors.
-                state.harmony.activeVoices.length = 0; // @worker-mutation
-                for (const v of survivors) {
-                    state.harmony.activeVoices.push(v); // @worker-mutation
-                }
-            } else {
-                // B11 (#710) — likewise schedule the blanket release at `time`.
-                killHarmonyNote(state, starter.killFade || 0.05, time);
-            }
+            releaseHarmonyVoicing(state, legatoMidis, time, starter.killFade || 0.05);
         }
 
         // Power-compensation for multiple voices: Scale volume by 1/sqrt(N)

@@ -4,7 +4,7 @@ import { clampFreq, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import { foldToSampledCeiling, pickZone, playSampledNote } from './sample-voice.js';
-import { createSimplePanner, killActiveVoices } from './synth-utils.js';
+import { createSimplePanner } from './synth-utils.js';
 
 /**
  * Polyphonic Synthesizer for the Harmony Module (harmony).
@@ -12,6 +12,23 @@ import { createSimplePanner, killActiveVoices } from './synth-utils.js';
  */
 
 const HARMONY_VOICE_LIMIT_FADE = 0.02;
+
+/**
+ * The release contract the synth harmony voice hands back (#934 — mirrors the
+ * chord voice's `ChordVoiceHandle`, #707). The scheduler releases a sounding
+ * voicing at the next chord's onset via `release(when, fade)`; `midi` lets the
+ * release keep same-pitch legato survivors. Structurally satisfied by the
+ * `voiceRefs` object the voice registers in `harmony.activeVoices`, so the
+ * registry entry *is* the handle — one owner, no parallel handle list.
+ */
+export type HarmonyVoiceHandle = {
+    midi: number | null;
+    release(when: number, fade: number): void;
+};
+
+// Reused across every release path (chord change + panic): the shared empty
+// keep-set means "release all voices" without allocating a Set per call.
+const RELEASE_ALL: ReadonlySet<number> = new Set();
 
 /**
  * The organ saturator's soft-clip curve is a pure function of a fixed drive
@@ -63,10 +80,11 @@ function getHarmonyRetriggerProfile(style: string): {
  * Extends an already-sounding voice at the same MIDI in place rather than
  * choking + re-attacking — what makes pads actually sustain across chord
  * changes on common tones. Returns `true` when an existing voice was found
- * and extended (the caller returns early, spawning no oscillators), `false`
- * when there was nothing to extend (the caller falls through and spawns a
- * fresh voice). Extracted as a New-only helper so the rebuilt voice body
- * does not duplicate the Current voice's inline block.
+ * and extended (the caller returns its handle early, spawning no oscillators),
+ * `null` when there was nothing to extend (the caller falls through and spawns
+ * a fresh voice). Returns the extended voice itself so the caller can hand its
+ * release handle back (#934). Extracted as a New-only helper so the rebuilt
+ * voice body does not duplicate the Current voice's inline block.
  */
 function extendLegatoHarmonyVoice(
     state: EnsembleState,
@@ -75,11 +93,11 @@ function extendLegatoHarmonyVoice(
     style: string,
     playTime: number,
     duration: number,
-): boolean {
+): HarmonyVoiceHandle | null {
     const { playback, harmony } = state;
     const existing = harmony.activeVoices.find((v: { midi: number | null }) => v.midi === midi);
     if (!existing?.gain || !playback.audio) {
-        return false;
+        return null;
     }
     const releaseTail = style === 'horns' ? 0.1 : style === 'plucks' ? 0.02 : 0.5;
     try {
@@ -116,7 +134,7 @@ function extendLegatoHarmonyVoice(
             }
         }
     }
-    return true;
+    return existing as HarmonyVoiceHandle;
 }
 
 /**
@@ -141,14 +159,24 @@ function killHarmonyVoice(
     time: number,
     fadeTime: number,
 ): void {
+    // Clamp to finite values before anything reaches an AudioParam (#934 review).
+    // This is now the *sole* harmony release path and a public API surface
+    // (`releaseHarmonyVoicing`), so it guards its own inputs the way the chords
+    // `ChordVoiceHandle.release` does rather than trust callers: a non-finite
+    // `time` would make every write below throw into the `catch`, pruning the
+    // voice from `activeVoices` while leaving it sounding with no handle left to
+    // stop it. A garbage `time` falls back to 0 — a past time the audio clock
+    // applies immediately, i.e. "release now".
+    const at = Number.isFinite(time) ? time : 0;
+    const fade = Math.max(0.005, Number.isFinite(fadeTime) ? fadeTime : 0.05);
     const g = voice.gain?.gain;
     if (g) {
         try {
-            g.cancelScheduledValues(time);
-            // Anchor at the current value so the ramp is a true `fadeTime`
-            // fade, not a slow ramp down from some stale earlier event.
-            g.setValueAtTime(g.value, time);
-            g.linearRampToValueAtTime(0, time + fadeTime);
+            g.cancelScheduledValues(at);
+            // Anchor at the current value so the ramp is a true `fade`, not a
+            // slow ramp down from some stale earlier event.
+            g.setValueAtTime(g.value, at);
+            g.linearRampToValueAtTime(0, at + fade);
         } catch {
             /* some test mocks don't implement the full AudioParam API */
         }
@@ -157,7 +185,7 @@ function killHarmonyVoice(
         for (const node of voice.nodes as Array<AudioNode & { stop?: (t: number) => void }>) {
             try {
                 // Stop only after the linear fade has reached 0.
-                node.stop?.(time + fadeTime + 0.02);
+                node.stop?.(at + fade + 0.02);
             } catch {
                 /* ignore: node may already be stopped */
             }
@@ -264,25 +292,73 @@ function resolveHarmonyTimbre(style: string, feel: string): HarmonyTimbre {
 }
 
 /**
- * Release the harmony voicing. `when` schedules the fade at a future audio time
- * (B11/#710) — pass the new chord's scheduled onset for a true crossfade rather
- * than cutting the prior pad ~200-400ms early at `currentTime`. Defaults to
- * `currentTime` for panic/immediate callers.
+ * Release a harmony voicing, click-free, and prune the retired voices from the
+ * registry (#934 — the single voice-lifecycle owner). Voices whose MIDI is in
+ * `keepMidis` survive (same-pitch legato held across the chord change); every
+ * other voice is released via its own `release` handle — a `linearRamp` that
+ * reaches *exactly* 0 (the #601 click-free retirement), never the shared
+ * `killActiveVoices` `setTargetAtTime` that hard-stops at ~3% and clicks.
+ *
+ * `when` schedules the fade at a future audio time (B11/#710) — the scheduler
+ * passes the new chord's onset for a true crossfade rather than cutting the
+ * prior pad ~200-400ms early at `currentTime`. This is the ONE place that
+ * mutates `harmony.activeVoices` on release, so the scheduler never reaches
+ * into the array itself.
+ */
+export function releaseHarmonyVoicing(
+    state: EnsembleState,
+    keepMidis: ReadonlySet<number>,
+    when: number,
+    fade: number,
+): void {
+    const { harmony } = state;
+    const voices = harmony.activeVoices;
+    if (!voices || voices.length === 0) {
+        return;
+    }
+    const survivors: typeof voices = [];
+    for (const v of voices) {
+        if (v.midi !== null && v.midi !== undefined && keepMidis.has(v.midi)) {
+            survivors.push(v);
+        } else if (typeof v.release === 'function') {
+            v.release(when, fade); // the voice's own click-free handle (#934)
+        } else {
+            // Hand-built voices (some unit-test mocks) have no handle — fall
+            // back to the shared click-free retirement directly.
+            killHarmonyVoice(v, when, fade);
+        }
+    }
+    // Rebuild in-place so the worker keeps the same array reference.
+    voices.length = 0; // @worker-mutation
+    for (const v of survivors) {
+        voices.push(v); // @worker-mutation
+    }
+}
+
+/**
+ * Blanket release of every harmony voice — the panic/stop/voice-switch entry
+ * point (called by the instrument controller and the engine stop path). Kept as
+ * the public API it always was, but its internals now delegate to the click-free
+ * `releaseHarmonyVoicing` (#934) instead of the shared `killActiveVoices`, so a
+ * stop no longer risks the residual-gain click on a loud held pad. `when`
+ * defaults to `currentTime` for immediate callers.
  */
 export function killHarmonyNote(state: EnsembleState, fadeTime = 0.05, when?: number) {
-    const { playback, harmony } = state;
+    const { playback } = state;
     if (!playback.audio) {
         return;
     }
     const now = playback.audio.currentTime;
     const killTime = Number.isFinite(when) ? Math.max(when as number, now) : now;
-    killActiveVoices(harmony.activeVoices, killTime, fadeTime);
+    releaseHarmonyVoicing(state, RELEASE_ALL, killTime, fadeTime);
 }
 
 // The synth harmony voice. `playHarmonyNoteNew` is the reworked synth-audit
 // voice — the only one since #649 retired the Current/New A/B.
-function dispatchHarmonySynth(...args: Parameters<typeof playHarmonyNoteNew>): void {
-    playHarmonyNoteNew(...args);
+function dispatchHarmonySynth(
+    ...args: Parameters<typeof playHarmonyNoteNew>
+): HarmonyVoiceHandle | null {
+    return playHarmonyNoteNew(...args);
 }
 
 // synth-audit Epic 6 — play one harmony voice from a sample pack (#660, the
@@ -345,15 +421,20 @@ function playSampledHarmony(
 // synth-audit Epic 6 S1 — instrument-source seam. A `pack:<id>` voice plays
 // from the sample pack once its zones are loaded; until then (or if a note is
 // out of range) it falls back to the synth voice — bit-identical with no packs.
-export function playHarmonyNote(...args: Parameters<typeof playHarmonyNoteNew>): void {
+export function playHarmonyNote(
+    ...args: Parameters<typeof playHarmonyNoteNew>
+): HarmonyVoiceHandle | null {
     const source = resolveInstrumentSource(args[0].harmony.voice);
     if (source.kind === 'sample') {
         const [state, freq, time, duration, vol = 0.4] = args;
+        // The sampled pad self-releases on its own duration envelope and isn't
+        // registered in `activeVoices`; it exposes no chord-change handle (the
+        // #934 handle plumbing is scoped to the synth voice), so return null.
         if (playSampledHarmony(state, source.packId, freq, time, duration, vol)) {
-            return;
+            return null;
         }
     }
-    dispatchHarmonySynth(...args);
+    return dispatchHarmonySynth(...args);
 }
 
 /**
@@ -384,11 +465,11 @@ function playHarmonyNoteNew(
     isLegato = false,
     isBloom = false,
     isLatched = false,
-) {
+): HarmonyVoiceHandle | null {
     const { playback, harmony, groove } = state;
     // Reject non-finite AND non-positive freq — see the doc comment above.
     if (!Number.isFinite(freq) || freq <= 0 || !playback.audio) {
-        return;
+        return null;
     }
 
     const now = playback.audio.currentTime;
@@ -412,8 +493,9 @@ function playHarmonyNoteNew(
 
     // Legato continuation — extend a sounding same-MIDI voice in place.
     if (isLegato && midi !== null) {
-        if (extendLegatoHarmonyVoice(state, midi, vol, style, playTime, duration)) {
-            return;
+        const extended = extendLegatoHarmonyVoice(state, midi, vol, style, playTime, duration);
+        if (extended) {
+            return extended; // hand back the still-live voice's release handle
         }
         // No voice to extend (already GC'd / killed) — spawn one normally.
     }
@@ -873,8 +955,20 @@ function playHarmonyNoteNew(
         panner.connect(playback.audioGraph.harmonies.gain);
     }
 
-    // Register the active voice.
-    const voiceRefs = { gain, time: playTime, duration, midi, nodes: voiceNodes };
+    // Register the active voice. The registry entry doubles as the voice's
+    // release handle (#934): `release(when, fade)` retires THIS voice click-free
+    // (the #601 `killHarmonyVoice` linear-ramp-to-0), so the scheduler releases
+    // a voicing on a chord change without a shared blanket kill.
+    const voiceRefs = {
+        gain,
+        time: playTime,
+        duration,
+        midi,
+        nodes: voiceNodes,
+        release(when: number, fade: number): void {
+            killHarmonyVoice({ gain, nodes: voiceNodes }, when, fade);
+        },
+    };
     harmony.activeVoices.push(voiceRefs);
 
     osc1.start(playTime);
@@ -911,4 +1005,6 @@ function playHarmonyNoteNew(
     }
 
     osc1.onended = () => safeDisconnect(voiceNodes);
+
+    return voiceRefs;
 }

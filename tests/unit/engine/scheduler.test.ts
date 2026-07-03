@@ -139,6 +139,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     playSoloNote: vi.fn(),
     playNote: vi.fn(),
     playHarmonyNote: vi.fn(),
+    releaseHarmonyVoicing: vi.fn(),
     killAllNotes: vi.fn(),
     killHarmonyNote: vi.fn(),
     killAllPianoNotes: vi.fn(),
@@ -370,9 +371,17 @@ describe('Scheduler Core System', () => {
 
             scheduleGlobalEvent(getState(), 0, 10.0);
 
-            // B11 (#710) — the release is now scheduled at the chord's onset
-            // (`time` = 10.0), not currentTime, for a true crossfade.
-            expect(Engine.killHarmonyNote).toHaveBeenCalledWith(expect.any(Object), 0.1, 10.0);
+            // B11 (#710) — the release is scheduled at the chord's onset
+            // (`time` = 10.0), not currentTime, for a true crossfade. #934 — the
+            // chord-change release now flows through `releaseHarmonyVoicing`
+            // (synth-harmonies owns the lifecycle): no legato here, so the
+            // keep-set is empty and every prior voice is released.
+            expect(Engine.releaseHarmonyVoicing).toHaveBeenCalledWith(
+                expect.any(Object),
+                expect.any(Set),
+                10.0,
+                0.1,
+            );
             expect(Engine.playHarmonyNote).toHaveBeenCalled();
         });
 

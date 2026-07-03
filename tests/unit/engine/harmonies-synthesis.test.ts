@@ -243,26 +243,31 @@ describe('Harmony Synthesis', () => {
     });
 
     describe('killHarmonyNote', () => {
-        it('should kill all active voices', () => {
+        it('should release all active voices click-free (#934)', () => {
             const cancelSpy = vi.fn();
-            const setTargetSpy = vi.fn();
+            const setValueSpy = vi.fn();
+            const rampSpy = vi.fn();
+            const mkGain = () => ({
+                gain: {
+                    value: 0.5,
+                    cancelScheduledValues: cancelSpy,
+                    setValueAtTime: setValueSpy,
+                    linearRampToValueAtTime: rampSpy,
+                },
+            });
             harmony.activeVoices = [
-                {
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
-                },
-                {
-                    gain: {
-                        gain: { cancelScheduledValues: cancelSpy, setTargetAtTime: setTargetSpy },
-                    },
-                },
+                { gain: mkGain(), nodes: [] },
+                { gain: mkGain(), nodes: [] },
             ];
 
             killHarmonyNote(getState(), 0.1);
 
             expect(cancelSpy).toHaveBeenCalledTimes(2);
-            expect(setTargetSpy).toHaveBeenCalledTimes(2);
+            // #934 — the blanket kill now delegates to the click-free per-voice
+            // release: a linear ramp to EXACTLY 0, not the shared
+            // `setTargetAtTime` (which stops at ~3% of level and clicks).
+            expect(rampSpy).toHaveBeenCalledTimes(2);
+            expect(rampSpy.mock.calls.every((c) => c[0] === 0)).toBe(true);
             expect(harmony.activeVoices.length).toBe(0);
         });
     });
