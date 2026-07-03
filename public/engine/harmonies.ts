@@ -744,6 +744,40 @@ function applyGenreVoicingOverride(
         result = [0, 7, 12];
     }
 
+    // --- HORN SECTION: tight guide-tone-forward stab (#935) ---
+    // why: a BB-King big-band horn section punches a COMPACT stab, not
+    // the generic running chord voicing — a tight ≤1-octave shape led by the
+    // guide tones so it reads as a brass hit rather than a pad. #716 already
+    // made the horns play sparse call-and-response stabs (the RHYTHM); this
+    // gives those stabs the idiomatic VOICING. Quality-honest: a dominant keeps
+    // its 3↔♭7 tritone bite (the horn snarl), a minor its ♭3+♭7 shell, a plain
+    // major a bright 3rd-led triad. Bloom/latch/tension keep their fuller stack
+    // (deliberate tutti highlights / color chords, not the steady stab).
+    //
+    // GUIDE-TONE-FIRST ordering is load-bearing: the polyphony slicer below keeps
+    // `intervals.slice(0, densityCap)`, and the Blues stab is density-capped hard
+    // (baseDensity 2, → 1 when it would crowd a chord hit). Leading with the
+    // guide tones means a 2-note reduction keeps the characterful 3rd+♭7 tritone
+    // (the snarl) and a 1-note reduction keeps the 3rd — the root, which the bass
+    // already covers, is the first thing sacrificed, never the color.
+    if (profile.voicing?.hornSection && !isBloom && !isLatched && !isTensionChord) {
+        const pcs = (chord.intervals || []).map((i) => ((i % 12) + 12) % 12);
+        const hasMajorThird = pcs.includes(4);
+        const isMinorThird = pcs.includes(3) && !hasMajorThird;
+        const hasFlatSeven = pcs.includes(10);
+        // Quality-honest: only reshape a chord that HAS a 3rd. A sus / no-3rd
+        // chord (sus2, sus4, 7sus4, bare power-5th) would otherwise be handed a
+        // fabricated major 3rd — erasing the suspension the chart asked for — so
+        // leave those on the running voicing untouched. (Altered/dim/half-dim
+        // dominants never reach here: they're TENSION_CHORD_QUALITIES, gated out
+        // above by `!isTensionChord`.)
+        if (isMinorThird) {
+            result = hasFlatSeven ? [3, 10, 0] : [3, 7, 0];
+        } else if (hasMajorThird) {
+            result = hasFlatSeven ? [4, 10, 0] : [4, 7, 0];
+        }
+    }
+
     return result;
 }
 
