@@ -8,8 +8,6 @@ import {
     type GrooveContext,
     makeMotifSelector,
     placementSkew,
-    roll,
-    rollSeed,
     scaleVelocity,
 } from './utils.js';
 
@@ -131,8 +129,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             shouldPlay = true;
             velocity = 1.1;
         }
-        // Four-on-the-floor drive at high intensity
-        else if (isBeatStart && intensity > 0.8 && roll(0.8, 1.0, rollSeed(context, 1))) {
+        // Four-on-the-floor drive at high intensity — deterministic (#797).
+        // why: a driving country train beat lands a kick on EVERY beat; the drive
+        // is the point. The prior `roll(0.8)` dropped ~1 in 5 of the 2/4 fill
+        // kicks, pockmarking the four-on-the-floor at exactly the energy where it
+        // should be locked. `!shouldPlay` (like the compound branch above) means
+        // this only FILLS the empty 2/4 — the foundation's accented 1/3 kicks
+        // (1.25 / 1.1) survive untouched, so the feathered fills sit UNDER the
+        // boom-chick accents instead of flattening them to the fill level.
+        else if (isBeatStart && intensity > 0.8 && !shouldPlay) {
             shouldPlay = true;
             velocity = scaleVelocity(0.6, intensity, 0.1); // Feathered
         }

@@ -184,23 +184,44 @@ describe('Country Drummer Critique', () => {
         expect(openRatio).toBeLessThan(0.3);
     });
 
-    it('should engage four-on-the-floor kick above intensity 0.8', () => {
-        // Engine: foundation is downbeat + beat 3 (2 kicks/bar). Above intensity > 0.8,
-        // beats 2 and 4 fire with roll(0.8) → expected ~1.6 extra kicks/bar.
+    it('should engage four-on-the-floor kick above intensity 0.8 without flattening the downbeat accent', () => {
+        // Engine (#797): foundation is downbeat + beat 3 (2 ACCENTED kicks/bar, 1.25 /
+        // 1.1). Above intensity > 0.8 the 4OTF branch now fires DETERMINISTICALLY,
+        // filling the empty beats 2 and 4 (feathered ~0.7) → a full 4.0 kicks/bar.
+        // Critically it must only FILL (guarded by `!shouldPlay`), never clobber the
+        // 1/3 accent down to the fill level — the P1 the deterministic change first
+        // introduced. This test guards both the density AND the surviving downbeat accent.
         const numBars = 64;
         const performance = simulatePerformance(numBars, {
             playback: { bandIntensity: 0.95 },
         });
         let kickHits = 0;
+        let downbeatVelSum = 0;
+        let downbeatKicks = 0;
         performance.forEach((bar) =>
-            bar.forEach((stepData) => stepData.instruments.Kick && kickHits++),
+            bar.forEach((stepData) => {
+                if (stepData.instruments.Kick) {
+                    kickHits++;
+                    // loopStep 0 = the downbeat (beat 1) in 4/4 — the accented
+                    // foundation kick the 4OTF fill must not clobber.
+                    if (stepData.loopStep === 0) {
+                        downbeatVelSum += stepData.instruments.Kick.velocity;
+                        downbeatKicks++;
+                    }
+                }
+            }),
         );
         const density = kickHits / numBars;
+        const avgDownbeatVel = downbeatVelSum / (downbeatKicks || 1);
         console.log(
-            `[Country 4OTF] Kick density at intensity 0.95: ${density.toFixed(2)}/bar (Target: >3.0)`,
+            `[Country 4OTF] Kick density at intensity 0.95: ${density.toFixed(2)}/bar (Target: >3.0), ` +
+                `avg downbeat kick velocity: ${avgDownbeatVel.toFixed(2)} (Target: >1.0, accented)`,
         );
-        // Foundation 2 + ~1.6 extra ≈ 3.6/bar.
+        // Deterministic 4-on-the-floor: foundation 2 + fills on 2/4 = 4.0/bar.
         expect(density).toBeGreaterThan(3.0);
+        // The downbeat accent (~1.25) must survive the 4OTF fill — a regression that
+        // let the fill branch clobber beat 1 would drop this to the feather level (~0.7).
+        expect(avgDownbeatVel).toBeGreaterThan(1.0);
     });
 
     it('should increase snare continuity with intensity', () => {

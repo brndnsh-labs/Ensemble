@@ -280,8 +280,17 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // General Syncopation
         if (intensity > 0.6 && !shouldPlay) {
-            // General syncopation on 'a' of beats or offbeats
-            if ((isAOfBeat && isBackbeat) || (isOffbeat && roll(0.2, 1.0, rollSeed(context, 3)))) {
+            // Offbeat syncopation push. why (#797): the original condition also had
+            // a dead `isAOfBeat && isBackbeat` half — isBackbeat is only the
+            // beat-START of 2/4 (mStep 4/12), never the 'a' subdivision (mStep
+            // 3/7/11/15), so the two never coincide and that branch never fired.
+            // Reviving it as an a-of-2/4 push (the author's likely intent) was
+            // auditioned and WAIVED (2026-07-03): even as a soft ghost it pushed the
+            // ghost-to-backbeat ratio past the funk-drummer-critique's 50% ceiling —
+            // the dead branch was quietly keeping the pocket appropriately sparse.
+            // So the dead half is removed rather than resurrected (behavior-preserving:
+            // this was already `false || (isOffbeat && …)`).
+            if (isOffbeat && roll(0.2, 1.0, rollSeed(context, 3))) {
                 if (roll(0.3, 1.0, rollSeed(context, 4))) {
                     shouldPlay = true;
                     soundName = intensity > 0.8 ? 'Snare' : 'Sidestick';

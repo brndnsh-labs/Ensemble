@@ -72,6 +72,15 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             if (!isOpenLane) {
                 shouldPlay = true;
                 soundName = 'HiHat';
+                // why (#797, waived by ear 2026-07-03): the offbeat upstroke is the
+                // ska SKANK — it is meant to be the dynamic ceiling, prominently
+                // louder than the on-beat (ska-punk-drummer-critique guards offbeat
+                // ≥1.4× on-beat). The audit flagged >1.0 as "flattening top-end
+                // dynamics", but that's a property of the global 1.0 velocity clamp
+                // that touches every genre — pulling ska's offbeat under 1.0 would
+                // kill the signature skank (the critique fails at ~1.1×). Left
+                // prominent by design; the clamp-headroom concern is a global
+                // velocity-curve question, not a ska one.
                 velocity = scaleVelocity(1.3, intensity, 0.1);
             } else if (intensity > 0.78 && activeMotif >= 1) {
                 const accentChance = beatIndex === 3 ? 0.35 : 0.18;

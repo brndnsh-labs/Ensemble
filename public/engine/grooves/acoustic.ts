@@ -108,6 +108,17 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = scaleVelocity(0.9, intensity, 0.15);
         }
 
+        // why (#797): a quiet acoustic / Americana groove under intensity 0.35 and
+        // BPM < 130 should read as BRUSHWORK, not a hard sidestick click — the same
+        // routing jazz uses for quiet swing (jazz.ts). Real brush playing has a
+        // sweep texture the wood-on-rim sidestick completely misses. The BPM gate
+        // keeps faster acoustic grooves on sidestick so the rhythmic placement
+        // stays crisp. Brush is a synth voice available to every kit (synth-drums).
+        const bpm = context.playback.bpm;
+        if (shouldPlay && intensity < 0.35 && bpm !== undefined && bpm < 130) {
+            soundName = 'Brush';
+        }
+
         // Occasional light ghost chatter at high intensity
         if (intensity > 0.7 && !shouldPlay && isOffbeat && roll(0.3, 1.0, rollSeed(context, 1))) {
             shouldPlay = true;
