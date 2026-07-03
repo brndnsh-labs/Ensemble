@@ -269,8 +269,8 @@ describe('Hip Hop Piano Critique — live consumer (getAccompanimentNotes)', () 
         soloist: makeSoloistMock({ enabled: false, busySteps: 0, lastFreq: 0 }),
         bass: { enabled: true, lastFreq: 55 },
         harmony: { enabled: false },
-        // style 'smart' keeps genre = groove.genreFeel ('Hip Hop' survives the
-        // override + smartMapping at accompaniment.ts:1278+), matching production.
+        // style 'smart' keeps genre = groove.genreFeel ('Hip Hop' passes through
+        // the updateRhythmicIntent override ladder untouched), matching production.
         chords: { enabled: true, style: 'smart', density: 'balanced' },
         arranger: { timeSignature: '4/4', totalSteps: 512, progression: [] },
     });

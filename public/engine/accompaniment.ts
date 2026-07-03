@@ -1623,15 +1623,6 @@ function updateRhythmicIntent(
         genre = 'Ska';
     }
 
-    if (chords.style === 'smart') {
-        const smartMapping: any = {
-            Country: 'Rock',
-        };
-        if (smartMapping[genre]) {
-            genre = smartMapping[genre];
-        }
-    }
-
     // --- Sticky Groove Logic ---
     if (STICKY_GENRES.includes(genre)) {
         // why: epic-coordination-consistency S5.c follow-up — Bossa partido-alto's
