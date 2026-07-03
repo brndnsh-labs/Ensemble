@@ -424,6 +424,14 @@ export interface SampleBend {
     peakFrac?: number;
     /** When it returns to the target (0..1 of hold). Omit = hold the peak. */
     releaseFrac?: number;
+    /**
+     * Bend-IN glide duration in seconds. Omit → the default short scoop glide
+     * (`min(0.1, hold·0.5)`). A guitar legato slur (hammer-on/pull-off) passes a
+     * short value (~0.04s) so the pitch snaps into place like a fretted slur, not
+     * a slow scoop. Only affects the `fromSemitones` glide, never the cry's
+     * up-bend timing (which stays fraction-of-hold based). #855.
+     */
+    inSeconds?: number;
 }
 
 /** Clamp to [0,1], mapping a non-finite input to the given fallback. */
@@ -454,7 +462,13 @@ function scheduleSampleBend(
     // Bend-IN: start off-target and ramp to the written pitch over a short, fixed
     // glide (matches the synth voice's `min(0.1, dur*0.5)`); else anchor at base.
     const from = Number.isFinite(bend.fromSemitones) ? (bend.fromSemitones as number) : 0;
-    const bendInEnd = startTime + Math.min(0.1, dur * 0.5 || 0.1);
+    // A legato slur passes an explicit short glide (`inSeconds`); otherwise the
+    // scoop's default tempo-relative glide, capped at 0.1s. Floored at 5ms so the
+    // exponential ramp always spans a real interval.
+    const glide = Number.isFinite(bend.inSeconds)
+        ? Math.max(0.005, bend.inSeconds as number)
+        : Math.min(0.1, dur * 0.5 || 0.1);
+    const bendInEnd = startTime + glide;
     if (from !== 0) {
         rate.setValueAtTime(ratioAt(from), startTime);
         rate.exponentialRampToValueAtTime(baseRate, bendInEnd);

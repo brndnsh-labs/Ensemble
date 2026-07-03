@@ -140,6 +140,8 @@ function playSampledSolo(
     noteSeed: number,
     bendStartInterval: number,
     expression: SoloistExpression | undefined,
+    isLegato: boolean,
+    prevFreq: number,
 ): boolean {
     const { playback } = state;
     const audio = playback.audio;
@@ -158,15 +160,42 @@ function playSampledSolo(
         return false;
     }
     const velocity = Math.min(1, (Number.isFinite(vol) ? vol : 0.5) * gainForPack(packId));
+
+    // Guitar legato slur — the hammer-on / pull-off (#855). A horn re-articulates
+    // every note; a guitarist slurs a connected run: pick the first note, then
+    // hammer/pull the rest without re-picking. The sampled voice re-triggers a
+    // fresh pluck (with its recorded pick transient) on every note, so a run reads
+    // as horn-like. When the scheduler flags a note legato (rhythmically contiguous
+    // with its predecessor, no bend of its own), and the voice is a guitar pack,
+    // and the move is a step-to-a-5th (a real slur, not a leap you'd re-pick), we
+    // glide *into* the pitch from the previous note over a short 40ms slur and
+    // soften the onset so the recorded pick transient is masked — a fretted-hand
+    // articulation, not a picked one. Larger leaps and non-guitar sample voices
+    // (sax/strings) keep the plain per-note attack. Never overrides an explicit
+    // scoop/cry (they're mutually exclusive with legato upstream).
+    let bend = toSampleBend(bendStartInterval, expression);
+    let attack: number | undefined;
+    if (!bend && isLegato && packId.includes('guitar') && prevFreq > 0 && freq > 0) {
+        const semis = 12 * Math.log2(prevFreq / freq);
+        // ≤ a perfect 5th (mirrors the synth voice's portamento window); above
+        // that a guitarist re-picks rather than slurring.
+        if (Math.abs(semis) > 0.1 && Math.abs(semis) <= 7) {
+            bend = { fromSemitones: semis, inSeconds: 0.04 };
+            attack = 0.028; // soften the re-pick transient into a slur
+        }
+    }
+
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
+        ...(attack !== undefined ? { attack } : {}),
         // The engine flags vibrato on sustained notes (durationSteps >= a beat);
         // the synth voice already renders it, the sampled seam now does too (#744).
         vibrato: vibrato ? leadVibrato(noteSeed, packId) : undefined,
         // Bend-in (bendStartInterval) and/or bend-and-release (expression.bend),
-        // now rendered on the sampled seam too — full pitch-gesture parity (#744).
-        bend: toSampleBend(bendStartInterval, expression),
+        // now rendered on the sampled seam too — full pitch-gesture parity (#744);
+        // or the guitar legato slur synthesized just above (#855).
+        bend,
         tone: toneTiltForPack(packId),
     });
     return true;
@@ -189,11 +218,17 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
             vol,
             bendStartInterval = 0,
             ,
-            ,
+            isLegato = false,
             vibrato = false,
             noteSeed = 0,
             expression,
         ] = args;
+        // Mirror the synth path's previous-pitch tracking so the sample voice can
+        // slur a legato run into pitch (#855). Read the predecessor BEFORE the
+        // call; only commit `lastRenderedFreq` once the sample actually plays, so
+        // a fallback to the synth voice below still sees the correct predecessor.
+        const audioState = state.soloist.audio as Mutable<typeof state.soloist.audio>;
+        const prevFreq = audioState.lastRenderedFreq || freq;
         if (
             playSampledSolo(
                 state,
@@ -206,8 +241,11 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
                 noteSeed,
                 bendStartInterval,
                 expression,
+                isLegato,
+                prevFreq,
             )
         ) {
+            audioState.lastRenderedFreq = freq; // @direct-mutation
             return;
         }
     }
