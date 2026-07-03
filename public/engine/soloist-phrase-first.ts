@@ -753,10 +753,27 @@ export function getSoloistNotePhraseFirst(
             }
         }
         if (peakSemitones > 0) {
-            // Let the note speak first, cry up to the tone, then release back down
-            // before it ends — the vocal arc, not a static detune.
+            // A bend's POINT is its destination: real players bend UP to the target
+            // chord tone and HOLD it — the bent note IS the resolution ("it's the
+            // destination note that grabs the ear"). Bend-and-release (returning to
+            // the pre-bend pitch) is a specific flutter effect, NOT the default;
+            // releasing de-emphasizes the target just reached and lands on the
+            // weaker starting note — the "up-and-down" that reads as unnatural
+            // phrasing (#960, heard on Blues). So HOLD by default (omit releaseFrac
+            // → the synth + sampled voice sustain the peak, and .mid export holds
+            // the bend to the note's end), and keep the release as a MINORITY
+            // (~25%, its own sparse per-(step,loop) hash) for the occasional
+            // expressive flutter. The note speaks first (onset 0.35), then bends up
+            // to the tone (peak 0.62) and stays.
+            const flutter = scrambleHash(step * 31 + Math.max(loopCount, 0) * 23 + 6) < 0.25;
             expression = {
-                bend: { peakSemitones, onsetFrac: 0.35, peakFrac: 0.62, releaseFrac: 0.85 },
+                bend: flutter
+                    ? // Flutter: speak, bend up, then release back down — needs room
+                      // for the return trip, so it peaks later (0.62) and releases at 0.85.
+                      { peakSemitones, onsetFrac: 0.35, peakFrac: 0.62, releaseFrac: 0.85 }
+                    : // Hold: the destination IS the point, so arrive a touch sooner
+                      // (0.5) and sustain the bent target for the note's back half.
+                      { peakSemitones, onsetFrac: 0.35, peakFrac: 0.5 },
             };
         }
     }

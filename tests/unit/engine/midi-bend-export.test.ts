@@ -105,6 +105,34 @@ describe('MIDI bend-and-release export (#744/#747)', () => {
         }
     });
 
+    it('HOLDS the bent target for a held cry (no releaseFrac), re-centring only after the note (#960)', () => {
+        const track = new MidiTrack();
+        // Held cry: rises to the target at 0.5, then sustains it (no releaseFrac) —
+        // the .mid must hold the destination, not sag back down like a release.
+        processor.emitBendGesture(
+            track,
+            2,
+            { peakSemitones: 2, onsetFrac: 0.35, peakFrac: 0.5 },
+            1.0,
+            2.0,
+        );
+        const curve = bendCurve(track, 2);
+        expect(curve.length).toBeGreaterThan(6);
+        // Reaches the full 2-semitone peak.
+        expect(Math.max(...curve.map((p) => p.val))).toBe(8191);
+        // Once at the peak, it STAYS there for the rest of the note — no in-note
+        // down-ramp (the up-then-down artifact #960 removes). Every event from the
+        // peak onward, except the single closing reset, is pinned at the target.
+        const peakIdx = curve.findIndex((p) => p.val === 8191);
+        for (let i = peakIdx; i < curve.length - 1; i++) {
+            expect(curve[i].val).toBe(8191);
+        }
+        // The held target rings right up to the note's end...
+        expect(curve[curve.length - 2].val).toBe(8191);
+        // ...and the channel is re-centred exactly once, by the safety-net, AFTER it.
+        expect(curve[curve.length - 1].val).toBe(0);
+    });
+
     it('scales the peak to the bend interval (half-step → +4096)', () => {
         const track = new MidiTrack();
         processor.emitBendGesture(track, 2, { peakSemitones: 1, releaseFrac: 0.8 }, 1.0, 2.0);

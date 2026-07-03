@@ -1,9 +1,11 @@
 // @ts-nocheck
-// Soloist "cry" (bend-and-release) critique — PRODUCTION-FAITHFUL on the live
-// engine (getSoloistNotePhraseFirst). Guards the #869 port: the expressive
-// blues/rock cry — a sustained note bends UP to a chord tone mid-ring, then
-// releases — must fire SPARINGLY on structural landings, target a real chord
-// tone, and stay OFF non-bend genres (the genre gate). Re-establishes the
+// Soloist "cry" critique — PRODUCTION-FAITHFUL on the live engine
+// (getSoloistNotePhraseFirst). Guards the #869 port + the #960 resolution fix:
+// the expressive blues/rock cry — a sustained note bends UP to a chord tone
+// mid-ring — must fire SPARINGLY on structural landings, target a real chord
+// tone, stay OFF non-bend genres (the genre gate), and by default HOLD the bent
+// target (the destination note is the point). Bend-and-release (returning to the
+// pre-bend pitch) is a minority flutter, not the default. Re-establishes the
 // coverage the deleted legacy soloist-bend-expression.test.ts had.
 //
 // The cry is `note.expression.bend` (PitchBendGesture), distinct from the
@@ -106,14 +108,31 @@ describe('Soloist cry — bend-and-release (#869)', () => {
         // observed; the ceiling catches a regression that sprays the cry on every
         // sustained note (it lives only on phrase-enders between peaks).
         expect(rate).toBeLessThan(0.06);
-        // Every cry is a real bend-and-release to a chord tone 1–2 semitones up.
+        // #960: bend-up-and-HOLD is the default resolution — a bend's point is its
+        // destination chord tone, so a player bends up and sustains it; releasing
+        // back down (bend-and-release) is a MINORITY flutter, not every cry. The
+        // held cries omit releaseFrac (the synth/sampled voice sustains the peak).
+        const held = cries.filter((c) => !Number.isFinite(c.expression.bend.releaseFrac));
+        const released = cries.filter((c) => Number.isFinite(c.expression.bend.releaseFrac));
+        console.log(`held=${held.length} released=${released.length}`);
+        // Most cries hold the bent target (arrive-and-sustain, not up-and-down) —
+        // hold should be the clear default (~75/25), not a bare coin-flip majority.
+        expect(held.length).toBeGreaterThan(released.length * 2);
+        // ...but the expressive flutter still fires occasionally — don't kill it.
+        expect(released.length).toBeGreaterThanOrEqual(1);
+
         for (const c of cries) {
             const b = c.expression.bend;
+            // Bend up to a chord tone 1–2 semitones above the written note.
             expect([1, 2]).toContain(b.peakSemitones);
-            // The vocal arc: leave the pitch, peak, then release back down.
+            // The note speaks first, then bends up to the tone.
             expect(b.onsetFrac).toBeLessThan(b.peakFrac);
-            expect(b.peakFrac).toBeLessThan(b.releaseFrac);
-            // Only on a note with room to bend up and release (sustained ≥ 1.25 beats).
+            // A held cry sustains the peak (no release); a flutter releases back
+            // down, strictly after the peak.
+            if (Number.isFinite(b.releaseFrac)) {
+                expect(b.peakFrac).toBeLessThan(b.releaseFrac);
+            }
+            // Only on a note with room to bend up (sustained ≥ 1.25 beats).
             expect(c.durationSteps).toBeGreaterThanOrEqual(Math.ceil(1.25 * STEPS_PER_BEAT));
             // The cry owns the lead voice — never stacked on an entry-scoop.
             expect(c.bendStartInterval || 0).toBe(0);

@@ -310,8 +310,14 @@ export class ExportProcessor {
         const peakVal = Math.min(8191, Math.round(Math.min(1, peakSemis / 2) * 8192));
         const onsetFrac = frac(bend.onsetFrac, 0.12);
         const peakFrac = Math.max(onsetFrac + 0.01, frac(bend.peakFrac, 0.4));
-        // releaseFrac present → reset to centre there; held bend (omitted) → by note end.
-        const releaseFrac = Number.isFinite(bend.releaseFrac)
+        // A released cry ramps back to centre at releaseFrac; a HELD cry (#960,
+        // releaseFrac omitted) sustains the bent chord tone to the note's end —
+        // the destination is the point, so the .mid must hold it, not sag back
+        // down (matching the synth + sampled voices, which only add the down-ramp
+        // when releaseFrac is finite). The channel-reset safety-net below then
+        // re-centres AFTER the note, before the next one — no in-note down-ramp.
+        const hasRelease = Number.isFinite(bend.releaseFrac);
+        const releaseFrac = hasRelease
             ? Math.max(peakFrac + 0.01, frac(bend.releaseFrac, 0.85))
             : 1;
         const onsetS = noteStartS + onsetFrac * durS;
@@ -319,13 +325,20 @@ export class ExportProcessor {
         const releaseS = noteStartS + releaseFrac * durS;
 
         // Centre the channel at the note's onset (clears any leftover bend), then
-        // ramp through the gesture polyline, always ending at centre (0).
+        // ramp through the gesture polyline. A released cry ends at centre; a held
+        // cry ends AT the peak and is re-centred after the note by the safety-net.
         track.pitchBend(Math.max(0, this.toPulses(noteStartS)), channel, 0);
-        const waypoints: Array<[number, number]> = [
-            [onsetS, 0],
-            [peakS, peakVal],
-            [releaseS, 0],
-        ];
+        const waypoints: Array<[number, number]> = hasRelease
+            ? [
+                  [onsetS, 0],
+                  [peakS, peakVal],
+                  [releaseS, 0],
+              ]
+            : [
+                  [onsetS, 0],
+                  [peakS, peakVal],
+                  [noteEndS, peakVal],
+              ];
         const STEPS = 10;
         let lastPulse = -1;
         let lastVal = 0;
@@ -346,11 +359,13 @@ export class ExportProcessor {
                 lastPulse = pulse;
             }
         }
-        // Guarantee the channel ends at centre: if the down-ramp collapsed onto an
-        // already-emitted pulse (a note too short for the step grid), the dedup can
-        // drop the closing 0 and leave the channel bent for the next note. Force it
-        // at the next free pulse — unreachable at the picker's durationSteps>=4 gate,
-        // but cheap insurance that no export can play sharp after a bend.
+        // Guarantee the channel ends at centre. Two ways it can still be bent here:
+        // a HELD cry (#960) deliberately ends its polyline AT the peak, so this is
+        // the reset that re-centres it just past the note (before the next note);
+        // and a released cry whose down-ramp collapsed onto an already-emitted
+        // pulse (a note too short for the step grid) can have its closing 0 dropped
+        // by the dedup. Either way, force centre at the next free pulse so no export
+        // plays sharp after a bend.
         if (lastVal !== 0) {
             track.pitchBend(lastPulse + 1, channel, 0);
         }
