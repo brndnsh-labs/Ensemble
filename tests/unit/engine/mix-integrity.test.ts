@@ -172,15 +172,14 @@ describe('Mix & Signal Integrity Audit', () => {
         expect(limiter.ratio.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
     });
 
-    it('should route all instrument buses through the master gain or EQs', () => {
+    it('should route the drums bus through its own highpass EQ chain', () => {
         initAudio(getState());
 
-        // Check instrument gains are connected
+        // Chords/bass/soloist bus routing is asserted more strongly below
+        // (Pro Mix v3 bus chain); drums routes through a dedicated highpass
+        // instead of the shared neutral busEQ, so it needs its own check.
         const graph = playback.audioGraph;
-        expect(graph.chords.gain.connect).toHaveBeenCalled();
-        expect(graph.bass.gain.connect).toHaveBeenCalled();
-        expect(graph.soloist.gain.connect).toHaveBeenCalled();
-        expect(graph.drums.gain.connect).toHaveBeenCalled();
+        expect(graph.drums.gain.connect).toHaveBeenCalledWith(graph.drums.eq);
     });
 
     it('should correctly assemble the Pro Mix v3 bus chain', () => {

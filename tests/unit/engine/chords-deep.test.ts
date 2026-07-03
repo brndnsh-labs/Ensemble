@@ -20,10 +20,18 @@ describe('Chords Details Deep Dive', () => {
     });
 
     it('should handle various dominant extensions', () => {
-        const dominants = ['C9', 'C11', 'C13', 'C7b9', 'C7#9', 'C7b5', 'C7#5'];
-        dominants.forEach((input) => {
+        const dominants = [
+            { input: 'C9', quality: '9' },
+            { input: 'C11', quality: '11' },
+            { input: 'C13', quality: '13' },
+            { input: 'C7b9', quality: '7b9' },
+            { input: 'C7#9', quality: '7#9' },
+            { input: 'C7b5', quality: 'halfdim' },
+            { input: 'C7#5', quality: 'aug' },
+        ];
+        dominants.forEach(({ input, quality }) => {
             const details = getChordDetails(input);
-            expect(details.quality).toBeDefined();
+            expect(details.quality).toBe(quality);
             expect(details.is7th).toBe(true);
         });
     });

@@ -217,17 +217,16 @@ describe('Audio Engine Snapshot Regression', () => {
         const starts = audioLog.filter((l) => l.includes('start'));
         expect(starts.length).toBeGreaterThan(5);
 
-        // 3. Determinism check
-        // The exact log should be identical every run given the seeded random
+        // 3. Regression fixture — pins the exact note/ramp counts for this seeded
+        // 1-bar Jazz Blues schedule. A deliberate engine change (new voice, an
+        // extra automation call, a different voicing choice) should update these;
+        // an unexpected drift means something in the schedule changed silently.
         const snapshotParams = {
             oscStarts: starts.length,
             gainRamps: audioLog.filter((l) => l.includes('gain.ramp')).length,
             uniqueFreqs: new Set(freqSets.map((l) => l.split('(')[1].split(',')[0])).size,
         };
 
-        // These numbers are derived from a "golden run".
-        // If logic changes significantly, these will need updating.
-        expect(snapshotParams.oscStarts).toBeGreaterThanOrEqual(12); // At least 1 note per beat + chord voices
-        expect(snapshotParams.gainRamps).toBeGreaterThanOrEqual(10);
+        expect(snapshotParams).toEqual({ oscStarts: 24, gainRamps: 11, uniqueFreqs: 6 });
     });
 });
