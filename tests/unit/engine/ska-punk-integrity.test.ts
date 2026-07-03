@@ -58,12 +58,17 @@ describe('Ska-Punk Genre Integrity', () => {
     });
 
     it('should use horns style for harmonies in Ska', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
-        // Step 2 is an offbeat stab in my implementation
-        const notes = getHarmonyNotes(getState(), chord, null, 2, 0, 'smart', 2);
-        if (notes.length > 0) {
-            expect(notes[0].style).toBe('horns');
-        }
+        // A real chord always carries a sectionId; the harmony comper's motif seed
+        // derives from it (`sectionKey` in getHarmonyNotes). Without one the seed is
+        // 0 and the scrambleHash stab gate never lands at the old step 2 — which is
+        // why the prior `if (notes.length > 0)` guard let this assertion silently
+        // never run (#954, surfaced in PR #953). With a sectionId the Ska comper
+        // deterministically stabs on step 6 (an offbeat), and smart routing resolves
+        // Ska → 'horns' (HARMONY_GENRE_PROFILES in harmony-styles.ts).
+        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4, sectionId: 's1' };
+        const notes = getHarmonyNotes(getState(), chord, null, 6, 0, 'smart', 6);
+        expect(notes.length).toBeGreaterThan(0);
+        expect(notes[0].style).toBe('horns');
     });
 
     it('should apply Hi-Hat offbeat accents in groove-engine', () => {
@@ -149,10 +154,13 @@ describe('Ska-Punk Genre Integrity', () => {
         const sharedHookBuffer = [{ step: 0, res: { midi: 72 } }];
         soloist.session.memory.sharedHookBuffer = sharedHookBuffer;
 
-        // 2. Harmony should now latch to this step even if it's not a standard stab step
-        // Bypass the 85% dropout by mocking Math.random
-        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
-
+        // 2. Harmony should now latch to this step even if it's not a standard stab step.
+        // The shared-hook reinforcement path in playShadowMode (harmonies.ts, "B. Shared
+        // Hook Reinforcement") is a pure coordination-driven latch — a hookMatch on the
+        // step returns { isLatched: true } with NO random/scrambleHash gate — so no
+        // Math.random mock is needed here. (The prior `spyOn(Math,'random')` "bypass the
+        // 85% dropout" mock was a no-op after the May 2026 scrambleHash migration — the
+        // #954 dead-gate class.)
         // S9(b): the shared-hook buffer reaches harmony via the coordination contract.
         const notes = getHarmonyNotes(
             getState(),
@@ -170,7 +178,5 @@ describe('Ska-Punk Genre Integrity', () => {
 
         expect(notes.length).toBeGreaterThan(0);
         expect(notes[0].isLatched).toBe(true);
-
-        randomSpy.mockRestore();
     });
 });
