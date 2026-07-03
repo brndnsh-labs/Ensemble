@@ -457,10 +457,14 @@ export class ExportProcessor {
                 }
 
                 if (res.bendStartInterval) {
+                    // Positive = wheel UP, matching emitBendGesture (line ~281) and the
+                    // synth/sampled voices; bendStartInterval is where the note STARTS
+                    // relative to its target (+1 = start above → wheel up at onset).
+                    // #963 fixed the sign (was negated → entry-bends exported reversed).
                     track.pitchBend(
                         notePulse,
                         channel,
-                        Math.round(-(res.bendStartInterval / 2) * 8192),
+                        Math.round((res.bendStartInterval / 2) * 8192),
                     );
                     track.noteOn(notePulse, channel, finalMidi, midiVel);
                 } else {
@@ -886,10 +890,12 @@ export class ExportProcessor {
                 const finalMidi = Math.max(0, Math.min(127, n.midi + octaveShift * 12));
 
                 if (n.module === 'soloist' && n.bendStartInterval) {
+                    // Positive = wheel UP (see the sibling site above + emitBendGesture);
+                    // #963 fixed the sign. bendStartInterval +1 = start above → wheel up.
                     track.pitchBend(
                         notePulse,
                         channel,
-                        Math.round(-(n.bendStartInterval / 2) * 8192),
+                        Math.round((n.bendStartInterval / 2) * 8192),
                     );
                 }
 

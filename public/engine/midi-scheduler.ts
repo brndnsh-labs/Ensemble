@@ -60,9 +60,13 @@ export function dispatchMidiSoloist(
     // Support Pitch Bend for MIDI scoops
     let bend = 0;
     if (bendStartInterval !== 0) {
-        // Map semitones to 14-bit value (-8192 to 8191)
-        // Assuming standard 2-semitone range.
-        bend = Math.round(-(bendStartInterval / 2) * 8192);
+        // Map semitones to 14-bit value (-8192 to 8191), standard 2-semitone range.
+        // Positive = wheel UP, matching emitBendGesture and the synth/sampled voices
+        // (synth-soloist startFreq = freq * 2**(bendStartInterval/12): +1 starts
+        // ABOVE). bendStartInterval is where the note STARTS relative to its target,
+        // so +1 ("start above, glide down") = wheel up at onset. #963 fixed the sign
+        // (was negated → every entry-bend played the wrong way on MIDI-out).
+        bend = Math.round((bendStartInterval / 2) * 8192);
     }
 
     sendMIDINote(

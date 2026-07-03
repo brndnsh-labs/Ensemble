@@ -159,6 +159,41 @@ describe('MIDI bend-and-release export (#744/#747)', () => {
         expect(curve[curve.length - 1].val).toBe(0);
     });
 
+    it('exports the scalar entry-bend in the RIGHT direction (#963): +1 up, -1 down', () => {
+        // The one-way `bendStartInterval` scoop/slide (grace-slide +1 = "start above,
+        // glide down"; countryBend/scoop -1 = "start below, glide up") is a separate
+        // render path from expression.bend — a single onset pitchBend + a reset to
+        // centre. It was sign-INVERTED (`-(bsi/2)*8192`), so every exported entry-bend
+        // slid the wrong way vs the synth/sampled voices. Positive wheel = UP (same
+        // convention as emitBendGesture), and bendStartInterval is where the note
+        // STARTS relative to its target — so +1 must emit a POSITIVE onset wheel.
+        for (const [bsi, wantPositive] of [
+            [1, true], // start ABOVE → wheel up
+            [-1, false], // start BELOW → wheel down
+        ] as Array<[number, boolean]>) {
+            const soloTrack = new MidiTrack();
+            const proc = new ExportProcessor(makeState(), { includedTracks: ['soloist'] });
+            proc.soloistTrack = soloTrack;
+            generateResolutionNotes.mockReturnValue([
+                { module: 'soloist', midi: 67, durationSteps: 8, bendStartInterval: bsi },
+            ]);
+            proc.finish();
+            const curve = bendCurve(soloTrack, proc.state.midi.soloistChannel - 1);
+            // Onset (lowest pulse) carries the start offset; a later event resets to 0.
+            expect(curve.length).toBeGreaterThanOrEqual(2);
+            const onset = curve[0].val;
+            if (wantPositive) {
+                expect(onset).toBeGreaterThan(0); // +1 → up (fails on the old -(…) sign)
+            } else {
+                expect(onset).toBeLessThan(0); // -1 → down
+            }
+            // A half-step over a ±2-semitone range is a quarter of full scale.
+            expect(Math.abs(onset)).toBe(4096);
+            // ...and it re-centres by the note's end (clean handoff to the next note).
+            expect(curve[curve.length - 1].val).toBe(0);
+        }
+    });
+
     it('wires the gesture through the resolution-note export path', () => {
         // The second render site: a soloist note carrying expression.bend that arrives
         // via the resolution buffer must also get the full pitch-bend curve.
