@@ -994,6 +994,13 @@ export interface GlobalContext {
     readonly scheduleAheadTime: number;
     /** The global step counter. */
     readonly step: number;
+    /**
+     * #981 — the id of the section the playhead currently sits in, written by
+     * the scheduler only when it actually changes (never per-step). Lets
+     * reactive readers (e.g. the instrument rail's section-override lookup)
+     * update on section transitions instead of every 16th note.
+     */
+    readonly currentSectionId: string | null;
     /** Queue of normalized visual events waiting to be rendered. */
     readonly drawQueue: any[];
     /** Whether the metronome count-in is active. */

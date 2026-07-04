@@ -13,6 +13,7 @@ export const playback = deepSignal<GlobalContext>({
     unswungNextNoteTime: 0.0,
     scheduleAheadTime: 0.2,
     step: 0,
+    currentSectionId: null,
     drawQueue: [],
     isCountingIn: false,
     countInBeat: 0,

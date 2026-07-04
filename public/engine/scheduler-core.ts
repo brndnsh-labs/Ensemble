@@ -69,6 +69,7 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
+import { sectionAtStep } from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
@@ -158,7 +159,7 @@ export function togglePlay(
     fromDispatch: boolean = false,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { playback, chords } = state;
+    const { playback, chords, arranger } = state;
 
     // Determine if we are STARTING or STOPPING based on current state.
     // If fromDispatch is true, isPlaying ALREADY reflects the target state.
@@ -225,6 +226,8 @@ export function togglePlay(
         }
 
         (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
+        (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
+            sectionAtStep(arranger, 0)?.id ?? null;
         (playback as Mutable<typeof playback>).resolutionTriggered = false; // @direct-mutation
         (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
         (chords as Mutable<typeof chords>).scheduledChordIndex = 0; // @direct-mutation
@@ -462,6 +465,8 @@ function advanceCountIn(state: EnsembleState): void {
     if (playback.countInBeat >= ts.beats) {
         (playback as Mutable<typeof playback>).isCountingIn = false; // @direct-mutation
         (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
+        (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
+            sectionAtStep(arranger, 0)?.id ?? null;
     }
 }
 
@@ -535,6 +540,19 @@ function advanceGlobalStep(state: EnsembleState): void {
     (playback as Mutable<typeof playback>).nextNoteTime += duration; // @direct-mutation
     (playback as Mutable<typeof playback>).unswungNextNoteTime += stepSec; // @direct-mutation
     (playback as Mutable<typeof playback>).step++; // @direct-mutation
+
+    // #981 — publish the current section only when it actually changes, so
+    // reactive readers (e.g. StudioMixRow's section-override lookup) don't
+    // re-render on every 16th-note step, only on section transitions.
+    // sectionMap only covers one pass through the chart ([0, totalSteps)) —
+    // modulo the ever-incrementing step the same way conductor.ts/
+    // midi-worker-logic.ts do, or this goes stale (stuck at the last
+    // section) after the first loop.
+    const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : playback.step;
+    const nextSectionId = sectionAtStep(arranger, modStep)?.id ?? null;
+    if (nextSectionId !== playback.currentSectionId) {
+        (playback as Mutable<typeof playback>).currentSectionId = nextSectionId; // @direct-mutation
+    }
 }
 
 /**

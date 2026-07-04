@@ -2,7 +2,6 @@ import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
-import { sectionAtStep } from '../engine/section-overrides.js';
 import { togglePower } from '../instrument-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
@@ -416,7 +415,10 @@ function StudioMixRow({
     const { enabled, sectionOverride } = useEnsembleState((s) => {
         const mod = instrument.module;
         const baseEnabled = (s as any)[mod].enabled as boolean;
-        const sec = sectionAtStep(s.arranger, s.playback.step || 0);
+        // #981 — read the coarse, change-only currentSectionId (written by the
+        // scheduler only on section transitions) instead of the raw per-16th
+        // playback.step, so this row doesn't re-render every step.
+        const sec = s.arranger.sections?.find((s2) => s2.id === s.playback.currentSectionId);
         const override = sec?.instruments?.[mod as keyof NonNullable<typeof sec.instruments>];
         return { enabled: baseEnabled, sectionOverride: override };
     });
