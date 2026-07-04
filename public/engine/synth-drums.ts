@@ -913,10 +913,73 @@ export function getSnareVoiceConfig(velocity: number): SnareVoiceConfig {
     };
 }
 
+// Key → pitch-class (0–11). Mirrors KEY_PC in soloist-phrase-first.ts — a stable
+// 12-name music constant, kept local to avoid a soloist→drum-synth import edge.
+const TOM_KEY_PC: Record<string, number> = {
+    C: 0,
+    'C#': 1,
+    Db: 1,
+    D: 2,
+    'D#': 3,
+    Eb: 3,
+    E: 4,
+    F: 5,
+    'F#': 6,
+    Gb: 6,
+    G: 7,
+    'G#': 8,
+    Ab: 8,
+    A: 9,
+    'A#': 10,
+    Bb: 10,
+    B: 11,
+};
+
+// The default Low tom (94 Hz) sits ~F#2 (MIDI 42, pc 6); the three toms already
+// form ~root/fifth/octave (94 : 140 : 188 ≈ 1 : 1.49 : 2). So #730 "key-tunes"
+// the kit by ONE uniform semitone offset that lands the Low tom on the selected
+// key's tonic in its native register — Mid then rings the fifth, High the octave.
+// A single scalar on all three baseFreqs preserves every internal ratio, the
+// High>Mid>Low ordering, AND the low-end-declutter sustain relationships.
+// F# — the pitch-class the default 94 Hz Low tom already voices (94 Hz ≈ F#2
+// +28 cents), so key=F# is the zero-shift no-op that preserves the hand-tuned
+// timbre. This anchor is REQUIRED for correctness, not a free knob: to make the
+// Low tom land on the actual tonic, the pc the untuned voice sits at must be the
+// zero point. (The ~+28 cents rides along, so tuned tonics are ~a quarter-tone
+// sharp — inaudible on fast-decaying inharmonic toms, and arguably less sterile.)
+const TOM_ANCHOR_PC = 6;
+
+/**
+ * Semitones to transpose the whole tom kit so its Low tom lands on `key`'s
+ * tonic, wrapped to the NEAREST tonic (range [-6, +5]) so the shift stays
+ * subtle — most keys move only 1–4 semitones; the tritone key (C) resolves
+ * DOWN a tritone (-6) rather than up, keeping the tom lower = more bass
+ * reinforcement (the #730 goal). Unknown/absent key → 0 (no shift). Synth-only:
+ * recorded sample-pack toms can't be retuned, so this never touches them.
+ */
+export function getTomKeyTuneSemitones(key: string | undefined): number {
+    if (!key) {
+        return 0;
+    }
+    const tonicPc = TOM_KEY_PC[key];
+    if (tonicPc === undefined) {
+        return 0;
+    }
+    // Nearest-tonic wrap into [-6, +5]: a tritone (delta 6) resolves downward (-6).
+    return ((((tonicPc - TOM_ANCHOR_PC + 6) % 12) + 12) % 12) - 6;
+}
+
 /**
  * Toms should separate more clearly by shell size, pitch drop, and sustain.
+ *
+ * `keyTuneSemitones` (#730) transposes the whole kit to the selected key's
+ * tonic — see `getTomKeyTuneSemitones`. Default 0 keeps the untuned voice.
  */
-export function getTomVoiceConfig(name: string, velocity: number): TomVoiceConfig {
+export function getTomVoiceConfig(
+    name: string,
+    velocity: number,
+    keyTuneSemitones = 0,
+): TomVoiceConfig {
     const register: TomRegister = name.includes('High')
         ? 'High'
         : name.includes('Mid')
@@ -924,22 +987,24 @@ export function getTomVoiceConfig(name: string, velocity: number): TomVoiceConfi
           : 'Low';
     const base = TOM_VOICE_PROFILES[register];
     const vel = clamp01(Math.max(0.2, velocity));
+    // Uniform transpose: one scalar on the fundamental keeps all ratios intact.
+    const baseFreq = base.baseFreq * 2 ** (keyTuneSemitones / 12);
 
     return {
         register,
-        baseFreq: base.baseFreq,
-        stickFreqStart: base.baseFreq * (base.stickRatioBase + vel * base.stickRatioVelocity),
-        stickFreqEnd: base.baseFreq * (register === 'Low' ? 1.08 : register === 'Mid' ? 1.1 : 1.12),
+        baseFreq,
+        stickFreqStart: baseFreq * (base.stickRatioBase + vel * base.stickRatioVelocity),
+        stickFreqEnd: baseFreq * (register === 'Low' ? 1.08 : register === 'Mid' ? 1.1 : 1.12),
         stickVolume: base.stickVolume + vel * 0.04,
         skinVolume: base.skinVolume * vel,
-        skinFreq: base.baseFreq * base.skinFreqMultiplier,
+        skinFreq: baseFreq * base.skinFreqMultiplier,
         skinQ: base.skinQ,
-        bodyFreqStart: base.baseFreq * base.bodyStartRatio,
-        bodyFreqEnd: base.baseFreq,
+        bodyFreqStart: baseFreq * base.bodyStartRatio,
+        bodyFreqEnd: baseFreq,
         bodyVolume: base.bodyVolume + vel * 0.08,
         bodyDecay: base.bodyDecay + vel * 0.03,
         bodyDuration: base.bodyDuration,
-        shellFreq: base.baseFreq * 0.98,
+        shellFreq: baseFreq * 0.98,
         shellVolume: base.shellVolume + vel * 0.06,
         shellDecay: base.shellDecay + vel * 0.04,
         shellDuration: base.shellDuration,
@@ -2583,7 +2648,14 @@ function playDrumSoundCurrent(
             onEnded: releasePanner,
         });
     } else if (name.includes('Tom')) {
-        const voiceConfig = getTomVoiceConfig(name, velocity);
+        // #730: tune the synth tom kit to the selected key so fills reinforce the
+        // bass register harmonically instead of beating against it. Reads the live
+        // key at play time (main-thread synth voice) — no worker sync needed.
+        const voiceConfig = getTomVoiceConfig(
+            name,
+            velocity,
+            getTomKeyTuneSemitones(state.arranger?.key),
+        );
         const vol = masterVol * 0.8 * getRhythmBodyMixScale(state, name) * rr();
 
         // 1. Stick Impact (The "Thwack")

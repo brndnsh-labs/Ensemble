@@ -101,6 +101,7 @@ import {
     getRhythmBodyMixScale,
     getSnareMixScale,
     getSnareVoiceConfig,
+    getTomKeyTuneSemitones,
     getTomVoiceConfig,
     playDrumSound,
 } from '../../../public/engine/synth-drums.js';
@@ -274,6 +275,92 @@ describe('Drum Synthesis', () => {
         expect(high.shellDuration).toBeLessThan(mid.shellDuration);
         expect(mid.shellDuration).toBeLessThan(low.shellDuration);
         expect(high.bodyDecay).toBeLessThan(low.bodyDecay);
+    });
+
+    // #730 — key-tuned synth toms. The kit transposes by one uniform semitone
+    // offset so the Low tom lands on the selected key's tonic (Mid = the fifth,
+    // High = the octave), reinforcing the bass register instead of beating it.
+    describe('key-tuning (#730)', () => {
+        it('maps a key to a nearest-tonic transpose offset in [-6, +5]', () => {
+            // F# is the pitch-class the untuned 94 Hz Low tom already voices → 0 shift.
+            expect(getTomKeyTuneSemitones('F#')).toBe(0);
+            expect(getTomKeyTuneSemitones('G')).toBe(1); // one semitone up
+            expect(getTomKeyTuneSemitones('F')).toBe(-1); // one semitone down
+            expect(getTomKeyTuneSemitones('A')).toBe(3);
+            expect(getTomKeyTuneSemitones('E')).toBe(-2);
+            // A tritone away resolves DOWN, not up, keeping every key within a tritone.
+            expect(getTomKeyTuneSemitones('C')).toBe(-6);
+            // Enharmonic alias resolves the same as its sharp spelling.
+            expect(getTomKeyTuneSemitones('Gb')).toBe(getTomKeyTuneSemitones('F#'));
+            // Unknown / absent key → no shift (safe default; never throws).
+            expect(getTomKeyTuneSemitones('H' as unknown as string)).toBe(0);
+            expect(getTomKeyTuneSemitones(undefined)).toBe(0);
+        });
+
+        it('never shifts more than a tritone for ANY key (no octave-jumping toms)', () => {
+            // The named-range guard: nearest-tonic wrapping exists to keep every key
+            // within [-6, +5] so no tom ever jumps a register. Pin it across all 17
+            // spellings (12 pitch classes plus their sharp/flat aliases) so a future
+            // formula/anchor change that produced a >tritone shift can't slip through.
+            const ALL_KEYS = [
+                'C',
+                'C#',
+                'Db',
+                'D',
+                'D#',
+                'Eb',
+                'E',
+                'F',
+                'F#',
+                'Gb',
+                'G',
+                'G#',
+                'Ab',
+                'A',
+                'A#',
+                'Bb',
+                'B',
+            ];
+            for (const k of ALL_KEYS) {
+                const shift = getTomKeyTuneSemitones(k);
+                expect(shift).toBeGreaterThanOrEqual(-6);
+                expect(shift).toBeLessThanOrEqual(5);
+            }
+        });
+
+        it('shifts every tom fundamental with the key (verifiable per acceptance)', () => {
+            const cLow = getTomVoiceConfig('Low Tom', 1.0, getTomKeyTuneSemitones('C'));
+            const gLow = getTomVoiceConfig('Low Tom', 1.0, getTomKeyTuneSemitones('G'));
+            const fsLow = getTomVoiceConfig('Low Tom', 1.0, getTomKeyTuneSemitones('F#'));
+
+            // Different keys → different fundamentals.
+            expect(cLow.baseFreq).not.toBeCloseTo(gLow.baseFreq, 1);
+            // F# is the anchor: it equals the untuned voice exactly.
+            expect(fsLow.baseFreq).toBeCloseTo(getTomVoiceConfig('Low Tom', 1.0).baseFreq, 5);
+            // G is one semitone up from the F# anchor.
+            expect(gLow.baseFreq).toBeCloseTo(fsLow.baseFreq * 2 ** (1 / 12), 3);
+        });
+
+        it('is a uniform transpose: preserves High>Mid>Low + the octave/fifth ratios', () => {
+            const tune = getTomKeyTuneSemitones('A'); // +3, a non-trivial shift
+            const high = getTomVoiceConfig('High Tom', 1.0, tune);
+            const mid = getTomVoiceConfig('Mid Tom', 1.0, tune);
+            const low = getTomVoiceConfig('Low Tom', 1.0, tune);
+
+            // Register ordering the existing critique asserts is untouched by tuning.
+            expect(high.baseFreq).toBeGreaterThan(mid.baseFreq);
+            expect(mid.baseFreq).toBeGreaterThan(low.baseFreq);
+            expect(high.shellDuration).toBeLessThan(low.shellDuration);
+
+            // The kit stays root/fifth/octave: the tuned ratios equal the untuned ratios.
+            const u = {
+                high: getTomVoiceConfig('High Tom', 1.0).baseFreq,
+                mid: getTomVoiceConfig('Mid Tom', 1.0).baseFreq,
+                low: getTomVoiceConfig('Low Tom', 1.0).baseFreq,
+            };
+            expect(high.baseFreq / low.baseFreq).toBeCloseTo(u.high / u.low, 5);
+            expect(mid.baseFreq / low.baseFreq).toBeCloseTo(u.mid / u.low, 5);
+        });
     });
 
     it('should implement Ride cymbal synthesis', () => {
