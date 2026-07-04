@@ -1,6 +1,8 @@
+import { useRef } from 'preact/hooks';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
+import { useModalA11y } from './use-modal-a11y.js';
 
 /**
  * Lightweight overlay shown when the app hydrates from an audition permalink
@@ -17,6 +19,14 @@ export function AuditionOverlay() {
         isPlaying: s.playback.isPlaying,
     }));
 
+    const overlayRef = useRef<HTMLDivElement | null>(null);
+
+    const dismiss = () => {
+        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'audition', open: false });
+    };
+
+    useModalA11y(overlayRef, isOpen, dismiss, 'Audition this scene');
+
     if (!isOpen) {
         return null;
     }
@@ -28,12 +38,9 @@ export function AuditionOverlay() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'audition', open: false });
     };
 
-    const dismiss = () => {
-        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'audition', open: false });
-    };
-
     return (
         <div
+            ref={overlayRef}
             class="modal-overlay active audition-overlay"
             role="dialog"
             aria-modal="true"
