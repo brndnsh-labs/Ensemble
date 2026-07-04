@@ -71,9 +71,9 @@ When you want an engine to vary its behavior across loop passes ("Chorus Evoluti
 
 2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`arranger-utils.ts:81-92`). The seeder's `index` maxes out at ~5 regardless of loop count.
 
-3. **Reference consumers:** `soloist-pitch-engine.ts:235, 861-877, 999-1056` (~20 reads — Head/paraphrase/development branching, device-frequency scaling, fatigue decay); `groove-engine.ts:143-155` (motif complexity cap, via the exported `motifCapForLoop()` helper).
+3. **Reference consumers:** `soloist-pitch-engine.ts:235, 861-877, 999-1056` (~20 reads — Head/paraphrase/development branching, device-frequency scaling, fatigue decay); `groove-engine.ts:520` (motif complexity cap, via the exported `loopMotifCeiling()` helper defined at `groove-engine.ts:308`).
 
-4. **Helper-extract the cap/scale formula** so the boundary table is unit-testable separately from the engine integration. Pattern: `export function motifCapForLoop(loopCount)` + a 6-line boundary-table test + one integration smoke that confirms the helper is wired into `applyGrooveOverrides`. Avoids the brittle "direction-of-divergence" assertion problem when PRNG state interacts with the cap.
+4. **Helper-extract the cap/scale formula** so the boundary table is unit-testable separately from the engine integration. Pattern: `export function loopMotifCeiling(loopCount)` + a 6-line boundary-table test + one integration smoke that confirms the helper is wired into `applyGrooveOverrides`. Avoids the brittle "direction-of-divergence" assertion problem when PRNG state interacts with the cap.
 
 5. **Test framing:** drive the engine with two `playback` objects (`currentLoopCount: 0` vs `2`) against the same fixture, and assert direction-agnostic divergence (`diffSteps.length >= threshold`). Don't assert "Loop 2 produces *more* X than Loop 0" — depending on PRNG state inside the engine, tier-boundary cases can flip the direction even when the cap is correctly wired.
 
