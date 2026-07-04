@@ -194,6 +194,23 @@ export class VisualizerEngine {
         return getXStandalone(t, currentTime, this.labelRailWidth, this.timeScale);
     }
 
+    // Clamp an event's [evStart, evEnd] window to the visible span and project it
+    // to a pixel rect. Returns xEnd too (the leading edge, used to anchor the active dot).
+    private rectForWindow(
+        evStart: number,
+        evEnd: number,
+        currentTime: number,
+        minTime: number,
+    ): { left: number; width: number; xEnd: number } {
+        const start = max(minTime, evStart);
+        const end = min(currentTime, evEnd);
+        const xStart = this.getX(start, currentTime);
+        const xEnd = this.getX(end, currentTime);
+        const left = min(xStart, xEnd);
+        const width = max(2, abs(xStart - xEnd));
+        return { left, width, xEnd };
+    }
+
     setRegister(name: string, midi: number): void {
         this.registers[name] = midi;
     }
@@ -711,12 +728,7 @@ export class VisualizerEngine {
 
             this.forEachVisibleChordEvent(currentTime, minTime, (event, chordEnd) => {
                 const ev = event as { time: number; label?: string };
-                const start = max(minTime, ev.time);
-                const end = min(currentTime, chordEnd);
-                const xStart = this.getX(start, currentTime);
-                const xEnd = this.getX(end, currentTime);
-                const left = min(xStart, xEnd);
-                const width = max(2, abs(xStart - xEnd));
+                const { left, width } = this.rectForWindow(ev.time, chordEnd, currentTime, minTime);
                 const overlayEntries = this.getChordOverlayEntries(config.laneName, event);
 
                 if (overlayEntries.length > 0) {
@@ -825,12 +837,12 @@ export class VisualizerEngine {
             } else {
                 this.forEachVisibleTrackEvent(name, currentTime, minTime, (event, noteEnd) => {
                     const ev = event as { time: number; midi: number };
-                    const start = max(minTime, ev.time);
-                    const end = min(currentTime, noteEnd);
-                    const xStart = this.getX(start, currentTime);
-                    const xEnd = this.getX(end, currentTime);
-                    const left = min(xStart, xEnd);
-                    const width = max(2, abs(xStart - xEnd));
+                    const { left, width, xEnd } = this.rectForWindow(
+                        ev.time,
+                        noteEnd,
+                        currentTime,
+                        minTime,
+                    );
                     const y = this.getLaneY(name, ev.midi);
                     const thickness = this.getTrackThickness(name);
                     const eventColor = this.getEventColor(name, event);
