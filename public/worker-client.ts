@@ -6,8 +6,15 @@ const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 
 let timerWorker: Worker | null = null;
-let schedulerRequestHandler: ((...args: any[]) => void) | null = null;
-let notesReceivedHandler: ((...args: any[]) => void) | null = null;
+let schedulerRequestHandler: (() => void) | null = null;
+let notesReceivedHandler:
+    | ((
+          notes: unknown[],
+          requestTimestamp: number,
+          workerProcessTime: number,
+          isResolution: boolean,
+      ) => void)
+    | null = null;
 let exportProgressHandler: ((progress: number) => void) | null = null;
 
 export const getTimerWorker = (): Worker | null => timerWorker;
@@ -17,8 +24,13 @@ export function setExportProgressHandler(handler: (progress: number) => void): v
 }
 
 export function initWorker(
-    onSchedulerRequest: (...args: any[]) => void,
-    onNotesReceived: (...args: any[]) => void,
+    onSchedulerRequest: () => void,
+    onNotesReceived: (
+        notes: unknown[],
+        requestTimestamp: number,
+        workerProcessTime: number,
+        isResolution: boolean,
+    ) => void,
 ): void {
     if (timerWorker) {
         schedulerRequestHandler = onSchedulerRequest;
@@ -75,7 +87,7 @@ export function initWorker(
     };
 }
 
-export function startExport(options: any): void {
+export function startExport(options: Record<string, unknown>): void {
     if (timerWorker) {
         timerWorker.postMessage({ type: WORKER_MSG.EXPORT, data: options });
     }
@@ -97,7 +109,7 @@ export function stopWorker(): void {
  * Deeply unwrap proxy/signal objects into plain objects.
  * Much faster than JSON.parse(JSON.stringify(val)).
  */
-function toRaw(val: any): any {
+function toRaw(val: unknown): unknown {
     if (val === null || typeof val !== 'object') {
         return val;
     }
@@ -116,10 +128,11 @@ function toRaw(val: any): any {
     if (val instanceof Map) {
         return new Map(Array.from(val.entries()).map(([k, v]) => [k, toRaw(v)]));
     }
-    const raw: Record<string, any> = {};
-    for (const key in val) {
-        if (Object.hasOwn(val, key)) {
-            const rawVal = toRaw(val[key]);
+    const raw: Record<string, unknown> = {};
+    const obj = val as Record<string, unknown>;
+    for (const key in obj) {
+        if (Object.hasOwn(obj, key)) {
+            const rawVal = toRaw(obj[key]);
             // JSON.stringify drops undefined values in objects
             if (rawVal !== undefined) {
                 raw[key] = rawVal;
@@ -129,7 +142,7 @@ function toRaw(val: any): any {
     return raw;
 }
 
-export function flushWorker(step: number, syncData: any = null): void {
+export function flushWorker(step: number, syncData: unknown = null): void {
     if (timerWorker) {
         timerWorker.postMessage({
             type: WORKER_MSG.FLUSH,
