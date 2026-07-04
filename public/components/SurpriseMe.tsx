@@ -23,6 +23,7 @@ import { generateId } from '../utils.js';
 import { Icon } from './Icon.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { ButtonGroup } from './UIControls.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 /**
  * Consolidated inspiration affordance. One 🎲 entry point that hosts three
@@ -161,6 +162,11 @@ export function SurpriseMe() {
     const close = () => {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'surpriseMe', open: false });
     };
+
+    // Focus-trap / focus-restore contract shared by every other modal. The
+    // existing role/aria-modal/aria-labelledby JSX stays authoritative, so pass
+    // no ariaLabel (the hook would otherwise add a competing aria-label).
+    useModalA11y(overlayRef, isOpen, close, undefined);
 
     const resolveFeel = (): string => {
         if (feel === FEEL_GROOVE) {
