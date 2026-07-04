@@ -273,31 +273,31 @@ function applySoloistPayload(target: typeof soloist, payload: Record<string, unk
         }
         const route = SOLOIST_FIELD_ROUTES[flatKey];
         if (!route) {
-            (t as any)[flatKey] = payload[flatKey];
+            (t as Record<string, unknown>)[flatKey] = payload[flatKey];
             continue;
         }
         const value = payload[flatKey];
         switch (route.kind) {
             case 'config':
-                (t as any)[route.key] = value;
+                (t as Record<string, unknown>)[route.key] = value;
                 break;
             case 'session':
-                (t.session as any)[route.key] = value;
+                (t.session as Record<string, unknown>)[route.key] = value;
                 break;
             case 'phrasing':
-                (t.session.phrasing as any)[route.key] = value;
+                (t.session.phrasing as Record<string, unknown>)[route.key] = value;
                 break;
             case 'currentPhrase':
-                (t.session.currentPhrase as any)[route.key] = value;
+                (t.session.currentPhrase as Record<string, unknown>)[route.key] = value;
                 break;
             case 'memory':
-                (t.session.memory as any)[route.key] = value;
+                (t.session.memory as Record<string, unknown>)[route.key] = value;
                 break;
             case 'contour':
-                (t.session.contour as any)[route.key] = value;
+                (t.session.contour as Record<string, unknown>)[route.key] = value;
                 break;
             case 'audio':
-                (t.audio as any)[route.key] = value;
+                (t.audio as Record<string, unknown>)[route.key] = value;
                 break;
         }
     }
@@ -509,7 +509,9 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.UPDATE_HB:
             for (const key in action.payload) {
                 if (Object.hasOwn(harmony, key)) {
-                    (harmony as any)[key] = (action.payload as any)[key];
+                    (harmony as Record<string, unknown>)[key] = (
+                        action.payload as Record<string, unknown>
+                    )[key];
                 }
             }
             return true;
