@@ -71,7 +71,9 @@ When you want an engine to vary its behavior across loop passes ("Chorus Evoluti
 
 2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`arranger-utils.ts:81-92`). The seeder's `index` maxes out at ~5 regardless of loop count.
 
-3. **Reference consumers:** `soloist-pitch-engine.ts:235, 861-877, 999-1056` (~20 reads — Head/paraphrase/development branching, device-frequency scaling, fatigue decay); `groove-engine.ts:520` (motif complexity cap, via the exported `loopMotifCeiling()` helper defined at `groove-engine.ts:308`).
+3. **Reference consumers:** `groove-engine.ts:520` (motif complexity cap, via the exported `loopMotifCeiling()` helper defined at `groove-engine.ts:308`); `soloist-phrase-first.ts:342-373` (per-loop `loopLift` shaping note density via `activityAt`, keyed off `playback.currentLoopCount`).
+
+> **Historical note:** earlier versions of this guide cited `soloist-pitch-engine.ts:235, 861-877, 999-1056` (the legacy weighted picker `selectPitchAndDevices`) as the loop-awareness reference consumer. That picker was removed in the phrase-first migration (epic #10/#866); `soloist-pitch-engine.ts` is now a 124-line helper module (`chordTargetTones`/`classifyChordQuality`) with no loop-count read — the *pattern* remains the guidance, only its concrete carrier changed.
 
 4. **Helper-extract the cap/scale formula** so the boundary table is unit-testable separately from the engine integration. Pattern: `export function loopMotifCeiling(loopCount)` + a 6-line boundary-table test + one integration smoke that confirms the helper is wired into `applyGrooveOverrides`. Avoids the brittle "direction-of-divergence" assertion problem when PRNG state interacts with the cap.
 
@@ -85,7 +87,9 @@ The pattern generalizes to any engine where an activation predicate gates a sepa
 
 ### Final-stage multiplier discipline (canonical placement)
 
-For any weight-based picker (`selectPitchAndDevices` in `soloist-pitch-engine.ts`, drum/bass selectors with multiple bias contributions), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line.
+For any weight-based picker (e.g. `getBassNote` in `bass-engine.ts:300-352`, drum/soloist selectors with multiple bias contributions), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line.
+
+> **Historical note:** earlier versions of this guide cited the legacy `selectPitchAndDevices` picker in `soloist-pitch-engine.ts` as the canonical example. It was removed in the phrase-first migration (epic #10/#866) — `getBassNote` is CLAUDE.md's current canonical example of this pattern.
 
 Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.). Scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
 
