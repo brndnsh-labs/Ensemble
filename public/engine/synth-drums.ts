@@ -1623,6 +1623,53 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
 }
 
 /**
+ * Shared preamble for the Epic 4 cymbal `new` voices (closed/open hat, pedal
+ * chick, ride): layers the family's `getCymbalVoiceConfig` lookup on top of
+ * `setupNewPercHit`'s density-duck/panner/velocity preamble, pinned to the
+ * cymbal family's fixed right-pan (0.35 — see RIGHT_PANNED_INSTRUMENTS).
+ * Returns `null` when there's no audio context or the family has no runtime
+ * profile. `setupNewPercHit` already created + connected the panner by the
+ * time the `voiceConfig` guard runs, so the no-profile bail disconnects it
+ * (mirrors the same guard-after-panner shape in `playDrumSoundCurrent`'s
+ * Crash/China branch) rather than leaking a live node into the drums bus.
+ */
+function setupNewCymbalHit(
+    state: EnsembleState,
+    time: number,
+    velocity: number,
+    family: CymbalName,
+): {
+    audio: AudioContext;
+    playTime: number;
+    hitVelocity: number;
+    masterVol: number;
+    panner: ReturnType<typeof createSimplePanner>;
+    voiceConfig: CymbalVoiceConfig;
+} | null {
+    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    if (!ctx) {
+        return null;
+    }
+    const voiceConfig = getCymbalVoiceConfig(
+        family,
+        ctx.hitVelocity,
+        (state.playback as any).bandIntensity || 0.5,
+    );
+    if (!voiceConfig) {
+        safeDisconnect([ctx.panner]);
+        return null;
+    }
+    return {
+        audio: ctx.audio,
+        playTime: ctx.playTime,
+        hitVelocity: ctx.hitVelocity,
+        masterVol: ctx.masterVol,
+        panner: ctx.panner,
+        voiceConfig,
+    };
+}
+
+/**
  * `New`-voice closed hihat — synth-audit Epic 4 S2 ("un-choke the closed hat").
  *
  * The `current` closed hat is choked: three independent decay-shorteners stack on
@@ -1644,34 +1691,12 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
  * un-seeded layer keeps the `new` voice reproducible.
  */
 function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
-    const { playback, groove } = state;
-    if (!playback.audio) {
+    const { groove } = state;
+    const ctx = setupNewCymbalHit(state, time, velocity, 'HiHat');
+    if (!ctx) {
         return;
     }
-    const now = playback.audio.currentTime;
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
-    const playTime = Math.max(time, now + 0.002);
-    // Fail-fast on a malformed velocity rather than poisoning the gain envelope
-    // with NaN (which would throw at `setTargetAtTime` and drop the hit silently).
-    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
-    // why: no `velJitter` here — see the doc comment. The scheduler already
-    // applied seeded humanization to `velocity`.
-    const masterVol = hitVelocity * 1.3 * densityDuck;
-
-    const voiceConfig = getCymbalVoiceConfig(
-        'HiHat',
-        hitVelocity,
-        (playback as any).bandIntensity || 0.5,
-    );
-    if (!voiceConfig) {
-        return;
-    }
-
-    // HiHat is a right-panned instrument (see RIGHT_PANNED_INSTRUMENTS).
-    const panner = createSimplePanner(playback.audio, 0.35, playTime);
-    if (playback.audioGraph) {
-        panner.connect(playback.audioGraph.drums.gain);
-    }
+    const { audio, playTime, hitVelocity, masterVol, panner, voiceConfig } = ctx;
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
     const vel = clamp01(Math.max(0.3, hitVelocity));
@@ -1699,14 +1724,14 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
         rampGain(groove.lastHatGain.gain, 0, playTime, 0.008);
     }
 
-    const source = playback.audio.createBufferSource();
+    const source = audio.createBufferSource();
     // Epic 4 S4 — draw from the variation pool so successive closed hats are
     // not byte-identical replays of one cached buffer.
-    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'HiHat');
+    source.buffer = getVariedCymbalBuffer(audio, groove, 'HiHat');
     source.playbackRate.value =
         voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
 
-    const bpFilter = playback.audio.createBiquadFilter();
+    const bpFilter = audio.createBiquadFilter();
     bpFilter.type = 'bandpass';
     bpFilter.frequency.setValueAtTime(
         voiceConfig.bandpassFreq * (1.06 + Math.random() * 0.08),
@@ -1719,7 +1744,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     );
     bpFilter.Q.value = voiceConfig.q * (0.92 + Math.random() * 0.22);
 
-    const hpFilter = playback.audio.createBiquadFilter();
+    const hpFilter = audio.createBiquadFilter();
     hpFilter.type = 'highpass';
     hpFilter.frequency.setValueAtTime(
         voiceConfig.highpassFreq * (1.03 + Math.random() * 0.09),
@@ -1731,7 +1756,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
         0.025,
     );
 
-    const gain = playback.audio.createGain();
+    const gain = audio.createGain();
     gain.gain.setValueAtTime(0, playTime);
     gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
     gain.gain.setTargetAtTime(0, playTime + decayDelay, decayTc);
@@ -1745,22 +1770,16 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     // Sizzle: thin 2–4 kHz presence layer under the bright buffer. S7 — a
     // `bright` colored-noise buffer read at a random per-hit offset, so the
     // sizzle is fine/airy and varies hit-to-hit instead of a flat static slice.
-    playPercussiveStrike(
-        playback.audio,
-        getColoredNoiseBuffer(playback.audio, groove, 'bright'),
-        panner,
-        playTime,
-        {
-            volume: vol * 0.12,
-            filterType: 'bandpass',
-            freq: 3200 + Math.random() * 400,
-            Q: 1.2,
-            attack: 0.001,
-            decay: 0.04,
-            duration: 0.06,
-            bufferOffset: noiseOffset(),
-        },
-    );
+    playPercussiveStrike(audio, getColoredNoiseBuffer(audio, groove, 'bright'), panner, playTime, {
+        volume: vol * 0.12,
+        filterType: 'bandpass',
+        freq: 3200 + Math.random() * 400,
+        Q: 1.2,
+        attack: 0.001,
+        decay: 0.04,
+        duration: 0.06,
+        bufferOffset: noiseOffset(),
+    });
 
     source.start(playTime);
     // why: stop at +0.45 s — long after the buffer's ≈0.22 s natural ring has
@@ -1797,31 +1816,13 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
  * to retune them at the listening gate.
  */
 function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, openness = 1.0): void {
-    const { playback, groove } = state;
-    if (!playback.audio) {
+    const { groove } = state;
+    const ctx = setupNewCymbalHit(state, time, velocity, 'Open');
+    if (!ctx) {
         return;
     }
-    const now = playback.audio.currentTime;
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
-    const playTime = Math.max(time, now + 0.002);
-    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    const { audio, playTime, hitVelocity, masterVol, panner, voiceConfig } = ctx;
     const open = clamp01(Number.isFinite(openness) ? openness : 1.0);
-    const masterVol = hitVelocity * 1.3 * densityDuck;
-
-    const voiceConfig = getCymbalVoiceConfig(
-        'Open',
-        hitVelocity,
-        (playback as any).bandIntensity || 0.5,
-    );
-    if (!voiceConfig) {
-        return;
-    }
-
-    // HiHat family is right-panned (see RIGHT_PANNED_INSTRUMENTS).
-    const panner = createSimplePanner(playback.audio, 0.35, playTime);
-    if (playback.audioGraph) {
-        panner.connect(playback.audioGraph.drums.gain);
-    }
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
     const vel = clamp01(Math.max(0.3, hitVelocity));
@@ -1856,13 +1857,13 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, open
         rampGain(groove.lastHatGain.gain, 0, playTime, 0.012);
     }
 
-    const source = playback.audio.createBufferSource();
+    const source = audio.createBufferSource();
     // Epic 4 S4 — variation pool: fast open/half/quarter runs vary stick-to-stick.
-    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'Open');
+    source.buffer = getVariedCymbalBuffer(audio, groove, 'Open');
     source.playbackRate.value =
         voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
 
-    const bpFilter = playback.audio.createBiquadFilter();
+    const bpFilter = audio.createBiquadFilter();
     bpFilter.type = 'bandpass';
     bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * brightness * 1.08, playTime);
     bpFilter.frequency.setTargetAtTime(
@@ -1872,11 +1873,11 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, open
     );
     bpFilter.Q.value = voiceConfig.q * (0.9 + Math.random() * 0.2);
 
-    const hpFilter = playback.audio.createBiquadFilter();
+    const hpFilter = audio.createBiquadFilter();
     hpFilter.type = 'highpass';
     hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * (0.9 + open * 0.1), playTime);
 
-    const gain = playback.audio.createGain();
+    const gain = audio.createGain();
     gain.gain.setValueAtTime(0, playTime);
     gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
     gain.gain.setTargetAtTime(0, playTime + decayDelay, decayTc);
@@ -1911,29 +1912,12 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, open
  * decay, and no sizzle layer.
  */
 function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): void {
-    const { playback, groove } = state;
-    if (!playback.audio) {
+    const { groove } = state;
+    const ctx = setupNewCymbalHit(state, time, velocity, 'HiHat');
+    if (!ctx) {
         return;
     }
-    const now = playback.audio.currentTime;
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
-    const playTime = Math.max(time, now + 0.002);
-    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
-    const masterVol = hitVelocity * 1.3 * densityDuck;
-
-    const voiceConfig = getCymbalVoiceConfig(
-        'HiHat',
-        hitVelocity,
-        (playback as any).bandIntensity || 0.5,
-    );
-    if (!voiceConfig) {
-        return;
-    }
-
-    const panner = createSimplePanner(playback.audio, 0.35, playTime);
-    if (playback.audioGraph) {
-        panner.connect(playback.audioGraph.drums.gain);
-    }
+    const { audio, playTime, masterVol, panner, voiceConfig } = ctx;
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
 
@@ -1945,13 +1929,13 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
         rampGain(groove.lastHatGain.gain, 0, playTime, 0.006);
     }
 
-    const source = playback.audio.createBufferSource();
+    const source = audio.createBufferSource();
     // Epic 4 S4 — variation pool shared with the closed hat (same HiHat family).
-    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'HiHat');
+    source.buffer = getVariedCymbalBuffer(audio, groove, 'HiHat');
     source.playbackRate.value =
         voiceConfig.playbackRate * (0.95 + Math.random() * 0.03) * rr(voiceConfig.playbackVariance);
 
-    const bpFilter = playback.audio.createBiquadFilter();
+    const bpFilter = audio.createBiquadFilter();
     bpFilter.type = 'bandpass';
     // why: dark and rounded — the pedal close has little top sizzle. A lower
     // centre (0.6×) pulls the metallic edge down, and a low Q (0.85×, below the
@@ -1960,12 +1944,12 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
     bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * 0.6, playTime);
     bpFilter.Q.value = voiceConfig.q * 0.85;
 
-    const hpFilter = playback.audio.createBiquadFilter();
+    const hpFilter = audio.createBiquadFilter();
     hpFilter.type = 'highpass';
     // lower highpass than the stick hat — keep more warm low-mid body
     hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * 0.62, playTime);
 
-    const gain = playback.audio.createGain();
+    const gain = audio.createGain();
     gain.gain.setValueAtTime(0, playTime);
     // why: soft attack — the cymbals *meet*, they are not struck. Slow enough
     // (7 ms) to round off the buffer's 8 ms transient burst, which is what
@@ -2018,32 +2002,12 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
  * retune them at the listening gate.
  */
 function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
-    const { playback, groove } = state;
-    if (!playback.audio) {
+    const { groove } = state;
+    const ctx = setupNewCymbalHit(state, time, velocity, 'Ride');
+    if (!ctx) {
         return;
     }
-    const now = playback.audio.currentTime;
-    const densityDuck = updateDensityDucking(mixState, now, 18, 0.015);
-    const playTime = Math.max(time, now + 0.002);
-    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
-    // why: no `velJitter` — see the doc comment; the scheduler already applied
-    // seeded humanization to `velocity`.
-    const masterVol = hitVelocity * 1.3 * densityDuck;
-
-    const voiceConfig = getCymbalVoiceConfig(
-        'Ride',
-        hitVelocity,
-        (playback as any).bandIntensity || 0.5,
-    );
-    if (!voiceConfig) {
-        return;
-    }
-
-    // Ride is right-panned (see RIGHT_PANNED_INSTRUMENTS).
-    const panner = createSimplePanner(playback.audio, 0.35, playTime);
-    if (playback.audioGraph) {
-        panner.connect(playback.audioGraph.drums.gain);
-    }
+    const { audio, playTime, hitVelocity, masterVol, panner, voiceConfig } = ctx;
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
     const vol = masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Ride') * rr();
@@ -2053,23 +2017,23 @@ function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
         rampGain(groove.lastRideGain.gain, 0, playTime, 0.05);
     }
 
-    const source = playback.audio.createBufferSource();
+    const source = audio.createBufferSource();
     // Epic 4 S4 variation pool — fast ride patterns vary stick-to-stick.
-    source.buffer = getVariedCymbalBuffer(playback.audio, groove, 'Ride');
+    source.buffer = getVariedCymbalBuffer(audio, groove, 'Ride');
     source.playbackRate.value = voiceConfig.playbackRate * rr(voiceConfig.playbackVariance);
 
-    const bpFilter = playback.audio.createBiquadFilter();
+    const bpFilter = audio.createBiquadFilter();
     bpFilter.type = 'bandpass';
     bpFilter.frequency.setValueAtTime(voiceConfig.bandpassFreq * 1.14, playTime);
     bpFilter.frequency.setTargetAtTime(voiceConfig.bandpassFreq * 0.96, playTime + 0.008, 0.08);
     bpFilter.Q.value = voiceConfig.q;
 
-    const hpFilter = playback.audio.createBiquadFilter();
+    const hpFilter = audio.createBiquadFilter();
     hpFilter.type = 'highpass';
     hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * 1.1, playTime);
     hpFilter.frequency.setTargetAtTime(voiceConfig.highpassFreq * 0.95, playTime + 0.008, 0.1);
 
-    const gain = playback.audio.createGain();
+    const gain = audio.createGain();
     gain.gain.setValueAtTime(0, playTime);
     gain.gain.setTargetAtTime(vol, playTime, voiceConfig.attack);
     gain.gain.setTargetAtTime(0, playTime + voiceConfig.decayDelay, voiceConfig.decayTime);
@@ -2087,7 +2051,7 @@ function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
     if (voiceConfig.pingFreq && voiceConfig.pingVolume) {
         const velNorm = clamp01((hitVelocity - 0.3) / 0.7);
         const pingScale = 1.0 + (1 - velNorm) * 0.7;
-        playResonantTone(playback.audio, panner, playTime, {
+        playResonantTone(audio, panner, playTime, {
             type: 'triangle',
             freqStart: voiceConfig.pingFreq * rr(0.02),
             freqEnd: voiceConfig.pingFreq * 0.84,
