@@ -124,7 +124,7 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'playback') {
-                (playback as any)[action.payload.param] = action.payload.value;
+                (playback as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;

@@ -88,7 +88,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 action.payload.module === 'drum' ||
                 action.payload.module === 'drums'
             ) {
-                (groove as any)[action.payload.param] = action.payload.value;
+                (groove as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;

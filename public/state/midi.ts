@@ -27,14 +27,15 @@ export function midiReducer(action: Action): boolean {
     switch (action.type) {
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'midi') {
-                (midi as any)[action.payload.param] = action.payload.value;
+                (midi as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
         case ACTIONS.SET_MIDI_CONFIG:
             for (const key in action.payload) {
                 if (Object.hasOwn(midi, key)) {
-                    (midi as any)[key] = action.payload[key as keyof typeof action.payload];
+                    (midi as Record<string, unknown>)[key] =
+                        action.payload[key as keyof typeof action.payload];
                 }
             }
             return true;

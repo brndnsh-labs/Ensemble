@@ -31,7 +31,7 @@ export function arrangerReducer(action: Action): boolean {
     switch (action.type) {
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'arranger') {
-                (arranger as any)[action.payload.param] = action.payload.value;
+                (arranger as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
             break;
