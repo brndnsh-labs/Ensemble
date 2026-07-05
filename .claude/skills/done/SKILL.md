@@ -42,10 +42,18 @@ explicit status write, no markdown tracker to touch.
     - **Safe story** (Track musical/bundle, CI green, none of §5's always-brake classes) → run the
       **poll-then-merge guard in the background** (§6), then sync local main + prune the branch. The
       issue auto-closes.
-    - **Judgment-call story** (Track `synth` / by-ear / destructive data op / state-or-worker-contract
-      design call, or anything Brandon should *see*) → **leave the PR open**, Status stays In review
-      (or Needs-ear for synth awaiting audition), report "ready for your merge: <url>" + *why* it's
-      gated. Do NOT auto-merge.
+    - **Track `synth`** → **leave the PR open** (Status `Needs-ear`), then **deploy the branch to
+      test** (`scripts/deploy.sh test` — the `/deploy-test` flow; it builds whatever's checked out,
+      no merge required first) and run its derived per-Track checklist + verdict prompt (Works /
+      Something's off / Haven't checked) right there — that *is* the A/B audition, on the real build
+      instead of a local harness. **"Works"** → run §6's poll-then-merge guard immediately (the
+      verdict *is* the approval — no separate re-invocation needed). **"Something's off"** → capture
+      what's wrong, offer fix-forward / revert / regression-issue, don't merge. **"Haven't checked"**
+      → leave it parked, report the PR URL (`/cycle #<n> approved` once he's listened, same as
+      today). Do NOT auto-merge on your own say-so.
+    - **Other judgment-call story** (by-ear musical / destructive data op / state-or-worker-contract
+      design call, or anything Brandon should *see*) → **leave the PR open**, Status stays In review,
+      report "ready for your merge: <url>" + *why* it's gated. Do NOT auto-merge.
 12. **Suggest next:** `scripts/deploy.sh test` (staging), `/next`, or `/cycle` continues.
 
 ## Edge cases

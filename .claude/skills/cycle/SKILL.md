@@ -1,6 +1,6 @@
 ---
 name: cycle
-description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done, interrupting only on a judgment call. Track-aware (musical → critique-test DoD; synth → A/B audition listening gate, a hard human stop; bundle → KB delta). Replaces the old /synth-cycle and /bundle-cycle. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
+description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done, interrupting only on a judgment call. Track-aware (musical → critique-test DoD; synth → deploy-to-test + listen, a low-friction human stop; bundle → KB delta). Replaces the old /synth-cycle and /bundle-cycle. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
 
 # /cycle — full loop on one story or a chain
@@ -27,21 +27,27 @@ work — runs unattended.
 Read the issue's **Track** field; it sets the loop's tail:
 - **musical** → DoD is the **critique test** (run it, read the Critique Report); reviewer
   `music-theory-reviewer` (+ state/worker if those changed). Safe → auto-merge on green.
-- **synth** → DoD is the **A/B audition** through the audition harness; reviewer
-  `synth-graph-reviewer` (graph hygiene only). **The listening gate is a HARD HUMAN STOP**, not a
-  confirmation gate — `/done` builds + opens the PR and **HALTS for Brandon's ear** (Status Needs-ear).
-  Re-invoke `/cycle #<n> approved` after auditioning to finalize the merge. This is the one Track that
-  cannot run fully unattended.
+- **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
+  (graph hygiene only). Pick these up freely — the loop runs the same as any other Track right up
+  to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`scripts/deploy.sh
+  test`, no merge needed first) and hands Brandon the checklist + a Works/Something's-off/Haven't-
+  checked verdict prompt right there — **that's the audition**, not a separate local harness step.
+  "Works" merges immediately (the verdict *is* the approval); "Haven't checked" parks it (Status
+  `Needs-ear`) — re-invoke `/cycle #<n> approved` once he's listened. The merge itself still always
+  waits on his ear; nothing here auto-merges unheard.
 - **bundle** → DoD is a **measured KB delta** (`npm run build` / size check) **and** the full suite
   green (behavior-preserving); reviewer `bundle-hygiene-reviewer`. Safe → auto-merge on green.
 
 ## Forms
 
 - **`/cycle #<n>`** — one issue, full loop. `/done` auto-merges a safe story on CI green (§6) or leaves
-  a judgment-call PR for Brandon. A **synth** issue halts at the listening gate. `--deploy` runs
-  `scripts/deploy.sh test` after the merge.
-- **`/cycle #<n> approved`** — finalize a synth issue whose audition you've now signed off: run §6's
-  merge (`Closes #<n>` closes the issue = done), then continue.
+  a judgment-call PR for Brandon. A **synth** issue gets deployed to test + a check-in at the gate —
+  a "Works" verdict merges right then; otherwise it parks on `Needs-ear`. `--deploy` runs
+  `scripts/deploy.sh test` again after a musical/bundle merge (the synth gate already deploys as
+  part of its own tail).
+- **`/cycle #<n> approved`** — finalize a synth issue you parked as "haven't checked yet" and have
+  now listened to (on your own time, outside the check-in prompt): run §6's merge (`Closes #<n>`
+  closes the issue = done), then continue.
 - **`/cycle next`** — runs `/next` first, then cycles whatever Ready issue it picks.
 - **`/cycle next --until-blocked`** — after each `/done`, auto-`/next` and continue. **Stops on:** a
   judgment call (§5 — incl. a synth listening gate or a PR left un-merged) · no Ready issue left ·
@@ -59,9 +65,9 @@ Read the issue's **Track** field; it sets the loop's tail:
    ## Cycle plan
    **Issue:** #<n> — <title>   **Track:** <musical|synth|bundle>   **Model:** <sonnet|opus>   **Size:** <S|M|L>   **Milestone:** <epic>
    **Executor:** <agent | orchestrator-inline>   **Reviewer:** <per §3 / the diff>
-   **DoD:** <critique test `tests/standards/…` | A/B audition (HARD STOP) | KB delta>
-   **Chain:** /implement → /review → /patch (if findings) → /done (PR + Closes #<n> → §6 merge / Track gate) <→ deploy-test if --deploy>
-   **Auto-pause points:** judgment call (§5) · gates/CI red · synth listening gate · (--until-blocked) blocked-on-Brandon / milestone boundary
+   **DoD:** <critique test `tests/standards/…` | deploy-to-test + listen | KB delta>
+   **Chain:** /implement → /review → /patch (if findings) → /done (PR + Closes #<n> → §6 merge / Track gate, synth deploys-to-test at the gate) <→ deploy-test again if --deploy>
+   **Auto-pause points:** judgment call (§5) · gates/CI red · synth check-in verdict (Works merges now, else parks) · (--until-blocked) blocked-on-Brandon / milestone boundary
    Start?
    ```
 
@@ -74,11 +80,13 @@ Read the issue's **Track** field; it sets the loop's tail:
    | implement | gates + Track DoD green when **the orchestrator re-runs them itself** (§4) | gates red, agent Blocked, or a spawned "green" that doesn't reproduce (§3) |
    | review | findings all P1/P2 mechanical | any P0, or a finding contradicts a memory note (§5) |
    | patch | gates green | gates red, a fix needs a design call |
-   | done | safe story (musical/bundle): §6 poll-then-merge → closed (`Closes #<n>` = done) | CI red / conflict / hook failure that isn't a trivial retry · **synth → HALT at the listening gate** · **judgment-call class → PR left open for Brandon** |
+   | done | safe story (musical/bundle): §6 poll-then-merge → closed (`Closes #<n>` = done) · **synth "Works" verdict at the deploy-to-test check-in: §6 poll-then-merge → closed** | CI red / conflict / hook failure that isn't a trivial retry · **synth "Something's off"/"Haven't checked" → parked on Needs-ear** · **other judgment-call class → PR left open for Brandon** |
    | deploy-test | deploy + verify green | deploy non-zero, external check fails after retries |
 
 6. **On `--until-blocked`, after `/done` (and optional deploy):**
-   - `/done` **left the PR open for Brandon** (judgment-call / synth listening gate) → stop and report.
+   - `/done` **left the PR open for Brandon** (a synth "Something's off"/"Haven't checked" verdict, or
+     another judgment-call class) → stop and report. A synth **"Works"** verdict merges inline and
+     the chain keeps going — it's not a stop.
    - Just-shipped issue was the **last open one in its milestone** → stop with the retrospective.
    - Else run `/next` internally. Any Ready issue (sonnet *or* opus) → loop to step 3 (auto-confirm,
      "starting cycle N+1: #<n>"). Stop only when no Ready issue remains (§1) — say which — or a judgment
@@ -112,15 +120,18 @@ park. The open **`finding` issues must not grow** as a cycle side effect.
 
 Same as `/done` (§6 + §8): never `git add -A`, never `--no-verify`, never **force**-push, never amend,
 **never bypass §6's poll-then-merge guard** (`node scripts/forgejo-merge.mjs <pr> &`). Never override a pause gate without
-explicit direction this turn. Never auto-merge a synth story past the listening gate. Don't accept
+explicit direction this turn. Never merge a synth story on your own say-so — only on an explicit
+"Works" verdict at the deploy-to-test check-in, or a later `/cycle #<n> approved`. Don't accept
 "looks fine" from a reviewer without parsing findings — empty findings is valid, *missing* findings
 (timeout/error) is a failure.
 
 ## Edge cases
 
 - **Story is opus in `--until-blocked`:** run it like any other; stop only on a *judgment call*.
-- **Synth story under `--until-blocked`:** it will halt at the listening gate — report it as blocked on
-  Brandon's ear; the chain stops (or continues with non-synth Ready work only if still clearly clean).
+- **Synth story under `--until-blocked`:** `/done` deploys it to test and asks for a verdict right
+  there. **"Works"** → merges inline, chain continues. **"Something's off" / "Haven't checked"** →
+  report it as blocked on Brandon's ear; the chain stops (or continues with non-synth Ready work only
+  if still clearly clean).
 - **Last story of an epic ships under `--until-blocked`:** stop with the retrospective.
 - **Reviewer fails (timeout/none):** pause-worthy; don't auto-`/done` unreviewed.
 - **Forgejo unreachable (§7):** stop; don't fabricate a story.

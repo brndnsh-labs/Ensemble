@@ -82,9 +82,12 @@ Model→`model/*`, Size→`size/*`, Agent→`agent/*`, "Review lens"→`lens/*`,
     automated oracle). Most musical stories are fully auto-mergeable on green; when the change is
     audible, ship it `verify-by-ear` (auto-merge on green + a 🎧 listen checklist — §5). Only
     genuinely-subjective feel (no test can assert the idiom) is a `Needs-ear` hard stop.
-  - **synth** → gated by a **human A/B audition** through the audition harness
-    (`scripts/audition-link.ts`); there is no automated oracle. A synth story is **`Needs-ear`**
-    at the merge gate (§5) — build + PR, but **never auto-merge unheard**.
+  - **synth** → gated by a **human listen on the deployed test build**: `/done` builds the PR, then
+    deploys the branch to test (`scripts/deploy.sh test` — no merge needed first) and runs a
+    Works/Something's-off/Haven't-checked check-in right there; there is no automated oracle. A synth
+    story is **`Needs-ear`** at the merge gate (§5) — a **"Works"** verdict at that check-in merges
+    immediately (the verdict *is* the approval); otherwise it stays parked. **Never auto-merge
+    unheard.**
   - **bundle** → gated by a **measurable KB delta** (`npm run build` / size check) **and**
     behavior-preservation (full suite green). Auto-mergeable on green.
   - **ui** → UI/UX surface work (`public/components/**`, non-engine `public/**`) with no new
@@ -149,8 +152,9 @@ before a `/done` that touches more than one file. **CI** runs `npm test` and a p
 - **musical** → run the matching **critique test** (`npx vitest run tests/standards/<…>-critique.test.ts`)
   and read its "Critique Report" for balance. A new musical bias without a passing critique test
   is not done.
-- **synth** → the **A/B audition** is the gate; it's a **human listening stop**, not an automated
-  check (→ `Needs-ear`, §5).
+- **synth** → the **human listen on the deployed test build** is the gate — `/done` deploys the
+  branch at the gate itself so the listen happens on the real build, not a local harness; it's a
+  **human listening stop**, not an automated check (→ `Needs-ear`, §5).
 - **bundle** → a **measured KB delta** from the size check **and** the full suite green
   (behavior-preserving).
 
