@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { StyleObject } from '../ui-types.js';
+import { useModalA11y } from './use-modal-a11y.js';
 
 interface ToolbarPopoverRenderContext {
     closePopover: () => void;
@@ -41,6 +42,8 @@ export function ToolbarPopover({
         setIsOpen(false);
     };
 
+    useModalA11y(panelRef, isOpen, closePopover, panelLabel);
+
     const handleFocusExit = (event: FocusEvent) => {
         const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
 
@@ -78,20 +81,9 @@ export function ToolbarPopover({
             closePopover();
         };
 
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') {
-                return;
-            }
-
-            closePopover();
-            triggerRef.current?.focus();
-        };
-
         window.addEventListener('pointerdown', handlePointerDown, true);
-        window.addEventListener('keydown', handleKeyDown);
         return () => {
             window.removeEventListener('pointerdown', handlePointerDown, true);
-            window.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOpen]);
 
