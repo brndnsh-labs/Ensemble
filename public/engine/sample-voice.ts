@@ -254,6 +254,29 @@ export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
  * context/buffer/destination — the same graceful-fallback contract as
  * `playSampledNote`.
  */
+/**
+ * Click-free attack/hold/release gain envelope shared by `playSampledStrike`
+ * and `playSampledNote`: linear ramp to `peak`, hold, linear ramp to silence.
+ * Anchoring `releaseStart` at >= the attack end keeps a very short note from
+ * inverting the ramp order. Returns `releaseStart` so callers can derive their
+ * own natural-end/stop time.
+ */
+function scheduleEnvelope(
+    gain: GainNode,
+    startTime: number,
+    peak: number,
+    attack: number,
+    hold: number,
+    release: number,
+): number {
+    const releaseStart = Math.max(startTime + attack, startTime + hold);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(peak, startTime + attack);
+    gain.gain.setValueAtTime(peak, releaseStart);
+    gain.gain.linearRampToValueAtTime(0, releaseStart + release);
+    return releaseStart;
+}
+
 export function playSampledStrike(
     audio: AudioContext,
     buffer: AudioBuffer | null,
@@ -293,13 +316,7 @@ export function playSampledStrike(
         source.buffer = buffer;
 
         const gain = audio.createGain();
-        // Click-free: quick linear attack to peak, hold across the recording,
-        // short release so the source can free itself without a tail click.
-        const releaseStart = Math.max(startTime + attack, startTime + hold);
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(peak, startTime + attack);
-        gain.gain.setValueAtTime(peak, releaseStart);
-        gain.gain.linearRampToValueAtTime(0, releaseStart + release);
+        const releaseStart = scheduleEnvelope(gain, startTime, peak, attack, hold, release);
 
         source.connect(gain);
         gain.connect(destination);
@@ -561,14 +578,7 @@ export function playSampledNote(
         }
 
         const gain = audio.createGain();
-        // Click-free envelope: linear attack to peak, hold for `duration`, linear
-        // release to silence. Anchoring `releaseStart` at >= the attack end keeps a
-        // very short note from inverting the ramp order.
-        const releaseStart = Math.max(startTime + attack, startTime + hold);
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(peak, startTime + attack);
-        gain.gain.setValueAtTime(peak, releaseStart);
-        gain.gain.linearRampToValueAtTime(0, releaseStart + release);
+        const releaseStart = scheduleEnvelope(gain, startTime, peak, attack, hold, release);
 
         source.connect(gain);
         // Opt-in per-pack tone correction (#755): splice a tilt between the note
