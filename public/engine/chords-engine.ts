@@ -598,7 +598,7 @@ function resolveChordRoot(
         const accidental = romanMatch[1] || '',
             numeral = romanMatch[2];
         rootRomanBase = numeral;
-        let rootOffset = (ROMAN_VALS as any)[numeral.toUpperCase()];
+        let rootOffset = (ROMAN_VALS as Record<string, number>)[numeral.toUpperCase()];
         if (accidental === 'b') {
             rootOffset -= 1;
         }
@@ -908,8 +908,8 @@ function parseProgressionPart(
                         resolvedBass.noteMatch?.[1] || '',
                         keyIsMinor,
                     );
-                    bassNameNNS = (INTERVAL_TO_NNS as any)[bassInterval];
-                    bassNameRom = (INTERVAL_TO_ROMAN as any)[bassInterval];
+                    bassNameNNS = (INTERVAL_TO_NNS as Record<number, string>)[bassInterval];
+                    bassNameRom = (INTERVAL_TO_ROMAN as Record<number, string>)[bassInterval];
                 }
 
                 const suffixPart = chordPart.slice(rootPart.length);
@@ -992,10 +992,10 @@ function parseProgressionPart(
                 lastMidis = currentMidis;
 
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
-                const rootNNS = (INTERVAL_TO_NNS as any)[interval];
+                const rootNNS = (INTERVAL_TO_NNS as Record<number, string>)[interval];
                 const displayRomanBase = romanMatch
                     ? `${romanMatch[1] || ''}${romanMatch[2].toUpperCase()}`
-                    : (INTERVAL_TO_ROMAN as any)[interval];
+                    : (INTERVAL_TO_ROMAN as Record<number, string>)[interval];
                 const rootAccidentalHint =
                     romanMatch?.[1] ||
                     nnsMatch?.[1] ||
@@ -1028,9 +1028,12 @@ function parseProgressionPart(
                     finalAbsName += `/${bassNameAbs}`;
                     finalNNSName += `/${bassNameNNS}`;
                     finalRomName += `/${bassNameRom}`;
-                    (formatted.name as any).bass = bassNameAbs;
-                    (formatted.nns as any).bass = bassNameNNS;
-                    (formatted.roman as any).bass = bassNameRom;
+                    formatted.name.bass = bassNameAbs;
+                    // bassNameNNS/Rom are set alongside bassNameAbs above, so they're
+                    // non-null whenever this guard passes; coalesce null→undefined to
+                    // match ChordNamePart.bass (string | undefined).
+                    formatted.nns.bass = bassNameNNS ?? undefined;
+                    formatted.roman.bass = bassNameRom ?? undefined;
                 }
 
                 const isMinor =
