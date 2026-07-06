@@ -36,6 +36,9 @@ export const config = {
  * seed-driven (density axis) and intensity governs velocity only via
  * scaleVelocity calls below — never gates which lane fires.
  */
+// Deliberately ignores intensity (unlike sibling grooves' makeMotifSelector gate) — the
+// 4-motif index is load-bearing for synth-drums velocity scaling; gating it here would
+// change that scaling. Decided 2026-05-28 (docs/audit/FOLLOWUPS.md §E); see #997.
 export function getMotif(seed: number, complexity: number, _intensity = 1.0): number {
     // why: low-complexity sections still collapse to foundation. `complexity`
     // is the orchestration-driven drum-complexity signal (capped motif / 3, or
