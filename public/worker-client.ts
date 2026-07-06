@@ -304,6 +304,15 @@ export function syncWorker(action?: string, payload?: any): void {
             // pushed to the worker each time the scheduler crosses a chorus boundary.
             data.playback = { currentLoopCount: playback.currentLoopCount };
             break;
+        case 'SET_ENDING_PENDING':
+            // #993 — the worker reads this for ending-anticipation gestures
+            // (harmony thickening, drum final-measure flourish); without this
+            // delta the anticipation window ran on a stale `false`.
+            data.playback = { isEndingPending: playback.isEndingPending };
+            break;
+        case 'SET_SONG_MODE':
+            data.playback = { songMode: playback.songMode };
+            break;
         case 'ARRANGER_UPDATE': // Custom action for large structural changes
             data.arranger = {
                 progression: arranger.progression,

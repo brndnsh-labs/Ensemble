@@ -75,7 +75,14 @@ vi.mock('../../../public/state.js', () => {
             swingSub: '8th',
             instruments: [{ name: 'Kick', steps: [], muted: false }],
         },
-        playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
+        playback: {
+            bpm: 120,
+            bandIntensity: 0.5,
+            complexity: 0.5,
+            autoIntensity: false,
+            isEndingPending: true,
+            songMode: false,
+        },
         midi: {
             chordsChannel: 1,
             bassChannel: 2,
@@ -260,6 +267,8 @@ describe('Worker Client', () => {
                 'SET_SESSION_TIMER',
                 'TOGGLE_PLAY',
                 'ARRANGER_UPDATE',
+                'SET_ENDING_PENDING',
+                'SET_SONG_MODE',
             ];
 
             for (const action of actions) {
@@ -279,6 +288,34 @@ describe('Worker Client', () => {
                     }),
                 );
             }
+        });
+
+        it('should push isEndingPending and songMode deltas (#993)', () => {
+            // The worker reads isEndingPending for ending-anticipation gestures
+            // (harmony thickening, drum final-measure flourish) — before #993 these
+            // two actions fell through the switch with no delta case, so the
+            // anticipation window ran on a stale value.
+            mockPostMessage.mockClear();
+            syncWorker('SET_ENDING_PENDING');
+            expect(mockPostMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: WORKER_MSG.SYNC_STATE,
+                    data: expect.objectContaining({
+                        playback: { isEndingPending: true },
+                    }),
+                }),
+            );
+
+            mockPostMessage.mockClear();
+            syncWorker('SET_SONG_MODE');
+            expect(mockPostMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    type: WORKER_MSG.SYNC_STATE,
+                    data: expect.objectContaining({
+                        playback: { songMode: false },
+                    }),
+                }),
+            );
         });
 
         it('should handle SET_PARAM action', () => {
