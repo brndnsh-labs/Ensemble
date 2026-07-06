@@ -362,10 +362,7 @@ export function checkSectionTransition(
             : binarySearchMapIndex(arranger.stepMap || [], measureEnd);
         const nextEntry = nextChordIdx !== -1 ? arranger.stepMap[nextChordIdx] : null;
 
-        if (
-            nextEntry &&
-            (isLoopEnd || (nextEntry.chord as any).sectionId !== (entry.chord as any).sectionId)
-        ) {
+        if (nextEntry && (isLoopEnd || nextEntry.chord.sectionId !== entry.chord.sectionId)) {
             // --- 1. THE SOLOIST TRADE ---
             // Real musicians trade even if there isn't a drum fill!
             const { soloist: soloistState } = state;
@@ -399,7 +396,7 @@ export function checkSectionTransition(
             let shouldFill = true;
 
             // CHECK FOR SEAMLESS TRANSITION
-            const nextSectionId = (nextEntry.chord as any).sectionId;
+            const nextSectionId = nextEntry.chord.sectionId;
             const nextSection = arranger.sections.find((s: any) => s.id === nextSectionId);
             if (nextSection?.seamless) {
                 shouldFill = false;
@@ -475,7 +472,7 @@ export function checkSectionTransition(
                     // --- 2. THE LOCAL FUNCTIONAL ROLE ---
                     if (conductor.form && (conductor.form as any).sections) {
                         const nextSection = (conductor.form as any).sections.find(
-                            (s: any) => s.id === (nextEntry.chord as any).sectionId,
+                            (s: any) => s.id === nextEntry.chord.sectionId,
                         );
                         if (nextSection) {
                             // why: switch arms used to enumerate a formal-music
@@ -535,10 +532,10 @@ export function checkSectionTransition(
                                 targetEnergy -= 0.15;
                             }
                         } else {
-                            targetEnergy = getSectionEnergy((nextEntry.chord as any).sectionLabel);
+                            targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel);
                         }
                     } else {
-                        targetEnergy = getSectionEnergy((nextEntry.chord as any).sectionLabel);
+                        targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel);
                     }
 
                     targetEnergy = Math.max(macroFloor, Math.min(macroCeiling, targetEnergy));
@@ -782,8 +779,7 @@ export function checkSectionTransition(
     const isChordEnd = modStep === entry.end - 1;
     if (isChordEnd) {
         const nextEntry = arranger.stepMap[currentChordIdx + 1];
-        const isTransition =
-            !nextEntry || (nextEntry.chord as any).sectionId !== (entry.chord as any).sectionId;
+        const isTransition = !nextEntry || nextEntry.chord.sectionId !== entry.chord.sectionId;
 
         if (isTransition && !groove.fillActive && playback.bandIntensity > 0.4) {
             dispatch(ACTIONS.TRIGGER_FILL, {
