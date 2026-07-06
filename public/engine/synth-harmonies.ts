@@ -2,9 +2,8 @@ import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
-import { getPackZones } from './pack-runtime.js';
-import { foldToSampledCeiling, pickZone, playSampledNote } from './sample-voice.js';
-import { createSimplePanner } from './synth-utils.js';
+import { playSampledNote } from './sample-voice.js';
+import { createSimplePanner, resolveSampledZone } from './synth-utils.js';
 
 /**
  * Polyphonic Synthesizer for the Harmony Module (harmony).
@@ -376,21 +375,14 @@ function playSampledHarmony(
     duration: number,
     vol: number,
 ): boolean {
-    const { playback } = state;
-    const audio = playback.audio;
-    const dest = playback.audioGraph?.harmonies?.gain;
-    const zones = getPackZones(packId);
-    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
-        return false;
-    }
     // Fold notes above the pack's sampled range down an octave (#755): harmony
     // runs to MIDI 84 but the strings top at 74 and horns at 72, so the top zone
     // would otherwise pitch-shift up into a thin metallic ring. In-range unchanged.
-    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
-    const zone = pickZone(zones, targetMidi);
-    if (!zone) {
+    const resolved = resolveSampledZone(state, 'harmonies', packId, freq);
+    if (!resolved) {
         return false;
     }
+    const { audio, dest, zone, targetMidi } = resolved;
     // Lift the loudness-normalized sample to the synth harmony seat via the
     // pack's catalog-owned gain (`gainForPack`, #656 — calibrated against the
     // synth baseline by `mix-report --calibrate-pack`). NOT clamped to ≤1 here:

@@ -1,9 +1,47 @@
+import type { AudioGraph, EnsembleState } from '../types.js';
 import { safeDisconnect } from '../utils.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
+import { getPackZones } from './pack-runtime.js';
+import { foldToSampledCeiling, pickZone, type SampleZone } from './sample-voice.js';
 
 /**
  * Standardized WebAudio utilities for instrument synthesis.
  */
+
+export interface ResolvedSampledZone {
+    audio: AudioContext;
+    dest: GainNode;
+    zone: SampleZone;
+    targetMidi: number;
+}
+
+/**
+ * Shared zone-resolution prologue for sampled-pack voices (#996): converts a
+ * scheduled frequency to a MIDI target, folds it to the pack's sampled
+ * ceiling, and picks the nearest loaded zone. Returns `null` when the audio
+ * graph/zones aren't ready or the note is unplayable — callers fall back to
+ * their synth voice in that case, same as before this was shared.
+ */
+export function resolveSampledZone(
+    state: EnsembleState,
+    graphKey: Extract<keyof AudioGraph, 'bass' | 'soloist' | 'harmonies'>,
+    packId: string,
+    freq: number,
+): ResolvedSampledZone | null {
+    const { playback } = state;
+    const audio = playback.audio;
+    const dest = playback.audioGraph?.[graphKey]?.gain;
+    const zones = getPackZones(packId);
+    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
+        return null;
+    }
+    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
+    const zone = pickZone(zones, targetMidi);
+    if (!zone) {
+        return null;
+    }
+    return { audio, dest, zone, targetMidi };
+}
 
 export function rampGain(
     param: AudioParam,

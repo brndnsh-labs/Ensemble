@@ -3,22 +3,19 @@ import type { EnsembleState, Mutable, SoloistExpression, SoloistVoice } from '..
 import { clampFreq, safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
-import { getPackZones } from './pack-runtime.js';
-import {
-    clampFrac,
-    foldToSampledCeiling,
-    pickZone,
-    playSampledNote,
-    type SampleBend,
-    type SampleVibrato,
-} from './sample-voice.js';
+import { clampFrac, playSampledNote, type SampleBend, type SampleVibrato } from './sample-voice.js';
 import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
     isSoloistMonophonicMode,
 } from './soloist-mode-policy.js';
-import { createSimplePanner, killActiveVoices, velocityTimbre } from './synth-utils.js';
+import {
+    createSimplePanner,
+    killActiveVoices,
+    resolveSampledZone,
+    velocityTimbre,
+} from './synth-utils.js';
 
 export type { SoloistVoice } from '../types.js';
 
@@ -143,22 +140,15 @@ function playSampledSolo(
     isLegato: boolean,
     prevFreq: number,
 ): boolean {
-    const { playback } = state;
-    const audio = playback.audio;
-    const dest = playback.audioGraph?.soloist?.gain;
-    const zones = getPackZones(packId);
-    if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
-        return false;
-    }
     // Fold notes above the pack's sampled range down an octave (#755): the
     // soloist runs to MIDI 90 but the packs top out lower (nylon 84, sax 79,
     // guitars 85), so the top zone would otherwise pitch-shift up into a thin
     // metallic ring. In-range notes are unchanged.
-    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
-    const zone = pickZone(zones, targetMidi);
-    if (!zone) {
+    const resolved = resolveSampledZone(state, 'soloist', packId, freq);
+    if (!resolved) {
         return false;
     }
+    const { audio, dest, zone, targetMidi } = resolved;
     const velocity = Math.min(1, (Number.isFinite(vol) ? vol : 0.5) * gainForPack(packId));
 
     // Guitar legato slur — the hammer-on / pull-off (#855). A horn re-articulates
