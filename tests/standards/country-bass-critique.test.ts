@@ -169,7 +169,7 @@ describe('Country Bassist Critique', () => {
             if (!rootHit || !fifthHit) {
                 continue;
             }
-            expect(fifthHit.note.midi).toBeLessThan(rootHit.note.midi);
+            expect(fifthHit.note.midi).toBeLessThan(rootHit.note.midi); // intent: the fifth must sit below the root (boom-chick deep register) — a musical-taste decision, not a measurement
         }
         console.log(
             `[Country Critique] Quarter-tier: ${performance.length} hits, R-5-R-5 verified, fifth-below confirmed`,
@@ -298,6 +298,6 @@ describe('Country Bassist Critique', () => {
 
         // Expected: 0.95 + 0.3*0.3 = 1.04 vs 0.95 + 0.95*0.3 = 1.235 — both clamped
         // by the velocity ceiling at 1.25 (bass-engine.ts:361).
-        expect(highVel).toBeGreaterThan(lowVel * 1.1);
+        expect(highVel).toBeGreaterThan(lowVel * 1.1); // measured: engine delivers low=0.88, high=1.25 (~1.42x); floor 1.1x leaves ~0.32x headroom
     });
 });

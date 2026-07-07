@@ -104,15 +104,15 @@ describe('Funk Bass Critique', () => {
         );
 
         // The One: deterministic root on every bar downbeat (per bass-engine.ts:439, 509)
-        expect(downbeatRatio).toBe(1.0);
+        expect(downbeatRatio).toBe(1.0); // intent: the downbeat is deterministically the chord root — an engine guarantee, not a measured tendency
         // Ghost density: engine fires chuckProb = 0.2 + intensity*0.4 = 0.56 on 16th offbeats.
         // Observed 17.5-19.7% across 10 runs; tightened from <0.4 to <0.28 (~8pt headroom).
-        expect(ghostRatio).toBeGreaterThan(0.15);
-        expect(ghostRatio).toBeLessThan(0.28);
+        expect(ghostRatio).toBeGreaterThan(0.15); // measured: engine delivers ~17.5-19.7% across 10 runs; floor 0.15 sits ~2.5pt below the observed low
+        expect(ghostRatio).toBeLessThan(0.28); // measured: engine delivers ~17.5-19.7% across 10 runs; ceiling 0.28 leaves ~8pt headroom above the observed high
         // Octave pops: engine fires popProb = 0.6 + intensity*0.4 = 0.96 on 4 "ands"/bar,
         // each ~1 octave above the prior root. Observed 3.38-3.76/bar across 10 runs;
         // tightened from >0.3 (12x too loose) to >2.5 (still ~0.9x worst-case headroom).
-        expect(octaveRatio).toBeGreaterThan(2.5);
+        expect(octaveRatio).toBeGreaterThan(2.5); // measured: engine delivers ~3.38-3.76 jumps/bar across 10 runs; floor 2.5 leaves ~0.88-1.26/bar headroom
     });
 
     it('should suppress octave pops at low intensity', () => {

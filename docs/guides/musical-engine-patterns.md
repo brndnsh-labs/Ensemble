@@ -27,6 +27,24 @@ Two additional smells discovered during the May 2026 audit:
 
 Look for any of the five per test file, then verify the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
 
+### Threshold provenance: intent vs measured
+
+Empirically-calibrated thresholds silently become a ratchet: after a deliberate musical change, failing assertions get loosened one at a time with no record of which thresholds encode musical intent versus which were just measured headroom. An `intent` number and a `measured` number look identical as code (`toBeGreaterThan(0.5)`) but a PR that loosens one has a completely different review burden than a PR that loosens the other. Tag every range/threshold assertion with its provenance so that's legible without archaeology:
+
+- **`// intent:`** — a musical INVARIANT the number encodes, true regardless of what the engine currently measures. Example:
+  ```ts
+  expect(backbeatVel).toBeGreaterThan(ghostVel); // intent: backbeat must strike harder than a ghost note — a rock invariant, not a measurement
+  ```
+  Loosening an `intent` threshold is a musical-correctness decision — it needs a by-ear/theory look, not a quiet nudge.
+
+- **`// measured:`** — an empirically-CALIBRATED floor below observed engine delivery, with the headroom argument inline (what the engine delivers, the random baseline, the resulting headroom). Example:
+  ```ts
+  expect(chordToneRatio).toBeGreaterThan(0.5); // measured: engine delivers ~0.62; random baseline 0.33; floor 0.50 leaves ~0.12 headroom
+  ```
+  Loosening a `measured` threshold means either the engine regressed or the original calibration was wrong — it needs a re-measurement and a fresh headroom justification, not a quiet nudge.
+
+This applies to new and modified range assertions going forward — it is not a mandate to retrofit the ~750 existing assertions in one pass.
+
 ## Patterns proven
 
 ### Engine-knows-where-it-is (form-aware pitch / rhythm selection)

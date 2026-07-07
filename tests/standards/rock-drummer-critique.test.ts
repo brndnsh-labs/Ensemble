@@ -179,7 +179,7 @@ describe('Rock Drummer Critique', () => {
         // CRITICAL: Rock drummer MUST hit the backbeat on 2 AND 4. Engine
         // delivers 100% (256/128/2); 0.95 is the floor that still requires
         // the engine to land both snare anchors on essentially every bar.
-        expect(backbeatScore).toBeGreaterThan(0.95);
+        expect(backbeatScore).toBeGreaterThan(0.95); // measured: engine delivers 100% (256/256 over 128 bars); floor 0.95 leaves ~5pt headroom
 
         // CRITICAL: Kick grounds beats 1 and 3 ("the foundation"). Engine
         // delivers 100%; 0.99 is the floor.
@@ -197,7 +197,7 @@ describe('Rock Drummer Critique', () => {
         // hits — the dynamic contrast IS the Rock idiom. Asserting ghost avg <
         // 60% of backbeat avg locks in real dynamic shaping; without this gate
         // a flat-velocity engine could still ship green on count-based checks.
-        expect(ghostAvg).toBeLessThan(backbeatAvg * 0.6);
+        expect(ghostAvg).toBeLessThan(backbeatAvg * 0.6); // intent: ghost notes must stay quieter than the backbeat — a Rock dynamic-contrast invariant, not a measurement
 
         // Note: open-hat reachability at intensity 0.75 is intentionally NOT
         // asserted here — opens fire on off-beats (non-eighth steps) in this
