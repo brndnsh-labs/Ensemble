@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import { getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveSoloistStyle } from './soloist-config.js';
@@ -234,7 +235,12 @@ export function getSoloistNotePhraseFirst(
     _octave: number,
     style: string,
     _stepInChord: number,
-    _coordination: any = {},
+    // #1020: promoted from vestigial. tick-logic passes
+    // `{ sectionStart, sectionEnd, stepCoordination }` — the soloist now READS the
+    // section boundaries to phrase around form seams (rest into a change, enter big
+    // after a rising one). Still tolerant of `{}` from callers that don't supply it
+    // (partial mocks, the pre-seed fallback path) — every read below guards.
+    coordination: any = {},
     _stepInfo: any = null,
 ): any {
     const { playback, soloist, arranger } = state;
@@ -382,11 +388,83 @@ export function getSoloistNotePhraseFirst(
     // test mock that omits it — "no arc signal → no arc modulation."
     const bandEnergy = playback.bandIntensity ?? 0.6;
     const bandLift = (bandEnergy - 0.6) * 0.5;
+
+    // #1020: the lead PHRASES AROUND FORM SEAMS ("give the soloist ears", slice B).
+    // Slice A (above) rides the sustained band energy; this reads the STRUCTURE the
+    // band already publishes — the current section's boundaries — so the lead does
+    // what a player does at a form seam: breathe on the way into a change, then come
+    // in strong on the far side of a lift. Two gated, final-stage terms folded into
+    // the SAME `activityAt` lambda as slice A, so the live emit and the duration-
+    // clamp lookahead below see one gate (the slice-A invariant).
+    //   • rest into the change: thin the ornament gate across the LAST bar before a
+    //     section boundary (multi-section forms only — a single-section loop has no
+    //     "change" to rest into, just the head restating).
+    //   • enter big after a rise: fill the FIRST bar of a section the form entered
+    //     on an energy LIFT (verse→chorus, breakdown→drop). Detected read-only by
+    //     comparing this section's energy to the previous section's (the chord just
+    //     before `sectionStart`, wrapped for loops) via form-analysis' energy map —
+    //     no new coordination/state field. On a rise `bandLift` is already high, so
+    //     (as in slice A) density saturates and the velocity bump below carries most
+    //     of the "dig in"; the gate lift still fills the early-loop / sparse cases.
+    // Bar math is hoisted here (it was defined below for the pitch grammar) so the
+    // seam terms can live inside `activityAt`; the pitch-grammar block below reuses
+    // these same locals.
+    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const stepsPerBeat = ts.stepsPerBeat;
+    const stepsPerBar = ts.beats * stepsPerBeat;
+    const secStart = Number(coordination?.sectionStart) || 0;
+    const secEnd = Number(coordination?.sectionEnd) || 0;
+    const multiSection = (arranger.sections?.length ?? 0) > 1 && secEnd > secStart;
+    // "Entered on a rise?" — a per-section constant, computed once. The previous
+    // section is whatever covers the step just before this section's start (mod the
+    // form length, so loop-boundary entries compare against the form's tail). The
+    // +0.15 margin means only a GENUINE lift earns the entry emphasis: verse→chorus
+    // (+0.4), verse→build (+0.2), breakdown→drop (+0.7) all fire, but a mild step
+    // like intro→verse / verse→pre-chorus / verse→bridge (+0.1 in SECTION_ENERGY_MAP)
+    // does NOT — a bridge is often a mellow contrast, not a dig-in, so it shouldn't
+    // "enter big."
+    let enteredOnRise = false;
+    if (multiSection && (arranger.stepMap?.length ?? 0) > 0) {
+        const prevStep = (((secStart - 1) % totalSteps) + totalSteps) % totalSteps;
+        const prevEntry = arranger.stepMap.find(
+            (e: any) => prevStep >= e.start && prevStep < e.end,
+        );
+        const curEnergy = getSectionEnergy((currentChord as any)?.sectionLabel ?? null);
+        const prevEnergy = getSectionEnergy((prevEntry?.chord as any)?.sectionLabel ?? null);
+        enteredOnRise = curEnergy > prevEnergy + 0.15;
+    }
+    // Bar position of a step within the current section (0 = first bar;
+    // `barsToChange` 0 = the last bar before the boundary). `secStart`/`secEnd` are
+    // LOOP-RELATIVE (getChordAtStep derives them from the sectionMap in 0..totalSteps
+    // and wraps its own lookup), but `st` here is the raw monotonic transport counter
+    // that never resets on a loop boundary — so wrap `st` into the form frame before
+    // comparing, or the gates only ever fire on the very first lap (the #923/#921
+    // hazard; same wrap bass-engine.ts applies). The lookahead passes a FUTURE
+    // `absStep`, so wrap per-argument, not once. Guarded by `multiSection`.
+    const seamActivityAt = (st: number): number => {
+        if (!multiSection) {
+            return 0;
+        }
+        const stInForm = totalSteps > 0 ? ((st % totalSteps) + totalSteps) % totalSteps : st;
+        let d = 0;
+        if (secEnd > stInForm && Math.floor((secEnd - 1 - stInForm) / stepsPerBar) === 0) {
+            d -= 0.22; // rest INTO the change: thin the last bar before the seam
+        }
+        if (
+            enteredOnRise &&
+            stInForm >= secStart &&
+            Math.floor((stInForm - secStart) / stepsPerBar) === 0
+        ) {
+            d += 0.18; // enter BIG: fill the first bar after a rising boundary
+        }
+        return d;
+    };
+
     // Activity (0..1) at any absolute step: a floor (keeps the theme's bones
-    // audible) + the tempo/intensity/entrance/band lifts + the within-form swell
-    // (the only per-step term — peaks mid-form, settles at the edges). One
-    // definition so the duration-clamp lookahead below sees the SAME gate as the
-    // live emit.
+    // audible) + the tempo/intensity/entrance/band lifts + the seam phrasing + the
+    // within-form swell (the only per-step term — peaks mid-form, settles at the
+    // edges). One definition so the duration-clamp lookahead below sees the SAME
+    // gate as the live emit.
     // #858: floor lifted 0.30 → 0.34 so even the entrance/edges read a touch more
     // present. It's self-limiting where it should be — late-loop peaks already
     // clamp to 1.0, so the bump only lifts early loops and form edges (exactly the
@@ -395,7 +473,13 @@ export function getSoloistNotePhraseFirst(
         const ap =
             totalSteps > 0 ? (((st % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
         return clamp01(
-            0.34 + tempoFill + intensityLift + loopLift + bandLift + 0.25 * Math.sin(Math.PI * ap),
+            0.34 +
+                tempoFill +
+                intensityLift +
+                loopLift +
+                bandLift +
+                seamActivityAt(st) +
+                0.25 * Math.sin(Math.PI * ap),
         );
     };
     const activity = activityAt(step);
@@ -527,9 +611,8 @@ export function getSoloistNotePhraseFirst(
     // outlines the harmony and sounds like it's GOING somewhere, not running over
     // static chords. (The apex still owns its money note, below; idiom-specific
     // chromatic enclosures / bebop passing scales are a later slice — §8.)
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerBeat = ts.stepsPerBeat;
-    const stepsPerBar = ts.beats * stepsPerBeat;
+    // `ts`/`stepsPerBeat`/`stepsPerBar` are hoisted above `activityAt` (#1020 seam
+    // phrasing); reused here for the pitch grammar.
     const stepInBar = ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
     // Strong beats = the downbeat and the bar's midpoint (beat 3 in 4/4): the two
     // metrically strong points a phrase resolves onto.
@@ -629,8 +712,24 @@ export function getSoloistNotePhraseFirst(
     // +0.08 at the climax down to −0.12 in the intro — a weight shift you feel, not
     // a dynamic cliff.
     const bandVel = (bandEnergy - 0.6) * 0.2;
+    // #1020: the seam gesture shapes WEIGHT too — ease off into the rest before a
+    // change, then hit harder entering a lift. These are the velocity partners of
+    // the `seamActivityAt` density terms (which handle note COUNT); on a rise
+    // density saturates, so this bump carries most of the audible "enter big".
+    // Final-stage, like `bandVel`/`apexBoost`. Same gates (and same loop-relative
+    // wrap of `step`, #923) as the density seam above.
+    const stepInForm = totalSteps > 0 ? ((step % totalSteps) + totalSteps) % totalSteps : step;
+    const inSeamBar =
+        multiSection &&
+        secEnd > stepInForm &&
+        Math.floor((secEnd - 1 - stepInForm) / stepsPerBar) === 0;
+    const inEntryBar =
+        enteredOnRise &&
+        stepInForm >= secStart &&
+        Math.floor((stepInForm - secStart) / stepsPerBar) === 0;
+    const seamVel = (inSeamBar ? -0.05 : 0) + (inEntryBar ? 0.07 : 0);
     const velocity = clamp01(
-        (primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost + bandVel,
+        (primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost + bandVel + seamVel,
     );
 
     // --- Clamp duration to the next note that sounds (monophonic lead) ---
