@@ -3,6 +3,7 @@ import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { ALTERED_HOOK_QUALITIES } from './chord-quality-sets.js';
+import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import {
     getBassSpaceFloor,
@@ -97,12 +98,6 @@ export const compingState: CompingState = {
 // entry was dead. Per CLAUDE.md, Soul/Minimal/Shred/Latin/Afrobeat are
 // non-canonical keys being retired, not the supported 13.
 const STICKY_GENRES = ['Funk', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
-
-// #714: the comp's fixed per-lane feel on top of the shared groove pocket — a
-// keyboardist comps a hair behind the beat (cushioning the bass/drums). Small
-// and constant by design; the band-wide pocket + intensity pushes do the rest.
-// By-ear tunable (paired with BASS_POCKET_FEEL in bass-engine.ts).
-const COMP_POCKET_FEEL = 0.004; // ~4ms behind
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation
@@ -3279,14 +3274,15 @@ export function getAccompanimentNotes(
             (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa Nova');
 
         // --- Holistic Pocket Implementation ---
-        // #714: the comp sits in the ONE shared groove pocket (drum preamble →
-        // coordination.pocketOffset) plus a small fixed comp-feel constant (a hair
-        // behind the beat), so chords + bass + harmony all lock to the same pocket
-        // relative to the drums instead of each running its own timing formula.
-        // The intensity-tightening pushes (#713) stay layered on top — that's the
-        // comp's own character the owner heard and liked. Falls back to 0 only
-        // when no coordination is supplied (bare tests).
-        let timingOffset = (coordination.pocketOffset || 0) + COMP_POCKET_FEEL;
+        // #714/#1005: the comp sits in the ONE shared groove pocket (drum preamble →
+        // coordination.pocketOffset) plus the single per-genre band pocket
+        // (getBandPocket), so chords + bass + harmony + soloist all lock to the same
+        // pocket relative to the drums instead of each carrying its own feel constant.
+        // Pre-#1005 this was a comp-specific fixed +4 ms; folding it into the shared
+        // per-genre palette is the point of #1005. The intensity-tightening pushes
+        // (#713) stay layered on top — that's the comp's own character the owner heard
+        // and liked. Falls back to 0 only when no coordination is supplied (bare tests).
+        let timingOffset = (coordination.pocketOffset || 0) + getBandPocket(genre);
 
         if (chords.style === 'smart') {
             // #713: the smart-path pushes were flat (±25/10/20ms) and ignored

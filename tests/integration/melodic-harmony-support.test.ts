@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getBandPocket } from '../../public/engine/coordination-engine.js';
 import { clearHarmonyMemory, getHarmonyNotes } from '../../public/engine/harmonies.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -190,14 +191,21 @@ describe('Melodic Harmony Support (Behavioral)', () => {
             };
             // Jazz + smart style → 'organ' activeStyle (harmonies.ts:844-857),
             // which has timingJitter = 0.015 (line 878). Voice i's offset =
-            // stagger + scramble * 0.015 + response-lag(0.005). Stagger =
-            // (i - (n-1)/2) * 0.005.
+            // stagger + scramble * 0.015 + response-lag(0.005) + band-pocket. Stagger =
+            // (i - (n-1)/2) * 0.005. As of #1005 every melodic lane (harmony included)
+            // adds the single per-genre band pocket `getBandPocket('Jazz')` (+8 ms behind
+            // — the ride-cymbal lean), so the response now sits at the response-lag PLUS
+            // the shared pocket. Reference getBandPocket so this tracks the palette.
+            const bandPocket = getBandPocket('Jazz');
             const n = notes.length;
             for (let i = 0; i < n; i++) {
                 const stagger = (i - (n - 1) / 2) * 0.005;
                 const jitterTerm = scrambleHash(chord.rootMidi * 100 + 4 * 31 + i * 7 + 8) * 0.015;
                 const expectedWithoutLag = stagger + jitterTerm;
-                expect(notes[i].timingOffset).toBeCloseTo(expectedWithoutLag + 0.005, 9);
+                expect(notes[i].timingOffset).toBeCloseTo(
+                    expectedWithoutLag + 0.005 + bandPocket,
+                    9,
+                );
             }
 
             randomSpy.mockRestore();

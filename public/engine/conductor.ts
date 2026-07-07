@@ -6,6 +6,7 @@ import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex, createPRNG } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
+import { getBandPocket } from './coordination-engine.js';
 import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
 import { deriveSectionSeed, stringHash31 } from './hash-utils.js';
@@ -146,15 +147,19 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     });
 
     // --- 6. Micro-Timing (Pocket) ---
-    let targetBassPocket = 0;
+    // #1005: the per-genre pocket palette is now the SINGLE authority in
+    // coordination-engine.ts (getBandPocket), consumed live by every melodic lane
+    // (bass/comp/harmony/soloist) on top of the shared groove pocket. This
+    // conductor write just mirrors that one value onto the bass state param so the
+    // published state stays consistent with the palette (Neo-Soul +25 ms, Funk
+    // −5 ms, etc.) — it is NOT a second source of truth. Deriving it from
+    // getBandPocket (rather than a private if/else) keeps the palette in one place.
     const genre = groove.genreFeel;
-    if (genre === 'Neo-Soul') {
-        targetBassPocket = 0.025; // 25ms "Dilla" lag
-    } else if (genre === 'Funk') {
-        targetBassPocket = -0.005; // 5ms "Ahead of the beat" push for Funk energy
-    }
-
-    dispatch(ACTIONS.SET_PARAM, { module: 'bass', param: 'pocketOffset', value: targetBassPocket });
+    dispatch(ACTIONS.SET_PARAM, {
+        module: 'bass',
+        param: 'pocketOffset',
+        value: getBandPocket(genre),
+    });
 
     // --- 5. Intensity-Aware Mix Shaping ---
     if (playback.audio && playback.audioGraph) {

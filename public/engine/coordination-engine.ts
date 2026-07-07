@@ -47,6 +47,85 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
 };
 
 /**
+ * BAND-WIDE POCKET PALETTE (#1005) — the single per-genre micro-timing authority.
+ *
+ * A "pocket" is a FIXED time offset (seconds, ± around the beat) that the whole
+ * melodic band (bass, comper/chords, harmony, soloist) leans by RELATIVE to the
+ * drum grid. Positive = behind the beat (laid-back drag); negative = on top /
+ * ahead (driving push). Keyed by `groove.genreFeel` (the drum-strategy key: note
+ * 'Bossa Nova' and 'Ska', NOT 'Bossa'/'Ska-Punk' — see the `strategies` table in
+ * groove-engine.ts and CANONICAL_METERS_BY_FEEL in smart-genres.ts).
+ *
+ * WHY this is the single source of truth: before #1005 each lane carried its own
+ * scattered feel constant (bass +5 ms, comp +4 ms, harmony a Neo-Soul-only +20 ms)
+ * and the soloist wasn't pocket-locked at all — so "the band's pocket" wasn't
+ * provably one value. Now every melodic lane adds `getBandPocket(genreFeel)` on top
+ * of the shared drum-relative groove pocket (`coordination.pocketOffset`, from
+ * calculatePocketOffset), so the whole band leans by ONE per-genre amount.
+ *
+ * Metronome-core identity: this is a CONSTANT offset, not tempo breathing/rubato —
+ * time stays metronomic; every lane just shares one consistent lean. It is applied
+ * to the MELODIC lanes only (not the drum grid), so it's audible as the band
+ * sitting behind/ahead of the kit rather than an inaudible global latency.
+ *
+ * Values are by-ear starting points (July 2026 pocket sweep, owner priority
+ * "a consistent pocket the entire band respects"); expect ±few-ms tuning.
+ */
+const GENRE_POCKET: Record<string, number> = {
+    // why: Dilla drag — the signature laid-back neo-soul feel is the band sitting
+    // way behind the kick. 25 ms is the deepest lean in the palette (kept from the
+    // pre-#1005 conductor pocket block). This is the audible melodic-lane drag; the
+    // groove strategy's separate band-uniform dillaFeel term is a different, mostly
+    // inaudible global offset and is left untouched.
+    'Neo-Soul': 0.025,
+    // why: funk pushes — a hair AHEAD of the beat for urgency/drive (JB's band on
+    // top of the One). Kept from the pre-#1005 conductor pocket block.
+    Funk: -0.005,
+    // why: jazz leans behind — the ride-cymbal pull. A swung jazz rhythm section
+    // rides a touch back of the beat; +8 ms reads as relaxed-but-present.
+    Jazz: 0.008,
+    // why: bossa sits ON TOP — the nylon-guitar and surdo pulse are crisp and
+    // slightly forward; a small −3 ms keeps it buoyant, never dragging.
+    'Bossa Nova': -0.003,
+    // why: metal drives — tight and slightly on top so the band feels aggressive
+    // and forward, locked hard to the kick.
+    Metal: -0.004,
+    // why: ska-punk drives — the upbeat skank and fast tempos want a slight
+    // on-top push so it feels urgent, not laid-back. Canonical feel key is 'Ska'.
+    Ska: -0.004,
+    // why: acoustic is honest/tight — a singer-songwriter feel wants the band
+    // right on the grid, no affected lean. Explicitly neutral.
+    Acoustic: 0,
+    // why: country train-beat is crisp and on the grid — no drag, no push.
+    // Explicitly neutral.
+    Country: 0,
+    // why: rock backbeat sits a hair behind for weight/heft — 3 ms is subtle,
+    // just enough to feel grounded rather than rushing.
+    Rock: 0.003,
+    // why: disco is machine-tight, four-on-the-floor DRIVES — a tiny −2 ms on-top
+    // push keeps the groove pulling forward.
+    Disco: -0.002,
+    // why: hip-hop boom-bap lays back — the MPC-swung, behind-the-beat head-nod.
+    // +12 ms is a real drag but shy of the deeper Dilla neo-soul lean.
+    'Hip Hop': 0.012,
+    // why: blues shuffle is lazy/relaxed — the band leans back into the pocket.
+    // +10 ms behind.
+    Blues: 0.01,
+    // why: reggae riddim sits deep — the one-drop/skank is famously laid-back.
+    // +8 ms behind keeps it relaxed and heavy.
+    Reggae: 0.008,
+};
+
+/**
+ * The single band-wide pocket authority (#1005). Returns the per-genre melodic-lane
+ * time offset (seconds, +behind / −ahead) every lane adds on top of the shared
+ * `coordination.pocketOffset`. Unknown/undefined genres → 0 (neutral, on the grid).
+ */
+export function getBandPocket(genreFeel: string | undefined | null): number {
+    return (genreFeel && GENRE_POCKET[genreFeel]) || 0;
+}
+
+/**
  * Returns the pitch classes (semitone offsets from chord root) of the *altered
  * extensions* for a chord, or [] if the chord is not a recognized tension chord.
  * Soloist final-stage weight multiplier consumes this list.

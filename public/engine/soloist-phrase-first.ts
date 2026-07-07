@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
+import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveSoloistStyle } from './soloist-config.js';
 import { consonantDoubleStopInterval, guitarDoubleStopVoice } from './soloist-devices.js';
@@ -975,11 +976,20 @@ export function getSoloistNotePhraseFirst(
     }
 
     phr.isResting = false; // @worker-mutation
+    // #1005: the soloist joins the single band-wide pocket — it leans by the SAME
+    // per-genre amount (getBandPocket) as bass/comp/harmony, so the lead sits in the
+    // band's pocket instead of floating on its own straightened-swing time. Layered
+    // on top of any seed-authored per-note micro-offset (primary.timingOffset). NOTE:
+    // the soloist historically was not locked to the shared groove pocket
+    // (coordination.pocketOffset) the way the other lanes are — #1005 only adds the
+    // per-genre lean; wiring the soloist into coordination.pocketOffset too is a
+    // separate, larger change left out of scope.
+    const bandPocket = getBandPocket(state.groove?.genreFeel);
     const lead = {
         midi,
         velocity,
         durationSteps,
-        timingOffset: primary.timingOffset ?? 0,
+        timingOffset: (primary.timingOffset ?? 0) + bandPocket,
         bendStartInterval,
         vibrato,
         expression,

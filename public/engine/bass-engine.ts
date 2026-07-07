@@ -1,15 +1,16 @@
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
+import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
-// #714: the bass's fixed per-lane feel on top of the shared groove pocket
-// (coordination.pocketOffset, written by the drum preamble). The bassist sits a
-// hair behind the beat for a fat pocket; the band-wide offset keeps bass + comp
-// + harmony locked to the same pocket relative to the drums instead of each
-// running its own calculateTimingOffset. By-ear tunable (paired with
-// COMP_POCKET_FEEL in accompaniment.ts). The Neo-Soul/Dilla lag layers on top.
-const BASS_POCKET_FEEL = 0.005; // ~5ms behind
+// #1005: the bass's band-relative micro-timing = the shared groove pocket
+// (coordination.pocketOffset, written by the drum preamble, keeps bass+comp+
+// harmony+soloist locked to the same drums-relative pocket) PLUS the single
+// per-genre band pocket (getBandPocket). Pre-#1005 the bass carried its own fixed
+// +5 ms feel constant; that scattered per-lane value is now replaced by the
+// one-authority per-genre palette in coordination-engine.ts, so the whole band
+// leans by exactly one per-genre amount instead of each lane guessing its own.
 
 // #1006 — within-phrase velocity envelope test seam (§4.6). The bass envelope is a
 // pure function of metric POSITION (distance to the nearest strong beat), so there is
@@ -568,9 +569,15 @@ export function getBassNote(
         // the scheduler / MIDI export never read it.
         approachTargetRoot?: number,
     ) => {
-        let timingOffset = (context?.stepCoordination?.pocketOffset || 0) + BASS_POCKET_FEEL;
+        let timingOffset =
+            (context?.stepCoordination?.pocketOffset || 0) + getBandPocket(groove.genreFeel);
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
-            timingOffset += 0.01 + intensity * 0.015;
+            // #1005: getBandPocket('Neo-Soul') already supplies the +25ms band pocket;
+            // this residual is the EXTRA Dilla drag that sits the bass deeper than the
+            // 25ms comp (deliberate neo-soul split, ~33-35ms bass total). Retuned from
+            // 0.01+int*0.015 — that was tuned against the old 5ms bass base, and folding
+            // in the 25ms palette without retuning stacked to a ~44-50ms over-drag.
+            timingOffset += 0.005 + intensity * 0.005;
         }
 
         let durationSteps: number = 1;
@@ -795,9 +802,13 @@ export function getBassNote(
         if (isDownbeat) {
             const intensityFactor = 0.6 + intensity * 0.7;
             const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
-            let timingOffset = (context?.stepCoordination?.pocketOffset || 0) + BASS_POCKET_FEEL;
+            let timingOffset =
+                (context?.stepCoordination?.pocketOffset || 0) + getBandPocket(groove.genreFeel);
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
-                timingOffset += 0.01 + intensity * 0.015;
+                // #1005: see the main timing block — residual retuned against the 25ms
+                // palette base so the neo-soul bass lands ~33-35ms deep (deeper than the
+                // comp's 25ms), not the ~44-50ms the un-retuned stack produced.
+                timingOffset += 0.005 + intensity * 0.005;
             }
             return {
                 freq: getFrequency(baseRoot),

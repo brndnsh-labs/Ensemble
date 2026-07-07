@@ -3,6 +3,7 @@ import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import { getBestInversion } from './chords-engine.js';
+import { getBandPocket } from './coordination-engine.js';
 import { type HarmonyPatternKey, resolveHarmonyProfile } from './harmony-styles.js';
 import { scrambleHash } from './hash-utils.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
@@ -1125,14 +1126,17 @@ function finalizeHarmonyNotes(
         // voice index i) so each voice gets a distinct but reproducible offset.
         // Original Math.random() * jitter produced [0, jitter] (asymmetric, always
         // pushes notes late); preserved literally for behavioral parity.
+        // #1005: harmony joins the single band-wide pocket authority. The shared
+        // groove pocket (coordination.pocketOffset) keeps it drums-relative-locked;
+        // getBandPocket(feel) is the ONE per-genre lean every melodic lane shares
+        // (was a harmony-only Neo-Soul `+= 0.02` Dilla special-case — now folded into
+        // the palette so harmony leans by the same per-genre amount as bass/comp/solo).
         let offset =
             (coordination.pocketOffset || 0) +
+            getBandPocket(feel) +
             stagger +
             scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
                 (styleConfig.timingJitter || 0.008);
-        if (feel === 'Neo-Soul') {
-            offset += 0.02; // Dilla lag
-        }
         // why: epic-harmony-polish S4 — `isResponse` marks an antiphonal answer
         // fired after the soloist's phrase ends (playShadowMode tag 1). A
         // call-and-response answer sits a hair behind the beat — that's what
