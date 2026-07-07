@@ -1,5 +1,10 @@
 import { useRef, useState } from 'preact/hooks';
-import { downloadExportResult, renderCurrentSessionToWav } from '../audio-export.js';
+import {
+    downloadExportResult,
+    renderCurrentSessionToWav,
+    renderStemsToWav,
+    type StemInstrument,
+} from '../audio-export.js';
 import { exportToMidi } from '../midi-export.js';
 import { generateShareUrl } from '../sharing.js';
 import { dispatch, getState } from '../state.js';
@@ -9,10 +14,24 @@ import { Icon } from './Icon.jsx';
 import { SettingGroup, SettingRow, Stepper, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
+const STEM_LABELS: Record<StemInstrument, string> = {
+    soloist: 'Soloist',
+    bass: 'Bass',
+    chords: 'Chords',
+    harmony: 'Harmony',
+    drums: 'Drums',
+};
+
 export function ShareModal() {
     const isOpen = useEnsembleState((s) => s.playback.modals.share);
     const [isExporting, setIsExporting] = useState(false);
     const [isRenderingAudio, setIsRenderingAudio] = useState(false);
+    const [isExportingStems, setIsExportingStems] = useState(false);
+    const [stemProgress, setStemProgress] = useState<{
+        instrument: StemInstrument;
+        index: number;
+        total: number;
+    } | null>(null);
 
     const [includeSolo, setIncludeSolo] = useState(true);
     const [includeBass, setIncludeBass] = useState(true);
@@ -136,6 +155,55 @@ export function ShareModal() {
             });
         } finally {
             setIsRenderingAudio(false);
+        }
+    };
+
+    const getSelectedStemInstruments = (): StemInstrument[] => {
+        const selection: Array<[boolean, StemInstrument]> = [
+            [includeSolo, 'soloist'],
+            [includeBass, 'bass'],
+            [includeChords, 'chords'],
+            [includeHarmony, 'harmony'],
+            [includeDrums, 'drums'],
+        ];
+        return selection.filter(([checked]) => checked).map(([, instrument]) => instrument);
+    };
+
+    const handleExportStems = async () => {
+        const instruments = getSelectedStemInstruments();
+        if (instruments.length === 0) {
+            dispatch(ACTIONS.SHOW_TOAST, {
+                message: 'Select at least one instrument above to export stems.',
+                type: 'error',
+            });
+            return;
+        }
+
+        setIsExportingStems(true);
+        setStemProgress({ instrument: instruments[0], index: 0, total: instruments.length });
+        try {
+            const options = getExportOptions();
+            const results = await renderStemsToWav(instruments, {
+                loops: options.numLoops,
+                filename: options.filename,
+                onStemProgress: (progress) => setStemProgress(progress),
+            });
+            for (const result of results) {
+                downloadExportResult(result);
+            }
+            dispatch(ACTIONS.SHOW_TOAST, {
+                message: `${results.length} stem${results.length === 1 ? '' : 's'} exported`,
+                type: 'success',
+            });
+        } catch (err) {
+            console.error('Stem export failed:', err);
+            dispatch(ACTIONS.SHOW_TOAST, {
+                message: 'Stem export failed.',
+                type: 'error',
+            });
+        } finally {
+            setIsExportingStems(false);
+            setStemProgress(null);
         }
     };
 
@@ -319,6 +387,28 @@ export function ShareModal() {
                                         data-testid="export-audio-btn"
                                     >
                                         {isRenderingAudio ? 'Rendering…' : 'Download .wav'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="help-card share-card share-card--accent">
+                                <h4 class="share-card-title">
+                                    <Icon name="headphones" /> Stems (WAV per instrument)
+                                </h4>
+                                <p class="text-mini-muted share-card-copy">
+                                    Renders one WAV per checked instrument above, each soloed — drop
+                                    straight into a DAW mix.
+                                </p>
+                                <div class="flex-col">
+                                    <button
+                                        class="secondary-btn w-full share-action-btn share-action-btn--accent"
+                                        onClick={handleExportStems}
+                                        disabled={isExportingStems}
+                                        data-testid="export-stems-btn"
+                                    >
+                                        {isExportingStems && stemProgress
+                                            ? `Rendering ${STEM_LABELS[stemProgress.instrument]} (${stemProgress.index + 1}/${stemProgress.total})…`
+                                            : 'Export Stems'}
                                     </button>
                                 </div>
                             </div>

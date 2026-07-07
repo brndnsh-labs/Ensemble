@@ -21,6 +21,36 @@ export interface AudioExportResult {
     filename: string;
 }
 
+/** The five instrument stems a session can be exported as. `drums` maps to the `groove` state slice. */
+export type StemInstrument = 'soloist' | 'bass' | 'chords' | 'harmony' | 'drums';
+
+export const STEM_INSTRUMENTS: StemInstrument[] = ['soloist', 'bass', 'chords', 'harmony', 'drums'];
+
+/** Maps a stem name to the state-slice key that carries its `.enabled` gate (read by `scheduleGlobalEvent`). */
+const STEM_ENABLE_SLICE: Record<
+    StemInstrument,
+    'soloist' | 'bass' | 'chords' | 'harmony' | 'groove'
+> = {
+    soloist: 'soloist',
+    bass: 'bass',
+    chords: 'chords',
+    harmony: 'harmony',
+    drums: 'groove',
+};
+
+export interface StemExportOptions extends AudioExportOptions {
+    /** Called right before each stem starts rendering. */
+    onStemProgress?: (progress: {
+        instrument: StemInstrument;
+        index: number;
+        total: number;
+    }) => void;
+}
+
+export interface StemExportResult extends AudioExportResult {
+    instrument: StemInstrument;
+}
+
 /**
  * Renders the user's current session into a downloadable WAV. Mirrors the
  * offline-render approach proven by `scripts/mix-report.ts`: clone the live
@@ -41,6 +71,71 @@ export async function renderCurrentSessionToWav(
 
     const live = getState();
     const state = cloneStateForRender(live);
+    return renderClonedStateToWav(state, loops, sampleRate, filename);
+}
+
+/**
+ * Renders one WAV per requested instrument stem, each with exactly that
+ * instrument's `.enabled` flag on and every other stem-bearing slice
+ * (`soloist`/`bass`/`chords`/`harmony`/`groove`) forced off. Every stem gets
+ * its own fresh clone of the live state (via `cloneStateForRender`) — same
+ * per-scene re-clone discipline `scripts/mix-report.ts`'s `createSceneState`
+ * uses for its per-stem renders — so one stem's in-place `@direct-mutation`
+ * schedule-walk can never bleed into the next, and each clone independently
+ * nulls the live-audio-handle fields (the #691 clone-parity gotcha).
+ *
+ * Stems render sequentially (not in parallel): each pass owns its own
+ * `OfflineAudioContext`, and `onStemProgress` fires before each one starts so
+ * the UI can show real progress.
+ */
+export async function renderStemsToWav(
+    instruments: StemInstrument[] = STEM_INSTRUMENTS,
+    opts: StemExportOptions = {},
+): Promise<StemExportResult[]> {
+    const loops = Math.max(1, Math.floor(opts.loops ?? 1));
+    const sampleRate = opts.sampleRate ?? 44100;
+    const baseFilename = sanitizeFilename(opts.filename ?? 'ensemble-export');
+
+    const results: StemExportResult[] = [];
+    const total = instruments.length;
+
+    for (let index = 0; index < total; index++) {
+        const instrument = instruments[index];
+        opts.onStemProgress?.({ instrument, index, total });
+
+        const live = getState();
+        const state = cloneStateForRender(live);
+
+        // Solo exactly this stem on the clone: force the target slice on and
+        // every other stem-bearing slice off. This is independent of what's
+        // enabled live — a stem export always renders that instrument, even
+        // if it happens to be muted in the current mix.
+        for (const stem of STEM_INSTRUMENTS) {
+            const sliceKey = STEM_ENABLE_SLICE[stem];
+            state[sliceKey].enabled = stem === instrument; // @direct-mutation — throwaway clone
+        }
+
+        const filename = `${baseFilename}-stem-${instrument}`;
+        const result = await renderClonedStateToWav(state, loops, sampleRate, filename);
+        results.push({ ...result, instrument });
+    }
+
+    return results;
+}
+
+/**
+ * Shared render core: walks a fully-prepared cloned state through
+ * `initAudio` + the offline schedule loop and encodes the result to WAV.
+ * Extracted so `renderCurrentSessionToWav` and `renderStemsToWav` share the
+ * exact same offline-render mechanics and only differ in how the clone's
+ * per-instrument `.enabled` flags are set before this runs.
+ */
+async function renderClonedStateToWav(
+    state: any,
+    loops: number,
+    sampleRate: number,
+    filename: string,
+): Promise<AudioExportResult> {
     validateProgression(state);
 
     const sixteenth = 60 / state.playback.bpm / 4;
