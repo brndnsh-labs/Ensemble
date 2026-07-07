@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
@@ -385,5 +386,89 @@ describe('Blues Drummer Critique', () => {
         // not actually enforced. Engine delivers ~1.23x (e.g. 1280 → 1575) from kick
         // shuffle pushes, crash adds, and higher kick activity at high intensity.
         expect(highHits).toBeGreaterThan(lowHits * 1.15);
+    });
+
+    it('should layer the lightest subtle shuffle shaker off the backbeat (#1007)', () => {
+        // #1007: preset-data aux-percussion spread (Epic 7 S5 pattern). Blues is
+        // the lightest of the spread — a subtle roadhouse shaker on the 8th
+        // offbeats that, under swing 100, lopes into the last note of each
+        // shuffle triplet. The blues strategy leaves the Shaker lane untouched,
+        // so it replays the preset literally. Preset key is 'Blues Shuffle'.
+        const shakerLane = DRUM_PRESETS['Blues Shuffle'].Shaker;
+        // Presence: the aux lane must exist in the preset data now.
+        expect(Array.isArray(shakerLane)).toBe(true);
+        expect(shakerLane.some((v: number) => v > 0)).toBe(true);
+
+        const mockState = {
+            playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
+            groove: { genreFeel: 'Blues', lastDrumPreset: 'Blues Shuffle', instruments: [] },
+            arranger: {
+                timeSignature: '4/4',
+                stepMap: [],
+                sectionMap: [{ start: 0, end: 32 * 16 }],
+            },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(mockState);
+
+        const numBars = 32;
+        let totalHits = 0;
+        let onBackbeat = 0; // steps 4, 12 — the 2/4 crack must stay clean
+        let velSum = 0;
+        const positions = new Set<number>();
+        for (let bar = 0; bar < numBars; bar++) {
+            for (let step = 0; step < 16; step++) {
+                const globalStep = bar * 16 + step;
+                const info = getStepInfo(globalStep, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+                const result = applyGrooveOverrides(getState(), {
+                    step: globalStep,
+                    inst: { name: 'Shaker', muted: false, steps: shakerLane },
+                    stepVal: shakerLane[step],
+                    playback: mockState.playback,
+                    groove: mockState.groove,
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    isGroupStart: info.isGroupStart,
+                    beatIndex: info.beatIndex,
+                    isOffbeat: info.isOffbeat,
+                    isEOfBeat: info.isEOfBeat,
+                    isAOfBeat: info.isAOfBeat,
+                    tsConfig: info.tsConfig,
+                    loopStep: step,
+                    stepsPerBar: 16,
+                });
+                if (result.shouldPlay) {
+                    totalHits++;
+                    velSum += result.velocity;
+                    positions.add(step);
+                    if (step === 4 || step === 12) {
+                        onBackbeat++;
+                    }
+                }
+            }
+        }
+        const hitsPerBar = totalHits / numBars;
+        const avgVel = velSum / (totalHits || 1);
+        console.log('\n--- BLUES AUX-PERCUSSION CRITIQUE (#1007) ---');
+        console.log(`[Shaker density]   ${hitsPerBar.toFixed(2)} hits/bar`);
+        console.log(`[Positions]        [${[...positions].sort((a, b) => a - b)}]`);
+        console.log(`[On backbeat]      ${onBackbeat}`);
+        console.log(`[Avg velocity]     ${avgVel.toFixed(3)}`);
+        console.log('---------------------------------------------\n');
+
+        // Presence + density: the lightest lane — a sparse 8th-offbeat shaker at
+        // ~4 hits/bar. Floor 3 (dead lane = 0), ceiling 5 keeps it "subtle".
+        expect(hitsPerBar).toBeGreaterThan(3);
+        expect(hitsPerBar).toBeLessThanOrEqual(5);
+        // Idiom: off the 2/4 backbeat so the shuffle snare crack stays clean.
+        expect(onBackbeat).toBe(0);
+        // Pin the exact subdivision the test name claims (8th offbeats, the "&"):
+        // off-backbeat alone is satisfied by any offbeat placement, so assert the
+        // shaker lands squarely on steps 2/6/10/14 — the notes swing lopes into
+        // the last shuffle-triplet.
+        expect([...positions].sort((a, b) => a - b)).toEqual([2, 6, 10, 14]);
+        // Sits under the shuffled ride: ghost-level velocity, never an accent.
+        expect(avgVel).toBeLessThan(1.0);
     });
 });

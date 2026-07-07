@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
@@ -306,5 +307,87 @@ describe('Disco Drummer Critique', () => {
         // closed. Tolerate the slight inversion but require open share stays >= 35%.
         expect(lowShare).toBeGreaterThan(0.35);
         expect(highShare).toBeGreaterThan(0.35);
+    });
+
+    it('should layer an idiomatic offbeat-16th shaker under the four-on-the-floor (#1007)', () => {
+        // #1007: preset-data aux-percussion spread (Epic 7 S5 pattern). Disco
+        // gets a shaker on the offbeat 16ths — the sizzle between the 8th-note
+        // hats. The disco strategy leaves the Shaker lane untouched, so it
+        // replays the preset literally at ghost velocity, sitting under the kit.
+        const shakerLane = DRUM_PRESETS.Disco.Shaker;
+        // Presence: the aux lane must exist in the preset data now.
+        expect(Array.isArray(shakerLane)).toBe(true);
+        expect(shakerLane.some((v: number) => v > 0)).toBe(true);
+
+        const mockState = {
+            playback: { bandIntensity: 0.75, bpm: 120, songMode: false },
+            groove: { genreFeel: 'Disco', lastDrumPreset: 'Disco', instruments: [] },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+            arranger: sectionSweepArranger(32),
+        };
+        getState.mockReturnValue(mockState);
+
+        const numBars = 32;
+        let totalHits = 0;
+        let onOffbeat16th = 0; // odd steps — the "between-the-hats" positions
+        let onEven = 0; // even steps — where the hats live
+        let velSum = 0;
+        for (let bar = 0; bar < numBars; bar++) {
+            for (let step = 0; step < 16; step++) {
+                const info = getStepInfo(
+                    bar * 16 + step,
+                    TIME_SIGNATURES['4/4'],
+                    [],
+                    TIME_SIGNATURES,
+                );
+                const result = applyGrooveOverrides(getState(), {
+                    step: bar * 16 + step,
+                    inst: { name: 'Shaker', muted: false, steps: shakerLane },
+                    stepVal: shakerLane[step],
+                    playback: mockState.playback,
+                    groove: mockState.groove,
+                    isDownbeat: info.isMeasureStart,
+                    isBeatStart: info.isBeatStart,
+                    isBackbeat: info.isBackbeat,
+                    isGroupStart: info.isGroupStart,
+                    beatIndex: info.beatIndex,
+                    isOffbeat: info.isOffbeat,
+                    isEOfBeat: info.isEOfBeat,
+                    isAOfBeat: info.isAOfBeat,
+                    tsConfig: info.tsConfig,
+                    loopStep: step,
+                    stepsPerBar: 16,
+                });
+                if (result.shouldPlay) {
+                    totalHits++;
+                    velSum += result.velocity;
+                    if (step % 2 === 1) {
+                        onOffbeat16th++;
+                    } else {
+                        onEven++;
+                    }
+                }
+            }
+        }
+        const hitsPerBar = totalHits / numBars;
+        const avgVel = velSum / (totalHits || 1);
+        console.log('\n--- DISCO AUX-PERCUSSION CRITIQUE (#1007) ---');
+        console.log(`[Shaker density]   ${hitsPerBar.toFixed(2)} hits/bar`);
+        console.log(`[Offbeat-16th %]   ${((onOffbeat16th / totalHits) * 100).toFixed(1)}%`);
+        console.log(`[Avg velocity]     ${avgVel.toFixed(3)}`);
+        console.log('---------------------------------------------\n');
+
+        // Presence + density: a continuous offbeat-16th shaker delivers 8 hits
+        // per bar. The band brackets the deterministic value — floor at 6 (a
+        // dead lane reads 0) and a ceiling at 8 that rules out a runaway that
+        // also fills the on-beat 16ths.
+        expect(hitsPerBar).toBeGreaterThan(6);
+        expect(hitsPerBar).toBeLessThanOrEqual(8);
+        // Idiom: EVERY shaker hit lands on an offbeat 16th (odd step). Zero on
+        // the even 16ths where the hats sit — that interlock IS the disco sizzle.
+        expect(onEven).toBe(0);
+        expect(onOffbeat16th).toBe(totalHits);
+        // Sits under the kit: ghost-level velocity, never an accent.
+        expect(avgVel).toBeLessThan(1.0);
     });
 });

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
@@ -275,5 +276,108 @@ describe('Reggae Drummer Critique', () => {
         expect(fullCoverageRatio).toBeGreaterThan(0.6);
         // Overall pulse-kick density should be well above One Drop alone (50%).
         expect(overallDensity).toBeGreaterThan(0.75);
+    });
+
+    it('should layer sparse hand percussion clear of the one-drop backbeat (#1007)', () => {
+        // #1007: preset-data aux-percussion spread (Epic 7 S5 pattern). Reggae
+        // gets a shaker on the 8th offbeats plus two syncopated conga colors,
+        // ALL kept off the one-drop (step 8) so the drop still lands naked. The
+        // reggae strategy leaves both lanes untouched, so they replay literally.
+        const shakerLane = DRUM_PRESETS.Reggae.Shaker;
+        const congaLane = DRUM_PRESETS.Reggae.Conga;
+        // Presence: both aux lanes must exist in the preset data now.
+        expect(Array.isArray(shakerLane)).toBe(true);
+        expect(Array.isArray(congaLane)).toBe(true);
+        expect(shakerLane.some((v: number) => v > 0)).toBe(true);
+        expect(congaLane.some((v: number) => v > 0)).toBe(true);
+
+        const mockState = {
+            playback: { bandIntensity: 0.6, bpm: 90, songMode: false },
+            groove: { genreFeel: 'Reggae', lastDrumPreset: 'Reggae', instruments: [] },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(mockState);
+
+        const numBars = 32;
+        const runLane = (name: string, lane: number[]) => {
+            let hits = 0;
+            let onDrop = 0; // step 8 — the one-drop backbeat
+            let velSum = 0;
+            const positions = new Set<number>();
+            for (let bar = 0; bar < numBars; bar++) {
+                for (let step = 0; step < 16; step++) {
+                    const info = getStepInfo(
+                        bar * 16 + step,
+                        TIME_SIGNATURES['4/4'],
+                        [],
+                        TIME_SIGNATURES,
+                    );
+                    const result = applyGrooveOverrides(getState(), {
+                        step: bar * 16 + step,
+                        inst: { name, muted: false, steps: lane },
+                        stepVal: lane[step],
+                        playback: mockState.playback,
+                        groove: mockState.groove,
+                        isDownbeat: info.isMeasureStart,
+                        isPulseStart: info.isPulseStart,
+                        isBeatStart: info.isBeatStart,
+                        isBackbeat: info.isBackbeat,
+                        isGroupStart: info.isGroupStart,
+                        beatIndex: info.beatIndex,
+                        isOffbeat: info.isOffbeat,
+                        isEOfBeat: info.isEOfBeat,
+                        isAOfBeat: info.isAOfBeat,
+                        tsConfig: info.tsConfig,
+                        loopStep: step,
+                        stepsPerBar: 16,
+                    });
+                    if (result.shouldPlay) {
+                        hits++;
+                        velSum += result.velocity;
+                        positions.add(step);
+                        if (step === 8) {
+                            onDrop++;
+                        }
+                    }
+                }
+            }
+            return {
+                hits,
+                onDrop,
+                avgVel: velSum / (hits || 1),
+                positions: [...positions].sort((a, b) => a - b),
+            };
+        };
+
+        const shaker = runLane('Shaker', shakerLane);
+        const conga = runLane('Conga', congaLane);
+        console.log('\n--- REGGAE AUX-PERCUSSION CRITIQUE (#1007) ---');
+        console.log(
+            `[Shaker] ${(shaker.hits / numBars).toFixed(2)}/bar, pos [${shaker.positions}], onDrop ${shaker.onDrop}, vel ${shaker.avgVel.toFixed(3)}`,
+        );
+        console.log(
+            `[Conga]  ${(conga.hits / numBars).toFixed(2)}/bar, pos [${conga.positions}], onDrop ${conga.onDrop}, vel ${conga.avgVel.toFixed(3)}`,
+        );
+        console.log('----------------------------------------------\n');
+
+        // Shaker: sparse 8th-offbeat "chick" — ~4/bar. Floor 3 (dead lane = 0),
+        // ceiling 5 rules out a runaway.
+        expect(shaker.hits / numBars).toBeGreaterThan(3);
+        expect(shaker.hits / numBars).toBeLessThanOrEqual(5);
+        // Conga: two syncopated color hits per bar — ~2/bar.
+        expect(conga.hits / numBars).toBeGreaterThan(1);
+        expect(conga.hits / numBars).toBeLessThanOrEqual(3);
+        // Idiom (the whole point): NEITHER lane touches the one-drop at step 8,
+        // so the genre-defining drop stays exposed.
+        expect(shaker.onDrop).toBe(0);
+        expect(conga.onDrop).toBe(0);
+        // Pin the exact subdivision each lane claims (guard the test name, not just
+        // "off the drop"): Shaker on the 8th offbeats ("&"), Conga on the "a" of
+        // beats 1 & 3 (4th sixteenth). A wrong-offbeat lane would pass onDrop=0.
+        expect(shaker.positions).toEqual([2, 6, 10, 14]);
+        expect(conga.positions).toEqual([3, 11]);
+        // Sits under the kit: ghost-level velocity on both lanes.
+        expect(shaker.avgVel).toBeLessThan(1.0);
+        expect(conga.avgVel).toBeLessThan(1.0);
     });
 });

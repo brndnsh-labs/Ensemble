@@ -510,6 +510,13 @@ const PRESET_OVERRIDES = {
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0],
         Open: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+        // Aux-percussion (Epic 7 S5 pattern → #1007): the lightest of the S5
+        // spread — a subtle roadhouse shaker that reinforces the shuffle without
+        // crowding the shuffled ride. It ticks only the 8th offbeats (steps
+        // 2/6/10/14) as a ghost (1 → 0.9); with swing 100 these lope into the
+        // last note of each shuffle triplet, so the shaker lands squarely in the
+        // swung pocket. Off the 2/4 backbeat, so the crack stays clean.
+        Shaker: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
         '12/8': {
             measures: 1,
             Kick: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
@@ -543,6 +550,15 @@ const PRESET_OVERRIDES = {
         Snare: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
         HiHat: [2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0],
         Open: [0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+        // Aux-percussion (Epic 7 S5 pattern → #1007): sparse roots-reggae hand
+        // percussion, deliberately OFF the one-drop backbeat (step 8) so the
+        // drop still lands naked. Shaker ticks the 8th offbeats (steps 2/6/10/14,
+        // the "&") as a light ghost (1 → 0.9) — the steady "chick" under the
+        // skank. Conga adds two syncopated color hits on the "a" of beats 1 and 3
+        // (steps 3/11 — the 4th sixteenth), well clear of the drop, for a rolling
+        // hand-drum pulse that pushes into beats 2 and 4.
+        Shaker: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+        Conga: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
         '3/4': {
             measures: 1,
             Kick: [0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
@@ -679,6 +695,13 @@ const PRESET_OVERRIDES = {
         Snare: [0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0],
         HiHat: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
         Open: [0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0],
+        // Aux-percussion (Epic 7 S5 pattern → #1007): the disco offbeat sizzle.
+        // The 8th-note hats sit on the even 16ths; a shaker fills EVERY odd 16th
+        // (the offbeat 16ths between the hats) as a light ghost (1 → 0.9),
+        // interlocking with the four-on-the-floor for the continuous 16th sizzle
+        // that defines the disco engine-room. Regular odd-step grid, never a
+        // random gate, so it reads as a shaken instrument, not scatter.
+        Shaker: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
         '3/4': {
             measures: 1,
             Kick: [2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0],
@@ -863,6 +886,13 @@ const PRESET_OVERRIDES = {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
             0, 0, 0,
         ],
+        // NOTE (#1007): Bossa is NOT part of the S5 preset-data spread — its
+        // Shaker is already generated live by the `latin` groove strategy
+        // (grooves/latin.ts §4 PERCUSSION), which sets shouldPlay=true on the
+        // Shaker lane every step with beat/offbeat velocity shaping. A preset
+        // Shaker array here would be a no-op (the strategy overrides stepVal), so
+        // the enrichment landed on Disco/Reggae/Blues, whose strategies leave the
+        // aux lanes untouched.
         '3/4': {
             Kick: [2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0],
             Snare: [2, 0, 0, 2, 0, 0, 2, 0, 0, 0, 2, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 0, 2, 0],
