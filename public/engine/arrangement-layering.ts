@@ -111,3 +111,98 @@ export function isOutroSectionLabel(label: string | undefined | null): boolean {
     const l = label.toLowerCase();
     return l.includes('outro') || l.includes('end');
 }
+
+/**
+ * Arrangement-by-subtraction (story #1008).
+ *
+ * The whole macro-arc otherwise projects onto one scalar (`bandIntensity`) — a
+ * big chorus is "the same band, louder." Real arrangements evolve by TEXTURE:
+ * the most audible arrangement gesture is an instrument *not playing*. This
+ * module publishes a seeded (deterministic) per-`(section, occurrence, genre)`
+ * set of lanes that should rest, reusing the exact `INTRO_MUTES` precedence path
+ * (each engine's intro/outro mute gate honors the returned lane set) so the
+ * subtraction composes cleanly with intro/outro layering and the S4 final-bar
+ * cadence rather than forking a parallel muting system.
+ *
+ * Determinism: this is a pure lookup of `(sectionLabel, occurrence, genre)` — no
+ * `Math.random`. The same section/occurrence yields the same lane set on every
+ * loop, so critique tests and looped playback stay coherent.
+ */
+
+/**
+ * Pilot genres for arrangement-by-subtraction. Gated tight (Rock, Neo-Soul,
+ * Jazz) for the first ship — every other genre gets an empty lane set (feature
+ * inert, full band as before). Keys are the runtime `groove.genreFeel` form
+ * (the drum-strategy key: 'Neo-Soul' is 'Neo-Soul'; 'Jazz'/'Rock' are literal),
+ * NOT a UI label — see smart-genres.ts `feel`.
+ */
+export const SUBTRACTION_PILOT_GENRES: ReadonlySet<string> = new Set(['Rock', 'Neo-Soul', 'Jazz']);
+
+/**
+ * Lanes the subtraction plan can silence. These are exactly the lane keys that
+ * already own an `INTRO_MUTES` gate (bass, chords, harmony) — the subtraction
+ * plan feeds the SAME gate, so it can only rest lanes that already have a
+ * proven mute path. Drums and the soloist are intentionally NOT subtractable
+ * here: the starter table never mutes them (the section's rhythmic + melodic
+ * bones must sound), and neither has an intro/outro mute gate to reuse.
+ */
+export type SubtractionLane = 'bass' | 'chords' | 'harmony';
+
+/**
+ * Seeded instrumentation plan: which lanes rest for this `(section, occurrence)`.
+ *
+ * Starter subtraction table (story #1008, approved by Brandon /unblock) — the
+ * `chords` lane is the comp (accompaniment.ts); `harmony` is the pad layer
+ * (harmonies.ts). "Comp tacet" / "pads only, no comp" both mute the comp lane:
+ *
+ *   - Verse, 2nd pass  → comp tacet          → mute [chords]
+ *       (bass + drums + lead + pads still play — the repeat verse pulls the
+ *        rhythm-guitar/piano comp so the second pass feels stripped, not just
+ *        quieter)
+ *   - Bridge, any pass → harmony pads only   → mute [chords]
+ *       (no comp; the sustained pad + rhythm section carry the bridge — the
+ *        classic "bridge floats on pads" texture)
+ *   - Chorus, final pass → tutti             → mute []  (everyone in — the
+ *        climax is deliberately the FULL band; kept explicit so a future table
+ *        that thins earlier choruses can never accidentally thin the last one)
+ *   - Every other (section, occurrence)      → mute []  (full band, unchanged)
+ *
+ * `occurrence` / `totalOccurrences` come from `getSectionContext` (arranger-utils),
+ * which already wraps `step` into the loop frame (#923) before matching the
+ * sectionMap — so callers pass the section context values directly.
+ */
+export function getSubtractionMutes(
+    sectionLabel: string | undefined | null,
+    occurrence: number,
+    totalOccurrences: number,
+    genreFeel: string | undefined | null,
+): SubtractionLane[] {
+    // why: pilot-gated — non-pilot genres get the full band (feature inert).
+    if (!genreFeel || !SUBTRACTION_PILOT_GENRES.has(genreFeel)) {
+        return [];
+    }
+    const label = (sectionLabel || '').toLowerCase();
+
+    // why: Verse 2nd pass drops the comp — the return of the verse reads as a
+    // texture change (stripped) rather than a louder repeat. 1st pass and any
+    // 3rd+ pass stay full band (the table only specifies the 2nd).
+    if (label.includes('verse') && occurrence === 2) {
+        return ['chords'];
+    }
+
+    // why: the bridge floats on sustained pads over the rhythm section — comp
+    // out, harmony/pads in. Any pass (bridges typically occur once).
+    if (label.includes('bridge')) {
+        return ['chords'];
+    }
+
+    // why: final chorus is tutti — explicit no-subtraction so the climax is the
+    // full band. (Falls through to the same empty set as the default, but named
+    // for intent and future-proofing.)
+    if (label.includes('chorus') && occurrence === totalOccurrences) {
+        return [];
+    }
+
+    // why: every other (section, occurrence) is unchanged / full band.
+    return [];
+}

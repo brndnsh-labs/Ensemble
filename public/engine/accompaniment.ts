@@ -1896,6 +1896,11 @@ interface AccompanimentCoordination {
     // if not in an Intro. The comper rests when `< INTRO_MUTES.chords` so
     // the drum-and-bass duo establishes before the harmonic layer enters.
     introBarsElapsed?: number;
+    // why: story #1008 arrangement-by-subtraction — lane keys the seeded
+    // instrumentation plan wants to REST this tick ('chords' rests the comp).
+    // Optional so partial-mock tests reading `?.includes('chords')` see undefined
+    // → full band, and the array guard in the gate treats it as no-op.
+    subtractionMutedLanes?: string[];
     // why: epic-form-arrangement S5. Bars REMAINING in the current Outro
     // section (including the current bar), or `-1` if not in an Outro. The
     // comper rests when `<= OUTRO_MUTES.chords` so the outro fades out before
@@ -2258,6 +2263,21 @@ export function getAccompanimentNotes(
     }
     const compOutroRemaining = coordination?.outroBarsRemaining ?? -1;
     if (compOutroRemaining >= 0 && compOutroRemaining <= OUTRO_MUTES.chords) {
+        return [];
+    }
+
+    // --- Arrangement-by-subtraction mute (story #1008) ---
+    // why: the seeded per-(section, occurrence) instrumentation plan drops the
+    // comp on repeat verses (2nd pass) and across the bridge (pads-only) for the
+    // pilot genres — "comp tacet" so the second verse feels stripped and the
+    // bridge floats on sustained pads + rhythm section, not just quieter. This
+    // is the primary consumer of the plan (the starter table only ever rests the
+    // `chords` lane). Return `[]` (a hard rest — no voicings, no sustain-pedal
+    // CC) exactly like the intro/outro mute above so an "empty" bar is truly
+    // silent. Precedence: the isFinalMeasure cadence branch above already
+    // returned for the form's final downbeat, so this cannot suppress S4.
+    const compSubtractionMutes = coordination?.subtractionMutedLanes;
+    if (Array.isArray(compSubtractionMutes) && compSubtractionMutes.includes('chords')) {
         return [];
     }
 

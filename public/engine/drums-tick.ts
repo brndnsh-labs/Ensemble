@@ -2,7 +2,11 @@ import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { getStepInfo, isSectionTurnaround } from '../utils.js';
-import { isIntroSectionLabel, isOutroSectionLabel } from './arrangement-layering.js';
+import {
+    getSubtractionMutes,
+    isIntroSectionLabel,
+    isOutroSectionLabel,
+} from './arrangement-layering.js';
 import { getSectionContext } from './arranger-utils.js';
 import {
     type CoordinationCarryover,
@@ -239,6 +243,32 @@ export function runDrumTick(
         // writer: chord-data preamble (this line); readable-after: any producer
         const sectionCtx = getSectionContext(arranger, step);
         coordination.sectionOccurrence = sectionCtx.occurrence;
+
+        // --- Arrangement-by-subtraction publication (story #1008) ---
+        // why: the macro-arc otherwise projects onto one scalar (bandIntensity) —
+        // a big chorus is "the same band, louder." Publish a seeded, deterministic
+        // per-(section, occurrence, genre) set of lanes that should REST this tick
+        // so the arrangement can evolve by TEXTURE (verse 2 drops the comp; the
+        // bridge floats on pads; the final chorus is tutti). Computed here in the
+        // preamble — exactly like introBarsElapsed — from the section context
+        // (getSectionContext already wraps `step` into the loop frame per #923, so
+        // occurrence/totalOccurrences are loop-safe) and `groove.genreFeel` (the
+        // runtime drum-strategy key). Gated to the 3 pilot genres inside
+        // getSubtractionMutes; every other genre / section gets `[]` (full band).
+        //
+        // Consumed by the bass / comp / harmony intro-mute gates, which reuse the
+        // INTRO_MUTES precedence path (isFinalMeasure cadence wins first). Single
+        // preamble site → computed identically in every host (live worker via
+        // worker-buffer-manager, MIDI export + offline audio-export all funnel
+        // through generateNotesForStep → runDrumTick), so the plan can never
+        // silently revert to full-band in an offline render.
+        // writer: chord-data preamble (this line); readable-after: any producer
+        coordination.subtractionMutedLanes = getSubtractionMutes(
+            sectionCtx.label,
+            sectionCtx.occurrence,
+            sectionCtx.totalOccurrences,
+            groove.genreFeel,
+        );
 
         // --- Final-measure publication (epic-form-arrangement S4) ---
         // why: form-arranger.md P1 #6 — only the soloist senses the form's end

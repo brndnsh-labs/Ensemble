@@ -178,6 +178,17 @@ export function isBassActive(
         return false;
     }
 
+    // why: arrangement-by-subtraction (story #1008). The seeded per-(section,
+    // occurrence) instrumentation plan may rest the bass on a given pass. Reuses
+    // the same intro/outro precedence path — sits AFTER the isFinalMeasure early
+    // return above so the S4 cadence still lands. The starter table never rests
+    // the bass (bass is a "bone"), but the gate is wired so a future table entry
+    // works without re-plumbing.
+    const subtractionMutes = coordination?.subtractionMutedLanes;
+    if (Array.isArray(subtractionMutes) && subtractionMutes.includes('bass')) {
+        return false;
+    }
+
     const intBeat = stepInfo
         ? stepInfo.beatIndex
         : Math.floor((step % (ts.beats * ts.stepsPerBeat)) / ts.stepsPerBeat);
@@ -847,6 +858,14 @@ export function getBassNote(
     }
     const bassOutroRemaining = context?.stepCoordination?.outroBarsRemaining ?? -1;
     if (bassOutroRemaining >= 0 && bassOutroRemaining <= OUTRO_MUTES.bass) {
+        return null;
+    }
+    // why: arrangement-by-subtraction (story #1008) — defense-in-depth mirror of
+    // the `isBassActive` subtraction gate, so any direct `getBassNote` caller or
+    // future bypass also honors the seeded instrumentation plan. AFTER the S4
+    // isFinalMeasure short-circuit above so the cadence is never suppressed.
+    const bassSubtractionMutes = context?.stepCoordination?.subtractionMutedLanes;
+    if (Array.isArray(bassSubtractionMutes) && bassSubtractionMutes.includes('bass')) {
         return null;
     }
 

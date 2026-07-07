@@ -350,6 +350,33 @@ export function createCoordinationContext(
         // readable-after: chord-data preamble (any producer)
         introBarsElapsed: -1,
         outroBarsRemaining: -1,
+        // why: arrangement-by-subtraction (story #1008). A seeded, deterministic
+        // per-`(sectionLabel, occurrence, genre)` set of lane keys that should
+        // REST this tick — the most audible arrangement gesture is an instrument
+        // NOT playing. Computed in the drum-tick chord-data preamble (like
+        // introBarsElapsed) via `getSubtractionMutes` (arrangement-layering.ts)
+        // from the section context (getSectionContext) + `groove.genreFeel`, and
+        // consumed by the bass / comp / harmony intro-mute gates which reuse the
+        // SAME INTRO_MUTES precedence path (see arrangement-layering.ts).
+        //
+        // Semantics: a lane key present in the array ('bass' | 'chords' |
+        // 'harmony') means "this lane rests this tick." Empty `[]` = full band
+        // (the default, and the value for every non-pilot genre / unchanged
+        // section) so every engine can gate cleanly with `.includes(me)` and
+        // partial-mock tests that omit it read a safe empty set.
+        //
+        // Precedence: `isFinalMeasure` (S4) OVERRIDES this — engines check the
+        // final-bar cadence FIRST (return the resolution gesture), so a
+        // subtraction mute can never suppress the landing. Intro/outro mutes and
+        // this subtraction mute gate disjoint sections (a section is an Intro OR
+        // a Verse/Bridge/Chorus, not both), so their order is immaterial: any
+        // that fires rests the lane.
+        //
+        // Worker-internal: computed worker-side each tick in the preamble (never
+        // stored on a state slice), so it does NOT cross getSyncState/syncWorker.
+        // writer: drums-tick.ts runDrumTick chord-data preamble (before producers)
+        // readable-after: chord-data preamble (any producer)
+        subtractionMutedLanes: [] as string[],
         // why: published per-tick from the current chord (writer: tick-logic chord-preamble
         // at lines ~102-122; readable-after: chord-preamble — i.e. by EVERY producer
         // including the soloist which runs first). Lets the soloist bias toward

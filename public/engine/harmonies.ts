@@ -1229,6 +1229,17 @@ export function getHarmonyNotes(
         return [];
     }
 
+    // why: arrangement-by-subtraction (story #1008). The seeded instrumentation
+    // plan may rest the harmony/pad layer on a given (section, occurrence). The
+    // starter table never rests harmony (the bridge is "pads ON, comp OFF", and
+    // pads are the section's texture there), but the gate is wired for symmetry
+    // with bass/comp so a future table entry works. Reuses the same intro/outro
+    // precedence path; harmony has no S4 final-bar cadence to protect.
+    const harmSubtractionMutes = coordination?.subtractionMutedLanes;
+    if (Array.isArray(harmSubtractionMutes) && harmSubtractionMutes.includes('harmony')) {
+        return [];
+    }
+
     const feel = groove.genreFeel;
     const tsConfigs: any = TIME_SIGNATURES;
     const ts = tsConfigs[arranger.timeSignature] || tsConfigs['4/4'];
