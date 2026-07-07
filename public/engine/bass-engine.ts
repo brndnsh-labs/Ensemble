@@ -11,6 +11,15 @@ import { getScaleForChord } from './theory-scales.js';
 // COMP_POCKET_FEEL in accompaniment.ts). The Neo-Soul/Dilla lag layers on top.
 const BASS_POCKET_FEEL = 0.005; // ~5ms behind
 
+// #1006 — within-phrase velocity envelope test seam (§4.6). The bass envelope is a
+// pure function of metric POSITION (distance to the nearest strong beat), so there is
+// no production input that turns it off; this module-level flag is the clean A/B toggle
+// the critique test flips to measure the shaped path against the flat baseline. Mirrors
+// SOLOIST_VELOCITY_ENVELOPE. Production NEVER touches it — the envelope is always on in
+// normal playback (default `true`). Kept off the state slice deliberately: it isn't
+// persisted, synced, or user-settable, just a test hook.
+export const BASS_VELOCITY_ENVELOPE = { enabled: true };
+
 /**
  * BASS ENGINE - Procedural Line Generation
  *
@@ -603,7 +612,53 @@ export function getBassNote(
         }
 
         const intensityFactor = 0.6 + intensity * 0.7;
-        const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor);
+
+        // #1006 — WITHIN-PHRASE velocity envelope (design §4.6). The bass had NO
+        // note-to-note dynamic shape: `velocity` (odd-beat accent) × `intensityFactor`
+        // (a slow macro term) left every note in a bar at essentially one weight. A
+        // real bassist swells INTO the metric anchors (the downbeat and the bar
+        // midpoint) and eases off the step right after. This is a distance-to-target
+        // shaping term applied FINAL-STAGE — a `* envelope` AFTER the accent × intensity
+        // product — per the final-stage-multiplier rule; folded into the accent it would
+        // wash out against intensityFactor. Genre-neutral first pass (no per-genre
+        // contour tables yet). `stepInMeasure` is already measure-relative, so no #923
+        // wrap is needed. KNOWN LIMITATION (#1006): multiplicative-then-clamped, so the
+        // swell fades when the base is already hot — same tradeoff as the soloist envelope.
+        // Note the envelope anchors beats 1 & 3 (metric) while the existing accent favors
+        // the backbeat (2 & 4), so per-beat weight reads 1.05 / 1.15 / 1.05 / 1.15 — a
+        // coherent metric-under-backbeat interplay, intentional for the genre-neutral pass.
+        const spb = ts.stepsPerBeat;
+        const spBar = ts.beats * spb;
+        const midBeatStepB = Math.floor(ts.beats / 2) * spb;
+        const isStrongBeatB = stepInMeasure === 0 || stepInMeasure === midBeatStepB;
+        const approachWindowB = Math.max(1, Math.floor(spb / 2)); // last eighth into a beat
+        let bassEnvelope = 1.0;
+        if (BASS_VELOCITY_ENVELOPE.enabled) {
+            if (isStrongBeatB) {
+                bassEnvelope = 1.05; // why: lean into the downbeat / bar midpoint — the pocket anchors
+            } else {
+                // Distance to the next strong beat (bar midpoint if before it, else the
+                // next downbeat), and steps since the last one.
+                const toStrongB =
+                    stepInMeasure < midBeatStepB
+                        ? midBeatStepB - stepInMeasure
+                        : spBar - stepInMeasure;
+                const lastStrongB = stepInMeasure >= midBeatStepB ? midBeatStepB : 0;
+                const sinceStrongB = stepInMeasure - lastStrongB;
+                if (toStrongB <= approachWindowB) {
+                    // why: a pickup/passing note swells INTO the coming strong beat —
+                    // louder the closer it is (an eighth out ≈ +1%, right before ≈ +5%).
+                    const closenessB = 1 - (toStrongB - 1) / approachWindowB; // 0..1
+                    bassEnvelope = 1.0 + 0.05 * closenessB;
+                } else if (sinceStrongB >= 1 && sinceStrongB <= approachWindowB) {
+                    // why: release — the step right after a strong beat eases off (−7%),
+                    // recovering toward neutral.
+                    const recoveryB = (sinceStrongB - 1) / approachWindowB; // 0..1
+                    bassEnvelope = 0.93 + 0.07 * recoveryB;
+                }
+            }
+        }
+        const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor * bassEnvelope);
         const isLongStyle = ['acoustic'].includes(style);
         const maxSafeDuration =
             style === 'quarter'

@@ -52,6 +52,14 @@ import { chordTargetTones } from './soloist-pitch-engine.js';
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 
+// #1006 — within-phrase velocity envelope test seam (§4.6). The envelope is a pure
+// function of metric/apex POSITION, so there is no production input that turns it
+// off; this module-level flag is the clean A/B toggle the critique test flips to
+// measure the shaped path against the flat baseline. Production NEVER touches it —
+// the envelope is always on in normal playback (default `true`). Kept off the state
+// slice deliberately: it isn't persisted, synced, or user-settable, just a test hook.
+export const SOLOIST_VELOCITY_ENVELOPE = { enabled: true };
+
 // --- Key / diatonic vocabulary (self-contained, like the rest of this engine) ---
 // Note-name → pitch class, including the sharp spellings the arranger emits.
 const KEY_PC: Record<string, number> = {
@@ -728,8 +736,59 @@ export function getSoloistNotePhraseFirst(
         stepInForm >= secStart &&
         Math.floor((stepInForm - secStart) / stepsPerBar) === 0;
     const seamVel = (inSeamBar ? -0.05 : 0) + (inEntryBar ? 0.07 : 0);
+
+    // #1006 — WITHIN-PHRASE velocity envelope (design §4.6). Every term above moves
+    // SLOWLY (the arc/band/seam lifts shift across a whole form pass, apexBoost is one
+    // note) so note-to-note the line landed at a near-constant weight — the last place
+    // the lead sounded quantized. A player instead LEANS INTO the strong beats and the
+    // apex and RELAXES on the note right after (the release). This is a distance-to-
+    // target shaping term applied FINAL-STAGE — a `velocity *= envelope` AFTER every
+    // additive term — per the final-stage-multiplier rule (folded into an earlier
+    // factor it washes out against the activity/arc/apex biases all pushing at once).
+    // Genre-neutral first pass: no per-genre contour tables yet (§4.6 leaves those for
+    // a later slice). `nextStrongStep`/`isStrongBeat`/`apexStepInLoop`/`stepInLoop` are
+    // all already loop-relative, so no #923 wrap is needed here.
+    // KNOWN LIMITATION (#1006): the envelope is multiplicative-then-clamped, so when
+    // the additive base already sits near 1.0 (late loops / high band energy) the swell
+    // terms clamp and only the release dip stays audible — the "lean in" fades exactly
+    // when the band is loudest. Acceptable for a genre-neutral first pass; a bipolar
+    // shape around a slightly-lowered center (reserving pre-clamp headroom) is a later slice.
+    let velocityEnvelope = 1.0;
+    if (SOLOIST_VELOCITY_ENVELOPE.enabled) {
+        // The last eighth before a beat is the "pickup" window that swells into it.
+        const approachWindow = Math.max(1, Math.floor(stepsPerBeat / 2));
+        if (isApexStep) {
+            velocityEnvelope = 1.15; // why: the money note is the phrase's dynamic crest
+        } else if (isStrongBeat) {
+            velocityEnvelope = 1.06; // why: metric accent — lean into the downbeat / bar midpoint
+        } else {
+            const toStrong = nextStrongStep - step; // ≥1 for any non-strong step
+            const lastStrongInBar = stepInBar >= midBeatStep ? midBeatStep : 0;
+            const sinceStrong = stepInBar - lastStrongInBar;
+            if (toStrong <= approachWindow) {
+                // why: swell across the pickup INTO the beat — louder the closer it is
+                // (an eighth out ≈ +1%, the 16th right before the beat ≈ +6%).
+                const closeness = 1 - (toStrong - 1) / approachWindow; // 0..1
+                velocityEnvelope = 1.0 + 0.06 * closeness;
+            } else if (sinceStrong >= 1 && sinceStrong <= approachWindow) {
+                // why: release — the note just after a strong beat eases off, deepest
+                // right after the beat (−9%) and recovering toward neutral.
+                const recovery = (sinceStrong - 1) / approachWindow; // 0..1
+                velocityEnvelope = 0.91 + 0.08 * recovery;
+            }
+        }
+        // why: swell as the line CLIMBS to the apex within its own loop window — the
+        // approach bar leans in so the money note is ARRIVED at, not stumbled onto.
+        // Compounds gently with the metric term. Only when climbing from below.
+        const toApex = apexStepInLoop - stepInLoop;
+        if (!isApexStep && toApex > 0 && toApex <= stepsPerBar) {
+            velocityEnvelope *= 1.0 + 0.05 * (1 - (toApex - 1) / stepsPerBar);
+        }
+    }
+
     const velocity = clamp01(
-        (primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost + bandVel + seamVel,
+        ((primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost + bandVel + seamVel) *
+            velocityEnvelope,
     );
 
     // --- Clamp duration to the next note that sounds (monophonic lead) ---
