@@ -359,10 +359,34 @@ export function getSoloistNotePhraseFirst(
     // phrasingIntensity (user slider, default 0.5) nudges how fully the theme is
     // stated: a "more present" ↔ "more spacious" knob layered on the arc.
     const intensityLift = ((soloist.phrasingIntensity ?? 0.5) - 0.5) * 0.3; // ±0.15
+    // #1004: the lead RIDES THE BAND ARC. `bandIntensity` (conductor-driven, 0..1)
+    // is the macro-form energy the rest of the band already moves with (density
+    // tiers, limiter, motif ceilings) — but the foreground voice was deaf to it,
+    // playing the same density through a build, a drop, a breakdown. Fold it in so
+    // the lead thins on a quiet passage and fills in on a build, the way a player
+    // reads the room. Centered at 0.6 = the center-of-mass of the conductor's live
+    // macro-arc (the `conductor.ts` session ladder holds sustained mid-session
+    // energy in ~0.5–0.7): so the intro/outro (floor 0.2) sit BELOW center and the
+    // line lays back and thins, while the climax (ceiling 1.0) sits above and it
+    // digs in. NOT the 0.35 dial default — the resting verse is now intentionally a
+    // touch sparser, which is the desired arc, not "unchanged". Gain 0.5 makes this
+    // the dominant macro term after `loopLift` (arc swing ~+0.20 at the climax down
+    // to −0.20 in the intro), outweighing the within-form swell below as a macro
+    // arc should. This is the "give the soloist ears" slice-A: a live read of state
+    // the band already sets, not reactive listening (the coordination-transition
+    // slice, #1020).
+    // `?? 0.6` = fall back to the neutral CENTER when no band signal is present, so
+    // both the density and velocity terms below evaluate to exactly 0 and the line
+    // behaves as it did pre-#1004. Production always sets `bandIntensity` (playback
+    // slice default, conductor-written); the fallback only ever fires for a partial
+    // test mock that omits it — "no arc signal → no arc modulation."
+    const bandEnergy = playback.bandIntensity ?? 0.6;
+    const bandLift = (bandEnergy - 0.6) * 0.5;
     // Activity (0..1) at any absolute step: a floor (keeps the theme's bones
-    // audible) + the tempo/intensity/entrance lifts + the within-form swell (the
-    // only per-step term — peaks mid-form, settles at the edges). One definition
-    // so the duration-clamp lookahead below sees the SAME gate as the live emit.
+    // audible) + the tempo/intensity/entrance/band lifts + the within-form swell
+    // (the only per-step term — peaks mid-form, settles at the edges). One
+    // definition so the duration-clamp lookahead below sees the SAME gate as the
+    // live emit.
     // #858: floor lifted 0.30 → 0.34 so even the entrance/edges read a touch more
     // present. It's self-limiting where it should be — late-loop peaks already
     // clamp to 1.0, so the bump only lifts early loops and form edges (exactly the
@@ -370,7 +394,9 @@ export function getSoloistNotePhraseFirst(
     const activityAt = (st: number): number => {
         const ap =
             totalSteps > 0 ? (((st % totalSteps) + totalSteps) % totalSteps) / totalSteps : 0;
-        return clamp01(0.34 + tempoFill + intensityLift + loopLift + 0.25 * Math.sin(Math.PI * ap));
+        return clamp01(
+            0.34 + tempoFill + intensityLift + loopLift + bandLift + 0.25 * Math.sin(Math.PI * ap),
+        );
     };
     const activity = activityAt(step);
 
@@ -593,7 +619,19 @@ export function getSoloistNotePhraseFirst(
     // --- Dynamics follow the arc: softer when sparse, fuller toward the peak ---
     // The money note also hits harder as it's reached — the climax has weight.
     const apexBoost = isApexStep ? 0.12 : 0; // the climax peak carries weight
-    const velocity = clamp01((primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost);
+    // #1004: the lead DIGS IN with the band. Velocity already tracks `activity`
+    // (0.7 + 0.3·activity), so it indirectly rides bandIntensity through the gate —
+    // but on saturated late loops `activity` pins at 1.0 exactly when a build
+    // happens, flattening that dependence right when the lead should hit hardest.
+    // A direct, final-stage weight (added after the activity multiply, like
+    // apexBoost) keeps the "dig in" audible when activity is maxed. Same 0.6 center
+    // (neutral at mid-session energy); gentler gain 0.2 — asymmetric around center,
+    // +0.08 at the climax down to −0.12 in the intro — a weight shift you feel, not
+    // a dynamic cliff.
+    const bandVel = (bandEnergy - 0.6) * 0.2;
+    const velocity = clamp01(
+        (primary.velocity ?? 0.8) * (0.7 + 0.3 * activity) + apexBoost + bandVel,
+    );
 
     // --- Clamp duration to the next note that sounds (monophonic lead) ---
     // The lead is one voice: a note must release before the next one speaks.
