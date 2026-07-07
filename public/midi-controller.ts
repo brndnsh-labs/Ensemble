@@ -1,10 +1,42 @@
 import { DRUM_MAP } from './engine/midi-constants.js';
 import { normalizeMidiVelocity } from './engine/midi-utils.js';
-import type { MidiState } from './state/midi.js';
+import { stopSoloist, triggerDrumSound, triggerSoloNote } from './performance-controller.js';
 import { dispatch, getState } from './state.js';
+import type { ActionPayloadSetMidiConfig, MidiState } from './types.js';
 import { ACTIONS } from './types.js';
+import { getFrequency } from './utils.js';
 
 let midiAccess: any = null;
+
+// Reverse of DRUM_MAP for incoming Note On → drum-name lookup (play-along).
+// Several instrument names share one GM note (e.g. HiHat/HiHatQuarter both
+// 42); the first name declared in DRUM_MAP wins, so the mapping stays stable
+// and deterministic rather than depending on object-iteration happenstance.
+const REVERSE_DRUM_MAP: Record<number, string> = {};
+for (const [name, note] of Object.entries(DRUM_MAP)) {
+    if (!(note in REVERSE_DRUM_MAP)) {
+        REVERSE_DRUM_MAP[note] = name;
+    }
+}
+
+// Notes currently held on the play-along input, so releasing one key of a
+// chord/legato run doesn't cut the soloist voice — only the last release does.
+const heldSoloNotes = new Set<number>();
+
+// A generous upfront ceiling for a MIDI-triggered solo note: the player, not a
+// fixed clock, decides when it ends. Note Off truncates early via
+// stopSoloist() (killSoloistNote's fast release), so this is a max sustain,
+// not an expected note length.
+const PLAY_ALONG_SUSTAIN_SECONDS = 4.0;
+
+/**
+ * Dispatches SET_MIDI_CONFIG for the play-along input fields
+ * (`inputs`/`selectedInputId`/`inputEnabled`). A thin named wrapper so the
+ * input-config call sites read as clear intent.
+ */
+export function dispatchMidiInputConfig(payload: ActionPayloadSetMidiConfig): void {
+    dispatch(ACTIONS.SET_MIDI_CONFIG, payload);
+}
 
 // Track pending Note Offs to handle overlaps/legato properly.
 // Key: `${channel}_${note}`, Value: timeoutId
@@ -23,7 +55,7 @@ const sentBendValues = new Map<number, number>();
 /**
  * Handles incoming MIDI messages from controllers.
  */
-function handleMIDIMessage(event: any): void {
+function handleMIDIMessage(event: any, inputId?: string): void {
     const { midi } = getState();
     if (!midi.enabled) {
         return;
@@ -38,6 +70,83 @@ function handleMIDIMessage(event: any): void {
         if (data1 === 11 || data1 === 1) {
             const intensity = data2 / 127;
             dispatch(ACTIONS.SET_BAND_INTENSITY, intensity);
+        }
+        return;
+    }
+
+    // Note On (0x90 w/ velocity>0) / Note Off (0x80, or 0x90 w/ velocity 0) — play-along.
+    if (type === 0x90 || type === 0x80) {
+        const midiExt = midi as MidiState;
+        if (!midiExt.inputEnabled) {
+            return;
+        }
+        // Once a specific input is selected, only it drives play-along; with no
+        // selection, any connected keyboard works (the common single-device case).
+        if (midiExt.selectedInputId && inputId && midiExt.selectedInputId !== inputId) {
+            return;
+        }
+
+        const isNoteOn = type === 0x90 && data2 > 0;
+        const note = data1;
+        const velocity = data2;
+        const channel = (status & 0x0f) + 1;
+
+        if (channel === midiExt.drumsChannel) {
+            handleDrumNoteMessage(isNoteOn, note, velocity, midiExt);
+        } else {
+            handleSoloNoteMessage(isNoteOn, note, velocity, midiExt);
+        }
+    }
+}
+
+/**
+ * Routes an incoming Note On/Off on the play-along drums channel to the
+ * one-shot drum trigger. Drums have no sustain, so Note Off is a no-op —
+ * mirrors `sendMIDIDrum`'s one-shot behavior on the output side.
+ */
+function handleDrumNoteMessage(
+    isNoteOn: boolean,
+    note: number,
+    velocity: number,
+    midi: MidiState,
+): void {
+    if (!isNoteOn) {
+        return;
+    }
+    const name = REVERSE_DRUM_MAP[note];
+    if (!name) {
+        return;
+    }
+    const { playback } = getState();
+    const time = playback.audio?.currentTime || 0;
+    const vol = Math.min(1, (velocity / 127) * (midi.velocitySensitivity || 1));
+    triggerDrumSound(name, time, vol);
+}
+
+/**
+ * Routes an incoming Note On/Off on any non-drum channel to the chord-aware
+ * soloist play-along voice. Note On triggers with a generous sustain ceiling;
+ * Note Off truncates it early via `stopSoloist()` once the LAST held note
+ * (not necessarily the one released) is off, so holding a chord/legato run
+ * doesn't choke the voice mid-phrase when one key lifts before another.
+ */
+function handleSoloNoteMessage(
+    isNoteOn: boolean,
+    note: number,
+    velocity: number,
+    midi: MidiState,
+): void {
+    const { playback } = getState();
+    const time = playback.audio?.currentTime || 0;
+
+    if (isNoteOn) {
+        heldSoloNotes.add(note);
+        const vol = Math.min(1, (velocity / 127) * (midi.velocitySensitivity || 1));
+        triggerSoloNote(getFrequency(note), time, PLAY_ALONG_SUSTAIN_SECONDS, vol);
+    } else {
+        heldSoloNotes.delete(note);
+        if (heldSoloNotes.size === 0) {
+            stopSoloist();
         }
     }
 }
@@ -55,20 +164,31 @@ export async function initMIDI(): Promise<boolean> {
         midiAccess = await navigator.requestMIDIAccess();
         midiAccess.onstatechange = () => {
             syncMIDIOutputs();
+            syncMIDIInputs();
+            attachInputListeners();
         };
 
-        // Setup input listeners
-        if (midiAccess.inputs) {
-            for (const input of midiAccess.inputs.values()) {
-                input.onmidimessage = handleMIDIMessage;
-            }
-        }
-
+        attachInputListeners();
         syncMIDIOutputs();
+        syncMIDIInputs();
         return true;
     } catch (err) {
         console.error('Failed to get MIDI access', err);
         return false;
+    }
+}
+
+/**
+ * (Re)attaches the message handler to every currently known MIDI input.
+ * Re-run on `onstatechange` too, so a hot-plugged keyboard starts routing
+ * without requiring the user to re-toggle MIDI in Settings.
+ */
+function attachInputListeners(): void {
+    if (!midiAccess?.inputs) {
+        return;
+    }
+    for (const input of midiAccess.inputs.values()) {
+        input.onmidimessage = (event: any) => handleMIDIMessage(event, input.id);
     }
 }
 
@@ -84,6 +204,21 @@ function syncMIDIOutputs(): void {
         outputs.push({ id: output.id, name: output.name });
     }
     dispatch(ACTIONS.SET_MIDI_CONFIG, { outputs });
+}
+
+/**
+ * Updates the state with the current list of MIDI inputs (for the play-along
+ * device picker in Settings).
+ */
+function syncMIDIInputs(): void {
+    if (!midiAccess) {
+        return;
+    }
+    const inputs: { id: string; name: string }[] = [];
+    for (const input of midiAccess.inputs.values()) {
+        inputs.push({ id: input.id, name: input.name });
+    }
+    dispatchMidiInputConfig({ inputs });
 }
 
 /**
@@ -104,7 +239,7 @@ function getMIDIOutputAndTimestamp(
     const midiTime =
         (time - (playback.audio?.currentTime || 0)) * 1000 + performance.now() + midi.latency;
 
-    return { output, midiTime, midiState: midi };
+    return { output, midiTime, midiState: midi as MidiState };
 }
 
 /**

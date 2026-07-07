@@ -7,7 +7,7 @@ const { playback } = getState();
 
 import { APP_VERSION, BUILD_REV, KOFI_URL, MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
-import { initMIDI, panic } from '../midi-controller.js';
+import { dispatchMidiInputConfig, initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { secondsPerStepFor } from '../utils.js';
@@ -45,6 +45,9 @@ export function Settings() {
         midiOctaves,
         midiLatency,
         midiVelocity,
+        midiInputEnabled,
+        midiSelectedInputId,
+        midiInputs,
     } = useEnsembleState((s) => ({
         countIn: s.playback.countIn,
         metronome: s.playback.metronome,
@@ -76,6 +79,9 @@ export function Settings() {
         } as Record<string, number>,
         midiLatency: s.midi.latency,
         midiVelocity: s.midi.velocitySensitivity,
+        midiInputEnabled: s.midi.inputEnabled,
+        midiSelectedInputId: s.midi.selectedInputId,
+        midiInputs: s.midi.inputs,
     }));
 
     const masterVolume = useEnsembleState((s) => s.playback.masterVolume);
@@ -588,6 +594,49 @@ export function Settings() {
                                             }
                                         />
                                     </SettingRow>
+
+                                    <SettingRow
+                                        label="Enable Play-Along (Note Input)"
+                                        description="Route your MIDI keyboard's notes to the soloist and drum triggers."
+                                        id="midiInputEnableCheck"
+                                    >
+                                        <Toggle
+                                            id="midiInputEnableCheck"
+                                            checked={midiInputEnabled}
+                                            onChange={(val) => {
+                                                dispatchMidiInputConfig({ inputEnabled: val });
+                                                saveCurrentState();
+                                            }}
+                                        />
+                                    </SettingRow>
+
+                                    <div class={!midiInputEnabled ? 'disabled-group' : ''}>
+                                        <SettingRow label="Input Port" id="midiInputSelect">
+                                            <Select
+                                                id="midiInputSelect"
+                                                value={midiSelectedInputId || ''}
+                                                onChange={(val) => {
+                                                    dispatchMidiInputConfig({
+                                                        selectedInputId: val,
+                                                    });
+                                                    saveCurrentState();
+                                                }}
+                                                options={
+                                                    midiInputs && midiInputs.length > 0
+                                                        ? (midiInputs as any[]).map((inp) => ({
+                                                              value: inp.id,
+                                                              label: inp.name,
+                                                          }))
+                                                        : [
+                                                              {
+                                                                  value: '',
+                                                                  label: 'No inputs found (any device works)',
+                                                              },
+                                                          ]
+                                                }
+                                            />
+                                        </SettingRow>
+                                    </div>
 
                                     <div class="midi-grid">
                                         {['Chords', 'Bass', 'Soloist', 'Harmony', 'Drums'].map(

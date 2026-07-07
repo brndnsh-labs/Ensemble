@@ -21,6 +21,9 @@ export const midi = deepSignal<MidiState>({
     harmonyOctave: 0,
     drumsOctave: 0,
     velocitySensitivity: 1.0,
+    inputs: [],
+    selectedInputId: null,
+    inputEnabled: false,
 });
 
 export function midiReducer(action: Action): boolean {

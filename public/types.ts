@@ -879,6 +879,12 @@ export interface MidiState {
     readonly drumsOctave: number;
     /** Velocity scaling factor. */
     readonly velocitySensitivity: number;
+    /** List of available MIDI input ports. */
+    readonly inputs: MidiOutput[];
+    /** The ID of the currently selected MIDI input driving play-along. Null = any input. */
+    readonly selectedInputId: string | null;
+    /** Whether incoming Note On/Off is routed to the soloist/drum performance triggers. */
+    readonly inputEnabled: boolean;
 }
 
 /**
@@ -1292,6 +1298,9 @@ export interface ActionPayloadSetMidiConfig {
     harmonyOctave?: number;
     drumsOctave?: number;
     velocitySensitivity?: number;
+    inputs?: Array<{ id: string; name: string }>;
+    selectedInputId?: string | null;
+    inputEnabled?: boolean;
 }
 
 export interface ActionPayloadUpdateConductorState {
