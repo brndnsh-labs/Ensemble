@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { TIME_SIGNATURES } from './config.js';
-import { compingState } from './engine/accompaniment.js';
+import { compingState, resetCompingState } from './engine/accompaniment.js';
 import { resetBassState } from './engine/bass-engine.js';
 import { createCoordinationContext } from './engine/coordination-engine.js';
 import { clearHarmonyMemory } from './engine/harmonies.js';
@@ -92,16 +92,7 @@ function processMessage(type: string, data: any, startTime: number): void {
                 resetBassState(state);
                 clearHarmonyMemory(state);
 
-                compingState.lastChordIndex = -1;
-                compingState.lockedUntil = 0;
-                compingState.lastVoicingMidis = [];
-                // #715 — clear the per-hit-economy statement memory too, or a new
-                // song that opens on the same chord the last one ended on treats
-                // its first downbeat as an "answer" (thin shell) instead of a
-                // statement (full voicing).
-                compingState.statementChordKey = null;
-                compingState.statementVoicingMidis = [];
-                (compingState as any).rhythmPattern = [];
+                resetCompingState(compingState);
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.RESOLUTION:

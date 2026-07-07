@@ -6,7 +6,7 @@ import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex, createPRNG } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
-import { getBandPocket } from './coordination-engine.js';
+import { getBandPocket, macroArcLadder } from './coordination-engine.js';
 import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
 import { deriveSectionSeed, stringHash31 } from './hash-utils.js';
@@ -446,22 +446,7 @@ export function checkSectionTransition(
                         const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
                         const progress = Math.min(1.0, elapsedMins / playback.sessionTimer);
 
-                        if (progress < 0.15) {
-                            macroFloor = 0.2;
-                            macroCeiling = 0.45;
-                        } else if (progress < 0.4) {
-                            macroFloor = 0.4;
-                            macroCeiling = 0.7;
-                        } else if (progress < 0.65) {
-                            macroFloor = 0.5;
-                            macroCeiling = 0.8;
-                        } else if (progress < 0.85) {
-                            macroFloor = 0.7;
-                            macroCeiling = 1.0;
-                        } else {
-                            macroFloor = 0.2;
-                            macroCeiling = 0.5;
-                        }
+                        ({ macroFloor, macroCeiling } = macroArcLadder(progress));
                     } else {
                         // Fallback: open-ended jam (no session timer) — a
                         // genre-aware raised-cosine swell with deterministic

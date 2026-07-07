@@ -177,6 +177,38 @@ export interface CoordinationCarryover {
     lastActiveSoloistStep: number;
 }
 
+/**
+ * Zero the cross-tick soloist-sticky carryover. Both hosts (the live workerContext
+ * and the offline ExportProcessor) reset these on song/export start — one home (#1013).
+ */
+export function resetCoordinationCarryover(target: CoordinationCarryover): void {
+    target.lastActiveSoloistMidi = 0;
+    target.lastActiveSoloistStep = 0;
+}
+
+/**
+ * The macro-arc floor/ceiling ladder, keyed on 0..1 progress through the arc.
+ * Shared verbatim by the live conductor (session-timer arc) and the offline export
+ * (loop-based arc) — each derives `progress` its own way, then reads the same ladder
+ * (#1013). The per-section-role energy shaping downstream is INTENTIONALLY different
+ * between the two hosts and stays in each caller.
+ */
+export function macroArcLadder(progress: number): { macroFloor: number; macroCeiling: number } {
+    if (progress < 0.15) {
+        return { macroFloor: 0.2, macroCeiling: 0.45 };
+    }
+    if (progress < 0.4) {
+        return { macroFloor: 0.4, macroCeiling: 0.7 };
+    }
+    if (progress < 0.65) {
+        return { macroFloor: 0.5, macroCeiling: 0.8 };
+    }
+    if (progress < 0.85) {
+        return { macroFloor: 0.7, macroCeiling: 1.0 };
+    }
+    return { macroFloor: 0.2, macroCeiling: 0.5 };
+}
+
 export function createCoordinationContext(
     step: number,
     stepInfo: StepInfo | null = null,

@@ -3,9 +3,9 @@ import { analyzeForm } from '../form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, getStepInfo, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
-import { compingState } from './accompaniment.js';
+import { compingState, resetCompingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
-import { updateCoordinationContext } from './coordination-engine.js';
+import { resetCoordinationCarryover, updateCoordinationContext } from './coordination-engine.js';
 import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
@@ -95,8 +95,10 @@ export class ExportProcessor {
     // why: sticky cross-tick soloist position for harmony's spectral-gap branch.
     // Independent from the live workerContext so an export run doesn't pollute (or get
     // polluted by) playback state. Step is paired so consumers can age-cap stale values.
-    lastActiveSoloistMidi: number;
-    lastActiveSoloistStep: number;
+    // Definite-assignment: initialized via resetCoordinationCarryover(this) in the
+    // constructor rather than a direct field write (#1013 one-home reset ritual).
+    lastActiveSoloistMidi!: number;
+    lastActiveSoloistStep!: number;
 
     constructor(state: EnsembleState, options: ExportOptions) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
@@ -228,12 +230,7 @@ export class ExportProcessor {
         (groove as Mutable<typeof groove>).fillActive = false; // @worker-mutation
         (groove as Mutable<typeof groove>).pendingCrash = false; // @worker-mutation
 
-        compingState.lockedUntil = 0; // @worker-mutation
-        compingState.lastChordIndex = -1; // @worker-mutation
-        compingState.grooveRetentionCount = 0; // @worker-mutation
-        compingState.lastVoicingMidis = []; // @worker-mutation
-        compingState.statementChordKey = null; // @worker-mutation — #715 per-hit-economy memory
-        compingState.statementVoicingMidis = []; // @worker-mutation
+        resetCompingState(compingState); // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
@@ -247,8 +244,7 @@ export class ExportProcessor {
         };
 
         this.globalStep = 0;
-        this.lastActiveSoloistMidi = 0;
-        this.lastActiveSoloistStep = 0;
+        resetCoordinationCarryover(this);
     }
 
     start(): void {

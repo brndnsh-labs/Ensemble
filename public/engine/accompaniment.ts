@@ -85,6 +85,23 @@ export const compingState: CompingState = {
     bossaRotationIndex: 0,
 };
 
+/**
+ * Reset the per-song comp memory both worker hosts clear on NEW_SONG / export start.
+ * One home for the ritual — the live worker (logic-worker.ts) and the offline export
+ * (midi-worker-logic.ts) both call this so they can never drift (#1013).
+ */
+export function resetCompingState(compingState: CompingState): void {
+    compingState.lastChordIndex = -1;
+    compingState.lockedUntil = 0;
+    compingState.grooveRetentionCount = 0;
+    compingState.lastVoicingMidis = [];
+    // #715 — clear the per-hit-economy statement memory too, or a new song that opens
+    // on the same chord the last one ended on treats its first downbeat as an "answer"
+    // (thin shell) instead of a statement (full voicing).
+    compingState.statementChordKey = null;
+    compingState.statementVoicingMidis = [];
+}
+
 // why: STICKY genres retain the comping cell across multiple bars instead of
 //      re-rolling every bar in `updateRhythmicIntent`. Funk was the original
 //      sticky case (S1: deterministic cell bank). S2 (epic-deterministic-

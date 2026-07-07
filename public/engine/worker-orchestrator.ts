@@ -1,4 +1,5 @@
 import type { EnsembleState } from '../types.js';
+import { resetCoordinationCarryover } from './coordination-engine.js';
 
 interface WorkerCursor {
     index: number;
@@ -62,6 +63,5 @@ export function resetWorkerContext(step: number): void {
     workerContext.lookaheadCursor.index = 0;
     workerContext.lookaheadCursor.sectionIndex = 0;
     // Clear sticky coordination — a fresh playback should not remember the prior session.
-    workerContext.lastActiveSoloistMidi = 0;
-    workerContext.lastActiveSoloistStep = 0;
+    resetCoordinationCarryover(workerContext);
 }

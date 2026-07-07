@@ -7,6 +7,7 @@ import {
     type CoordinationCarryover,
     type CoordinationContext,
     enforceRegisterSlotting,
+    macroArcLadder,
     updateCoordinationContext,
 } from './coordination-engine.js';
 import { runDrumTick } from './drums-tick.js';
@@ -372,25 +373,7 @@ export function applyWorkerTransition(
         const progress = totalExportSteps > 0 ? step / totalExportSteps : 0;
 
         // Match the macro-arc logic from conductor.js (session timer arc)
-        let macroFloor = 0.2;
-        let macroCeiling = 0.6;
-
-        if (progress < 0.15) {
-            macroFloor = 0.2;
-            macroCeiling = 0.45;
-        } else if (progress < 0.4) {
-            macroFloor = 0.4;
-            macroCeiling = 0.7;
-        } else if (progress < 0.65) {
-            macroFloor = 0.5;
-            macroCeiling = 0.8;
-        } else if (progress < 0.85) {
-            macroFloor = 0.7;
-            macroCeiling = 1.0;
-        } else {
-            macroFloor = 0.2;
-            macroCeiling = 0.5;
-        }
+        const { macroFloor, macroCeiling } = macroArcLadder(progress);
 
         // Incorporate Section Energy
         let targetEnergy = 0.5;
