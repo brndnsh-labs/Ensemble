@@ -43,7 +43,7 @@ write.
    ### Test-quality lens (for test-only diffs)
 
    When the deliverable **is** the tests, review the tests *as the subject* against the module under
-   test (a critique test → the 5 smells in `docs/MUSICAL_AUDIT.md`: tautology, sub-baseline threshold,
+   test (a critique test → the 5 smells in `docs/guides/musical-engine-patterns.md` § Methodology: tautology, sub-baseline threshold,
    mislabel, log-vs-assert mismatch, harness-silencing):
    - **Coverage gaps** — which branches / gated paths of the target are unexercised?
    - **Intent vs implementation** — do the asserts pin the *contract*, or just codify today's output
