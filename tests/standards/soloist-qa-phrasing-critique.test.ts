@@ -27,6 +27,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
+import { chordTargetTones } from '../../public/engine/soloist-pitch-engine.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
@@ -118,6 +119,8 @@ function measureOnce(presetName, genre, bpm, seedStr) {
         q: 0,
         qSounded: 0,
         qNonChord: 0,
+        qKeyUnstable: 0,
+        qNotResolution: 0,
         breathN: 0,
         breath: 0,
         a: 0,
@@ -126,6 +129,16 @@ function measureOnce(presetName, genre, bpm, seedStr) {
         seedQ,
         seedBreath,
     };
+    // #1051 — key-frame metrics for the blues idiom. The test is always in C major
+    // (buildState dispatches SET_KEY 'C', isMinor false), so the key's tonic triad is
+    // {0,4,7}. Over a dominant a correct ♭7 hang IS a chord tone, so the chord-frame
+    // `nonChordRate` is the wrong "hang" metric for blues — these two frame the ask:
+    //   keyUnstable      — question pc ∉ key tonic triad {0,4,7} (it pulls somewhere)
+    //   notResolution    — question pc ∉ the sounding chord's {root,3,5} (♭7 counts as
+    //                      unresolved: a chord tone, but the ask, not the home)
+    const KEY_TONIC_TRIAD = new Set([0, 4, 7]);
+    const resolutionPcsOf = (chord) =>
+        new Set([0, 4, 7].map((iv) => (((chord.rootMidi + iv) % 12) + 12) % 12));
     for (let loop = 0; loop < 2; loop++) {
         const base = loop * loopLen;
         for (const s of qSteps) {
@@ -143,6 +156,12 @@ function measureOnce(presetName, genre, bpm, seedStr) {
             const pc = ((midi % 12) + 12) % 12;
             if (!chordPcsOf(chord).has(pc)) {
                 acc.qNonChord++;
+            }
+            if (!KEY_TONIC_TRIAD.has(pc)) {
+                acc.qKeyUnstable++;
+            }
+            if (!resolutionPcsOf(chord).has(pc)) {
+                acc.qNotResolution++;
             }
             // Breath: the beat AFTER the question cadence should be a rest.
             acc.breathN++;
@@ -170,7 +189,12 @@ function measureOnce(presetName, genre, bpm, seedStr) {
             }
             acc.aSounded++;
             const pc = ((midi % 12) + 12) % 12;
-            if (chordPcsOf(chord).has(pc)) {
+            // Grade the answer against the chord's QUALITY-derived pillars (root/3/5/(♭7)),
+            // NOT the comp voicing: blues comps ROOTLESS, so a `chord.intervals` set omits
+            // the root and would miscount a correct root-landing resolution as a miss.
+            // This is the same functional-pillar reference the live answer re-snap uses.
+            const pillarPcs = new Set(chordTargetTones(chord.rootMidi, chord.quality).pillars);
+            if (pillarPcs.has(pc)) {
                 acc.aPillar++;
             }
         }
@@ -183,6 +207,8 @@ function sweep(presetName, genre, bpm) {
         q: 0,
         qSounded: 0,
         qNonChord: 0,
+        qKeyUnstable: 0,
+        qNotResolution: 0,
         breathN: 0,
         breath: 0,
         a: 0,
@@ -203,44 +229,82 @@ function sweep(presetName, genre, bpm) {
         qSoundedRate: agg.q > 0 ? agg.qSounded / agg.q : 0,
         aSoundedRate: agg.a > 0 ? agg.aSounded / agg.a : 0,
         nonChordRate: agg.qSounded > 0 ? agg.qNonChord / agg.qSounded : 0,
+        keyUnstableRate: agg.qSounded > 0 ? agg.qKeyUnstable / agg.qSounded : 0,
+        notResolutionRate: agg.qSounded > 0 ? agg.qNotResolution / agg.qSounded : 0,
         pillarRate: agg.aSounded > 0 ? agg.aPillar / agg.aSounded : 0,
         breathRate: agg.breathN > 0 ? agg.breath / agg.breathN : 0,
         seedBreathRate: agg.seedQ > 0 ? agg.seedBreath / agg.seedQ : 0,
     };
 }
 
-// Diatonic-progression presets (Q&A Slice 1 — the ballad idiom, where chord-color and
-// key-instability align; the dom7-heavy blues idiom is the deferred Slice 2).
+// Two idioms, two "hang" metrics.
+//   • diatonic (Slice 1) — ballad presets where chord-color and key-instability align;
+//     the hang is measured in the CHORD frame (`nonChordRate`).
+//   • blues (Slice 2, #1051) — dom7-heavy presets where a correct ♭7 hang IS a chord
+//     tone, so the chord frame can't tell an ask from a resolution. Measured in the KEY
+//     frame (`keyUnstableRate`) plus a not-on-the-chord's-home check (`notResolutionRate`).
+// 'Jazz Blues' (ii–V, style jazz) is the deferred bebop slice; 'Minor Blues' hangs over
+// i7 (the untouched diatonic branch) — both excluded here.
 const CASES = [
-    ['Pop (Ballad)', 'Rock', 72],
-    ['Canon', 'Acoustic', 76],
-    ['Pop (Standard)', 'Rock', 84],
+    { preset: 'Pop (Ballad)', genre: 'Rock', bpm: 72, idiom: 'diatonic' },
+    { preset: 'Canon', genre: 'Acoustic', bpm: 76, idiom: 'diatonic' },
+    { preset: 'Pop (Standard)', genre: 'Rock', bpm: 84, idiom: 'diatonic' },
+    { preset: '12-Bar Blues', genre: 'Blues', bpm: 100, idiom: 'blues' },
+    { preset: '8-Bar Blues', genre: 'Blues', bpm: 110, idiom: 'blues' },
 ];
 
-describe('Soloist Q&A phrasing critique (#1009)', () => {
-    for (const [preset, genre, bpm] of CASES) {
+describe('Soloist Q&A phrasing critique (#1009, #1051)', () => {
+    for (const { preset, genre, bpm, idiom } of CASES) {
         it(`${preset}: the lead asks (hangs) and answers (resolves), audible on loops 0-1`, () => {
             const r = sweep(preset, genre, bpm);
+            const hangReport =
+                idiom === 'blues'
+                    ? `keyUnstable ${(100 * r.keyUnstableRate).toFixed(1)}% notResolution ${(100 * r.notResolutionRate).toFixed(1)}%`
+                    : `nonChord ${(100 * r.nonChordRate).toFixed(1)}%`;
             console.log(
-                `\n[Critique Report — ${preset}] Q=${r.qCount} A=${r.aCount} | ` +
-                    `Q sounded ${(100 * r.qSoundedRate).toFixed(1)}% nonChord ${(100 * r.nonChordRate).toFixed(1)}% | ` +
+                `\n[Critique Report — ${preset} (${idiom})] Q=${r.qCount} A=${r.aCount} | ` +
+                    `Q sounded ${(100 * r.qSoundedRate).toFixed(1)}% ${hangReport} | ` +
                     `A sounded ${(100 * r.aSoundedRate).toFixed(1)}% pillar ${(100 * r.pillarRate).toFixed(1)}% | ` +
                     `breath live ${(100 * r.breathRate).toFixed(1)}% seed ${(100 * r.seedBreathRate).toFixed(1)}%`,
             );
 
-            // Enough cadences to be statistically meaningful (harness liveness).
-            expect(r.qCount).toBeGreaterThan(100);
-            expect(r.aCount).toBeGreaterThan(100);
+            // Enough cadences to be statistically meaningful (harness liveness). Both
+            // idioms host ~350-440 questions over the 8-seed × 2-loop sweep (blues charts
+            // do NOT host fewer — their macro-form unrolls just as many 4-bar blocks), so a
+            // single 200 floor leaves ample headroom while still catching a gross
+            // cadence-count regression.
+            expect(r.qCount).toBeGreaterThan(200);
+            expect(r.aCount).toBeGreaterThan(200);
 
             // PROTECTION — the cadences are never gated to silence, so the phrase
             // speaks even on the sparse early loops (the story's core). Live=100%.
             expect(r.qSoundedRate).toBeGreaterThan(0.98);
             expect(r.aSoundedRate).toBeGreaterThan(0.98);
 
-            // THE HANG — the question lands a non-chord tone (unresolved tension against
-            // the sounding chord). Live 91-97%; floor 0.80 (>10pp headroom). A washed-out
-            // pin drops this toward the ~25-45% incidental rate — the regression guard.
-            expect(r.nonChordRate).toBeGreaterThan(0.8);
+            if (idiom === 'blues') {
+                // THE HANG (blues, two-frame). The PRIMARY guard is keyUnstable: the
+                // question pulls away from the key tonic triad {C,E,G}. A PINNED question
+                // never lands there (verified: over I7/IV7/V7 no two-frame candidate is a
+                // key tonic tone), so live 92-98%; floor 0.85. A washed-out pin regresses to
+                // the scoring loop's guide-tone pull (3rd/♭7/root), landing ~half on key-
+                // stable tones → keyUnstable collapses toward ~55%. That's the guard.
+                expect(r.keyUnstableRate).toBeGreaterThan(0.85);
+                // SECONDARY: notResolution — the question is not sitting on the sounding
+                // chord's {root,3,5} home (♭7 counts as unresolved: the ask, not the rest).
+                // Floors LOWER (live 75-78%; floor 0.65) than keyUnstable BY DESIGN: the
+                // #1009 apex dovetail deliberately aims the biggest question at the money
+                // note's neighbor (e.g. F→G approach), which over IV7 lands on the chord
+                // root — key-unstable (a real ask) yet on a chord tone. A washed pin still
+                // drops this toward ~55% (chord-tone / guide-tone landings), so it remains a
+                // regression guard, just a looser one than the key-frame metric.
+                expect(r.notResolutionRate).toBeGreaterThan(0.65);
+            } else {
+                // THE HANG (diatonic). The question lands a non-chord tone (unresolved
+                // tension against the sounding chord). Live 91-97%; floor 0.80 (>10pp
+                // headroom). A washed-out pin drops this toward the ~25-45% incidental
+                // rate — the regression guard.
+                expect(r.nonChordRate).toBeGreaterThan(0.8);
+            }
 
             // THE RESOLUTION — the answer lands a chord tone (comes home). Live 85-100%;
             // floor 0.75 (10pp under the lowest case).

@@ -11,7 +11,8 @@ import type {
 import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './soloist-config.js';
-import { getScaleForChord } from './theory-scales.js';
+import { classifyChordQuality } from './soloist-pitch-engine.js';
+import { getKeyContext, getScaleForChord } from './theory-scales.js';
 
 export type {
     SeedGuitarSupportHint,
@@ -1703,6 +1704,12 @@ export function generateSessionSeed(
 
                 const currentChord: any = stepEntry.chord;
                 const scale = getScaleForChord(state, currentChord, null, style);
+                // #1051 — the KEY frame (beside the chord-relative scale). Blues Q&A pins
+                // the question on a tone unstable in BOTH frames; over a dominant the chord
+                // frame alone can't tell an ask (V7's ♭7) from a false-hang (V7's 11 = key
+                // tonic). `keyRootIdx` is -1 when the key can't be parsed → the two-frame
+                // pin degrades to the diatonic chord-only rule (see the pin block below).
+                const keyCtx = getKeyContext(state, currentChord);
                 const currentScalePitches = scale.map((ivl) => (currentChord.rootMidi + ivl) % 12);
                 const chordIntervals = currentChord.intervals || [0, 4, 7];
 
@@ -1915,6 +1922,17 @@ export function generateSessionSeed(
                     // RIGHT set: a mixed pool would let a stable tone win on distance and
                     // resolve a question we meant to leave hanging.
                     const wantAnswer = qaRoleForNote === 'answer';
+                    // #1051 — dominant chords get a TWO-FRAME question pin and a tightened
+                    // answer set. Detection is by chord QUALITY (robust to the rootless blues
+                    // comp voicing) — same rationale as `chordTargetTones`. `alt` counts too.
+                    const chordClass = classifyChordQuality(currentChord.quality);
+                    const isDomChord = chordClass === 'dom' || chordClass === 'alt';
+                    // Two-frame needs a parseable key; without one, fall through to the
+                    // diatonic chord-only rule (a dominant still hangs, never un-pins).
+                    const useTwoFrameQuestion = !wantAnswer && isDomChord && keyCtx.keyRootIdx >= 0;
+                    // The key's tonic triad — the tones that DON'T pull. Everything else is
+                    // key-unstable ("asks"). Minor key uses the ♭3.
+                    const keyStable = keyCtx.isMinor ? [0, 3, 7] : [0, 4, 7];
                     const candidateDegrees: number[] = [];
                     scale.forEach((interval, deg) => {
                         const norm = normalizeInterval(interval);
@@ -1922,20 +1940,62 @@ export function generateSessionSeed(
                             (ci: number) => normalizeInterval(ci) === norm,
                         );
                         if (wantAnswer) {
-                            // ANSWER resolves onto a chord pillar (root / 3rd / 5th).
-                            if (norm === 0 || norm === 3 || norm === 4 || norm === 7) {
+                            // ANSWER resolves onto a chord pillar. On a DOMINANT restrict to
+                            // the triad {root,3,5}: the blues-dominant scale has BOTH ♭3 and
+                            // ♮3, so the old {0,3,4,7} could pin the ♯9 (a TENSION) as the
+                            // "resolution"; and ♭7 is reserved for the question, keeping the
+                            // Q and A vocabularies disjoint (the asymmetry the feature exists
+                            // for). Non-dominant chords keep the original {root,♭3,3,5}.
+                            // NB the disjointness is a SEED-time guarantee governing loops
+                            // 0-1 (depth 0, the story's target): on later loops the live
+                            // answer re-snap (soloist-phrase-first.ts) pulls to the full
+                            // dominant pillar set {0,4,7,10}, which can re-admit ♭7 to a
+                            // developed answer — harmless (♭7 is a chord tone) and outside
+                            // the early-loop window this slice is scored on.
+                            const answerOk = isDomChord
+                                ? norm === 0 || norm === 4 || norm === 7
+                                : norm === 0 || norm === 3 || norm === 4 || norm === 7;
+                            if (answerOk) {
+                                candidateDegrees.push(deg);
+                            }
+                        } else if (useTwoFrameQuestion) {
+                            // QUESTION over a DOMINANT — the TWO-FRAME pin. Hang on a tone that
+                            // is chord-color {9, ♯9/blue-3rd, 11, 13, ♭7} AND key-unstable (not
+                            // the key's tonic triad). Over blues the chord frame alone lies: on
+                            // V7 the chord-11 IS the key tonic (a false hang) while the ♭7 — a
+                            // chord tone — is the true ask. So here, unlike the diatonic branch,
+                            // we do NOT exclude chord tones; the key frame carries instability.
+                            const isDomColor =
+                                norm === 2 || norm === 3 || norm === 5 || norm === 9 || norm === 10;
+                            const keyNorm = normalizeInterval(
+                                currentChord.rootMidi + interval - keyCtx.keyRootIdx,
+                            );
+                            if (isDomColor && !keyStable.includes(keyNorm)) {
                                 candidateDegrees.push(deg);
                             }
                         } else if (!isChordTone && isSoftCadenceInterval(norm)) {
-                            // QUESTION hangs on a soft-color NON-chord tone (9/11/13).
-                            // NB this is the CHORD frame only: over I and V chord-color
-                            // and KEY-instability align (a real ask), but over IV the
-                            // chord-9 is the key's 5th (key-consonant), so the hang is
-                            // softer there. Acceptable for the diatonic Slice-1 idiom;
-                            // biasing toward tones unstable in BOTH frames is a later slice.
+                            // QUESTION (diatonic idiom) — hang on a soft-color NON-chord tone
+                            // (9/11/13), CHORD frame only. Over I/V chord-color and key-
+                            // instability align; over IV the chord-9 is the key's 5th (a softer
+                            // hang) — acceptable for the diatonic idiom. Dominants use the
+                            // two-frame branch above; this stays byte-identical for triads.
                             candidateDegrees.push(deg);
                         }
                     });
+                    // Two-frame question came up empty (exotic dominant scale / odd key) —
+                    // fall back to the diatonic chord-only rule so a dominant question still
+                    // hangs rather than un-pinning (the #1009 pre-fix wash). Deterministic.
+                    if (useTwoFrameQuestion && candidateDegrees.length === 0) {
+                        scale.forEach((interval, deg) => {
+                            const norm = normalizeInterval(interval);
+                            const isChordTone = chordIntervals.some(
+                                (ci: number) => normalizeInterval(ci) === norm,
+                            );
+                            if (!isChordTone && isSoftCadenceInterval(norm)) {
+                                candidateDegrees.push(deg);
+                            }
+                        });
+                    }
                     if (candidateDegrees.length > 0) {
                         let bestCadenceMidi = midi;
                         let bestCadenceDist = Number.POSITIVE_INFINITY;

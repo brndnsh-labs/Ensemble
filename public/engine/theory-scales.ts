@@ -76,7 +76,7 @@ const ENHARMONIC_KEY_MAP: Record<string, string> = {
     Fb: 'E',
 };
 
-function getKeyContext(
+export function getKeyContext(
     state: EnsembleState,
     chord: any,
 ): { keyName: string | null; keyRootIdx: number; isMinor: boolean } {

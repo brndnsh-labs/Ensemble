@@ -19,7 +19,7 @@ type ChordQualityClass =
     | 'sus' // sus2, sus4 — no 3rd, looser palette
     | 'aug'; // aug, augmaj7 — whole-tone / lydian-aug, no perfect 5
 
-function classifyChordQuality(quality: string | undefined): ChordQualityClass {
+export function classifyChordQuality(quality: string | undefined): ChordQualityClass {
     if (!quality) {
         return 'maj';
     }
