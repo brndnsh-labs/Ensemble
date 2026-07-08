@@ -1349,19 +1349,22 @@ input[type="range"] {
     border-color: var(--accent-color);
 }
 
+/* Fixed-positioned (coords set inline from the trigger's rect in JS) so the menu
+ * escapes the chart's nested `isolation: isolate` / `overflow` stacking contexts
+ * — the same pattern the chord-picker uses to float above the lead sheet. An
+ * absolutely-positioned menu stays trapped inside the section-group context and
+ * paints behind the chord cards. */
 .section-strip__practice-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 30;
+    position: fixed;
+    z-index: var(--z-popover, 1000);
     display: flex;
     flex-direction: column;
     min-width: 11rem;
     padding: 0.25rem;
-    background: var(--input-bg);
-    border: 1px solid var(--border-color);
+    background: var(--bg-elevated, var(--input-bg));
+    border: 1px solid var(--border-strong, var(--border-color));
     border-radius: var(--radius-sm);
-    box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
 }
 
 .section-strip__practice-item {

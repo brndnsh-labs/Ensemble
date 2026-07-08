@@ -43,6 +43,33 @@ test.describe('Section practice @ui', () => {
         await expect(page.locator('.section-strip__loop-badge')).toHaveCount(0);
     });
 
+    test('during playback the section label stays live but chord cards go inert', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1366, height: 900 });
+
+        // Stopped + locked (default): clicking a chord card opens the picker.
+        await page.locator('.chord-card').first().click();
+        await expect(page.locator('.chord-picker')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('.chord-picker')).toHaveCount(0);
+
+        // Start playback from a section.
+        await page.locator('.section-strip__label--practice').first().click();
+        await page
+            .locator('.section-strip__practice-menu')
+            .getByRole('menuitem', { name: /Start from here/ })
+            .click();
+
+        // Mid-play: the section label practice trigger is still present…
+        await expect(page.locator('.section-strip__label--practice').first()).toBeVisible();
+        // …but chord cards are now inert — clicking one does NOT open the picker.
+        await page.locator('.chord-card').first().click();
+        await expect(page.locator('.chord-picker')).toHaveCount(0);
+        // …and the measure box has shed its button role (no measure editor).
+        await expect(page.locator('.measure-box[role="button"]')).toHaveCount(0);
+    });
+
     test('popover works on mobile @mobile', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
 

@@ -161,6 +161,7 @@ export function ChordVisualizer() {
         sectionsState,
         notation,
         chartLocked,
+        isPlaying,
         keyName,
         keyIsMinor,
         qualityColors,
@@ -171,6 +172,10 @@ export function ChordVisualizer() {
         sectionsState: state.arranger.sections,
         notation: state.arranger.notation || 'roman',
         chartLocked: state.playback?.chartLocked ?? true,
+        // #1016 — during playback the chord chart is read-only: chord cards and
+        // the measure editor are inert so the only live control is the section
+        // label's practice popover (start-from-here / loop).
+        isPlaying: !!state.playback?.isPlaying,
         keyName: state.arranger.key,
         keyIsMinor: state.arranger.isMinor,
         qualityColors: state.playback?.qualityColors ?? true,
@@ -464,34 +469,49 @@ export function ChordVisualizer() {
                                                             gridColumn: `${measureIndex + 1}`,
                                                             gridRow: '1',
                                                         }}
-                                                        role="button"
-                                                        tabIndex={0}
+                                                        role={isPlaying ? undefined : 'button'}
+                                                        tabIndex={isPlaying ? undefined : 0}
                                                         aria-label={
-                                                            measure.sectionId
-                                                                ? 'Open section editor'
-                                                                : 'Open measure editor'
+                                                            isPlaying
+                                                                ? undefined
+                                                                : measure.sectionId
+                                                                  ? 'Open section editor'
+                                                                  : 'Open measure editor'
                                                         }
-                                                        onClick={() =>
-                                                            openSectionEditor(measure.sectionId)
+                                                        onClick={
+                                                            isPlaying
+                                                                ? undefined
+                                                                : () =>
+                                                                      openSectionEditor(
+                                                                          measure.sectionId,
+                                                                      )
                                                         }
-                                                        onKeyDown={(e) => {
-                                                            // Nested ChordCard buttons have their
-                                                            // own click/keyboard activation — only
-                                                            // react when the box itself is the
-                                                            // event target, not a bubbled descendant.
-                                                            if (e.target !== e.currentTarget) {
-                                                                return;
-                                                            }
-                                                            if (
-                                                                e.key === 'Enter' ||
-                                                                e.key === ' '
-                                                            ) {
-                                                                e.preventDefault();
-                                                                openSectionEditor(
-                                                                    measure.sectionId,
-                                                                );
-                                                            }
-                                                        }}
+                                                        onKeyDown={
+                                                            isPlaying
+                                                                ? undefined
+                                                                : (e) => {
+                                                                      // Nested ChordCard buttons have
+                                                                      // their own click/keyboard
+                                                                      // activation — only react when
+                                                                      // the box itself is the event
+                                                                      // target, not a bubbled child.
+                                                                      if (
+                                                                          e.target !==
+                                                                          e.currentTarget
+                                                                      ) {
+                                                                          return;
+                                                                      }
+                                                                      if (
+                                                                          e.key === 'Enter' ||
+                                                                          e.key === ' '
+                                                                      ) {
+                                                                          e.preventDefault();
+                                                                          openSectionEditor(
+                                                                              measure.sectionId,
+                                                                          );
+                                                                      }
+                                                                  }
+                                                        }
                                                     >
                                                         {measure.chords.map(
                                                             (chord: LeadSheetChord) => (
@@ -504,7 +524,7 @@ export function ChordVisualizer() {
                                                                     }
                                                                     notation={notation}
                                                                     onPick={
-                                                                        chartLocked
+                                                                        chartLocked && !isPlaying
                                                                             ? handleChordPick
                                                                             : undefined
                                                                     }
