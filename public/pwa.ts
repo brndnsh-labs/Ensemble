@@ -6,13 +6,23 @@ let deferredPrompt: any;
 let newWorker: ServiceWorker | null;
 
 // Flag an available update once a newly-installing worker reaches the
-// `installed` state while another worker still controls the page.
+// `installed` state while another worker still controls the page. Checks the
+// captured `worker` param's OWN state, not the shared `newWorker` module var —
+// when two updates land close together (e.g. a run of quick redeploys to
+// TEST), `newWorker` may already point at a second, still-installing worker
+// by the time the first one's `statechange` fires, silently swallowing the
+// flag. Also checks immediately after attaching: a fast install (cached
+// assets) can reach `installed` before the listener attaches (the
+// MDN-documented missed-transition race), so a future-only event would never
+// see it.
 function registerUpdateOnInstalled(worker: ServiceWorker): void {
-    worker.addEventListener('statechange', () => {
-        if (newWorker && newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+    const flagIfInstalled = () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
             dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
         }
-    });
+    };
+    worker.addEventListener('statechange', flagIfInstalled);
+    flagIfInstalled();
 }
 
 export function initPWA(): void {
