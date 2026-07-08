@@ -1,29 +1,10 @@
+import { Workbox } from 'workbox-window';
 import { dispatch } from './state.js';
 import { ACTIONS } from './types.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let deferredPrompt: any;
-let newWorker: ServiceWorker | null;
-
-// Flag an available update once a newly-installing worker reaches the
-// `installed` state while another worker still controls the page. Checks the
-// captured `worker` param's OWN state, not the shared `newWorker` module var —
-// when two updates land close together (e.g. a run of quick redeploys to
-// TEST), `newWorker` may already point at a second, still-installing worker
-// by the time the first one's `statechange` fires, silently swallowing the
-// flag. Also checks immediately after attaching: a fast install (cached
-// assets) can reach `installed` before the listener attaches (the
-// MDN-documented missed-transition race), so a future-only event would never
-// see it.
-function registerUpdateOnInstalled(worker: ServiceWorker): void {
-    const flagIfInstalled = () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-            dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-        }
-    };
-    worker.addEventListener('statechange', flagIfInstalled);
-    flagIfInstalled();
-}
+let wb: Workbox | null = null;
 
 export function initPWA(): void {
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -53,60 +34,53 @@ export function initPWA(): void {
     );
 
     if ('serviceWorker' in navigator && !navigator.webdriver && !isLocalhost) {
-        navigator.serviceWorker
-            .register('./sw.js', { updateViaCache: 'none' })
-            .then((reg) => {
-                reg.update();
+        wb = new Workbox('./sw.js', { updateViaCache: 'none' });
 
-                if (reg.waiting) {
-                    newWorker = reg.waiting;
-                    dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
-                }
+        // #1048 — replaces a hand-rolled `newWorker` module variable that a
+        // second update could clobber before the first worker's `statechange`
+        // fired (#1046). Workbox tracks the waiting worker per-registration
+        // internally, so `waiting` fires correctly whether a worker was
+        // already waiting when we registered, or just finished installing —
+        // one event covers both cases the old code hand-coded separately.
+        wb.addEventListener('waiting', () => {
+            dispatch(ACTIONS.SET_UPDATE_AVAILABLE, true);
+        });
 
-                if (reg.installing) {
-                    newWorker = reg.installing;
-                    if (newWorker) {
-                        registerUpdateOnInstalled(newWorker);
-                    }
-                }
+        let refreshing = false;
+        wb.addEventListener('controlling', () => {
+            if (refreshing) {
+                return;
+            }
+            refreshing = true;
+            window.location.reload();
+        });
+
+        wb.register()
+            .then(() => {
+                wb?.update();
 
                 setInterval(
                     () => {
-                        reg.update();
+                        wb?.update();
                     },
                     60 * 60 * 1000,
                 );
 
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
-                        reg.update();
-                    }
-                });
-
-                reg.addEventListener('updatefound', () => {
-                    newWorker = reg.installing;
-                    if (newWorker) {
-                        registerUpdateOnInstalled(newWorker);
+                        wb?.update();
                     }
                 });
             })
             .catch((err) => console.error('SW failed', err));
-
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (refreshing) {
-                return;
-            }
-            window.location.reload();
-            refreshing = true;
-        });
     }
 }
 
 export function skipWaiting(): void {
-    if (newWorker) {
-        newWorker.postMessage({ type: 'SKIP_WAITING' });
-    }
+    // Targets whatever's currently waiting on the live registration — not a
+    // captured reference, so it can't go stale the way the old `newWorker`
+    // var could.
+    wb?.messageSkipWaiting();
 }
 
 export async function triggerInstall(): Promise<boolean> {

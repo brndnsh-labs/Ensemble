@@ -1,43 +1,75 @@
 // @vitest-environment happy-dom
 //
-// #1046 — the section-practice deploy tonight surfaced a real race in the
-// update-toast logic: rapid successive service-worker updates (a run of quick
-// TEST redeploys during a by-ear/UI audition loop) can leave a genuinely
-// `installed` worker's transition unflagged. See public/pwa.ts for the full
-// writeup.
+// #1048 — pwa.ts now delegates SW lifecycle tracking to workbox-window's
+// `Workbox` class instead of hand-rolling it (the hand-rolled version had the
+// #1046 overlapping-update race: a shared, mutable `newWorker` variable a
+// second update could clobber before the first worker's `statechange` fired).
+// Workbox owns that race internally now, so this test's job shifts to what's
+// actually still our code: that `waiting` is wired to the update-available
+// flag, `controlling` is wired to a reload that only fires once even if the
+// event fires twice, and `skipWaiting()` delegates to
+// `wb.messageSkipWaiting()` (which targets whatever's currently waiting on
+// the live registration, not a captured reference that can go stale).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { dispatchMock } = vi.hoisted(() => ({ dispatchMock: vi.fn() }));
-vi.mock('../../public/state.js', () => ({ dispatch: dispatchMock }));
-
-import { initPWA } from '../../public/pwa.js';
-import { ACTIONS } from '../../public/types.js';
-
-function makeWorker(state: string) {
-    const listeners: Array<() => void> = [];
-    return {
-        state,
-        postMessage: vi.fn(),
-        addEventListener: (type: string, cb: () => void) => {
-            if (type === 'statechange') {
-                listeners.push(cb);
-            }
-        },
-        fireStateChange() {
-            for (const cb of listeners) {
-                cb();
-            }
-        },
-    };
+interface MockWorkboxInstance {
+    listeners: Record<string, Array<(event?: unknown) => void>>;
+    register: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    messageSkipWaiting: ReturnType<typeof vi.fn>;
+    emit(type: string, event?: unknown): void;
 }
 
-describe('initPWA — overlapping service-worker updates', () => {
+const { dispatchMock, instances } = vi.hoisted(() => ({
+    dispatchMock: vi.fn(),
+    instances: [] as MockWorkboxInstance[],
+}));
+
+vi.mock('../../public/state.js', () => ({ dispatch: dispatchMock }));
+
+// Defined inside the factory (not hoisted-then-referenced) since vi.mock
+// factories run before top-level class declarations would initialize.
+vi.mock('workbox-window', () => {
+    class MockWorkbox {
+        listeners: Record<string, Array<(event?: unknown) => void>> = {};
+        register = vi.fn(() => Promise.resolve(undefined));
+        update = vi.fn();
+        messageSkipWaiting = vi.fn();
+
+        constructor(
+            public scriptURL: string,
+            public options: unknown,
+        ) {
+            instances.push(this);
+        }
+
+        addEventListener(type: string, cb: (event?: unknown) => void) {
+            if (!this.listeners[type]) {
+                this.listeners[type] = [];
+            }
+            this.listeners[type].push(cb);
+        }
+
+        emit(type: string, event?: unknown) {
+            for (const cb of this.listeners[type] ?? []) {
+                cb(event);
+            }
+        }
+    }
+    return { Workbox: MockWorkbox };
+});
+
+import { initPWA, skipWaiting } from '../../public/pwa.js';
+import { ACTIONS } from '../../public/types.js';
+
+describe('initPWA — workbox-window wiring', () => {
     beforeEach(() => {
         dispatchMock.mockClear();
+        instances.length = 0;
         Object.defineProperty(window, 'location', {
             writable: true,
             configurable: true,
-            value: { hostname: 'ensembletest.brndn.zip' },
+            value: { hostname: 'ensembletest.brndn.zip', reload: vi.fn() },
         });
         // happy-dom reports navigator.webdriver === true by default, which
         // would otherwise short-circuit initPWA's SW-registration gate.
@@ -45,86 +77,40 @@ describe('initPWA — overlapping service-worker updates', () => {
             configurable: true,
             value: false,
         });
-    });
-
-    it('flags an update for the worker that actually reached installed, even when a second update starts installing before the first settles', async () => {
-        let updatefoundHandler: (() => void) | undefined;
-        const reg = {
-            installing: null as ReturnType<typeof makeWorker> | null,
-            waiting: null,
-            update: vi.fn(),
-            addEventListener: (type: string, cb: () => void) => {
-                if (type === 'updatefound') {
-                    updatefoundHandler = cb;
-                }
-            },
-        };
-        const swContainer = {
-            controller: {},
-            register: vi.fn(() => Promise.resolve(reg)),
-            addEventListener: vi.fn(),
-        };
+        // happy-dom doesn't implement the Service Worker API at all; initPWA
+        // only feature-detects with `'serviceWorker' in navigator` (the
+        // Workbox instance itself is mocked above), so a stub object suffices.
         Object.defineProperty(navigator, 'serviceWorker', {
             configurable: true,
-            value: swContainer,
+            value: {},
         });
+    });
 
+    it('flags an update when Workbox reports a waiting worker', () => {
         initPWA();
-        // Flush the register().then(...) microtask.
-        await Promise.resolve();
-        await Promise.resolve();
 
-        const workerB = makeWorker('installing');
-        reg.installing = workerB;
-        updatefoundHandler?.();
-
-        // A second, newer update starts installing before B's statechange fires
-        // — the rapid-redeploy scenario (a run of quick TEST deploys).
-        const workerC = makeWorker('installing');
-        reg.installing = workerC;
-        updatefoundHandler?.();
-
-        // B actually finishes installing. The stale-shared-variable bug would
-        // read `newWorker.state` here — which by now points at C, still
-        // `installing` — and silently miss this real transition.
-        workerB.state = 'installed';
-        workerB.fireStateChange();
+        expect(instances).toHaveLength(1);
+        instances[0].emit('waiting');
 
         expect(dispatchMock).toHaveBeenCalledWith(ACTIONS.SET_UPDATE_AVAILABLE, true);
     });
 
-    it('flags an update immediately if the worker already reached installed before the listener attached', async () => {
-        let updatefoundHandler: (() => void) | undefined;
-        const reg = {
-            installing: null as ReturnType<typeof makeWorker> | null,
-            waiting: null,
-            update: vi.fn(),
-            addEventListener: (type: string, cb: () => void) => {
-                if (type === 'updatefound') {
-                    updatefoundHandler = cb;
-                }
-            },
-        };
-        const swContainer = {
-            controller: {},
-            register: vi.fn(() => Promise.resolve(reg)),
-            addEventListener: vi.fn(),
-        };
-        Object.defineProperty(navigator, 'serviceWorker', {
-            configurable: true,
-            value: swContainer,
-        });
-
+    it('reloads exactly once even if `controlling` fires more than once', () => {
         initPWA();
-        await Promise.resolve();
-        await Promise.resolve();
+        const wb = instances[0];
 
-        // Already `installed` by the time updatefound is observed (a fast,
-        // fully-cached install) — the MDN-documented missed-transition race.
-        const worker = makeWorker('installed');
-        reg.installing = worker;
-        updatefoundHandler?.();
+        wb.emit('controlling');
+        wb.emit('controlling');
 
-        expect(dispatchMock).toHaveBeenCalledWith(ACTIONS.SET_UPDATE_AVAILABLE, true);
+        expect(window.location.reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('skipWaiting() delegates to the live Workbox instance, not a captured worker reference', () => {
+        initPWA();
+        const wb = instances[0];
+
+        skipWaiting();
+
+        expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1);
     });
 });
