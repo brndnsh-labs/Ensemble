@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { setSectionInstrumentEnabled, setSectionIntensity } from '../../arranger-controller.js';
 import {
@@ -128,9 +129,12 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
     const [isPracticeOpen, setIsPracticeOpen] = useState(false);
     // Fixed-position coords for the popover menu, computed from the trigger's
     // rect at open time (see `openPracticeMenu`). Fixed positioning lets the menu
-    // escape the chart's nested isolate/overflow stacking contexts.
+    // escape the chart's nested isolate/overflow stacking contexts — and #1043
+    // portals the menu to document.body (see below) so a transformed ancestor
+    // (`.lead-sheet-section-group`) can't hijack it as its containing block.
     const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
     const practiceRef = useRef<HTMLDivElement | null>(null);
+    const menuRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         if (!isPracticeOpen) {
             return;
@@ -138,9 +142,9 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
         const close = () => setIsPracticeOpen(false);
         const onDocClick = (e: MouseEvent) => {
             if (
-                practiceRef.current &&
                 e.target instanceof Node &&
-                !practiceRef.current.contains(e.target)
+                !practiceRef.current?.contains(e.target) &&
+                !menuRef.current?.contains(e.target)
             ) {
                 close();
             }
@@ -193,36 +197,40 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
             >
                 {section.label}
             </button>
-            {isPracticeOpen && menuPos && (
-                <div
-                    class="section-strip__practice-menu"
-                    role="menu"
-                    style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
-                >
-                    <button
-                        type="button"
-                        class="section-strip__practice-item"
-                        role="menuitem"
-                        onClick={() => {
-                            setIsPracticeOpen(false);
-                            startSectionFromHere(section.id);
-                        }}
+            {isPracticeOpen &&
+                menuPos &&
+                createPortal(
+                    <div
+                        ref={menuRef}
+                        class="section-strip__practice-menu"
+                        role="menu"
+                        style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
                     >
-                        ▶ Start from here
-                    </button>
-                    <button
-                        type="button"
-                        class="section-strip__practice-item"
-                        role="menuitem"
-                        onClick={() => {
-                            setIsPracticeOpen(false);
-                            loopSection(section.id);
-                        }}
-                    >
-                        🔁 Loop this section
-                    </button>
-                </div>
-            )}
+                        <button
+                            type="button"
+                            class="section-strip__practice-item"
+                            role="menuitem"
+                            onClick={() => {
+                                setIsPracticeOpen(false);
+                                startSectionFromHere(section.id);
+                            }}
+                        >
+                            ▶ Start from here
+                        </button>
+                        <button
+                            type="button"
+                            class="section-strip__practice-item"
+                            role="menuitem"
+                            onClick={() => {
+                                setIsPracticeOpen(false);
+                                loopSection(section.id);
+                            }}
+                        >
+                            🔁 Loop this section
+                        </button>
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 

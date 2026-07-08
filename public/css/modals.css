@@ -1349,10 +1349,12 @@ input[type="range"] {
     border-color: var(--accent-color);
 }
 
-/* Fixed-positioned (coords set inline from the trigger's rect in JS) so the menu
- * escapes the chart's nested `isolation: isolate` / `overflow` stacking contexts
- * — the same pattern the chord-picker uses to float above the lead sheet. An
- * absolutely-positioned menu stays trapped inside the section-group context and
+/* Fixed-positioned (coords set inline from the trigger's rect in JS) AND
+ * portaled to document.body (#1043) so the menu escapes the chart's nested
+ * `isolation: isolate` / `overflow` / transformed-ancestor stacking contexts —
+ * the same pattern `ToolbarPopover`/`ChordPicker` use to float above the lead
+ * sheet. Without the portal, a transformed ancestor (`.lead-sheet-section-group`)
+ * becomes this element's containing block despite `position: fixed`, and it
  * paints behind the chord cards. */
 .section-strip__practice-menu {
     position: fixed;
