@@ -347,6 +347,13 @@ export function getSoloistNotePhraseFirst(
         ? here.reduce((hi: any, n: any) => (n.midi > hi.midi ? n : hi), here[0])
         : here[0];
     const isAnchor = here.some((n: any) => n?.isAnchor);
+    // #1009 — the seed-planned question/answer cadence role of the note sounding here
+    // (set on the LAST note of each half of a 4-bar block; absent otherwise). Drives
+    // the density-gate exemption (a cadence never gets eroded) and the development
+    // asymmetry in the pitch block below (answers re-land at every depth; questions
+    // roam). Read off `primary` — the note this tick actually develops.
+    const qaRole = (primary as any)?.qaRole as 'question' | 'answer' | undefined;
+    const isQaCadence = qaRole === 'question' || qaRole === 'answer';
 
     // --- Dramatic arc → how active the lead is right now (0..1) ---
     // Two deliberately simple contributions (tuned by ear in later builds):
@@ -576,6 +583,7 @@ export function getSoloistNotePhraseFirst(
         const sInLoop = ((absStep % loopLen) + loopLen) % loopLen;
         let present = false;
         let anchorHere = false;
+        let qaCadenceHere = false;
         // Match every seed note that lands on this step — INCLUDING pickups (whose
         // negative step maps via the modulo to a high stepInLoop near the loop end),
         // exactly as the live `here` filter does. Skipping them here falsely
@@ -586,12 +594,19 @@ export function getSoloistNotePhraseFirst(
                 if (n.isAnchor) {
                     anchorHere = true;
                 }
+                if (n.qaRole === 'question' || n.qaRole === 'answer') {
+                    qaCadenceHere = true;
+                }
             }
         }
         if (!present) {
             return false;
         }
-        if (anchorHere || sInLoop === apexStepInLoop) {
+        // #1009 — mirror the live gate's Q&A-cadence exemption EXACTLY, or the
+        // duration-clamp lookahead would predict a cadence rests when the live emit
+        // sounds it, and the preceding note would overrun the cadence (the slice-A
+        // "live emit and lookahead see one gate" invariant).
+        if (anchorHere || sInLoop === apexStepInLoop || qaCadenceHere) {
             return true;
         }
         const g = scrambleHash(absStep * 7 + Math.max(loopCount, 0) * 131 + 17);
@@ -604,13 +619,17 @@ export function getSoloistNotePhraseFirst(
     // and must never be gated out. Non-anchor ornament notes only fill in as the
     // arc opens up, so quiet passages stay spacious and energetic ones fill in.
     // The gate is a deterministic per-(step,loop) hash so loops stay reproducible.
-    if (!isAnchor && !isApexStep) {
+    if (!isAnchor && !isApexStep && !isQaCadence) {
         const gate = scrambleHash(step * 7 + Math.max(loopCount, 0) * 131 + 17);
         if (gate > activity) {
             phr.isResting = true; // @worker-mutation
             return null;
         }
     }
+    // #1009 — Q&A cadences are exempt from the density gate (like anchors and the
+    // apex): the question's hang and the answer's resolution are the structural
+    // skeleton of the phrase, so they must sound even on the sparse early loops —
+    // that is precisely what makes loops 0-1 "say something".
 
     // --- Pitch: develop the theme, then VOICE-LEAD through the changes (§5) ---
     // The keystone grammar: *where you land matters more than what you run.* Strong
@@ -674,7 +693,41 @@ export function getSoloistNotePhraseFirst(
     } else {
         // Develop the theme (contour preserved, folded to register as one unit).
         midi = diatonicTranspose(primary.midi, liftDegrees, keyRootPc, keyIsMinor) + bodyOctaveFold;
-        if (isStrongBeat) {
+        if (qaRole === 'answer') {
+            // #1009 — the ANSWER re-lands at EVERY development depth. Its seed pitch is
+            // a chord pillar, but diatonic development (`liftDegrees`) transposes it off
+            // the chord on later loops; pull it back onto a pillar (root/3rd/5th) so the
+            // consequent always resolves home, however far the loop has developed. This
+            // is the "answers re-land" half of the asymmetry. At depth 0 (loops 0-1, the
+            // story's target) `liftDegrees` is 0, so the seed pillar is already home and
+            // this is a no-op — the resolution is audible from the very first phrase.
+            const { pillars } = chordTargetTones(currentChord.rootMidi, currentChord.quality);
+            if (pillars.length > 0) {
+                midi = snapToNearestPc(midi, new Set(pillars));
+            }
+        } else if (qaRole === 'question') {
+            // #1009 — the QUESTION hangs on its seed-pinned soft-color tone, PRESERVED
+            // at every depth (register-folded only). The body `diatonicTranspose` above
+            // snaps to the KEY scale, which would drift the chromatic hang onto a stable
+            // tone and resolve the question we meant to leave open — so we override it
+            // back to the pin. The question is thus a recurring structural hang (like
+            // the apex is a recurring peak): the line develops AROUND it while it
+            // anchors the antecedent. No `landOnTarget`/approach snap: tension is the
+            // point. (A depth-varying "question roams wilder" is a later refinement; the
+            // answer-re-lands half of the asymmetry is fully live below.)
+            midi = primary.midi + bodyOctaveFold;
+            // Apex dovetail (§9): if this is the last question before the window's
+            // climax, aim the hang AT the money note (its lower diatonic neighbor) so
+            // the coming apex answers THIS question — the biggest ask, resolved by the
+            // peak.
+            const stepsToApex =
+                apexStepInLoop >= 0
+                    ? (((apexStepInLoop - stepInLoop) % loopLen) + loopLen) % loopLen
+                    : -1;
+            if (moneyNote > 0 && stepsToApex > 0 && stepsToApex <= stepsPerBar * 2) {
+                midi = diatonicNeighbor(moneyNote, -1, keyRootPc, keyIsMinor);
+            }
+        } else if (isStrongBeat) {
             // LAND: pull a non-chord-tone strong beat onto a guide tone of the
             // current chord (nearest functional tone if no guide is in reach);
             // a note already on a chord tone is left as the melody states it.
@@ -705,6 +758,16 @@ export function getSoloistNotePhraseFirst(
                 const above = diatonicNeighbor(target, 1, keyRootPc, keyIsMinor);
                 midi = Math.abs(below - midi) <= Math.abs(above - midi) ? below : above;
             }
+        }
+    }
+
+    // #1009 — keep a pinned Q&A cadence inside the soloist register. The overrides
+    // above bypass the body octave fold, and the answer's `snapToNearestPc` can land
+    // a pillar below the slotting floor; lift by octaves to ≥ 52 (the high end is
+    // already bounded by the body fold / the ≤ 88 apex ceiling).
+    if (isQaCadence) {
+        while (midi < 52) {
+            midi += 12;
         }
     }
 
@@ -928,6 +991,11 @@ export function getSoloistNotePhraseFirst(
         !isApexStep &&
         !inFlurry &&
         !vibrato &&
+        // #1009 — a Q&A cadence owns its pitch: the answer resolves cleanly (a cry on
+        // the deliberate landing works against the "sparing" restraint), and a cry on
+        // the QUESTION would bend its non-chord hang UP to a chord tone — resolving the
+        // very tension the question exists to leave open. Both stay cry-exempt.
+        !isQaCadence &&
         bendStartInterval === 0 &&
         // Most eligible held notes cry (a blues player leans into them); the hash
         // keeps a little variation so it doesn't read as mechanically every-note.

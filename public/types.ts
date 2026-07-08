@@ -405,6 +405,17 @@ export interface SeedNote {
     tripletPlacement?: 't1' | 't2';
     /** Optional accompaniment hints that keep the melody primary. */
     supportHints?: SeedSupportHints;
+    /**
+     * #1009 — question/answer phrase pairing. Set at seed time on the LAST sounding
+     * note of each half of a 4-bar motif block: `'question'` (the antecedent's
+     * cadence — pinned to a key-unstable soft-color tone, left to hang) or
+     * `'answer'` (the consequent's cadence — pinned to a resolved chord pillar).
+     * The live engine reads this to protect the cadence from the density gate and
+     * to drive the development asymmetry (answers re-land at every depth; questions
+     * roam with development). Absent on non-cadence notes. Rides the play-start seed
+     * snapshot as an opaque nested property (no worker delta plumbing).
+     */
+    qaRole?: 'question' | 'answer';
 }
 
 export interface SoloistSessionSeed {

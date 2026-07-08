@@ -295,6 +295,7 @@ interface CreateSeedNoteOptions {
     isPickup?: boolean;
     stepsPerMeasure: number;
     stepsPerBeat: number;
+    qaRole?: 'question' | 'answer';
 }
 
 function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
@@ -310,6 +311,7 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
         isPickup = false,
         stepsPerMeasure,
         stepsPerBeat,
+        qaRole = undefined,
     } = options;
 
     const note: SeedNote = {
@@ -334,6 +336,9 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
     }
     if (tripletPlacement) {
         note.tripletPlacement = tripletPlacement;
+    }
+    if (qaRole) {
+        note.qaRole = qaRole;
     }
 
     return note;
@@ -1513,6 +1518,106 @@ export function generateSessionSeed(
                 }
             }
 
+            // --- #1009 Question→answer phrase pairing (plan the pair up front) ---
+            // Within a full 4-measure motif block, measures 0-1 are a QUESTION that
+            // hangs on soft-color tension and measures 2-3 an ANSWER that resolves onto
+            // a chord pillar — a musical sentence, so even the exposed early loops (0-1,
+            // before development kicks in) "say something". Only full 4-measure blocks
+            // (the common case); turnaround / stationary / pickup-only blocks stay
+            // through-composed. The SESSION'S OPENING block is left a plain statement —
+            // state the head first, start asking from the second phrase on (#1009 owner
+            // decision). Cadence notes are identified by REFERENCE (like
+            // `lastActiveMotifNote` below), tension/resolution PINNED post-scoring, and
+            // the seam breath carved here at seed time (silence as a choice, not a gate).
+            const qaBeatsPerMeasure = tsConfig.beats;
+            const qaQuestionEndBeat = 2 * qaBeatsPerMeasure; // measures 0-1 = the question
+            const qaBreathBeats = 1; // carved gap at the seam (≥ the §7 wall-clock floor)
+            const isSessionOpeningBlock = index === 0 && m === sectionStartMeasure;
+            const applyQA =
+                phraseLength === 4 &&
+                !isTurnaroundMeasures &&
+                !isStationaryMotif &&
+                !isSessionOpeningBlock;
+            let questionCadenceNote: MotifEvent | null = null;
+            let answerCadenceNote: MotifEvent | null = null;
+            if (applyQA) {
+                // `activeMotif` shares note OBJECTS with the reusable `motif` template
+                // (shallow `[...motif]`), so deep-copy before mutating durations/rests —
+                // otherwise the breath carve would corrupt every later block/section.
+                activeMotif = activeMotif.map((n) => ({ ...n }));
+                const qActive = activeMotif.filter(
+                    (n) =>
+                        !n.isRest &&
+                        !n.isPickup &&
+                        n.beatOffset >= 0 &&
+                        n.beatOffset < qaQuestionEndBeat,
+                );
+                const aActive = activeMotif.filter(
+                    (n) => !n.isRest && !n.isPickup && n.beatOffset >= qaQuestionEndBeat,
+                );
+                // Question cadence = the latest active question-half note that ends BY
+                // the breath window (room to ring) and PREFERABLY sits on a WEAK beat —
+                // a hanging question reads better off the beat, and it keeps the STRONG
+                // beats resolving to chord tones (the §5 voice-leading invariant). This
+                // is a PREFERENCE, not a guarantee: on a sparse question-half whose only
+                // pre-breath notes are on strong beats, the fallbacks pin the hang to a
+                // strong beat — a soft-color appoggiatura/suspension, which is itself a
+                // fine question gesture, just not the invariant-preserving one.
+                const qBreathStartBeat = qaQuestionEndBeat - qaBreathBeats;
+                const qaMidBeat = Math.floor(qaBeatsPerMeasure / 2);
+                const isStrongBeatOffset = (bo: number) =>
+                    bo % qaBeatsPerMeasure === 0 || bo % qaBeatsPerMeasure === qaMidBeat;
+                for (const n of qActive) {
+                    if (n.beatOffset < qBreathStartBeat && !isStrongBeatOffset(n.beatOffset)) {
+                        questionCadenceNote = n;
+                    }
+                }
+                if (!questionCadenceNote) {
+                    for (const n of qActive) {
+                        if (n.beatOffset < qBreathStartBeat) {
+                            questionCadenceNote = n;
+                        }
+                    }
+                }
+                if (!questionCadenceNote && qActive.length > 0) {
+                    questionCadenceNote = qActive[qActive.length - 1];
+                }
+                answerCadenceNote = aActive.length > 0 ? aActive[aActive.length - 1] : null;
+                // Only pair when BOTH halves are present — never half-apply (that would
+                // leave a dangling question with no resolution).
+                if (questionCadenceNote && answerCadenceNote) {
+                    // Carve the breath: rest question-half notes AFTER the cadence so it
+                    // rings into a real gap before the answer.
+                    for (const n of activeMotif) {
+                        if (
+                            !n.isRest &&
+                            !n.isPickup &&
+                            n !== questionCadenceNote &&
+                            n.beatOffset > questionCadenceNote.beatOffset &&
+                            n.beatOffset < qaQuestionEndBeat
+                        ) {
+                            n.isRest = true;
+                        }
+                    }
+                    // Hold the question cadence up to the breath (a raised-eyebrow hang).
+                    const ringSteps = Math.max(
+                        stepsPerBeat,
+                        Math.round(
+                            (qBreathStartBeat - questionCadenceNote.beatOffset) * stepsPerBeat,
+                        ),
+                    );
+                    questionCadenceNote.duration = ringSteps;
+                    // The answer sits down: a held landing (≥ 2 beats) so it reads closed.
+                    answerCadenceNote.duration = Math.max(
+                        answerCadenceNote.duration,
+                        stepsPerBeat * 2,
+                    );
+                } else {
+                    questionCadenceNote = null;
+                    answerCadenceNote = null;
+                }
+            }
+
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, actualTotalSteps - 1);
             const entryForMeasure = binarySearchMap(stepMap, stepToSearch);
@@ -1788,7 +1893,76 @@ export function generateSessionSeed(
                     }
                 }
 
-                const midi = bestMidi;
+                let midi = bestMidi;
+
+                // #1009 — PIN the Q&A cadence pitches. The scoring loop above only
+                // SOFT-biases toward the intended degree (`motifPenalty`), so a cadence
+                // pool alone gets washed out toward the nearest guide/chord tone — the
+                // same reason the live path pins its targets with `landOnTarget` instead
+                // of trusting a bias. Here we override post-scoring, choosing the pool
+                // tone nearest `lastMidi` (smooth voice-leading INTO the cadence, and
+                // deterministic — no PRNG draw, so no downstream stream desync).
+                const qaRoleForNote =
+                    motifNote === questionCadenceNote
+                        ? 'question'
+                        : motifNote === answerCadenceNote
+                          ? 'answer'
+                          : undefined;
+                if (qaRoleForNote) {
+                    // Collect the candidate degrees for THIS cadence role, then pin to
+                    // the nearest one (smooth voice-leading in; deterministic — no PRNG,
+                    // so no downstream stream desync). Nearest-select only within the
+                    // RIGHT set: a mixed pool would let a stable tone win on distance and
+                    // resolve a question we meant to leave hanging.
+                    const wantAnswer = qaRoleForNote === 'answer';
+                    const candidateDegrees: number[] = [];
+                    scale.forEach((interval, deg) => {
+                        const norm = normalizeInterval(interval);
+                        const isChordTone = chordIntervals.some(
+                            (ci: number) => normalizeInterval(ci) === norm,
+                        );
+                        if (wantAnswer) {
+                            // ANSWER resolves onto a chord pillar (root / 3rd / 5th).
+                            if (norm === 0 || norm === 3 || norm === 4 || norm === 7) {
+                                candidateDegrees.push(deg);
+                            }
+                        } else if (!isChordTone && isSoftCadenceInterval(norm)) {
+                            // QUESTION hangs on a soft-color NON-chord tone (9/11/13).
+                            // NB this is the CHORD frame only: over I and V chord-color
+                            // and KEY-instability align (a real ask), but over IV the
+                            // chord-9 is the key's 5th (key-consonant), so the hang is
+                            // softer there. Acceptable for the diatonic Slice-1 idiom;
+                            // biasing toward tones unstable in BOTH frames is a later slice.
+                            candidateDegrees.push(deg);
+                        }
+                    });
+                    if (candidateDegrees.length > 0) {
+                        let bestCadenceMidi = midi;
+                        let bestCadenceDist = Number.POSITIVE_INFINITY;
+                        for (const deg of candidateDegrees) {
+                            const ivl = scale[((deg % scaleLen) + scaleLen) % scaleLen];
+                            const pc = (currentChord.rootMidi + ivl) % 12;
+                            let cand = registerOctaveBase + pc;
+                            while (cand < registerBase - 6) {
+                                cand += 12;
+                            }
+                            while (cand > registerBase + 6) {
+                                cand -= 12;
+                            }
+                            cand = Math.max(
+                                registerProfile.seedFloor,
+                                Math.min(registerProfile.seedCeiling, cand),
+                            );
+                            const dist = Math.abs(cand - lastMidi);
+                            if (dist < bestCadenceDist) {
+                                bestCadenceDist = dist;
+                                bestCadenceMidi = cand;
+                            }
+                        }
+                        midi = bestCadenceMidi;
+                    }
+                }
+
                 lastMidi = midi;
                 previousMotifDegree = motifNote.scaleDegreeOffset;
                 prevNoteChord = currentChord;
@@ -1821,6 +1995,7 @@ export function generateSessionSeed(
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
+                            qaRole: qaRoleForNote,
                         });
                     }
                 } else {
@@ -1837,6 +2012,7 @@ export function generateSessionSeed(
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
+                            qaRole: qaRoleForNote,
                         }),
                     );
                 }
@@ -1864,7 +2040,13 @@ export function generateSessionSeed(
             ) > 0.05;
 
         // We only apply flair probabilistically
-        if (prng() < flairProb) {
+        // #1009 — never fracture a Q&A cadence with flair: the question must ring and
+        // the answer must sit. The guard `prng()` is still drawn (left of `&&`) so the
+        // flair GATE stays aligned; a cadence that would have taken the flair path does
+        // skip its inner mutation draws, shifting the stream from there — harmless, #1009
+        // recomposes the block anyway (there's no prior seed to keep byte-identical),
+        // and the whole seed stays deterministic. The cadence passes through held/intact.
+        if (prng() < flairProb && !currentNote.qaRole) {
             let mutationApplied = false;
             const r = prng();
 
