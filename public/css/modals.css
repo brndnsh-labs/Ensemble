@@ -1355,7 +1355,11 @@ input[type="range"] {
  * the same pattern `ToolbarPopover`/`ChordPicker` use to float above the lead
  * sheet. Without the portal, a transformed ancestor (`.lead-sheet-section-group`)
  * becomes this element's containing block despite `position: fixed`, and it
- * paints behind the chord cards. */
+ * paints behind the chord cards. Background is `--panel-color` (opaque, same
+ * as `.workspace-toolbar-panel`/`.section-actions-menu`) — NOT `--input-bg`,
+ * which every theme defines as a translucent "sunken well" tint meant to sit
+ * on an already-opaque parent; portaled straight onto the chart with nothing
+ * opaque behind it, that let chord-card text bleed through the menu. */
 .section-strip__practice-menu {
     position: fixed;
     z-index: var(--z-popover, 1000);
@@ -1363,7 +1367,7 @@ input[type="range"] {
     flex-direction: column;
     min-width: 11rem;
     padding: 0.25rem;
-    background: var(--bg-elevated, var(--input-bg));
+    background: var(--panel-color);
     border: 1px solid var(--border-strong, var(--border-color));
     border-radius: var(--radius-sm);
     box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
