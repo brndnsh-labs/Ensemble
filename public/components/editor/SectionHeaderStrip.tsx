@@ -1,4 +1,11 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { setSectionInstrumentEnabled, setSectionIntensity } from '../../arranger-controller.js';
+import {
+    clearPracticeLoop,
+    getSectionStepBounds,
+    loopSection,
+    startSectionFromHere,
+} from '../../practice-controller.js';
 import type { Section, SectionInstrumentKey } from '../../types.js';
 import { useEnsembleState } from '../../ui-bridge.js';
 import { Icon, type IconName } from '../Icon.jsx';
@@ -94,6 +101,10 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
     const selected = useEnsembleState((s) => ({
         globalIntensity: s?.playback?.bandIntensity ?? 0,
         isPlaying: !!s?.playback?.isPlaying,
+        // #1016 — section-practice loop bounds, so the header can show which
+        // section is being drilled and offer to clear it mid-play.
+        loopStartStep: s?.playback?.loopStartStep ?? -1,
+        loopEndStep: s?.playback?.loopEndStep ?? -1,
         globalEnabled: {
             groove: s?.groove?.enabled ?? true,
             bass: s?.bass?.enabled ?? true,
@@ -112,16 +123,62 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
         soloist: true,
     };
 
+    // #1016 — section practice. The popover that offers "start from here" /
+    // "loop this section" lives on the section label (compact chart view only).
+    const [isPracticeOpen, setIsPracticeOpen] = useState(false);
+    const practiceRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (!isPracticeOpen) {
+            return;
+        }
+        const onDocClick = (e: MouseEvent) => {
+            if (
+                practiceRef.current &&
+                e.target instanceof Node &&
+                !practiceRef.current.contains(e.target)
+            ) {
+                setIsPracticeOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', onDocClick);
+        return () => document.removeEventListener('mousedown', onDocClick);
+    }, [isPracticeOpen]);
+
+    // Is THIS section the one currently being drilled? Compared against the live
+    // loop bounds so the badge shows on the right header and clears the right loop.
+    const bounds = getSectionStepBounds(section.id);
+    const isThisLooping =
+        !!bounds && selected.loopStartStep === bounds.start && selected.loopEndStep === bounds.end;
+
     // While the band is playing in the locked sheet-music view, hide the
     // direction controls so the chart reads clean — you direct between takes,
     // not during them. The unlocked SectionCard view keeps the strip visible
     // because edit-while-playing is already paused by the lock controller.
     if (compact && isPlaying) {
         return (
-            <div class="section-strip section-strip--compact section-strip--playing">
-                <span class="section-strip__label" aria-hidden="true">
-                    {section.label}
-                </span>
+            <div
+                class={`section-strip section-strip--compact section-strip--playing${
+                    isThisLooping ? ' section-strip--looping' : ''
+                }`}
+            >
+                {isThisLooping ? (
+                    // The popover is hidden mid-play, so a live drill still needs
+                    // an escape hatch: this badge is the one control that persists
+                    // during playback — tap to drop the loop and flow into the form.
+                    <button
+                        type="button"
+                        class="section-strip__loop-badge"
+                        title={`Looping ${section.label} — tap to stop`}
+                        aria-label={`Looping ${section.label}. Tap to stop looping.`}
+                        onClick={clearPracticeLoop}
+                    >
+                        🔁 {section.label}
+                    </button>
+                ) : (
+                    <span class="section-strip__label" aria-hidden="true">
+                        {section.label}
+                    </span>
+                )}
             </div>
         );
     }
@@ -143,10 +200,47 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
                 // In the locked chord-visualizer view this label IS the section
                 // identifier — replaces the prior `(A)` row-marker slot. The
                 // unlocked SectionCard view already shows the label as an
-                // editable input, so we skip rendering it twice.
-                <span class="section-strip__label" aria-hidden="true">
-                    {section.label}
-                </span>
+                // editable input, so we skip rendering it twice. #1016 makes the
+                // label a practice trigger: tap → start-from-here / loop popover.
+                <div class="section-strip__practice" ref={practiceRef}>
+                    <button
+                        type="button"
+                        class="section-strip__label section-strip__label--practice"
+                        aria-haspopup="menu"
+                        aria-expanded={isPracticeOpen}
+                        title={`Practice ${section.label}`}
+                        aria-label={`Practice ${section.label} — start from here or loop`}
+                        onClick={() => setIsPracticeOpen((v) => !v)}
+                    >
+                        {section.label}
+                    </button>
+                    {isPracticeOpen && (
+                        <div class="section-strip__practice-menu" role="menu">
+                            <button
+                                type="button"
+                                class="section-strip__practice-item"
+                                role="menuitem"
+                                onClick={() => {
+                                    setIsPracticeOpen(false);
+                                    startSectionFromHere(section.id);
+                                }}
+                            >
+                                ▶ Start from here
+                            </button>
+                            <button
+                                type="button"
+                                class="section-strip__practice-item"
+                                role="menuitem"
+                                onClick={() => {
+                                    setIsPracticeOpen(false);
+                                    loopSection(section.id);
+                                }}
+                            >
+                                🔁 Loop this section
+                            </button>
+                        </div>
+                    )}
+                </div>
             )}
             <div class="section-strip__intensity">
                 {compact ? (

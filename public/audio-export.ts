@@ -238,6 +238,15 @@ function cloneStateForRender(liveState: any): any {
             isScheduling: false,
             nextNoteTime: 0,
             unswungNextNoteTime: 0,
+            // #1016 — always render the FULL song form, never a live section-
+            // practice drill. If an export fired while a loop was active the
+            // clone would inherit it and `foldPracticeStep` would confine the
+            // whole render to the drilled section (and inconsistently, since the
+            // direct generateNotesForStep path uses the raw step). Same
+            // clone-host parity discipline as the #691 live-voice handles.
+            startStep: 0,
+            loopStartStep: -1,
+            loopEndStep: -1,
         },
         arranger: {
             ...liveState.arranger,

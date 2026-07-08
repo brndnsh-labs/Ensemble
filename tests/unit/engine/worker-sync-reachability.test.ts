@@ -72,6 +72,8 @@ function makePopulatedState() {
             songMode: true,
             isEndingPending: true,
             currentLoopCount: num,
+            loopStartStep: num,
+            loopEndStep: num,
         },
         arranger: {
             progression: arr,
@@ -221,6 +223,8 @@ const WORKER_SYNC_MANIFEST: Record<
     'playback.songMode': { delta: 'SET_SONG_MODE' },
     'playback.isEndingPending': { delta: 'SET_ENDING_PENDING' },
     'playback.currentLoopCount': { delta: 'LOOP_BOUNDARY' },
+    'playback.loopStartStep': { delta: 'SET_PRACTICE_LOOP' },
+    'playback.loopEndStep': { delta: 'SET_PRACTICE_LOOP' },
 
     // --- arranger: structural + key edits ride a FULL syncWorker() (arranger-controller.ts,
     // KeySignatureControls.tsx, app-controller.ts). ARRANGER_UPDATE is an unused legacy case;

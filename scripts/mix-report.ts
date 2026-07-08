@@ -379,6 +379,11 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 // (clone-parity, same as audio-export.ts).
                                 activeChordVoices: [],
                                 lastChordKey: null,
+                                // #1016 — render the full form, never a live
+                                // section-practice drill (clone-host parity).
+                                startStep: 0,
+                                loopStartStep: -1,
+                                loopEndStep: -1,
                             },
                             arranger: {
                                 ...liveState.arranger,

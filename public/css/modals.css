@@ -1320,6 +1320,98 @@ input[type="range"] {
     white-space: nowrap;
 }
 
+/* #1016 — section practice. The label becomes a tap target that opens a small
+ * popover offering "start from here" / "loop this section". */
+.section-strip__practice {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.section-strip__label--practice {
+    appearance: none;
+    display: inline-block;
+    margin: 0;
+    padding: 0.1rem 0.35rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font: inherit;
+    max-width: 9rem;
+    transition:
+        background 120ms ease,
+        border-color 120ms ease;
+}
+
+.section-strip__label--practice:hover,
+.section-strip__label--practice[aria-expanded="true"] {
+    background: var(--bg-color);
+    border-color: var(--accent-color);
+}
+
+.section-strip__practice-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    min-width: 11rem;
+    padding: 0.25rem;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+}
+
+.section-strip__practice-item {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.55rem;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.section-strip__practice-item:hover {
+    background: var(--bg-color);
+    color: var(--accent-color);
+}
+
+/* The one control that persists while playing: a pill badge on the drilled
+ * section, tapped to drop the loop. Brass accent = active/live. */
+.section-strip__loop-badge {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.12rem 0.55rem;
+    background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+    border: 1px solid var(--accent-color);
+    border-radius: 999px;
+    color: var(--accent-color);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.section-strip__loop-badge:hover {
+    background: color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
 .section-strip__intensity {
     flex: 0 0 auto;
     width: 160px;

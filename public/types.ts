@@ -1007,6 +1007,22 @@ export interface GlobalContext {
      * update on section transitions instead of every 16th note.
      */
     readonly currentSectionId: string | null;
+    /**
+     * Section-practice ("drill") — the absolute step at which the next play
+     * should begin. Normally 0; set to a section's first step by "start from
+     * here" / "loop this section" (#1016). `startPlayback` and the count-in
+     * completion seed `step` from this, then it resets to 0 on stop.
+     */
+    readonly startStep: number;
+    /**
+     * Section-practice loop bounds, in absolute steps within one pass through
+     * the chart (`[0, totalSteps)`). Both `-1` means no loop. While a loop is
+     * active the scheduler folds `step` within `[loopStartStep, loopEndStep)`
+     * and the worker folds its buffer fill to match — song-mode form
+     * progression / ending is suspended until the loop is cleared (#1016).
+     */
+    readonly loopStartStep: number;
+    readonly loopEndStep: number;
     /** Queue of normalized visual events waiting to be rendered. */
     readonly drawQueue: any[];
     /** Whether the metronome count-in is active. */
@@ -1441,6 +1457,13 @@ export interface ActionPayloadMap {
     SET_SONG_MODE: boolean;
     SET_STOP_AT_END: boolean;
     SET_ENDING_PENDING: boolean;
+    /** Section-practice: seed the step the next play begins from (#1016). */
+    SET_START_STEP: number;
+    /**
+     * Section-practice loop bounds (#1016). `null` clears the loop; otherwise
+     * `{ start, end }` are absolute steps within `[0, totalSteps)`.
+     */
+    SET_PRACTICE_LOOP: { start: number; end: number } | null;
     RESET_STATE: undefined;
     SET_MIDI_CONFIG: ActionPayloadSetMidiConfig;
     RESTORE_GAINS: undefined;
@@ -1527,6 +1550,8 @@ export const ACTIONS = {
     SET_SONG_MODE: 'SET_SONG_MODE',
     SET_STOP_AT_END: 'SET_STOP_AT_END',
     SET_ENDING_PENDING: 'SET_ENDING_PENDING',
+    SET_START_STEP: 'SET_START_STEP',
+    SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
     RESET_STATE: 'RESET_STATE',
 
     // --- MIDI ---

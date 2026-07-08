@@ -14,6 +14,9 @@ export const playback = deepSignal<GlobalContext>({
     scheduleAheadTime: 0.2,
     step: 0,
     currentSectionId: null,
+    startStep: 0,
+    loopStartStep: -1,
+    loopEndStep: -1,
     drawQueue: [],
     isCountingIn: false,
     countInBeat: 0,
@@ -102,6 +105,14 @@ export function playbackReducer(action: Action): boolean {
             if (p.isPlaying) {
                 p.sessionStartTime = performance.now();
                 p.currentLoopCount = 0;
+            } else {
+                // Stopping ends any section-practice drill (#1016): the loop and
+                // the start-from-here seed are transient, invoked from the
+                // stopped-state popover. Clearing here means the global Play
+                // button always resumes normal full-form playback from the top.
+                p.startStep = 0;
+                p.loopStartStep = -1;
+                p.loopEndStep = -1;
             }
             if (p.autoIntensity) {
                 p.bandIntensity = 0.35;
@@ -164,6 +175,31 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_ENDING_PENDING:
             p.isEndingPending = action.payload;
+            return true;
+        case ACTIONS.SET_START_STEP:
+            // Section-practice (#1016): seed the step the next play starts from.
+            p.startStep = Number.isFinite(action.payload) ? Math.max(0, action.payload) : 0;
+            return true;
+        case ACTIONS.SET_PRACTICE_LOOP:
+            // Section-practice (#1016): `null` clears the loop; otherwise fold
+            // playback within [start, end). An empty/inverted range clears too.
+            if (
+                action.payload &&
+                Number.isFinite(action.payload.start) &&
+                Number.isFinite(action.payload.end) &&
+                action.payload.end > action.payload.start
+            ) {
+                p.loopStartStep = Math.max(0, action.payload.start);
+                p.loopEndStep = action.payload.end;
+                // A loop always begins at its own start, so seed it atomically
+                // here — the caller needn't also dispatch SET_START_STEP.
+                p.startStep = p.loopStartStep;
+            } else {
+                // Clearing a loop (e.g. the mid-play badge tap) leaves startStep
+                // alone — the playhead flows on from wherever it is.
+                p.loopStartStep = -1;
+                p.loopEndStep = -1;
+            }
             return true;
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
             if (p.scheduleAheadTime < 0.4) {

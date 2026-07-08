@@ -175,6 +175,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/arranger-controller.ts` | High-level song structure manipulation. |
 | `public/instrument-controller.ts` | Per-instrument state and preset routing. |
 | `public/performance-controller.ts` | Real-time keyboard performance logic. |
+| `public/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
 | `public/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/midi-export.ts` | Main-thread MIDI file triggers. |
 | `public/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |

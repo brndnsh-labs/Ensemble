@@ -69,7 +69,7 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
-import { sectionAtStep } from './section-overrides.js';
+import { foldPracticeStep, isPracticeLooping, sectionAtStep } from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
@@ -225,9 +225,17 @@ export function togglePlay(
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
 
-        (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
+        // #1016 — section practice. Normally 0; "start from here" / "loop this
+        // section" seed `startStep` with the drilled section's first step so
+        // playback (and the worker flush below) begins there instead of the top.
+        const rawStartStep = playback.startStep ?? 0;
+        const seedStep =
+            arranger.totalSteps > 0
+                ? Math.max(0, Math.min(rawStartStep, arranger.totalSteps - 1))
+                : Math.max(0, rawStartStep);
+        (playback as Mutable<typeof playback>).step = seedStep; // @direct-mutation
         (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
-            sectionAtStep(arranger, 0)?.id ?? null;
+            sectionAtStep(arranger, seedStep)?.id ?? null;
         (playback as Mutable<typeof playback>).resolutionTriggered = false; // @direct-mutation
         (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
         (chords as Mutable<typeof chords>).scheduledChordIndex = 0; // @direct-mutation
@@ -382,7 +390,16 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
 
                 // --- Resolution Trigger Logic ---
                 // If ending is pending or stopAtEnd is active, check for appropriate boundary (Next Chorus)
-                if (playback.step > 0 && playback.step % arranger.totalSteps === 0) {
+                // #1016 — while drilling a section, `step` keeps climbing
+                // monotonically but the music is folded within the loop window,
+                // so a form-loop boundary here would be spurious. Suspend
+                // chorus-count / session-ending / loop-limit until the drill is
+                // cleared; the drilled section just repeats indefinitely.
+                if (
+                    !isPracticeLooping(playback) &&
+                    playback.step > 0 &&
+                    playback.step % arranger.totalSteps === 0
+                ) {
                     (playback as Mutable<typeof playback>).currentLoopCount++; // @direct-mutation
                     syncWorker('LOOP_BOUNDARY');
 
@@ -464,9 +481,16 @@ function advanceCountIn(state: EnsembleState): void {
     (playback as Mutable<typeof playback>).countInBeat++; // @direct-mutation
     if (playback.countInBeat >= ts.beats) {
         (playback as Mutable<typeof playback>).isCountingIn = false; // @direct-mutation
-        (playback as Mutable<typeof playback>).step = 0; // @direct-mutation
+        // #1016 — begin at the drilled section's first step (0 normally). The
+        // count-in itself fires once, before this; folding never re-triggers it.
+        const rawStartStep = playback.startStep ?? 0;
+        const seedStep =
+            arranger.totalSteps > 0
+                ? Math.max(0, Math.min(rawStartStep, arranger.totalSteps - 1))
+                : Math.max(0, rawStartStep);
+        (playback as Mutable<typeof playback>).step = seedStep; // @direct-mutation
         (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
-            sectionAtStep(arranger, 0)?.id ?? null;
+            sectionAtStep(arranger, seedStep)?.id ?? null;
     }
 }
 
@@ -548,7 +572,11 @@ function advanceGlobalStep(state: EnsembleState): void {
     // modulo the ever-incrementing step the same way conductor.ts/
     // midi-worker-logic.ts do, or this goes stale (stuck at the last
     // section) after the first loop.
-    const modStep = arranger.totalSteps > 0 ? playback.step % arranger.totalSteps : playback.step;
+    // #1016 — fold into the practice-loop window (identity when not looping) so
+    // the published section stays on the drilled section, then wrap into the
+    // chart the same way as normal playback.
+    const foldedStep = foldPracticeStep(playback.step, playback);
+    const modStep = arranger.totalSteps > 0 ? foldedStep % arranger.totalSteps : foldedStep;
     const nextSectionId = sectionAtStep(arranger, modStep)?.id ?? null;
     if (nextSectionId !== playback.currentSectionId) {
         (playback as Mutable<typeof playback>).currentSectionId = nextSectionId; // @direct-mutation
@@ -1264,6 +1292,13 @@ export function scheduleGlobalEvent(
     const { arranger, playback, groove, soloist, chords, bass, harmony, vizState } = state;
     const signatures: any = TIME_SIGNATURES;
     const globalTS = signatures[arranger.timeSignature] || signatures['4/4'];
+    // #1016 — section practice. `step` stays monotonic for buffer-key lookups
+    // (the lane schedulers `.get(step)` the worker notes keyed by monotonic
+    // step). `musicalStep` folds into the drill window for chart-position work:
+    // section transitions, chord lookup, and main-thread drum generation. The
+    // two coincide (musicalStep === step) whenever no loop is active, so
+    // non-practice playback is unchanged.
+    const musicalStep = foldPracticeStep(step, playback);
     const stepInfo = getStepInfo(step, globalTS, arranger.measureMap, signatures);
     const ts = signatures[stepInfo.tsName || '4/4'] || globalTS;
 
@@ -1296,7 +1331,7 @@ export function scheduleGlobalEvent(
     }
 
     if (dispatch) {
-        checkSectionTransition(state, step, spm, dispatch);
+        checkSectionTransition(state, musicalStep, spm, dispatch);
     }
 
     // MIDI Automation
@@ -1351,12 +1386,12 @@ export function scheduleGlobalEvent(
             queueVisualizerStepEvent(playback, swungTime, drumStep);
         }
 
-        const chordDataForDrums = getChordAtStep(state, step);
+        const chordDataForDrums = getChordAtStep(state, musicalStep);
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
+        const isTurnaround = isSectionTurnaround(musicalStep, arranger.sectionMap, stepsPerBar, 1);
 
         scheduleDrums(
             state,
@@ -1369,7 +1404,7 @@ export function scheduleGlobalEvent(
                 isDownbeat: stepInfo.isMeasureStart,
                 isBeatStart: stepInfo.isBeatStart,
                 isBackbeat: stepInfo.isBackbeat,
-                absoluteStep: step,
+                absoluteStep: musicalStep,
                 isGroupStart: stepInfo.isGroupStart,
                 sectionId,
                 beatIndex: stepInfo.beatIndex,
@@ -1383,7 +1418,10 @@ export function scheduleGlobalEvent(
         );
     }
 
-    const chordData = getChordAtStep(state, step);
+    // Chord for this step's chart position (folded during a practice drill). The
+    // lane schedulers below still take the monotonic `step` — that's their
+    // worker-buffer key — but the chord/section context must match the drill.
+    const chordData = getChordAtStep(state, musicalStep);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
             (playback as Mutable<typeof playback>).currentKey = chordData.chord.key as any; // @direct-mutation

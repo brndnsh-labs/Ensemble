@@ -64,6 +64,56 @@ describe('Playback Reducer', () => {
         expect(playback.isEndingPending).toBe(true);
     });
 
+    describe('section practice (#1016)', () => {
+        it('seeds and clamps the start step', () => {
+            playbackReducer({ type: ACTIONS.SET_START_STEP, payload: 48 });
+            expect(playback.startStep).toBe(48);
+            // Negative / non-finite payloads floor to 0 rather than poison `step`.
+            playbackReducer({ type: ACTIONS.SET_START_STEP, payload: -5 });
+            expect(playback.startStep).toBe(0);
+            playbackReducer({ type: ACTIONS.SET_START_STEP, payload: Number.NaN });
+            expect(playback.startStep).toBe(0);
+        });
+
+        it('sets a valid practice loop, seeds startStep atomically, and clears on null', () => {
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            expect(playback.loopStartStep).toBe(32);
+            expect(playback.loopEndStep).toBe(64);
+            // The loop always begins at its own start — seeded in one dispatch.
+            expect(playback.startStep).toBe(32);
+
+            // Clearing leaves startStep alone (playhead flows on from where it is).
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null });
+            expect(playback.loopStartStep).toBe(-1);
+            expect(playback.loopEndStep).toBe(-1);
+            expect(playback.startStep).toBe(32);
+        });
+
+        it('rejects an empty or inverted loop range (clears instead)', () => {
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            // end <= start is not a loop — treat as clear.
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 64, end: 64 } });
+            expect(playback.loopStartStep).toBe(-1);
+            expect(playback.loopEndStep).toBe(-1);
+        });
+
+        it('stopping playback clears the drill (start step + loop)', () => {
+            playbackReducer({ type: ACTIONS.SET_START_STEP, payload: 32 });
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            // Start (isPlaying → true) keeps the seed…
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
+            expect(playback.isPlaying).toBe(true);
+            expect(playback.startStep).toBe(32);
+            expect(playback.loopStartStep).toBe(32);
+            // …stop (isPlaying → false) wipes it so the next plain Play starts at the top.
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined });
+            expect(playback.isPlaying).toBe(false);
+            expect(playback.startStep).toBe(0);
+            expect(playback.loopStartStep).toBe(-1);
+            expect(playback.loopEndStep).toBe(-1);
+        });
+    });
+
     it('should handle modal opening/closing for valid modals only (line 168)', () => {
         // Valid modal
         const result = playbackReducer({

@@ -299,6 +299,15 @@ export function syncWorker(action?: string, payload?: any): void {
                 sessionStartTime: playback.sessionStartTime,
             };
             break;
+        case 'SET_PRACTICE_LOOP':
+            // #1016 — cross the section-practice loop bounds to the worker so
+            // fillBuffers folds its fill within [loopStartStep, loopEndStep).
+            // Sent on both set and clear (clear = -1/-1).
+            data.playback = {
+                loopStartStep: playback.loopStartStep,
+                loopEndStep: playback.loopEndStep,
+            };
+            break;
         case 'LOOP_BOUNDARY':
             // Main thread is the canonical writer of playback.currentLoopCount;
             // pushed to the worker each time the scheduler crosses a chorus boundary.

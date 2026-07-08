@@ -69,6 +69,11 @@ export function buildPlaybackSyncPayload(playback: GlobalContext) {
         songMode: playback.songMode,
         isEndingPending: playback.isEndingPending,
         currentLoopCount: playback.currentLoopCount,
+        // #1016 — section-practice loop bounds. The worker folds its buffer
+        // fill within [loopStartStep, loopEndStep) so a drilled section keeps
+        // generating notes (rather than filling past into the next section).
+        loopStartStep: playback.loopStartStep,
+        loopEndStep: playback.loopEndStep,
     };
 }
 

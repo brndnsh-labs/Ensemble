@@ -1,6 +1,6 @@
 import type { EnsembleState } from '../types.js';
 import { WORKER_RESP } from '../worker-types.js';
-import { isInstrumentActiveAtStep } from './section-overrides.js';
+import { foldPracticeStep, isInstrumentActiveAtStep } from './section-overrides.js';
 import { generateNotesForStep } from './tick-logic.js';
 import { workerContext } from './worker-orchestrator.js';
 
@@ -63,14 +63,24 @@ export function fillBuffers(
     while (head < targetStep) {
         const step = head;
 
-        const soloistActive = isInstrumentActiveAtStep(state, 'soloist', step);
-        const bassActive = isInstrumentActiveAtStep(state, 'bass', step);
-        const chordsActive = isInstrumentActiveAtStep(state, 'chords', step);
-        const harmonyActive = isInstrumentActiveAtStep(state, 'harmony', step);
+        // #1016 — section practice. `step` stays monotonic (the buffer key, and
+        // the per-instrument buffer-head bookkeeping below), but the *musical*
+        // position folds into the active drill window so the drilled section
+        // keeps generating instead of running past into the next section. When
+        // no loop is active, `musicalStep === step` and everything below is
+        // byte-identical to normal playback. Notes are re-stamped back to the
+        // monotonic `step` before crossing to the main thread so the scheduler
+        // (which schedules by monotonic step) matches them.
+        const musicalStep = foldPracticeStep(step, state.playback);
+
+        const soloistActive = isInstrumentActiveAtStep(state, 'soloist', musicalStep);
+        const bassActive = isInstrumentActiveAtStep(state, 'bass', musicalStep);
+        const chordsActive = isInstrumentActiveAtStep(state, 'chords', musicalStep);
+        const harmonyActive = isInstrumentActiveAtStep(state, 'harmony', musicalStep);
 
         const tickResult = generateNotesForStep(
             state,
-            step,
+            musicalStep,
             {
                 mainCursor: workerContext.mainCursor,
                 lookaheadCursor: workerContext.lookaheadCursor,
@@ -104,7 +114,16 @@ export function fillBuffers(
         }
 
         for (let i = 0; i < tickResult.notes.length; i++) {
-            notesToMain.push(tickResult.notes[i]);
+            const note = tickResult.notes[i];
+            // Re-stamp to the monotonic buffer key. `generateNotesForStep` tags
+            // each note with the step it was *asked* for (the folded musicalStep
+            // during a practice loop); the main thread buckets notes by `n.step`
+            // and schedules by the monotonic step, so key them monotonically.
+            // No-op when not looping (musicalStep === step). (#1016)
+            if (musicalStep !== step) {
+                note.step = step;
+            }
+            notesToMain.push(note);
         }
 
         // why: advance each buffer head only when the instrument was active at
