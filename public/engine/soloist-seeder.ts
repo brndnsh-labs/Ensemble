@@ -297,6 +297,7 @@ interface CreateSeedNoteOptions {
     stepsPerMeasure: number;
     stepsPerBeat: number;
     qaRole?: 'question' | 'answer';
+    hookRole?: boolean;
 }
 
 function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
@@ -313,6 +314,7 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
         stepsPerMeasure,
         stepsPerBeat,
         qaRole = undefined,
+        hookRole = undefined,
     } = options;
 
     const note: SeedNote = {
@@ -340,6 +342,9 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
     }
     if (qaRole) {
         note.qaRole = qaRole;
+    }
+    if (hookRole) {
+        note.hookRole = hookRole;
     }
 
     return note;
@@ -1619,6 +1624,51 @@ export function generateSessionSeed(
                 }
             }
 
+            // --- #1056 Hook cell (plan it up front, like the Q&A pair) ---
+            // The first few active notes of MEASURE 0 become a protected, chord-rooted
+            // repeating figure. Measure 0 is the same template position every block, so
+            // its degree-shape is identical block-to-block; pinning its pitch (below,
+            // post-scoring) makes it recur verbatim and SEQUENCE with the harmony —
+            // exactly the short, identifiable hook the exposed early loops lack (#1055).
+            // Skipped on turnaround (meant to surprise) and stationary (already static)
+            // blocks; a note that is ALSO a Q&A cadence stays a cadence (that feature
+            // wins). Computed on the FINAL `activeMotif` (after the QA deep-copy above)
+            // so the references match what the note loop iterates.
+            // ASSUMES one chord per measure-0 bar (true for the riff-blues/ballad charts
+            // this targets): the whole cell is realized over the block's DOWNBEAT chord
+            // (`hookToneSet`/`hookCellOctaveOffset` below), so a mid-measure-0 chord change
+            // would blend that quality-shape with a later note's root. Doesn't arise in the
+            // supported presets; a fast-changing hook bar would need per-note chord tones.
+            const HOOK_MAX_NOTES = 4;
+            const hookNotes = new Set<MotifEvent>();
+            if (!isTurnaroundMeasures && !isStationaryMotif) {
+                const measureZeroActive = activeMotif.filter(
+                    (n) =>
+                        !n.isRest &&
+                        !n.isPickup &&
+                        n.beatOffset >= 0 &&
+                        n.beatOffset < qaBeatsPerMeasure,
+                );
+                for (const n of measureZeroActive.slice(0, HOOK_MAX_NOTES)) {
+                    hookNotes.add(n);
+                }
+            }
+            // Realize the hook over CHORD TONES (root/3rd/5th/7th), stepping the motif's
+            // degree shape through them. This keeps every hook note consonant and in-key
+            // (so strong beats still land chord tones — the §5 voice-leading invariant the
+            // rest of the line honors), makes the cell a classic arpeggiated riff, and — the
+            // key property — gives it ONE fixed interval shape that only TRANSPOSES with the
+            // chord root (a dom7 is [0,4,7,10] over I, IV and V alike), so the same figure
+            // is recognizable I→IV→V. Mapping through a key scale instead put non-chord,
+            // out-of-key tones on strong beats; per-chord scales gave a shape that only
+            // recurred every 3 blocks.
+            const hookRawOf = (degree: number, rootMidi: number, tones: number[]) => {
+                const len = tones.length;
+                const oct = Math.floor(degree / len) * 12;
+                const mod = ((degree % len) + len) % len;
+                return rootMidi + tones[mod] + oct;
+            };
+
             // Pick a target chord tone for the downbeat of these 2 measures
             const stepToSearch = Math.min(baseStep, actualTotalSteps - 1);
             const entryForMeasure = binarySearchMap(stepMap, stepToSearch);
@@ -1631,7 +1681,46 @@ export function generateSessionSeed(
             const targetInterval = chordTones[Math.floor(prng() * chordTones.length)]; // Root, 3rd, 5th, etc.
             const targetPitchClass = (targetChord.rootMidi + targetInterval) % 12;
 
+            // #1056 — the hook's chord-tone stepping cycle, WEIGHTED toward guide tones:
+            // root anchor, then the guides (3rd/7th) listed TWICE, then the rest (5th). The
+            // motif's degree shape steps through this cycle, so the riff leans on the
+            // harmony-defining tones — a root-heavy arpeggio diluted the line's guide-tone
+            // rate below the §5 floor, and on triads (one guide) only the doubling lifts it.
+            // Still all chord tones, still one fixed shape per chord quality (recurrence
+            // intact). Natural chord-tone order is the fallback if the split comes up empty.
+            const hookNorm = (iv: number) => ((iv % 12) + 12) % 12;
+            const hookIsGuide = (iv: number) => [3, 4, 10, 11].includes(hookNorm(iv));
+            const hookGuides = chordTones.filter((t: number) => hookIsGuide(t));
+            const hookTones = [
+                ...chordTones.filter((t: number) => hookNorm(t) === 0),
+                ...hookGuides,
+                ...hookGuides,
+                ...chordTones.filter((t: number) => hookNorm(t) !== 0 && !hookIsGuide(t)),
+            ];
+            const hookToneSet = hookTones.length > 0 ? hookTones : chordTones;
+
             const registerOctaveBase = Math.floor(registerBase / 12) * 12;
+
+            // #1056 — fit the WHOLE hook cell in-register with ONE shared octave offset,
+            // computed up front from every hook note over the block's downbeat chord (all
+            // hook notes sit in measure 0 = that one bar). Folding the cell as a unit — vs
+            // clamping each note to the floor/ceiling — is what preserves the interval
+            // shape when the cell transposes onto a low or high chord root (a per-note
+            // clamp collapsed the descending tail onto the floor and killed the recurrence).
+            let hookCellOctaveOffset = 0;
+            if (hookNotes.size > 0) {
+                const raws = [...hookNotes].map((n) =>
+                    hookRawOf(n.scaleDegreeOffset, targetChord.rootMidi, hookToneSet),
+                );
+                const cellMid = (Math.min(...raws) + Math.max(...raws)) / 2;
+                hookCellOctaveOffset = Math.round((registerBase - cellMid) / 12) * 12;
+                while (Math.min(...raws) + hookCellOctaveOffset < registerProfile.seedFloor) {
+                    hookCellOctaveOffset += 12;
+                }
+                while (Math.max(...raws) + hookCellOctaveOffset > registerProfile.seedCeiling) {
+                    hookCellOctaveOffset -= 12;
+                }
+            }
             let anchorMidi = registerOctaveBase + targetPitchClass;
             while (anchorMidi < registerBase - 6) {
                 anchorMidi += 12;
@@ -2023,6 +2112,28 @@ export function generateSessionSeed(
                     }
                 }
 
+                // #1056 — PIN the hook pitch. Like the Q&A pin, the scoring loop only
+                // soft-biases toward the intended degree, so the hook would re-realize
+                // differently each block (fresh anchor draw + `lastMidi` carry) and never
+                // recur. Override post-scoring to the motif's INTENDED degree shape,
+                // re-rooted on the current chord — deterministic (no PRNG, so no stream
+                // desync). The whole cell shares ONE octave offset (`hookCellOctaveOffset`,
+                // locked on the first hook note of the block): the interval shape stays
+                // intact and only the cell as a WHOLE transposes with the chord root, so
+                // the SAME figure is recognizable I→IV→V. (Per-note folding — the naive
+                // version — scattered degrees into different octaves per block and killed
+                // the shape.) A Q&A cadence note is never also a hook (cadence pin wins).
+                const isHookNote = hookNotes.has(motifNote) && !qaRoleForNote;
+                if (isHookNote) {
+                    // The cell's raw pitch, stepped through the current chord's tones (same
+                    // fixed shape every block), plus the whole-cell octave offset. No per-
+                    // note clamp: the offset already fit the cell in-register, so the
+                    // interval shape is preserved exactly and transposes with the chord.
+                    midi =
+                        hookRawOf(motifNote.scaleDegreeOffset, currentChord.rootMidi, hookToneSet) +
+                        hookCellOctaveOffset;
+                }
+
                 lastMidi = midi;
                 previousMotifDegree = motifNote.scaleDegreeOffset;
                 prevNoteChord = currentChord;
@@ -2056,6 +2167,7 @@ export function generateSessionSeed(
                             stepsPerMeasure,
                             stepsPerBeat,
                             qaRole: qaRoleForNote,
+                            hookRole: isHookNote || undefined,
                         });
                     }
                 } else {
@@ -2073,6 +2185,7 @@ export function generateSessionSeed(
                             stepsPerMeasure,
                             stepsPerBeat,
                             qaRole: qaRoleForNote,
+                            hookRole: isHookNote || undefined,
                         }),
                     );
                 }
@@ -2106,7 +2219,7 @@ export function generateSessionSeed(
         // skip its inner mutation draws, shifting the stream from there — harmless, #1009
         // recomposes the block anyway (there's no prior seed to keep byte-identical),
         // and the whole seed stays deterministic. The cadence passes through held/intact.
-        if (prng() < flairProb && !currentNote.qaRole) {
+        if (prng() < flairProb && !currentNote.qaRole && !currentNote.hookRole) {
             let mutationApplied = false;
             const r = prng();
 

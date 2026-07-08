@@ -354,6 +354,11 @@ export function getSoloistNotePhraseFirst(
     // roam). Read off `primary` — the note this tick actually develops.
     const qaRole = (primary as any)?.qaRole as 'question' | 'answer' | undefined;
     const isQaCadence = qaRole === 'question' || qaRole === 'answer';
+    // #1056 — the seed-planned hook figure (the first few notes of a block's measure 0,
+    // pitch-pinned and chord-rooted at seed time). Exempt from the density gate exactly
+    // like a Q&A cadence, so the repeating, identifiable figure always sounds and the
+    // ear has something to grab in the exposed early loops.
+    const isHook = Boolean((primary as any)?.hookRole);
 
     // --- Dramatic arc → how active the lead is right now (0..1) ---
     // Two deliberately simple contributions (tuned by ear in later builds):
@@ -584,6 +589,7 @@ export function getSoloistNotePhraseFirst(
         let present = false;
         let anchorHere = false;
         let qaCadenceHere = false;
+        let hookHere = false;
         // Match every seed note that lands on this step — INCLUDING pickups (whose
         // negative step maps via the modulo to a high stepInLoop near the loop end),
         // exactly as the live `here` filter does. Skipping them here falsely
@@ -597,6 +603,9 @@ export function getSoloistNotePhraseFirst(
                 if (n.qaRole === 'question' || n.qaRole === 'answer') {
                     qaCadenceHere = true;
                 }
+                if (n.hookRole) {
+                    hookHere = true;
+                }
             }
         }
         if (!present) {
@@ -606,7 +615,7 @@ export function getSoloistNotePhraseFirst(
         // duration-clamp lookahead would predict a cadence rests when the live emit
         // sounds it, and the preceding note would overrun the cadence (the slice-A
         // "live emit and lookahead see one gate" invariant).
-        if (anchorHere || sInLoop === apexStepInLoop || qaCadenceHere) {
+        if (anchorHere || sInLoop === apexStepInLoop || qaCadenceHere || hookHere) {
             return true;
         }
         const g = scrambleHash(absStep * 7 + Math.max(loopCount, 0) * 131 + 17);
@@ -619,7 +628,7 @@ export function getSoloistNotePhraseFirst(
     // and must never be gated out. Non-anchor ornament notes only fill in as the
     // arc opens up, so quiet passages stay spacious and energetic ones fill in.
     // The gate is a deterministic per-(step,loop) hash so loops stay reproducible.
-    if (!isAnchor && !isApexStep && !isQaCadence) {
+    if (!isAnchor && !isApexStep && !isQaCadence && !isHook) {
         const gate = scrambleHash(step * 7 + Math.max(loopCount, 0) * 131 + 17);
         if (gate > activity) {
             phr.isResting = true; // @worker-mutation
@@ -727,6 +736,14 @@ export function getSoloistNotePhraseFirst(
             if (moneyNote > 0 && stepsToApex > 0 && stepsToApex <= stepsPerBar * 2) {
                 midi = diatonicNeighbor(moneyNote, -1, keyRootPc, keyIsMinor);
             }
+        } else if (isHook) {
+            // #1056 — the hook is a seed-pinned, chord-rooted riff; preserve it VERBATIM
+            // (register-folded only), like the Q&A question hang. The body diatonicTranspose
+            // above snaps to the KEY scale, which would alter the hook's chord-rooted tones
+            // (e.g. a maj-3rd over V) and break the recurring shape; the isStrongBeat branch
+            // below would re-snap it to a guide tone. Skip both — the seeder already placed
+            // the identifiable figure, so the ear grabs the SAME cell each block.
+            midi = primary.midi + bodyOctaveFold;
         } else if (isStrongBeat) {
             // LAND: pull a non-chord-tone strong beat onto a guide tone of the
             // current chord (nearest functional tone if no guide is in reach);
@@ -768,6 +785,17 @@ export function getSoloistNotePhraseFirst(
     if (isQaCadence) {
         while (midi < 52) {
             midi += 12;
+        }
+    }
+    // #1056 — the hook is preserved verbatim (bypasses the body fold), so bound it to the
+    // register contract [52, 88] by octaves here — an octave shift keeps the interval
+    // shape intact, so the recurring figure survives the clamp.
+    if (isHook) {
+        while (midi < 52) {
+            midi += 12;
+        }
+        while (midi > 88) {
+            midi -= 12;
         }
     }
 
@@ -944,6 +972,10 @@ export function getSoloistNotePhraseFirst(
         resolvedStyle === 'country' &&
         !isApexStep &&
         !inFlurry &&
+        // #1056 — the hook stays crisp: a grace slide on every chord-tone hook note (the
+        // hook IS chord tones) smears the identifiable figure and stacks Country's expr
+        // rate against the §10 <30% guard. The hook owns its clean statement.
+        !isHook &&
         bendStartInterval === 0 &&
         graceIsChordTone &&
         // sparse within the chord-tone-arrival set — a player's lyrical lean into the
@@ -996,6 +1028,9 @@ export function getSoloistNotePhraseFirst(
         // the QUESTION would bend its non-chord hang UP to a chord tone — resolving the
         // very tension the question exists to leave open. Both stay cry-exempt.
         !isQaCadence &&
+        // #1056 — the hook owns its clean statement (like the Q&A cadence); a cry would
+        // bend the pinned figure and blur its recurring shape.
+        !isHook &&
         bendStartInterval === 0 &&
         // Most eligible held notes cry (a blues player leans into them); the hash
         // keeps a little variation so it doesn't read as mechanically every-note.
@@ -1216,7 +1251,11 @@ export function getSoloistNotePhraseFirst(
             scrambleHash(step * 17 + Math.max(loopCount, 0) * 5 + 9) < 0.72
         ) {
             const harmonyMidi = guitarDoubleStopVoice(currentChord, midi, style);
-            if (harmonyMidi !== null) {
+            // #1056 — skip the double-stop if its harmony voice would fall under the
+            // slotting floor. The lead is clamped to ≥52 above, but the added voice (a 6th
+            // below) is not; a low-register hook lead can push it under. Only the rare
+            // sub-floor case is skipped, so the double-stop feature is otherwise intact.
+            if (harmonyMidi !== null && harmonyMidi >= 52) {
                 // Harmony first, lead last — tick-logic updates lastFreq from the
                 // non-double-stop voice (the lead), matching the legacy ordering.
                 return [

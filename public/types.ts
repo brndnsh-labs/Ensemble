@@ -416,6 +416,22 @@ export interface SeedNote {
      * snapshot as an opaque nested property (no worker delta plumbing).
      */
     qaRole?: 'question' | 'answer';
+    /**
+     * #1056 — hook cell membership. Set at seed time on the first few active notes of
+     * measure 0 of each motif block: a short (≤4-note) CHORD-TONE arpeggio, re-rooted on
+     * each block's local chord, so its interval SHAPE is fixed and only the root transposes
+     * with the harmony — the SAME figure sequences I→IV→V. The live engine reads this to
+     * protect the hook from the density gate (like `qaRole`) and preserve it verbatim, so
+     * the ear gets a repeating, identifiable figure in the exposed early loops. Absent on
+     * non-hook notes. Rides the play-start seed snapshot as an opaque nested property (no
+     * worker delta plumbing).
+     *
+     * SCOPE: the "same figure" recurrence holds when consecutive blocks share chord QUALITY
+     * (blues I/IV/V, all dom7). On functional harmony (a jazz ii–V–I) the fixed degree-shape
+     * maps through differing chord-tone sets → the contour differs per chord. It is a
+     * riff-blues head device, not a general-purpose hook.
+     */
+    hookRole?: boolean;
 }
 
 export interface SoloistSessionSeed {
