@@ -13,6 +13,12 @@
 // combined `state` (success|pending|failure|error) + per-job `statuses[]`
 // ({context, state, target_url}) — the `gh statusCheckRollup` replacement.
 //
+// After a successful merge, it also closes the issues the PR body references with a
+// close keyword (`Closes #<n>`, `fixes #<n>`, …). Forgejo's OWN auto-close-on-merge
+// does NOT fire on this script's API squash-merge (observed systemic 2026-07 across
+// #1067/#1027 and #1068/#1040 — bodies verifiably carried `Closes #<n>` yet the issues
+// stayed open), so the guard closes them itself to remove the recurring manual step.
+//
 // Usage:
 //   node scripts/forgejo-merge.mjs <pr#>            # poll → merge on green
 //   node scripts/forgejo-merge.mjs <pr#> --dry-run  # poll + decide, but never merge
@@ -128,6 +134,54 @@ async function pollToTerminal(sha) {
     }
 }
 
+// Forgejo's close-keyword set (Gitea default): close/closes/closed, fix/fixes/fixed,
+// resolve/resolves/resolved, each followed by `#<n>`. Same-repo refs only — a cross-repo
+// `owner/repo#n` has non-`#` text after the keyword and is intentionally skipped. We match
+// regardless of surrounding prose (negations included), mirroring Forgejo's own literal
+// keyword behavior — a "does not close #5" still closes #5, same as Forgejo does.
+const CLOSE_KEYWORD_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+
+function parseClosesIssues(body) {
+    const nums = new Set();
+    for (const m of (body ?? '').matchAll(CLOSE_KEYWORD_RE)) {
+        nums.add(Number(m[1]));
+    }
+    return [...nums];
+}
+
+// Close every issue the merged PR body claims to close. Logs each outcome; a failure
+// here NEVER flips the exit code — the merge already succeeded (exit 0 = merged), and a
+// close hiccup is a surfaced warning, not a merge failure.
+async function closeReferencedIssues(prNum, body) {
+    for (const n of parseClosesIssues(body)) {
+        const cur = await api('GET', `/repos/${OWNER}/${REPO}/issues/${n}`);
+        if (!cur.ok) {
+            console.error(`forgejo-merge: could not read issue #${n} to close (${cur.status})`);
+            continue;
+        }
+        if (cur.data.pull_request) {
+            continue; // a PR, not an issue — skip
+        }
+        if (cur.data.state === 'closed') {
+            console.log(`forgejo-merge: issue #${n} already closed — skipping`);
+            continue;
+        }
+        await api('POST', `/repos/${OWNER}/${REPO}/issues/${n}/comments`, {
+            body: `Closed by PR #${prNum} (squash-merged).`,
+        });
+        const patched = await api('PATCH', `/repos/${OWNER}/${REPO}/issues/${n}`, {
+            state: 'closed',
+        });
+        if (patched.ok && patched.data?.state === 'closed') {
+            console.log(`forgejo-merge: closed issue #${n} (referenced by PR #${prNum})`);
+        } else {
+            console.error(
+                `forgejo-merge: FAILED to close issue #${n}: ${patched.status} ${patched.data?.message ?? patched.text?.slice(0, 120) ?? ''}`,
+            );
+        }
+    }
+}
+
 async function mergePr(prNum, { dryRun } = {}) {
     const pr = await api('GET', `/repos/${OWNER}/${REPO}/pulls/${prNum}`);
     if (!pr.ok) {
@@ -174,7 +228,9 @@ async function mergePr(prNum, { dryRun } = {}) {
             1,
         );
     }
-    done(`merged PR #${prNum} (squash) + deleted ${branch}`, 0);
+    console.log(`forgejo-merge: merged PR #${prNum} (squash) + deleted ${branch}`);
+    await closeReferencedIssues(prNum, pr.data.body);
+    process.exit(0);
 }
 
 const [cmd, arg] = process.argv.slice(2);
