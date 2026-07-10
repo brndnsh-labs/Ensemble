@@ -124,9 +124,11 @@ export function isOutroSectionLabel(label: string | undefined | null): boolean {
  * subtraction composes cleanly with intro/outro layering and the S4 final-bar
  * cadence rather than forking a parallel muting system.
  *
- * Determinism: this is a pure lookup of `(sectionLabel, occurrence, genre)` — no
- * `Math.random`. The same section/occurrence yields the same lane set on every
- * loop, so critique tests and looped playback stay coherent.
+ * Determinism: this is a pure lookup of `(sectionLabel, occurrence, genre,
+ * enabled-lanes)` — no `Math.random`. The same section/occurrence yields the
+ * same lane set on every loop, so critique tests and looped playback stay
+ * coherent. (#1027: the enabled-lane guard is equally pure — enabled flags
+ * only change on a user toggle or a per-section override boundary.)
  */
 
 /**
@@ -147,6 +149,67 @@ export const SUBTRACTION_PILOT_GENRES: ReadonlySet<string> = new Set(['Rock', 'N
  * bones must sound), and neither has an intro/outro mute gate to reuse.
  */
 export type SubtractionLane = 'bass' | 'chords' | 'harmony';
+
+/**
+ * Enabled-state of the four PITCHED lanes, as seen at the publish site
+ * (`isInstrumentActiveAtStep` — user enable toggle + per-section instrument
+ * override). Drums are deliberately absent: they are unpitched, so they can
+ * never satisfy "at least one pitched lane still sounds."
+ *
+ * The soloist counts even though it is never subtractable — a config of
+ * comp + lead + drums keeps its comp subtraction because the lead still
+ * carries pitch through the section.
+ */
+export interface PitchedLaneEnabled {
+    bass: boolean;
+    chords: boolean;
+    harmony: boolean;
+    soloist: boolean;
+}
+
+const PITCHED_LANES: readonly (keyof PitchedLaneEnabled)[] = [
+    'bass',
+    'chords',
+    'harmony',
+    'soloist',
+];
+
+/**
+ * Never-mute-the-last-pitched-lane guard (story #1027, #1008 follow-up).
+ *
+ * The subtraction table is blind to which lanes the user has ENABLED. A
+ * typical full-band config is unaffected, but an unusual one (comp + drums
+ * only) would let "Verse 2 drops the comp" strip the section to drums-only —
+ * a harmonic hole. So: walk the planned mutes and drop any whose removal
+ * would leave zero enabled pitched lanes.
+ *
+ * A mute of an already-disabled lane is kept — it silences nothing that was
+ * sounding, and keeping it preserves the published plan byte-for-byte for
+ * every config the guard doesn't need to rescue.
+ */
+function guardLastPitchedLane(
+    mutes: SubtractionLane[],
+    enabledLanes: PitchedLaneEnabled | undefined,
+): SubtractionLane[] {
+    if (!enabledLanes || mutes.length === 0) {
+        return mutes;
+    }
+    let remaining = PITCHED_LANES.filter((lane) => enabledLanes[lane]).length;
+    const safe: SubtractionLane[] = [];
+    for (const lane of mutes) {
+        if (!enabledLanes[lane]) {
+            safe.push(lane); // lane already silent — muting it changes nothing
+            continue;
+        }
+        // why: keep the mute only while at least one OTHER pitched lane would
+        // still sound. Earlier table entries win when several compete.
+        if (remaining > 1) {
+            safe.push(lane);
+            remaining--;
+        }
+    }
+    return safe;
+}
 
 /**
  * Seeded instrumentation plan: which lanes rest for this `(section, occurrence)`.
@@ -176,6 +239,10 @@ export function getSubtractionMutes(
     occurrence: number,
     totalOccurrences: number,
     genreFeel: string | undefined | null,
+    // #1027: which pitched lanes can actually sound (user enable + per-section
+    // override, from `isInstrumentActiveAtStep` at the publish site). Omitted =
+    // assume full band — the plain table, guard trivially satisfied.
+    enabledLanes?: PitchedLaneEnabled,
 ): SubtractionLane[] {
     // why: pilot-gated — non-pilot genres get the full band (feature inert).
     if (!genreFeel || !SUBTRACTION_PILOT_GENRES.has(genreFeel)) {
@@ -187,13 +254,13 @@ export function getSubtractionMutes(
     // texture change (stripped) rather than a louder repeat. 1st pass and any
     // 3rd+ pass stay full band (the table only specifies the 2nd).
     if (label.includes('verse') && occurrence === 2) {
-        return ['chords'];
+        return guardLastPitchedLane(['chords'], enabledLanes);
     }
 
     // why: the bridge floats on sustained pads over the rhythm section — comp
     // out, harmony/pads in. Any pass (bridges typically occur once).
     if (label.includes('bridge')) {
-        return ['chords'];
+        return guardLastPitchedLane(['chords'], enabledLanes);
     }
 
     // why: final chorus is tutti — explicit no-subtraction so the climax is the

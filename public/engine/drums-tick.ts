@@ -261,11 +261,21 @@ export function runDrumTick(
         // through generateNotesForStep → runDrumTick), so the plan can never
         // silently revert to full-band in an offline render.
         // writer: chord-data preamble (this line); readable-after: any producer
+        // #1027: thread the enabled-lane flags (user toggle + per-section
+        // override, computed above via isInstrumentActiveAtStep) so the plan
+        // can never strip a section to zero enabled pitched lanes — e.g. a
+        // comp+drums-only config keeps its comp through Verse 2 / the Bridge.
         coordination.subtractionMutedLanes = getSubtractionMutes(
             sectionCtx.label,
             sectionCtx.occurrence,
             sectionCtx.totalOccurrences,
             groove.genreFeel,
+            {
+                bass: includeBass,
+                chords: includeChords,
+                harmony: includeHarmony,
+                soloist: includeSoloist,
+            },
         );
 
         // --- Final-measure publication (epic-form-arrangement S4) ---

@@ -17,6 +17,11 @@
 //   - Chorus, final pass → tutti                    → mute []
 //   - every other (section, occurrence)             → mute []
 //
+// #1027 (never-mute-the-last-pitched-lane guard): the plan additionally
+// receives the enabled-pitched-lane flags from the publish site and drops any
+// mute whose removal would leave zero enabled pitched lanes — so an unusual
+// config (comp + drums only) can never be stripped to drums-only. Block (3).
+//
 // Test strategy (mirrors intro-outro-layering.test.ts):
 //   (1) Coordination publication via `generateNotesForStep` with all engines
 //       disabled — drive a REAL multi-section macro-form (repeated Verse,
@@ -327,7 +332,7 @@ function makeChordsMockState() {
         chords: { enabled: true, style: 'smart', density: 'standard', octave: 60 },
         bass: { enabled: false, lastFreq: null },
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
-        groove: { genreFeel: 'Rock', pocket: 0, instruments: [] },
+        groove: { genreFeel: 'Rock', instruments: [] },
         harmony: { enabled: false, buffer: new Map(), rhythmicMask: 0 },
     };
 }
@@ -343,7 +348,7 @@ function makeHarmonyMockState() {
         chords: { enabled: false, style: 'smart' },
         bass: { enabled: false, lastFreq: null, lastMidiPlayed: null },
         soloist: makeSoloistMock({ enabled: false, busySteps: 0, notesInPhrase: 0 }),
-        groove: { genreFeel: 'Rock', pocket: 0, instruments: [] },
+        groove: { genreFeel: 'Rock', instruments: [] },
         harmony: {
             enabled: true,
             style: 'strings',
@@ -359,7 +364,7 @@ function makeHarmonyMockState() {
 function makeBassMockState() {
     return {
         playback: { bandIntensity: 0.6, bpm: 120, complexity: 0.4, intent: {} },
-        groove: { genreFeel: 'Rock', pocket: 0, instruments: [], measures: 1 },
+        groove: { genreFeel: 'Rock', instruments: [], measures: 1 },
         soloist: makeSoloistMock({ busySteps: 0, tension: 0, enabled: false }),
         arranger: { timeSignature: '4/4', totalSteps: SEC_STEPS, stepMap: [], sectionMap: [] },
         bass: { lastFreq: null, busySteps: 0, lastMidiPlayed: null },
@@ -468,6 +473,129 @@ describe.each([
             );
             expect(n.length).toBe(0);
         }
+    });
+});
+
+// --- (3) Never-mute-the-last-pitched-lane guard (#1027) ----------------------
+//
+// The subtraction table is blind to which lanes the user has ENABLED. An
+// unusual config (comp + drums only) would let "Verse 2 drops the comp" strip
+// the section to drums-only — a harmonic hole. The guard drops any mute whose
+// removal would leave zero enabled pitched lanes (bass/chords/harmony/soloist;
+// drums are unpitched and never count).
+
+const FULL_BAND = { bass: true, chords: true, harmony: true, soloist: true };
+const NO_PITCHED = { bass: false, chords: false, harmony: false, soloist: false };
+
+describe('Arrangement by subtraction — last-pitched-lane guard (#1027, plan table)', () => {
+    it('drops the comp mute when the comp is the only enabled pitched lane', () => {
+        const compOnly = { ...NO_PITCHED, chords: true };
+        for (const genre of SUBTRACTION_PILOT_GENRES) {
+            // Verse 2 and the Bridge both want ['chords'] — the guard rescues both.
+            expect(getSubtractionMutes('Verse', 2, 2, genre, compOnly)).toEqual([]);
+            expect(getSubtractionMutes('Bridge', 1, 1, genre, compOnly)).toEqual([]);
+        }
+    });
+
+    it('keeps the comp mute when ANY other pitched lane still sounds', () => {
+        // Each pitched lane alone is enough to justify the subtraction — the
+        // soloist counts (a comp+lead band keeps its stripped Verse 2).
+        for (const survivor of ['bass', 'harmony', 'soloist'] as const) {
+            const enabled = { ...NO_PITCHED, chords: true, [survivor]: true };
+            expect(getSubtractionMutes('Verse', 2, 2, 'Rock', enabled)).toEqual(['chords']);
+            expect(getSubtractionMutes('Bridge', 1, 1, 'Rock', enabled)).toEqual(['chords']);
+        }
+    });
+
+    it('keeps a mute of an already-disabled lane (silences nothing; plan byte-stable)', () => {
+        // All pitched lanes off: muting the (already-silent) comp changes
+        // nothing audible, and keeping it preserves the published plan for
+        // every config the guard does not need to rescue.
+        expect(getSubtractionMutes('Verse', 2, 2, 'Rock', NO_PITCHED)).toEqual(['chords']);
+    });
+
+    it('omitted enabled-lanes param = plain table (full band assumed)', () => {
+        expect(getSubtractionMutes('Verse', 2, 2, 'Rock')).toEqual(['chords']);
+        expect(getSubtractionMutes('Verse', 2, 2, 'Rock', FULL_BAND)).toEqual(['chords']);
+    });
+});
+
+describe('Arrangement by subtraction — guard publication (#1027, production-faithful)', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    function freshCursors() {
+        return {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+    }
+
+    const LANES_OFF = {
+        includeSoloist: false,
+        includeBass: false,
+        includeChords: false,
+        includeHarmony: false,
+        includeDrums: false,
+    };
+
+    it('comp+drums-only config keeps the comp through Verse 2 and the Bridge', () => {
+        const state = makeMacroFormState('Rock');
+        state.chords.enabled = true; // the ONLY enabled pitched lane
+        const cursors = freshCursors();
+
+        const report: string[] = [];
+        FORM.forEach((sec, i) => {
+            const r = generateNotesForStep(state, i * SEC_STEPS, cursors, LANES_OFF);
+            const muted = r.coordination.subtractionMutedLanes as string[];
+            report.push(`  ${sec.label} #${sec.occ}: muted={${muted.join(',')}}`);
+            // The guard rescues EVERY section — the comp can never be stripped.
+            expect(muted).toEqual([]);
+        });
+        // eslint-disable-next-line no-console
+        console.log(
+            `[subtraction] Critique Report — comp+drums-only config (#1027 guard):\n${report.join('\n')}`,
+        );
+    });
+
+    it('full-band config still gets the plain table (guard inert)', () => {
+        const state = makeMacroFormState('Rock');
+        state.chords.enabled = true;
+        state.bass.enabled = true;
+        state.harmony.enabled = true;
+        state.soloist.enabled = true;
+        const cursors = freshCursors();
+
+        // Verse 2 (FORM[2]) and the Bridge (FORM[3]) keep their comp subtraction.
+        expect(
+            generateNotesForStep(state, 2 * SEC_STEPS, cursors, LANES_OFF).coordination
+                .subtractionMutedLanes,
+        ).toEqual(['chords']);
+        expect(
+            generateNotesForStep(state, 3 * SEC_STEPS, cursors, LANES_OFF).coordination
+                .subtractionMutedLanes,
+        ).toEqual(['chords']);
+    });
+
+    it('a per-section instrument override counts against the guard', () => {
+        const state = makeMacroFormState('Rock');
+        state.chords.enabled = true;
+        state.bass.enabled = true; // globally on…
+        // …but overridden OFF for the Verse-2 section (sec-2) — so inside that
+        // section the comp is the last pitched lane and the guard must rescue it.
+        state.arranger.sections = [{ id: 'sec-2', instruments: { bass: false } }];
+        const cursors = freshCursors();
+
+        expect(
+            generateNotesForStep(state, 2 * SEC_STEPS, cursors, LANES_OFF).coordination
+                .subtractionMutedLanes,
+        ).toEqual([]);
+        // The Bridge (sec-3) has no override — bass survives there, comp mute kept.
+        expect(
+            generateNotesForStep(state, 3 * SEC_STEPS, cursors, LANES_OFF).coordination
+                .subtractionMutedLanes,
+        ).toEqual(['chords']);
     });
 });
 
