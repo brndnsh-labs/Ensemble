@@ -1079,21 +1079,17 @@ export function getSoloistNotePhraseFirst(
     }
 
     phr.isResting = false; // @worker-mutation
-    // #1005/#1025: the soloist joins the single band-wide pocket in full — the same
-    // TWO terms every other melodic lane (bass/comp/harmony) sums, so the lead locks
-    // to the rhythm section instead of floating on its own straightened-swing time:
-    //   1. the shared drum-relative groove pocket (coordination.pocketOffset, from the
-    //      `groove.pocket` slider) — #1025 wired this in; before, the soloist was the
-    //      ONE lane missing it, so it drifted ahead of the band by the pocket amount.
-    //   2. the per-genre band lean (getBandPocket) — added in #1005.
-    // Both layer on top of any seed-authored per-note micro-offset (primary.timingOffset).
-    const sharedPocket = coordination?.stepCoordination?.pocketOffset || 0;
+    // #1005/#1025: the soloist joins the single band-wide pocket — the same per-genre
+    // band lean (getBandPocket) every other melodic lane (bass/comp/harmony) sums, so
+    // the lead locks to the rhythm section instead of floating on its own
+    // straightened-swing time (see docs/design/timing-model.md, tier 2). It layers on
+    // top of any seed-authored per-note micro-offset (primary.timingOffset).
     const bandPocket = getBandPocket(state.groove?.genreFeel);
     const lead = {
         midi,
         velocity,
         durationSteps,
-        timingOffset: (primary.timingOffset ?? 0) + sharedPocket + bandPocket,
+        timingOffset: (primary.timingOffset ?? 0) + bandPocket,
         bendStartInterval,
         vibrato,
         expression,

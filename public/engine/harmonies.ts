@@ -1126,13 +1126,12 @@ function finalizeHarmonyNotes(
         // voice index i) so each voice gets a distinct but reproducible offset.
         // Original Math.random() * jitter produced [0, jitter] (asymmetric, always
         // pushes notes late); preserved literally for behavioral parity.
-        // #1005: harmony joins the single band-wide pocket authority. The shared
-        // groove pocket (coordination.pocketOffset) keeps it drums-relative-locked;
+        // #1005: harmony joins the single band-wide pocket authority —
         // getBandPocket(feel) is the ONE per-genre lean every melodic lane shares
         // (was a harmony-only Neo-Soul `+= 0.02` Dilla special-case — now folded into
         // the palette so harmony leans by the same per-genre amount as bass/comp/solo).
+        // See docs/design/timing-model.md (tier 2).
         let offset =
-            (coordination.pocketOffset || 0) +
             getBandPocket(feel) +
             stagger +
             scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
@@ -1146,8 +1145,8 @@ function finalizeHarmonyNotes(
         // additive offset it accumulates into a perceptible backbeat lag,
         // while still well under the ~20 ms Dilla lag so it stays musical.
         // Folded into `offset` (not a synth-side path) because `timingOffset`
-        // is the established schedule accumulator (pocketOffset, stagger,
-        // jitter, Neo-Soul lag); keeping one source of truth means
+        // is the established schedule accumulator (band lean, stagger,
+        // jitter, response lag); keeping one source of truth means
         // `note.isResponse` does not need to ship on the schema.
         if (isResponse) {
             offset += 0.005;

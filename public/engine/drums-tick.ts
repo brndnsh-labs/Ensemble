@@ -16,7 +16,7 @@ import {
     isTensionChordForSoloist,
 } from './coordination-engine.js';
 import { shouldFireDropMute } from './drop-mechanic.js';
-import { applyGrooveOverrides, calculatePocketOffset } from './groove-engine.js';
+import { applyGrooveOverrides } from './groove-engine.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import type { DrumHitInfo, TickCursors } from './tick-logic.js';
 import { type ChordAtStep, getChordAtStep } from './worker-utils.js';
@@ -101,8 +101,6 @@ export function runDrumTick(
 
     // 1. Context Assembly (Anchor: Groove)
     const coordination = createCoordinationContext(step, stepInfo as any, carryover);
-    // writer: groove preamble (this line); readable-after: any producer
-    coordination.pocketOffset = calculatePocketOffset(playback, groove, step, arranger.totalSteps);
 
     if (chordData) {
         const { sectionEnd, sectionStart } = chordData;

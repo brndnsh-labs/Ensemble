@@ -15,7 +15,7 @@ vi.mock('../../../public/state.js', () => {
             lastDrumPreset: 'Basic Rock',
             instruments: [{ name: 'Kick', steps: [] }],
         },
-        bass: { style: 'smart', octave: 38, lastFreq: null, enabled: true, pocketOffset: 0 },
+        bass: { style: 'smart', octave: 38, lastFreq: null, enabled: true },
         soloist: makeSoloistMock({ busySteps: 0, tension: 0 }),
         arranger: {
             timeSignature: '4/4',

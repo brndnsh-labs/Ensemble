@@ -23,13 +23,11 @@ describe('Ensemble Coordination Contract', () => {
                 soloistBusy: true,
                 accompanimentHit: true,
                 kickHit: true,
-                pocketOffset: 0.05,
             };
 
             expect(context).toHaveProperty('soloistBusy');
             expect(context).toHaveProperty('accompanimentHit');
             expect(context).toHaveProperty('kickHit');
-            expect(context).toHaveProperty('pocketOffset');
         });
     });
 

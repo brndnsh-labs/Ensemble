@@ -57,13 +57,6 @@ describe('Accompaniment unison avoidance (harmony)', () => {
                 playback: { bandIntensity: 0.6, complexity: 0.5 },
                 groove: {
                     genreFeel: 'Jazz',
-                    pocket: {
-                        globalDrive: 0,
-                        tightness: 1,
-                        bassGravity: 1,
-                        chordGravity: 1,
-                        soloistGravity: 1,
-                    },
                 },
                 // why: makeSoloistMock with isResting:true, notesInPhrase:0 satisfies any
                 // private-state fallback reads; the actual rest/notes signal flows through

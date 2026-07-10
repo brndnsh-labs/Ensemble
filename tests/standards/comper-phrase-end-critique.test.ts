@@ -49,7 +49,6 @@ vi.mock('../../public/utils.js', () => ({
     normalizeKey: (k) => k || 'C',
     getFrequency: (m) => 440 * 2 ** ((m - 69) / 12),
     getMidi: (f) => (f > 0 ? Math.round(12 * Math.log2(f / 440) + 69) : 0),
-    calculateTimingOffset: vi.fn(() => 0),
     applyBluesBends: vi.fn(),
 }));
 

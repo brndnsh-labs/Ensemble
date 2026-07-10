@@ -196,19 +196,6 @@ export interface Instrument {
     muted: boolean;
 }
 
-export interface PocketState {
-    /** -1.0 (behind) to 1.0 (ahead) */
-    globalDrive: number;
-    /** 0.0 (loose/jittery) to 1.0 (grid-locked) */
-    tightness: number;
-    /** 0.0 to 1.0 (how much bass follows Kick) */
-    bassGravity: number;
-    /** 0.0 to 1.0 (how much chords follow Bass) */
-    chordGravity: number;
-    /** 0.0 to 1.0 (how much soloist follows Snare/Hats) */
-    soloistGravity: number;
-}
-
 /**
  * Which audio source an instrument uses. `synth` is the in-process synthesized
  * voice (the reworked synth-audit voice — the permanent fallback); a
@@ -283,8 +270,6 @@ export interface GrooveState {
     readonly pendingCrash: boolean;
     /** Random seeds for each song section, keyed by section id. */
     readonly sectionSeedMap: Record<string, number>;
-    /** Unified rhythmic pocket configuration. */
-    readonly pocket: PocketState;
     /** Last selected smart genre. */
     readonly lastSmartGenre: string;
     /** Genre queued for the next measure. */
@@ -846,8 +831,6 @@ export interface HarmonyState {
     readonly lastMidis: number[];
     /** Currently playing polyphonic voices. */
     readonly activeVoices: any[];
-    /** Current micro-timing offset. */
-    readonly pocketOffset: number;
 }
 
 export interface MidiOutput {

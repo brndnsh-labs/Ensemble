@@ -13,7 +13,6 @@ vi.mock('../../../public/state.js', () => {
             busySteps: 0,
             lastFreq: 440,
             volume: 0.5,
-            pocketOffset: 0,
             buffer: new Map(),
             style: 'smart',
         },

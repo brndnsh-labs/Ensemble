@@ -51,7 +51,7 @@ import {
     restoreGains,
     updateSustain,
 } from './engine.js';
-import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
+import { calculateStepDuration } from './groove-engine.js';
 import { stringHash31 } from './hash-utils.js';
 import {
     dispatchMidiAutomation,
@@ -622,12 +622,12 @@ function scheduleDrums(
     const { playback, groove, vizState, arranger } = state;
 
     const conductorVel = playback.conductorVelocity || 1.0;
-    // #714: thread the real step so the drum grid sits in the SAME per-step shared
-    // pocket the melodic lanes lock to (coordination.pocketOffset, published in the
-    // drum preamble) — "one shared pocket" is then literally one, and the drum
-    // timing is deterministic/loop-stable (was raw Math.random via the default args).
-    const finalTime =
-        time + calculatePocketOffset(playback, groove, absoluteStep, arranger.totalSteps);
+    // #1063: drums ARE the clock — the shared kit base time sits exactly on the
+    // grid (per-voice instTimeOffset + seeded humanize — tier-3 kit character —
+    // still layer per hit below). The retired band-global groove pocket once
+    // shifted this time (and every melodic lane, by the same amount): a uniform
+    // whole-band shift, inaudible by construction. See docs/design/timing-model.md.
+    const finalTime = time;
 
     // Evaluate fills and standard groove patterns via our unified tick logic
     // This maintains 1:1 playback/export parity.

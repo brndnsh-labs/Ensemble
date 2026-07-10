@@ -164,7 +164,6 @@ export const harmony = deepSignal<HarmonyState>({
     lastMidis: [],
     activeVoices: [],
     rhythmicMask: 0,
-    pocketOffset: 0,
 });
 
 /**

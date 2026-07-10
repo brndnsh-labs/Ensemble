@@ -1,31 +1,35 @@
 // @ts-nocheck
 /**
- * Critique (#1005): band-wide pocket palette — one per-genre micro-timing the
- * whole band respects.
+ * Critique (#1005/#1063): band-wide pocket palette — one per-genre micro-timing
+ * the whole band respects.
  *
  * Before #1005 the melodic lanes each carried their own scattered feel constant
  * (bass +5 ms, comp +4 ms, a harmony-only Neo-Soul +20 ms) and the soloist wasn't
  * pocket-locked at all, so "the band's pocket" was not provably one value. #1005
- * introduces `getBandPocket(genreFeel)` in coordination-engine.ts as the SINGLE
- * per-genre authority; every melodic lane (bass, comper/chords, harmony, soloist)
- * adds THAT one value on top of the shared groove pocket
- * (`coordination.pocketOffset`).
+ * introduced `getBandPocket(genreFeel)` in coordination-engine.ts as the SINGLE
+ * per-genre authority; #1063 then deleted the band-global groove pocket that once
+ * layered underneath (a uniform whole-band shift, inaudible by construction — see
+ * docs/design/timing-model.md §2/§4). Every melodic lane (bass, comper/chords,
+ * harmony, soloist) now adds EXACTLY getBandPocket + its own lane character; the
+ * drums stay on the grid, and that asymmetry is what makes the lean audible.
  *
  * Guards:
  *   (A) AUTHORITY — the palette returns the documented per-genre ms offsets with
  *       the right sign semantics (behind = +, on-top/ahead = −, neutral = 0), and
  *       is a CONSTANT offset (a pure fn of genre — metronome-core: not tempo/step
  *       breathing).
- *   (B) BASS propagation — the bass note's timingOffset picks up getBandPocket.
+ *   (B) BASS propagation — the bass note's timingOffset IS getBandPocket (plus the
+ *       bounded Neo-Soul lane residual).
  *   (C) COMPER propagation — the comp onset's timingOffset picks up getBandPocket.
  *   (D) SOLOIST propagation — the lead's timingOffset picks up getBandPocket
  *       (differential with the seed held fixed).
- *   (E) COMPOSES with the shared pocket (didn't replace #714) and does NOT touch
- *       the swing grid (the swing-ratio-audit oracle stays green, run separately).
- *   (F) SOLOIST shared-pocket lock (#1025) — the lead now also adds the shared
- *       drum-relative groove pocket (coordination.pocketOffset), so it tracks the
- *       rhythm section 1:1 instead of drifting ahead by the pocket amount. Before
- *       #1025 the soloist was the one lane missing this term.
+ *   (E) MICRO-TIMING BOUND — every palette lean stays feel-sized (|lean| < 30 ms,
+ *       never rhythmic displacement), and getBandPocket is a pure fn of genre so
+ *       it can't touch the swing grid (the swing-ratio-audit oracle, run
+ *       separately, stays the subdivision authority).
+ *
+ * HARMONY propagation (the 4th lane) is pinned exactly — including the bandPocket
+ * term — in tests/integration/melodic-harmony-support.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
@@ -78,14 +82,6 @@ function makeC7() {
     };
 }
 
-const POCKET = {
-    globalDrive: 0.3,
-    tightness: 0.5,
-    bassGravity: 0.8,
-    chordGravity: 0.6,
-    soloistGravity: 0.4,
-};
-
 function resetCompingState() {
     compingState.currentCell = new Array(16).fill(1);
     compingState.lockedUntil = 0;
@@ -117,11 +113,11 @@ function makeState(genre: string) {
             // intent all-0 → the comp's intensity pushes (gated on
             // intent.anticipation / layBack) never fire, and the offbeat push is
             // skipped on a downbeat. So at a downbeat the comp's timingOffset is
-            // exactly pocketOffset + getBandPocket(genre) with no residual.
+            // exactly getBandPocket(genre) with no residual.
             intent: { syncopation: 0, anticipation: 0, layBack: 0 },
             audio: { currentTime: 0 },
         },
-        groove: { genreFeel: genre, lastDrumPreset: genre, enabled: true, pocket: POCKET },
+        groove: { genreFeel: genre, lastDrumPreset: genre, enabled: true },
         soloist: {
             enabled: false,
             style: 'smart',
@@ -145,14 +141,14 @@ function makeState(genre: string) {
     } as any;
 }
 
-// Bass note timingOffset at a bar downbeat, shared pocket = `pocketOffset`.
-function bassTiming(genre: string, pocketOffset: number): number | null {
+// Bass note timingOffset at a bar downbeat.
+function bassTiming(genre: string): number | null {
     const state = makeState(genre);
     const chord = makeC7();
     const ctx = {
         sectionStart: 0,
         sectionEnd: TOTAL,
-        stepCoordination: { pocketOffset, kickHit: false },
+        stepCoordination: { kickHit: false },
     };
     const step = STEPS_PER_BAR;
     const info = getStepInfo(step, FOUR_FOUR, [], TIME_SIGNATURES);
@@ -160,16 +156,15 @@ function bassTiming(genre: string, pocketOffset: number): number | null {
     return res ? (res.timingOffset ?? Number.NaN) : null;
 }
 
-// Comp lead-onset timingOffset at a bar downbeat, shared pocket = `pocketOffset`.
-// The lead (voice 0) onset = pocketOffset + getBandPocket(genre) + a DETERMINISTIC
-// per-voice keyboard humanization (`humanShift`, ±3 ms, seeded off the step — not
-// random, so not flaky). Intent is all-0 and it's a downbeat, so the smart-path
-// intensity pushes never fire.
-function chordLeadTiming(genre: string, pocketOffset: number): number | null {
+// Comp lead-onset timingOffset at a bar downbeat. The lead (voice 0) onset =
+// getBandPocket(genre) + a DETERMINISTIC per-voice keyboard humanization
+// (`humanShift`, ±3 ms, seeded off the step — not random, so not flaky). Intent
+// is all-0 and it's a downbeat, so the smart-path intensity pushes never fire.
+function chordLeadTiming(genre: string): number | null {
     resetCompingState();
     const state = makeState(genre);
     const chord = makeC7();
-    const coord: any = { soloistBusy: false, sectionOccurrence: 1, pocketOffset };
+    const coord: any = { soloistBusy: false, sectionOccurrence: 1 };
     const step = STEPS_PER_BAR;
     const info = getStepInfo(step, FOUR_FOUR, [], TIME_SIGNATURES);
     const notes = getAccompanimentNotes(state, chord, step, 0, 0, info, coord);
@@ -198,10 +193,7 @@ function buildSoloistState(genre: string) {
 // Collect the lead's timingOffset per absolute step across one macro-form, with
 // `state.groove.genreFeel` overridden to `genre` but the SAME seed held fixed, so
 // the seed-authored per-note offset cancels in a cross-genre differential.
-// `pocketOffset` is the shared drum-relative groove pocket threaded via the
-// coordination arg's `stepCoordination` (as tick-logic supplies it live) — used by
-// guard (F) to prove the lead now composes with the shared pocket (#1025).
-function soloistTimingByStep(state: any, genre: string, pocketOffset = 0): Map<number, number> {
+function soloistTimingByStep(state: any, genre: string): Map<number, number> {
     state.groove.genreFeel = genre;
     const seed = state.soloist.session.seed;
     const total = state.arranger.totalSteps;
@@ -224,7 +216,7 @@ function soloistTimingByStep(state: any, genre: string, pocketOffset = 0): Map<n
             state.soloist.octave,
             'smart',
             abs % 16,
-            { stepCoordination: { pocketOffset } },
+            { stepCoordination: {} },
             { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
         );
         if (!res) {
@@ -268,7 +260,7 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
 
     it('(B) the bass note timingOffset picks up the genre pocket', () => {
         for (const g of GENRES) {
-            const t = bassTiming(g, 0);
+            const t = bassTiming(g);
             expect(t, `bass emits a note for ${g}`).not.toBeNull();
             if (g === 'Neo-Soul') {
                 // Neo-Soul layers an ADDITIONAL intensity-scaled Dilla lag on the
@@ -282,7 +274,8 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
                 // re-introducing the over-drag.
                 expect(t as number, 'neo-soul bass drag stays bounded').toBeLessThan(0.04);
             } else {
-                // Downbeat, intent-0, pocket 0 → timingOffset IS the band pocket.
+                // Downbeat, intent-0 → timingOffset IS the band pocket, exactly
+                // (#1063: no band-global term underneath — see timing-model.md).
                 expect(t as number, `bass pocket for ${g}`).toBeCloseTo(getBandPocket(g), 9);
             }
             report.push(`  bass    ${g.padEnd(10)} ${((t as number) * 1000).toFixed(1)} ms`);
@@ -296,7 +289,7 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         const compByGenre = new Map<string, number>();
         let covered = 0;
         for (const g of GENRES) {
-            const t = chordLeadTiming(g, 0);
+            const t = chordLeadTiming(g);
             if (t === null) {
                 report.push(`  comp    ${g.padEnd(10)} (no downbeat onset — skipped)`);
                 continue;
@@ -350,53 +343,23 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         }
     });
 
-    it('(E) the genre pocket COMPOSES with the shared pocket and is a constant offset', () => {
-        // Composes: shifting the shared coordination pocket by Δ still shifts each
-        // lane by Δ ON TOP of the genre pocket (the #714 shared pocket was not
-        // replaced — the two add).
-        const delta = 0.02;
-        const bassA = bassTiming('Jazz', 0);
-        const bassB = bassTiming('Jazz', delta);
-        expect((bassB as number) - (bassA as number)).toBeCloseTo(delta, 9);
-        const compA = chordLeadTiming('Jazz', 0);
-        const compB = chordLeadTiming('Jazz', delta);
-        expect((compB as number) - (compA as number)).toBeCloseTo(delta, 9);
-
+    it('(E) every palette lean is feel-sized (micro-timing, never rhythmic displacement)', () => {
+        // The lean must stay a FEEL — a few ms against the drums — not a rhythmic
+        // event. 30 ms is well under any subdivision at playable tempos (a 16th at
+        // 200 BPM is 75 ms), so a palette entry that crosses it has stopped being
+        // micro-timing and become a flam/displacement. Guards future palette tuning
+        // (#1064 energy modulation included) from silently leaving feel territory.
+        for (const g of GENRES) {
+            expect(Math.abs(getBandPocket(g)), `|lean| for ${g}`).toBeLessThan(0.03);
+        }
         // Constant offset (metronome-core): getBandPocket is a pure fn of genre —
-        // it takes no step/tempo, so it can't be tempo breathing or a swing-grid
-        // term. The swing subdivision lives entirely in the swing-ratio-audit
-        // oracle (run separately, unedited) and is orthogonal to this ± ms offset.
-        expect(getBandPocket('Jazz')).toBe(getBandPocket('Jazz'));
+        // it takes no step/tempo/state, so it can't be tempo breathing or a
+        // swing-grid term. The swing subdivision lives entirely in the
+        // swing-ratio-audit oracle (run separately, unedited) and is orthogonal to
+        // this ± ms offset. (#1063 deleted the band-global groove pocket this once
+        // composed with — the palette is now the ONLY band-level term; see
+        // docs/design/timing-model.md §2/§4.)
         expect(getBandPocket.length).toBe(1); // arity: (genreFeel) only
-    });
-
-    it('(F) the soloist lead timingOffset picks up the SHARED groove pocket (#1025)', () => {
-        // #1025: the soloist was the ONE melodic lane that did not add the shared
-        // drum-relative groove pocket (coordination.pocketOffset) — it carried only
-        // the per-genre lean (guard D), so it drifted ahead of the rhythm section by
-        // the whole pocket amount. Now it sums BOTH terms like bass/comp/harmony.
-        // Proof: shifting the shared pocket by Δ shifts the lead's timingOffset by Δ,
-        // seed held fixed. Before the fix this delta was 0 (lead ignored the pocket).
-        const state = buildSoloistState('Jazz');
-        const seed = generateSessionSeed(state, state.arranger, 'smart', 0.62, 'POCKET_SEED');
-        state.soloist.session.seed = seed;
-        const delta = 0.02;
-        const base = soloistTimingByStep(state, 'Jazz', 0);
-        const shifted = soloistTimingByStep(state, 'Jazz', delta);
-        const deltas: number[] = [];
-        for (const [step, v] of shifted) {
-            if (base.has(step)) {
-                deltas.push(v - (base.get(step) as number));
-            }
-        }
-        expect(deltas.length, 'shared soloist steps').toBeGreaterThan(4);
-        // Full lock (not a scaled depth): the lead tracks the rhythm section 1:1.
-        for (const d of deltas) {
-            expect(d, 'soloist shared-pocket delta').toBeCloseTo(delta, 9);
-        }
-        report.push(
-            `  solo    shared-pocket compose: +${(delta * 1000).toFixed(1)} ms → lead tracks 1:1`,
-        );
     });
 
     it('Critique Report', () => {
@@ -405,7 +368,7 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         for (const g of GENRES) {
             console.log(`  ${g.padEnd(10)} ${(getBandPocket(g) * 1000).toFixed(1)} ms`);
         }
-        console.log('Per-lane realized offsets at a downbeat (shared pocket = 0):');
+        console.log('Per-lane realized offsets at a downbeat:');
         for (const line of report) {
             console.log(line);
         }

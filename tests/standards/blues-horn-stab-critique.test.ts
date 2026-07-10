@@ -44,13 +44,6 @@ describe('Blues Horn-Stab Voicing Critique (#935)', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5 },
             groove: {
                 genreFeel: 'Blues',
-                pocket: {
-                    globalDrive: 0,
-                    tightness: 1,
-                    bassGravity: 1,
-                    chordGravity: 1,
-                    soloistGravity: 1,
-                },
             },
             // Soloist resting so the call-and-response horns actually answer (#716).
             soloist: makeSoloistMock({ enabled: true, isResting: true, notesInPhrase: 0 }),

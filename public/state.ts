@@ -148,7 +148,6 @@ export function buildHarmonySyncPayload(harmony: HarmonyState) {
         volume: harmony.volume,
         reverb: harmony.reverb,
         complexity: harmony.complexity,
-        pocketOffset: harmony.pocketOffset,
     };
 }
 
@@ -159,7 +158,6 @@ export function buildGrooveSyncPayload(groove: GrooveState) {
         swing: groove.swing,
         swingSub: groove.swingSub,
         humanize: groove.humanize,
-        pocket: groove.pocket,
         sectionSeedMap: groove.sectionSeedMap,
         lastDrumPreset: groove.lastDrumPreset,
         fillActive: groove.fillActive,

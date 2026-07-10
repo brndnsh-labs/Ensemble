@@ -20,7 +20,7 @@ vi.mock('../../public/state.js', () => {
         bpm: 120,
         intent: { soloistMod: 0, anticipation: 0, syncopation: 0, layBack: 0 },
     };
-    const mockGroove = { genreFeel: 'Jazz', pocket: 'ahead', instruments: [] };
+    const mockGroove = { genreFeel: 'Jazz', instruments: [] };
     const mockSoloist = makeSoloistMock({
         enabled: true,
         busySteps: 0,

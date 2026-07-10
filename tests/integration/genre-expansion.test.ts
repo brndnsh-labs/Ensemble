@@ -26,7 +26,7 @@ vi.mock('../../public/state.js', () => {
             instruments: [],
         },
         chords: { enabled: true, style: 'strum-country' },
-        bass: { enabled: true, pocketOffset: 0 },
+        bass: { enabled: true },
         soloist: makeSoloistMock({ enabled: true, tension: 0, busySteps: 0, motifBuffer: [] }),
         harmony: { enabled: false },
         playback: {

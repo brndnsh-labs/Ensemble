@@ -32,13 +32,6 @@ describe('Ska Harmony Critique', () => {
             playback: { bandIntensity: 0.6, complexity: 0.5 },
             groove: {
                 genreFeel: 'Ska',
-                pocket: {
-                    globalDrive: 0,
-                    tightness: 1,
-                    bassGravity: 1,
-                    chordGravity: 1,
-                    soloistGravity: 1,
-                },
             },
             soloist: makeSoloistMock({ enabled: true, isResting: true, notesInPhrase: 0 }),
             harmony: { enabled: true, complexity: 0.5, lastMidis: [], rhythmicMask: 0 },

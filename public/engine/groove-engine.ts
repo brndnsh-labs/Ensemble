@@ -1,7 +1,6 @@
 import type { EnsembleState } from '../types.js';
 import {
     binarySearchMap,
-    calculateTimingOffset,
     getStepsPerMeasure,
     isSectionTurnaround,
     secondsPerStepFor,
@@ -998,39 +997,6 @@ export function calculateStepDuration(step: number, bpm: number, ts: any, groove
     }
 
     return duration;
-}
-
-export function calculatePocketOffset(
-    playback: any,
-    groove: any,
-    step = 0,
-    totalSteps = 0,
-): number {
-    // #714: the ONE shared groove pocket the melodic lanes (bass, chords, harmony)
-    // all sit in, RELATIVE to the drums' grid (drums play at instTimeOffset 0).
-    // Published once here on coordination.pocketOffset; every lane adds THIS + a
-    // small fixed per-lane feel constant, so the whole band breathes as a unit
-    // instead of running four independent timing formulas.
-    //
-    // Lane-agnostic: pass 'shared' so calculateTimingOffset contributes only the
-    // global drive + intensity-tightened wobble (no per-instrument gravity term).
-    // Seeded off the IN-LOOP step (not raw Math.random and not the monotonic
-    // global step) so the pocket is deterministic AND repeats loop-to-loop — the
-    // band locks like the comp does (#712). Falls back to the raw step when the
-    // loop length is unknown (never collapses to step 0).
-    const inLoopStep =
-        totalSteps > 0 ? (((step % totalSteps) + totalSteps) % totalSteps) | 0 : step;
-    const pocketOffset = groove.pocket
-        ? calculateTimingOffset('shared', groove.pocket, playback.bandIntensity, () =>
-              scrambleHash((inLoopStep * 0x9e3779b1) | 0),
-          )
-        : 0;
-    // #1025: the neo-soul `dillaFeel += 0.015` term was removed here — it lived inside
-    // pocketOffset, which #714 applies to the drum grid AND every melodic lane equally,
-    // so it was a uniform whole-band latency (nothing moved relative to anything) rather
-    // than an audible lean. Neo-Soul's audible drag is the getBandPocket 25 ms melodic
-    // lean (coordination-engine.ts), not this.
-    return pocketOffset;
 }
 
 export function getDrumMotif(

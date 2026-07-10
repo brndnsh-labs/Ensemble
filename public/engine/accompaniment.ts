@@ -1136,10 +1136,6 @@ interface AccompanimentCoordination {
     bassMidi?: number;
     kickHit?: boolean;
     snareHit?: boolean;
-    // #714: the shared groove pocket (written by the drum preamble,
-    // drums-tick.ts) the comp locks into, so chords + bass + harmony all sit in
-    // the same pocket relative to the drums instead of each drifting on its own.
-    pocketOffset?: number;
     // writer: tick-logic chord-preamble (readable by any producer)
     // why: chord anticipation gate reads the upcoming section root so the comper
     // can pre-voice the new chord on the "and-of-4" of the last measure.
@@ -2564,15 +2560,14 @@ export function getAccompanimentNotes(
             (genre === 'Jazz' || genre === 'Blues' || genre === 'Bossa Nova');
 
         // --- Holistic Pocket Implementation ---
-        // #714/#1005: the comp sits in the ONE shared groove pocket (drum preamble →
-        // coordination.pocketOffset) plus the single per-genre band pocket
-        // (getBandPocket), so chords + bass + harmony + soloist all lock to the same
-        // pocket relative to the drums instead of each carrying its own feel constant.
-        // Pre-#1005 this was a comp-specific fixed +4 ms; folding it into the shared
-        // per-genre palette is the point of #1005. The intensity-tightening pushes
-        // (#713) stay layered on top — that's the comp's own character the owner heard
-        // and liked. Falls back to 0 only when no coordination is supplied (bare tests).
-        let timingOffset = (coordination.pocketOffset || 0) + getBandPocket(genre);
+        // #1005: the comp leans by the single per-genre band pocket (getBandPocket),
+        // so chords + bass + harmony + soloist all lock to the same pocket relative
+        // to the drums instead of each carrying its own feel constant. Pre-#1005 this
+        // was a comp-specific fixed +4 ms; folding it into the shared per-genre
+        // palette is the point of #1005 (see docs/design/timing-model.md, tier 2).
+        // The intensity-tightening pushes (#713) stay layered on top — that's the
+        // comp's own character the owner heard and liked.
+        let timingOffset = getBandPocket(genre);
 
         if (chords.style === 'smart') {
             // #713: the smart-path pushes were flat (±25/10/20ms) and ignored
@@ -2581,7 +2576,7 @@ export function getAccompanimentNotes(
             // SAME intensity elasticity the pocket uses (1.1 - elasticity): ~0.7×
             // at low intensity (loose, expressive) down to ~0.1× at intensity 1
             // (tight, locked to the grid). B3.
-            const elasticity = 0.4 + intensity * 0.6; // matches calculateTimingOffset
+            const elasticity = 0.4 + intensity * 0.6; // 0.4 (ballad) → 1.0 (full energy)
             const pushScale = 1.1 - elasticity; // 0.7 (loose) → 0.1 (tight)
             const pushProb = 0.15 + intensity * 0.2;
             if (!isDownbeat && compDraw(8) < pushProb) {

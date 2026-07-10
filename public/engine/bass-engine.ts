@@ -4,13 +4,12 @@ import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
 
-// #1005: the bass's band-relative micro-timing = the shared groove pocket
-// (coordination.pocketOffset, written by the drum preamble, keeps bass+comp+
-// harmony+soloist locked to the same drums-relative pocket) PLUS the single
-// per-genre band pocket (getBandPocket). Pre-#1005 the bass carried its own fixed
-// +5 ms feel constant; that scattered per-lane value is now replaced by the
-// one-authority per-genre palette in coordination-engine.ts, so the whole band
-// leans by exactly one per-genre amount instead of each lane guessing its own.
+// #1005: the bass's band-relative micro-timing = the single per-genre band pocket
+// (getBandPocket), the same lean bass+comp+harmony+soloist all add relative to the
+// drums' grid. Pre-#1005 the bass carried its own fixed +5 ms feel constant; that
+// scattered per-lane value is now replaced by the one-authority per-genre palette
+// in coordination-engine.ts, so the whole band leans by exactly one per-genre
+// amount instead of each lane guessing its own (docs/design/timing-model.md).
 
 // #1006 — within-phrase velocity envelope test seam (§4.6). The bass envelope is a
 // pure function of metric POSITION (distance to the nearest strong beat), so there is
@@ -580,8 +579,7 @@ export function getBassNote(
         // the scheduler / MIDI export never read it.
         approachTargetRoot?: number,
     ) => {
-        let timingOffset =
-            (context?.stepCoordination?.pocketOffset || 0) + getBandPocket(groove.genreFeel);
+        let timingOffset = getBandPocket(groove.genreFeel);
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             // #1005: getBandPocket('Neo-Soul') already supplies the +25ms band pocket;
             // this residual is the EXTRA Dilla drag that sits the bass deeper than the
@@ -813,8 +811,7 @@ export function getBassNote(
         if (isDownbeat) {
             const intensityFactor = 0.6 + intensity * 0.7;
             const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
-            let timingOffset =
-                (context?.stepCoordination?.pocketOffset || 0) + getBandPocket(groove.genreFeel);
+            let timingOffset = getBandPocket(groove.genreFeel);
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
                 // #1005: see the main timing block — residual retuned against the 25ms
                 // palette base so the neo-soul bass lands ~33-35ms deep (deeper than the
@@ -954,8 +951,7 @@ export function getBassNote(
             // flat rate regardless of context.
             const hitProb = 0.2 + intensity * 0.4 + (playback.complexity || 0.5) * 0.3;
             // why: CLAUDE.md "Deterministic phrasing" — seed off the IN-LOOP step
-            // (not the monotonic global `step`), mirroring calculatePocketOffset's
-            // established pattern in groove-engine.ts, so this repeats loop-to-loop
+            // (not the monotonic global `step`) so this repeats loop-to-loop
             // instead of just being reproducible at a fixed absolute step (was bare
             // Math.random(), diverging bar-to-bar on every replay).
             const inLoopStep =

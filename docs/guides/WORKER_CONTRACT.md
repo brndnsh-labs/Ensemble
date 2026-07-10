@@ -163,7 +163,7 @@ Reports an internal worker error.
 
 1.  **Step Mapping**: Both threads must use the same `arranger.stepMap`, `arranger.sectionMap`, and `totalSteps` to ensure harmonic and structural alignment.
 2.  **Lookahead**: The worker targets a `LOOKAHEAD` of 64 steps (typically 4 measures in 4/4) to prevent buffer underruns during CPU spikes.
-3.  **Generative Drum Parity**: To ensure MIDI exports match live playback, the worker utilizes the shared `applyGrooveOverrides` strategy. This ensures that intensity-aware ghost notes, turnaround fills, and pocket timing offsets are identical in both environments.
+3.  **Generative Drum Parity**: To ensure MIDI exports match live playback, the worker utilizes the shared `applyGrooveOverrides` strategy. This ensures that intensity-aware ghost notes, turnaround fills, and per-voice drum micro-timing are identical in both environments. Drums schedule exactly on the grid in both environments (#1063 — see `docs/design/timing-model.md`).
 4.  **Flush resets caches**: `flush` is the only message that resets cursors, buffer heads, and per-engine memory before immediately refilling buffers.
 5.  **Musical Coordination**: The worker enforces the `ENSEMBLE_COORDINATION.md` contract using a centralized `CoordinationContext`. To allow for rhythmic yielding, instruments MUST be generated in the following order: Soloist -> Bass -> Chords -> Harmony.
 6.  **Register Slotting Enforcement**: All generated notes MUST be wrapped in `enforceRegisterSlotting(module, midi, context)` before being returned to the main thread. The live slotting contract is Bass 23-57, Chords/Harmony 52-84, and Soloist free range at or above 52 with a 60-90 priority clamp only when it would otherwise fall below the chord floor.

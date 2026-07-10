@@ -44,13 +44,6 @@ function buildState() {
             // steel, Acoustic arpeggio) that changes the emitted MIDIs, so the
             // genre-agnostic default is the honest home for the legato mechanism.
             genreFeel: 'PadDefault',
-            pocket: {
-                globalDrive: 0,
-                tightness: 1,
-                bassGravity: 1,
-                chordGravity: 1,
-                soloistGravity: 1,
-            },
         },
         soloist: makeSoloistMock({ enabled: false, isResting: true, notesInPhrase: 0 }),
         harmony: { enabled: true, complexity: 0.5, lastMidis: [], rhythmicMask: 0, volume: 0.6 },

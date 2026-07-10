@@ -1,8 +1,7 @@
 /* eslint-disable */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import {
-    calculateTimingOffset,
     clampFreq,
     compressSections,
     createSoftClipCurve,
@@ -43,74 +42,6 @@ describe('Utility Functions', () => {
             expect(clampFreq(440)).toBe(440);
             expect(clampFreq(25000)).toBe(24000); // Default max
             expect(clampFreq(25000, 26000)).toBe(25000); // Custom max
-        });
-    });
-
-    describe('calculateTimingOffset', () => {
-        const pocket = {
-            globalDrive: 0.5,
-            tightness: 0.8,
-            bassGravity: 0.7,
-            chordGravity: 0.6,
-            soloistGravity: 0.4,
-        };
-
-        afterEach(() => {
-            vi.restoreAllMocks();
-        });
-
-        it('should correctly calculate global drive offset', () => {
-            // 0.5 drive = -6ms (ahead)
-            // With 1.0 intensity (elasticity 1.0, factor 0.1), jitter 0
-            // instrumentSpecific for drums at high intensity is -0.005
-            // Total = -0.006 + (-0.005 * 0.1) = -0.0065
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            const offset = calculateTimingOffset('drums', pocket, 1.0);
-            expect(offset).toBeCloseTo(-0.0065, 4);
-        });
-
-        it('should apply bass gravity displacement', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            // 0.7 gravity = 0.3 * 0.008 = 0.0024
-            // At 1.0 intensity (elasticity 1.0, factor 0.1) -> 0.00024
-            // Global drive (0.5) -> -0.006
-            // Total -> -0.00576
-            const offset = calculateTimingOffset('bass', pocket, 1.0);
-            expect(offset).toBeCloseTo(-0.00576, 5);
-        });
-
-        it('should apply chord gravity displacement', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            const offset = calculateTimingOffset('chords', pocket, 1.0);
-            // 0.6 chordGravity -> 0.4 * 0.006 = +0.0024
-            // + 0.3 (1-bassGravity) * 0.003 = +0.0009
-            // sum = 0.0033
-            // elasticity factor * 0.1 -> 0.00033
-            // Global drive -> -0.006
-            // Total -> -0.00567
-            expect(offset).toBeCloseTo(-0.00567, 5);
-        });
-
-        it('should apply soloist gravity displacement', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            const offset = calculateTimingOffset('soloist', pocket, 1.0);
-            // 0.4 soloistGravity -> 0.6 * 0.012 = 0.0072
-            // elasticity factor * 0.1 -> 0.00072
-            // Global drive -> -0.006
-            // Total -> -0.00528
-            expect(offset).toBeCloseTo(-0.00528, 5);
-        });
-
-        it('should handle missing match as 0 instrumentSpecific', () => {
-            vi.spyOn(Math, 'random').mockReturnValue(0.5);
-            const offset = calculateTimingOffset('unknown', pocket, 1.0);
-            // instrumentSpecific = 0
-            // Total -> -0.006
-            expect(offset).toBeCloseTo(-0.006, 5);
-        });
-
-        it('should return 0 if pocket is missing', () => {
-            expect(calculateTimingOffset('drums', null, 0.5)).toBe(0);
         });
     });
 

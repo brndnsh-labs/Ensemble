@@ -793,61 +793,11 @@ export function clampFreq(freq: number, max = 24000): number {
     return Math.min(Math.max(0, freq), max);
 }
 
-/**
- * Calculates a unified timing offset for an instrument based on the global pocket state.
- *
- * `random` is an injectable PRNG (Epic 12 S1, the `pickByRank` pattern). It
- * defaults to `Math.random` so bass / drums / chords callers are byte-for-byte
- * unchanged; the soloist passes a `scrambleHash`-derived seeded source so its
- * micro-timing humanization is deterministic by construction (the soloist
- * engine-determinism critique test needs every emitted field reproducible).
- */
-export function calculateTimingOffset(
-    instrument: string,
-    pocket: any,
-    intensity: number,
-    random: () => number = Math.random,
-): number {
-    if (!pocket) {
-        return 0;
-    }
-
-    // 1. Global Drive (The whole band pushes or pulls)
-    // Scale: 1.0 drive = -12ms (ahead), -1.0 drive = +12ms (behind)
-    const driveBase = -(pocket.globalDrive * 0.012);
-
-    // 2. Tightness (Inverse variance)
-    // High tightness (1.0) = no random jitter. Low tightness (0.0) = ±8ms jitter.
-    const jitter = (1.0 - pocket.tightness) * (random() - 0.5) * 0.016;
-
-    let instrumentSpecific = 0;
-
-    // 3. Holistic Gravity (Instruments following each other)
-    switch (instrument) {
-        case 'drums':
-            if (intensity > 0.8) {
-                instrumentSpecific -= 0.005;
-            }
-            break;
-        case 'bass':
-            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.008;
-            break;
-        case 'chords':
-            instrumentSpecific += (1.0 - pocket.chordGravity) * 0.006;
-            // Inherit 30% of the bass's expected displacement for cohesion
-            instrumentSpecific += (1.0 - pocket.bassGravity) * 0.003;
-            break;
-        case 'soloist':
-            instrumentSpecific += (1.0 - pocket.soloistGravity) * 0.012;
-            break;
-    }
-
-    // 4. Intensity Elasticity: High intensity forces everyone closer to the base drive
-    const elasticity = 0.4 + intensity * 0.6; // 0.4 to 1.0
-    const finalOffset = driveBase + (instrumentSpecific + jitter) * (1.1 - elasticity);
-
-    return finalOffset;
-}
+// calculateTimingOffset (the gravity-era pocket formula: globalDrive / tightness /
+// per-instrument gravity) removed in #1063 — post-#714 its output was added to the
+// drum grid AND every melodic lane equally, a uniform whole-band shift that is
+// inaudible by construction. The live band-level lean is getBandPocket in
+// coordination-engine.ts. See docs/design/timing-model.md §2/§4.
 
 // applyBluesBends (the blues/neo ±0.5 gospel b3/b5 vocal scoop) removed in
 // epic #10/#866 — its only caller was the retired legacy picker. The live

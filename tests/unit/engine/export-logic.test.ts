@@ -56,7 +56,7 @@ vi.mock('../../../public/state.js', () => {
             },
         }),
         chords: { enabled: true, octave: 60, density: 'standard' },
-        bass: { enabled: true, lastFreq: 110, pocketOffset: 0, octave: 36, style: 'smart' },
+        bass: { enabled: true, lastFreq: 110, octave: 36, style: 'smart' },
         harmony: {
             enabled: true,
             volume: 0.4,

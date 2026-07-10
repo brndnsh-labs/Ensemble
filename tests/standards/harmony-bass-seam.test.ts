@@ -18,13 +18,6 @@ describe('Harmony / Bass register-seam critique', () => {
             playback: { bandIntensity: 0.7, complexity: 0.6 },
             groove: {
                 genreFeel: 'Jazz',
-                pocket: {
-                    globalDrive: 0,
-                    tightness: 1,
-                    bassGravity: 1,
-                    chordGravity: 1,
-                    soloistGravity: 1,
-                },
             },
             soloist: makeSoloistMock({ enabled: false, isResting: true, notesInPhrase: 0 }),
             harmony: { enabled: true, complexity: 0.5, lastMidis: [], rhythmicMask: 0 },

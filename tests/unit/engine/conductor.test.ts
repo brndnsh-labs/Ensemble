@@ -163,22 +163,16 @@ describe('Conductor Logic', () => {
             );
         });
 
-        it('should apply micro-timing pocket offsets for specific genres', () => {
+        it('does not write the retired bass.pocketOffset mirror param (#1063)', () => {
+            // The old conductor block mirrored getBandPocket onto bass.pocketOffset;
+            // nothing ever read it (lanes call getBandPocket directly — see
+            // docs/design/timing-model.md §4), so the write was deleted.
             groove.genreFeel = 'Neo-Soul';
             applyConductor(getState(), dispatch);
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'bass',
-                param: 'pocketOffset',
-                value: 0.025,
-            });
-
-            groove.genreFeel = 'Funk';
-            applyConductor(getState(), dispatch);
-            expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
-                module: 'bass',
-                param: 'pocketOffset',
-                value: -0.005,
-            });
+            expect(dispatch).not.toHaveBeenCalledWith(
+                'SET_PARAM',
+                expect.objectContaining({ param: 'pocketOffset' }),
+            );
         });
 
         it('should adjust master limiter without mutating instrument reverb', () => {

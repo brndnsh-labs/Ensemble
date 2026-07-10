@@ -1,7 +1,6 @@
 # The timing model — three tiers, drums are the clock
 
-**Status:** design ratified July 2026; the gravity-era deletion it prescribes is tracked on the
-board ("pocket consolidation" story — see Migration status at the bottom).
+**Status:** design ratified July 2026; the gravity-era deletion it prescribes shipped as #1063.
 **Provenance:** distilled from the #714 → #1005 → #1025 pocket trace. Ensemble is "a fancy
 metronome at its core": metronomic by default, expressive timing opt-in and *earned*.
 
@@ -23,10 +22,11 @@ A new timing idea must name its tier before it lands. If it can't, it's probably
 
 Since #714, any offset added to **both** the drum grid and every melodic lane's `timingOffset` is
 the *same value per step on both sides* — a uniform whole-band time shift. Nothing moves relative
-to anything else, so it is **inaudible by construction**, regardless of magnitude or driver.
-(A few ms of absolute latency against the wall clock is imperceptible; the inter-onset wobble a
-seeded per-step version produces tops out ~±1.5 ms — below perception and against the
-metronome-core identity anyway.)
+to anything else. A **constant** uniform shift is inaudible by construction, regardless of
+magnitude or driver (it's just wall-clock latency). A **per-step-varying** uniform shift is
+tempo-domain jitter — in-principle audible (it's tier-1 territory) — but the deleted seeded
+flutter was bounded ≤ ~±3 ms peak (tightness 0.5, worst case at low intensity), below tempo-jitter
+perception and against the metronome-core identity anyway.
 
 This argument retired `dillaFeel` (#1025) and then generalized to the whole gravity-era shared
 pocket (§4). The corollary is the design rule:
@@ -89,5 +89,6 @@ see §5. Do not resurrect a band-global term; it cannot work (§2).
 ## Migration status
 
 - [x] `dillaFeel` removed (#1025).
-- [ ] Gravity-era machinery deleted (the "pocket consolidation" story) — flip this box when it
-  ships and update §4's tense if anything diverged.
+- [x] Gravity-era machinery deleted (#1063) — shipped as designed; `band-pocket-palette-critique`
+  now asserts lane onset = `getBandPocket` + lane character exactly, and the conductor test pins
+  that the retired `bass.pocketOffset` mirror write stays gone.

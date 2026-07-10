@@ -10,7 +10,6 @@ export interface SeedTriplets {
 }
 
 export interface StyleConfig {
-    genreGravityOffset: number;
     restBase: number;
     timingJitter: number;
     // #591: the base *duration* (in beats) a phrase stays active, NOT a note
@@ -62,7 +61,6 @@ const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
 };
 
 const DEFAULT_STYLE_CONFIG: StyleConfig = {
-    genreGravityOffset: 0,
     restBase: 0.1,
     timingJitter: 8,
     phraseActiveBeats: 24,
@@ -125,7 +123,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         },
     },
     neo: {
-        genreGravityOffset: 0.015,
         restBase: 0.12,
         timingJitter: 25,
         doubleStopProb: 0.15,
@@ -143,7 +140,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         chromaticism: 0.4,
     },
     funk: {
-        genreGravityOffset: -0.005,
         timingJitter: 5,
         phraseActiveBeats: 32,
         minNotesPerPhrase: 3,
@@ -173,7 +169,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // Notes) — these are funk-shaped starting values.
     },
     hiphop: {
-        genreGravityOffset: 0.015,
         restBase: 0.15,
         timingJitter: 20,
         phraseActiveBeats: 16,
@@ -386,7 +381,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         chromaticism: 0.2,
     },
     ska: {
-        genreGravityOffset: -0.005,
         timingJitter: 5,
         phraseActiveBeats: 32,
         minNotesPerPhrase: 4,

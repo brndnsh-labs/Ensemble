@@ -59,10 +59,11 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
  * WHY this is the single source of truth: before #1005 each lane carried its own
  * scattered feel constant (bass +5 ms, comp +4 ms, harmony a Neo-Soul-only +20 ms)
  * and the soloist wasn't pocket-locked at all — so "the band's pocket" wasn't
- * provably one value. Now every melodic lane — soloist included, once #1025 wired
- * the lead into the shared groove pocket too — adds `getBandPocket(genreFeel)` on top
- * of the shared drum-relative groove pocket (`coordination.pocketOffset`, from
- * calculatePocketOffset), so the whole band leans by ONE per-genre amount.
+ * provably one value. Now every melodic lane — soloist included since #1025 — adds
+ * `getBandPocket(genreFeel)`, so the whole band leans by ONE per-genre amount.
+ * (The band-global groove pocket that once layered underneath was deleted in
+ * #1063 — a uniform whole-band shift is inaudible by construction; see
+ * docs/design/timing-model.md §2/§4.)
  *
  * Metronome-core identity: this is a CONSTANT offset, not tempo breathing/rubato —
  * time stays metronomic; every lane just shares one consistent lean. It is applied
@@ -120,8 +121,9 @@ const GENRE_POCKET: Record<string, number> = {
 
 /**
  * The single band-wide pocket authority (#1005). Returns the per-genre melodic-lane
- * time offset (seconds, +behind / −ahead) every lane adds on top of the shared
- * `coordination.pocketOffset`. Unknown/undefined genres → 0 (neutral, on the grid).
+ * time offset (seconds, +behind / −ahead) every melodic lane adds — the drums stay
+ * on the grid, and that asymmetry is what makes the lean audible
+ * (docs/design/timing-model.md, tier 2). Unknown/undefined genres → 0 (neutral).
  */
 export function getBandPocket(genreFeel: string | undefined | null): number {
     return (genreFeel && GENRE_POCKET[genreFeel]) || 0;
@@ -240,9 +242,6 @@ export function createCoordinationContext(
         // writer: tick-logic.ts drum preamble (checkHit('Snare') at line ~261, before producers)
         // readable-after: drum preamble (any producer)
         snareHit: false,
-        // writer: tick-logic.ts groove preamble (calculatePocketOffset at line ~102, before producers)
-        // readable-after: groove preamble (any producer)
-        pocketOffset: 0,
         // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318
         // readable-after: soloist producer (bass, chords, harmony can read this)
         soloistBusy: false,

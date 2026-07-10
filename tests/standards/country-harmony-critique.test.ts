@@ -36,13 +36,6 @@ describe('Country Harmony Critique', () => {
             playback: { bandIntensity: 0.5, complexity: 0.5 },
             groove: {
                 genreFeel: 'Country',
-                pocket: {
-                    globalDrive: 0,
-                    tightness: 1,
-                    bassGravity: 1,
-                    chordGravity: 1,
-                    soloistGravity: 1,
-                },
             },
             soloist: makeSoloistMock({ enabled: true, isResting: true, notesInPhrase: 0 }),
             harmony: {

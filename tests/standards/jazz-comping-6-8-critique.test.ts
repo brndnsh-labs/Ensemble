@@ -73,7 +73,6 @@ vi.mock('../../public/utils.js', async () => {
     const actual = await vi.importActual<any>('../../public/utils.js');
     return {
         ...actual,
-        calculateTimingOffset: vi.fn(() => 0),
         applyBluesBends: vi.fn(),
     };
 });

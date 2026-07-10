@@ -1,15 +1,8 @@
 import { deepSignal } from 'deepsignal';
-import type {
-    Action,
-    GlobalContext,
-    GrooveState,
-    Instrument,
-    Mutable,
-    PocketState,
-} from '../types.js';
+import type { Action, GlobalContext, GrooveState, Instrument, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export type { GrooveState, Instrument, PocketState };
+export type { GrooveState, Instrument };
 
 export const groove = deepSignal<GrooveState>({
     enabled: true,
@@ -63,13 +56,6 @@ export const groove = deepSignal<GrooveState>({
     // why: generative fills/variations/entropy default ON (drum audit 2026-05-29).
     sectionSeedMap: {},
     variations: null,
-    pocket: {
-        globalDrive: 0, // -1.0 (behind) to 1.0 (ahead)
-        tightness: 0.5, // 0.0 (loose/jittery) to 1.0 (grid-locked)
-        bassGravity: 0.8, // 0.0 to 1.0 (how much bass follows Kick)
-        chordGravity: 0.6, // 0.0 to 1.0 (how much chords follow Bass)
-        soloistGravity: 0.4, // 0.0 to 1.0 (how much soloist follows Snare/Hats)
-    },
 });
 
 export function grooveReducer(action: Action, playback: GlobalContext): boolean {
@@ -117,12 +103,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.lastSampledHatVoice = null;
             g.lastRideGain = null;
             g.lastCrashGain = null;
-
-            groove.pocket.globalDrive = 0;
-            groove.pocket.tightness = 0.5;
-            groove.pocket.bassGravity = 0.8;
-            groove.pocket.chordGravity = 0.6;
-            groove.pocket.soloistGravity = 0.4;
 
             groove.instruments.forEach((inst) => {
                 inst.steps.fill(0);

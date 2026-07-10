@@ -524,7 +524,6 @@ export function simulateEnsembleLoops({
                 sectionId: section?.id || null,
                 sectionLabel: section?.label || measure.label || 'Main',
                 bandIntensity: state.playback.bandIntensity || 0,
-                pocketOffsetMs: (tickResult.coordination.pocketOffset || 0) * 1000,
                 isTurnaround: Boolean(tickResult.coordination.isTurnaround),
                 kickHit: Boolean(tickResult.coordination.kickHit),
                 snareHit: Boolean(tickResult.coordination.snareHit),
@@ -711,7 +710,6 @@ export function buildEnsembleSeedSummary(capture) {
             2,
         ),
         maxPitchedVoices: Math.max(0, ...measureRows.map((row) => row.maxPitchedVoices)),
-        pocketOffsetMs: roundValue(average(capture.steps.map((step) => step.pocketOffsetMs)), 2),
         bassKickLockMs: roundValue(average(bassKickRows), 2),
         chordSoloistOverlapShare: roundValue(
             average(measureRows.map((row) => row.chordSoloistOverlapShare)),
@@ -767,7 +765,6 @@ export function buildEnsembleAggregateSummary(seedSummaries) {
             2,
         ),
         maxPitchedVoices: Math.max(0, ...seedSummaries.map((row) => row.maxPitchedVoices)),
-        pocketOffsetMs: roundValue(average(seedSummaries.map((row) => row.pocketOffsetMs)), 2),
         bassKickLockMs: roundValue(average(seedSummaries.map((row) => row.bassKickLockMs)), 2),
         chordSoloistOverlapShare: roundValue(
             average(seedSummaries.map((row) => row.chordSoloistOverlapShare)),

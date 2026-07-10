@@ -6,7 +6,7 @@ import { WORKER_RESP } from '../worker-types.js';
 import { compingState, resetCompingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
 import { resetCoordinationCarryover, updateCoordinationContext } from './coordination-engine.js';
-import { calculatePocketOffset, calculateStepDuration } from './groove-engine.js';
+import { calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
     MidiTrack,
@@ -550,7 +550,7 @@ export class ExportProcessor {
     processStep(globalStep: number): void {
         applyWorkerTransition(this.state, globalStep, this.exportConductor);
 
-        const { arranger, groove, playback } = this.state;
+        const { arranger, groove } = this.state;
         const stepTimeS = this.stepTimes[globalStep];
 
         const tickResult = generateNotesForStep(
@@ -669,12 +669,9 @@ export class ExportProcessor {
         }
 
         if (this.includedTracks.includes('drums')) {
-            // #714: thread the real step + loop length so export drum timing matches
-            // the shared per-step pocket (and the realtime scheduler), keeping
-            // playback/export parity airtight and the drum lane loop-stable.
-            const drumTimeS =
-                stepTimeS +
-                calculatePocketOffset(playback, groove, globalStep, this.totalStepsOneLoop);
+            // #1063: drums export exactly on the grid, matching the realtime
+            // scheduler (playback/export parity) — see docs/design/timing-model.md.
+            const drumTimeS = stepTimeS;
 
             const nextStepTimeS = this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
             const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;

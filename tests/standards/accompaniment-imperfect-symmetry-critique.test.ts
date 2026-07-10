@@ -49,7 +49,7 @@ vi.mock('../../public/state.js', () => {
         chords: { enabled: true, style: 'smart', density: 'standard', octave: 60 },
         bass: { enabled: false, lastFreq: null },
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
-        groove: { genreFeel: 'Jazz', pocket: 0, instruments: [] },
+        groove: { genreFeel: 'Jazz', instruments: [] },
         harmony: { enabled: false, buffer: new Map(), rhythmicMask: 0 },
         vizState: {},
         midi: {},

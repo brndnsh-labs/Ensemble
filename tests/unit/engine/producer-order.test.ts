@@ -80,7 +80,6 @@ vi.mock('../../../public/engine/groove-engine.js', () => ({
         soundName: '',
         instTimeOffset: 0,
     })),
-    calculatePocketOffset: vi.fn(() => 0),
 }));
 
 // ── imports (after mocks) ────────────────────────────────────────────────────
