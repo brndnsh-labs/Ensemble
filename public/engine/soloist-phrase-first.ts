@@ -1079,20 +1079,21 @@ export function getSoloistNotePhraseFirst(
     }
 
     phr.isResting = false; // @worker-mutation
-    // #1005: the soloist joins the single band-wide pocket — it leans by the SAME
-    // per-genre amount (getBandPocket) as bass/comp/harmony, so the lead sits in the
-    // band's pocket instead of floating on its own straightened-swing time. Layered
-    // on top of any seed-authored per-note micro-offset (primary.timingOffset). NOTE:
-    // the soloist historically was not locked to the shared groove pocket
-    // (coordination.pocketOffset) the way the other lanes are — #1005 only adds the
-    // per-genre lean; wiring the soloist into coordination.pocketOffset too is a
-    // separate, larger change left out of scope.
+    // #1005/#1025: the soloist joins the single band-wide pocket in full — the same
+    // TWO terms every other melodic lane (bass/comp/harmony) sums, so the lead locks
+    // to the rhythm section instead of floating on its own straightened-swing time:
+    //   1. the shared drum-relative groove pocket (coordination.pocketOffset, from the
+    //      `groove.pocket` slider) — #1025 wired this in; before, the soloist was the
+    //      ONE lane missing it, so it drifted ahead of the band by the pocket amount.
+    //   2. the per-genre band lean (getBandPocket) — added in #1005.
+    // Both layer on top of any seed-authored per-note micro-offset (primary.timingOffset).
+    const sharedPocket = coordination?.stepCoordination?.pocketOffset || 0;
     const bandPocket = getBandPocket(state.groove?.genreFeel);
     const lead = {
         midi,
         velocity,
         durationSteps,
-        timingOffset: (primary.timingOffset ?? 0) + bandPocket,
+        timingOffset: (primary.timingOffset ?? 0) + sharedPocket + bandPocket,
         bendStartInterval,
         vibrato,
         expression,

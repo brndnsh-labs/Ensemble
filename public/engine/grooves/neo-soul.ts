@@ -16,7 +16,6 @@ import {
 
 export const config = {
     ...DEFAULT_CONFIG,
-    dillaFeel: true,
 };
 
 /**

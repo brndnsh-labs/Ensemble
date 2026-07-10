@@ -1020,15 +1020,16 @@ export function calculatePocketOffset(
     // loop length is unknown (never collapses to step 0).
     const inLoopStep =
         totalSteps > 0 ? (((step % totalSteps) + totalSteps) % totalSteps) | 0 : step;
-    let pocketOffset = groove.pocket
+    const pocketOffset = groove.pocket
         ? calculateTimingOffset('shared', groove.pocket, playback.bandIntensity, () =>
               scrambleHash((inLoopStep * 0x9e3779b1) | 0),
           )
         : 0;
-    const strategy = getStrategy(groove);
-    if (strategy?.config.dillaFeel) {
-        pocketOffset += 0.015; // band-wide laid-back lag (everyone lays back together)
-    }
+    // #1025: the neo-soul `dillaFeel += 0.015` term was removed here — it lived inside
+    // pocketOffset, which #714 applies to the drum grid AND every melodic lane equally,
+    // so it was a uniform whole-band latency (nothing moved relative to anything) rather
+    // than an audible lean. Neo-Soul's audible drag is the getBandPocket 25 ms melodic
+    // lean (coordination-engine.ts), not this.
     return pocketOffset;
 }
 

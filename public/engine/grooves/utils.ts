@@ -196,7 +196,6 @@ export const DEFAULT_CONFIG = {
     suppressEntropyBelow: 0,
     blockAdjacentSnare: false,
     exemptFromPulseShaping: false,
-    dillaFeel: false,
     backbeatCrack: false,
     isLatin: false,
     // why: epic-deferred-followups S8(b) — the post-turnaround section-boundary

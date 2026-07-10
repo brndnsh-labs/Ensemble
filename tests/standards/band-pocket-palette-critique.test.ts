@@ -22,6 +22,10 @@
  *       (differential with the seed held fixed).
  *   (E) COMPOSES with the shared pocket (didn't replace #714) and does NOT touch
  *       the swing grid (the swing-ratio-audit oracle stays green, run separately).
+ *   (F) SOLOIST shared-pocket lock (#1025) — the lead now also adds the shared
+ *       drum-relative groove pocket (coordination.pocketOffset), so it tracks the
+ *       rhythm section 1:1 instead of drifting ahead by the pocket amount. Before
+ *       #1025 the soloist was the one lane missing this term.
  */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
@@ -194,7 +198,10 @@ function buildSoloistState(genre: string) {
 // Collect the lead's timingOffset per absolute step across one macro-form, with
 // `state.groove.genreFeel` overridden to `genre` but the SAME seed held fixed, so
 // the seed-authored per-note offset cancels in a cross-genre differential.
-function soloistTimingByStep(state: any, genre: string): Map<number, number> {
+// `pocketOffset` is the shared drum-relative groove pocket threaded via the
+// coordination arg's `stepCoordination` (as tick-logic supplies it live) — used by
+// guard (F) to prove the lead now composes with the shared pocket (#1025).
+function soloistTimingByStep(state: any, genre: string, pocketOffset = 0): Map<number, number> {
     state.groove.genreFeel = genre;
     const seed = state.soloist.session.seed;
     const total = state.arranger.totalSteps;
@@ -217,7 +224,7 @@ function soloistTimingByStep(state: any, genre: string): Map<number, number> {
             state.soloist.octave,
             'smart',
             abs % 16,
-            {},
+            { stepCoordination: { pocketOffset } },
             { isDownbeat: abs % 16 === 0, isMeasureStart: abs % 16 === 0 },
         );
         if (!res) {
@@ -361,6 +368,35 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         // oracle (run separately, unedited) and is orthogonal to this ± ms offset.
         expect(getBandPocket('Jazz')).toBe(getBandPocket('Jazz'));
         expect(getBandPocket.length).toBe(1); // arity: (genreFeel) only
+    });
+
+    it('(F) the soloist lead timingOffset picks up the SHARED groove pocket (#1025)', () => {
+        // #1025: the soloist was the ONE melodic lane that did not add the shared
+        // drum-relative groove pocket (coordination.pocketOffset) — it carried only
+        // the per-genre lean (guard D), so it drifted ahead of the rhythm section by
+        // the whole pocket amount. Now it sums BOTH terms like bass/comp/harmony.
+        // Proof: shifting the shared pocket by Δ shifts the lead's timingOffset by Δ,
+        // seed held fixed. Before the fix this delta was 0 (lead ignored the pocket).
+        const state = buildSoloistState('Jazz');
+        const seed = generateSessionSeed(state, state.arranger, 'smart', 0.62, 'POCKET_SEED');
+        state.soloist.session.seed = seed;
+        const delta = 0.02;
+        const base = soloistTimingByStep(state, 'Jazz', 0);
+        const shifted = soloistTimingByStep(state, 'Jazz', delta);
+        const deltas: number[] = [];
+        for (const [step, v] of shifted) {
+            if (base.has(step)) {
+                deltas.push(v - (base.get(step) as number));
+            }
+        }
+        expect(deltas.length, 'shared soloist steps').toBeGreaterThan(4);
+        // Full lock (not a scaled depth): the lead tracks the rhythm section 1:1.
+        for (const d of deltas) {
+            expect(d, 'soloist shared-pocket delta').toBeCloseTo(delta, 9);
+        }
+        report.push(
+            `  solo    shared-pocket compose: +${(delta * 1000).toFixed(1)} ms → lead tracks 1:1`,
+        );
     });
 
     it('Critique Report', () => {

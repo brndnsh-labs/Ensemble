@@ -59,7 +59,8 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
  * WHY this is the single source of truth: before #1005 each lane carried its own
  * scattered feel constant (bass +5 ms, comp +4 ms, harmony a Neo-Soul-only +20 ms)
  * and the soloist wasn't pocket-locked at all — so "the band's pocket" wasn't
- * provably one value. Now every melodic lane adds `getBandPocket(genreFeel)` on top
+ * provably one value. Now every melodic lane — soloist included, once #1025 wired
+ * the lead into the shared groove pocket too — adds `getBandPocket(genreFeel)` on top
  * of the shared drum-relative groove pocket (`coordination.pocketOffset`, from
  * calculatePocketOffset), so the whole band leans by ONE per-genre amount.
  *
@@ -74,9 +75,10 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
 const GENRE_POCKET: Record<string, number> = {
     // why: Dilla drag — the signature laid-back neo-soul feel is the band sitting
     // way behind the kick. 25 ms is the deepest lean in the palette (kept from the
-    // pre-#1005 conductor pocket block). This is the audible melodic-lane drag; the
-    // groove strategy's separate band-uniform dillaFeel term is a different, mostly
-    // inaudible global offset and is left untouched.
+    // pre-#1005 conductor pocket block). This is the audible melodic-lane drag. (A
+    // separate band-uniform `dillaFeel += 0.015` term once sat inside the groove
+    // pocket, but #714 applied that pocket to the drum grid too, making it an
+    // inaudible whole-band latency — it was removed in #1025.)
     'Neo-Soul': 0.025,
     // why: funk pushes — a hair AHEAD of the beat for urgency/drive (JB's band on
     // top of the One). Kept from the pre-#1005 conductor pocket block.
