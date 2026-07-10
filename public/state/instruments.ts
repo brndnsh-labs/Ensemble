@@ -80,14 +80,12 @@ export const soloist = deepSignal<SoloistState>({
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
     complexity: 0.5,
     phrasingIntensity: 0.5,
-    hookRetentionProb: 0.5,
     doubleStopProb: 1.0,
     tradeMode: 'manual',
 
     // === Engine runtime ===
     session: {
         seed: null,
-        hook: null,
         sessionSteps: 0,
         phraseCount: 0,
         tension: 0,
@@ -196,13 +194,11 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     reverb: { kind: 'config', key: 'reverb' },
     complexity: { kind: 'config', key: 'complexity' },
     phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
-    hookRetentionProb: { kind: 'config', key: 'hookRetentionProb' },
     doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
-    soloistHook: { kind: 'session', key: 'hook' },
     sessionSteps: { kind: 'session', key: 'sessionSteps' },
     phraseCount: { kind: 'session', key: 'phraseCount' },
     tension: { kind: 'session', key: 'tension' },
@@ -376,7 +372,6 @@ export function instrumentReducer(action: Action): boolean {
             const mem = session.memory as Mutable<typeof session.memory>;
             const con = session.contour as Mutable<typeof session.contour>;
             session.seed = null;
-            session.hook = null;
             session.sessionSteps = 0;
             session.phraseCount = 0;
             session.tension = 0;
@@ -501,9 +496,6 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (action.payload.density) {
                 c.density = action.payload.density;
-            }
-            if (action.payload.hookProb) {
-                s.hookRetentionProb = action.payload.hookProb;
             }
             return true;
         case ACTIONS.UPDATE_HB:

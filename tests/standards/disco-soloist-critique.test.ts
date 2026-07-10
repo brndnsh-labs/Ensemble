@@ -199,13 +199,11 @@ describe('Soloist Disco Critique (phrase-first)', () => {
 
         // #553 profile-intent guard: pin the enrichment so a future edit can't
         // silently hollow disco back to a stub. octaveLeap is the signature hook;
-        // [2,9] is the 6/9 brightness intent; hook-recall motivicResponse on. (These
-        // are CONFIG-object assertions — they guard the profile's declared intent,
-        // not live engine emission; the octave-leap GESTURE itself is dark on
-        // phrase-first, tracked in #869/#870.)
+        // [2,9] is the 6/9 brightness intent. (These are CONFIG-object assertions —
+        // they guard the profile's declared intent, not live engine emission; the
+        // octave-leap GESTURE itself is dark on phrase-first, tracked in #869/#870.)
         const disco = STYLE_CONFIG.disco;
         expect(disco.allowedDevices).toContain('octaveLeap');
         expect(disco.targetExtensions).toEqual([2, 9]);
-        expect(disco.motivicResponse.enabled).toBe(true);
     });
 });

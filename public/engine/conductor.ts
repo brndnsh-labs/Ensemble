@@ -121,9 +121,6 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
 
     const targetVelocity = 0.7 + intensity * 0.45; // 0.7x to 1.15x (Adjusted to avoid overloads)
 
-    // --- 2. Complexity / Busyness ---
-    const targetHookProb = 0.2 + complexity * 0.6;
-
     // --- 4. Harmony Evolution ---
     // Harmonies follow the complexity signal for activity level.
     let targetHbComplexity = complexity;
@@ -139,7 +136,6 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     dispatch(ACTIONS.UPDATE_CONDUCTOR_DECISION, {
         density: targetDensity,
         velocity: targetVelocity,
-        hookProb: targetHookProb,
     });
 
     dispatch(ACTIONS.UPDATE_HB, {

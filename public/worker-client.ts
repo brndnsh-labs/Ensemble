@@ -191,7 +191,7 @@ export function syncWorker(action?: string, payload?: any): void {
     if (!timerWorker) {
         return;
     }
-    const { arranger, chords, soloist, harmony, groove, playback } = getState();
+    const { arranger, chords, harmony, groove, playback } = getState();
 
     const data: Partial<Record<keyof EnsembleState, any>> = {};
 
@@ -217,10 +217,10 @@ export function syncWorker(action?: string, payload?: any): void {
             data.harmony = payload;
             break;
         case 'UPDATE_SB':
-            // NOTE: this delta forwards the flat payload as-is; nested session
-            // fields (`session.seed`, `session.hook` — #555) are NOT re-routed here
-            // and ride the full snapshot/flush (getSyncState) at play-start instead,
-            // not this delta. See getSyncState() + recursiveSafeSync.
+            // NOTE: this delta forwards the flat payload as-is; the nested session
+            // seed (`session.seed`) is NOT re-routed here and rides the full
+            // snapshot/flush (getSyncState) at play-start instead, not this delta.
+            // See getSyncState() + recursiveSafeSync.
             data.soloist = payload;
             break;
         case 'UPDATE_GB':
@@ -233,7 +233,6 @@ export function syncWorker(action?: string, payload?: any): void {
             break;
         case 'UPDATE_CONDUCTOR_DECISION':
             data.chords = { density: chords.density };
-            data.soloist = { hookRetentionProb: soloist.hookRetentionProb };
             data.playback = {
                 conductorVelocity: playback.conductorVelocity,
                 intent: playback.intent,

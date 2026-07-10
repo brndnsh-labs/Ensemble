@@ -19,7 +19,6 @@ vi.mock('../../public/state.js', () => {
             tension: 0,
             motifBuffer: [],
             lastFreq: 440,
-            hookRetentionProb: 0.5,
             phraseContext: {
                 role: 'call',
                 skeleton: [],

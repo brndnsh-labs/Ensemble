@@ -106,8 +106,7 @@ function makePopulatedState() {
             mode: str,
             phrasingIntensity: num,
             tradeMode: str,
-            hookRetentionProb: num,
-            session: { sessionSteps: num, seed: num, hook: map() },
+            session: { sessionSteps: num, seed: num },
             audio: { lastFreq: num },
         },
         harmony: {
@@ -300,7 +299,6 @@ const WORKER_SYNC_MANIFEST: Record<
     'soloist.mode': { delta: 'SET_SOLOIST_MODE' },
     'soloist.phrasingIntensity': { delta: 'SET_PARAM' },
     'soloist.tradeMode': { delta: 'SET_PARAM' },
-    'soloist.hookRetentionProb': { delta: 'UPDATE_CONDUCTOR_DECISION' },
     // Reaches the worker only nested via the full snapshot/flush, which is exactly how
     // its worker consumer reads it (`soloist.session.sessionSteps`, midi-worker-logic.ts).
     // (The `SET_SESSION_STEPS` case in syncWorker() is dead — never dispatched, not in
@@ -313,10 +311,6 @@ const WORKER_SYNC_MANIFEST: Record<
     'soloist.session.seed': {
         snapshotOnly:
             'seeded at play-start; rides the full snapshot/flush, never a delta (see UPDATE_SB note)',
-    },
-    'soloist.session.hook': {
-        snapshotOnly:
-            '#555 verbatim hook replay; captured main-thread next to seed, rides the full snapshot',
     },
     'soloist.audio.lastFreq': {
         snapshotOnly: 'audio-continuity running value; worker-internal',

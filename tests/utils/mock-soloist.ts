@@ -23,7 +23,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         'reverb',
         'complexity',
         'phrasingIntensity',
-        'hookRetentionProb',
         'doubleStopProb',
         'tradeMode',
         'seed',
@@ -96,9 +95,6 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     const ROUTES: Record<string, (v: unknown) => void> = {
         sessionSeed: (v) => {
             session.seed = v;
-        },
-        soloistHook: (v) => {
-            session.hook = v;
         },
         sessionSteps: (v) => {
             session.sessionSteps = v;

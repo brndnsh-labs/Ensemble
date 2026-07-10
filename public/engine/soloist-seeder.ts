@@ -6,7 +6,6 @@ import type {
     SeedNote,
     SeedSupportHints,
     SeedSupportRole,
-    SoloistHookLane,
 } from '../types.js';
 import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
@@ -2514,69 +2513,4 @@ export function generateSessionSeed(
 
     logSeed(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
     return { notes: polishedNotes, loopLengthSteps: actualTotalSteps };
-}
-
-/**
- * #555 — derive the VERBATIM HOOK window from a generated head seed. Hook-driven
- * genres (Hip Hop) loop a short 1–2 bar motif rather than play a through-composed
- * solo; this carves that motif out of the head.
- *
- * Smart window selection: the SRDC Statement front-loads the strongest idea, so
- * the head's opening usually IS the best hook — but a thin opening would loop
- * badly, so we score every bar-aligned `hookBars`-window of the head by note
- * density + anchor presence and pick the best, earliest-wins on ties. The chosen
- * window's notes are rebased to `[0, hookLengthSteps)` so the replay can index by
- * `step % hookLengthSteps`.
- *
- * Pure + side-effect-free: the caller gates on the active profile's `hookLoop` and
- * supplies `hookBars` / `stepsPerMeasure`. Returns null when there is nothing to
- * hook (no seed, empty head, degenerate bar length).
- */
-export function deriveSoloistHook(
-    seed: { notes: SeedNote[]; loopLengthSteps: number } | null | undefined,
-    hookBars: number,
-    stepsPerMeasure: number,
-): SoloistHookLane | null {
-    if (!seed?.notes.length || hookBars <= 0 || stepsPerMeasure <= 0) {
-        return null;
-    }
-    const hookLengthSteps = hookBars * stepsPerMeasure;
-    const headLength = seed.loopLengthSteps || hookLengthSteps;
-
-    // Bar-aligned candidate windows across the head. If the head is no longer than
-    // one window, there's a single candidate (start 0 → take it whole).
-    const lastStart = Math.max(0, headLength - hookLengthSteps);
-    let bestStart = 0;
-    let bestScore = -1;
-    for (let start = 0; start <= lastStart; start += stepsPerMeasure) {
-        const end = start + hookLengthSteps;
-        let notes = 0;
-        let anchors = 0;
-        for (const n of seed.notes) {
-            if (n.step >= start && n.step < end) {
-                notes++;
-                if (n.isAnchor) {
-                    anchors++;
-                }
-            }
-        }
-        // Density + anchor weight (an anchored window reads as a hook, not a
-        // run of passing tones). Strictly-greater keeps the EARLIEST best window,
-        // biasing toward the Statement.
-        const score = notes + anchors * 2;
-        if (score > bestScore) {
-            bestScore = score;
-            bestStart = start;
-        }
-    }
-
-    const windowEnd = bestStart + hookLengthSteps;
-    const windowNotes = seed.notes
-        .filter((n) => n.step >= bestStart && n.step < windowEnd)
-        .map((n) => ({ ...n, step: n.step - bestStart }));
-
-    if (!windowNotes.length) {
-        return null;
-    }
-    return { notes: windowNotes, loopLengthSteps: hookLengthSteps };
 }

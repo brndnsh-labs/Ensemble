@@ -9,23 +9,6 @@ export interface SeedTriplets {
     timingStrength: number;
 }
 
-export interface MotivicResponse {
-    enabled: boolean;
-    rhythmReuse: number;
-    pitchReuse: number;
-    contourReuse: number;
-    cadenceWeight: number;
-    tripletCarry: number;
-    deviceDamp: number;
-    delayBias: number;
-    echoBias: number;
-    compressionBias: number;
-    sectionRecall: number;
-    formArcRecall: number;
-    maxResponseNotes: number;
-    spaceBias: number;
-}
-
 export interface StyleConfig {
     genreGravityOffset: number;
     restBase: number;
@@ -67,14 +50,6 @@ export interface StyleConfig {
     // so low-chromaticism styles (country 0.2, default scalar 0.1) stay diatonic.
     chromaticism: number;
     seedTriplets: SeedTriplets;
-    motivicResponse: MotivicResponse;
-    // #555 — hook-lane opt-in (legacy). When `hookLoop` is true the carve in
-    // state-effects captures a short window of the head (`hookBars` bars, default 2).
-    // The retired getSoloistNote engine replayed it near-verbatim every bar (Hip Hop);
-    // the live phrase-first engine does not consume the hook lane, so this is inert —
-    // the #870 living-hook port reference.
-    hookLoop?: boolean;
-    hookBars?: number;
 }
 
 const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
@@ -84,23 +59,6 @@ const DEFAULT_SEED_TRIPLETS: SeedTriplets = {
     mutationBias: 0,
     cadenceBias: 0,
     timingStrength: 0,
-};
-
-const DEFAULT_MOTIVIC_RESPONSE: MotivicResponse = {
-    enabled: false,
-    rhythmReuse: 0.68,
-    pitchReuse: 0.42,
-    contourReuse: 0.36,
-    cadenceWeight: 0.55,
-    tripletCarry: 0.35,
-    deviceDamp: 0.72,
-    delayBias: 0.18,
-    echoBias: 0.16,
-    compressionBias: 0.12,
-    sectionRecall: 0.72,
-    formArcRecall: 0.52,
-    maxResponseNotes: 8,
-    spaceBias: 0,
 };
 
 const DEFAULT_STYLE_CONFIG: StyleConfig = {
@@ -123,28 +81,10 @@ const DEFAULT_STYLE_CONFIG: StyleConfig = {
     syncopationLikelihood: 0.2,
     chromaticism: 0.1,
     seedTriplets: DEFAULT_SEED_TRIPLETS,
-    motivicResponse: DEFAULT_MOTIVIC_RESPONSE,
 };
 
 const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
-    scalar: {
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.74,
-            pitchReuse: 0.48,
-            contourReuse: 0.4,
-            cadenceWeight: 0.6,
-            tripletCarry: 0.4,
-            deviceDamp: 0.68,
-            delayBias: 0.16,
-            echoBias: 0.14,
-            compressionBias: 0.1,
-            sectionRecall: 0.76,
-            formArcRecall: 0.58,
-            maxResponseNotes: 7,
-            spaceBias: 0.12,
-        },
-    },
+    scalar: {},
     rock: {
         doubleStopProb: 0.1,
         allowedDevices: ['run', 'slide', 'guitarDouble', 'bluesCurl'],
@@ -153,22 +93,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         commonToneWeight: 300,
         stationaryProb: 0.15,
         syncopationLikelihood: 0.3,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.7,
-            pitchReuse: 0.44,
-            contourReuse: 0.32,
-            cadenceWeight: 0.58,
-            tripletCarry: 0.18,
-            deviceDamp: 0.62,
-            delayBias: 0.14,
-            echoBias: 0.18,
-            compressionBias: 0.08,
-            sectionRecall: 0.84,
-            formArcRecall: 0,
-            maxResponseNotes: 7,
-            spaceBias: 0.14,
-        },
     },
     blues: {
         restBase: 0.09,
@@ -191,22 +115,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.82,
         syncopationLikelihood: 0.8,
         chromaticism: 0.6,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.88,
-            pitchReuse: 0.62,
-            contourReuse: 0.46,
-            cadenceWeight: 0.82,
-            tripletCarry: 0.78,
-            deviceDamp: 0.38,
-            delayBias: 0.12,
-            echoBias: 0.12,
-            compressionBias: 0.1,
-            sectionRecall: 0.84,
-            formArcRecall: 0.72,
-            maxResponseNotes: 8,
-            spaceBias: 0.06,
-        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.72,
@@ -233,22 +141,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.68,
         syncopationLikelihood: 0.9,
         chromaticism: 0.4,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.64,
-            pitchReuse: 0.46,
-            contourReuse: 0.38,
-            cadenceWeight: 0.52,
-            tripletCarry: 0.22,
-            deviceDamp: 0.74,
-            delayBias: 0.3,
-            echoBias: 0.22,
-            compressionBias: 0.1,
-            sectionRecall: 0.78,
-            formArcRecall: 0.44,
-            maxResponseNotes: 6,
-            spaceBias: 0.36,
-        },
     },
     funk: {
         genreGravityOffset: -0.005,
@@ -279,22 +171,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // spaceBias (leave air in the answer), few notes. tripletCarry low (funk is
         // sixteenth-based, not triplet). Exact weights are a by-ear tuning item (#563
         // Notes) — these are funk-shaped starting values.
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.82,
-            pitchReuse: 0.28,
-            contourReuse: 0.3,
-            cadenceWeight: 0.5,
-            tripletCarry: 0.2,
-            deviceDamp: 0.74,
-            delayBias: 0.18,
-            echoBias: 0.16,
-            compressionBias: 0.12,
-            sectionRecall: 0.7,
-            formArcRecall: 0.48,
-            maxResponseNotes: 5,
-            spaceBias: 0.34,
-        },
     },
     hiphop: {
         genreGravityOffset: 0.015,
@@ -313,8 +189,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         chromaticism: 0.2,
         // #555 — hip-hop melody is a looped 1–2 bar hook, not a through-composed
         // solo. Capture the head's strongest 2-bar window and replay it verbatim.
-        hookLoop: true,
-        hookBars: 2,
     },
     jazz: {
         restBase: 0.08,
@@ -340,22 +214,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         rhythmicDensity: 0.8,
         syncopationLikelihood: 0.85,
         chromaticism: 0.7,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.84,
-            pitchReuse: 0.56,
-            contourReuse: 0.52,
-            cadenceWeight: 0.74,
-            tripletCarry: 0.74,
-            deviceDamp: 0.46,
-            delayBias: 0.18,
-            echoBias: 0.16,
-            compressionBias: 0.22,
-            sectionRecall: 0.86,
-            formArcRecall: 0.74,
-            maxResponseNotes: 8,
-            spaceBias: 0.08,
-        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.56,
@@ -398,22 +256,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         maxSustainSteps: 6,
         syncopationLikelihood: 0.7,
         chromaticism: 0.9,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.8,
-            pitchReuse: 0.52,
-            contourReuse: 0.58,
-            cadenceWeight: 0.68,
-            tripletCarry: 0.7,
-            deviceDamp: 0.5,
-            delayBias: 0.22,
-            echoBias: 0.2,
-            compressionBias: 0.24,
-            sectionRecall: 0.84,
-            formArcRecall: 0.78,
-            maxResponseNotes: 8,
-            spaceBias: 0.06,
-        },
         seedTriplets: {
             enabled: true,
             cellBias: 0.68,
@@ -453,22 +295,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // Hook recall — disco is riff-driven: the syncopated figure recurs nearly
         // verbatim and returns each section. Higher pitchReuse than funk's
         // pitch-shy percussive reply; tripletCarry near zero (disco is 16th-based).
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.85,
-            pitchReuse: 0.5,
-            contourReuse: 0.5,
-            cadenceWeight: 0.5,
-            tripletCarry: 0.1,
-            deviceDamp: 0.6,
-            delayBias: 0.16,
-            echoBias: 0.18,
-            compressionBias: 0.14,
-            sectionRecall: 0.8,
-            formArcRecall: 0.6,
-            maxResponseNotes: 6,
-            spaceBias: 0.22,
-        },
     },
     bossa: {
         restBase: 0.12,
@@ -494,22 +320,6 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
         // tuning item (verify-by-ear).
         sustainProb: 0.42,
         maxSustainSteps: 16,
-        motivicResponse: {
-            enabled: true,
-            rhythmReuse: 0.66,
-            pitchReuse: 0.44,
-            contourReuse: 0.34,
-            cadenceWeight: 0.56,
-            tripletCarry: 0.2,
-            deviceDamp: 0.76,
-            delayBias: 0.24,
-            echoBias: 0.2,
-            compressionBias: 0.1,
-            sectionRecall: 0.86,
-            formArcRecall: 0.32,
-            maxResponseNotes: 5,
-            spaceBias: 0.42,
-        },
     },
     country: {
         restBase: 0.08,
@@ -603,10 +413,6 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
             seedTriplets: {
                 ...DEFAULT_SEED_TRIPLETS,
                 ...(styleOverride.seedTriplets || {}),
-            },
-            motivicResponse: {
-                ...DEFAULT_MOTIVIC_RESPONSE,
-                ...(styleOverride.motivicResponse || {}),
             },
         };
         return acc;

@@ -1,5 +1,4 @@
 import { applyThemeToDom, setBpm } from './app-controller.js';
-import { TIME_SIGNATURES } from './config.js';
 import { autoVoiceForGenre } from './data/genre-sound-map.js';
 import { SMART_GENRES } from './data/smart-genres.js';
 import { validateProgression } from './engine/chords-engine.js';
@@ -12,9 +11,8 @@ import { initAudio, restoreGains, syncBusReverbSend } from './engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.js';
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
-import { resolveSoloistStyle, STYLE_CONFIG } from './engine/soloist-config.js';
 import { deriveSoloistMode } from './engine/soloist-mode-policy.js';
-import { deriveSoloistHook, generateSessionSeed } from './engine/soloist-seeder.js';
+import { generateSessionSeed } from './engine/soloist-seeder.js';
 import { loadDrumPreset } from './instrument-controller.js';
 import { initMIDI } from './midi-controller.js';
 import type { EnsembleState, InstrumentModule, InstrumentVoice } from './types.js';
@@ -120,21 +118,7 @@ function regenerateSessionSeeds(
         songSeed,
     );
 
-    // #555 — hook lane: for hook-driven profiles (Hip Hop), carve a short verbatim
-    // hook out of the head. Gated on the resolved profile's `hookLoop`, so non-hook
-    // genres dispatch a null hook. NOTE: the legacy replay consumer (in the retired
-    // getSoloistNote engine) is gone — the live phrase-first engine does not loop a
-    // hook, so this lane is currently inert, retained as the #870 living-hook port
-    // reference.
-    const resolvedStyle = resolveSoloistStyle(soloist.style || 'smart', groove.genreFeel);
-    const profile = STYLE_CONFIG[resolvedStyle];
-    let soloistHook = null;
-    if (profile?.hookLoop) {
-        const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-        const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-        soloistHook = deriveSoloistHook(soloGenerated, profile.hookBars ?? 2, stepsPerMeasure);
-    }
-    dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated, soloistHook });
+    dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
 
     if (groove.enabled) {
         const genreFeel = groove.genreFeel || 'Rock';
@@ -238,7 +222,7 @@ export function handleEffects(
 
                 regenerateSessionSeeds(stateMap, currentSongSeed, playback.step || 0, dispatch);
             } else {
-                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null, soloistHook: null });
+                dispatch(ACTIONS.UPDATE_SB, { sessionSeed: null });
                 dispatch(ACTIONS.UPDATE_GB, {
                     orchestrationMap: null,
                     fillMap: null,

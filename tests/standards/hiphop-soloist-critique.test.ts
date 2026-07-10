@@ -47,18 +47,12 @@ function hookProfile() {
         seed: 'HEAD_AUDIT',
     });
     const cap = simulateSoloistLoops({ state: boot.state, arrangement, loops: 4, style: 'smart' });
-    const hook = boot.state.soloist.session.hook;
-    const hookLen = hook?.loopLengthSteps || 0;
-    // raw carved hook note by its step-in-hook position (pre-snap baseline source)
-    const rawAt = new Map();
-    for (const n of hook?.notes || []) {
-        rawAt.set(((n.step % hookLen) + hookLen) % hookLen, n);
-    }
+    // Recurrence period the line is checked NOT to verbatim-repeat at: 2 bars × 16
+    // steps in 4/4. Formerly read off the retired #555 hook lane's `loopLengthSteps`
+    // (removed in #1059 — that mechanism was inert, never consumed by phrase-first);
+    // the period is the same literal 2-bar window regardless of the dead lane.
+    const HOOK_PERIOD = 32;
 
-    let emitAnchor = 0;
-    let emitAnchorOnChord = 0;
-    let rawAnchor = 0;
-    let rawAnchorOnChord = 0;
     let allNotes = 0;
     let allOnChord = 0;
     const byStep = new Map();
@@ -82,24 +76,11 @@ function hookProfile() {
         if (chordPcs.has(pc(e.note.midi))) {
             allOnChord++;
         }
-        if (e.note.isAnchor) {
-            emitAnchor++;
-            if (chordPcs.has(pc(e.note.midi))) {
-                emitAnchorOnChord++;
-            }
-            const raw = rawAt.get(((e.stepInLoop % hookLen) + hookLen) % hookLen);
-            if (raw) {
-                rawAnchor++;
-                if (chordPcs.has(pc(raw.midi))) {
-                    rawAnchorOnChord++;
-                }
-            }
-        }
     }
     let pHits = 0;
     let pTot = 0;
     for (const [s, m] of byStep) {
-        const o = byStep.get(s + hookLen);
+        const o = byStep.get(s + HOOK_PERIOD);
         if (o !== undefined) {
             pTot++;
             if (o === m) {
@@ -108,11 +89,8 @@ function hookProfile() {
         }
     }
     return {
-        hookLen,
         noteCount: byStep.size,
         measures: arrangement.measuresPerLoop * 4,
-        emitAnchorChordRate: emitAnchor ? emitAnchorOnChord / emitAnchor : 0,
-        rawAnchorChordRate: rawAnchor ? rawAnchorOnChord / rawAnchor : 0,
         allChordToneRate: allNotes ? allOnChord / allNotes : 0,
         periodPitchRep: pTot ? pHits / pTot : 0,
         loopNotes,
@@ -132,7 +110,6 @@ describe('Hip Hop Soloist Critique', () => {
     it('outlines the chord changes — voice-led chord-tone alignment, not a verbatim loop', () => {
         const p = hookProfile();
         console.log('\n--- HIP HOP SOLOIST REPORT (phrase-first) ---');
-        console.log(`[hook length]          ${p.hookLen} (2 bars × 16)`);
         console.log(
             `[all chord-tone]       ${(p.allChordToneRate * 100).toFixed(1)}% (Target: >0.55)`,
         );
@@ -142,7 +119,6 @@ describe('Hip Hop Soloist Critique', () => {
         console.log(`[notes/loop]           ${JSON.stringify(p.loopNotes)}`);
         console.log('----------------------------------\n');
 
-        expect(p.hookLen).toBe(32);
         // Phrase-first voice-leads to the chord under it, so the whole line stays
         // harmonic (chord + scale tones) — well above the ~0.33 random floor over a
         // 4-note chord set. This IS the live engine's "outlines the changes".
@@ -153,16 +129,17 @@ describe('Hip Hop Soloist Critique', () => {
         expect(p.periodPitchRep).toBeLessThan(0.9);
 
         // DROPPED (epic #10 — legacy "living hook" mechanism #555, dark on the live
-        // engine): the anchor-snap LIFT metric (emitAnchorChordRate vs raw hook).
-        // Phrase-first DOES consume `isAnchor` internally (it reads it off the seed),
-        // but it does not propagate an `isAnchor` flag onto its EMITTED note object,
-        // so this test's `emitAnchor` count is 0 and the lift ratio has no
-        // denominator on the live engine. Also dropped: the recurring-hook recognizability
-        // window (periodPitchRep >0.4 — phrase-first develops to ~0.14, the
-        // "hooks wash out under SRDC development" behavior), and the ghost-grace /
-        // monotonic-densify "builds over loops" guard (phrase-first emits no
-        // sub-0.36 ghost graces and grows via pitch development, not density). The
-        // recurring hip-hop HOOK character is a genuine phrase-first PORT CANDIDATE.
+        // engine): the anchor-snap LIFT metric (emit-anchor chord rate vs the raw
+        // carved hook). Phrase-first DOES consume `isAnchor` internally (it reads it
+        // off the seed), but it does not propagate an `isAnchor` flag onto its EMITTED
+        // note object, so the metric had no denominator on the live engine — its
+        // machinery, along with the #555 hook lane it read from, was removed in #1059.
+        // Also dropped earlier: the recurring-hook recognizability window
+        // (periodPitchRep >0.4 — phrase-first develops to ~0.14, the "hooks wash out
+        // under SRDC development" behavior), and the ghost-grace / monotonic-densify
+        // "builds over loops" guard (phrase-first emits no sub-0.36 ghost graces and
+        // grows via pitch development, not density). The recurring hip-hop HOOK
+        // character is a genuine phrase-first PORT CANDIDATE.
     });
 
     it('stays a coherent, non-empty melodic line (regression guard)', () => {

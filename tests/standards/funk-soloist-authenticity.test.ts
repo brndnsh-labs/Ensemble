@@ -16,9 +16,9 @@
 // DROPPED (dark — produced only by the retired legacy engine; phrase-first never
 // emits them, re-added by #869/#870):
 //   - call-and-response role alternation (state.soloist.session.currentPhrase
-//     .context.role): the legacy motivicResponse Markov chain; phrase-first is
-//     theme-based and tags no call/response role. The audit harness
-//     (simulateSoloistLoops) that surfaced it drives the LEGACY getSoloistNote.
+//     .context.role): the retired legacy engine's motivic-response chain (its
+//     config was removed in #1059); phrase-first is theme-based and tags no
+//     call/response role.
 //   - funk articulation (ghosted off-beats + device palette bluesCurl/graceNote/
 //     run via note.device + velocity ghost gate): phrase-first notes carry no
 //     .device field and no rhythm-engine ghost-velocity gate.

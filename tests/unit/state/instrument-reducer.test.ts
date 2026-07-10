@@ -106,10 +106,9 @@ describe('Instrument Reducer', () => {
     it('should update conductor decisions', () => {
         instrumentReducer({
             type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
-            payload: { density: 'thin', hookProb: 0.9 },
+            payload: { density: 'thin' },
         });
         expect(chords.density).toBe('thin');
-        expect(soloist.hookRetentionProb).toBe(0.9);
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {

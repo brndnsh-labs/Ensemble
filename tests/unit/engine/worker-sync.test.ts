@@ -30,7 +30,6 @@ vi.mock('../../../public/state.js', () => {
         volume: 1.0,
         mode: 'monophonic',
         sessionSteps: 0,
-        hookRetentionProb: 0.5,
     });
     const harmony = { enabled: true, style: 'pad', octave: 0, volume: 1.0, complexity: 0.5 };
     const groove = {
