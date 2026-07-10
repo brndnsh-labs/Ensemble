@@ -189,6 +189,11 @@ describe('KeySignatureControls Component', () => {
         expect(mockDispatch).toHaveBeenCalledWith('SET_GROUPING', null);
         expect(loadDrumPreset).not.toHaveBeenCalled();
         expect(validateAndAnalyze).toHaveBeenCalled();
+        // #1030: a mid-playback meter change must flush + full-sync the worker
+        // (no SET_TIME_SIGNATURE/PROG_VALIDATED delta case), mirroring cycleGrouping —
+        // otherwise the worker keeps generating on the stale meter until stop→play.
+        expect(flushBuffers).toHaveBeenCalled();
+        expect(syncWorker).toHaveBeenCalled();
         expect(saveCurrentState).toHaveBeenCalled();
     });
 

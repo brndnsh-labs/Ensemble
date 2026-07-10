@@ -53,6 +53,11 @@ function updateTimeSignature(
         loadDrumPreset(lastDrumPreset);
     }
     validateAndAnalyze();
+    // Mirror cycleGrouping: push the new meter/grouping + recomputed arranger maps
+    // to the logic worker so a mid-playback meter change takes effect immediately
+    // (no delta case covers SET_TIME_SIGNATURE/PROG_VALIDATED — full flush is required).
+    flushBuffers();
+    syncWorker();
     saveCurrentState();
 }
 
