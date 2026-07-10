@@ -74,6 +74,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/chord-quality-sets.ts` | Dependency-free leaf of shared chord-quality classification Sets (keeps cross-engine const imports from dragging heavy lanes into a chunk). | `ALTERED_HOOK_QUALITIES` |
 | `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
 | `public/engine/comping-cells.ts` | Pure deterministic comping-cell banks (per-genre 16th-step hit patterns) extracted from accompaniment.ts. | `FUNK_COMPING_CELLS`, `JAZZ_COMPING_CELLS`, `BOSSA_PARTIDO_ALTO_CELLS` |
+| `public/engine/comping-emit.ts` | Standard comp lane hit decision + per-hit emission (coordination overlays, #715 statement/answer economy, #766 ring, #707 clamp) extracted from getAccompanimentNotes; compingState + coordination threaded explicitly. | `emitCompNotes`, `AccompanimentCoordination`, `CCEvent` |
 | `public/engine/comping-state.ts` | The mutated-shared-singleton comp-memory struct (groove/voice-leading/statement memory) and its per-song reset ritual. | `compingState`, `resetCompingState`, `CompingState` |
 | `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
 | `public/engine/grooves/` | 13 genre-specific drum strategies, one per canonical genre (see CLAUDE.md canon; Bossa's strategy is `latin.ts`), plus shared `utils.ts`. | `jazz.ts`, `rock.ts`, `funk.ts`, etc. |
