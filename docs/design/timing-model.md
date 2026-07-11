@@ -36,8 +36,12 @@ pocket (§4). The corollary is the design rule:
 
 ## 3. Live inventory (what exists and where)
 
-- **Band lean:** `getBandPocket(genreFeel)` — the per-genre palette table in
-  `coordination-engine.ts`. Summed by bass (`getBassNote`), comp (`getAccompanimentNotes`),
+- **Band lean:** `getBandPocket(genreFeel, sectionLabel?)` — the per-genre palette table in
+  `coordination-engine.ts`, scaled per section by energy (#1064): `getSectionEnergy(sectionLabel)`
+  drives a bounded final-stage multiplier (scale ∈ [0.6, 1.4], 1.0 at verse/default energy, hard
+  30 ms feel-ceiling) so the genre's character amplifies as the arrangement builds — push genres
+  dig in harder at a chorus/drop, laid-back genres lean deeper, everyone plays breakdowns/intros
+  closer to the grid. Summed by bass (`getBassNote`), comp (`getAccompanimentNotes`),
   harmony (`getHarmonyNotes`), and soloist (`getSoloistNotePhraseFirst`, since #1025). Drums do
   **not** add it — that asymmetry is what makes it audible.
 - **Lane character:** bass Neo-Soul drag residual in `bass-engine.ts`; harmony's schedule
@@ -79,9 +83,9 @@ see §5. Do not resurrect a band-global term; it cannot work (§2).
 
 ## 5. Future hooks (one authority per domain)
 
-- **"Band digs in / lays back as energy builds"** → modulate **tier 2**: scale `getBandPocket` by
-  section energy inside `coordination-engine.ts`. Differential, audible, one function, by-ear
-  gate. (Backlog: "energy-modulated band lean".)
+- **"Band digs in / lays back as energy builds"** → **shipped as #1064**: `getBandPocket` scales
+  by `getSectionEnergy(sectionLabel)` inside `coordination-engine.ts` (see §3). Differential,
+  audible, one function, guarded by the band-pocket critique's energy-modulation section.
 - **"Band breathes with intensity" in time** → tier 1, tempo domain: #1010 tempo breathing.
   Don't build the same response twice in two domains.
 - **New genre feel** → tier 2 palette entry + tier 3 character in that genre's strategy/lane.

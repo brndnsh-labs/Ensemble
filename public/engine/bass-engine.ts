@@ -579,7 +579,8 @@ export function getBassNote(
         // the scheduler / MIDI export never read it.
         approachTargetRoot?: number,
     ) => {
-        let timingOffset = getBandPocket(groove.genreFeel);
+        // #1064: the current section's label keys the energy modulation of the lean.
+        let timingOffset = getBandPocket(groove.genreFeel, chord?.sectionLabel ?? null);
         if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
             // #1005: getBandPocket('Neo-Soul') already supplies the +25ms band pocket;
             // this residual is the EXTRA Dilla drag that sits the bass deeper than the
@@ -811,7 +812,7 @@ export function getBassNote(
         if (isDownbeat) {
             const intensityFactor = 0.6 + intensity * 0.7;
             const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
-            let timingOffset = getBandPocket(groove.genreFeel);
+            let timingOffset = getBandPocket(groove.genreFeel, chord?.sectionLabel ?? null);
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
                 // #1005: see the main timing block — residual retuned against the 25ms
                 // palette base so the neo-soul bass lands ~33-35ms deep (deeper than the

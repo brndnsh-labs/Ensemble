@@ -1,3 +1,4 @@
+import { getSectionEnergy } from '../form-analysis.js';
 import type { SoloistHook, SoloistSessionSeed, StepInfo } from '../types.js';
 
 /**
@@ -65,10 +66,12 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
  * #1063 — a uniform whole-band shift is inaudible by construction; see
  * docs/design/timing-model.md §2/§4.)
  *
- * Metronome-core identity: this is a CONSTANT offset, not tempo breathing/rubato —
- * time stays metronomic; every lane just shares one consistent lean. It is applied
- * to the MELODIC lanes only (not the drum grid), so it's audible as the band
- * sitting behind/ahead of the kit rather than an inaudible global latency.
+ * Metronome-core identity: this is a per-section CONSTANT offset, not tempo
+ * breathing/rubato — time stays metronomic; every lane just shares one consistent
+ * lean (scaled per section by energy, #1064 — see POCKET_ENERGY_SLOPE below). It
+ * is applied to the MELODIC lanes only (not the drum grid), so it's audible as
+ * the band sitting behind/ahead of the kit rather than an inaudible global
+ * latency.
  *
  * Values are by-ear starting points (July 2026 pocket sweep, owner priority
  * "a consistent pocket the entire band respects"); expect ±few-ms tuning.
@@ -120,13 +123,69 @@ const GENRE_POCKET: Record<string, number> = {
 };
 
 /**
- * The single band-wide pocket authority (#1005). Returns the per-genre melodic-lane
- * time offset (seconds, +behind / −ahead) every melodic lane adds — the drums stay
- * on the grid, and that asymmetry is what makes the lean audible
- * (docs/design/timing-model.md, tier 2). Unknown/undefined genres → 0 (neutral).
+ * ENERGY MODULATION of the band lean (#1064) — tier-2 differential, scaled.
+ *
+ * why: the palette alone plays the verse and the drop with the identical lean —
+ * the band's feel never responds to the arrangement building. The architecturally
+ * valid response (timing-model.md §5) is to scale the tier-2 differential itself:
+ * section energy AMPLIFIES the genre's timing character. At a chorus/drop the funk
+ * band digs in harder ahead of the beat and the neo-soul band leans deeper behind
+ * it (laying back deeper at the heavy section is where the weight comes from); in
+ * a breakdown/intro everyone plays it straighter, closer to the grid (sparse
+ * sections read as tight and intentional). The rejected alternative — everyone
+ * migrating toward the grid as energy rises — would evaporate the Dilla drag
+ * exactly at the drop.
+ *
+ * Slope 0.8 over energy ∈ [0,1] centered on 0.5 → scale ∈ [0.6, 1.4]: ±40% of the
+ * palette value at the extremes, and EXACTLY 1.0 at verse/default energy so
+ * label-less chords, default charts, and every pre-#1064 fixture keep the palette
+ * value verbatim. Positive by construction — the lean can never sign-flip.
  */
-export function getBandPocket(genreFeel: string | undefined | null): number {
-    return (genreFeel && GENRE_POCKET[genreFeel]) || 0;
+const POCKET_ENERGY_SLOPE = 0.8;
+/**
+ * Hard ceiling on the scaled lean magnitude (seconds). 30 ms is the documented
+ * micro-timing bound (band-pocket-palette-critique guard E): past it a lean stops
+ * being feel and becomes a flam/displacement. Only Neo-Soul's top end touches it
+ * (25 ms × 1.4 = 35 ms saturates here), so a drop can deepen the Dilla drag but
+ * never push it out of feel territory.
+ *
+ * Scope: this bounds the TIER-2 POCKET TERM only. Tier-3 lane character stacks
+ * on top — specifically the Neo-Soul bass residual (+5–10 ms in bass-engine.ts,
+ * the deliberate deeper-than-comp split), so the deepest possible bass onset is
+ * 30 + 10 = 40 ms (Neo-Soul drop at full intensity; pre-#1064 the same worst
+ * case was 35 ms). That total is pinned in critique guard (G) — still inside
+ * the documented Dilla drag range, but it is the palette's absolute floor:
+ * nothing may stack deeper.
+ */
+const POCKET_FEEL_CEILING = 0.03;
+
+/**
+ * The single band-wide pocket authority (#1005, energy-modulated by #1064).
+ * Returns the per-genre melodic-lane time offset (seconds, +behind / −ahead)
+ * every melodic lane adds — the drums stay on the grid, and that asymmetry is
+ * what makes the lean audible (docs/design/timing-model.md, tier 2). Unknown/
+ * undefined genres → 0 (neutral).
+ *
+ * `sectionLabel` (the current chord's `sectionLabel`, which every lane already
+ * has in scope in both hosts — live worker and offline export) keys the energy
+ * modulation above via `getSectionEnergy`. Omitted/null/unknown labels resolve
+ * to energy 0.5 → the palette value verbatim. Still a pure function of
+ * (genreFeel, sectionLabel) — deterministic per section, no step/tempo/state
+ * input, so it cannot become tempo breathing (metronome-core identity).
+ */
+export function getBandPocket(
+    genreFeel: string | undefined | null,
+    sectionLabel: string | null = null,
+): number {
+    const base = (genreFeel && GENRE_POCKET[genreFeel]) || 0;
+    if (base === 0 || sectionLabel == null) {
+        return base;
+    }
+    // Final-stage multiplier (repo rule: a bias that must actually shift the
+    // outcome scales the final value, not one additive term).
+    const scale = 1 + (getSectionEnergy(sectionLabel) - 0.5) * POCKET_ENERGY_SLOPE;
+    const scaled = base * scale;
+    return Math.sign(scaled) * Math.min(Math.abs(scaled), POCKET_FEEL_CEILING);
 }
 
 /**

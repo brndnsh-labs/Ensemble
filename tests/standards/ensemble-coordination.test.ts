@@ -3,6 +3,7 @@
 
 import { getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { enforceRegisterSlotting } from '../../public/engine/coordination-engine.js';
 import { getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
 import { dispatch, getState } from '../../public/state.js';
@@ -289,8 +290,12 @@ describe('Ensemble Coordination Contract', () => {
     });
 
     describe('Register Slotting Enforcement (Middleware)', () => {
-        const { enforceRegisterSlotting } = require('../../public/engine/coordination-engine.ts');
-
+        // was a CJS `require('...coordination-engine.ts')` — that bypassed
+        // vite-node and loaded the module through Node's native resolver, which
+        // can't map the engine's .js-suffixed internal imports back to .ts
+        // source (broke the moment coordination-engine gained a runtime import,
+        // #1064). A static import goes through the same transform as every
+        // other suite.
         it('transposes any active note to the correct register regardless of input', () => {
             for (let i = 0; i < 100; i++) {
                 const randomMidi = 1 + Math.floor(Math.random() * 126);

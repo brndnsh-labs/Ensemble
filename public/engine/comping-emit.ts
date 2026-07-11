@@ -542,7 +542,8 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         // palette is the point of #1005 (see docs/design/timing-model.md, tier 2).
         // The intensity-tightening pushes (#713) stay layered on top — that's the
         // comp's own character the owner heard and liked.
-        let timingOffset = getBandPocket(genre);
+        // #1064: the current section's label keys the energy modulation of the lean.
+        let timingOffset = getBandPocket(genre, chord?.sectionLabel ?? null);
 
         if (chords.style === 'smart') {
             // #713: the smart-path pushes were flat (±25/10/20ms) and ignored

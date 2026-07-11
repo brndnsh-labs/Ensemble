@@ -24,9 +24,18 @@
  *   (D) SOLOIST propagation — the lead's timingOffset picks up getBandPocket
  *       (differential with the seed held fixed).
  *   (E) MICRO-TIMING BOUND — every palette lean stays feel-sized (|lean| < 30 ms,
- *       never rhythmic displacement), and getBandPocket is a pure fn of genre so
- *       it can't touch the swing grid (the swing-ratio-audit oracle, run
- *       separately, stays the subdivision authority).
+ *       never rhythmic displacement), and getBandPocket is a pure fn of
+ *       (genre, section label) so it can't touch the swing grid (the
+ *       swing-ratio-audit oracle, run separately, stays the subdivision
+ *       authority).
+ *   (F) ENERGY MODULATION (#1064) — section energy scales the lean as a bounded
+ *       final-stage multiplier (scale ∈ [0.6, 1.4], exactly 1.0 at verse/default
+ *       energy, hard 30 ms feel-ceiling): the genre's character AMPLIFIES as the
+ *       arrangement builds — never sign-flipping, monotonic in energy,
+ *       deterministic per section, neutral genres untouched.
+ *   (G) ENERGY DIFFERENTIAL AT THE LANES — the same downbeat played in a Verse
+ *       vs a Chorus section shifts the bass/comp onset by exactly the scaled
+ *       differential (drums stay on the grid — tier 2 stays a differential).
  *
  * HARMONY propagation (the 4th lane) is pinned exactly — including the bandPocket
  * term — in tests/integration/melodic-harmony-support.test.ts.
@@ -69,7 +78,25 @@ const EXPECTED_POCKET: Record<string, number> = {
 };
 const GENRES = Object.keys(EXPECTED_POCKET);
 
-function makeC7() {
+// #1064 energy modulation — hardcoded mirrors of the SECTION_ENERGY_MAP entries
+// this guard drives (pinned here, NOT imported from form-analysis, so the guard
+// stays non-tautological: if the energy map or the slope drifts, this fails
+// loudly instead of silently tracking the implementation).
+const ENERGY_BY_LABEL: Record<string, number> = {
+    Breakdown: 0.3,
+    Verse: 0.5,
+    Chorus: 0.9,
+    Drop: 1.0,
+};
+const POCKET_ENERGY_SLOPE = 0.8; // scale ∈ [0.6, 1.4] over energy ∈ [0, 1]
+const FEEL_CEILING = 0.03; // |lean| hard cap — micro-timing, never displacement
+function expectedModulated(genre: string, label: string): number {
+    const scale = 1 + (ENERGY_BY_LABEL[label] - 0.5) * POCKET_ENERGY_SLOPE;
+    const scaled = EXPECTED_POCKET[genre] * scale;
+    return Math.sign(scaled) * Math.min(Math.abs(scaled), FEEL_CEILING);
+}
+
+function makeC7(sectionLabel: string | null = null) {
     const intervals = [0, 4, 7, 10];
     return {
         rootMidi: 60,
@@ -79,6 +106,7 @@ function makeC7() {
         beats: 4,
         freqs: intervals.map((iv) => midiToFreq(60 + iv)),
         sectionId: 'Head',
+        ...(sectionLabel ? { sectionLabel } : {}),
     };
 }
 
@@ -142,9 +170,16 @@ function makeState(genre: string) {
 }
 
 // Bass note timingOffset at a bar downbeat.
-function bassTiming(genre: string): number | null {
+function bassTiming(
+    genre: string,
+    sectionLabel: string | null = null,
+    bandIntensity: number | null = null,
+): number | null {
     const state = makeState(genre);
-    const chord = makeC7();
+    if (bandIntensity !== null) {
+        state.playback.bandIntensity = bandIntensity;
+    }
+    const chord = makeC7(sectionLabel);
     const ctx = {
         sectionStart: 0,
         sectionEnd: TOTAL,
@@ -160,10 +195,10 @@ function bassTiming(genre: string): number | null {
 // getBandPocket(genre) + a DETERMINISTIC per-voice keyboard humanization
 // (`humanShift`, ±3 ms, seeded off the step — not random, so not flaky). Intent
 // is all-0 and it's a downbeat, so the smart-path intensity pushes never fire.
-function chordLeadTiming(genre: string): number | null {
+function chordLeadTiming(genre: string, sectionLabel: string | null = null): number | null {
     resetCompingState();
     const state = makeState(genre);
-    const chord = makeC7();
+    const chord = makeC7(sectionLabel);
     const coord: any = { soloistBusy: false, sectionOccurrence: 1 };
     const step = STEPS_PER_BAR;
     const info = getStepInfo(step, FOUR_FOUR, [], TIME_SIGNATURES);
@@ -343,6 +378,105 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         }
     });
 
+    it('(F) #1064: section energy modulates the lean — amplify direction, bounded, no sign flip', () => {
+        const LABELS = Object.keys(ENERGY_BY_LABEL);
+        for (const g of GENRES) {
+            const base = EXPECTED_POCKET[g];
+            // Back-compat: a verse (energy 0.5), a label-less chord, and an unknown
+            // label all yield the palette value VERBATIM — pre-#1064 behavior.
+            expect(getBandPocket(g, 'Verse'), `${g} verse`).toBeCloseTo(base, 9);
+            expect(getBandPocket(g, null), `${g} null label`).toBeCloseTo(base, 9);
+            expect(getBandPocket(g, 'Interlude Q'), `${g} unknown label`).toBeCloseTo(base, 9);
+
+            for (const label of LABELS) {
+                const lean = getBandPocket(g, label);
+                // Exact final-stage-multiplier math, saturating at the feel ceiling.
+                expect(lean, `${g} @ ${label}`).toBeCloseTo(expectedModulated(g, label), 9);
+                if (base === 0) {
+                    // Neutral genres (Acoustic/Country) are untouched at EVERY energy —
+                    // energy amplifies a character; it never invents one.
+                    expect(lean, `${g} stays neutral @ ${label}`).toBe(0);
+                } else {
+                    // The lean never sign-flips: a laid-back genre can never be pushed
+                    // ahead of the beat by a quiet section, nor vice versa.
+                    expect(Math.sign(lean), `${g} sign @ ${label}`).toBe(Math.sign(base));
+                }
+                // Bounded band: within ±40% of the palette value AND feel-sized.
+                expect(Math.abs(lean)).toBeLessThanOrEqual(Math.abs(base) * 1.4 + 1e-12);
+                expect(Math.abs(lean)).toBeLessThanOrEqual(FEEL_CEILING + 1e-12);
+                // Deterministic per section: pure fn of (genre, label), no state.
+                expect(getBandPocket(g, label)).toBe(lean);
+            }
+
+            if (base !== 0) {
+                // Amplify direction: |lean| grows as the arrangement builds —
+                // breakdown < verse < chorus ≤ drop (≤ because Neo-Soul's top end
+                // saturates at the 30 ms feel ceiling: 25 ms × 1.32 and × 1.4 both cap).
+                const bd = Math.abs(getBandPocket(g, 'Breakdown'));
+                const v = Math.abs(getBandPocket(g, 'Verse'));
+                const ch = Math.abs(getBandPocket(g, 'Chorus'));
+                const dr = Math.abs(getBandPocket(g, 'Drop'));
+                expect(bd, `${g} breakdown < verse`).toBeLessThan(v);
+                expect(v, `${g} verse < chorus`).toBeLessThan(ch);
+                expect(ch, `${g} chorus <= drop`).toBeLessThanOrEqual(dr);
+            }
+        }
+        report.push(
+            '  energy  scale 0.84 (breakdown) → 1.0 (verse) → 1.32 (chorus) → 1.4 (drop, 30ms cap)',
+        );
+    });
+
+    it('(G) #1064: the lane-level verse→chorus lean delta is exactly the scaled differential', () => {
+        // Bass, Blues (+10 ms palette; the only lane residual is Neo-Soul's, so
+        // Blues isolates the pocket): the SAME bar downbeat rendered in a Verse vs
+        // a Chorus section deepens the lay-back by exactly palette × (1.32 − 1.0).
+        const bluesDelta = expectedModulated('Blues', 'Chorus') - EXPECTED_POCKET.Blues;
+        const bassVerse = bassTiming('Blues', 'Verse');
+        const bassChorus = bassTiming('Blues', 'Chorus');
+        expect(bassVerse, 'bass emits on the verse downbeat').not.toBeNull();
+        expect(bassChorus, 'bass emits on the chorus downbeat').not.toBeNull();
+        expect(
+            (bassChorus as number) - (bassVerse as number),
+            'bass verse→chorus delta',
+        ).toBeCloseTo(bluesDelta, 9);
+
+        // Comp, same differential: the per-voice keyboard humanShift is seeded off
+        // the STEP, and both renders use the same step, so it cancels exactly.
+        const compVerse = chordLeadTiming('Blues', 'Verse');
+        const compChorus = chordLeadTiming('Blues', 'Chorus');
+        expect(compVerse, 'comp emits on the verse downbeat').not.toBeNull();
+        expect(compChorus, 'comp emits on the chorus downbeat').not.toBeNull();
+        expect(
+            (compChorus as number) - (compVerse as number),
+            'comp verse→chorus delta',
+        ).toBeCloseTo(bluesDelta, 9);
+
+        // Push genre: the chorus digs in HARDER ahead of the beat (more negative),
+        // and stays ahead — the build never drags a pushing band behind the kit.
+        const funkVerse = bassTiming('Funk', 'Verse') as number;
+        const funkChorus = bassTiming('Funk', 'Chorus') as number;
+        expect(funkChorus, 'funk chorus pushes harder').toBeLessThan(funkVerse);
+        expect(funkChorus).toBeLessThan(0);
+
+        // THE PALETTE'S ABSOLUTE FLOOR — the deepest onset any lane can produce:
+        // Neo-Soul bass at a Drop, full intensity. The pocket term saturates at
+        // the 30 ms feel ceiling (25 ms × 1.4 = 35 → capped) and the tier-3 bass
+        // residual (+0.005 + 1.0 × 0.005) stacks on top → exactly 40 ms. #1064
+        // deepened this worst case from 35 ms (review P2-1) — pinned EXACTLY so
+        // any future stacking that pushes the band deeper fails loud here.
+        const worst = bassTiming('Neo-Soul', 'Drop', 1.0);
+        expect(worst, 'neo-soul drop bass emits').not.toBeNull();
+        expect(worst as number, 'deepest possible lane onset').toBeCloseTo(0.04, 9);
+
+        report.push(
+            `  floor   Neo-Soul drop bass ${((worst as number) * 1000).toFixed(1)} ms (30ms capped pocket + 10ms residual)`,
+        );
+
+        report.push(
+            `  lanes   Blues verse→chorus deepens ${(bluesDelta * 1000).toFixed(1)} ms (bass & comp, exact)`,
+        );
+    });
+
     it('(E) every palette lean is feel-sized (micro-timing, never rhythmic displacement)', () => {
         // The lean must stay a FEEL — a few ms against the drums — not a rhythmic
         // event. 30 ms is well under any subdivision at playable tempos (a 16th at
@@ -351,15 +485,24 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         // (#1064 energy modulation included) from silently leaving feel territory.
         for (const g of GENRES) {
             expect(Math.abs(getBandPocket(g)), `|lean| for ${g}`).toBeLessThan(0.03);
+            // #1064: the energy-modulated lean saturates at the 30 ms feel ceiling —
+            // no section can push any genre's lean out of micro-timing territory.
+            for (const label of Object.keys(ENERGY_BY_LABEL)) {
+                expect(
+                    Math.abs(getBandPocket(g, label)),
+                    `modulated |lean| for ${g} @ ${label}`,
+                ).toBeLessThanOrEqual(FEEL_CEILING + 1e-12);
+            }
         }
-        // Constant offset (metronome-core): getBandPocket is a pure fn of genre —
-        // it takes no step/tempo/state, so it can't be tempo breathing or a
-        // swing-grid term. The swing subdivision lives entirely in the
-        // swing-ratio-audit oracle (run separately, unedited) and is orthogonal to
-        // this ± ms offset. (#1063 deleted the band-global groove pocket this once
-        // composed with — the palette is now the ONLY band-level term; see
-        // docs/design/timing-model.md §2/§4.)
-        expect(getBandPocket.length).toBe(1); // arity: (genreFeel) only
+        // Constant per (genre, section) — metronome-core: getBandPocket is a pure
+        // fn of genre + section label. It takes no step/tempo/state, so it can't
+        // be tempo breathing or a swing-grid term; #1064's section-energy input is
+        // STRUCTURAL (the label), not temporal. The swing subdivision lives
+        // entirely in the swing-ratio-audit oracle (run separately, unedited) and
+        // is orthogonal to this ± ms offset. (#1063 deleted the band-global groove
+        // pocket this once composed with — the palette is now the ONLY band-level
+        // term; see docs/design/timing-model.md §2/§4.)
+        expect(getBandPocket.length).toBe(1); // arity: (genreFeel, sectionLabel = null)
     });
 
     it('Critique Report', () => {

@@ -1084,7 +1084,8 @@ export function getSoloistNotePhraseFirst(
     // the lead locks to the rhythm section instead of floating on its own
     // straightened-swing time (see docs/design/timing-model.md, tier 2). It layers on
     // top of any seed-authored per-note micro-offset (primary.timingOffset).
-    const bandPocket = getBandPocket(state.groove?.genreFeel);
+    // #1064: the current section's label keys the energy modulation of the lean.
+    const bandPocket = getBandPocket(state.groove?.genreFeel, currentChord?.sectionLabel ?? null);
     const lead = {
         midi,
         velocity,

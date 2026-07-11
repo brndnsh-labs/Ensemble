@@ -1131,8 +1131,9 @@ function finalizeHarmonyNotes(
         // (was a harmony-only Neo-Soul `+= 0.02` Dilla special-case — now folded into
         // the palette so harmony leans by the same per-genre amount as bass/comp/solo).
         // See docs/design/timing-model.md (tier 2).
+        // #1064: the current section's label keys the energy modulation of the lean.
         let offset =
-            getBandPocket(feel) +
+            getBandPocket(feel, chord?.sectionLabel ?? null) +
             stagger +
             scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
                 (styleConfig.timingJitter || 0.008);
