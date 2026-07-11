@@ -14,10 +14,13 @@
 // ({context, state, target_url}) — the `gh statusCheckRollup` replacement.
 //
 // After a successful merge, it also closes the issues the PR body references with a
-// close keyword (`Closes #<n>`, `fixes #<n>`, …). Forgejo's OWN auto-close-on-merge
-// does NOT fire on this script's API squash-merge (observed systemic 2026-07 across
-// #1067/#1027 and #1068/#1040 — bodies verifiably carried `Closes #<n>` yet the issues
-// stayed open), so the guard closes them itself to remove the recurring manual step.
+// close keyword (`Closes #<n>`, `fixes #<n>`, …) as defense-in-depth: closure becomes
+// deterministic regardless of whether Forgejo's native close-on-merge fires for an
+// API-driven squash. (The "Forgejo didn't auto-close" saga — #1067/#1027, #1068/#1040 —
+// turned out NOT to be a Forgejo bug at all: `forgejo.mjs pr create` was fed a bogus
+// `--body-file` flag the parser silently swallowed, so the PR bodies went out EMPTY and
+// there was never a `Closes #<n>` server-side for anything to act on. That root cause is
+// fixed in forgejo.mjs; this close step stays as a belt-and-suspenders guarantee.)
 //
 // Usage:
 //   node scripts/forgejo-merge.mjs <pr#>            # poll → merge on green

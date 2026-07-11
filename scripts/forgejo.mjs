@@ -27,7 +27,8 @@
 //
 // list/view print JSON (pipe to jq/python); create/edit/comment/close print a
 // one-line human result. --body may be "@path" or "@-" to read the body from a file
-// or stdin (long markdown bodies — mirrors gh -F).
+// or stdin (long markdown bodies — mirrors gh -F). `--body-file <path>` is an accepted
+// alias for `--body @<path>` (matches gh's flag name).
 //
 // Auth/env identical to forgejo-project.mjs: FORGEJO_API / FORGEJO_TOKEN[_FILE] /
 // FORGEJO_REPO. Exit codes: 0 ok · 1 usage/API error · 3 Forgejo unreachable (STOP).
@@ -110,6 +111,14 @@ function parseArgs(argv) {
         } else {
             positional.push(a);
         }
+    }
+    // `--body-file <path>` is an alias for `--body @<path>` (matches `gh`'s flag name,
+    // which is the one everyone reflexively reaches for). Without this, an unrecognized
+    // `--body-file` was silently swallowed by the generic parser above and the body went
+    // out EMPTY — the real cause of the "Forgejo didn't auto-close the issue" saga
+    // (#1067/#1027, #1068/#1040): the PR bodies never carried `Closes #<n>` server-side.
+    if (typeof flags['body-file'] === 'string' && flags.body === undefined) {
+        flags.body = `@${flags['body-file']}`;
     }
     return { flags, positional };
 }
@@ -325,6 +334,7 @@ async function prCmd(sub, rest) {
                         state: p.state,
                         url: p.html_url,
                         head: p.head?.ref,
+                        body: p.body ?? '',
                         merged: p.merged,
                         mergeable: p.mergeable,
                     },
