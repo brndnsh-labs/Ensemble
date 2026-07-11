@@ -249,4 +249,72 @@ describe('MIDI Controller System', () => {
             expect(calls[2][0]).toEqual([0x90, 60, 0.8]);
         });
     });
+
+    describe('Play-along input validation on (re)sync (#1038)', () => {
+        afterEach(() => {
+            midi.selectedInputId = null;
+        });
+
+        it('drops a selectedInputId not present in the live enumerated inputs, falling back to "any input"', async () => {
+            midi.selectedInputId = 'stale-device-id';
+
+            vi.stubGlobal('navigator', {
+                requestMIDIAccess: () =>
+                    Promise.resolve({
+                        inputs: new Map([
+                            ['live-device', { id: 'live-device', name: 'Live Keyboard' }],
+                        ]),
+                        outputs: new Map(),
+                        onstatechange: null,
+                    }),
+            });
+
+            await initMIDI();
+
+            expect(midi.selectedInputId).toBeNull();
+        });
+
+        it('keeps a selectedInputId that is present in the live enumerated inputs', async () => {
+            midi.selectedInputId = 'live-device';
+
+            vi.stubGlobal('navigator', {
+                requestMIDIAccess: () =>
+                    Promise.resolve({
+                        inputs: new Map([
+                            ['live-device', { id: 'live-device', name: 'Live Keyboard' }],
+                        ]),
+                        outputs: new Map(),
+                        onstatechange: null,
+                    }),
+            });
+
+            await initMIDI();
+
+            expect(midi.selectedInputId).toBe('live-device');
+        });
+
+        it('does NOT clear selectedInputId on a later onstatechange resync (transient unplug/reconnect mid-session)', async () => {
+            midi.selectedInputId = 'live-device';
+
+            const mockMidiAccess = {
+                inputs: new Map([['live-device', { id: 'live-device', name: 'Live Keyboard' }]]),
+                outputs: new Map(),
+                onstatechange: null,
+            };
+            vi.stubGlobal('navigator', {
+                requestMIDIAccess: () => Promise.resolve(mockMidiAccess),
+            });
+
+            await initMIDI();
+            expect(midi.selectedInputId).toBe('live-device');
+
+            // Simulate a momentary disconnect: the device drops out of the live
+            // enumeration and onstatechange fires — this must NOT wipe the
+            // selection, only the initial hydrate-time sync validates it.
+            mockMidiAccess.inputs = new Map();
+            mockMidiAccess.onstatechange();
+
+            expect(midi.selectedInputId).toBe('live-device');
+        });
+    });
 });

@@ -50,7 +50,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
 });
 
 describe('Persistence Integrity', () => {
-    let arranger, playback, groove;
+    let arranger, playback, groove, midi;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -58,6 +58,7 @@ describe('Persistence Integrity', () => {
         arranger = state.arranger;
         playback = state.playback;
         groove = state.groove;
+        midi = state.midi;
     });
 
     it('should save the complete state accurately', () => {
@@ -98,5 +99,16 @@ describe('Persistence Integrity', () => {
         expect(savedData.groove).toHaveProperty('followPlayback');
         expect(savedData.groove).toHaveProperty('humanize');
         expect(savedData.groove).toHaveProperty('sectionSeedMap');
+    });
+
+    it('should persist play-along inputEnabled and selectedInputId (#1038)', () => {
+        midi.inputEnabled = true;
+        midi.selectedInputId = 'device-42';
+
+        saveCurrentState();
+
+        const savedData = vi.mocked(storage.save).mock.calls[0][1];
+        expect(savedData.midi.inputEnabled).toBe(true);
+        expect(savedData.midi.selectedInputId).toBe('device-42');
     });
 });

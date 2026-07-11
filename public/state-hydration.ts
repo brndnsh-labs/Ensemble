@@ -374,6 +374,11 @@ export function hydrateState(): void {
             dispatch(ACTIONS.SET_MIDI_CONFIG, {
                 enabled: savedState.midi.enabled || false,
                 selectedOutputId: savedState.midi.selectedOutputId || null,
+                inputEnabled: savedState.midi.inputEnabled || false,
+                // Validated against the live enumerated `inputs` list once MIDI access
+                // is (re)acquired (syncMIDIInputs) — a stale/no-longer-connected device
+                // id falls back to "any input" rather than silently killing play-along.
+                selectedInputId: savedState.midi.selectedInputId || null,
                 chordsChannel: savedState.midi.chordsChannel || 1,
                 bassChannel: savedState.midi.bassChannel || 2,
                 soloistChannel: savedState.midi.soloistChannel || 3,

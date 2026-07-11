@@ -170,7 +170,12 @@ export async function initMIDI(): Promise<boolean> {
 
         attachInputListeners();
         syncMIDIOutputs();
-        syncMIDIInputs();
+        // Only the initial sync validates a (possibly stale, freshly-hydrated)
+        // selectedInputId against the live device list — a later hot-plug
+        // resync (onstatechange, e.g. a momentary disconnect/reconnect of
+        // the selected keyboard) must NOT clear it, or a transient dropout
+        // would permanently fall back to "any input" mid-session (#1038).
+        syncMIDIInputs(true);
         return true;
     } catch (err) {
         console.error('Failed to get MIDI access', err);
@@ -209,8 +214,16 @@ function syncMIDIOutputs(): void {
 /**
  * Updates the state with the current list of MIDI inputs (for the play-along
  * device picker in Settings).
+ *
+ * @param validateSelection Only true for the initial sync in `initMIDI()`
+ * (covers both a fresh page load and re-enabling MIDI). A persisted (or
+ * otherwise stale) `selectedInputId` that isn't among the live devices would
+ * otherwise silently filter out every play-along note (#1038) — drop it so
+ * play-along falls back to "any input" instead of looking dead. NOT applied
+ * on later `onstatechange` hot-plug resyncs, or a momentary disconnect of the
+ * selected keyboard would permanently reset the selection mid-session.
  */
-function syncMIDIInputs(): void {
+function syncMIDIInputs(validateSelection = false): void {
     if (!midiAccess) {
         return;
     }
@@ -218,7 +231,15 @@ function syncMIDIInputs(): void {
     for (const input of midiAccess.inputs.values()) {
         inputs.push({ id: input.id, name: input.name });
     }
-    dispatchMidiInputConfig({ inputs });
+    const payload: ActionPayloadSetMidiConfig = { inputs };
+    if (validateSelection) {
+        const { midi } = getState();
+        const midiExt = midi as MidiState;
+        if (midiExt.selectedInputId && !inputs.some((i) => i.id === midiExt.selectedInputId)) {
+            payload.selectedInputId = null;
+        }
+    }
+    dispatchMidiInputConfig(payload);
 }
 
 /**

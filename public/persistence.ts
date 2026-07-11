@@ -98,6 +98,8 @@ export function saveCurrentState(): void {
         midi: {
             enabled: midi.enabled,
             selectedOutputId: midi.selectedOutputId,
+            inputEnabled: midi.inputEnabled,
+            selectedInputId: midi.selectedInputId,
             chordsChannel: midi.chordsChannel,
             bassChannel: midi.bassChannel,
             soloistChannel: midi.soloistChannel,
