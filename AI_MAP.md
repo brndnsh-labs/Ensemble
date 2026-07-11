@@ -62,6 +62,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/theory-scales.ts` | Scale degrees and mode definitions. | `getScaleForChord` |
 | `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
 | `public/engine/resolution.ts` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
+| `public/engine/reharm.ts` | Late-pass reharmonization (#1011): ephemeral in-place turnaround subs at high loopCount, Jazz/Blues. | `withLateReharm` |
 | `public/engine/arranger-utils.ts` | Arrangement unrolling and form utilities. | `unrollArrangement` |
 | `public/engine/arrangement-layering.ts` | Per-engine intro/outro mute schedule (S5). | `INTRO_MUTES`, `OUTRO_MUTES`, `isIntroSectionLabel` |
 | `public/engine/drop-mechanic.ts` | Drop/Breakdown structural-cut gate (genre + energy-delta). | `shouldFireDropMute` |
