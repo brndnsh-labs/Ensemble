@@ -10,10 +10,8 @@
         "strict": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
-        "ignoreDeprecations": "6.0",
-        "baseUrl": ".",
         "paths": {
-            "*": ["node_modules/*", "public/*"]
+            "*": ["./node_modules/*", "./public/*"]
         }
     },
     "include": ["public/**/*.ts", "public/**/*.tsx", "env.d.ts"],
