@@ -35,15 +35,21 @@
 //   • 12-Bar Blues — full RECURRENCE DoD. A 12-bar loop unrolls to a 24-bar Intro (6
 //     four-bar hook blocks over I/IV/V), so the transposing riff recurs strongly (~3×+
 //     the null). This is the #1055 complaint chart and the real guard.
-//   • Pop (Ballad) — LIVENESS + PROTECTION only. A 4-bar loop unrolls to Intro (12 bars)
-//     THEN a different Verse motif inside the 24-bar window, and its head is sparse, so a
-//     measure-0 hook can't recur strongly here — that is bounded by the out-of-scope
-//     "motif inheritance across role sections" follow-up, NOT this slice. Asserting
-//     recurrence here would be a sub-baseline (fake) gate; its musical payoff is the
-//     Needs-ear listen. We still assert the hook is placed and never gated to silence.
+//   • Pop (Ballad) — LIVENESS + PROTECTION + CROSS-SECTION (no generic-figure floor).
+//     Its head is sparse (~2-note cells), so the 4-note n-gram can't certify recurrence
+//     — that stays blues-only, by design (not over-claimed).
+//
+// #1058 CROSS-SECTION THEME RETURN (both cases): the Verse used to compose a FRESH
+// motif (the head a listener learned was replaced wholesale — the weak-ballad-hook
+// root cause). With motif inheritance the Verse's measure-0 hook cell IS the head's,
+// so an Intro-emitted cell shape must reappear among the first Verse blocks. This is
+// asserted as a set-intersection of per-block cell signatures (relative steps +
+// within-cell intervals — octave- and, in a same-quality loop, root-invariant),
+// windowed by the REAL unrolled section boundaries. Pre-inheritance: 0 matches ever.
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
+import { unrollArrangement } from '../../public/engine/arranger-utils.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
@@ -122,8 +128,9 @@ function shuffled(arr, rng) {
 const NGRAM = 3; // a 4-note figure — the hook cell is up to 4 notes at measure 0
 const NULL_TRIALS = 4;
 
-// Drive the LIVE engine over the 24-bar head, collect the emitted note stream, and score
-// the recurring-figure strength vs a seeded-shuffle null.
+// Drive the LIVE engine over the 24-bar head (plus the first Verse blocks for the
+// #1058 cross-section check), collect the emitted note stream, and score the
+// recurring-figure strength vs a seeded-shuffle null.
 function measureOnce(presetName, genre, bpm, seedStr, shuffleSeed) {
     const state = buildState(presetName, genre, bpm);
     const seed = generateSessionSeed(state, state.arranger, 'smart', 0.5, seedStr);
@@ -134,6 +141,15 @@ function measureOnce(presetName, genre, bpm, seedStr, shuffleSeed) {
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const total = state.arranger.totalSteps;
     const sampleSteps = 24 * stepsPerBar; // the unrolled Intro "head" span
+    // #1058 — real section boundaries of the unrolled macro-form (same call the seeder
+    // makes), so the cross-section cell check compares actual Intro vs Verse spans
+    // rather than assuming where the boundary falls for a given preset.
+    const unrolled = unrollArrangement(state.arranger, 128);
+    const intro = unrolled.sectionMap.find((s) => s.label === 'Intro');
+    const verse = unrolled.sectionMap.find((s) => s.label === 'Verse');
+    const blockSteps = 4 * stepsPerBar;
+    const verseSampleEnd = verse ? Math.min(verse.start + 6 * blockSteps, verse.end) : 0;
+    const emitEnd = Math.max(sampleSteps, verseSampleEnd);
     const stepMap = state.arranger.stepMap;
     const chordAt = (s) => {
         const w = ((s % total) + total) % total;
@@ -162,20 +178,20 @@ function measureOnce(presetName, genre, bpm, seedStr, shuffleSeed) {
     };
 
     const hookSteps = new Set(
-        seed.notes
-            .filter((n) => n.hookRole && n.step >= 0 && n.step < sampleSteps)
-            .map((n) => n.step),
+        seed.notes.filter((n) => n.hookRole && n.step >= 0 && n.step < emitEnd).map((n) => n.step),
     );
 
     const emitted = []; // { step, midi }
     let hookSeen = 0;
     let hookSounded = 0;
-    for (let abs = 0; abs < sampleSteps; abs++) {
+    for (let abs = 0; abs < emitEnd; abs++) {
         const midi = midiOf(emit(abs));
         if (midi != null) {
             emitted.push({ step: abs, midi });
         }
-        if (hookSteps.has(abs)) {
+        // Liveness/protection counters stay windowed to the 24-bar head — the
+        // original #1056 contract, kept comparable across builds.
+        if (hookSteps.has(abs) && abs < sampleSteps) {
             hookSeen++;
             if (midi != null) {
                 hookSounded++;
@@ -183,13 +199,15 @@ function measureOnce(presetName, genre, bpm, seedStr, shuffleSeed) {
         }
     }
 
-    // (interval, IOI) transition tokens over consecutive emitted notes. Interval-based, so
-    // the metric is transposition-invariant — it tolerates the hook's chord re-rooting and
-    // any depth-development transposition, matching what the ear recognizes.
+    // (interval, IOI) transition tokens over consecutive emitted notes in the 24-bar
+    // head window. Interval-based, so the metric is transposition-invariant — it
+    // tolerates the hook's chord re-rooting and any depth-development transposition,
+    // matching what the ear recognizes.
+    const headEmitted = emitted.filter((e) => e.step < sampleSteps);
     const tokens = [];
-    for (let i = 0; i + 1 < emitted.length; i++) {
-        const interval = clampInterval(emitted[i + 1].midi - emitted[i].midi);
-        const ioi = Math.min(16, emitted[i + 1].step - emitted[i].step);
+    for (let i = 0; i + 1 < headEmitted.length; i++) {
+        const interval = clampInterval(headEmitted[i + 1].midi - headEmitted[i].midi);
+        const ioi = Math.min(16, headEmitted[i + 1].step - headEmitted[i].step);
         tokens.push(`${interval}:${ioi}`);
     }
 
@@ -199,7 +217,55 @@ function measureOnce(presetName, genre, bpm, seedStr, shuffleSeed) {
     for (let t = 0; t < NULL_TRIALS; t++) {
         nullSum += topNgramCount(shuffled(tokens, rng), NGRAM);
     }
-    return { hookSeen, hookSounded, liveTop, nullTop: nullSum / NULL_TRIALS };
+
+    // #1058 — cross-section hook-cell identity: does some ≥2-note cell shape emitted
+    // in the Intro also appear among the first Verse blocks? With motif inheritance
+    // the Verse's measure-0 cell IS the head's, so the sets intersect; with fresh
+    // per-role composition they essentially never do.
+    const introSigs = intro
+        ? cellSigsIn(emitted, hookSteps, stepsPerBar, intro.start, intro.end)
+        : new Set();
+    const verseSigs = verse
+        ? cellSigsIn(emitted, hookSteps, stepsPerBar, verse.start, verseSampleEnd)
+        : new Set();
+    const crossComparable = introSigs.size > 0 && verseSigs.size > 0;
+    const crossMatch = crossComparable && [...introSigs].some((s) => verseSigs.has(s));
+
+    return {
+        hookSeen,
+        hookSounded,
+        liveTop,
+        nullTop: nullSum / NULL_TRIALS,
+        crossComparable: crossComparable ? 1 : 0,
+        crossMatch: crossMatch ? 1 : 0,
+    };
+}
+
+// #1058 — hook-CELL signatures on the emitted stream, per 4-measure motif block. The
+// hook lives in measure 0 of each block; signature = (relative steps)+(within-cell
+// intervals) — the shape the ear recognizes, octave-invariant (a section register
+// drop/lift moves the whole pinned cell) and, within a same-quality loop, chord-root-
+// invariant. Single-note cells are not signatures (a lone recurring step index is not
+// a figure) — skipped.
+function cellSigsIn(emitted, hookSteps, stepsPerBar, fromStep, toStep) {
+    const blockSteps = 4 * stepsPerBar;
+    const sigs = new Set();
+    for (let bs = fromStep; bs < toStep; bs += blockSteps) {
+        const cell = emitted.filter(
+            (e) => e.step >= bs && e.step < bs + stepsPerBar && hookSteps.has(e.step),
+        );
+        if (cell.length < 2) {
+            continue;
+        }
+        sigs.add(
+            `[${cell.map((e) => e.step - bs).join(',')}]` +
+                `(${cell
+                    .slice(1)
+                    .map((e, i) => clampInterval(e.midi - cell[i].midi))
+                    .join(',')})`,
+        );
+    }
+    return sigs;
 }
 
 function sweep(presetName, genre, bpm) {
@@ -207,6 +273,8 @@ function sweep(presetName, genre, bpm) {
     let hookSounded = 0;
     let liveSum = 0;
     let nullSum = 0;
+    let crossComparable = 0;
+    let crossMatches = 0;
     const seeds = 8;
     for (let i = 0; i < seeds; i++) {
         const r = measureOnce(presetName, genre, bpm, `HOOK_${presetName}_${i}`, 1000 + i);
@@ -214,13 +282,18 @@ function sweep(presetName, genre, bpm) {
         hookSounded += r.hookSounded;
         liveSum += r.liveTop;
         nullSum += r.nullTop;
+        crossComparable += r.crossComparable;
+        crossMatches += r.crossMatch;
     }
     return {
+        seeds,
         hookSeen,
         hookSoundedRate: hookSeen > 0 ? hookSounded / hookSeen : 0,
         liveTopMean: liveSum / seeds,
         nullTopMean: nullSum / seeds,
         ratio: nullSum > 0 ? liveSum / nullSum : 0,
+        crossComparable,
+        crossMatches,
     };
 }
 
@@ -234,10 +307,12 @@ describe('Soloist hookiness critique (#1056)', () => {
         it(`${preset}: the head carries an identifiable, protected hook`, () => {
             const r = sweep(preset, genre, bpm);
             console.log(
-                `\n[Critique Report — ${preset}${recurrence ? '' : ' (liveness-only)'}] ` +
+                `\n[Critique Report — ${preset}] ` +
                     `hookNotes=${r.hookSeen} sounded ${(100 * r.hookSoundedRate).toFixed(1)}% | ` +
                     `top${NGRAM + 1}note-figure live ${r.liveTopMean.toFixed(2)} ` +
-                    `null ${r.nullTopMean.toFixed(2)} | ratio ${r.ratio.toFixed(2)}×`,
+                    `null ${r.nullTopMean.toFixed(2)} | ratio ${r.ratio.toFixed(2)}× | ` +
+                    `Intro↔Verse cell match ${r.crossMatches}/${r.crossComparable} ` +
+                    `(of ${r.seeds} seeds)`,
             );
 
             // LIVENESS — hook notes exist in the head (the seeder placed the cell; guards
@@ -247,6 +322,16 @@ describe('Soloist hookiness critique (#1056)', () => {
             // PROTECTION — the hook is never gated to silence (a figure can't be a hook if
             // the density gate erodes it on the sparse early loops). Live 100%.
             expect(r.hookSoundedRate).toBeGreaterThan(0.98);
+
+            // #1058 CROSS-SECTION THEME RETURN — the Verse INHERITS the head motif
+            // (measure-0 hook cell verbatim), so some ≥2-note cell shape emitted in the
+            // Intro must reappear among the first Verse blocks. Pre-inheritance builds
+            // measure 0/8 and 0/4 here (fresh per-role motifs never coincide); with
+            // inheritance every comparable seed matches (8/8, 4/4). Sparse ballad heads
+            // don't always emit a ≥2-note cell in both sections, hence the comparable
+            // floor rather than all-8.
+            expect(r.crossComparable).toBeGreaterThanOrEqual(3);
+            expect(r.crossMatches / r.crossComparable).toBeGreaterThanOrEqual(0.75);
 
             if (recurrence) {
                 // RECURRENCE (vs null) — the PRIMARY guard. The recurring figure is REAL,

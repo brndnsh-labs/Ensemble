@@ -36,9 +36,9 @@ function buildState(genreFeel: string, presetName: string) {
     return state;
 }
 
-function simulate(genreFeel: string, presetName: string) {
+function simulate(genreFeel: string, presetName: string, seedStr = `CRY_${genreFeel}`) {
     const state = buildState(genreFeel, presetName);
-    const seed = generateSessionSeed(state, state.arranger, 'smart', 0.85, `CRY_${genreFeel}`);
+    const seed = generateSessionSeed(state, state.arranger, 'smart', 0.85, seedStr);
     state.soloist.session.seed = seed;
     state.soloist.session.phrasing.isResting = false;
 
@@ -87,7 +87,14 @@ function cryStats(notes: any[]) {
 
 describe('Soloist cry — bend-and-release (#869)', () => {
     it('fires sparingly on sustained blues landings, targeting a chord tone', () => {
-        const notes = simulate('Blues', '12-Bar Blues');
+        // 6-seed sweep (#1058): a single seed now yields only ~8-10 cries — far too
+        // small a sample for the hold-vs-release ratio below to mean anything (the
+        // flutter is a fixed 25% per-(step,loop) hash in the engine, so which cries
+        // flutter is hash-POSITION luck per seed). Aggregate across seeds so both the
+        // presence floor and the ratio converge toward the mechanism's real numbers.
+        const notes = ['', '_B', '_C', '_D', '_E', '_F'].flatMap((sfx) =>
+            simulate('Blues', '12-Bar Blues', `CRY_Blues${sfx}`),
+        );
         const { total, cries } = cryStats(notes);
         const rate = cries.length / total;
 
@@ -101,9 +108,13 @@ describe('Soloist cry — bend-and-release (#869)', () => {
         );
 
         // Fires as a real presence (the whole point — dark in production pre-#869).
-        // Deterministic (seeded, no Math.random): 33 observed; floor leaves headroom
-        // for engine evolution without letting it silently fall back to ~nothing.
-        expect(cries.length).toBeGreaterThanOrEqual(12);
+        // Deterministic (seeded, no Math.random): 91 observed across the 6-seed
+        // aggregate (~15/seed; pre-#1058 a single seed gave ~33 — inherited
+        // restatements subdivide/displace some of the long landings the cry fed on,
+        // so per-seed counts vary more now). Floor 45 guards the dark-in-production
+        // regression (~0) with 2× headroom; whether the new sparser per-seed cadence
+        // is ENOUGH blues punctuation is an ear call flagged at the #1058 listen gate.
+        expect(cries.length).toBeGreaterThanOrEqual(45);
         // SPARSE — a punctuation, not a constant trill (§10 restraint). 2.1%
         // observed; the ceiling catches a regression that sprays the cry on every
         // sustained note (it lives only on phrase-enders between peaks).

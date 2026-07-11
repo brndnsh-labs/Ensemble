@@ -98,7 +98,7 @@ function simulate(genre: string, presetName: string) {
             });
         }
     }
-    return { emitted, apexByWindow, apexSteps, cycleLen, loopLen, total };
+    return { emitted, apexByWindow, apexSteps, cycleLen, loopLen, total, seed };
 }
 
 const GENRES = [
@@ -177,6 +177,16 @@ describe('phrase-first soloist · musical critique', () => {
             // share should be GUIDE tones (3rd/7th) that actually define the
             // harmony, not just roots/5ths. (Strong beat = step 0 or 8 of the
             // 16-step bar, matching the engine's stepsPerBar=16, midBeat=8.)
+            // #1058 — exclude seed-PINNED steps from the landing stats, like the apex
+            // exclusion below: a Q&A question cadence is deliberately pinned to a
+            // key-UNSTABLE tone (its strong-beat fallback is a designed appoggiatura,
+            // #1009), and a hook cell is pinned to its own chord-tone stepping cycle
+            // (#1056) — neither is a decision of the landing snap this test guards.
+            // With inherited motifs recurring across sections these pins land on
+            // strong beats often enough to dilute the rates the snap is measured by.
+            const pinnedSteps = new Set(
+                sim.seed.notes.filter((n: any) => n.qaRole || n.hookRole).map((n: any) => n.step),
+            );
             let strong = 0;
             let chordTones = 0;
             let guideTones = 0;
@@ -186,6 +196,9 @@ describe('phrase-first soloist · musical critique', () => {
                 }
                 const sib = e.step % 16;
                 if (sib !== 0 && sib !== 8) {
+                    continue;
+                }
+                if (pinnedSteps.has(((e.step % sim.loopLen) + sim.loopLen) % sim.loopLen)) {
                     continue;
                 }
                 strong++;

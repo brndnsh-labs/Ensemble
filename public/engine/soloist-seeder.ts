@@ -396,6 +396,46 @@ function isDepartureCategory(category: string): boolean {
     );
 }
 
+/**
+ * #1058 — development depth per role when an UNROLLED macro-form inherits the head
+ * motif (`unrollArrangement` only emits Intro/Verse/Chorus/Solo/Outro labels; jazz
+ * styles collapse verse+solo to one 'jazz' category). The macro-form reads
+ * A–A′–B–C–A: Verse is a developed restatement, Solo develops deeper (thematic
+ * improvisation), Outro is the verbatim theme return ("head out"). Chorus is
+ * deliberately not listed — it composes fresh with the departure-contrast machinery.
+ */
+const UNROLLED_INHERIT_OPS: Record<string, number> = {
+    verse: 1,
+    jazz: 1,
+    solo: 2,
+    outro: 0,
+};
+
+/** Summary stats used to detect contrast needs when generating departure sections. */
+function computeMotifMetrics(
+    motif: MotifEvent[],
+    phraseLength: number,
+    beatsPerMeasure: number,
+): { density: number; syncopationRatio: number } {
+    let attacks = 0;
+    let syncopatedAttacks = 0;
+    motif.forEach((n) => {
+        if (!n.isRest) {
+            attacks++;
+            // An off-beat is any offset that is not a whole number or downbeat
+            const isDownbeat = n.beatOffset % beatsPerMeasure === 0;
+            const isWholeBeat = n.beatOffset % 1 === 0;
+            if (!isWholeBeat || !isDownbeat) {
+                syncopatedAttacks++;
+            }
+        }
+    });
+    return {
+        density: attacks / phraseLength, // attacks per measure
+        syncopationRatio: attacks > 0 ? syncopatedAttacks / attacks : 0,
+    };
+}
+
 function isSoftCadenceInterval(interval: number): boolean {
     const normalized = normalizeInterval(interval);
     return normalized === 2 || normalized === 5 || normalized === 9;
@@ -644,6 +684,19 @@ export function generateSessionSeed(
 
     const sectionIterationCount = new Map<string, number>();
 
+    // --- #1058 Motif inheritance on unrolled macro-forms ---
+    // `unrollArrangement` merges adjacent same-role iterations, so on a synthetic
+    // macro-form every role category occurs exactly once and the `iteration > 0`
+    // restatement ops below can never fire — each role would compose a FRESH motif
+    // and the head the listener just learned gets replaced wholesale. Instead,
+    // theme-roles INHERIT the head (A–A′–B–C–A): Verse develops it (1 op), Solo
+    // develops it deeper (2 ops), Outro returns it verbatim ("head out"), while
+    // Chorus stays freshly composed with the existing contrast machinery (the B).
+    // Real multi-section charts are NOT unrolled, so they keep composer freedom
+    // and their existing restatement behavior.
+    const isUnrolledForm = unrolled.totalSteps !== unrolled.originalSteps;
+    const headCategory = getSectionCategory(sectionMap[0]?.label, style);
+
     // Find macro turnaround index
     const turnaroundIndex = sectionMap.length - 1;
     // ... (rest of logic remains same, but using actualTotalSteps)
@@ -849,6 +902,157 @@ export function generateSessionSeed(
             return cell;
         };
 
+        /**
+         * One motivic development op (the restatement vocabulary), applied in place.
+         * `eligible` scopes which events an op may touch — `() => true` reproduces the
+         * classic whole-motif restatement (and preserves its exact PRNG draw order);
+         * the #1058 inheritance path passes a tail-measures guard so the measure-0
+         * hook cell recurs verbatim while the rest of the motif develops.
+         */
+        const applyRestatementOp = (
+            motifNotes: MotifEvent[],
+            eligible: (n: MotifEvent) => boolean,
+        ): void => {
+            const r = prng();
+            if (r < 0.2) {
+                // Enhanced Rhythmic Displacement: Shift motif by 16th, 8th, or anticipate
+                const shiftAmount =
+                    tripletEnabled && prng() < tripletMutationBias
+                        ? prng() > 0.5
+                            ? 1 / 3
+                            : -1 / 3
+                        : prng() > 0.5
+                          ? 0.5
+                          : prng() > 0.5
+                            ? 0.25
+                            : -0.5;
+                motifNotes.forEach((n) => {
+                    if (eligible(n)) {
+                        n.beatOffset += shiftAmount;
+                    }
+                });
+            } else if (r < 0.4) {
+                // Rhythmic Compression / Subdivision
+                const longNotes = motifNotes.filter(
+                    (n) => n.duration >= stepsPerBeat && !n.isRest && eligible(n),
+                );
+                if (longNotes.length > 0) {
+                    const target = longNotes[Math.floor(prng() * longNotes.length)];
+                    const originalDuration = target.duration;
+                    const useTripletSplit =
+                        tripletEnabled &&
+                        prng() < tripletMutationBias &&
+                        originalDuration >= stepsPerBeat * 1.5;
+                    const firstDuration = useTripletSplit
+                        ? roundSeedRhythmValue(originalDuration / 3)
+                        : originalDuration / 2;
+                    const secondDuration = roundSeedRhythmValue(originalDuration - firstDuration);
+                    target.duration = firstDuration;
+                    // Insert the second note
+                    const newNote = {
+                        ...target,
+                        beatOffset: roundSeedRhythmValue(
+                            target.beatOffset + firstDuration / stepsPerBeat,
+                        ),
+                        duration: secondDuration,
+                        scaleDegreeOffset: target.scaleDegreeOffset + (prng() > 0.5 ? 1 : -1),
+                    };
+                    const idx = motifNotes.indexOf(target);
+                    motifNotes.splice(idx + 1, 0, newNote);
+                }
+            } else if (r < 0.55) {
+                // Note Drop (Less is More)
+                const optionalNotes = motifNotes.filter(
+                    (n) => !n.isRest && n.beatOffset % tsConfig.beats !== 0 && eligible(n),
+                );
+                if (optionalNotes.length > 0) {
+                    const target = optionalNotes[Math.floor(prng() * optionalNotes.length)];
+                    target.isRest = true;
+                }
+            } else if (r < 0.7) {
+                // Interval Expansion: Push the highest pitch up a diatonic third
+                let maxDegree = -999;
+                let targetNote: MotifEvent | null = null;
+                motifNotes.forEach((n) => {
+                    if (!n.isRest && eligible(n) && n.scaleDegreeOffset > maxDegree) {
+                        maxDegree = n.scaleDegreeOffset;
+                        targetNote = n;
+                    }
+                });
+                if (targetNote) {
+                    (targetNote as MotifEvent).scaleDegreeOffset += 2; // Diatonic third
+                }
+            } else if (r < 0.85) {
+                if (isSmoothSyncStyle) {
+                    // Smooth-sync styles still benefit from a memorable restatement,
+                    // but a total pitch collapse tends to produce overly static weak seeds.
+                    let gestureDir = prng() > 0.5 ? 1 : -1;
+                    let activeIndex = 0;
+                    motifNotes.forEach((n) => {
+                        if (n.isRest || !eligible(n)) {
+                            return;
+                        }
+                        const gestureSlot = activeIndex % 4;
+                        if (gestureSlot === 0 || gestureSlot === 2) {
+                            n.scaleDegreeOffset = 0;
+                        } else if (gestureSlot === 1) {
+                            n.scaleDegreeOffset = gestureDir * 2;
+                        } else {
+                            n.scaleDegreeOffset = gestureDir;
+                            gestureDir *= -1;
+                        }
+                        activeIndex++;
+                    });
+                } else {
+                    // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
+                    // This creates "tension hooks" during restatements
+                    motifNotes.forEach((n) => {
+                        if (eligible(n)) {
+                            n.scaleDegreeOffset = 0;
+                        }
+                    });
+                }
+            } else {
+                // Sequencing: Transpose the entire motif by a diatonic step or third
+                const shift = prng() > 0.5 ? 1 : 2;
+                motifNotes.forEach((n) => {
+                    if (!n.isRest && eligible(n)) {
+                        n.scaleDegreeOffset += shift;
+                    }
+                });
+            }
+        };
+
+        // --- #1058 Inheritance branch (unrolled macro-forms only; see the note at
+        // `isUnrolledForm`) --- Theme-roles clone the head's motif instead of composing
+        // fresh. Measure 0 is held verbatim: it is the #1056 hook cell, which re-realizes
+        // over each block's downbeat chord, so an identical degree shape recurs and
+        // transposes with the harmony for free. Dev ops touch only the tail measures.
+        // Chorus is deliberately absent — it stays freshly composed with the departure
+        // contrast machinery (the B section).
+        if (
+            isUnrolledForm &&
+            index > 0 &&
+            !sectionMotifs.has(category) &&
+            category in UNROLLED_INHERIT_OPS
+        ) {
+            const headEntry = sectionMotifs.get(headCategory);
+            if (headEntry) {
+                const inherited = headEntry.motif.map((n) => ({ ...n }));
+                const inTailMeasures = (n: MotifEvent) => n.beatOffset >= tsConfig.beats;
+                for (let op = 0; op < UNROLLED_INHERIT_OPS[category]; op++) {
+                    applyRestatementOp(inherited, inTailMeasures);
+                }
+                sectionMotifs.set(category, {
+                    motif: inherited,
+                    phraseLength: headEntry.phraseLength,
+                    contourType: headEntry.contourType,
+                    metrics: computeMotifMetrics(inherited, headEntry.phraseLength, tsConfig.beats),
+                    isStationaryMotif: headEntry.isStationaryMotif,
+                });
+            }
+        }
+
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
         if (!sectionMotifs.has(category)) {
@@ -868,11 +1072,14 @@ export function generateSessionSeed(
             let forceSparse = false;
             let forceDense = false;
             if (isDeparture) {
-                // Find primary motif metrics to create contrast
+                // Find primary motif metrics to create contrast. On an unrolled
+                // macro-form the head is the true primary (#1058) — jazz styles file
+                // their verse under the 'jazz' category, so the label chain misses.
                 const primaryMetrics =
                     sectionMotifs.get('verse')?.metrics ||
                     sectionMotifs.get('main')?.metrics ||
-                    sectionMotifs.get('a')?.metrics;
+                    sectionMotifs.get('a')?.metrics ||
+                    (isUnrolledForm ? sectionMotifs.get(headCategory)?.metrics : undefined);
                 if (primaryMetrics) {
                     if (primaryMetrics.density > 4 && primaryMetrics.syncopationRatio > 0.4) {
                         forceSparse = true;
@@ -1277,28 +1484,11 @@ export function generateSessionSeed(
                 }
             }
 
-            // Calculate metrics for this new motif
-            let attacks = 0;
-            let syncopatedAttacks = 0;
-            motif.forEach((n) => {
-                if (!n.isRest) {
-                    attacks++;
-                    // An off-beat is any offset that is not a whole number or downbeat
-                    const isDownbeat = n.beatOffset % tsConfig.beats === 0;
-                    const isWholeBeat = n.beatOffset % 1 === 0;
-                    if (!isWholeBeat || !isDownbeat) {
-                        syncopatedAttacks++;
-                    }
-                }
-            });
-            const density = attacks / phraseLength; // attacks per measure
-            const syncopationRatio = attacks > 0 ? syncopatedAttacks / attacks : 0;
-
             sectionMotifs.set(category, {
                 motif,
                 phraseLength,
                 contourType,
-                metrics: { density, syncopationRatio },
+                metrics: computeMotifMetrics(motif, phraseLength, tsConfig.beats),
                 isStationaryMotif,
             });
         }
@@ -1316,109 +1506,18 @@ export function generateSessionSeed(
         if (iteration > 0) {
             // Create a deep copy to mutate
             motif = motif.map((n) => ({ ...n }));
-
-            const r = prng();
-            if (r < 0.2) {
-                // Enhanced Rhythmic Displacement: Shift motif by 16th, 8th, or anticipate
-                const shiftAmount =
-                    tripletEnabled && prng() < tripletMutationBias
-                        ? prng() > 0.5
-                            ? 1 / 3
-                            : -1 / 3
-                        : prng() > 0.5
-                          ? 0.5
-                          : prng() > 0.5
-                            ? 0.25
-                            : -0.5;
-                motif.forEach((n) => {
-                    n.beatOffset += shiftAmount;
-                });
-            } else if (r < 0.4) {
-                // Rhythmic Compression / Subdivision
-                const longNotes = motif.filter((n) => n.duration >= stepsPerBeat && !n.isRest);
-                if (longNotes.length > 0) {
-                    const target = longNotes[Math.floor(prng() * longNotes.length)];
-                    const originalDuration = target.duration;
-                    const useTripletSplit =
-                        tripletEnabled &&
-                        prng() < tripletMutationBias &&
-                        originalDuration >= stepsPerBeat * 1.5;
-                    const firstDuration = useTripletSplit
-                        ? roundSeedRhythmValue(originalDuration / 3)
-                        : originalDuration / 2;
-                    const secondDuration = roundSeedRhythmValue(originalDuration - firstDuration);
-                    target.duration = firstDuration;
-                    // Insert the second note
-                    const newNote = {
-                        ...target,
-                        beatOffset: roundSeedRhythmValue(
-                            target.beatOffset + firstDuration / stepsPerBeat,
-                        ),
-                        duration: secondDuration,
-                        scaleDegreeOffset: target.scaleDegreeOffset + (prng() > 0.5 ? 1 : -1),
-                    };
-                    const idx = motif.indexOf(target);
-                    motif.splice(idx + 1, 0, newNote);
-                }
-            } else if (r < 0.55) {
-                // Note Drop (Less is More)
-                const optionalNotes = motif.filter(
-                    (n) => !n.isRest && n.beatOffset % tsConfig.beats !== 0,
-                );
-                if (optionalNotes.length > 0) {
-                    const target = optionalNotes[Math.floor(prng() * optionalNotes.length)];
-                    target.isRest = true;
-                }
-            } else if (r < 0.7) {
-                // Interval Expansion: Push the highest pitch up a diatonic third
-                let maxDegree = -999;
-                let targetNote: any = null;
-                motif.forEach((n) => {
-                    if (!n.isRest && n.scaleDegreeOffset > maxDegree) {
-                        maxDegree = n.scaleDegreeOffset;
-                        targetNote = n;
-                    }
-                });
-                if (targetNote) {
-                    targetNote.scaleDegreeOffset += 2; // Diatonic third
-                }
-            } else if (r < 0.85) {
-                if (isSmoothSyncStyle) {
-                    // Smooth-sync styles still benefit from a memorable restatement,
-                    // but a total pitch collapse tends to produce overly static weak seeds.
-                    let gestureDir = prng() > 0.5 ? 1 : -1;
-                    let activeIndex = 0;
-                    motif.forEach((n) => {
-                        if (n.isRest) {
-                            return;
-                        }
-                        const gestureSlot = activeIndex % 4;
-                        if (gestureSlot === 0 || gestureSlot === 2) {
-                            n.scaleDegreeOffset = 0;
-                        } else if (gestureSlot === 1) {
-                            n.scaleDegreeOffset = gestureDir * 2;
-                        } else {
-                            n.scaleDegreeOffset = gestureDir;
-                            gestureDir *= -1;
-                        }
-                        activeIndex++;
-                    });
-                } else {
-                    // Stationary Transformation: Collapse all pitches to a single anchor tone (Root/5th)
-                    // This creates "tension hooks" during restatements
-                    motif.forEach((n) => {
-                        n.scaleDegreeOffset = 0;
-                    });
-                }
-            } else {
-                // Sequencing: Transpose the entire motif by a diatonic step or third
-                const shift = prng() > 0.5 ? 1 : 2;
-                motif.forEach((n) => {
-                    if (!n.isRest) {
-                        n.scaleDegreeOffset += shift;
-                    }
-                });
-            }
+            // #1058 — on an unrolled form, a repeated category is inheritance-sourced
+            // (jazz styles collapse verse+solo to one 'jazz' category, so the Solo is
+            // the second occurrence). Its restatement keeps the same measure-0 hook
+            // guard as the inheritance branch — the head's hook cell stays the
+            // through-line while the tail develops ("blow on the head"). Real charts
+            // (isUnrolledForm false) keep the classic whole-motif op, and its exact
+            // PRNG draw order.
+            const restatementEligible =
+                isUnrolledForm && category in UNROLLED_INHERIT_OPS
+                    ? (n: MotifEvent) => n.beatOffset >= tsConfig.beats
+                    : () => true;
+            applyRestatementOp(motif, restatementEligible);
         }
 
         // Apply motif to the section, typically repeating in 2-measure blocks
