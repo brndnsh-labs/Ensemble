@@ -13,7 +13,6 @@ import {
 import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { isPowerChordChordsVoice } from './instrument-registry.js';
-import { withLateReharm } from './reharm.js';
 import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
 
@@ -120,14 +119,7 @@ export function generateNotesForStep(
     if (includeSoloist && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord, sectionStart, sectionEnd } = chordData;
-            // #1011: lookaheads route through the reharm wrapper too — when
-            // step+4 lands on a substituted turnaround chord, the lane must aim
-            // at the SUB (what will actually play), not the written chord.
-            const nextChordData = withLateReharm(
-                getChordAtStep(step + 4, arranger, cursors.lookaheadCursor),
-                arranger,
-                state,
-            );
+            const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
             // Phrase-first is THE soloist engine (the beta toggle was retired once
             // it became the default). It self-delegates to the legacy generator
             // during the brief pre-seed window (no session seed yet), so the
@@ -202,12 +194,7 @@ export function generateNotesForStep(
         if (chordData) {
             const { chord, stepInChord } = chordData;
             if (isBassActive(state, bass.style, step, stepInChord, stepInfo, coordination)) {
-                // #1011: see the soloist lookahead — approach lines aim at the sub.
-                const nextChordData = withLateReharm(
-                    getChordAtStep(step + 4, arranger, cursors.lookaheadCursor),
-                    arranger,
-                    state,
-                );
+                const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
                 const { sectionStart, sectionEnd } = chordData;
                 const bassResult = getBassNote(
                     state,
@@ -304,12 +291,7 @@ export function generateNotesForStep(
     if (includeHarmony && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
-            // #1011: see the soloist lookahead — shadow/answer lines aim at the sub.
-            const nextChordData = withLateReharm(
-                getChordAtStep(step + 4, arranger, cursors.lookaheadCursor),
-                arranger,
-                state,
-            );
+            const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
             const harmonyNotes = getHarmonyNotes(
                 state,
                 chord,

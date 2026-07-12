@@ -15,7 +15,6 @@ import {
     writeInt32,
     writeString,
 } from './midi-utils.js';
-import { withLateReharm } from './reharm.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
@@ -600,15 +599,7 @@ export class ExportProcessor {
         const notes = tickResult.notes;
         const drumHits = tickResult.drumHits;
 
-        // #1011: markers route through the reharm wrapper so an exported chord
-        // marker always names the chord the notes were generated over. (The
-        // export pins playback.currentLoopCount at 0, so today this is identity
-        // — but if export loop-keying ever goes live, markers stay coherent.)
-        const chordData = withLateReharm(
-            getChordAtStep(globalStep, arranger, this.exportCursor),
-            arranger,
-            this.state,
-        );
+        const chordData = getChordAtStep(globalStep, arranger, this.exportCursor);
         if (chordData && chordData.stepInChord === 0) {
             const { chord } = chordData;
             const pulse = this.toPulses(stepTimeS);

@@ -17,7 +17,6 @@ import {
 } from './coordination-engine.js';
 import { shouldFireDropMute } from './drop-mechanic.js';
 import { applyGrooveOverrides } from './groove-engine.js';
-import { withLateReharm } from './reharm.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import type { DrumHitInfo, TickCursors } from './tick-logic.js';
 import { type ChordAtStep, getChordAtStep } from './worker-utils.js';
@@ -80,16 +79,7 @@ export function runDrumTick(
     const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
-    // #1011: the late-reharm wrapper is THE single point where the played chord
-    // can diverge (ephemerally) from the written chart. Wrapping the fetch here —
-    // before the preamble derives isTensionChord/altPitchClasses/energy fields
-    // and before any producer runs — is what guarantees one harmonic truth: every
-    // lane and every chord-derived signal sees the same substituted chord.
-    const chordData = withLateReharm(
-        getChordAtStep(step, arranger, cursors.mainCursor),
-        arranger,
-        state,
-    );
+    const chordData = getChordAtStep(step, arranger, cursors.mainCursor);
     const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
     // #842: bar-latch the motif-selection intensity on the CONDUCTOR-LESS paths
@@ -160,13 +150,10 @@ export function runDrumTick(
 
         // writer: chord-data preamble (this block); readable-after: any producer
         if (remainingSteps <= stepsPerMeasure) {
-            // #1011: routed through the reharm wrapper for coherence-by-
-            // construction (a section's FIRST chord is never in a turnaround
-            // window, so this is identity in practice).
-            const nextSectionChordData = withLateReharm(
-                getChordAtStep(sectionEnd, arranger, cursors.lookaheadCursor),
+            const nextSectionChordData = getChordAtStep(
+                sectionEnd,
                 arranger,
-                state,
+                cursors.lookaheadCursor,
             );
             if (nextSectionChordData?.chord) {
                 coordination.upcomingSectionFirstChord = nextSectionChordData.chord;
