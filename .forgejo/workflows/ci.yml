@@ -8,8 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
+  # The full non-browser gate. `npm run ci` is the single source of truth for
+  # what "green" means — typecheck, depcheck, knip, mutation/lint/docs checks,
+  # unit tests, production build, and bundle-size budgets — so `npm run ci`
+  # locally predicts this job exactly. Keep this job's checks == that script;
+  # don't add gate steps here that aren't in the script (or vice versa).
+  checks:
     runs-on: [self-hosted, ensemble]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -22,13 +28,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run unit and lint tests
-        run: npm test
+      - name: Run the full gate (npm run ci)
+        run: npm run ci
 
   e2e-tests:
     runs-on: [self-hosted, ensemble]
-    # Needs unit tests to pass first for efficiency, but could be run in parallel
-    needs: unit-tests
+    timeout-minutes: 25
+    # Gate first (fast, cheap) before spending a runner slot on the browser suite.
+    needs: checks
     steps:
       - uses: actions/checkout@v7
 
