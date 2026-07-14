@@ -5,7 +5,11 @@ import { binarySearchMap, getStepInfo, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState, resetCompingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
-import { resetCoordinationCarryover, updateCoordinationContext } from './coordination-engine.js';
+import {
+    type CoordinationContext,
+    resetCoordinationCarryover,
+    updateCoordinationContext,
+} from './coordination-engine.js';
 import { calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
@@ -17,7 +21,7 @@ import {
 } from './midi-utils.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
-import { applyWorkerTransition, generateNotesForStep } from './tick-logic.js';
+import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
 import { getChordAtStep } from './worker-utils.js';
 
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
@@ -393,10 +397,10 @@ export class ExportProcessor {
     _writeNotesToTrack(
         track: MidiTrack,
         channel: number,
-        notes: any[],
+        notes: NoteResult[],
         stepTimeS: number,
         moduleName: string,
-        coordination: any,
+        coordination: CoordinationContext,
         globalStep: number,
     ): void {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
@@ -421,17 +425,20 @@ export class ExportProcessor {
 
                 const finalMidi = Math.max(0, Math.min(127, res.midi + octaveShift * 12));
 
-                let finalVel = res.velocity * polyphonyComp;
+                // `velocity` is optional on NoteResult but always set for notes past the
+                // `res.midi > 0` guard; default to 0 (silent) rather than propagate NaN.
+                const noteVel = res.velocity ?? 0;
+                let finalVel = noteVel * polyphonyComp;
 
                 // Match live engine dynamic scaling
                 if (moduleName === 'bass') {
                     // Match synth-bass square-root compression curve
-                    finalVel = Math.sqrt(res.velocity);
+                    finalVel = Math.sqrt(noteVel);
                 } else if (moduleName === 'soloist') {
                     // Match synth-soloist band intensity swell
                     const intensity = this.state.playback.bandIntensity ?? 0.5;
                     const intensityGain = 0.5 + intensity * 0.9;
-                    finalVel = res.velocity * intensityGain;
+                    finalVel = noteVel * intensityGain;
                 }
 
                 if (res.muted) {
@@ -468,7 +475,10 @@ export class ExportProcessor {
                 }
 
                 let endTimeS: number;
-                let actualDurationSteps = res.durationSteps;
+                // `durationSteps` is optional on NoteResult but always set for notes on this
+                // write path; default to one step so an unexpected omission yields a sane
+                // minimal note rather than a NaN duration (the untyped `any[]` hid this).
+                let actualDurationSteps = res.durationSteps ?? 1;
 
                 // Handle Staccato "Dry" notes (e.g. Reggae Skanks, Funk Chucks)
                 if (res.dry) {
@@ -616,7 +626,7 @@ export class ExportProcessor {
             }
         }
 
-        const soloistNotes = notes.filter((n: any) => n.module === 'soloist');
+        const soloistNotes = notes.filter((n) => n.module === 'soloist');
         if (soloistNotes.length > 0) {
             this._writeNotesToTrack(
                 this.soloistTrack,
@@ -629,7 +639,7 @@ export class ExportProcessor {
             );
         }
 
-        const bassNotes = notes.filter((n: any) => n.module === 'bass');
+        const bassNotes = notes.filter((n) => n.module === 'bass');
         if (bassNotes.length > 0) {
             this._writeNotesToTrack(
                 this.bassTrack,
@@ -642,7 +652,7 @@ export class ExportProcessor {
             );
         }
 
-        const chordsNotes = notes.filter((n: any) => n.module === 'chords');
+        const chordsNotes = notes.filter((n) => n.module === 'chords');
         if (chordsNotes.length > 0) {
             this._writeNotesToTrack(
                 this.chordTrack,
@@ -655,7 +665,7 @@ export class ExportProcessor {
             );
         }
 
-        const harmonyNotes = notes.filter((n: any) => n.module === 'harmony');
+        const harmonyNotes = notes.filter((n) => n.module === 'harmony');
         if (harmonyNotes.length > 0) {
             this._writeNotesToTrack(
                 this.harmonyTrack,
