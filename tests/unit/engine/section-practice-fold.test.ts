@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { foldPracticeStep, isPracticeLooping } from '../../../public/engine/section-overrides.js';
+import {
+    foldPracticeStep,
+    isPracticeLooping,
+    isPracticeLoopWrap,
+    practiceRampNextBpm,
+} from '../../../public/engine/section-overrides.js';
 
 /**
  * #1016 — section practice. The scheduler and worker keep `step` monotonic and
@@ -64,6 +69,84 @@ describe('section-practice fold (#1016)', () => {
             expect(foldPracticeStep(15, pb)).toBe(15);
             expect(foldPracticeStep(16, pb)).toBe(0);
             expect(foldPracticeStep(33, pb)).toBe(1);
+        });
+    });
+
+    // #1021 — practice tempo ramp. A wrap is a fresh pass through the drilled
+    // section (folded step back at the window top); the ramp climbs the BPM there.
+    describe('isPracticeLoopWrap', () => {
+        it('is false with no active loop', () => {
+            expect(isPracticeLoopWrap(64, null)).toBe(false);
+            expect(isPracticeLoopWrap(64, { loopStartStep: -1, loopEndStep: -1 })).toBe(false);
+        });
+
+        it('fires exactly at each window-top return, never mid-window', () => {
+            const pb = { loopStartStep: 32, loopEndStep: 64 }; // width 32
+            expect(isPracticeLoopWrap(32, pb)).toBe(false); // first entry, not a wrap
+            expect(isPracticeLoopWrap(63, pb)).toBe(false); // last step of lap 1
+            expect(isPracticeLoopWrap(64, pb)).toBe(true); // top of lap 2 → wrap
+            expect(isPracticeLoopWrap(65, pb)).toBe(false);
+            expect(isPracticeLoopWrap(96, pb)).toBe(true); // top of lap 3 → wrap
+        });
+
+        it('agrees with foldPracticeStep returning to the window top', () => {
+            const pb = { loopStartStep: 16, loopEndStep: 48 };
+            for (let step = pb.loopStartStep + 1; step < 2000; step++) {
+                const atTop = foldPracticeStep(step, pb) === pb.loopStartStep;
+                expect(isPracticeLoopWrap(step, pb)).toBe(atTop);
+            }
+        });
+    });
+
+    describe('practiceRampNextBpm', () => {
+        const base = {
+            loopStartStep: 32,
+            loopEndStep: 64, // width 32
+            rampBpm: true,
+            bpm: 79, // started at ~66% of the 120 goal
+            rampBpmPerLoop: 4,
+            rampBpmTarget: 120, // the goal, captured at play-start
+        };
+
+        it('returns null when the ramp is disarmed', () => {
+            expect(practiceRampNextBpm({ ...base, rampBpm: false, step: 64 })).toBeNull();
+        });
+
+        it('returns null when there is no active loop', () => {
+            expect(
+                practiceRampNextBpm({
+                    ...base,
+                    loopStartStep: -1,
+                    loopEndStep: -1,
+                    step: 64,
+                }),
+            ).toBeNull();
+        });
+
+        it('returns null with no captured target (drill not started)', () => {
+            expect(practiceRampNextBpm({ ...base, rampBpmTarget: 0, step: 64 })).toBeNull();
+        });
+
+        it('returns null on non-wrap steps (never mid-bar)', () => {
+            expect(practiceRampNextBpm({ ...base, step: 32 })).toBeNull(); // first entry
+            expect(practiceRampNextBpm({ ...base, step: 50 })).toBeNull(); // mid-window
+            expect(practiceRampNextBpm({ ...base, step: 63 })).toBeNull(); // last step
+        });
+
+        it('climbs by perLoop at each wrap toward the goal', () => {
+            expect(practiceRampNextBpm({ ...base, step: 64 })).toBe(83);
+            expect(practiceRampNextBpm({ ...base, step: 96, bpm: 83 })).toBe(87);
+        });
+
+        it('lands exactly on the goal and then holds (no overshoot, no step-down)', () => {
+            // one perLoop below the goal → lands exactly on it
+            expect(practiceRampNextBpm({ ...base, step: 64, bpm: 117 })).toBe(120);
+            // at the goal → null (drill complete, hold)
+            expect(practiceRampNextBpm({ ...base, step: 64, bpm: 120 })).toBeNull();
+            // final partial step never overshoots past the goal
+            expect(practiceRampNextBpm({ ...base, step: 64, bpm: 118, rampBpmPerLoop: 10 })).toBe(
+                120,
+            );
         });
     });
 });

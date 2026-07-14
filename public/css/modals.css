@@ -1349,6 +1349,15 @@ input[type="range"] {
     border-color: var(--accent-color);
 }
 
+/* Armed to loop (#1021): a brass tint so a stopped-but-armed drill is visible on
+ * the chart after the popover closes, before you hit START. */
+.section-strip__label--looping {
+    background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
 /* Fixed-positioned (coords set inline from the trigger's rect in JS) AND
  * portaled to document.body (#1043) so the menu escapes the chart's nested
  * `isolation: isolate` / `overflow` / transformed-ancestor stacking contexts —
@@ -1392,6 +1401,93 @@ input[type="range"] {
 .section-strip__practice-item:hover {
     background: var(--bg-color);
     color: var(--accent-color);
+}
+
+/* #1021 — practice tempo-ramp config, disclosed inside the loop popover. The
+ * toggle sits flush with the menu items; flipping it on reveals the two number
+ * fields below a hairline divider. */
+.section-strip__ramp {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.4rem 0.55rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.25rem;
+}
+
+.section-strip__ramp-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.section-strip__ramp-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    align-items: center;
+}
+
+.section-strip__ramp-field {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+/* The value cell pairs a compact number input with its inline unit (% or /loop)
+ * so the field reads as a sentence: "Start at [66] %", "Climb +[4] /loop". */
+.section-strip__ramp-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+}
+
+/* Scoped under `.section-strip__ramp` (specificity 0,2,1) so it decisively beats
+ * the global `input[type="number"]` rule (0,1,1) regardless of import order — the
+ * global's 60px + native spinners previously clipped these 2-digit values to
+ * near-invisibility (#1021). Roomy enough to show "66"/"120" with the spinner. */
+.section-strip__ramp .section-strip__ramp-value input {
+    width: 3.4rem;
+    padding: 0.15rem 0.3rem;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* The concrete drill readout: "79 → 120 BPM". */
+.section-strip__ramp-summary {
+    width: 100%;
+    margin: 0.1rem 0 0;
+    color: var(--accent-color);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Popover heading when the loop is armed ("Looping Verse"). */
+.section-strip__practice-heading {
+    margin: 0.1rem 0.15rem 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* The live-climb marker beside the transport BPM label while a ramp is active. */
+.bpm-ramp-indicator {
+    color: var(--accent-color);
+    font-weight: 700;
 }
 
 /* The one control that persists while playing: a pill badge on the drilled

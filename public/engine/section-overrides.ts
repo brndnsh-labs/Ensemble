@@ -60,6 +60,56 @@ export function foldPracticeStep(step: number, pb: PracticeLoopBounds | null | u
 }
 
 /**
+ * A step is a practice-loop *wrap* when the folded position has just returned to
+ * the top of the window — a fresh pass through the drilled section. Equivalent
+ * to `foldPracticeStep(step) === loopStartStep` for `step > loopStartStep`, but
+ * cheaper. False when no loop is active. Because the window is a whole number of
+ * bars, a wrap is always a bar line — nothing here fires mid-bar. (#1021)
+ */
+export function isPracticeLoopWrap(
+    step: number,
+    pb: PracticeLoopBounds | null | undefined,
+): boolean {
+    if (!isPracticeLooping(pb)) {
+        return false;
+    }
+    const start = pb!.loopStartStep as number;
+    const width = (pb!.loopEndStep as number) - start;
+    return step > start && (step - start) % width === 0;
+}
+
+/** The playback fields the practice tempo ramp reads (#1021). */
+interface PracticeRampState extends PracticeLoopBounds {
+    readonly step?: number;
+    readonly bpm?: number;
+    readonly rampBpm?: boolean;
+    readonly rampBpmPerLoop?: number;
+    readonly rampBpmTarget?: number;
+}
+
+/**
+ * Practice tempo ramp (#1021), the woodshed drill: looping a section, starting
+ * below tempo and climbing `rampBpmPerLoop` BPM each pass back up to the goal
+ * tempo (`rampBpmTarget`, captured from the live BPM at play-start). Returns the
+ * next BPM to apply at this step, or `null` when nothing should change — ramp
+ * disarmed, no active loop, no captured target, this step isn't a loop wrap, or
+ * the goal is already reached. Pure; the scheduler routes the result through
+ * SET_BPM so it gets the same live audio-clock adjustment a manual change does.
+ */
+export function practiceRampNextBpm(pb: PracticeRampState | null | undefined): number | null {
+    if (!pb?.rampBpm || !isPracticeLoopWrap(pb.step ?? -1, pb)) {
+        return null;
+    }
+    const target = pb.rampBpmTarget ?? 0;
+    if (target <= 0) {
+        return null;
+    }
+    const bpm = pb.bpm ?? 0;
+    const next = Math.min(target, bpm + (pb.rampBpmPerLoop ?? 0));
+    return next > bpm ? next : null;
+}
+
+/**
  * Find the section that owns `step`, walking the live `sections[]` and matching
  * by `sectionMap` ranges (which are populated by `validateProgression`). Returns
  * `null` when the arranger has no resolved sectionMap yet (e.g. pre-validate).

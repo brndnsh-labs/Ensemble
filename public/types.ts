@@ -1013,6 +1013,20 @@ export interface GlobalContext {
      */
     readonly loopStartStep: number;
     readonly loopEndStep: number;
+    /**
+     * Practice tempo-ramp (#1021): the woodshed drill — loop a section, start
+     * below tempo, and climb `rampBpmPerLoop` BPM each pass back up to your set
+     * tempo. `rampBpm` arms it; `rampStartPct` is the fraction of the goal to
+     * start at (0.4–0.95). `rampBpmTarget` is the goal tempo, captured from the
+     * live BPM when playback starts (0 = drill not running) and restored on
+     * stop/clear. Off by default; only meaningful while a practice loop is
+     * active. Read only by the main-thread scheduler at the practice-loop wrap
+     * — not worker-synced (tempo is a main-thread concern).
+     */
+    readonly rampBpm: boolean;
+    readonly rampBpmPerLoop: number;
+    readonly rampStartPct: number;
+    readonly rampBpmTarget: number;
     /** Queue of normalized visual events waiting to be rendered. */
     readonly drawQueue: any[];
     /** Whether the metronome count-in is active. */
@@ -1451,6 +1465,12 @@ export interface ActionPayloadMap {
      * `{ start, end }` are absolute steps within `[0, totalSteps)`.
      */
     SET_PRACTICE_LOOP: { start: number; end: number } | null;
+    /**
+     * Practice tempo-ramp config (#1021). Any subset of the fields; the reducer
+     * merges onto current values. `null` disarms the ramp. The goal tempo isn't
+     * set here — it's captured from the live BPM at play-start.
+     */
+    SET_PRACTICE_RAMP: { enabled?: boolean; perLoop?: number; startPct?: number } | null;
     RESET_STATE: undefined;
     SET_MIDI_CONFIG: ActionPayloadSetMidiConfig;
     RESTORE_GAINS: undefined;
@@ -1539,6 +1559,7 @@ export const ACTIONS = {
     SET_ENDING_PENDING: 'SET_ENDING_PENDING',
     SET_START_STEP: 'SET_START_STEP',
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',
+    SET_PRACTICE_RAMP: 'SET_PRACTICE_RAMP',
     RESET_STATE: 'RESET_STATE',
 
     // --- MIDI ---

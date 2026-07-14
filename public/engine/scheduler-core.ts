@@ -69,7 +69,12 @@ import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
 } from './platform-orchestrator.js';
-import { foldPracticeStep, isPracticeLooping, sectionAtStep } from './section-overrides.js';
+import {
+    foldPracticeStep,
+    isPracticeLooping,
+    practiceRampNextBpm,
+    sectionAtStep,
+} from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
@@ -429,7 +434,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 }
 
                 scheduleGlobalEvent(state, playback.step, playback.nextNoteTime, dispatch);
-                advanceGlobalStep(state);
+                advanceGlobalStep(state, dispatch);
             }
         }
     } finally {
@@ -542,7 +547,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
     // the metronome click above; the soloist enters on the downbeat.)
 }
 
-function advanceGlobalStep(state: EnsembleState): void {
+function advanceGlobalStep(state: EnsembleState, dispatch?: Dispatch): void {
     const { playback, groove, arranger } = state;
     const effectiveBpm = playback.bpm;
 
@@ -580,6 +585,18 @@ function advanceGlobalStep(state: EnsembleState): void {
     const nextSectionId = sectionAtStep(arranger, modStep)?.id ?? null;
     if (nextSectionId !== playback.currentSectionId) {
         (playback as Mutable<typeof playback>).currentSectionId = nextSectionId; // @direct-mutation
+    }
+
+    // #1021 — practice tempo ramp (the woodshed drill). At each practice-loop
+    // wrap the BPM climbs toward the cap; the wrap is a bar line, so tempo never
+    // steps mid-bar. Routed through SET_BPM so it reuses the exact live
+    // audio-clock adjustment a manual tempo change gets. Guarded on `dispatch`
+    // so the offline export (null dispatch) never ramps.
+    if (dispatch) {
+        const nextBpm = practiceRampNextBpm(playback);
+        if (nextBpm !== null) {
+            dispatch(ACTIONS.SET_BPM, nextBpm);
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import {
     clearPracticeLoop,
     getSectionStepBounds,
     loopSection,
+    setPracticeRamp,
     startSectionFromHere,
 } from '../../practice-controller.js';
 import type { Section, SectionInstrumentKey } from '../../types.js';
@@ -106,6 +107,14 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
         // section is being drilled and offer to clear it mid-play.
         loopStartStep: s?.playback?.loopStartStep ?? -1,
         loopEndStep: s?.playback?.loopEndStep ?? -1,
+        // #1021 — practice tempo-ramp config, surfaced in the loop popover. `bpm`
+        // is the prospective goal (shown until play-start captures it as
+        // `rampBpmTarget`); the drill climbs from `rampStartPct` of the goal up to it.
+        bpm: s?.playback?.bpm ?? 120,
+        rampBpm: !!s?.playback?.rampBpm,
+        rampBpmPerLoop: s?.playback?.rampBpmPerLoop ?? 4,
+        rampStartPct: s?.playback?.rampStartPct ?? 0.66,
+        rampBpmTarget: s?.playback?.rampBpmTarget ?? 0,
         globalEnabled: {
             groove: s?.groove?.enabled ?? true,
             bass: s?.bass?.enabled ?? true,
@@ -179,6 +188,146 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
     const isThisLooping =
         !!bounds && selected.loopStartStep === bounds.start && selected.loopEndStep === bounds.end;
 
+    // #1021 — practice tempo ramp (the woodshed drill): start below tempo and
+    // climb back up to your set BPM a step per loop. The goal is your current
+    // tempo (captured at play-start as `rampBpmTarget`; until then it's the live
+    // `bpm`), so there's no cap to invent — just how slow to start and how fast to
+    // climb. Config flows through `setPracticeRamp`; the transport BPM readout
+    // shows the live climb.
+    const rampGoal = selected.rampBpmTarget || selected.bpm;
+    const rampStart = Math.max(40, Math.round(rampGoal * selected.rampStartPct));
+    const rampControls = (
+        <div class="section-strip__ramp" role="group" aria-label="Practice tempo ramp">
+            <label class="section-strip__ramp-toggle">
+                <input
+                    type="checkbox"
+                    checked={selected.rampBpm}
+                    onChange={(e) =>
+                        setPracticeRamp({ enabled: (e.target as HTMLInputElement).checked })
+                    }
+                />
+                Ramp tempo up ↑
+            </label>
+            {selected.rampBpm && (
+                <div class="section-strip__ramp-fields">
+                    <label class="section-strip__ramp-field">
+                        <span>Start at</span>
+                        <span class="section-strip__ramp-value">
+                            <input
+                                type="number"
+                                min="40"
+                                max="95"
+                                step="1"
+                                value={Math.round(selected.rampStartPct * 100)}
+                                aria-label="Start speed, percent of goal tempo"
+                                onInput={(e) =>
+                                    setPracticeRamp({
+                                        startPct:
+                                            parseInt((e.target as HTMLInputElement).value, 10) /
+                                            100,
+                                    })
+                                }
+                            />
+                            %
+                        </span>
+                    </label>
+                    <label class="section-strip__ramp-field">
+                        <span>Climb</span>
+                        <span class="section-strip__ramp-value">
+                            +
+                            <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={selected.rampBpmPerLoop}
+                                aria-label="BPM added each loop"
+                                onInput={(e) =>
+                                    setPracticeRamp({
+                                        perLoop: parseInt((e.target as HTMLInputElement).value, 10),
+                                    })
+                                }
+                            />
+                            /loop
+                        </span>
+                    </label>
+                    <p class="section-strip__ramp-summary" aria-live="polite">
+                        {rampStart} → {rampGoal} BPM
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+
+    // The popover content adapts to whether this section is actively being
+    // drilled: once a loop is armed the popover expands in place to the drill
+    // setup (tempo ramp + an explicit stop); before that, the start-from-here /
+    // loop entry points (#1016). Arming the loop does NOT close the popover or
+    // start playback (#1021) — you configure the drill, then press the main
+    // transport START.
+    const menuInner = isThisLooping ? (
+        <>
+            <p class="section-strip__practice-heading">Looping {section.label}</p>
+            {rampControls}
+            <button
+                type="button"
+                class="section-strip__practice-item"
+                onClick={() => {
+                    setIsPracticeOpen(false);
+                    clearPracticeLoop();
+                }}
+            >
+                ⏹ Stop looping
+            </button>
+        </>
+    ) : (
+        <>
+            <button
+                type="button"
+                class="section-strip__practice-item"
+                onClick={() => {
+                    setIsPracticeOpen(false);
+                    startSectionFromHere(section.id);
+                }}
+            >
+                ▶ Start from here
+            </button>
+            <button
+                type="button"
+                class="section-strip__practice-item"
+                // Arms the loop and lets the popover expand to the drill setup —
+                // no auto-play. Deliberately does NOT close the menu (#1021).
+                onClick={() => loopSection(section.id)}
+            >
+                🔁 Loop this section
+            </button>
+        </>
+    );
+
+    // One portal, shared by both triggers (the section label and the loop badge)
+    // — whichever is live anchors the menu; click-away/scroll close it via the
+    // effect above. Portaled to document.body to escape the chart's transformed
+    // stacking contexts (#1043).
+    const practiceMenu =
+        isPracticeOpen && menuPos
+            ? createPortal(
+                  <div
+                      ref={menuRef}
+                      class="section-strip__practice-menu"
+                      // A labeled group, not a role="menu": while looping it hosts
+                      // the tempo-ramp form (a checkbox + number inputs), which the
+                      // ARIA menu pattern forbids and some AT trap. Plain buttons +
+                      // Tab order is the honest structure (the menu keyboard pattern
+                      // was never implemented here anyway). #1021.
+                      role="group"
+                      aria-label={`Practice ${section.label}`}
+                      style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
+                  >
+                      {menuInner}
+                  </div>,
+                  document.body,
+              )
+            : null;
+
     // The section label doubles as the practice trigger: tap → start-from-here /
     // loop popover. Shared between the stopped strip and the playing view so a
     // practicing musician can jump to (or loop) a section MID-PLAY — during
@@ -188,49 +337,26 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
         <div class="section-strip__practice" ref={practiceRef}>
             <button
                 type="button"
-                class="section-strip__label section-strip__label--practice"
-                aria-haspopup="menu"
+                class={`section-strip__label section-strip__label--practice${
+                    isThisLooping ? ' section-strip__label--looping' : ''
+                }`}
+                aria-haspopup="true"
                 aria-expanded={isPracticeOpen}
-                title={`Practice ${section.label}`}
-                aria-label={`Practice ${section.label} — start from here or loop`}
+                title={
+                    isThisLooping
+                        ? `${section.label} armed to loop — tap to set up the drill or start playback`
+                        : `Practice ${section.label}`
+                }
+                aria-label={
+                    isThisLooping
+                        ? `${section.label} armed to loop. Tap to configure the tempo drill or stop.`
+                        : `Practice ${section.label} — start from here or loop`
+                }
                 onClick={openPracticeMenu}
             >
-                {section.label}
+                {isThisLooping ? `🔁 ${section.label}` : section.label}
             </button>
-            {isPracticeOpen &&
-                menuPos &&
-                createPortal(
-                    <div
-                        ref={menuRef}
-                        class="section-strip__practice-menu"
-                        role="menu"
-                        style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
-                    >
-                        <button
-                            type="button"
-                            class="section-strip__practice-item"
-                            role="menuitem"
-                            onClick={() => {
-                                setIsPracticeOpen(false);
-                                startSectionFromHere(section.id);
-                            }}
-                        >
-                            ▶ Start from here
-                        </button>
-                        <button
-                            type="button"
-                            class="section-strip__practice-item"
-                            role="menuitem"
-                            onClick={() => {
-                                setIsPracticeOpen(false);
-                                loopSection(section.id);
-                            }}
-                        >
-                            🔁 Loop this section
-                        </button>
-                    </div>,
-                    document.body,
-                )}
+            {practiceMenu}
         </div>
     );
 
@@ -247,17 +373,24 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
                 }`}
             >
                 {isThisLooping ? (
-                    // The one control that persists on the drilled section — tap to
-                    // drop the loop and flow back into the form.
-                    <button
-                        type="button"
-                        class="section-strip__loop-badge"
-                        title={`Looping ${section.label} — tap to stop`}
-                        aria-label={`Looping ${section.label}. Tap to stop looping.`}
-                        onClick={clearPracticeLoop}
-                    >
-                        🔁 {section.label}
-                    </button>
+                    // The one control that persists on the drilled section. #1021 —
+                    // tapping it opens the practice popover (tempo ramp + stop),
+                    // since the collapsed label is the only surface left for the
+                    // ramp config while looping mid-play.
+                    <div class="section-strip__practice" ref={practiceRef}>
+                        <button
+                            type="button"
+                            class="section-strip__loop-badge"
+                            aria-haspopup="true"
+                            aria-expanded={isPracticeOpen}
+                            title={`Looping ${section.label} — tap for tempo ramp or to stop`}
+                            aria-label={`Looping ${section.label}. Tap for tempo-ramp options or to stop.`}
+                            onClick={openPracticeMenu}
+                        >
+                            🔁 {section.label}
+                        </button>
+                        {practiceMenu}
+                    </div>
                 ) : (
                     practiceControl
                 )}

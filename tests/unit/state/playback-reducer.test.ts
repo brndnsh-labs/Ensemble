@@ -114,6 +114,111 @@ describe('Playback Reducer', () => {
         });
     });
 
+    describe('practice tempo ramp (#1021)', () => {
+        // RESET_STATE doesn't clear the transport/loop transients, so normalize
+        // them per-test — otherwise a prior test's live `isPlaying` flips a
+        // TOGGLE_PLAY "start" into a "stop".
+        beforeEach(() => {
+            playback.isPlaying = false;
+            playback.loopStartStep = -1;
+            playback.loopEndStep = -1;
+            playback.rampBpm = false;
+            playback.rampBpmTarget = 0;
+        });
+
+        it('merges provided fields and clamps to drill bounds', () => {
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { enabled: true } });
+            expect(playback.rampBpm).toBe(true);
+            // per-loop clamps to [1, 20]
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { perLoop: 99 } });
+            expect(playback.rampBpmPerLoop).toBe(20);
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { perLoop: 0 } });
+            expect(playback.rampBpmPerLoop).toBe(1);
+            // startPct clamps to [0.4, 0.95]
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { startPct: 0.1 } });
+            expect(playback.rampStartPct).toBe(0.4);
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { startPct: 1.5 } });
+            expect(playback.rampStartPct).toBe(0.95);
+            // a partial update leaves the other fields untouched
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { startPct: 0.6 } });
+            expect(playback.rampBpm).toBe(true);
+            expect(playback.rampBpmPerLoop).toBe(1);
+            expect(playback.rampStartPct).toBe(0.6);
+        });
+
+        it('rejects NaN (a cleared number field) rather than writing garbage', () => {
+            playbackReducer({
+                type: ACTIONS.SET_PRACTICE_RAMP,
+                payload: { perLoop: 6, startPct: 0.7 },
+            });
+            // parseInt('')/… → NaN, e.g. the user clears the input mid-edit
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { perLoop: NaN } });
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { startPct: NaN } });
+            expect(playback.rampBpmPerLoop).toBe(6);
+            expect(playback.rampStartPct).toBe(0.7);
+        });
+
+        it('captures the goal and drops to the start speed at play-start', () => {
+            playback.bpm = 120;
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            playbackReducer({
+                type: ACTIONS.SET_PRACTICE_RAMP,
+                payload: { enabled: true, startPct: 0.5 },
+            });
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START
+            expect(playback.rampBpmTarget).toBe(120); // goal captured
+            expect(playback.bpm).toBe(60); // dropped to 50% of goal
+        });
+
+        it('does not touch tempo at play-start when unarmed or without a loop', () => {
+            playback.bpm = 120;
+            // armed but NO loop → no capture, tempo untouched
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null });
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { enabled: true } });
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START
+            expect(playback.rampBpmTarget).toBe(0);
+            expect(playback.bpm).toBe(120);
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // stop
+        });
+
+        it('restores the goal tempo and disarms on stop (never stranded slow)', () => {
+            playback.bpm = 120;
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            playbackReducer({
+                type: ACTIONS.SET_PRACTICE_RAMP,
+                payload: { enabled: true, startPct: 0.5 },
+            });
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START → 60
+            playback.bpm = 92; // simulate climbing partway
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // STOP
+            expect(playback.bpm).toBe(120); // restored to goal, not left at 92
+            expect(playback.rampBpm).toBe(false);
+            expect(playback.rampBpmTarget).toBe(0);
+        });
+
+        it('restores the goal tempo when the loop is cleared mid-drill', () => {
+            playback.bpm = 100;
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: { start: 32, end: 64 } });
+            playbackReducer({
+                type: ACTIONS.SET_PRACTICE_RAMP,
+                payload: { enabled: true, startPct: 0.6 },
+            });
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // START → 60
+            playback.bpm = 78;
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_LOOP, payload: null }); // clear loop
+            expect(playback.bpm).toBe(100);
+            expect(playback.rampBpm).toBe(false);
+            expect(playback.rampBpmTarget).toBe(0);
+            playbackReducer({ type: ACTIONS.TOGGLE_PLAY, payload: undefined }); // stop (cleanup)
+        });
+
+        it('disarms on an explicit null', () => {
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: { enabled: true } });
+            playbackReducer({ type: ACTIONS.SET_PRACTICE_RAMP, payload: null });
+            expect(playback.rampBpm).toBe(false);
+        });
+    });
+
     it('should handle modal opening/closing for valid modals only (line 168)', () => {
         // Valid modal
         const result = playbackReducer({

@@ -71,9 +71,16 @@ export function startSectionFromHere(sectionId: string): void {
 }
 
 /**
- * Loop `sectionId` on repeat: play begins at its first step and folds back at
- * its end until the loop is cleared. Song-mode form progression / ending is
- * suspended for the duration (see the scheduler's `isPracticeLooping` guard).
+ * Arm a section-practice loop on `sectionId`: playback, once started, begins at
+ * its first step and folds back at its end until the loop is cleared. Song-mode
+ * form progression / ending is suspended for the duration (see the scheduler's
+ * `isPracticeLooping` guard).
+ *
+ * #1021 — arming no longer auto-starts playback. The popover expands in place to
+ * the drill setup (optionally arm the tempo ramp); the musician configures, then
+ * presses the main transport START. This decouples "set up the drill" from "play
+ * it" — the tempo-trainer flow. (If a loop is armed while already playing, it
+ * engages live on the next fold, as before.)
  */
 export function loopSection(sectionId: string): void {
     const bounds = getSectionStepBounds(sectionId);
@@ -83,7 +90,6 @@ export function loopSection(sectionId: string): void {
     // SET_PRACTICE_LOOP seeds startStep = start atomically (see the reducer), so
     // one dispatch arms both the loop and the play-from-here seed.
     dispatch(ACTIONS.SET_PRACTICE_LOOP, { start: bounds.start, end: bounds.end });
-    startOrRestart();
 }
 
 /**
@@ -92,6 +98,22 @@ export function loopSection(sectionId: string): void {
  */
 export function clearPracticeLoop(): void {
     dispatch(ACTIONS.SET_PRACTICE_LOOP, null);
+}
+
+/**
+ * Configure the practice tempo ramp (#1021) — the woodshed drill where the
+ * looped section starts at `startPct` of your set tempo and climbs `perLoop` BPM
+ * each pass back up to it. Pass any subset; the reducer merges and clamps. The
+ * goal tempo is captured from the live BPM at play-start (not here); this only
+ * arms the ramp and sets the two knobs. Disarmed automatically when the loop is
+ * cleared or playback stops.
+ */
+export function setPracticeRamp(config: {
+    enabled?: boolean;
+    perLoop?: number;
+    startPct?: number;
+}): void {
+    dispatch(ACTIONS.SET_PRACTICE_RAMP, config);
 }
 
 /**

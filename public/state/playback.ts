@@ -17,6 +17,10 @@ export const playback = deepSignal<GlobalContext>({
     startStep: 0,
     loopStartStep: -1,
     loopEndStep: -1,
+    rampBpm: false,
+    rampBpmPerLoop: 4,
+    rampStartPct: 0.66,
+    rampBpmTarget: 0,
     drawQueue: [],
     isCountingIn: false,
     countInBeat: 0,
@@ -104,6 +108,16 @@ export function playbackReducer(action: Action): boolean {
             if (p.isPlaying) {
                 p.sessionStartTime = performance.now();
                 p.currentLoopCount = 0;
+                // #1021 — the woodshed drill starts here. If a tempo ramp is armed
+                // on a live loop, the CURRENT tempo is the goal: capture it as the
+                // target, then drop to the start speed (rampStartPct of target) so
+                // the scheduler can climb back up to it a step per loop. Captured at
+                // START (not arm-time) so whatever BPM you set before pressing play
+                // is the tempo you earn your way back to.
+                if (p.rampBpm && p.loopStartStep >= 0 && p.loopEndStep > p.loopStartStep) {
+                    p.rampBpmTarget = p.bpm;
+                    p.bpm = Math.max(40, Math.round(p.bpm * p.rampStartPct));
+                }
             } else {
                 // Stopping ends any section-practice drill (#1016): the loop and
                 // the start-from-here seed are transient, invoked from the
@@ -112,6 +126,14 @@ export function playbackReducer(action: Action): boolean {
                 p.startStep = 0;
                 p.loopStartStep = -1;
                 p.loopEndStep = -1;
+                // Ramp drill ends with the loop (#1021): restore the goal tempo so
+                // stopping mid-climb never strands you at a slow practice speed
+                // (reaching the target already leaves you there), then disarm.
+                if (p.rampBpmTarget > 0) {
+                    p.bpm = p.rampBpmTarget;
+                    p.rampBpmTarget = 0;
+                }
+                p.rampBpm = false;
             }
             if (p.autoIntensity) {
                 p.bandIntensity = 0.35;
@@ -198,6 +220,39 @@ export function playbackReducer(action: Action): boolean {
                 // alone — the playhead flows on from wherever it is.
                 p.loopStartStep = -1;
                 p.loopEndStep = -1;
+                // A tempo ramp needs a live loop; clearing the loop disarms it
+                // (#1021). Restore the goal tempo first so a mid-climb clear never
+                // leaves you at a slow practice speed.
+                if (p.rampBpmTarget > 0) {
+                    p.bpm = p.rampBpmTarget;
+                    p.rampBpmTarget = 0;
+                }
+                p.rampBpm = false;
+            }
+            return true;
+        case ACTIONS.SET_PRACTICE_RAMP:
+            // Practice tempo-ramp config (#1021). `null` disarms; otherwise merge
+            // the provided fields, clamped to sane drill bounds. The goal tempo is
+            // whatever BPM is set when playback starts (see TOGGLE_PLAY); here we
+            // only carry the arming flag and the two knobs — the start fraction and
+            // the per-loop climb.
+            if (action.payload === null) {
+                p.rampBpm = false;
+            } else {
+                if (typeof action.payload.enabled === 'boolean') {
+                    p.rampBpm = action.payload.enabled;
+                }
+                if (Number.isFinite(action.payload.perLoop)) {
+                    p.rampBpmPerLoop = Math.max(1, Math.min(20, action.payload.perLoop as number));
+                }
+                if (Number.isFinite(action.payload.startPct)) {
+                    // 40%–95% of the goal — below 40 is a pointless crawl, above 95
+                    // isn't a ramp.
+                    p.rampStartPct = Math.max(
+                        0.4,
+                        Math.min(0.95, action.payload.startPct as number),
+                    );
+                }
             }
             return true;
         case ACTIONS.TRIGGER_EMERGENCY_LOOKAHEAD:
