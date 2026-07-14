@@ -183,11 +183,11 @@ describe('Playback Reducer', () => {
     it('should update conductor decision', () => {
         const payload = {
             velocity: 0.7,
-            intent: { syncopation: 0.8 },
+            intent: { anticipation: 0.8 },
         };
         playbackReducer({ type: ACTIONS.UPDATE_CONDUCTOR_DECISION, payload });
         expect(playback.conductorVelocity).toBe(0.7);
-        expect(playback.intent.syncopation).toBe(0.8);
+        expect(playback.intent.anticipation).toBe(0.8);
     });
 
     describe('setPlaybackParam via reducer', () => {

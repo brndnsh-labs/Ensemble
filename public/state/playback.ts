@@ -40,7 +40,6 @@ export const playback = deepSignal<GlobalContext>({
     stopAtEnd: false,
     isEndingPending: false,
     intent: {
-        syncopation: 0.5,
         anticipation: 0.2,
         layBack: 0,
     },
@@ -218,9 +217,6 @@ export function playbackReducer(action: Action): boolean {
                 p.conductorVelocity = action.payload.velocity;
             }
             if (action.payload.intent) {
-                if (action.payload.intent.syncopation !== undefined) {
-                    playback.intent.syncopation = action.payload.intent.syncopation;
-                }
                 if (action.payload.intent.anticipation !== undefined) {
                     playback.intent.anticipation = action.payload.intent.anticipation;
                 }

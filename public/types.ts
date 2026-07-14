@@ -71,8 +71,6 @@ export interface Chord {
 
 export interface PlaybackIntent {
     /** 0-1 */
-    syncopation: number;
-    /** 0-1 */
     anticipation: number;
     /** Dilla feel; 0-1 */
     layBack: number;

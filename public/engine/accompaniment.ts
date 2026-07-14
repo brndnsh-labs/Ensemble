@@ -888,20 +888,23 @@ function updateRhythmicIntent(
     }
     (chords as Mutable<typeof chords>).rhythmicMask = mask; // @worker-mutation
 
+    // why: comp anticipation pulls the chord slightly ahead of the beat. The two idioms
+    // that comp *ahead* are bebop's "and-of-4" push (Jazz) and partido-alto's
+    // anticipation-of-1 (Bossa). Scales with intensity; consumed as a small (~1-4ms)
+    // probabilistic pull in comping-emit. NOT Blues — its shuffle leans *behind* the beat
+    // (owned by GENRE_POCKET's +10ms drag), so an anticipation bump there fought the pocket
+    // and was removed (#1089). Per-genre feel proper lives in GENRE_POCKET, not here.
     playback.intent.anticipation = intensity * 0.2; // @worker-mutation
-    if (genre === 'Jazz' || genre === 'Bossa Nova' || genre === 'Blues') {
+    if (genre === 'Jazz' || genre === 'Bossa Nova') {
         playback.intent.anticipation += 0.15;
     }
 
-    playback.intent.syncopation = complexity * 0.4; // @worker-mutation
-    if (genre === 'Funk') {
-        playback.intent.syncopation += 0.2;
-    }
-
-    playback.intent.layBack = intensity < 0.4 ? 0.02 : 0; // @worker-mutation
-    if (genre === 'Neo-Soul') {
-        playback.intent.layBack += 0.05; // More lag for Dilla feel
-    }
+    // why: Neo-Soul lays back behind the beat (J Dilla drag) — the one genre with a generic
+    // layBack here (it also feeds Neo-Soul's direct "drunken timing" comp path). Every other
+    // genre's signed lean is owned by GENRE_POCKET, and the tighten-as-energy-rises coupling
+    // is handled continuously by the #713 elasticity — so the old intensity<0.4 generic
+    // layBack was redundant + sub-audible and was removed (#1089).
+    playback.intent.layBack = genre === 'Neo-Soul' ? 0.05 : 0; // @worker-mutation
 
     compingState.lockedUntil = step + spm;
 }
