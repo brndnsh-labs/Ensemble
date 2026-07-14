@@ -9,6 +9,7 @@ import { formatUnicodeSymbols } from '../utils.js';
 import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
 import { Icon } from './Icon.jsx';
 import { SymbolMenu } from './SymbolMenu.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 /**
  * Trigger-based autocomplete for chord-quality shorthand. Typing a `:` prefix
@@ -77,6 +78,9 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
         const textareaRef = useRef<HTMLTextAreaElement | null>(null);
         const rootRef = useRef<HTMLDivElement | null>(null);
         const menuRef = useRef<HTMLDivElement | null>(null);
+        const settingsPanelRef = useRef<HTMLDivElement | null>(null);
+
+        useModalA11y(settingsPanelRef, isMenuOpen, () => setIsMenuOpen(false), 'Section settings');
 
         useEffect(() => {
             if (!isMenuOpen) {
@@ -330,7 +334,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                 ⋮
                             </button>
                             {isMenuOpen && (
-                                <div class="section-actions-menu" role="menu">
+                                <div class="section-actions-menu" ref={settingsPanelRef}>
                                     <div class="section-actions-menu__row">
                                         <span class="section-actions-menu__label">Repeat</span>
                                         <input

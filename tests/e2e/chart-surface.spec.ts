@@ -223,6 +223,44 @@ test.describe('ChartSurface @ui', () => {
             await expectLocatorFitsViewport(page, menu);
             await expectOwnsInteriorProbe(menu);
         });
+
+        // #1082: wired useModalA11y onto this hand-rolled dropdown for
+        // Escape-to-close + focus-restore (the existing click-away overlay
+        // stays as the outside-click path; the hook doesn't do that).
+        test('closes on Escape', async ({ page }) => {
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await page.getByRole('button', { name: 'Unlock chart to edit' }).click();
+            await expect(page.locator('.inline-editor')).toBeVisible();
+
+            await page.getByRole('button', { name: 'Arrangement Tools Menu' }).click();
+            const menu = page.locator('.editor-action-menu');
+            await expect(menu).toBeVisible();
+
+            await page.keyboard.press('Escape');
+            await expect(menu).toBeHidden();
+        });
+    });
+
+    test.describe('Section settings popover', () => {
+        // #1082: the section kebab's settings panel (Repeat/Key/Time) is a
+        // hand-rolled dropdown wired onto useModalA11y for Escape-to-close.
+        // The existing mousedown click-outside handler on `.section-kebab-wrap`
+        // stays in place; the hook only adds Escape/focus-trap/focus-restore.
+        test('opens via kebab and closes on Escape', async ({ page }) => {
+            await page.setViewportSize({ width: 1440, height: 900 });
+            await page.getByRole('button', { name: 'Unlock chart to edit' }).click();
+            await expect(page.locator('.inline-editor')).toBeVisible();
+
+            const kebab = page.locator('.section-kebab-btn').first();
+            await kebab.click();
+
+            const panel = page.locator('.section-actions-menu');
+            await expect(panel).toBeVisible();
+            await expect(panel).toHaveAttribute('role', 'dialog');
+
+            await page.keyboard.press('Escape');
+            await expect(panel).toHaveCount(0);
+        });
     });
 
     test.describe('Sharing prominence', () => {

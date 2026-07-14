@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import {
     addSection,
     clearChordPresetHighlight,
@@ -12,6 +12,7 @@ import { ACTIONS } from '../types.js';
 import { generateId } from '../utils.js';
 import { Arranger } from './Arranger.jsx';
 import { Icon } from './Icon.jsx';
+import { useModalA11y } from './use-modal-a11y.js';
 
 /**
  * Inline section-card editor mounted directly on `ChartSurface` when the
@@ -22,6 +23,9 @@ import { Icon } from './Icon.jsx';
 export function InlineEditor() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [showConfirmClear, setShowConfirmClear] = useState(false);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
+    useModalA11y(menuRef, isMenuOpen, () => setIsMenuOpen(false), 'Arrangement tools');
 
     const handleAddSection = () => {
         setIsMenuOpen(false);
@@ -130,6 +134,7 @@ export function InlineEditor() {
                         </span>
                     </button>
                     <div
+                        ref={menuRef}
                         class={`action-menu-content editor-action-menu ${isMenuOpen ? 'open' : ''}`}
                     >
                         <div class="menu-section-header">Structure</div>
