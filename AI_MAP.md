@@ -23,7 +23,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
-| `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `workerClient` |
+| `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
 
 ## State Management (Domain Slices)
@@ -159,7 +159,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Orchestration** | `public/components/Modals.tsx` | Lazy-loading modal orchestrator. |
 | **Inspiration** | `public/components/SurpriseMe.tsx` | Single 🎲 entry point hosting three flows — Roll (instant random `generateSong`), Templates (`SONG_TEMPLATES`), Library (`PresetLibrary` replace/append). Replaces the prior GenerateSongModal + LibraryModal + LibraryDrawer trio. |
 | **Orchestration** | `public/components/AuditionOverlay.tsx` | One-button "▶ Play" landing shown when the app is opened from an audition permalink (`?autoplay=1`); satisfies the browser autoplay gesture and starts the hydrated scene. |
-| **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface used by the editor modal and related flows. |
+| **Logic Views** | `public/components/Arranger.tsx` | Arranger editor surface (section-card list); mounted by `InlineEditor` when the chart is unlocked. |
 | **Logic Views** | `public/components/ChordVisualizer.tsx` | Continuous lead-sheet renderer for arranger playback, density tiers, and maximized reading mode. |
 | **Controls** | `public/components/Transport.tsx` | Playback controls and tempo. |
 | **Icons** | `public/components/Icon.tsx` | Inline-SVG icon component (`<Icon name=… />`); tints via `currentColor`, sizes in em. |
