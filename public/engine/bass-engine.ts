@@ -1011,6 +1011,10 @@ export function getBassNote(
         intensity < 0.4 &&
         !isDownbeat
     ) {
+        // Quiet rock/funk off-beats (low intensity): mostly lay out — 60% skip, else a
+        // soft ghost 30% of the time for a breathing, human feel. Raw Math.random here
+        // (not this file's scrambleHash sites) is deliberate: per-loop variety on this
+        // ornament is wanted; loop-stable repetition is intentionally NOT (#1083).
         if (isSoloistBusy || Math.random() < 0.6) {
             return null;
         }
@@ -1040,6 +1044,9 @@ export function getBassNote(
             } else if (beatInPattern === 3) {
                 targetInterval = scale.includes(10) ? 10 : 9;
             }
+            // High-energy blues (intensity > 0.7): 40% of the time break the predictable
+            // walk-up with a random scale tone for an improvised, live feel. Raw
+            // Math.random (not scrambleHash) on purpose — per-loop variety is the point (#1083).
             if (intensity > 0.7 && Math.random() < 0.4) {
                 targetInterval = scale[Math.floor(Math.random() * scale.length)];
             }
