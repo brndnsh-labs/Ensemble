@@ -80,7 +80,10 @@ If an item *almost* qualifies but has one catch, it's **out** — leave it for a
   sensitive mid-cycle.
 - Auto-merge only, only for filter-passing items with green CI, via §6's guard — **never bypass it
   with a direct merge**.
-- Prod deploy is **never** part of `/burndown` (always Brandon's `scripts/deploy.sh prod`).
+- **Merges auto-deploy to prod (CD, §6).** A green auto-merge ships to `ensemble.brndn.zip` via
+  the CI `deploy` job — including overnight `/burndown` merges (Brandon's standing call
+  2026-07-14). So the safe-set filter *is* the prod-ship gate: only §5-safe, gate-verifiable items
+  merge, so only those ship. `scripts/deploy.sh prod` stays the manual break-glass path, not the loop's job.
 - Honor the 5-item check-in and the >30-min-per-cycle guard from `/cycle`.
 
 ## Edge cases

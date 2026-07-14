@@ -6,12 +6,15 @@
 #
 #   ./scripts/deploy.sh <test|prod> [--dry-run] [--quiet]
 #
-# The *ceremony* that differs between environments lives in the SKILLS, not here:
-#   /deploy-test  — low ceremony, pipeline-runnable (the private staging box).
-#   /deploy-prod  — gated, awake-only: a clean tree + an explicit human "go".
+# Prod is continuously deployed: the CI `deploy` job (.forgejo/workflows/ci.yml)
+# runs `deploy.sh prod` on every merge to main. This script is also the manual
+# path for both environments; the *ceremony* lives in the SKILLS, not here:
+#   /deploy-test  — low ceremony, pre-merge audition box (the private staging box).
+#   /deploy-prod  — manual break-glass (CI down / forced redeploy off-pipeline).
 # This script owns mechanics only — plus one hard safety guard: it refuses a PROD
 # deploy from a dirty tree, so the public origin can never serve an unreviewed
-# build even if the skill gate is bypassed.
+# build even if the skill gate is bypassed. (CI checks out a clean tree, so the
+# guard is a no-op there and a real backstop for manual laptop runs.)
 #
 # "What's live" is read straight off the running site: vite.config.ts bakes the
 # commit rev into every asset filename (index.<REV>.js), so the deployed build is

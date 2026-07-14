@@ -11,7 +11,8 @@ private, single-user environment — **keep this light.** Ceremony is for prod
 simpler runtime: **static files, no service, no DB.**
 
 **Shared rules in `.claude/skills/DOCTRINE.md`** — §6 (deploy mechanics: this is the
-staging push; prod is the gated awake-only call) and §4 (gates).
+**pre-merge audition** box — deploy a branch to hear/preview before merging; prod is CD,
+auto-deployed on merge via the CI `deploy` job) and §4 (gates).
 
 ## Context (so a failure is legible)
 - Target **`ensembletest.brndn.zip`**: an edge **Caddy** terminates TLS and reverse-

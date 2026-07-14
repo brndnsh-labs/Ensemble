@@ -82,3 +82,52 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+  # Continuous deployment: main IS live. A push to main only happens via a
+  # green PR merge (main is branch-protected, no direct push), so reaching this
+  # job means the full gate already passed on this exact commit — deploy it.
+  # `workflow_dispatch` on main is a manual break-glass redeploy (no new commit).
+  # Serialization is by the single self-hosted runner: two deploys can't run at
+  # once. (If a second runner is ever added, add a `concurrency:` group here.)
+  deploy:
+    runs-on: [self-hosted, ensemble]
+    needs: [checks, e2e-tests]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Materialize the `ensemble-admin` ssh alias that deploy.sh targets, from
+      # the dedicated CI deploy key (a scoped keypair — not the laptop's key).
+      # Secrets go through env, never interpolated into the command line.
+      - name: Configure deploy SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ci_deploy_key
+          chmod 600 ~/.ssh/ci_deploy_key
+          {
+            echo "Host ensemble-admin"
+            echo "  HostName $PROD_DEPLOY_HOST"
+            echo "  User $DEPLOY_SSH_USER"
+            echo "  IdentityFile ~/.ssh/ci_deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } >> ~/.ssh/config
+
+      # deploy.sh builds --mode production, rsyncs to prod, and self-verifies the
+      # live REV == built REV (its exit-1-on-mismatch is our post-deploy check).
+      - name: Deploy to prod
+        run: ./scripts/deploy.sh prod

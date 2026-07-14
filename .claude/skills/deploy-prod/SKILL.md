@@ -1,20 +1,24 @@
 ---
 name: deploy-prod
-description: Deploy the Ensemble app to PRODUCTION (ensemble.brndn.zip) the gated way — full validate + clean pushed main, show exactly what's shipping, pause for one explicit "go", then deploy and verify the public origin. PROD — more ceremony than /deploy-test; never auto-runs. A merge to main is NOT a prod deploy.
+description: Manual break-glass deploy of the Ensemble app to PRODUCTION (ensemble.brndn.zip) — for when CI is down or you need to force a known-good build off-pipeline. NORMAL deploys are automatic: a merge to main auto-ships via the CI deploy job (DOCTRINE §6, CD). This skill is the awake, gated fallback — full validate + clean tree, show exactly what's shipping, pause for one explicit "go", deploy, verify the public origin.
 ---
 
 # Deploy to prod
 
-Ship the current tree to **production** (`ensemble.brndn.zip`) the careful way. Prod is
-the public origin, so this is **gated, not push-button**: run each step, but **stop for
-an explicit "go" before the deploy** (the `rsync --delete` over the live web root is the
-one irreversible act). Ensemble's runtime is simple — **static files, no DB, no service**
-— so this is far lighter than a DB-backed app's ritual (no backup, no migrations, no
-restart), but the public origin still earns the gate.
+**Normal deploys are automatic (CD).** `main` is continuously deployed — a green PR merge auto-ships
+to `ensemble.brndn.zip` via the CI `deploy` job (DOCTRINE §6). **Reach for this skill only as
+break-glass:** CI itself is down, or you need to force a known-good build off-pipeline (e.g. after a
+prod box rebuild). First consider the lighter options — a `git revert` → PR (rollback = roll forward)
+or a `workflow_dispatch` on `main` (redeploy current main, no new commit).
 
-**Shared rules in `.claude/skills/DOCTRINE.md`** — §4 (gates), §5 (a prod deploy is an
-always-brake, awake-only judgment call), §6 (deploy mechanics: `scripts/deploy.sh prod` is
-always a manual call; a merge to `main` ships nothing on its own), §8/§9 (branch/commit).
+When you do run it: ship the current tree the careful way. Prod is the public origin, so this manual
+path stays **gated, not push-button** — run each step, but **stop for an explicit "go" before the
+deploy** (the `rsync --delete` over the live web root is the one irreversible act). Ensemble's runtime
+is simple — **static files, no DB, no service** — so no backup / migrations / restart, but the public
+origin still earns the gate.
+
+**Shared rules in `.claude/skills/DOCTRINE.md`** — §4 (gates), §5 (autonomy), §6 (deploy mechanics:
+prod is CD via the CI `deploy` job; this skill is the manual break-glass fallback), §8/§9 (branch/commit).
 
 ## Context (so a failure is legible)
 - Target **`ensemble.brndn.zip`**: edge **Caddy** terminates TLS and reverse-proxies to
@@ -86,8 +90,8 @@ always a manual call; a merge to `main` ships nothing on its own), §8/§9 (bran
 5. **Report** pass/fail. **Green only if** the edge returns **200** and the live asset
    hash equals the **deployed SHA**, and the spot-checks pass. The live prod hash now ==
    HEAD, so `git log <live-prod-sha>..HEAD` (curl the origin to get it) is the pending set
-   going forward — no ref to consult. **A merge to `main` is not a deploy** — this skill
-   is the only thing that ships prod.
+   going forward — no ref to consult. (Normally the CI `deploy` job ships prod on merge; this
+   manual run just brought prod to the current tree the same way.)
 
 ## If it goes wrong (rollback)
 There's no DB and no migration, so rollback is **redeploy the previous good commit** —

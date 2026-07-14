@@ -170,7 +170,9 @@ before a `/done` that touches more than one file. **CI** runs `npm test` and a p
 **Default: full-auto + merge-to-`main` for self-contained, gate-verifiable, non-destructive
 stories of *any* tier (sonnet OR opus).** Run the whole chain unattended; Brandon reviews the
 result. **Tier does not gate autonomy** — it only picks the executor's model. What gates a pause
-is a **judgment call**.
+is a **judgment call**. **Auto-merge now means auto-deploy** — `main` is continuously deployed to
+prod (§6), so an auto-merged PR ships to `ensemble.brndn.zip` within minutes; the pre-merge
+`Needs-ear` stop below is what keeps un-auditioned work from shipping.
 
 **Stop and surface — the always-brake set:**
 - **Track `synth`** and **genuinely-subjective** musical work (timbre / feel with **no idiom a
@@ -240,18 +242,28 @@ The gate is the verified `GET /commits/{sha}/status` endpoint (combined `state` 
 closed the issue = done (§1 — no Shipped field to set). Just **sync local main** (`git checkout main
 && git fetch origin && git reset --hard origin/main`) and prune the branch.
 
-**Deploy (static-file app).** Ensemble ships as **static files on nginx behind Caddy** —
-`vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app server, no DB,
-no migrations, no restart; nginx serves the new files the instant rsync finishes. **One script
-— `scripts/deploy.sh <test|prod>`** — owns the mechanics for both; two skills wrap it with the
-right ceremony:
-- **`/deploy-test`** (`scripts/deploy.sh test` → `ensembletest.brndn.zip`) — low ceremony, the
-  staging push. **May run unattended from the pipeline after a merge to `main`** (private box,
-  non-destructive static rsync). The script confirms the live asset hash matches the build.
-- **`/deploy-prod`** (`scripts/deploy.sh prod` → `ensemble.brndn.zip`) — **gated, awake-only,
-  never automatic** (§5 always-brake). Full `validate` + clean pushed `main` → one explicit
-  "go" → deploy → verify the public origin. The script **refuses a dirty tree** for prod as a
-  built-in backstop. **A merge to `main` is NOT a prod deploy — it ships nothing on its own.**
+**Deploy (static-file app) — CD: `main` IS live.** Ensemble ships as **static files on nginx
+behind Caddy** — `vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app
+server, no DB, no migrations, no restart; nginx serves the new files the instant rsync finishes.
+**One script — `scripts/deploy.sh <test|prod>`** — owns the mechanics for both.
+
+**Prod is continuous (2026-07-14).** A push to `main` only happens via a green PR merge (`main`
+is branch-protected — no direct push, required CI contexts `CI / checks` + `CI / e2e-tests`), so
+the CI **`deploy`** job (`.forgejo/workflows/ci.yml`) ships every merge to `ensemble.brndn.zip`
+automatically: it runs `deploy.sh prod` after `checks` + `e2e-tests` pass on the merged commit,
+over a **dedicated CI deploy key** (Forgejo secret `DEPLOY_SSH_KEY`, scoped — not the laptop's
+key). **A merge to `main` IS a prod deploy** — including unattended overnight `/burndown` /
+`/nightly` merges (Brandon's standing call 2026-07-14). Nothing un-auditioned reaches prod
+because the §5 **`Needs-ear`** gate is a *pre-merge* stop: by-ear/synth work never auto-merges,
+so it never auto-ships.
+
+- **`/deploy-prod`** (`scripts/deploy.sh prod` → `ensemble.brndn.zip`) is now the **manual
+  break-glass** path — a laptop redeploy when CI itself is down, or to force a known-good build.
+  It still **refuses a dirty tree**. **Rollback = roll forward:** `git revert` → PR → green → the
+  CI deploy job redeploys (a manual `workflow_dispatch` on `main` also redeploys, no new commit).
+- **`/deploy-test`** (`scripts/deploy.sh test` → `ensembletest.brndn.zip`) — the **pre-merge
+  audition** box: deploy a *branch* here to hear/preview it before merging (esp. `Needs-ear`
+  work). Low ceremony, private box; the script confirms the live asset hash matches the build.
 
 **The live site is the source of truth for what's deployed — there is no stored deploy ref**
 (the old `refs/deploys/*` refs were retired: their best-effort push silently drifted, faking
