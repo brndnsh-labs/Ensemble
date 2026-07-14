@@ -89,6 +89,13 @@ jobs:
   # `workflow_dispatch` on main is a manual break-glass redeploy (no new commit).
   # Serialization is by the single self-hosted runner: two deploys can't run at
   # once. (If a second runner is ever added, add a `concurrency:` group here.)
+  #
+  # RUNNER DEPENDENCY: jobs run directly on the self-hosted host (not a
+  # container — that's why the Playwright host-libs note above applies), so
+  # `deploy.sh prod`'s `rsync -e ssh` needs BOTH `rsync` and an ssh client
+  # installed on the runner box. A missing `rsync` fails ONLY this job (checks
+  # + e2e are green, since they don't shell out to it) with prod left unchanged.
+  # One-time provisioning on ghrunner01: `sudo apt-get install -y rsync openssh-client`.
   deploy:
     runs-on: [self-hosted, ensemble]
     needs: [checks, e2e-tests]
