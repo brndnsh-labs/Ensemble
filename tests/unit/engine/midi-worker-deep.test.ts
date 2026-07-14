@@ -173,4 +173,44 @@ describe('MIDI Worker Logic Deep Dive', () => {
         processor.start();
         expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }));
     });
+
+    // #1078: the export unrolls `loopCount` arrangement passes, but the offline
+    // export has no main-thread scheduler to advance `playback.currentLoopCount`,
+    // so before the fix every unrolled pass rendered as loop 0 — soloist
+    // development depth / loopLift, drum motif lift and #1011 reharm subs all
+    // frozen at the first pass. processStep must now mirror the live scheduler.
+    describe('#1078 loop-keyed export evolution', () => {
+        const oneLoop = 32; // matches beforeEach arranger.totalSteps
+
+        it('advances currentLoopCount per loop, stepping only at loop boundaries', () => {
+            // The value the engine reads is written at the TOP of processStep,
+            // before generateNotesForStep — so reading it after each call is
+            // exactly what that pass's note generation saw.
+            const seenAt = (step) => {
+                processor.processStep(step);
+                return processor.state.playback.currentLoopCount;
+            };
+
+            // last step of loop 0 is still loop 0; first step of loop 1 flips it.
+            expect(seenAt(0)).toBe(0);
+            expect(seenAt(oneLoop - 1)).toBe(0);
+            expect(seenAt(oneLoop)).toBe(1);
+            expect(seenAt(oneLoop + 5)).toBe(1);
+            // the exact regression: mid-way through the 3rd pass must read loop 2,
+            // not the pinned-0 it rendered before the fix.
+            expect(seenAt(oneLoop * 2 + 3)).toBe(2);
+        });
+
+        it('drives the engine input across the full unrolled export (not pinned to 0)', () => {
+            const seen = new Set();
+            for (let step = 0; step < oneLoop * 4; step++) {
+                processor.processStep(step);
+                seen.add(processor.state.playback.currentLoopCount);
+                // stays bar-aligned: floor(step / oneLoop), never mid-bar drift.
+                expect(processor.state.playback.currentLoopCount).toBe(Math.floor(step / oneLoop));
+            }
+            // pre-fix this set was {0}; now it must span every unrolled pass.
+            expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
+        });
+    });
 });

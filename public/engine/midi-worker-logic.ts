@@ -560,7 +560,19 @@ export class ExportProcessor {
     processStep(globalStep: number): void {
         applyWorkerTransition(this.state, globalStep, this.exportConductor);
 
-        const { arranger, groove } = this.state;
+        const { arranger, groove, playback } = this.state;
+        // #1078: mirror the live scheduler's per-loop `currentLoopCount` (scheduler-core
+        // increments it once per loop boundary) so loop-keyed evolution — soloist
+        // development depth / loopLift, drum motif lift, #1011 reharm turnaround subs —
+        // actually renders across the unrolled export passes instead of pinning every
+        // pass to loop 0. `applyWorkerTransition` only bumps the export conductor's own
+        // counter; offline there's no main thread to write `playback.currentLoopCount`,
+        // so the export must. `totalStepsOneLoop` is bar-aligned, so this only steps at
+        // loop (whole-bar) boundaries — no mid-bar drum-motif flip. Restored on cleanup
+        // from `prevStates.currentLoopCount`.
+        (playback as Mutable<typeof playback>).currentLoopCount = Math.floor(
+            globalStep / this.totalStepsOneLoop,
+        ); // @worker-mutation
         const stepTimeS = this.stepTimes[globalStep];
 
         const tickResult = generateNotesForStep(
