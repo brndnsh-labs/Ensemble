@@ -3,7 +3,7 @@
 A living record of every test in this repo that has been observed to pass and
 fail on the **same code**. Ensemble is unusually flake-prone by nature: the
 generative engines lean on randomness, the critique suite asserts *statistical*
-ranges, and the e2e suite drives a live Vite dev server. This file is where we
+ranges, and the e2e suite drives a live browser. This file is where we
 track each flake, its root-cause class, and its fix so we don't re-diagnose the
 same thing twice.
 
@@ -16,7 +16,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 |---|---|---|---|
 | **Unseeded-statistical** | Passes alone, passes in suite, fails ~1-in-N on an unlucky roll. A critique test asserts a bound the engine's raw `Math.random` occasionally crosses. | `tests/standards/*-critique.test.ts` | Seed the RNG with `installSeededRandom()` (`tests/utils/seeded-random.ts`) at the `describe` level — the house pattern. Makes the multi-bar sample reproducible while still asserting a real range. Widening the bound is the band-aid; seeding is the fix. |
 | **Ordering-dependent** | Passes alone, fails only inside a multi-file run (`vitest related`, full suite). A prior file leaked global state (an un-restored `Math.random` spy, a live `deepSignal`, a `vi.mock` that didn't reset). | anywhere | Find the leaking file's missing `vi.restoreAllMocks()` / `afterEach` cleanup. `installSeededRandom` already restores in `before`+`after`, so converting both files to it usually fixes the leak too. |
-| **e2e-timing** | Playwright hydration-wait timeouts under parallel workers, or a whole-run crash from a bad import. | `tests/e2e/*.spec.ts` | Cold-compile timeouts → `globalSetup` warm-up + the centralized `gotoHydrated` helper (NOT `vite preview` — it breaks the reverb-stability runtime `.ts` import). Import crashes → `@playwright/test` is CJS; use the default import only (`import pkg; const { chromium } = pkg`). |
+| **e2e-timing** | Playwright hydration-wait timeouts under parallel workers, or a whole-run crash from a bad import. | `tests/e2e/*.spec.ts` | Cold-compile timeouts → **retired at the root (#1096)**: the suite runs against a prebuilt `vite preview` bundle, so there is no on-demand dev-server compile to time out (the old `globalSetup` warm-up is gone; the `gotoHydrated` hydration wait remains). Import crashes → `@playwright/test` is CJS; use the default import only (`import pkg; const { chromium } = pkg`). |
 
 ## How to read the registry
 
@@ -41,21 +41,22 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix:** `installSeededRandom()` at the `describe` level (replaces the redundant `beforeEach(vi.restoreAllMocks)`; 2026-06-20). With the default mulberry32 seed the draw is now `20/31 = 64.5%` every run (margin 0.345 above the floor, 0.205 below the 0.85 ceiling) — deterministic, still a representative draw. Full file 7/7 and the `standards/` batch 968/968 green.
 - **Last seen:** 2026-06-20 (post-merge CI on main, since fixed).
 
-### 🟢 `tests/e2e/harmony-click-free.spec.ts` — "worst sample step must stay below half peak"
+### 🟢 `tests/browser/harmony-click-free.browser.test.ts` — "worst sample step must stay below half peak"
 
-- **Class:** unseeded-statistical (the e2e variant — unseeded `Math.random` inside `page.evaluate`, not a critique test).
+- **Class:** unseeded-statistical (the offline-render variant — unseeded `Math.random` in the audio render, not a critique test).
 - **Symptom:** `expect(metrics.maxStep).toBeLessThan(metrics.maxAbs * 0.5)` failed intermittently (failed the full e2e run of #533, #650, and #668; green on most re-runs). Same `@diagnostic` render every time; `maxStep`/`maxAbs` varied run-to-run.
 - **Root cause:** the harmony voice's per-note panning + timbre jitter draw unseeded `Math.random()`, so the offline render's `maxStep`/`maxAbs` varied each run. Worse, the `0.5×maxAbs` bound was calibrated against a couple of *lucky* unseeded renders — the legitimate worst step (sawtooth slew + constructive overlap of the stacked stab voices) actually reaches ~0.60×peak, *above* the 0.5 line. So the bound sat below real content and tripped on any unlucky roll.
 - **Fix (2026-06-22, #654):** both halves of the canonical fix. (1) Seed the render — a mulberry32 `Math.random` stub at the top of the `page.evaluate` callback (before importing the voice), the in-page analogue of `installSeededRandom`. Render is now exactly `maxStep=0.7523, maxAbs=1.2598` every run. (2) Re-anchor the threshold to the real failure boundary: legit content ~0.60×peak, a true full-scale hard-stop ~1.0×peak → `0.7×maxAbs` clears content (margin ~0.10) while still failing a full-scale discontinuity (margin ~0.30). The guard's intent (catch NaN + gross full-scale jumps; the fine click mechanism is unit-asserted in `harmonies-synthesis.test.ts`) is unchanged.
 - **Last seen:** 2026-06-22 (CI on PR #668, since fixed).
+- **Note (2026-07-14, #1096):** relocated from a Playwright `@diagnostic` spec (`tests/e2e/`, ran in `page.evaluate` against the dev server) to **Vitest browser mode** (`tests/browser/`, headless Chromium). The mulberry32 seed and the `0.7×peak` bound carried over verbatim — the guard is unchanged, only its host runner moved.
 
 ### 🟢 e2e hydration-wait timeouts (dev-server cold compile)
 
 - **Class:** e2e-timing
 - **Symptom:** Playwright specs intermittently time out waiting for hydration under parallel workers.
 - **Root cause:** Vite's dev server compiles routes on-demand; the first worker to hit a cold route eats the compile latency and blows the hydration wait.
-- **Fix:** `globalSetup` warm-up that pre-compiles before the workers fan out, plus a centralized `gotoHydrated` helper. Do **not** switch to `vite preview` — it breaks the reverb-stability spec's runtime `.ts` import.
-- **Last seen:** 2026-05-29 (fixed).
+- **Fix (superseded 2026-07-14, #1096):** originally a `globalSetup` warm-up that pre-compiled before the workers fanned out. Now **retired at the root** — the e2e suite runs against a prebuilt `vite preview` bundle, so there is no on-demand dev-server compile to warm (the `gotoHydrated` hydration wait remains as a slow-box guard). The old caveat *"don't switch to preview, it breaks the reverb `.ts` import"* no longer applies: those two offline-audio guards moved to Vitest browser mode (`tests/browser/`).
+- **Last seen:** 2026-05-29 (fixed; class eliminated 2026-07-14).
 
 ### 🟢 Playwright run-wide crash (CJS import)
 

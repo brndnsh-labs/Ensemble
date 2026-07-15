@@ -6,12 +6,12 @@ import type { Page } from '@playwright/test';
  * Generous on purpose: `waitForSelector` resolves the instant the attribute
  * appears, so a large ceiling costs nothing on the happy path and only guards
  * the pathological slow-cold-start case (e.g. a loaded CI box). The historical
- * flake — the Vite dev server compiling modules on demand under `fullyParallel`
- * workers — is removed separately by pre-warming the dev server's transform
- * cache once in `tests/e2e/global-setup.ts` before the workers start (see
- * `playwright.config.ts` `globalSetup` / `webServer`).
+ * cold-compile flake — the Vite dev server transforming modules on demand under
+ * `fullyParallel` workers — is gone at the root now that the suite runs against
+ * a prebuilt `vite preview` bundle (no on-demand compile); see
+ * `playwright.config.ts` `webServer` (#1096).
  */
-export const HYDRATION_TIMEOUT = 30_000;
+const HYDRATION_TIMEOUT = 30_000;
 
 /**
  * Navigate to `path` and block until the Preact tree has hydrated.

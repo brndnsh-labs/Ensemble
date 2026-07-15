@@ -63,18 +63,19 @@ function init() {
         ]);
 
         // E2E/dev helpers attach engine internals to `window.ensemble` for
-        // Playwright tooling (and local-dev debugging). Gated to the Vite dev
-        // server via `import.meta.env.DEV`: the e2e suite runs against `npm run
-        // dev` (DEV === true), while prod ships via `vite build`, where this is a
-        // static `false` and the whole branch — install call + `e2e-tools` import
-        // — is tree-shaken out. Prod dispatches go through the imported `dispatch`
-        // directly (below), so this global is never on the production dispatch path.
-        //
-        // `VITE_E2E_BRIDGE=1` is the explicit opt-in for the offline-render
-        // analysis harness (`scripts/mix-report.ts`), which builds + serves a
-        // real `dist` and needs the bridge. Vite replaces the var statically, so
-        // an unset flag (every real prod build) keeps the whole branch tree-shaken
-        // — the #543 prod guarantee holds; only the analysis build sets it (#656).
+        // Playwright tooling (and local-dev debugging). The gate has two arms:
+        //   • `import.meta.env.DEV` — true only under `npm run dev`, so the
+        //     bridge is always live for local dev-server debugging.
+        //   • `VITE_E2E_BRIDGE === '1'` — the explicit opt-in for *built* bundles
+        //     that need the bridge: the Playwright e2e suite, which since #1096
+        //     runs against a `vite preview` production build (DEV === false — see
+        //     playwright.config.ts `webServer`), and the offline-render analysis
+        //     harness (`scripts/mix-report.ts`, #656).
+        // Vite replaces the var statically, so a real prod build (no flag,
+        // DEV === false) tree-shakes the whole branch — install call + `e2e-tools`
+        // import — out entirely; the #543 prod guarantee holds. Prod dispatches go
+        // through the imported `dispatch` directly (below), so this global is
+        // never on the production dispatch path.
         if (import.meta.env.DEV || import.meta.env.VITE_E2E_BRIDGE === '1') {
             installE2EGlobals();
         }

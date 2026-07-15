@@ -69,6 +69,18 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install
 
+      # The offline-audio guards (reverb tail decays, harmony click-free) run in
+      # Vitest browser mode against the same Chromium installed above — they need
+      # a real `OfflineAudioContext`, which the node-mode `npm test` (happy-dom)
+      # can't provide. Kept here (not in the `checks` job / `npm run ci`) because
+      # only this job installs a browser. Fast (~2s); runs before the e2e suite
+      # so an audio-graph regression fails early.
+      - name: Run browser-mode audio guards
+        run: npm run test:browser
+
+      # `npm run test:e2e` builds the production bundle (VITE_E2E_BRIDGE=1) and
+      # serves it via `vite preview` (see playwright.config.ts webServer) — the
+      # suite exercises the real shipped artifact, not the dev server.
       - name: Run Playwright tests
         run: npm run test:e2e
 

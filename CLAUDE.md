@@ -35,8 +35,9 @@ npm run lint         # Biome lint + format check
 npm run format       # Biome write fixes
 npm run lint:docs    # repo-specific docs validation
 npm run typecheck    # tsc over public/**/*.{ts,tsx}
-npm test             # mutation check + Biome + docs lint + Vitest
-npm run test:e2e     # run Playwright against the Vite dev server
+npm test             # mutation check + Biome + docs lint + Vitest (node/happy-dom)
+npm run test:browser # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
+npm run test:e2e     # run Playwright against a `vite preview` build of the shipped bundle
 npm run validate     # typecheck + knip + jscpd + format + npm test
 ```
 
@@ -158,6 +159,12 @@ The **Definition of Done** for musicality. When you modify a musical engine (bas
 ### Playwright (e2e)
 
 Functional smoke tests only — no pixel snapshots. Three projects: **Desktop Chrome**, **Mobile Chrome** (`@mobile`, 390×844), **Mobile Safari** (`@ipad`). Use `@mobile`/`@ipad` tags to scope tests. `data-e2e-mode="true"` is injected to disable heavy animations. Prefer `data-testid="unique-id"` selectors over volatile CSS classes.
+
+The suite runs against a **`vite preview` build** of the shipped bundle (built with `VITE_E2E_BRIDGE=1` so the `window.ensemble` test bridge survives tree-shaking — see `public/main.ts`), **not** the dev server — so it exercises the minified, `DEV === false` artifact we actually deploy, and there is no on-demand compile to flake on.
+
+### Vitest browser mode (`tests/browser/`)
+
+The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail decay, harmony click-free) run here — headless Chromium via `@vitest/browser-playwright`, config in `vitest.browser.config.ts`, command `npm run test:browser`. Node-mode `npm test` (happy-dom) has no Web Audio, so these can't live there. Not folded into `npm run ci` (the `checks` job installs no browser); the CI **e2e** job runs them.
 
 ### Biome
 

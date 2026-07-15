@@ -141,9 +141,13 @@ Local, before handing to `/review` or `/done` (never proceed over a red gate):
 ```
 npm run typecheck     # tsc over public/**/*.{ts,tsx}
 npm run lint          # Biome lint + format check
-npm test              # mutation check + Biome + docs lint + Vitest
-npm run test:e2e      # Playwright (Desktop Chrome, Mobile Chrome, Mobile Safari)
+npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
+npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
+npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
 ```
+`npm test`, `npm run test:browser`, and `npm run test:e2e` are three separate
+runners (node · browser-audio · e2e); `npm run ci` covers only the first (the
+`checks` job has no browser). The e2e CI job runs the other two.
 `npm run validate` (typecheck + knip + jscpd + format + npm test) is the full sweep — run it
 before a `/done` that touches more than one file. **CI** runs `npm test` and a parallel
 `npm run test:e2e` job (both must be green to merge).

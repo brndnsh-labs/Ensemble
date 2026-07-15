@@ -24,7 +24,7 @@ export default defineConfig({
     /* Shared settings for all the projects below. See https://playwright.dev/docs/test-use */
     use: {
         /* Base URL to use in actions like `await page.goto('/')`. */
-        baseURL: 'http://localhost:5173',
+        baseURL: 'http://localhost:4173',
 
         /* Collect trace when retrying a failed test. See https://playwright.dev/docs/trace-viewer */
         trace: 'on-first-retry',
@@ -89,21 +89,25 @@ export default defineConfig({
         },
     ],
 
-    /* Warm the dev server's module graph ONCE before the parallel workers start.
-     * The dev server compiles modules on demand; under fullyParallel workers the
-     * first cold transforms can exceed a test's hydration wait and flake (a stale
-     * lingering server on the port is another local flake vector). `globalSetup`
-     * navigates to `/` and waits for hydration, so Vite's transform cache is hot
-     * before any spec runs and the cold-compile cost is paid once, off the clock.
-     * (Dev server is kept, not `vite preview`, because diagnostics like
-     * reverb-stability.spec.ts import raw `.ts` source at runtime — only the dev
-     * server serves that.) */
-    globalSetup: './tests/e2e/global-setup.ts',
+    /* E2E runs against the built artifact we actually ship, not the dev server.
+     * `build:e2e` produces the production bundle with VITE_E2E_BRIDGE=1 (so the
+     * `window.ensemble` test bridge survives tree-shaking — see public/main.ts),
+     * and `vite preview` serves the static `dist/` on 4173. The suite therefore
+     * exercises minified, `import.meta.env.DEV === false` code — the real prod
+     * artifact — and there is no on-demand dev-server compile, which retires the
+     * cold-compile hydration-timeout flake class at the root (#1096). A static
+     * build needs no globalSetup warm-up. The two @diagnostic offline-audio
+     * guards that used raw-`.ts` dev-server imports moved to Vitest browser mode
+     * (`tests/browser/`), which is what freed the suite to leave the dev server.
+     * Local caveat: `reuseExistingServer` (below, off in CI) means a `vite preview`
+     * already listening on 4173 from a prior run is reused *without* rebuilding —
+     * so kill it (or the port) if a local e2e run seems to ignore your latest edit. */
     webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
+        command: 'npm run build:e2e && npx vite preview --port 4173 --strictPort',
+        url: 'http://localhost:4173',
         reuseExistingServer: !process.env.CI,
-        timeout: 120 * 1000,
+        // Generous: the command builds the production bundle before serving it.
+        timeout: 180 * 1000,
         stdout: 'pipe',
         stderr: 'pipe',
     },
