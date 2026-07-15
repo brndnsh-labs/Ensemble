@@ -18,10 +18,16 @@ test.describe('ChartSurface @ui', () => {
             await expect(page.locator('.viz-overlay')).toHaveCount(0);
 
             await vizBtn.click();
-            await expect(page.locator('.viz-overlay')).toBeVisible();
+            const overlay = page.locator('.viz-overlay');
+            await expect(overlay).toBeVisible();
+            // why: useModalA11y attaches its Escape listener in a mount effect that
+            // can still be pending when the overlay first paints (docs/FLAKY_TESTS.md
+            // e2e-timing) — role="dialog" is set in that same effect, right before the
+            // listener, so waiting for it guarantees Escape has somewhere to land.
+            await expect(overlay).toHaveAttribute('role', 'dialog');
 
             await page.keyboard.press('Escape');
-            await expect(page.locator('.viz-overlay')).toHaveCount(0);
+            await expect(overlay).toHaveCount(0);
         });
 
         test('closes on backdrop click', async ({ page }) => {

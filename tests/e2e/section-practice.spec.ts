@@ -98,9 +98,14 @@ test.describe('Section practice @ui', () => {
 
         // Stopped + locked (default): clicking a chord card opens the picker.
         await page.locator('.chord-card').first().click();
-        await expect(page.locator('.chord-picker')).toBeVisible();
+        const picker = page.locator('.chord-picker');
+        await expect(picker).toBeVisible();
+        // why: the Escape listener attaches in a mount effect that can still be
+        // pending when the picker first paints (docs/FLAKY_TESTS.md e2e-timing) —
+        // wait for the post-effect readiness marker before sending Escape.
+        await expect(picker).toHaveAttribute('data-dismiss-ready', 'true');
         await page.keyboard.press('Escape');
-        await expect(page.locator('.chord-picker')).toHaveCount(0);
+        await expect(picker).toHaveCount(0);
 
         // Start playback from a section.
         await page.locator('.section-strip__label--practice').first().click();
@@ -111,11 +116,15 @@ test.describe('Section practice @ui', () => {
 
         // Mid-play: the section label practice trigger is still present…
         await expect(page.locator('.section-strip__label--practice').first()).toBeVisible();
-        // …but chord cards are now inert — clicking one does NOT open the picker.
+        // …and the measure box has shed its button role (no measure editor).
+        // why: TOGGLE_PLAY flips isPlaying synchronously in the reducer, but the
+        // re-render that detaches ChordCard's onPick is batched — waiting for this
+        // (same re-render, same isPlaying read) before the next click closes the
+        // window where the click could beat the commit (docs/FLAKY_TESTS.md e2e-timing).
+        await expect(page.locator('.measure-box[role="button"]')).toHaveCount(0);
+        // …so chord cards are now inert — clicking one does NOT open the picker.
         await page.locator('.chord-card').first().click();
         await expect(page.locator('.chord-picker')).toHaveCount(0);
-        // …and the measure box has shed its button role (no measure editor).
-        await expect(page.locator('.measure-box[role="button"]')).toHaveCount(0);
     });
 
     test('popover works on mobile @mobile', async ({ page }) => {

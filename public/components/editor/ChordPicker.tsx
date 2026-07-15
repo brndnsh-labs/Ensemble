@@ -204,6 +204,13 @@ export function ChordPicker({
             }
         };
         document.addEventListener('keydown', handleKey);
+        // why: the mount effect (where the Escape listener attaches) can still be
+        // pending when `.chord-picker` first paints — role="dialog" is static JSX,
+        // not a post-effect signal, so an e2e test racing straight to Escape can
+        // beat the listener (docs/FLAKY_TESTS.md e2e-timing). This attribute is
+        // set only once the listener is live, giving tests a real condition to
+        // await instead.
+        rootRef.current?.setAttribute('data-dismiss-ready', 'true');
         // Defer the click listener to the next tick so the click that *opened*
         // the picker doesn't immediately close it.
         const id = setTimeout(() => {

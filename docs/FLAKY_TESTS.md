@@ -58,6 +58,23 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (superseded 2026-07-14, #1096):** originally a `globalSetup` warm-up that pre-compiled before the workers fanned out. Now **retired at the root** — the e2e suite runs against a prebuilt `vite preview` bundle, so there is no on-demand dev-server compile to warm (the `gotoHydrated` hydration wait remains as a slow-box guard). The old caveat *"don't switch to preview, it breaks the reverb `.ts` import"* no longer applies: those two offline-audio guards moved to Vitest browser mode (`tests/browser/`).
 - **Last seen:** 2026-05-29 (fixed; class eliminated 2026-07-14).
 
+### 🟢 `tests/e2e/chart-surface.spec.ts` — "opens on 🌈 button click and closes with Esc"
+
+- **Class:** e2e-timing
+- **Symptom:** `expect(overlay).toHaveCount(0)` failed after pressing Escape (`Received: 1`). Failed 3/5 standalone at `--retries=0`; the flake is real and reproduces readily.
+- **Root cause:** `useModalA11y` (`public/components/use-modal-a11y.ts`) attaches its `document.addEventListener('keydown', ...)` inside a mount `useEffect`, which can still be pending when `.viz-overlay` first paints and passes `toBeVisible()`. The test pressed Escape immediately, occasionally beating the listener attach. The identical race was already solved elsewhere in the same file (`section settings popover › opens via kebab and closes on Escape`, #1082) by waiting for `role="dialog"` — set inside that same effect, right before the listener — before sending Escape; this test never adopted that pattern when #1082 wired `useModalA11y` onto the visualizer overlay.
+- **Fix:** `await expect(overlay).toHaveAttribute('role', 'dialog')` after the visibility check and before `Escape` (2026-07-14, #1101).
+- **Last seen:** 2026-07-14 (measured during #1101; 5/5 clean after the fix).
+
+### 🟢 `public/components/editor/ChordPicker.tsx` Escape-to-close (2 e2e sites)
+
+- **Class:** e2e-timing
+- **Symptom:** `tests/e2e/section-practice.spec.ts:94` ("during playback the section label stays live but chord cards go inert") intermittently failed at `expect(page.locator('.chord-picker')).toHaveCount(0)` after Escape (`Received: 1`). ~3/15-20 standalone at `--retries=0` once isolated to this assertion (a separate, unrelated state-transition race in the same test was fixed first — see note below — before this one surfaced as the residual failure).
+- **Root cause:** `ChordPicker`'s own inline Escape/click-outside effect (not `useModalA11y`) attaches its `keydown` listener inside a mount `useEffect`, same class as the visualizer flake above — but `.chord-picker` renders `role="dialog"` as **static JSX**, present at first paint, so (unlike `useModalA11y`) it can't serve as a post-effect readiness signal.
+- **Fix:** the effect now sets `data-dismiss-ready="true"` on the root element right after attaching the `keydown` listener (`ChordPicker.tsx`); the test waits for that attribute before pressing Escape (2026-07-14, #1101).
+- **Note:** the same test also had a second, independent race fixed in this pass — clicking `.chord-card` immediately after "Start from here" could beat the batched re-render that detaches `onPick` (`ChordVisualizer.tsx`, gated on `playback.isPlaying`). Fixed by waiting for `.measure-box[role="button"]` to hit count 0 (same re-render, same `isPlaying` read) before that click. Not registered as its own entry — same test, same investigation, same commit.
+- **Last seen:** 2026-07-14 (measured during #1101; 20/20 clean after both fixes).
+
 ### 🟢 Playwright run-wide crash (CJS import)
 
 - **Class:** e2e-timing (import)
