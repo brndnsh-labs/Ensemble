@@ -586,7 +586,7 @@ export function Settings() {
                                             }}
                                             options={
                                                 midiOutputs && midiOutputs.length > 0
-                                                    ? (midiOutputs as any[]).map((out) => ({
+                                                    ? midiOutputs.map((out) => ({
                                                           value: out.id,
                                                           label: out.name,
                                                       }))
@@ -623,7 +623,7 @@ export function Settings() {
                                                 }}
                                                 options={
                                                     midiInputs && midiInputs.length > 0
-                                                        ? (midiInputs as any[]).map((inp) => ({
+                                                        ? midiInputs.map((inp) => ({
                                                               value: inp.id,
                                                               label: inp.name,
                                                           }))

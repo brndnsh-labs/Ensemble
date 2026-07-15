@@ -79,7 +79,7 @@ function getClosedSurface(): ActiveSurface {
 }
 
 function setGenre(genreName: string) {
-    const config = (SMART_GENRES as any)[genreName];
+    const config = SMART_GENRES[genreName];
     const payload = {
         genreName,
         ...config,

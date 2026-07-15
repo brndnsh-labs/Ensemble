@@ -367,8 +367,8 @@ export function sendMIDINote(
     options: boolean | { isMono?: boolean; bend?: number } = false,
 ): void {
     const { playback } = getState();
-    const isMono = typeof options === 'boolean' ? options : !!(options as any).isMono;
-    const bend = typeof options === 'object' ? (options as any).bend : 0;
+    const isMono = typeof options === 'boolean' ? options : !!options.isMono;
+    const bend = typeof options === 'object' ? (options.bend ?? 0) : 0;
 
     const key = `${channel}_${note}`;
     const now = playback.audio?.currentTime || 0;
