@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getBandPocket } from '../../public/engine/coordination-engine.js';
 import { clearHarmonyMemory, getHarmonyNotes } from '../../public/engine/harmonies.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -143,70 +142,6 @@ describe('Melodic Harmony Support (Behavioral)', () => {
 
             expect(notes.length).toBeGreaterThan(0);
             expect(notes[0].isLatched).toBe(true); // Marked as latched/hype
-
-            randomSpy.mockRestore();
-        });
-    });
-
-    describe('Antiphony (Call & Response)', () => {
-        it('should trigger a response with a behind-the-beat lag when the soloist completes a phrase', () => {
-            const chord = { rootMidi: 60, intervals: [0, 4, 7], sectionId: 'A', beats: 4 };
-            // Simulate soloist just finished a phrase
-            const coordination = { soloistActive: false, soloistPhraseEnd: true };
-            mockState.playback.bandIntensity = 0.8; // High intensity for reliable response
-
-            const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
-
-            const notes = getHarmonyNotes(
-                mockState,
-                chord,
-                null,
-                4,
-                60,
-                'smart',
-                4,
-                null,
-                coordination,
-            );
-
-            expect(notes.length).toBeGreaterThan(0);
-            // why (epic-harmony-polish S4): `isResponse` no longer ships on the
-            // note schema — the gesture is folded into `timingOffset` (+5 ms
-            // behind-the-beat lag) and into `behavior.duration: 2` upstream
-            // (harmonies.ts:299). `durationSteps: 2` is the response branch's
-            // deterministic fingerprint vs other branches (shadow / hype-man /
-            // comp all return duration 1). Reproduce the scrambleHash math
-            // used at line 743 to compute the exact expected timingOffset,
-            // proving the +5 ms lag is applied.
-            expect(notes[0].durationSteps).toBe(2);
-
-            // Mirror of scrambleHash (harmonies.ts:24, mulberry32) so we can
-            // assert exact timingOffset values per voice. Keep in sync if
-            // that helper ever changes.
-            const scrambleHash = (seed: number): number => {
-                let t = (seed + 0x6d2b79f5) | 0;
-                t = Math.imul(t ^ (t >>> 15), t | 1);
-                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-                return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-            };
-            // Jazz + smart style → 'organ' activeStyle (harmonies.ts:844-857),
-            // which has timingJitter = 0.015 (line 878). Voice i's offset =
-            // stagger + scramble * 0.015 + response-lag(0.005) + band-pocket. Stagger =
-            // (i - (n-1)/2) * 0.005. As of #1005 every melodic lane (harmony included)
-            // adds the single per-genre band pocket `getBandPocket('Jazz')` (+8 ms behind
-            // — the ride-cymbal lean), so the response now sits at the response-lag PLUS
-            // the shared pocket. Reference getBandPocket so this tracks the palette.
-            const bandPocket = getBandPocket('Jazz');
-            const n = notes.length;
-            for (let i = 0; i < n; i++) {
-                const stagger = (i - (n - 1) / 2) * 0.005;
-                const jitterTerm = scrambleHash(chord.rootMidi * 100 + 4 * 31 + i * 7 + 8) * 0.015;
-                const expectedWithoutLag = stagger + jitterTerm;
-                expect(notes[i].timingOffset).toBeCloseTo(
-                    expectedWithoutLag + 0.005 + bandPocket,
-                    9,
-                );
-            }
 
             randomSpy.mockRestore();
         });

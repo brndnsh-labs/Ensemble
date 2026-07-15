@@ -9,12 +9,14 @@ vi.mock('../../public/state.js', () => ({
     getState: vi.fn(),
 }));
 
-// why: epic-deterministic-phrasing S5. The 8 Math.random() call sites in
-// harmonies.ts (response trigger, melodic-shadow reinforce, hype-man push,
-// busy-suppression, accompaniment/bass collision yield, anchor-tutti latch,
-// per-voice timing jitter) all flipped raw coins in otherwise-seeded harmony
-// logic, making antiphonal response and density flake across loops. Each is
-// now seeded via a scrambleHash of (motif.seed | chord.rootMidi, step, tag).
+// why: epic-deterministic-phrasing S5. The 7 Math.random() call sites in
+// harmonies.ts (melodic-shadow reinforce, hype-man push, busy-suppression,
+// accompaniment/bass collision yield, anchor-tutti latch, per-voice timing
+// jitter) all flipped raw coins in otherwise-seeded harmony logic, making
+// density flake across loops. Each is now seeded via a scrambleHash of
+// (motif.seed | chord.rootMidi, step, tag). (#1100: the response-trigger
+// tag-1 site was removed — its `soloistPhraseEnd` trigger had no production
+// writer and was permanently dead.)
 //
 // This test confirms two identical runs over a 128-bar passage produce
 // bit-identical harmony output. It also stubs Math.random() to a fixed value
@@ -71,7 +73,6 @@ describe('Harmony Determinism (S5)', () => {
                     stepInMeasure,
                     null,
                     {
-                        soloistPhraseEnd: stepInMeasure === 0,
                         soloistActive: false,
                         ...ctx,
                     },
@@ -87,7 +88,7 @@ describe('Harmony Determinism (S5)', () => {
     };
 
     // why: each fixture flips a different branch in playShadowMode / playComperMode
-    // / finalizeHarmonyNotes, covering all 8 seeded sites across the suite.
+    // / finalizeHarmonyNotes, covering all 7 seeded sites across the suite.
     const fixtures: Array<{
         name: string;
         bandIntensity: number;
@@ -95,7 +96,7 @@ describe('Harmony Determinism (S5)', () => {
         ctx: any;
     }> = [
         {
-            name: 'baseline (tags 1, 8: response + timing-jitter)',
+            name: 'baseline (tag 8: timing-jitter)',
             bandIntensity: 0.6,
             seedNotes: null,
             ctx: { soloistResting: true, soloistNotesInPhrase: 0 },

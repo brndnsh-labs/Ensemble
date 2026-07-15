@@ -34,7 +34,6 @@ interface HarmonyBehavior {
     duration: number;
     isLatched?: boolean;
     isBloom?: boolean;
-    isResponse?: boolean;
     isGhost?: boolean;
     anchorMidi?: number;
 }
@@ -409,26 +408,11 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     const { step, coordination, playback, feel } = context;
     const loopCount = playback.currentLoopCount || 0;
 
-    // A. Antiphony (Response)
-    if (coordination.soloistPhraseEnd && !coordination.soloistActive) {
-        // #716: the BB King horn section answers the soloist's phrase ends
-        // confidently — that's its whole job — so it responds far more reliably
-        // than a background pad would.
-        const responseProb = context.hornSection
-            ? 0.7 + playback.bandIntensity * 0.3
-            : 0.4 + playback.bandIntensity * 0.5;
-        // why: tag 1 — response trigger. Seeded from motif.seed (section hash)
-        // and step so the same phrase-end position fires the same way each loop.
-        if (scrambleHash(context.motif.seed + step * 31 + 1) < responseProb) {
-            return { type: 'reinforce', isResponse: true, duration: 2 };
-        }
-    }
-
     // #716: the horn section is purely CALL-AND-RESPONSE — it answers in the gaps
-    // (the antiphony above) and otherwise lays out, rather than melodically
-    // shadowing every soloist anchor (B/C/D below) which would track the solo
-    // note-for-note instead of conversing with it. The sparse, punchy section
-    // stabs when the soloist isn't playing come from playHornSectionMode.
+    // and otherwise lays out, rather than melodically shadowing every soloist
+    // anchor (B/C/D below) which would track the solo note-for-note instead of
+    // conversing with it. The sparse, punchy section stabs when the soloist
+    // isn't playing come from playHornSectionMode.
     if (context.hornSection) {
         return null;
     }
@@ -795,14 +779,7 @@ function finalizeHarmonyNotes(
     octave: number,
 ): HarmonyNote[] {
     const { playback, harmony, groove, chords } = activeState;
-    const {
-        duration: baseDuration,
-        isLatched,
-        isBloom,
-        isResponse,
-        isGhost,
-        anchorMidi,
-    } = behavior;
+    const { duration: baseDuration, isLatched, isBloom, isGhost, anchorMidi } = behavior;
     let duration = baseDuration;
 
     let intervals: number[] =
@@ -1132,26 +1109,11 @@ function finalizeHarmonyNotes(
         // the palette so harmony leans by the same per-genre amount as bass/comp/solo).
         // See docs/design/timing-model.md (tier 2).
         // #1064: the current section's label keys the energy modulation of the lean.
-        let offset =
+        const offset =
             getBandPocket(feel, chord?.sectionLabel ?? null) +
             stagger +
             scrambleHash(chord.rootMidi * 100 + step * 31 + i * 7 + 8) *
                 (styleConfig.timingJitter || 0.008);
-        // why: epic-harmony-polish S4 — `isResponse` marks an antiphonal answer
-        // fired after the soloist's phrase ends (playShadowMode tag 1). A
-        // call-and-response answer sits a hair behind the beat — that's what
-        // makes it sound conversational rather than as if the harmony was
-        // tracking the soloist. 5 ms is within the per-voice jitter range
-        // (timingJitter defaults to 0.008 → [0, 8 ms]) but as a *consistent*
-        // additive offset it accumulates into a perceptible backbeat lag,
-        // while still well under the ~20 ms Dilla lag so it stays musical.
-        // Folded into `offset` (not a synth-side path) because `timingOffset`
-        // is the established schedule accumulator (band lean, stagger,
-        // jitter, response lag); keeping one source of truth means
-        // `note.isResponse` does not need to ship on the schema.
-        if (isResponse) {
-            offset += 0.005;
-        }
 
         const isLegato = priorMidiSet.has(midi);
         notes.push({

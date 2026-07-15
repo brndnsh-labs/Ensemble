@@ -286,10 +286,9 @@ describe('Harmony Synthesis', () => {
 
     // epic-harmony-polish S4 — gesture flags must produce a timbrally distinct
     // shape from a plain stab. These tests prove the synth side actually
-    // consumes isBloom / isLatched. The third gesture (isResponse) is fully
-    // engine-side now — it bumps `timingOffset` by +5 ms and ships nothing
-    // extra on the note schema; its test lives in
-    // tests/integration/melodic-harmony-support.test.ts.
+    // consumes isBloom / isLatched. (#1100: the third gesture, isResponse,
+    // was removed — its only trigger, coordination.soloistPhraseEnd, had no
+    // production writer and was permanently dead.)
     describe('Gesture flags (S4)', () => {
         const ATTACK_TARGET_TIME = 'linearRampToValueAtTime';
 

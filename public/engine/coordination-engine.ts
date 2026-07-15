@@ -310,11 +310,6 @@ export function createCoordinationContext(
         // (unison-avoidance, dynamic-density) to decide whether to step out of
         // the soloist's way.
         soloistActive: false,
-        // writer: soloist.ts (end-of-phrase guard, ~line 1792) — true ONLY on
-        // the tick the soloist completes a phrase. Read by harmony to time
-        // entry/exit gestures against phrase boundaries rather than against
-        // raw rests.
-        soloistPhraseEnd: false,
         // writer: tick-logic.ts updateCoordinationContext('soloist') (current tick only)
         // readable-after: soloist producer (bass, chords, harmony can read this)
         // NOTE: this is 0 on most harmony-stab steps because harmony yields away from soloist-active
