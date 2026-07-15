@@ -295,13 +295,13 @@ export function createCoordinationContext(
         // writer: createCoordinationContext (derived from mStep + time-signature config)
         // readable-after: creation (all producers)
         isMeasureEnd: mStep >= stepsPerBar - (ts.stepsPerBeat || 4), // Last beat of measure
-        // writer: tick-logic.ts drum preamble (checkHit('Kick') at line ~260, before producers)
+        // writer: drums-tick.ts (checkHit('Kick', true), before producers)
         // readable-after: drum preamble (any producer — bass locks to kick using this)
         kickHit: false,
-        // writer: tick-logic.ts drum preamble (checkHit('Snare') at line ~261, before producers)
+        // writer: drums-tick.ts (checkHit('Snare', true), before producers)
         // readable-after: drum preamble (any producer)
         snareHit: false,
-        // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318
+        // writer: tick-logic.ts updateCoordinationContext('soloist')
         // readable-after: soloist producer (bass, chords, harmony can read this)
         soloistBusy: false,
         // writer: updateCoordinationContext('soloist') — set true whenever the
@@ -315,12 +315,12 @@ export function createCoordinationContext(
         // entry/exit gestures against phrase boundaries rather than against
         // raw rests.
         soloistPhraseEnd: false,
-        // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318 (current tick only)
+        // writer: tick-logic.ts updateCoordinationContext('soloist') (current tick only)
         // readable-after: soloist producer (bass, chords, harmony can read this)
         // NOTE: this is 0 on most harmony-stab steps because harmony yields away from soloist-active
         // steps. Use lastActiveSoloistMidi for cross-tick register awareness.
         soloistMidi: 0,
-        // writer: tick-logic.ts updateCoordinationContext('soloist') at line ~318
+        // writer: tick-logic.ts updateCoordinationContext('soloist')
         // readable-after: soloist producer (bass, chords, harmony can read this)
         avgSoloistMidi: 0,
         // why: harmony's spectral-gap branch (in finalizeHarmonyNotes) needs a non-zero
@@ -338,23 +338,23 @@ export function createCoordinationContext(
         //         seeded each tick from caller-supplied CoordinationCarryover
         // readable-after: creation (all producers — carryover value is always available)
         lastActiveSoloistStep: carryover?.lastActiveSoloistStep || 0,
-        // writer: tick-logic.ts updateCoordinationContext('bass') at line ~371
+        // writer: tick-logic.ts updateCoordinationContext('bass')
         // readable-after: bass producer (chords, harmony can read this)
         bassHit: false,
-        // writer: tick-logic.ts updateCoordinationContext('bass') at line ~371
+        // writer: tick-logic.ts updateCoordinationContext('bass')
         // readable-after: bass producer (chords, harmony can read this)
         bassMidi: 0,
-        // writer: tick-logic.ts updateCoordinationContext('chords') at line ~400
+        // writer: tick-logic.ts updateCoordinationContext('chords')
         // readable-after: chords producer (harmony can read this)
         accompanimentHit: false,
-        // writer: tick-logic.ts updateCoordinationContext('chords') at line ~400
+        // writer: tick-logic.ts updateCoordinationContext('chords')
         // readable-after: chords producer (harmony can read this; soloist also reads this
         //   but via the previous-tick value from accompanimentMidis — see S5 unison-avoidance)
         accompanimentMidis: [] as number[],
-        // writer: tick-logic.ts updateCoordinationContext('chords') at line ~400
+        // writer: tick-logic.ts updateCoordinationContext('chords')
         // readable-after: chords producer (harmony can read this)
         avgChordMidi: 0,
-        // writer: tick-logic.ts chord-data preamble at lines ~118-119 (before producers run)
+        // writer: tick-logic.ts chord-data preamble (before producers run)
         // readable-after: chord-data preamble (any producer)
         // Absolute step indices for the current section's boundaries. Default 0
         // means "no chord data yet" — consumers all guard via `|| 0`, `?? null`,
@@ -367,7 +367,7 @@ export function createCoordinationContext(
         // writer: tick-logic.ts (chord-data preamble, before producers run)
         // readable-after: chord-data preamble (any producer)
         isTurnaround: false,
-        // writer: tick-logic.ts chord-data preamble at line ~142 (before producers run)
+        // writer: tick-logic.ts chord-data preamble (before producers run)
         // readable-after: chord-data preamble (any producer including soloist)
         upcomingSectionFirstChord: null as any,
         // why: epic-form-arrangement S2 (Imperfect Symmetry). Same value the soloist
@@ -469,8 +469,8 @@ export function createCoordinationContext(
         // writer: drums-tick.ts runDrumTick chord-data preamble (before producers)
         // readable-after: chord-data preamble (any producer)
         subtractionMutedLanes: [] as string[],
-        // why: published per-tick from the current chord (writer: tick-logic chord-preamble
-        // at lines ~102-122; readable-after: chord-preamble — i.e. by EVERY producer
+        // why: published per-tick from the current chord (writer: tick-logic chord-preamble;
+        // readable-after: chord-preamble — i.e. by EVERY producer
         // including the soloist which runs first). Lets the soloist bias toward
         // b9/#9/#11/b13 over V7alt-family chords as a final-stage weight multiplier in
         // selectPitchAndDevices. See harmony-coordination.md P0 #8.
