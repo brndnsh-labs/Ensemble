@@ -1,6 +1,13 @@
 import { Fragment } from 'preact';
 import { dispatch, getState } from '../state.js';
-import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
+import {
+    ACTIONS,
+    type ChordState,
+    type EnsembleState,
+    type HarmonyState,
+    type InstrumentModule,
+    type SoloistState,
+} from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 
 const { playback } = getState();
@@ -17,11 +24,8 @@ import { ButtonGroup, Select, SettingGroup, SettingRow, Slider } from './UIContr
 
 type InstrumentAudioControl = 'volume' | 'reverb';
 
-function getInstrumentState(module: InstrumentModule) {
-    return useEnsembleState((s) => {
-        const key = module === 'groove' ? 'groove' : module;
-        return (s as any)[key];
-    });
+function getInstrumentState<M extends InstrumentModule>(module: M): EnsembleState[M] {
+    return useEnsembleState((s) => s[module]);
 }
 
 function getModuleName(module: InstrumentModule) {
@@ -59,7 +63,7 @@ function updateInstrumentAudio(
     const internalName =
         module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
     const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-    const multiplier = isReverb ? 1.0 : (MIXER_GAIN_MULTIPLIERS as any)[internalName] || 1.0;
+    const multiplier = isReverb ? 1.0 : MIXER_GAIN_MULTIPLIERS[internalName] || 1.0;
 
     const node = (playback as any)[gainKey];
     if (node && playback.audio) {
@@ -159,8 +163,8 @@ export function InstrumentMixerStrip({
  */
 function InstrumentSoundSource({ module }: { module: InstrumentModule }) {
     const { voice, autoSound } = useEnsembleState((s) => {
-        const m = (s as any)[module];
-        return { voice: m.voice as InstrumentVoice, autoSound: m.autoSound as boolean };
+        const m = s[module];
+        return { voice: m.voice, autoSound: m.autoSound };
     });
     const currentGenre = useEnsembleState((s) => s.groove.lastSmartGenre) as string | undefined;
 
@@ -239,119 +243,138 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
             <InstrumentSoundSource module={module} />
             {hasSpecificControls && (
                 <SettingGroup title={getInstrumentSpecificTitle(module)}>
-                    {module === 'chords' && (
-                        <SettingRow
-                            label="Density"
-                            id="densitySelect"
-                            description="Notes per chord — thinner or fuller voicings."
-                        >
-                            <Select
-                                id="densitySelect"
-                                value={state.density || 'standard'}
-                                onChange={(val) => {
-                                    dispatch(ACTIONS.SET_DENSITY, val);
-                                    saveCurrentState();
-                                }}
-                                options={[
-                                    { value: 'thin', label: 'Thin (3 notes)' },
-                                    { value: 'standard', label: 'Standard (4 notes)' },
-                                    { value: 'rich', label: 'Rich (5+ notes)' },
-                                ]}
-                            />
-                        </SettingRow>
-                    )}
-
-                    {module === 'harmony' && (
-                        <SettingRow
-                            label="Complexity"
-                            id="harmonyComplexity"
-                            description="Higher adds extensions and inner-voice movement."
-                            valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                        >
-                            <Slider
-                                id="harmonyComplexity"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={state.complexity || 0.5}
-                                onInput={(val) => {
-                                    dispatch(ACTIONS.SET_PARAM, {
-                                        module: 'harmony',
-                                        param: 'complexity',
-                                        value: parseFloat(val),
-                                    });
-                                    saveCurrentState();
-                                }}
-                                ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                            />
-                        </SettingRow>
-                    )}
-
-                    {module === 'soloist' && (
-                        <Fragment>
-                            <SettingRow
-                                label="Complexity"
-                                id="soloistComplexity"
-                                description="Higher plays busier, more adventurous lines."
-                                valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                            >
-                                <Slider
-                                    id="soloistComplexity"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={state.complexity !== undefined ? state.complexity : 0.5}
-                                    onInput={(val) => {
-                                        dispatch(ACTIONS.SET_PARAM, {
-                                            module: 'soloist',
-                                            param: 'complexity',
-                                            value: parseFloat(val),
-                                        });
-                                        saveCurrentState();
-                                    }}
-                                    ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
-                                />
-                            </SettingRow>
-
-                            <SettingRow
-                                label="Phrasing Mode"
-                                id="soloistModeSelect"
-                                description={
-                                    state.autoMode
-                                        ? `Auto — follows the lead voice (now ${
-                                              resolveSoloistMode(state.mode) === 'guitar'
-                                                  ? 'Guitar'
-                                                  : 'Monophonic'
-                                          }). A guitar pack adds chord-aware double-stops.`
-                                        : 'Pinned. Single-note lead, or chord-aware guitar double-stops.'
-                                }
-                            >
-                                <ButtonGroup
-                                    className="soloist-phrasing-mode"
-                                    value={state.autoMode ? 'auto' : resolveSoloistMode(state.mode)}
-                                    onChange={(val) => {
-                                        const v = String(val);
-                                        if (v === 'auto') {
-                                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, true);
-                                        } else {
-                                            dispatch(ACTIONS.SET_SOLOIST_MODE, v);
-                                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
-                                        }
-                                        saveCurrentState();
-                                    }}
-                                    options={[
-                                        { value: 'auto', label: 'Auto' },
-                                        { value: 'monophonic', label: 'Monophonic' },
-                                        { value: 'guitar', label: 'Guitar' },
-                                    ]}
-                                />
-                            </SettingRow>
-                        </Fragment>
-                    )}
-
-                    {module === 'groove' && <GrooveControls state={state} />}
+                    {module === 'chords' && <ChordsControls state={state as ChordState} />}
+                    {module === 'harmony' && <HarmonyControls state={state as HarmonyState} />}
+                    {module === 'soloist' && <SoloistControls state={state as SoloistState} />}
+                    {module === 'groove' && <GrooveControls state={state as GrooveState} />}
                 </SettingGroup>
             )}
+        </Fragment>
+    );
+}
+
+interface ChordsControlsProps {
+    state: ChordState;
+}
+
+function ChordsControls({ state }: ChordsControlsProps) {
+    return (
+        <SettingRow
+            label="Density"
+            id="densitySelect"
+            description="Notes per chord — thinner or fuller voicings."
+        >
+            <Select
+                id="densitySelect"
+                value={state.density || 'standard'}
+                onChange={(val) => {
+                    dispatch(ACTIONS.SET_DENSITY, val);
+                    saveCurrentState();
+                }}
+                options={[
+                    { value: 'thin', label: 'Thin (3 notes)' },
+                    { value: 'standard', label: 'Standard (4 notes)' },
+                    { value: 'rich', label: 'Rich (5+ notes)' },
+                ]}
+            />
+        </SettingRow>
+    );
+}
+
+interface HarmonyControlsProps {
+    state: HarmonyState;
+}
+
+function HarmonyControls({ state }: HarmonyControlsProps) {
+    return (
+        <SettingRow
+            label="Complexity"
+            id="harmonyComplexity"
+            description="Higher adds extensions and inner-voice movement."
+            valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+        >
+            <Slider
+                id="harmonyComplexity"
+                min="0"
+                max="1"
+                step="0.05"
+                value={state.complexity || 0.5}
+                onInput={(val) => {
+                    dispatch(ACTIONS.SET_PARAM, {
+                        module: 'harmony',
+                        param: 'complexity',
+                        value: parseFloat(val),
+                    });
+                    saveCurrentState();
+                }}
+                ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
+            />
+        </SettingRow>
+    );
+}
+
+interface SoloistControlsProps {
+    state: SoloistState;
+}
+
+function SoloistControls({ state }: SoloistControlsProps) {
+    return (
+        <Fragment>
+            <SettingRow
+                label="Complexity"
+                id="soloistComplexity"
+                description="Higher plays busier, more adventurous lines."
+                valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+            >
+                <Slider
+                    id="soloistComplexity"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={state.complexity !== undefined ? state.complexity : 0.5}
+                    onInput={(val) => {
+                        dispatch(ACTIONS.SET_PARAM, {
+                            module: 'soloist',
+                            param: 'complexity',
+                            value: parseFloat(val),
+                        });
+                        saveCurrentState();
+                    }}
+                    ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                />
+            </SettingRow>
+
+            <SettingRow
+                label="Phrasing Mode"
+                id="soloistModeSelect"
+                description={
+                    state.autoMode
+                        ? `Auto — follows the lead voice (now ${
+                              resolveSoloistMode(state.mode) === 'guitar' ? 'Guitar' : 'Monophonic'
+                          }). A guitar pack adds chord-aware double-stops.`
+                        : 'Pinned. Single-note lead, or chord-aware guitar double-stops.'
+                }
+            >
+                <ButtonGroup
+                    className="soloist-phrasing-mode"
+                    value={state.autoMode ? 'auto' : resolveSoloistMode(state.mode)}
+                    onChange={(val) => {
+                        const v = String(val);
+                        if (v === 'auto') {
+                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, true);
+                        } else {
+                            dispatch(ACTIONS.SET_SOLOIST_MODE, v);
+                            dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
+                        }
+                        saveCurrentState();
+                    }}
+                    options={[
+                        { value: 'auto', label: 'Auto' },
+                        { value: 'monophonic', label: 'Monophonic' },
+                        { value: 'guitar', label: 'Guitar' },
+                    ]}
+                />
+            </SettingRow>
         </Fragment>
     );
 }
