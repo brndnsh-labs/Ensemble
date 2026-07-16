@@ -12,6 +12,11 @@ This doc is the written target the by-ear stories gate against. It is intentiona
 
 ## 1. Diagnosis — why today's soloist sounds "aimless"
 
+> *Historical note (2026-07-16): this diagnosis describes the pre-Epic-#10/#866 engine —
+> `soloist.ts`, `getSoloistNote`, and `selectPitchAndDevices` were all deleted 2026-07-08. Kept
+> for the rationale that motivated Slices 0-2; for the current engine see AI_MAP.md's
+> `soloist-phrase-first.ts` entry.*
+
 Two as-built audits of the current engine (control-flow trace + geminism hunt) produced a consistent picture. The notes are usually *right*; the line has no *intention over time*. Mechanically:
 
 - **The melody is a frozen line that gets eroded, not developed.** At play start, `soloist-seeder.ts:generateSessionSeed` bakes a complete note list (pitch, anchor, duration). For the Head (Loop 0) and most later loops the live engine takes the **head-bypass** path (`soloist.ts` Path D): it pins each pitch to the frozen seed note (`isHeadBypass → selectedMidi = targetMidi` in `soloist-pitch-engine.ts:selectPitchAndDevices`, verified at `:1603-1605`) and **skips the weighted picker for pitch entirely.** Loop-over-loop "evolution" is then only *erosion*: probabilistic note-dropping (`survivalProb`), ±1–3 scale-step jitter, and added ornaments. **Erosion is the opposite of development** — the line can only become *less itself*, never grow.
