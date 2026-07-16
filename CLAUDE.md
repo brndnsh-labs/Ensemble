@@ -121,7 +121,7 @@ For any weight-based picker (e.g. the pitch-weighting block in `getBassNote` in 
 
 The soloist generates a session-wide `sessionSeed` (SRDC structure: Statement, Restatement, Departure, Conclusion) at playback start. The live mechanism (`getSoloistNotePhraseFirst` in `soloist-phrase-first.ts`, see `docs/design/soloist-phrase-first.md` §6/§9 for the full design):
 
-- **Loop 0 (The Head):** strict Head adherence, Imperfect Symmetry (30% motivic drift in cloned measures to avoid mechanical looping).
+- **Loop 0 (The Head):** the seed itself is pre-baked with Imperfect Symmetry — `generateSessionSeed` in `soloist-seeder.ts` drifts repeated 'A' measures at a 15–30% rate (`symmetryMutationProb`, tightest for HOOK contours, loosest outside jazz) so Loop 0 doesn't clone verbatim; the live engine then plays the frozen seed straight (head-bypass).
 - **Loop 1+:** `loopLift` (a concave entrance ramp reaching ~0.56 at loop 4 — front-loaded per #858, replacing the older linear 0.14/loop; `loopCount` clamped to 4) layers onto `intensityLift`/`tempoFill`; a per-step sine-swell `activityAt` shapes note density across the loop. `developmentDepth`/`DEPTH_DEGREES` drives cyclical diatonic transposition of the whole line, keyed to `loopCount` so pitch only shifts at a loop boundary (never mid-phrase) — with periodic theme-return (`depth 0` = verbatim head) and one apex/money-note peak per cycle.
 
 ### Coordination & Register Slotting
