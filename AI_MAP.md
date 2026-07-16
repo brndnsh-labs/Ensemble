@@ -53,7 +53,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
 | `public/engine/harmonies.ts` | Background pad/stab generation. | `getHarmonyNotes` |
 | `public/engine/harmony-styles.ts` | Per-genre harmony idiom profiles (style/rhythm/voicing). | `HARMONY_GENRE_PROFILES`, `resolveHarmonyProfile` |
-| `public/engine/soloist-config.ts` | Soloist style and influence pool data. | `STYLE_CONFIG`, `INFLUENCE_POOLS` |
+| `public/engine/soloist-config.ts` | Soloist style and register-profile data. | `STYLE_CONFIG`, `resolveSoloistStyle`, `getSoloistRegisterProfile` |
 | `public/engine/soloist-devices.ts` | Melodic embellishment and run algorithms. | `consonantDoubleStopInterval`, `guitarDoubleStopVoice` |
 | `public/engine/drum-seeder.ts` | Song-wide drum orchestration seeder. | `generateDrumOrchestration` |
 | `public/engine/fills.ts` | Procedural drum fill generation. | `generateProceduralFill` |
@@ -72,18 +72,18 @@ This map provides a quick reference for AI agents to understand the responsibili
 | :--- | :--- | :--- |
 | `public/engine/bass-styles.ts` | Genre-specific bass algorithms. | `checkBassActiveStyle` |
 | `public/engine/chord-quality-sets.ts` | Dependency-free leaf of shared chord-quality classification Sets (keeps cross-engine const imports from dragging heavy lanes into a chunk). | `ALTERED_HOOK_QUALITIES` |
-| `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getVoicingForStyle` |
+| `public/engine/chords-styles.ts` | Genre-specific chord voicing logic. | `getRootlessVoicing` |
 | `public/engine/comping-cells.ts` | Pure deterministic comping-cell banks (per-genre 16th-step hit patterns) extracted from accompaniment.ts. | `FUNK_COMPING_CELLS`, `JAZZ_COMPING_CELLS`, `BOSSA_PARTIDO_ALTO_CELLS` |
 | `public/engine/comping-emit.ts` | Standard comp lane hit decision + per-hit emission (coordination overlays, #715 statement/answer economy, #766 ring, #707 clamp) extracted from getAccompanimentNotes; compingState + coordination threaded explicitly. | `emitCompNotes`, `AccompanimentCoordination`, `CCEvent` |
 | `public/engine/comping-state.ts` | The mutated-shared-singleton comp-memory struct (groove/voice-leading/statement memory) and its per-song reset ritual. | `compingState`, `resetCompingState`, `CompingState` |
-| `public/engine/soloist-config.ts` | Style definitions and influence pools. | `STYLE_CONFIG` |
+| `public/engine/soloist-config.ts` | Style definitions and register profiles. | `STYLE_CONFIG` |
 | `public/engine/grooves/` | 13 genre-specific drum strategies, one per canonical genre (see CLAUDE.md canon; Bossa's strategy is `latin.ts`), plus shared `utils.ts`. | `jazz.ts`, `rock.ts`, `funk.ts`, etc. |
 
 ## Engine Core (Internal)
 
 | Path | Responsibility | Key Exports |
 | :--- | :--- | :--- |
-| `public/engine/scheduler-core.ts` | High-precision timing and lookahead. | `scheduler`, `scheduleStep` |
+| `public/engine/scheduler-core.ts` | High-precision timing and lookahead. | `scheduler`, `togglePlay` |
 | `public/engine/midi-scheduler.ts` | MIDI scheduling logic. | `dispatchMidiDrum`, `dispatchMidiSoloist` |
 | `public/engine/platform-orchestrator.ts` | Platform specific lifecycle management. | `initPlatformHacks`, `startPlatformAudioAndWakeLock` |
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
@@ -97,12 +97,12 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/clave.ts` | Canonical bossa son-clave spine + the offbeat clave cells (&-of-2/3/4) the lead accents. | `BOSSA_CLAVE_STEPS_4_4`, `BOSSA_OFFBEAT_CELL_STEPS_4_4`, `isBossaClaveStep` |
 | `public/engine/soloist-pitch-engine.ts` | Chord-target-tones helper (guide/pillar tones by chord quality) for the phrase-first realizer; legacy `selectPitchAndDevices` picker removed in epic #10/#866. | `chordTargetTones` |
-| `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `safeSync`, `resetCursors` |
+| `public/engine/worker-utils.ts` | Shared background thread utilities. | `getChordAtStep`, `recursiveSafeSync`, `resetCursors` |
 | `public/engine/worker-orchestrator.ts` | Worker lifecycle and message management. | `workerContext`, `resetWorkerContext` |
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
 | `public/engine/tick-logic.ts` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
 | `public/engine/drums-tick.ts` | Lane-free drum preamble + drum-block tick (keeps heavy lane generators off the main chunk; real-time scheduler imports this). | `runDrumTick`, `generateDrumsForStep` |
-| `public/engine/audio-recovery.ts` | Context resumption and error handling. | `resumeContext`, `handleAudioError` |
+| `public/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
 | `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |

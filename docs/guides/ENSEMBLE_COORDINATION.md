@@ -5,7 +5,8 @@ A single `CoordinationContext` object must be passed to every note generator per
 *   `soloistBusy`: Indicates if the soloist is actively playing a dense or prominent phrase.
 *   `accompanimentHit`: Indicates if the accompaniment (chords/keys) is striking a chord on the current step.
 *   `kickHit`: Indicates if the kick drum is striking on the current step.
-*   `pocketOffset`: Provides micro-timing adjustments for swing or groove feel.
+
+Per-genre micro-timing lean is NOT a `CoordinationContext` field — the band-global `coordination.pocketOffset` mechanism was deleted repo-wide in #1063 as a uniform, provably-inaudible time-shift (see `docs/design/timing-model.md` §4, "do not resurrect a band-global term"). The live replacement is `getBandPocket()` (`public/engine/coordination-engine.ts`), called directly by each melodic/comp lane that needs it, rather than threaded through this shared context.
 
 ## Strict Register Slotting
 To ensure a clean mix and avoid harmonic masking, instruments are strictly assigned to specific MIDI note ranges:
