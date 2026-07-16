@@ -7,7 +7,7 @@ import {
     generateDrumOrchestration,
     generateSoloistAccents,
 } from './engine/drum-seeder.js';
-import { initAudio, restoreGains, syncBusReverbSend } from './engine/engine.js';
+import { initAudio, restoreGains, syncBusReverbSend, syncBusVolume } from './engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.js';
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
@@ -197,6 +197,16 @@ export function handleEffects(
             // The helper no-ops before the audio graph exists.
             if (payload?.module) {
                 syncBusReverbSend(stateMap, payload.module);
+            }
+            break;
+        }
+        case ACTIONS.SET_VOLUME: {
+            // #1111 — the per-instrument volume slider writes state.<module>.volume,
+            // but (unlike SET_REVERB above) had no live-ramp effect at all: the bus
+            // gain node was otherwise only re-trimmed at initAudio/restoreGains (a
+            // mute toggle, transport start). Re-trim now, mirroring SET_REVERB.
+            if (payload?.module) {
+                syncBusVolume(stateMap, payload.module);
             }
             break;
         }

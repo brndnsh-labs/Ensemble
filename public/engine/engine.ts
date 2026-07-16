@@ -629,6 +629,31 @@ export function syncBusReverbSend(state: EnsembleState, module: InstrumentModule
     bus.reverb.gain.setTargetAtTime(reverbSendTarget(inst.reverb, inst.voice), t, 0.04);
 }
 
+/**
+ * Re-trim a lane's live bus gain for its current volume slider (#1111). Only
+ * the reverb send had a live-ramp path (#688); volume silently only took
+ * effect at the next `restoreGains`/`initAudio` (a mute toggle, transport
+ * start). Mirrors `syncBusReverbSend`'s per-module surgical update instead of
+ * calling `restoreGains` for every lane on a single slider drag.
+ */
+export function syncBusVolume(state: EnsembleState, module: InstrumentModule): void {
+    const { playback, midi } = state;
+    const graph = playback.audioGraph;
+    if (!playback.audio || !graph) {
+        return;
+    }
+    const inst = state[module] as unknown as { volume: number; enabled: boolean };
+    const busKey = MODULE_BUS_KEY[module];
+    const bus = graph[busKey];
+    const mult = MIXER_GAIN_MULTIPLIERS[busKey];
+    const isLocalMuted = midi.enabled && midi.muteLocal;
+    const isMuted = !inst.enabled;
+    const target = !isMuted && !isLocalMuted ? Math.max(0.0001, inst.volume * mult) : 0.0001;
+    const t = playback.audio.currentTime;
+    bus.gain.gain.cancelScheduledValues(t);
+    bus.gain.gain.setTargetAtTime(target, t, 0.04);
+}
+
 let lastAudioTime = 0;
 let lastPerfTime = 0;
 

@@ -12,6 +12,7 @@ import {
     killSoloistBus,
     restoreGains,
     syncBusReverbSend,
+    syncBusVolume,
 } from '../../../public/engine/engine.js';
 
 const { makeSoloistMock } = await vi.hoisted(
@@ -183,6 +184,40 @@ describe('Engine Bus Management', () => {
         it('no-ops before the audio graph exists', () => {
             state.playback.audioGraph = undefined;
             expect(() => syncBusReverbSend(state, 'chords')).not.toThrow();
+        });
+    });
+
+    describe('syncBusVolume (#1111)', () => {
+        it('re-trims the lane gain to volume × the mix multiplier', () => {
+            syncBusVolume(state, 'chords');
+            // mult for chords is MIXER_GAIN_MULTIPLIERS.chords (0.135), vol is 1.0 -> 0.135
+            expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalledWith(10.0);
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.135, 10.0, 0.04);
+        });
+
+        it('floors to near-silent if the module is disabled', () => {
+            state.chords.enabled = false;
+            syncBusVolume(state, 'chords');
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
+        });
+
+        it('floors to near-silent if MIDI local-mute is active', () => {
+            state.midi.enabled = true;
+            state.midi.muteLocal = true;
+            syncBusVolume(state, 'chords');
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
+        });
+
+        it('maps the groove module to the drums bus', () => {
+            state.groove.volume = 0.5;
+            syncBusVolume(state, 'groove');
+            // mult for drums is MIXER_GAIN_MULTIPLIERS.drums (0.38), vol 0.5 -> 0.19
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.19, 10.0, 0.04);
+        });
+
+        it('no-ops before the audio graph exists', () => {
+            state.playback.audioGraph = undefined;
+            expect(() => syncBusVolume(state, 'chords')).not.toThrow();
         });
     });
 });

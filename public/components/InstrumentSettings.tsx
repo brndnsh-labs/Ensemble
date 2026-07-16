@@ -1,5 +1,11 @@
 import { Fragment } from 'preact';
-import { dispatch, getState } from '../state.js';
+import { autoVoiceForGenre } from '../data/genre-sound-map.js';
+import { packsForInstrument } from '../data/sound-packs.js';
+import { isPackInstalled } from '../engine/instrument-registry.js';
+import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
+import { saveCurrentState } from '../persistence.js';
+import type { GrooveState } from '../state/groove.js';
+import { dispatch } from '../state.js';
 import {
     ACTIONS,
     type ChordState,
@@ -9,16 +15,6 @@ import {
     type SoloistState,
 } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-
-const { playback } = getState();
-
-import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
-import { autoVoiceForGenre } from '../data/genre-sound-map.js';
-import { packsForInstrument } from '../data/sound-packs.js';
-import { isPackInstalled } from '../engine/instrument-registry.js';
-import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import { saveCurrentState } from '../persistence.js';
-import type { GrooveState } from '../state/groove.js';
 import { Icon, type IconName } from './Icon.jsx';
 import { ButtonGroup, Select, SettingGroup, SettingRow, Slider } from './UIControls.jsx';
 
@@ -59,19 +55,6 @@ function updateInstrumentAudio(
         value: numVal,
     });
     saveCurrentState();
-
-    const internalName =
-        module === 'groove' ? 'drums' : module === 'harmony' ? 'harmonies' : module;
-    const gainKey = isReverb ? `${internalName}Reverb` : `${internalName}Gain`;
-    const multiplier = isReverb ? 1.0 : MIXER_GAIN_MULTIPLIERS[internalName] || 1.0;
-
-    const node = (playback as any)[gainKey];
-    if (node && playback.audio) {
-        const target = Math.max(0.0001, numVal * multiplier);
-        node.gain.cancelScheduledValues(playback.audio.currentTime);
-        node.gain.setValueAtTime(node.gain.value, playback.audio.currentTime);
-        node.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
-    }
 }
 
 interface InstrumentMixerStripProps {
