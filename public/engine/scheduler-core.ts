@@ -400,8 +400,12 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 // so a form-loop boundary here would be spurious. Suspend
                 // chorus-count / session-ending / loop-limit until the drill is
                 // cleared; the drilled section just repeats indefinitely.
+                // Capture as a plain boolean — negating the type-predicate call directly
+                // narrows `playback` to `never` in this branch (no discriminant property
+                // to split the intersection type on), which breaks every field read below.
+                const practiceLooping: boolean = isPracticeLooping(playback);
                 if (
-                    !isPracticeLooping(playback) &&
+                    !practiceLooping &&
                     playback.step > 0 &&
                     playback.step % arranger.totalSteps === 0
                 ) {

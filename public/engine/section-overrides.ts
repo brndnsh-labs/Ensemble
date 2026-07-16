@@ -24,7 +24,9 @@ interface PracticeLoopBounds {
  * True when a section-practice loop is active — a valid, non-empty window.
  * Both `-1` (the cleared sentinel) or an inverted range read as "no loop".
  */
-export function isPracticeLooping(pb: PracticeLoopBounds | null | undefined): boolean {
+export function isPracticeLooping(
+    pb: PracticeLoopBounds | null | undefined,
+): pb is PracticeLoopBounds & { loopStartStep: number; loopEndStep: number } {
     if (!pb) {
         return false;
     }
@@ -50,8 +52,8 @@ export function foldPracticeStep(step: number, pb: PracticeLoopBounds | null | u
     if (!pb || !isPracticeLooping(pb)) {
         return step;
     }
-    const start = pb.loopStartStep as number;
-    const end = pb.loopEndStep as number;
+    const start = pb.loopStartStep;
+    const end = pb.loopEndStep;
     if (step < start) {
         return step;
     }
@@ -73,8 +75,8 @@ export function isPracticeLoopWrap(
     if (!isPracticeLooping(pb)) {
         return false;
     }
-    const start = pb!.loopStartStep as number;
-    const width = (pb!.loopEndStep as number) - start;
+    const start = pb.loopStartStep;
+    const width = pb.loopEndStep - start;
     return step > start && (step - start) % width === 0;
 }
 
