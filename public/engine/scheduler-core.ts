@@ -10,7 +10,7 @@ import {
     buildPlaybackSyncPayload,
     buildSoloistSyncPayload,
 } from '../state.js';
-import type { EnsembleState, Mutable } from '../types.js';
+import type { ArrangerState, EnsembleState, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -154,6 +154,17 @@ const DRUM_VIS_PITCHES: Record<string, number> = {
 // Initialize platform-specific hacks (iOS Audio, WakeLock state)
 initPlatformHacks();
 
+// #1016 — section practice. Normally 0; "start from here" / "loop this section"
+// seed `startStep` with the drilled section's first step so playback begins
+// there instead of the top. Clamps into range so a stale/out-of-bounds
+// startStep (e.g. after an arrangement edit) can't seed an invalid step.
+function seedStartStep(playback: GlobalContext, arranger: ArrangerState): number {
+    const rawStartStep = playback.startStep ?? 0;
+    return arranger.totalSteps > 0
+        ? Math.max(0, Math.min(rawStartStep, arranger.totalSteps - 1))
+        : Math.max(0, rawStartStep);
+}
+
 /**
  * Toggles the playback state of the session.
  * Handles audio context suspension/resumption, worker synchronization,
@@ -230,14 +241,7 @@ export function togglePlay(
             dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, { targetIntensity: 0.35 });
         }
 
-        // #1016 — section practice. Normally 0; "start from here" / "loop this
-        // section" seed `startStep` with the drilled section's first step so
-        // playback (and the worker flush below) begins there instead of the top.
-        const rawStartStep = playback.startStep ?? 0;
-        const seedStep =
-            arranger.totalSteps > 0
-                ? Math.max(0, Math.min(rawStartStep, arranger.totalSteps - 1))
-                : Math.max(0, rawStartStep);
+        const seedStep = seedStartStep(playback, arranger);
         (playback as Mutable<typeof playback>).step = seedStep; // @direct-mutation
         (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
             sectionAtStep(arranger, seedStep)?.id ?? null;
@@ -492,11 +496,7 @@ function advanceCountIn(state: EnsembleState): void {
         (playback as Mutable<typeof playback>).isCountingIn = false; // @direct-mutation
         // #1016 — begin at the drilled section's first step (0 normally). The
         // count-in itself fires once, before this; folding never re-triggers it.
-        const rawStartStep = playback.startStep ?? 0;
-        const seedStep =
-            arranger.totalSteps > 0
-                ? Math.max(0, Math.min(rawStartStep, arranger.totalSteps - 1))
-                : Math.max(0, rawStartStep);
+        const seedStep = seedStartStep(playback, arranger);
         (playback as Mutable<typeof playback>).step = seedStep; // @direct-mutation
         (playback as Mutable<typeof playback>).currentSectionId = // @direct-mutation
             sectionAtStep(arranger, seedStep)?.id ?? null;
