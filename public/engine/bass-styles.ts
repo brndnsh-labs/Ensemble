@@ -31,6 +31,40 @@ export function isChordChangeApproach<T extends ChordChangeShape>(
     return nextTarget !== currentTarget;
 }
 
+// Genres whose bass idiom uses an expressive scoop/slide into a chromatic
+// approach note (upright/fretless gliss, rockabilly slap) — as opposed to a
+// genre like Metal (palm-muted precision) or Disco (clean octave line) where
+// the ornament would read as foreign. Only Jazz/Blues/Neo-Soul currently
+// reach this shared branch under default genre-to-style routing (Funk and
+// Country each have their own dedicated approach branch above that returns
+// before this point) — Funk and Country are listed here anyway so the gate
+// does the right thing if a user manually overrides Bass Style away from the
+// genre default, or if those styles' own branches are ever folded into this
+// shared path.
+const EXPRESSIVE_BEND_GENRES = new Set(['Jazz', 'Blues', 'Funk', 'Neo-Soul', 'Country']);
+
+/**
+ * why: 20% scoop/slide into the chromatic leading tone — an occasional
+ * expressive bass gliss, not on every approach (that reads as a mannerism).
+ * Gated to genres whose bass idiom actually uses this articulation (see
+ * EXPRESSIVE_BEND_GENRES); the pitch gate above already genre-scales whether a
+ * chromatic approach happens at all, but the bend is a pure articulation
+ * choice on top of that, not a harmonic one, so it's gated on/off rather than
+ * scaled down. Suppressed entirely under a busy soloist so the bass doesn't
+ * grab foreground attention mid-solo (call-and-response).
+ */
+export function approachBend(
+    genreFeel: string,
+    approach: number,
+    targetRoot: number,
+    isSoloistBusy: boolean,
+): -1 | 0 | 1 {
+    if (isSoloistBusy || !EXPRESSIVE_BEND_GENRES.has(genreFeel)) {
+        return 0;
+    }
+    return Math.random() < 0.2 ? (approach < targetRoot ? -1 : 1) : 0;
+}
+
 export function checkBassActiveStyle(
     style: string,
     step: number,
@@ -1592,8 +1626,7 @@ export function getBassNoteStyle(
             // a dissonant octave leap — contradicts voice-leading intent (bass.md P0 #2).
             // Octave displacement is reserved for downbeat root statements only.
             approach = clampAndNormalize(approach);
-            const bend =
-                Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0;
+            const bend = approachBend(groove.genreFeel, approach, targetRoot, isSoloistBusy);
             return result(getFrequency(approach), 1, velocity, 0, bend);
         } else {
             const candidates = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7];

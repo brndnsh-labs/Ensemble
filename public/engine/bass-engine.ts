@@ -33,7 +33,12 @@ export const BASS_VELOCITY_ENVELOPE = { enabled: true };
 // (Old getScaleForBass removed, using imported version)
 import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
-import { checkBassActiveStyle, getBassNoteStyle, isChordChangeApproach } from './bass-styles.js';
+import {
+    approachBend,
+    checkBassActiveStyle,
+    getBassNoteStyle,
+    isChordChangeApproach,
+} from './bass-styles.js';
 
 // why: Genres where bass-doubles-kick is the musical intent. Other styles
 // (jazz/dub/country/blues/bossa/acoustic/neo/walking-ska/hiphop)
@@ -1321,7 +1326,7 @@ export function getBassNote(
                 1,
                 velocity,
                 0,
-                Math.random() < 0.2 && !isSoloistBusy ? (approach < targetRoot ? -1 : 1) : 0,
+                approachBend(groove.genreFeel, approach, targetRoot, isSoloistBusy),
                 targetRoot,
             );
         } else {

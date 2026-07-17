@@ -345,6 +345,86 @@ const measureApproachDistances = (
     return { maxDist, violations, total };
 };
 
+/**
+ * Measures how often the chromatic-approach branch's expressive pitch-bend
+ * fires (bendStartInterval !== 0), among all step-14 samples that reached the
+ * chord-change-approach code path (note.approachTargetRoot is the
+ * test-observability field set on both the chromatic and perfect-interval
+ * approach branches — see approachBend in bass-styles.ts).
+ *
+ * why: approachBend gates the bend to a fixed genre allowlist
+ * (EXPRESSIVE_BEND_GENRES, bass-styles.ts) added by a 2026-07-16 hygiene
+ * sweep — before this, none of the tests above inspected bendStartInterval
+ * at all, so a genre-string typo or an accidentally-emptied allowlist would
+ * have passed every existing assertion silently.
+ */
+const measureBendRate = (
+    numBars: number,
+    genreFeel: string,
+    bassStyle: string,
+): { bentCount: number; sampleCount: number } => {
+    const stepMap = makeStepMap(numBars);
+    const mockState = makeMockState(genreFeel);
+    mockState.arranger.totalSteps = numBars * 16;
+    mockState.arranger.stepMap = stepMap;
+    getState.mockReturnValue(mockState);
+
+    const tsConfig = TIME_SIGNATURES['4/4'];
+    const totalSteps = numBars * 16;
+    let bentCount = 0;
+    let sampleCount = 0;
+    let lastMidi: number | null = null;
+
+    for (let i = 0; i < totalSteps; i++) {
+        const stepInMeasure = i % 16;
+        const measure = Math.floor(i / 16);
+        const currentChord = stepMap[measure].chord;
+        const nextMeasure = measure + 1;
+        const nextChord = nextMeasure < numBars ? stepMap[nextMeasure].chord : null;
+
+        const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
+        const active = isBassActive(getState(), bassStyle, i, stepInMeasure, info, {});
+
+        let note = null;
+        if (active) {
+            note = getBassNote(
+                getState(),
+                currentChord,
+                nextChord,
+                info.beatIndex,
+                lastMidi ? getFrequency(lastMidi) : 0,
+                48,
+                bassStyle,
+                0,
+                i,
+                stepInMeasure,
+                {},
+                info,
+            );
+        }
+
+        if (
+            stepInMeasure === 14 &&
+            nextChord &&
+            nextChord.rootMidi !== currentChord.rootMidi &&
+            note &&
+            !note.muted &&
+            typeof note.approachTargetRoot === 'number'
+        ) {
+            sampleCount++;
+            if (note.bendStartInterval) {
+                bentCount++;
+            }
+        }
+
+        if (note && !note.muted) {
+            lastMidi = note.midi;
+        }
+    }
+
+    return { bentCount, sampleCount };
+};
+
 // --- Tests ---
 
 describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
@@ -529,5 +609,38 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         // why: total > 0 confirms the approach branch actually fired and we measured something
         expect(jazz.total).toBeGreaterThan(0);
         expect(rock.total).toBeGreaterThan(0);
+    });
+
+    // why: approachBend (bass-styles.ts) gates the expressive pitch-bend to a
+    // fixed EXPRESSIVE_BEND_GENRES allowlist (Jazz/Blues/Funk/Neo-Soul/Country).
+    // Nothing above this test inspects bendStartInterval, so a genre-string
+    // typo or an accidentally-emptied allowlist would pass every other
+    // assertion in this file silently — this is the regression guard for that.
+    it('approach bend fires for an allowlisted genre (Jazz) and never for an excluded genre (Rock)', () => {
+        const numBars = 128;
+        const jazz = measureBendRate(numBars, 'Jazz', 'quarter');
+        const rock = measureBendRate(numBars, 'Rock', 'quarter');
+        const jazzRate = jazz.bentCount / (jazz.sampleCount || 1);
+
+        console.log(
+            '\n--- APPROACH-BEND GENRE GATE REPORT ---\n' +
+                `[Jazz samples] ${jazz.sampleCount}  bent=${jazz.bentCount}  rate=${(jazzRate * 100).toFixed(1)}%\n` +
+                `[Rock samples] ${rock.sampleCount}  bent=${rock.bentCount}\n` +
+                '[Required]     Jazz rate 5-35%, Rock bent=0\n' +
+                '----------------------------------------\n',
+        );
+
+        expect(jazz.sampleCount).toBeGreaterThan(20);
+        expect(rock.sampleCount).toBeGreaterThan(20);
+        // why: approachBend fires at a flat 20% rate whenever the chromatic
+        // branch is taken; Jazz at intensity 0.8 forces chromaticProb to 0.95,
+        // so ~19% of all approach-branch samples should show a nonzero bend.
+        // Wide floor/ceiling for stochastic variance.
+        expect(jazzRate).toBeGreaterThan(0.05);
+        expect(jazzRate).toBeLessThan(0.35);
+        // why: Rock is not in EXPRESSIVE_BEND_GENRES — this must stay exactly
+        // 0. A genre-string typo or an emptied allowlist would leak a nonzero
+        // bend here without tripping any other test in this file.
+        expect(rock.bentCount).toBe(0);
     });
 });

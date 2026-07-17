@@ -104,6 +104,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         if (isTurnaround && loopStep >= halfBarStep) {
             // Drop ride for fill
         } else if (isRideStep) {
+            // why: spang-a-lang skip note (the swung "and" of beats 2 & 4). The
+            // quarter pulse is the bedrock (1.0); the skip is the living ornament
+            // great drummers add/drop to breathe — so 0.6-0.9 scaled by
+            // complexity, never a metronomic 1.0 (that reads as a drum machine).
             const rideProb = isSkipBeat ? 0.6 + drumComplexity * 0.3 : 1.0;
 
             if (roll(rideProb, 1.0, rollSeed(context, 1))) {
@@ -242,6 +246,13 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 shouldPlay = true;
                 velocity = scaleVelocity(0.5, humanizeDraw(context, 5), 0.3);
             } else {
+                // why: jazz snare comping — conversational, not metronomic. Base
+                // 0.1 + complexity; +0.2 when the soloist rests (call-and-response
+                // fills the space the horn leaves). x0.5 above 175bpm because fast
+                // bebop comping thins out (the ride carries time at speed).
+                // Position weighting below: and-of-4 (0.5, the canonical
+                // Philly-Joe anchor) > and-of-2 (0.3, the Charleston) > weak
+                // offbeats (x0.4 chatter).
                 let compProb = 0.1 + drumComplexity * 0.3;
                 if (!isSoloistBusy) {
                     compProb += 0.2;
