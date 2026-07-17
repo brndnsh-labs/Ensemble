@@ -34,6 +34,10 @@ vi.mock('../../../public/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 
+vi.mock('../../../public/worker-client.js', () => ({
+    syncWorker: vi.fn(),
+}));
+
 vi.mock('../../../public/ui.js', () => ({
     showToast: (...args) => mockShowToast(...args),
 }));
@@ -66,7 +70,10 @@ vi.mock('../../../public/utils.js', () => ({
     }),
 }));
 
+import { validateAndAnalyze } from '../../../public/arranger-controller.js';
 import { PresetLibrary } from '../../../public/components/PresetLibrary.jsx';
+import { flushBuffers } from '../../../public/instrument-controller.js';
+import { syncWorker } from '../../../public/worker-client.js';
 
 describe('PresetLibrary', () => {
     let container;
@@ -264,5 +271,41 @@ describe('PresetLibrary', () => {
             },
         ]);
         expect(mockDispatch).toHaveBeenCalledWith('SET_BPM', 140);
+    });
+
+    it('resyncs and re-primes the worker AFTER validateAndAnalyze on a replace-mode preset-select (#1120)', async () => {
+        await act(async () => {
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+
+        const autumnLeavesButton = /** @type {HTMLButtonElement|null} */ (
+            container.querySelector('.preset-library-chip-name[aria-label="Autumn Leaves"]')
+        );
+
+        await act(async () => {
+            autumnLeavesButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        // A bare syncWorker() call (no action) sends a full snapshot patch, and
+        // flushBuffers() bundles its own worker FLUSH (which synchronously refills
+        // buffers from getSyncState()) — both must fire so neither the mirrored
+        // state NOR the primed buffers can be built from the stale pre-swap
+        // progression. This can't inspect the worker payload itself (that's proven
+        // by code trace, not this component-level test) — it verifies both calls
+        // happen, exactly once, at the right point in the sequence.
+        expect(syncWorker).toHaveBeenCalledWith();
+        expect(syncWorker).toHaveBeenCalledTimes(1);
+        expect(flushBuffers).toHaveBeenCalledTimes(1);
+
+        // Order matters: both must happen AFTER validateAndAnalyze() has
+        // recomputed the new arrangement, not before (that was the bug —
+        // flushBuffers() used to run first, priming the worker's buffers from the
+        // OLD progression before the new one even existed).
+        const validateOrder = vi.mocked(validateAndAnalyze).mock.invocationCallOrder[0];
+        const syncOrder = vi.mocked(syncWorker).mock.invocationCallOrder[0];
+        const flushOrder = vi.mocked(flushBuffers).mock.invocationCallOrder[0];
+        expect(syncOrder).toBeGreaterThan(validateOrder);
+        expect(flushOrder).toBeGreaterThan(validateOrder);
     });
 });

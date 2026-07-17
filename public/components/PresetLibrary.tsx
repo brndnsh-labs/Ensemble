@@ -10,6 +10,7 @@ import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { decompressSections, generateId, transposeKeyName } from '../utils.js';
+import { syncWorker } from '../worker-client.js';
 import { Icon } from './Icon.jsx';
 
 const USER_PRESETS_STORAGE_KEY = 'ensemble_userPresets';
@@ -516,7 +517,6 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
             return;
         }
 
-        flushBuffers();
         dispatch(ACTIONS.SET_ARRANGEMENT, sections);
         dispatch(ACTIONS.SET_IS_MINOR, !!preset.isMinor);
 
@@ -544,6 +544,18 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
         });
 
         validateAndAnalyze();
+        // #1120 — mirror refreshArrangerUI()'s order (validateAndAnalyze then
+        // syncWorker then flushBuffers). flushBuffers() used to run first, before
+        // the dispatches above: it kills currently-sounding notes (fine), but also
+        // bundles a worker FLUSH that synchronously refills buffers from
+        // getSyncState() — running it before the new arrangement existed meant
+        // that refill (and the ~4-measure lookahead window it generates) used the
+        // OLD progression. dispatch()/validateAndAnalyze() are synchronous, so
+        // moving flushBuffers() here doesn't add any perceptible delay to the
+        // note-kill — it just ensures both the SYNC_STATE patch and the FLUSH's
+        // own refill see the new progression/stepMap/sectionMap.
+        syncWorker();
+        flushBuffers();
         recordRecentPreset(entry.id);
         saveCurrentState();
         onSelect?.();
