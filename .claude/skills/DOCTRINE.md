@@ -319,8 +319,11 @@ The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`
 
 ## §9 Branch policy
 
-- **Issue work → a feature branch + PR** (the PR's `Closes #<n>` + CI gate earn their keep). Never
-  build on `main`; `/implement` branches (`git checkout -b <short-slug>`), reusing an epic branch
-  if one exists.
-- **Minor tooling / skills / docs edits → straight to `main`**, no branch/PR (`.claude/skills/*`,
-  `scripts/forgejo*.mjs`, ops notes, `docs/*` that aren't story deliverables).
+- **Everything → a feature branch + PR, no exceptions.** `main` is branch-protected against
+  *all* direct pushes (not just story work) — confirmed 2026-07-17 when a plain local commit on
+  `main` (a `chore(deps)` dependency bump, then a `docs(skills)` follow-up) was rejected at push
+  time by Forgejo's pre-receive hook (`Not allowed to push to protected branch main`) both times.
+  There is no minor-edit carve-out: `.claude/skills/*`, `scripts/forgejo*.mjs`, ops notes, and
+  `docs/*` all need their own branch + PR the same as issue work, even though most will auto-merge
+  immediately (§6 — gate-verified, non-destructive). Never build on `main`; `/implement` branches
+  (`git checkout -b <short-slug>`), reusing an epic branch if one exists.
