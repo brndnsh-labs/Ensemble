@@ -414,67 +414,68 @@ describe.each([0.05, 0.95])('Arrangement by subtraction — comp gate (Math.rand
     });
 });
 
-describe.each([
-    0.05, 0.95,
-])('Arrangement by subtraction — bones + pads survive (Math.random=%s)', (rnd) => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-        vi.spyOn(Math, 'random').mockReturnValue(rnd);
-    });
+describe.each([0.05, 0.95])(
+    'Arrangement by subtraction — bones + pads survive (Math.random=%s)',
+    (rnd) => {
+        beforeEach(() => {
+            vi.restoreAllMocks();
+            vi.spyOn(Math, 'random').mockReturnValue(rnd);
+        });
 
-    it("bass still plays when only 'chords' is subtracted (bones sound)", () => {
-        const state = makeBassMockState();
-        getState.mockReturnValue(state);
-        const stepInfo = getStepInfo(0, TS_CONFIG, [], TIME_SIGNATURES);
-        expect(isBassActive(state, 'rock', 0, 0, stepInfo, makeCoord(['chords']))).toBe(true);
-    });
+        it("bass still plays when only 'chords' is subtracted (bones sound)", () => {
+            const state = makeBassMockState();
+            getState.mockReturnValue(state);
+            const stepInfo = getStepInfo(0, TS_CONFIG, [], TIME_SIGNATURES);
+            expect(isBassActive(state, 'rock', 0, 0, stepInfo, makeCoord(['chords']))).toBe(true);
+        });
 
-    it("harmony/pads still play on the Bridge (only 'chords' subtracted)", () => {
-        const state = makeHarmonyMockState();
-        getState.mockReturnValue(state);
-        // Sample across the bar to dodge style-driven single-step exits — the
-        // KEY claim is "pads are NOT categorically silenced when chords is muted."
-        let total = 0;
-        for (let ms = 0; ms < STEPS_PER_BAR; ms++) {
-            const si = makeStepInfoForBeat(ms);
-            const n = getHarmonyNotes(
-                state,
-                CHORD_C_CHORDS,
-                null,
-                ms,
-                72,
-                'strings',
-                0,
-                null,
-                makeCoord(['chords']),
-                si,
-            );
-            total += n.length;
-        }
-        expect(total).toBeGreaterThan(0);
-    });
+        it("harmony/pads still play on the Bridge (only 'chords' subtracted)", () => {
+            const state = makeHarmonyMockState();
+            getState.mockReturnValue(state);
+            // Sample across the bar to dodge style-driven single-step exits — the
+            // KEY claim is "pads are NOT categorically silenced when chords is muted."
+            let total = 0;
+            for (let ms = 0; ms < STEPS_PER_BAR; ms++) {
+                const si = makeStepInfoForBeat(ms);
+                const n = getHarmonyNotes(
+                    state,
+                    CHORD_C_CHORDS,
+                    null,
+                    ms,
+                    72,
+                    'strings',
+                    0,
+                    null,
+                    makeCoord(['chords']),
+                    si,
+                );
+                total += n.length;
+            }
+            expect(total).toBeGreaterThan(0);
+        });
 
-    it("harmony IS silent when 'harmony' itself is subtracted (gate wired)", () => {
-        const state = makeHarmonyMockState();
-        getState.mockReturnValue(state);
-        for (let ms = 0; ms < STEPS_PER_BAR; ms++) {
-            const si = makeStepInfoForBeat(ms);
-            const n = getHarmonyNotes(
-                state,
-                CHORD_C_CHORDS,
-                null,
-                ms,
-                72,
-                'strings',
-                0,
-                null,
-                makeCoord(['harmony']),
-                si,
-            );
-            expect(n.length).toBe(0);
-        }
-    });
-});
+        it("harmony IS silent when 'harmony' itself is subtracted (gate wired)", () => {
+            const state = makeHarmonyMockState();
+            getState.mockReturnValue(state);
+            for (let ms = 0; ms < STEPS_PER_BAR; ms++) {
+                const si = makeStepInfoForBeat(ms);
+                const n = getHarmonyNotes(
+                    state,
+                    CHORD_C_CHORDS,
+                    null,
+                    ms,
+                    72,
+                    'strings',
+                    0,
+                    null,
+                    makeCoord(['harmony']),
+                    si,
+                );
+                expect(n.length).toBe(0);
+            }
+        });
+    },
+);
 
 // --- (3) Never-mute-the-last-pitched-lane guard (#1027) ----------------------
 //

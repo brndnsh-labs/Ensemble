@@ -391,24 +391,20 @@ describe('Arranger Controller', () => {
                 expectedVal: 'vi | ii',
                 desc: 'Minor to Relative Major',
             },
-        ])('should switch from $desc', ({
-            startKey,
-            startMinor,
-            startVal,
-            expectedKey,
-            expectedMinor,
-            expectedVal,
-        }) => {
-            state.arranger.key = startKey;
-            state.arranger.isMinor = startMinor;
-            state.arranger.sections = [{ value: startVal }];
+        ])(
+            'should switch from $desc',
+            ({ startKey, startMinor, startVal, expectedKey, expectedMinor, expectedVal }) => {
+                state.arranger.key = startKey;
+                state.arranger.isMinor = startMinor;
+                state.arranger.sections = [{ value: startVal }];
 
-            switchToRelativeKey();
+                switchToRelativeKey();
 
-            expect(state.arranger.key).toBe(expectedKey);
-            expect(state.arranger.isMinor).toBe(expectedMinor);
-            expect(state.arranger.sections[0].value).toBe(expectedVal);
-        });
+                expect(state.arranger.key).toBe(expectedKey);
+                expect(state.arranger.isMinor).toBe(expectedMinor);
+                expect(state.arranger.sections[0].value).toBe(expectedVal);
+            },
+        );
     });
 
     describe('setSectionIntensity', () => {

@@ -630,87 +630,104 @@ function makeStepInfoForBeat(measureStep: number) {
     };
 }
 
-describe.each([
-    0.05, 0.95,
-])('Intro/Outro layering — Accompaniment (Math.random=%s)', (randomVal) => {
-    beforeEach(() => {
-        vi.restoreAllMocks();
-        vi.spyOn(Math, 'random').mockReturnValue(randomVal);
-    });
+describe.each([0.05, 0.95])(
+    'Intro/Outro layering — Accompaniment (Math.random=%s)',
+    (randomVal) => {
+        beforeEach(() => {
+            vi.restoreAllMocks();
+            vi.spyOn(Math, 'random').mockReturnValue(randomVal);
+        });
 
-    it(`is silent on bars 0..${INTRO_MUTES.chords - 1} of the Intro (mute config)`, () => {
-        const state = makeChordsMockState();
-        getState.mockReturnValue(state);
+        it(`is silent on bars 0..${INTRO_MUTES.chords - 1} of the Intro (mute config)`, () => {
+            const state = makeChordsMockState();
+            getState.mockReturnValue(state);
 
-        for (let bar = 0; bar < INTRO_MUTES.chords; bar++) {
+            for (let bar = 0; bar < INTRO_MUTES.chords; bar++) {
+                const step = bar * STEPS_PER_BAR;
+                const stepInfo = makeStepInfoForBeat(0);
+                const coord = makeCoordination({ introBarsElapsed: bar });
+
+                const notes = getAccompanimentNotes(
+                    state,
+                    CHORD_C_CHORDS,
+                    step,
+                    0,
+                    0,
+                    stepInfo,
+                    coord,
+                );
+                const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
+                expect(musical.length).toBe(0);
+            }
+        });
+
+        it(`enters at bar ${INTRO_MUTES.chords} of the Intro`, () => {
+            const state = makeChordsMockState();
+            getState.mockReturnValue(state);
+
+            const bar = INTRO_MUTES.chords;
             const step = bar * STEPS_PER_BAR;
             const stepInfo = makeStepInfoForBeat(0);
             const coord = makeCoordination({ introBarsElapsed: bar });
 
             const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, step, 0, 0, stepInfo, coord);
             const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
-            expect(musical.length).toBe(0);
-        }
-    });
+            // eslint-disable-next-line no-console
+            console.log(`[intro-outro] chords entry at bar ${bar}: ${musical.length} notes`);
+            expect(musical.length).toBeGreaterThan(0);
+        });
 
-    it(`enters at bar ${INTRO_MUTES.chords} of the Intro`, () => {
-        const state = makeChordsMockState();
-        getState.mockReturnValue(state);
+        it(`is silent during the last ${OUTRO_MUTES.chords} bar(s) of the Outro`, () => {
+            const state = makeChordsMockState();
+            getState.mockReturnValue(state);
 
-        const bar = INTRO_MUTES.chords;
-        const step = bar * STEPS_PER_BAR;
-        const stepInfo = makeStepInfoForBeat(0);
-        const coord = makeCoordination({ introBarsElapsed: bar });
+            for (let remaining = 1; remaining <= OUTRO_MUTES.chords; remaining++) {
+                const stepInfo = makeStepInfoForBeat(0);
+                const coord = makeCoordination({ outroBarsRemaining: remaining });
+                const notes = getAccompanimentNotes(
+                    state,
+                    CHORD_C_CHORDS,
+                    0,
+                    0,
+                    0,
+                    stepInfo,
+                    coord,
+                );
+                const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
+                expect(musical.length).toBe(0);
+            }
+        });
 
-        const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, step, 0, 0, stepInfo, coord);
-        const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
-        // eslint-disable-next-line no-console
-        console.log(`[intro-outro] chords entry at bar ${bar}: ${musical.length} notes`);
-        expect(musical.length).toBeGreaterThan(0);
-    });
+        it('plays at outroBarsRemaining=OUTRO_MUTES.chords+1 (off-by-one guard)', () => {
+            const state = makeChordsMockState();
+            getState.mockReturnValue(state);
 
-    it(`is silent during the last ${OUTRO_MUTES.chords} bar(s) of the Outro`, () => {
-        const state = makeChordsMockState();
-        getState.mockReturnValue(state);
-
-        for (let remaining = 1; remaining <= OUTRO_MUTES.chords; remaining++) {
             const stepInfo = makeStepInfoForBeat(0);
-            const coord = makeCoordination({ outroBarsRemaining: remaining });
+            const coord = makeCoordination({
+                outroBarsRemaining: OUTRO_MUTES.chords + 1,
+            });
             const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, 0, 0, 0, stepInfo, coord);
             const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
-            expect(musical.length).toBe(0);
-        }
-    });
-
-    it('plays at outroBarsRemaining=OUTRO_MUTES.chords+1 (off-by-one guard)', () => {
-        const state = makeChordsMockState();
-        getState.mockReturnValue(state);
-
-        const stepInfo = makeStepInfoForBeat(0);
-        const coord = makeCoordination({
-            outroBarsRemaining: OUTRO_MUTES.chords + 1,
+            expect(musical.length).toBeGreaterThan(0);
         });
-        const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, 0, 0, 0, stepInfo, coord);
-        const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
-        expect(musical.length).toBeGreaterThan(0);
-    });
 
-    it('final-bar cadence OVERRIDES outro mute (S4 precedence)', () => {
-        const state = makeChordsMockState();
-        getState.mockReturnValue(state);
+        it('final-bar cadence OVERRIDES outro mute (S4 precedence)', () => {
+            const state = makeChordsMockState();
+            getState.mockReturnValue(state);
 
-        const stepInfo = makeStepInfoForBeat(0);
-        const coord = makeCoordination({
-            outroBarsRemaining: 1,
-            isFinalMeasure: true,
+            const stepInfo = makeStepInfoForBeat(0);
+            const coord = makeCoordination({
+                outroBarsRemaining: 1,
+                isFinalMeasure: true,
+            });
+            const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, 0, 0, 0, stepInfo, coord);
+            // S4 cadence: root-position voicing with ≥3 notes (root+3rd+5th
+            // at minimum).
+            const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
+            expect(musical.length).toBeGreaterThanOrEqual(3);
         });
-        const notes = getAccompanimentNotes(state, CHORD_C_CHORDS, 0, 0, 0, stepInfo, coord);
-        // S4 cadence: root-position voicing with ≥3 notes (root+3rd+5th
-        // at minimum).
-        const musical = notes.filter((n: any) => !n.muted && n.midi > 0);
-        expect(musical.length).toBeGreaterThanOrEqual(3);
-    });
-});
+    },
+);
 
 // --- Harmony intro/outro gates ---------------------------------------------
 

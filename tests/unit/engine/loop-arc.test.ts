@@ -47,20 +47,22 @@ describe('loopArcMultiplier', () => {
         expect(loopArcMultiplier(-5, 4)).toBe(head);
     });
 
-    it.each([
-        2, 3, 4, 5, 6, 7, 8,
-    ])('N=%i: peak NOT at index 0 (so the gate never classifies front-loaded)', (N) => {
-        const curve = Array.from({ length: N }, (_, i) => loopArcMultiplier(i, N));
-        const peakIdx = curve.indexOf(Math.max(...curve));
-        expect(peakIdx).toBeGreaterThan(0);
-    });
+    it.each([2, 3, 4, 5, 6, 7, 8])(
+        'N=%i: peak NOT at index 0 (so the gate never classifies front-loaded)',
+        (N) => {
+            const curve = Array.from({ length: N }, (_, i) => loopArcMultiplier(i, N));
+            const peakIdx = curve.indexOf(Math.max(...curve));
+            expect(peakIdx).toBeGreaterThan(0);
+        },
+    );
 
-    it.each([
-        3, 4, 5, 6, 7, 8,
-    ])('N=%i: final loop is below peak (release shape, not monotonic build)', (N) => {
-        const curve = Array.from({ length: N }, (_, i) => loopArcMultiplier(i, N));
-        expect(curve[N - 1]).toBeLessThan(Math.max(...curve));
-    });
+    it.each([3, 4, 5, 6, 7, 8])(
+        'N=%i: final loop is below peak (release shape, not monotonic build)',
+        (N) => {
+            const curve = Array.from({ length: N }, (_, i) => loopArcMultiplier(i, N));
+            expect(curve[N - 1]).toBeLessThan(Math.max(...curve));
+        },
+    );
 
     it('handles large N (>8) via fallback formula without throwing', () => {
         const curve = Array.from({ length: 12 }, (_, i) => loopArcMultiplier(i, 12));

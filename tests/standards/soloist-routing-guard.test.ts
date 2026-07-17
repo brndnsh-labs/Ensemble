@@ -45,14 +45,15 @@ describe('soloist genre→profile routing guard (#592)', () => {
         expect(Object.keys(ROUTING).sort()).toEqual(Object.keys(SMART_GENRES).sort());
     });
 
-    it.each(
-        Object.entries(ROUTING),
-    )('%s resolves to its agreed soloist profile in smart mode', (_genre, { feel, profile }) => {
-        // The production path a user hears: smart style + the genre's feel.
-        expect(resolveSoloistStyle('smart', feel)).toBe(profile);
-        // Undefined style (no explicit UI pick) routes identically.
-        expect(resolveSoloistStyle(undefined, feel)).toBe(profile);
-    });
+    it.each(Object.entries(ROUTING))(
+        '%s resolves to its agreed soloist profile in smart mode',
+        (_genre, { feel, profile }) => {
+            // The production path a user hears: smart style + the genre's feel.
+            expect(resolveSoloistStyle('smart', feel)).toBe(profile);
+            // Undefined style (no explicit UI pick) routes identically.
+            expect(resolveSoloistStyle(undefined, feel)).toBe(profile);
+        },
+    );
 
     it('every resolved profile is a real STYLE_CONFIG entry (no dead routes)', () => {
         // Guards the dead-profile class of bug directly: a route that resolves to

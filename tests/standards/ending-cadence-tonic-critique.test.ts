@@ -119,21 +119,22 @@ describe('Ending-cadence tonic critique (#830)', () => {
         expect(true).toBe(true);
     });
 
-    it.each(
-        CASES,
-    )('%s (key %s) lands on the true tonal center', (name, key, isMin, genre, expectedPC, expectedMode) => {
-        const r = resolveLanding(name, key, isMin, genre);
-        // Bass and soloist must land on the SAME hand-derived tonic PC — the resolved
-        // target threads through both voices (not just chords/bass).
-        expect(r.bassPC, `${name} bass landing PC`).toBe(expectedPC);
-        expect(r.soloPC, `${name} soloist landing PC`).toBe(expectedPC);
-        // Mode witness via the soloist pickup interval (ritardando genres only).
-        if (expectedMode === 'minor') {
-            expect(r.pickupInterval, `${name} pickup (♭3 ⇒ minor)`).toBe(3);
-        } else if (expectedMode === 'major') {
-            expect(r.pickupInterval, `${name} pickup (3 ⇒ major)`).toBe(4);
-        }
-    });
+    it.each(CASES)(
+        '%s (key %s) lands on the true tonal center',
+        (name, key, isMin, genre, expectedPC, expectedMode) => {
+            const r = resolveLanding(name, key, isMin, genre);
+            // Bass and soloist must land on the SAME hand-derived tonic PC — the resolved
+            // target threads through both voices (not just chords/bass).
+            expect(r.bassPC, `${name} bass landing PC`).toBe(expectedPC);
+            expect(r.soloPC, `${name} soloist landing PC`).toBe(expectedPC);
+            // Mode witness via the soloist pickup interval (ritardando genres only).
+            if (expectedMode === 'minor') {
+                expect(r.pickupInterval, `${name} pickup (♭3 ⇒ minor)`).toBe(3);
+            } else if (expectedMode === 'major') {
+                expect(r.pickupInterval, `${name} pickup (3 ⇒ major)`).toBe(4);
+            }
+        },
+    );
 
     // DETERMINISM: the pitch path has no RNG, so a repeat run is byte-identical.
     it('is deterministic across runs (landing PC + mode)', () => {
