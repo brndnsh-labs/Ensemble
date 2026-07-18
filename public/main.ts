@@ -17,6 +17,7 @@ import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { maybeShowPackInstallNudge } from './pack-nudge.js';
+import { saveCurrentState } from './persistence.js';
 import { initPWA } from './pwa.js';
 import { dispatch, getState, subscribe } from './state.js';
 import { deriveSoloistModeOnBoot, handleEffects } from './state-effects.js';
@@ -178,6 +179,12 @@ function init() {
                 if (playback.audio && playback.audio.state === 'suspended' && playback.isPlaying) {
                     playback.audio.resume().catch(() => {});
                 }
+            } else if (document.visibilityState === 'hidden') {
+                // #1127 — flush any pending debounced save before the tab is
+                // hidden or closed. saveCurrentState() cancels the debounce
+                // timer and writes synchronously, so the persistence chokepoint's
+                // 1s window can't drop a just-made change on close.
+                saveCurrentState();
             }
         });
 

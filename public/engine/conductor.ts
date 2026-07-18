@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../form-analysis.js';
-import { debounceSaveState, saveCurrentState } from '../persistence.js';
+import { saveCurrentState } from '../persistence.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -188,8 +188,10 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
         const reverbPreset = HALL_GENRES.has(genre) ? REVERB_PRESETS.hall : REVERB_PRESETS.room;
         graph.master.reverb.applyPreset(reverbPreset, time);
     }
-
-    debounceSaveState();
+    // #1127 — no debounceSaveState() here: this runs ~every step during an
+    // intensity ramp and would perpetually reset the persistence chokepoint's
+    // debounce, starving genuine saves. applyConductor changes no persisted
+    // field; the loop-boundary saveCurrentState() below is the periodic flush.
 }
 
 /**

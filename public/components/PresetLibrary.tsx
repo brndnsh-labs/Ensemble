@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { appendSections, refreshArrangerUI } from '../arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
-import { saveCurrentState } from '../persistence.js';
 import type { Section } from '../state/arranger.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -510,7 +509,6 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
             // (BPM/style/timeSig) since they belong to a "fresh start" gesture.
             appendSections(sections);
             recordRecentPreset(entry.id);
-            saveCurrentState();
             onSelect?.();
             return;
         }

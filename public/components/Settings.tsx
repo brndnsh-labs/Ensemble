@@ -2,7 +2,6 @@ import { useRef, useState } from 'preact/hooks';
 import { APP_VERSION, BUILD_REV, KOFI_URL } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { dispatchMidiInputConfig, initMIDI, panic } from '../midi-controller.js';
-import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
@@ -102,7 +101,6 @@ export function Settings() {
         // (syncMasterVolume in state-effects.ts) — #1128 moved it out of here so
         // it no longer reaches through a module-level getState() capture.
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
-        saveCurrentState();
     };
 
     const handleMidiEnable = async (enabled: boolean) => {
@@ -116,7 +114,6 @@ export function Settings() {
         }
         dispatch(ACTIONS.SET_MIDI_CONFIG, { enabled });
         dispatch(ACTIONS.RESTORE_GAINS);
-        saveCurrentState();
     };
 
     const handleReset = () => {
@@ -214,7 +211,6 @@ export function Settings() {
                                         checked={metronome}
                                         onChange={(val) => {
                                             dispatch(ACTIONS.SET_METRONOME, val);
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -229,7 +225,6 @@ export function Settings() {
                                                 param: 'countIn',
                                                 value: val,
                                             });
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -244,7 +239,6 @@ export function Settings() {
                                                 param: 'practiceMode',
                                                 value: val,
                                             });
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -276,7 +270,6 @@ export function Settings() {
                                                 param: 'qualityColors',
                                                 value: val,
                                             });
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -287,7 +280,6 @@ export function Settings() {
                                         value={notation}
                                         onChange={(val) => {
                                             dispatch(ACTIONS.SET_NOTATION, val);
-                                            saveCurrentState();
                                         }}
                                         options={[
                                             { value: 'roman', label: 'Roman Numerals (I, vi, IV)' },
@@ -307,7 +299,6 @@ export function Settings() {
                                                 param: 'visualFlash',
                                                 value: val,
                                             });
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -322,7 +313,6 @@ export function Settings() {
                                                 param: 'haptic',
                                                 value: val,
                                             });
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -359,7 +349,6 @@ export function Settings() {
                                                 checked={songMode}
                                                 onChange={(val) => {
                                                     dispatch(ACTIONS.SET_SONG_MODE, val);
-                                                    saveCurrentState();
                                                 }}
                                             />
                                         </SettingRow>
@@ -380,7 +369,6 @@ export function Settings() {
                                                                 param: 'loopLimit',
                                                                 value: 0,
                                                             });
-                                                            saveCurrentState();
                                                         }}
                                                     >
                                                         Timer
@@ -393,7 +381,6 @@ export function Settings() {
                                                                 param: 'loopLimit',
                                                                 value: 3,
                                                             });
-                                                            saveCurrentState();
                                                         }}
                                                     >
                                                         Loops
@@ -436,7 +423,6 @@ export function Settings() {
                                                                     next,
                                                                 );
                                                             }
-                                                            saveCurrentState();
                                                         }}
                                                         onIncrement={() => {
                                                             if (loopLimit > 0) {
@@ -459,7 +445,6 @@ export function Settings() {
                                                                     next,
                                                                 );
                                                             }
-                                                            saveCurrentState();
                                                         }}
                                                     />
                                                     <div class="text-mini-muted settings-estimated-time">
@@ -531,7 +516,6 @@ export function Settings() {
                                         checked={applyPresetSettings}
                                         onChange={(val) => {
                                             dispatch(ACTIONS.SET_PRESET_SETTINGS_MODE, val);
-                                            saveCurrentState();
                                         }}
                                     />
                                 </SettingRow>
@@ -561,7 +545,6 @@ export function Settings() {
                                                     muteLocal: val,
                                                 });
                                                 dispatch(ACTIONS.RESTORE_GAINS);
-                                                saveCurrentState();
                                             }}
                                         />
                                     </SettingRow>
@@ -574,7 +557,6 @@ export function Settings() {
                                                 dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                     selectedOutputId: val,
                                                 });
-                                                saveCurrentState();
                                             }}
                                             options={
                                                 midiOutputs && midiOutputs.length > 0
@@ -597,7 +579,6 @@ export function Settings() {
                                             checked={midiInputEnabled}
                                             onChange={(val) => {
                                                 dispatchMidiInputConfig({ inputEnabled: val });
-                                                saveCurrentState();
                                             }}
                                         />
                                     </SettingRow>
@@ -611,7 +592,6 @@ export function Settings() {
                                                     dispatchMidiInputConfig({
                                                         selectedInputId: val,
                                                     });
-                                                    saveCurrentState();
                                                 }}
                                                 options={
                                                     midiInputs && midiInputs.length > 0
@@ -652,7 +632,6 @@ export function Settings() {
                                                                             10,
                                                                         ),
                                                                 });
-                                                                saveCurrentState();
                                                             }}
                                                             title="Channel"
                                                             aria-label={`${ch} MIDI Channel`}
@@ -673,7 +652,6 @@ export function Settings() {
                                                                             10,
                                                                         ),
                                                                 });
-                                                                saveCurrentState();
                                                             }}
                                                             title="Octave Offset"
                                                             aria-label={`${ch} MIDI Octave Offset`}
@@ -699,7 +677,6 @@ export function Settings() {
                                                 dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                     latency: parseInt(val, 10),
                                                 });
-                                                saveCurrentState();
                                             }}
                                             ariaValueText={`${midiLatency} ms`}
                                         />
@@ -720,7 +697,6 @@ export function Settings() {
                                                 dispatch(ACTIONS.SET_MIDI_CONFIG, {
                                                     velocitySensitivity: parseFloat(val),
                                                 });
-                                                saveCurrentState();
                                             }}
                                             ariaValueText={`${midiVelocity.toFixed(1)}x`}
                                         />

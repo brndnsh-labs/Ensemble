@@ -9,7 +9,6 @@ import {
 } from '../engine/instrument-registry.js';
 import { ensurePackLoaded, getPackZones } from '../engine/pack-runtime.js';
 import { pickZone, playSampledNote } from '../engine/sample-voice.js';
-import { saveCurrentState } from '../persistence.js';
 import { dispatch, getState } from '../state.js';
 import { resolveAutoVoices } from '../state-effects.js';
 import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
@@ -188,7 +187,6 @@ export function PacksSettings() {
                 dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: 'synth' });
             }
         }
-        saveCurrentState();
         clearPack(pack.id);
         await evictPackCache(pack.id);
         markInstalled(pack.id, false);

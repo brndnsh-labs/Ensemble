@@ -1,4 +1,3 @@
-import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -11,7 +10,6 @@ export function SoloistControls() {
 
     const updateTradeMode = (mode: string | number) => {
         dispatch(ACTIONS.SET_PARAM, { module: 'soloist', param: 'tradeMode', value: mode });
-        saveCurrentState();
     };
 
     return (

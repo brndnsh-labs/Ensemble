@@ -1,4 +1,3 @@
-import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -20,12 +19,10 @@ export function SongSeedControl() {
 
     const updateSeed = (val: string) => {
         dispatch(ACTIONS.SET_SONG_SEED, val);
-        saveCurrentState();
     };
 
     const rollSeed = () => {
         dispatch(ACTIONS.SET_SONG_SEED, rollHexSeed());
-        saveCurrentState();
     };
 
     const toggleRandomize = (on: boolean) => {
@@ -36,7 +33,6 @@ export function SongSeedControl() {
         if (!on && !seed) {
             dispatch(ACTIONS.SET_SONG_SEED, rollHexSeed());
         }
-        saveCurrentState();
     };
 
     // When randomizing, the trigger reads "Random" (the seed re-rolls each play);

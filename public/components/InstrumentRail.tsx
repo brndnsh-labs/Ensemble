@@ -3,7 +3,6 @@ import { createPortal } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { togglePower } from '../instrument-controller.js';
-import { saveCurrentState } from '../persistence.js';
 import { dispatch } from '../state.js';
 import { ACTIONS, type InstrumentModule } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
@@ -99,7 +98,6 @@ function setGenre(genreName: string) {
     // it force-set the mode and would have overridden a user's pin. The derived
     // mode dispatches from the effect, which the global subscriber syncs to the
     // worker — so Neo-Soul → guitar still holds, via the genre fallback.
-    saveCurrentState();
 }
 
 function formatBandIntensity(bandIntensity: number) {
@@ -376,7 +374,6 @@ function StudioBandFeelChooser({
                             checked={autoIntensity}
                             onChange={(value) => {
                                 dispatch(ACTIONS.SET_AUTO_INTENSITY, value);
-                                saveCurrentState();
                             }}
                         />
                     </SettingRow>
@@ -399,7 +396,6 @@ function StudioBandFeelChooser({
                             disabled={autoIntensity}
                             onInput={(value) => {
                                 dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(value, 10) / 100);
-                                saveCurrentState();
                             }}
                             ariaValueText={formatBandIntensity(bandIntensity)}
                         />

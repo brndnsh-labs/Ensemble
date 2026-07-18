@@ -3,7 +3,6 @@ import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { packsForInstrument } from '../data/sound-packs.js';
 import { isPackInstalled } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import { saveCurrentState } from '../persistence.js';
 import type { GrooveState } from '../state/groove.js';
 import { dispatch } from '../state.js';
 import {
@@ -54,7 +53,6 @@ function updateInstrumentAudio(
         module,
         value: numVal,
     });
-    saveCurrentState();
 }
 
 interface InstrumentMixerStripProps {
@@ -185,7 +183,6 @@ function InstrumentSoundSource({ module }: { module: InstrumentModule }) {
         } else {
             dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: val, auto: false });
         }
-        saveCurrentState();
     };
 
     const hasUninstalled = catalogPacks.some((p) => !isPackInstalled(p.id));
@@ -252,7 +249,6 @@ function ChordsControls({ state }: ChordsControlsProps) {
                 value={state.density || 'standard'}
                 onChange={(val) => {
                     dispatch(ACTIONS.SET_DENSITY, val);
-                    saveCurrentState();
                 }}
                 options={[
                     { value: 'thin', label: 'Thin (3 notes)' },
@@ -288,7 +284,6 @@ function HarmonyControls({ state }: HarmonyControlsProps) {
                         param: 'complexity',
                         value: parseFloat(val),
                     });
-                    saveCurrentState();
                 }}
                 ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
             />
@@ -321,7 +316,6 @@ function SoloistControls({ state }: SoloistControlsProps) {
                             param: 'complexity',
                             value: parseFloat(val),
                         });
-                        saveCurrentState();
                     }}
                     ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
                 />
@@ -349,7 +343,6 @@ function SoloistControls({ state }: SoloistControlsProps) {
                             dispatch(ACTIONS.SET_SOLOIST_MODE, v);
                             dispatch(ACTIONS.SET_SOLOIST_AUTO_MODE, false);
                         }
-                        saveCurrentState();
                     }}
                     options={[
                         { value: 'auto', label: 'Auto' },
@@ -388,7 +381,6 @@ function GrooveControls({ state }: GrooveControlsProps) {
                         value={swing || 0}
                         onInput={(val) => {
                             dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
-                            saveCurrentState();
                         }}
                         ariaValueText={`${swing || 0}%`}
                     />
@@ -397,7 +389,6 @@ function GrooveControls({ state }: GrooveControlsProps) {
                         value={swingSub || '8th'}
                         onChange={(val) => {
                             dispatch(ACTIONS.SET_SWING_SUB, val);
-                            saveCurrentState();
                         }}
                         options={[
                             { value: '16th', label: '1/16' },
@@ -420,7 +411,6 @@ function GrooveControls({ state }: GrooveControlsProps) {
                     value={state.humanize || 0}
                     onInput={(val) => {
                         dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
-                        saveCurrentState();
                     }}
                     ariaValueText={`${state.humanize || 0}%`}
                 />
