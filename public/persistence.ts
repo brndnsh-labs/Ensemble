@@ -20,7 +20,16 @@ export function saveCurrentState(): void {
         randomizeSeed: arranger.randomizeSeed,
         palette: playback.palette,
         mode: playback.mode,
-        bpm: playback.bpm,
+        // #1145 — while a practice tempo ramp (#1021) is armed and in-flight,
+        // `playback.bpm` is the momentarily-elevated ramped value, not the
+        // user's base tempo; `rampBpmTarget` (>0 only during a live drill) is
+        // the goal captured from `bpm` at play-start, and the TOGGLE_PLAY/
+        // SET_PRACTICE_LOOP reducers already restore `bpm` from it on a normal
+        // stop/clear. Saving `rampBpmTarget` here (when set) covers the gap
+        // those reducers don't: an interrupted drill — tab close, crash, the
+        // 1s debounce, or main.ts's visibilitychange flush firing mid-climb —
+        // where a normal stop never ran to do the restore.
+        bpm: playback.rampBpmTarget > 0 ? playback.rampBpmTarget : playback.bpm,
         metronome: playback.metronome,
         visualFlash: playback.visualFlash,
         haptic: playback.haptic,
