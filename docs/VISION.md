@@ -35,6 +35,8 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 **Zero friction by default.** A visitor lands on the page and sees a basic I | V | vi | IV progression with the band ready to play. They hit play and hear something musical immediately. Configuration is available but never required.
 
+**Time is sacred; defaults are metronomic.** Ensemble is a fancy metronome at its core — the practicing musician has to be able to lock to a reference that does not move, so tempo and groove stay steady by default. Expressive and live-performance features (tempo breathing, band-leader gestures) ship **opt-in and off by default**; nothing may make the default tempo or groove drift. When personas conflict, priority runs: **practicing musician → songwriter / teacher-student sharing → live performer.** Instrument-identity features (gestures, pads, MIDI-triggered form control) advance only via the probe-first plan banked on #1019 — never as a speculative build.
+
 **No accounts, no subscriptions, no lock-in.** Ensemble is a URL. It works offline. Sessions are shareable without asking anything of the recipient.
 
 **The engine is precious.** The musical logic is the hardest part and the core differentiator. It is not refactored casually or extended without understanding what it already does.
@@ -65,8 +67,8 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 - Large test suite
 
 ### What needs work
-- The sharing feature deserves more prominence as a marquee feature
-- The engine outgrew the surface: the practicing-musician and live-performer personas have the least product coverage (no section looping/start-from-section, MIDI is output-only, live band control is one intensity slider) — tracked as the July 2026 sweep's `track/ui` stories
+- The sharing feature deserves more prominence as a marquee feature — the "band is already playing" autoplay landing exists but isn't yet produced by the Share UI (tracked as Forgejo #1126)
+- The engine outgrew the surface: the **live-performer** persona still has the least product coverage — live band control is one intensity slider, pending the #1019 conductor-lens probe decision. (Section looping / start-from-section (#1016), MIDI-in play-along (#1017), and the practice tempo ramp (#1021) all shipped in the July 2026 sweep, so the practicing-musician gap is largely closed.)
 
 ### Open work
 - **Band That Listens (July 2026 sweep)** — make the band listen to itself: the soloist rides `bandIntensity` and coordination transitions, a band-wide per-genre pocket palette, within-phrase velocity envelopes (Forgejo milestone "Band That Listens"), with arrangement-by-subtraction, question→answer phrasing, tempo breathing, and late-pass reharm parked as needs-decision designs.
@@ -82,3 +84,5 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 - Musical engine is untouched to start — it is the core differentiator
 - Synthesis quality improvement is a named phase, not an afterthought
 - Sharing via URL is treated as a marquee feature, not a hidden one
+- Metronomic by default; expressive timing and live-performance control are **opt-in, off by default** (per the #1010 ruling) — this protects the practicing-musician persona, who cannot lock to a reference that moves
+- The live-performer / "instrument" identity (band-leader gestures) is deliberately parked behind a probe-first plan (#1019), not built speculatively
