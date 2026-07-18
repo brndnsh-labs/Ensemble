@@ -11,7 +11,6 @@ import {
     killSoloistNote,
     restoreGains,
 } from './engine/engine.js';
-import { saveCurrentState } from './persistence.js';
 import { dispatch, getState, getSyncState, stateMap } from './state.js';
 import type { Mutable } from './types.js';
 import { ACTIONS } from './types.js';
@@ -231,5 +230,7 @@ export function togglePower(type: string): void {
         restoreGains(getState());
     }
 
-    saveCurrentState();
+    // #1144 — no immediate save: the SET_PARAM dispatch above (enabled, plus
+    // the soloist flag dispatches) already schedules the #1127 chokepoint's
+    // debounced save.
 }

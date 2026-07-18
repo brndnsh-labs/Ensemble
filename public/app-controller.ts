@@ -1,4 +1,3 @@
-import { saveCurrentState } from './persistence.js';
 import { dispatch, getState } from './state.js';
 import type { Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
@@ -31,7 +30,6 @@ export function setPalette(palette: Palette): void {
     const { playback } = getState();
     if (palette !== playback.palette) {
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'palette', value: palette });
-        saveCurrentState();
     }
 }
 
@@ -41,7 +39,6 @@ export function setMode(mode: ThemeMode): void {
     const { playback } = getState();
     if (mode !== playback.mode) {
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'mode', value: mode });
-        saveCurrentState();
     }
 }
 
@@ -80,8 +77,10 @@ export function setBpm(
     }
 
     syncWorker();
-    saveCurrentState();
-
+    // #1144 — no immediate save: setBpm's only live caller is the SET_BPM
+    // case in state-effects.ts's handleEffects, so the dispatch that reached
+    // this call already schedules the #1127 chokepoint's debounced save once
+    // this function returns and the switch falls through.
     if (viz && playback.isPlaying && playback.audio) {
         const secondsPerBeat = 60.0 / playback.bpm;
         const sixteenth = 0.25 * secondsPerBeat;

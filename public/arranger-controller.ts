@@ -74,6 +74,13 @@ export function clearChordPresetHighlight(): void {
  * that refill (and its ~4-measure lookahead) generates from the OLD
  * progression. dispatch()/validateAndAnalyze() are synchronous, so ordering
  * flush last costs nothing perceptible on the note-kill.
+ *
+ * #1144 — saveCurrentState() stays here (not folded into the #1127
+ * chokepoint's caller-side dispatch) because `history.ts` `undo()` reaches
+ * this function via a direct `@direct-mutation` array restore with NO
+ * preceding dispatch — the chokepoint never fires for that caller, so this is
+ * the only save undo gets. Every other caller here dispatches SET_PARAM right
+ * before calling this, making this save redundant-but-harmless for them.
  */
 export function refreshArrangerUI(): void {
     validateAndAnalyze();
@@ -142,7 +149,8 @@ export function onSectionUpdate(id: string, field: string, value: any): void {
     }
     validateAndAnalyze();
     flushBuffers();
-    saveCurrentState();
+    // #1144 — no immediate save: the SET_PARAM dispatches above (sections/
+    // isDirty) already schedule the #1127 chokepoint's debounced save.
 }
 
 export function onSectionDelete(id: string): void {

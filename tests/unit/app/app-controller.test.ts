@@ -4,7 +4,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setBpm, setMode, setPalette } from '../../../public/app-controller.js';
-import { saveCurrentState } from '../../../public/persistence.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { syncWorker } from '../../../public/worker-client.js';
 
@@ -15,10 +14,6 @@ vi.mock('../../../public/state.js', () => ({
 
 vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn(),
-}));
-
-vi.mock('../../../public/persistence.js', () => ({
-    saveCurrentState: vi.fn(),
 }));
 
 describe('App Controller', () => {
@@ -60,49 +55,48 @@ describe('App Controller', () => {
     });
 
     describe('setPalette', () => {
-        it('should dispatch SET_PARAM for a new palette and persist', () => {
+        it('should dispatch SET_PARAM for a new palette', () => {
+            // #1144 — persistence is no longer this function's job: the
+            // dispatch alone schedules the #1127 chokepoint's save (proven by
+            // tests/unit/app/persistence-roundtrip.test.ts), so dispatch is
+            // the only observable effect to assert here.
             setPalette('midnight');
             expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
                 module: 'playback',
                 param: 'palette',
                 value: 'midnight',
             });
-            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should not dispatch if the palette is unchanged', () => {
             state.playback.palette = 'after-hours';
             setPalette('after-hours');
             expect(dispatch).not.toHaveBeenCalled();
-            expect(saveCurrentState).not.toHaveBeenCalled();
         });
     });
 
     describe('setMode', () => {
-        it('should dispatch SET_PARAM for a new mode and persist', () => {
+        it('should dispatch SET_PARAM for a new mode', () => {
             setMode('light');
             expect(dispatch).toHaveBeenCalledWith('SET_PARAM', {
                 module: 'playback',
                 param: 'mode',
                 value: 'light',
             });
-            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should not dispatch if the mode is unchanged', () => {
             state.playback.mode = 'dark';
             setMode('dark');
             expect(dispatch).not.toHaveBeenCalled();
-            expect(saveCurrentState).not.toHaveBeenCalled();
         });
     });
 
     describe('setBpm', () => {
-        it('should dispatch SET_BPM and call sync/save when not playing', () => {
+        it('should dispatch SET_BPM and sync the worker when not playing', () => {
             setBpm(140);
             expect(dispatch).toHaveBeenCalledWith('SET_BPM', 140);
             expect(syncWorker).toHaveBeenCalled();
-            expect(saveCurrentState).toHaveBeenCalled();
         });
 
         it('should dispatch constrained BPM between 40 and 240', () => {
