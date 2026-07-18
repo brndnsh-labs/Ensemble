@@ -94,4 +94,53 @@ describe('Sharing Deep Dive', () => {
         expect(showToast).toHaveBeenCalledWith('Error generating share link.');
         consoleSpy.mockRestore();
     });
+
+    it('shares the goal tempo (rampBpmTarget), not the momentarily-ramped bpm, while a practice drill is in flight (#1152)', () => {
+        // Mid-climb: the drill dropped from 120 (the goal, captured at play-start
+        // into rampBpmTarget) to a start speed and is ramping back up — bpm here
+        // is a transient in-drill value, not the tempo that should land in the link.
+        (getState as any).mockReturnValue({
+            arranger: { sections: [], key: 'C', timeSignature: '4/4', notation: 'abs' },
+            playback: { bpm: 84, rampBpmTarget: 120, bandIntensity: 0.5, complexity: 0.5 },
+            chords: { enabled: true, volume: 0.5, reverb: 0.2 },
+            bass: { enabled: true, volume: 0.5, reverb: 0.2 },
+            soloist: makeSoloistMock({ enabled: true, volume: 0.5, reverb: 0.2 }),
+            harmony: { enabled: true, volume: 0.5, reverb: 0.2, complexity: 0.5 },
+            groove: {
+                enabled: true,
+                volume: 0.5,
+                reverb: 0.2,
+                swing: 0,
+                swingSub: 0,
+                humanize: 0,
+                genreFeel: 'Rock',
+            },
+        });
+
+        const url = generateShareUrl();
+        expect(url).toContain('bpm=120');
+    });
+
+    it('shares the live bpm as-is when no drill is armed (#1152)', () => {
+        (getState as any).mockReturnValue({
+            arranger: { sections: [], key: 'C', timeSignature: '4/4', notation: 'abs' },
+            playback: { bpm: 132, rampBpmTarget: 0, bandIntensity: 0.5, complexity: 0.5 },
+            chords: { enabled: true, volume: 0.5, reverb: 0.2 },
+            bass: { enabled: true, volume: 0.5, reverb: 0.2 },
+            soloist: makeSoloistMock({ enabled: true, volume: 0.5, reverb: 0.2 }),
+            harmony: { enabled: true, volume: 0.5, reverb: 0.2, complexity: 0.5 },
+            groove: {
+                enabled: true,
+                volume: 0.5,
+                reverb: 0.2,
+                swing: 0,
+                swingSub: 0,
+                humanize: 0,
+                genreFeel: 'Rock',
+            },
+        });
+
+        const url = generateShareUrl();
+        expect(url).toContain('bpm=132');
+    });
 });

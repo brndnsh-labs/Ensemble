@@ -80,7 +80,14 @@ export function generateShareUrl(options: ShareOptions = {}): string {
     params.set('s', compressSections(arranger.sections));
     params.set('key', arranger.key);
     params.set('ts', arranger.timeSignature);
-    params.set('bpm', playback.bpm.toString());
+    // #1152 — same gap as #1145's saveCurrentState(): while a practice tempo
+    // ramp (#1021) is armed and in-flight, `playback.bpm` is the momentarily-
+    // elevated ramped value, not the user's base tempo; `rampBpmTarget` (>0
+    // only during a live drill) holds the base to share instead.
+    params.set(
+        'bpm',
+        (playback.rampBpmTarget > 0 ? playback.rampBpmTarget : playback.bpm).toString(),
+    );
     params.set('style', chords.style);
     params.set('genre', groove.genreFeel);
     params.set('int', playback.bandIntensity.toFixed(2));
