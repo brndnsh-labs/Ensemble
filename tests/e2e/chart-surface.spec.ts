@@ -53,12 +53,13 @@ test.describe('ChartSurface @ui', () => {
         });
     });
 
-    test.describe('Instrument rail orientation', () => {
-        test('renders vertical rail on wide desktop viewport', async ({ page }) => {
+    test.describe('Instrument rail placement', () => {
+        test('renders the always-visible rail on wide desktop viewport', async ({ page }) => {
             await page.setViewportSize({ width: 1366, height: 900 });
-            const rail = page.locator('.instrument-rail');
+            const rail = page.locator('.chart-surface__rail .instrument-rail');
             await expect(rail).toBeVisible();
-            await expect(rail).toHaveClass(/instrument-rail--vertical/);
+            // #1131 deleted the orientation variants — one rail layout everywhere.
+            await expect(rail).not.toHaveClass(/instrument-rail--horizontal/);
         });
 
         test('renders bottom action bar on narrow mobile viewport @mobile', async ({ page }) => {
@@ -304,11 +305,25 @@ test.describe('ChartSurface @ui', () => {
             await expect(page.locator('.chart-surface__chart')).toBeVisible();
         });
 
-        test('renders horizontal rail on tablet breakpoint @ipad', async ({ page }) => {
+        // #1131 regression: in the 641–1023px band (iPad portrait = 768px, a
+        // first-class @ipad target) the old horizontal rail CSS-hid the genre
+        // chooser and the mixer with NO alternative entry point. The Mix sheet
+        // now owns the whole narrow band; both controls must be reachable there.
+        test('genre chooser and mixer are reachable via the Mix sheet @ipad', async ({ page }) => {
             await page.setViewportSize({ width: 768, height: 1024 });
-            const rail = page.locator('.instrument-rail');
-            await expect(rail).toBeVisible();
-            await expect(rail).toHaveClass(/instrument-rail--horizontal/);
+
+            // No always-visible edge rail in the narrow band — the bottom bar is
+            // the sole entry point.
+            await expect(page.locator('.chart-surface__rail')).toHaveCount(0);
+            await expect(page.locator('.mobile-action-bar')).toBeVisible();
+
+            await page.locator('.mobile-action-bar__btn', { hasText: 'Mix' }).click();
+            const sheet = page.locator('.mobile-mix-sheet');
+            await expect(sheet).toBeVisible();
+
+            // The two controls the horizontal rail hid, now reachable.
+            await expect(sheet.locator('.workspace-studio-panel-genre')).toBeVisible();
+            await expect(sheet.locator('.workspace-studio-mixer-accordion-trigger')).toBeVisible();
         });
     });
 });

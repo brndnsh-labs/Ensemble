@@ -62,7 +62,7 @@ export function MobileActionBar({ isVizOpen, onOpenViz }: MobileActionBarProps) 
                 subtitle="Choose feel, set the mix, toggle players."
                 title="Mix"
             >
-                <InstrumentRail orientation="vertical" />
+                <InstrumentRail />
             </StudioSurface>
         </>
     );

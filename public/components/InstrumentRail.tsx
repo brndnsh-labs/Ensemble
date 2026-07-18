@@ -15,7 +15,13 @@ import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
-const STUDIO_SURFACE_BREAKPOINT = '(max-width: 700px)';
+// Below this width the rail lives inside the Mix bottom sheet (no desktop
+// edge to anchor to), so its nested genre/settings surfaces render full-bleed
+// instead of anchored popovers. Kept in lock-step with ChartSurface's
+// NARROW_MQ so the whole compact band gets one consistent sheet treatment
+// (#1131 raised this from 700px when the 641–1023 horizontal-rail tier was
+// deleted).
+const STUDIO_SURFACE_BREAKPOINT = '(max-width: 1023px)';
 
 interface StudioInstrumentConfig {
     id: string;
@@ -593,11 +599,7 @@ function StudioSettingsSurface({
     );
 }
 
-interface InstrumentRailProps {
-    orientation?: 'vertical' | 'horizontal';
-}
-
-export function InstrumentRail({ orientation = 'vertical' }: InstrumentRailProps) {
+export function InstrumentRail() {
     const { groove, bass, chords, harmony, soloist, activeGenre, autoIntensity, bandIntensity } =
         useEnsembleState((s) => ({
             groove: s.groove.enabled,
@@ -651,9 +653,7 @@ export function InstrumentRail({ orientation = 'vertical' }: InstrumentRailProps
     };
 
     return (
-        <div
-            class={`panel dashboard-panel workspace-panel workspace-studio-live-mix instrument-rail instrument-rail--${orientation}`}
-        >
+        <div class="panel dashboard-panel workspace-panel workspace-studio-live-mix instrument-rail">
             <div class="workspace-studio-live-mix-header">
                 <p class="workspace-kicker">Studio</p>
                 <h2 id="studioWorkspaceTitle">Live mix</h2>

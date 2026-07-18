@@ -17,8 +17,12 @@ const VisualizerOverlay = lazy(() =>
     import('./VisualizerOverlay.jsx').then((m) => ({ default: m.VisualizerOverlay })),
 );
 
+// One breakpoint governs the compact experience: at ≤1023px the always-visible
+// rail is replaced by the bottom MobileActionBar (whose Mix sheet re-hosts the
+// full vertical rail — genre chooser, band energy, mixer). #1131 deleted the
+// old 641–1023 "horizontal rail" tier that CSS-hid those controls with no
+// alternative entry point.
 const NARROW_MQ = '(max-width: 1023px)';
-const MOBILE_MQ = '(max-width: 640px)';
 
 interface ChartSurfaceProps {
     getVisualTime: () => number;
@@ -34,7 +38,6 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
         return !!(p.get('s') || p.get('prog'));
     });
     const isNarrow = useMediaQuery(NARROW_MQ);
-    const isMobile = useMediaQuery(MOBILE_MQ);
     const { chartLocked, isPlaying } = useEnsembleState((s) => ({
         chartLocked: s.playback.chartLocked,
         isPlaying: s.playback.isPlaying,
@@ -81,7 +84,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                             </button>
                         </div>
                     )}
-                    {!isMobile && (
+                    {!isNarrow && (
                         <>
                             <button
                                 type="button"
@@ -135,7 +138,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                     >
                         {({ closePopover }) => (
                             <div class="chart-surface__overflow-menu">
-                                {isMobile && (
+                                {isNarrow && (
                                     <button
                                         type="button"
                                         class="workspace-toolbar-panel__action"
@@ -188,12 +191,12 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
             >
                 {chartLocked ? <ChordVisualizer /> : <InlineEditor />}
             </div>
-            {!isMobile && (
+            {!isNarrow && (
                 <div class="chart-surface__rail">
-                    <InstrumentRail orientation={isNarrow ? 'horizontal' : 'vertical'} />
+                    <InstrumentRail />
                 </div>
             )}
-            {isMobile && (
+            {isNarrow && (
                 <MobileActionBar isVizOpen={isVizOpen} onOpenViz={() => setIsVizOpen(true)} />
             )}
             {isVizOpen && (

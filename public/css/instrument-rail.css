@@ -1,13 +1,3 @@
-.instrument-rail--horizontal {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    overflow: hidden;
-    padding: 0;
-    gap: 0;
-    border-radius: 0;
-}
-
 .workspace-studio-section-override {
     display: inline-block;
     margin-top: 0.15rem;
@@ -23,56 +13,4 @@
 
 .power-btn.section-override {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color), transparent 60%);
-}
-
-/* Horizontal strip — no header, genre selector, or mixer accordion */
-.instrument-rail--horizontal .workspace-studio-live-mix-header,
-.instrument-rail--horizontal .workspace-studio-panel-genre,
-.instrument-rail--horizontal .workspace-studio-mixer-accordion {
-    display: none;
-}
-
-/* Horizontally scrolling row strip */
-.instrument-rail--horizontal .workspace-studio-live-mix-rows {
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex: 1;
-    gap: var(--space-2);
-    padding: var(--space-2);
-    align-items: stretch;
-}
-
-/* Each instrument becomes a compact channel-strip column */
-.instrument-rail--horizontal .workspace-studio-mix-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-1);
-    padding: var(--space-2);
-    min-width: 72px;
-    flex-shrink: 0;
-    text-align: center;
-}
-
-.instrument-rail--horizontal .workspace-studio-mix-row-main {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-}
-
-/* Name label is smaller in horizontal strip */
-.instrument-rail--horizontal .workspace-studio-mix-row-copy h3 {
-    font-size: 0.72rem;
-}
-
-/* Stack controls + power vertically in the strip */
-.instrument-rail--horizontal .workspace-studio-mix-row-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
 }

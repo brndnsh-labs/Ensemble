@@ -148,29 +148,10 @@
     min-height: 0;
 }
 
+/* Narrow band (≤1023px): the always-visible rail is gone — the fixed bottom
+   MobileActionBar owns the compact experience across the whole band, so the
+   grid drops the rail column and the chart reserves space for the bar. */
 @media (max-width: 1023px) {
-    .chart-surface {
-        grid-template-areas:
-            "topbar"
-            "chart"
-            "rail";
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr auto;
-    }
-}
-
-@media (max-width: 639px) {
-    .chart-surface__rail {
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-    }
-}
-
-/* Mobile (≤640px): bottom action bar replaces the horizontal rail strip,
-   and the topbar collapses to a deterministic two-row layout instead of
-   flex-wrapping into three lopsided rows. */
-@media (max-width: 640px) {
     .chart-surface {
         grid-template-areas:
             "topbar"
@@ -182,7 +163,11 @@
     .chart-surface__chart {
         padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     }
+}
 
+/* Phone (≤640px): the transport topbar collapses to a deterministic two-row
+   layout instead of flex-wrapping into three lopsided rows. */
+@media (max-width: 640px) {
     .chart-surface__topbar {
         display: grid;
         grid-template-areas:
@@ -223,7 +208,7 @@
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 1023px) {
     .mobile-action-bar {
         display: flex;
     }
@@ -347,18 +332,19 @@
     line-height: 1;
 }
 
-/* Rail in vertical mode is space-constrained — stack header, drop kicker,
-   and hide the per-row summary so the Controls trigger and power button fit. */
-.instrument-rail--vertical .workspace-studio-live-mix-header {
+/* The rail is space-constrained (desktop edge column or the Mix sheet) —
+   stack the header, drop the kicker, and hide the per-row summary so the
+   Controls trigger and power button fit. */
+.instrument-rail .workspace-studio-live-mix-header {
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-2);
 }
 
-.instrument-rail--vertical .workspace-studio-live-mix-header > div:first-child .workspace-kicker {
+.instrument-rail .workspace-studio-live-mix-header > div:first-child .workspace-kicker {
     display: none;
 }
 
-.instrument-rail--vertical .workspace-studio-mix-row-copy p {
+.instrument-rail .workspace-studio-mix-row-copy p {
     display: none;
 }
