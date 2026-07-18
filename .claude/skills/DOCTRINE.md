@@ -40,6 +40,12 @@ Forgejo has no closed→field automation, and a closed issue already says it). T
 mark done; it just lets the close speak. Clear any lingering `status/*` on close if you like, but
 nothing downstream reads it once the issue is closed.
 
+**A stale-*open* issue may already be shipped.** An umbrella/parent issue's slices often ship
+under sibling-numbered PRs that never reference the umbrella's own number — `git log
+--grep=#<n>` finds nothing even though the work is done. Before building a Ready-looking issue,
+trace whether the described *behavior* already exists in live code (`git log -S"<symbol>"`, read
+the actual function) — don't trust issue-number absence in history as proof no work has happened.
+
 ## §2 Labels
 
 - **`finding`** — review debt, diff-coupled; **should trend to empty**. A cycle must not *grow*
@@ -64,6 +70,11 @@ nothing downstream reads it once the issue is closed.
 - **`area:*`** — surface tags inferring the executor when `agent/*` is unset: `area:soloist`,
   `area:bass`, `area:drums`, `area:chords`, `area:harmony`, `area:groove`, `area:synth`,
   `area:state`, `area:worker`, `area:ui`, `area:infra`.
+- **A `finding`/`backlog` issue carved from a review's out-of-scope observation arrives unrouted
+  by design** — only `area:*` + `finding`/`backlog`, no `track/*`/`model/*`/`size/*`/`agent/*`/
+  `lens/*`. Don't treat that as a blocker or under-specification: infer Track from what the diff
+  actually ends up touching once traced, and set routing yourself (`forgejo-project.mjs`) before
+  branching.
 - **Routing namespaces** — `status/*`, `track/*`, `model/*`, `size/*`, `agent/*`, `lens/*` are
   **single-select label groups** that carry the routing formerly held by Project fields (§3). Each
   namespace holds at most one label per issue; **set them via `scripts/forgejo-project.mjs`, never
@@ -198,7 +209,15 @@ prod (§6), so an auto-merged PR ships to `ensemble.brndn.zip` within minutes; t
 When the work is well-specified, run it — opus included. When in doubt about a *decision*,
 surface it. **Findings get actioned, not parked:** `/patch` fix-now is the default
 (P0/P1/bounded-P2); too-big = *escalate* to a `finding` issue with Brandon's nod, never a silent
-defer.
+defer. An implementer's own "out of scope, defer to follow-up" tag does **not** override this —
+if the deferred item would falsify the story's stated `Acceptance:` criterion, it's in scope
+regardless of the tag; run `/review` anyway rather than `/done` on the implementer's word alone.
+
+**Lifting a `Needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise is not
+sign-off.** "Everything's sounding great" is encouragement, not a merge instruction for a specific
+parked PR; ask directly ("merge both / one / hold") before merging. The `/cycle #<n> approved`
+path is the canonical signal. Build + deploy-to-test is autonomous; the merge of a by-ear story
+never is.
 
 **`verify-by-ear` — musical correctness is not a work-blocker.** Most "by-ear" musical work is
 *not* subjective: its idiom is a music-theory **fact** (rock harmony = harmonized 3rds/6ths; ska
@@ -295,7 +314,16 @@ The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`
   atomic; never loop single-op writes.
 - **Issue/PR ops:** `node scripts/forgejo.mjs issue create|comment|close|edit ...` and
   `pr create ...` (see the script's `--help`). `Closes #<n>` in a PR body auto-closes on merge, same
-  as GitHub.
+  as GitHub. **No `reopen` verb** — `issue edit` has no `--state` flag either; to reopen, PATCH the
+  API directly: `curl -X PATCH .../issues/<n> -d '{"state":"open"}'` with the same auth the script
+  uses (`~/.config/forgejo/token`).
+- **Verify a body actually landed before trusting `Closes #<n>` to fire:** both `--body B` and
+  `--body-file <path>` work (the parser normalizes `--body-file` → `@<path>`), but an unexpected
+  empty body is a sign a flag got silently dropped upstream, not that Forgejo's auto-close is
+  broken — check with `pr view <n>` / `issue view <n>` (both include `body`) before assuming the
+  service, not the tooling, is at fault. `forgejo-merge.mjs` also closes referenced issues itself
+  after a successful merge (parses the same `Closes/Fixes/Resolves` keywords) as defense-in-depth,
+  independent of Forgejo's native close.
 - **Forgejo unreachable:** both scripts **exit 3** and say so — a skill must **stop**, not fall back
   to the frozen markdown or a cached list as current.
 
@@ -310,7 +338,11 @@ The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`
   **force**-push.
 - **PR:** `node scripts/forgejo.mjs pr create --base main --head <branch>` (after `git push`), a
   rich "what shipped + which findings were actioned" narrative as the body, **with `Closes #<n>`**,
-  title = the Conventional-Commit subject. PR bodies end with:
+  title = the Conventional-Commit subject. The `Closes/Fixes/Resolves #N` keyword fires **anywhere**
+  in the body regardless of surrounding prose — writing `Closes #844 is NOT set` still closes #844.
+  When carving one item out of a multi-item umbrella issue, never put that close-keyword token next
+  to the umbrella's number at all, not even to deny it — reference it as "part of #844" instead.
+  PR bodies end with:
   ```
   🤖 Generated with [Claude Code](https://claude.com/claude-code)
   ```
@@ -327,3 +359,16 @@ The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`
   `docs/*` all need their own branch + PR the same as issue work, even though most will auto-merge
   immediately (§6 — gate-verified, non-destructive). Never build on `main`; `/implement` branches
   (`git checkout -b <short-slug>`), reusing an epic branch if one exists.
+- **Branch off freshly-fetched `origin/main`, not local `main`.** A squash-merge PR is based
+  against `origin/main` HEAD, not your local HEAD — if local `main` carries commits never pushed to
+  origin, cutting a branch off it silently folds those unpushed commits into your feature's squash
+  commit (content survives, but loses its own commit identity). `git checkout main && git fetch
+  origin && git reset --hard origin/main` before branching avoids it; the tell after the fact is
+  `git pull --ff-only` refusing to fast-forward with local-ahead commits that aren't yours.
+- **Local branches don't clean up on their own.** `forgejo-merge.mjs` deletes the *remote* branch
+  on a successful merge but never the local one — 68 stale local branches had silently piled up
+  across sessions before a first cleanup (2026-07-18). Periodically: `git fetch --prune origin`
+  (refreshes stale tracking state — a branch showing a live remote may just be a stale local
+  cache), confirm zero open PRs, then bulk `git branch -D` everything but `main`/the current branch
+  (`-D` because a squash-merged branch is never a literal ancestor, so plain `-d` refuses every
+  one) — safe since the commits stay recoverable via reflog if that assumption is ever wrong.
