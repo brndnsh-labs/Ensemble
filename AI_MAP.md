@@ -21,6 +21,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
+| `public/breakpoints.ts` | Shared viewport breakpoint constants for the compact/narrow UI experience. | `COMPACT_MQ` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |

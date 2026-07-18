@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { COMPACT_MQ } from '../breakpoints.js';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { togglePower } from '../instrument-controller.js';
 import { dispatch } from '../state.js';
@@ -12,14 +13,6 @@ import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSe
 import { SoloistControls } from './SoloistControls.jsx';
 import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
-
-// Below this width the rail lives inside the Mix bottom sheet (no desktop
-// edge to anchor to), so its nested genre/settings surfaces render full-bleed
-// instead of anchored popovers. Kept in lock-step with ChartSurface's
-// NARROW_MQ so the whole compact band gets one consistent sheet treatment
-// (#1131 raised this from 700px when the 641–1023 horizontal-rail tier was
-// deleted).
-const STUDIO_SURFACE_BREAKPOINT = '(max-width: 1023px)';
 
 interface StudioInstrumentConfig {
     id: string;
@@ -609,7 +602,10 @@ export function InstrumentRail() {
             bandIntensity: s.playback.bandIntensity,
         }));
     const [activeSurface, setActiveSurface] = useState<ActiveSurface>(getClosedSurface);
-    const isCompactViewport = useMediaQuery(STUDIO_SURFACE_BREAKPOINT);
+    // Below COMPACT_MQ the rail lives inside the Mix bottom sheet (no desktop
+    // edge to anchor to), so its nested genre/settings surfaces render
+    // full-bleed instead of anchored popovers.
+    const isCompactViewport = useMediaQuery(COMPACT_MQ);
     const rowElementsRef = useRef<Record<string, HTMLDivElement | null>>({});
     const settingsTriggerRef = useRef<Record<string, HTMLButtonElement | null>>({});
     const genreTriggerRef = useRef<HTMLDivElement | null>(null);

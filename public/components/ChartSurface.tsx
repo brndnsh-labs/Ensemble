@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'preact/compat';
 import { useCallback, useState } from 'preact/hooks';
+import { COMPACT_MQ } from '../breakpoints.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
@@ -17,13 +18,6 @@ const VisualizerOverlay = lazy(() =>
     import('./VisualizerOverlay.jsx').then((m) => ({ default: m.VisualizerOverlay })),
 );
 
-// One breakpoint governs the compact experience: at ≤1023px the always-visible
-// rail is replaced by the bottom MobileActionBar (whose Mix sheet re-hosts the
-// full vertical rail — genre chooser, band energy, mixer). #1131 deleted the
-// old 641–1023 "horizontal rail" tier that CSS-hid those controls with no
-// alternative entry point.
-const NARROW_MQ = '(max-width: 1023px)';
-
 interface ChartSurfaceProps {
     getVisualTime: () => number;
 }
@@ -37,7 +31,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
         const p = new URLSearchParams(window.location.search);
         return !!(p.get('s') || p.get('prog'));
     });
-    const isNarrow = useMediaQuery(NARROW_MQ);
+    const isNarrow = useMediaQuery(COMPACT_MQ);
     const { chartLocked } = useEnsembleState((s) => ({
         chartLocked: s.playback.chartLocked,
     }));
