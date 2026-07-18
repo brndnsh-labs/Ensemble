@@ -7,7 +7,13 @@ import {
     generateDrumOrchestration,
     generateSoloistAccents,
 } from './engine/drum-seeder.js';
-import { initAudio, restoreGains, syncBusReverbSend, syncBusVolume } from './engine/engine.js';
+import {
+    initAudio,
+    restoreGains,
+    syncBusReverbSend,
+    syncBusVolume,
+    syncMasterVolume,
+} from './engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from './engine/instrument-registry.js';
 import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
@@ -210,6 +216,16 @@ export function handleEffects(
             }
             break;
         }
+        case ACTIONS.SET_PARAM: {
+            // #1128 — master volume writes via SET_PARAM (playback.masterVolume),
+            // not a dedicated action; ramp the master bus here instead of in
+            // Settings.tsx so any non-slider writer (preset apply, restore) also
+            // gets the live ramp — mirrors SET_VOLUME above for the per-bus case.
+            if (payload?.module === 'playback' && payload?.param === 'masterVolume') {
+                syncMasterVolume(stateMap);
+            }
+            break;
+        }
         case ACTIONS.TOGGLE_PLAY: {
             const { playback, arranger } = stateMap;
             if (playback.isPlaying) {
@@ -241,6 +257,21 @@ export function handleEffects(
                 });
             }
             togglePlay(stateMap, true, dispatch);
+            break;
+        }
+        case ACTIONS.SET_CHART_LOCKED: {
+            // #1128 — "unlocking pauses playback" is the symmetric partner of the
+            // auto-lock-on-play above (you don't rewrite while the band plays).
+            // Centralized here so ChartSurface.toggleLock, GlobalShortcuts ('e' +
+            // open-editor) no longer each hand-copy the pause. payload is the bare
+            // new locked flag. Locking (true) auto-locks silently; only unlocking
+            // while playing pauses — and TOGGLE_PLAY's lock branch can't re-fire
+            // because isPlaying is already false by the time its effect runs.
+            // `!payload` (not `=== false`) tracks the reducer's own `!!` coercion,
+            // so any falsy unlock pauses in lock-step with what it wrote.
+            if (!payload && stateMap.playback.isPlaying) {
+                dispatch(ACTIONS.TOGGLE_PLAY, undefined);
+            }
             break;
         }
         case ACTIONS.SET_SECTIONS:

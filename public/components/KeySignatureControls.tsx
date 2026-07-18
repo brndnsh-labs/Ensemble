@@ -1,18 +1,16 @@
 import {
+    refreshArrangerUI,
     setKeyCenter,
     switchToRelativeKey,
     transposeKey,
-    validateAndAnalyze,
 } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { getCanonicalMeters } from '../data/smart-genres.js';
-import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
-import { saveCurrentState } from '../persistence.js';
+import { loadDrumPreset } from '../instrument-controller.js';
 import { arranger } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { formatUnicodeSymbols } from '../utils.js';
-import { syncWorker } from '../worker-client.js';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 
 const GROUPING_OPTIONS: Record<string, number[][]> = {
@@ -52,13 +50,12 @@ function updateTimeSignature(
     if (lastDrumPreset) {
         loadDrumPreset(lastDrumPreset);
     }
-    validateAndAnalyze();
-    // Mirror cycleGrouping: push the new meter/grouping + recomputed arranger maps
-    // to the logic worker so a mid-playback meter change takes effect immediately
-    // (no delta case covers SET_TIME_SIGNATURE/PROG_VALIDATED — full flush is required).
-    flushBuffers();
-    syncWorker();
-    saveCurrentState();
+    // Canonical resync — pushes the new meter/grouping + recomputed arranger maps
+    // to the worker (no delta case covers SET_TIME_SIGNATURE, so a full flush is
+    // required for a mid-playback meter change to take effect). #1128 replaced a
+    // hand-copied tail that ran flushBuffers() BEFORE syncWorker() — the
+    // pre-#1120 buggy order that was live here; refreshArrangerUI() fixes it.
+    refreshArrangerUI();
 }
 
 function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
@@ -72,9 +69,7 @@ function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: a
     const nextIndex = (currentIndex + 1) % options.length;
 
     dispatch(ACTIONS.SET_GROUPING, options[nextIndex]);
-    flushBuffers();
-    syncWorker();
-    saveCurrentState();
+    refreshArrangerUI();
 }
 
 export function TimeSignatureControl() {

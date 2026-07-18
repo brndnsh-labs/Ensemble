@@ -1,15 +1,12 @@
 import { useRef, useState } from 'preact/hooks';
-import { dispatch, getState } from '../state.js';
-import { ACTIONS } from '../types.js';
-import { useEnsembleState } from '../ui-bridge.js';
-
-const { playback } = getState();
-
-import { APP_VERSION, BUILD_REV, KOFI_URL, MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { APP_VERSION, BUILD_REV, KOFI_URL } from '../config.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
 import { dispatchMidiInputConfig, initMIDI, panic } from '../midi-controller.js';
 import { saveCurrentState } from '../persistence.js';
 import { triggerInstall } from '../pwa.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
+import { useEnsembleState } from '../ui-bridge.js';
 import { secondsPerStepFor } from '../utils.js';
 import { Icon } from './Icon.jsx';
 import { PacksSettings } from './PacksSettings.jsx';
@@ -101,15 +98,10 @@ export function Settings() {
 
     const handleMasterVolume = (val: string | number) => {
         const numVal = parseFloat(val.toString());
+        // The live master-bus ramp is the SET_PARAM(masterVolume) effect
+        // (syncMasterVolume in state-effects.ts) — #1128 moved it out of here so
+        // it no longer reaches through a module-level getState() capture.
         dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'masterVolume', value: numVal });
-
-        if (playback.audioGraph && playback.audio) {
-            const masterGain = playback.audioGraph.master.gain;
-            const target = Math.max(0.0001, numVal * MIXER_GAIN_MULTIPLIERS.master);
-            masterGain.gain.cancelScheduledValues(playback.audio.currentTime);
-            masterGain.gain.setValueAtTime(masterGain.gain.value, playback.audio.currentTime);
-            masterGain.gain.exponentialRampToValueAtTime(target, playback.audio.currentTime + 0.04);
-        }
         saveCurrentState();
     };
 

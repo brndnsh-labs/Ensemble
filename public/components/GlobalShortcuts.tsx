@@ -38,14 +38,8 @@ export function GlobalShortcuts() {
                 !e.ctrlKey
             ) {
                 e.preventDefault();
-                if (!playback.chartLocked) {
-                    dispatch(ACTIONS.SET_CHART_LOCKED, true);
-                } else {
-                    if (playback.isPlaying) {
-                        dispatch(ACTIONS.TOGGLE_PLAY, undefined);
-                    }
-                    dispatch(ACTIONS.SET_CHART_LOCKED, false);
-                }
+                // Toggle; unlock-pauses-playback is the SET_CHART_LOCKED effect (#1128).
+                dispatch(ACTIONS.SET_CHART_LOCKED, !playback.chartLocked);
             }
 
             // Escape: Close Modal, then re-lock the chart if it's unlocked.
@@ -66,7 +60,6 @@ export function GlobalShortcuts() {
 
         const handleOpenEditor = (e: Event) => {
             const { sectionId } = (e as CustomEvent).detail || {};
-            const { playback } = getState();
             if (sectionId) {
                 dispatch(ACTIONS.SET_PARAM, {
                     module: 'arranger',
@@ -74,9 +67,7 @@ export function GlobalShortcuts() {
                     value: sectionId,
                 });
             }
-            if (playback.isPlaying) {
-                dispatch(ACTIONS.TOGGLE_PLAY, undefined);
-            }
+            // Unlock; pause-on-unlock is the SET_CHART_LOCKED effect (#1128).
             dispatch(ACTIONS.SET_CHART_LOCKED, false);
         };
 

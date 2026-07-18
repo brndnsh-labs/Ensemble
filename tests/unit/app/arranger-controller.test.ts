@@ -191,6 +191,21 @@ describe('Arranger Controller', () => {
             expect(restoreGains).toHaveBeenCalledWith(stateMap);
             expect(saveCurrentState).toHaveBeenCalled();
         });
+
+        // #1120 — the load-bearing order guard. This is the canonical resync every
+        // arrangement-mutating UI now delegates to (#1128 consolidated the
+        // hand-copied copies in PresetLibrary/KeySignatureControls onto it), so the
+        // order lives here: syncWorker() must patch the mirrored state BEFORE
+        // flushBuffers() refills the worker's buffers from getSyncState() — else the
+        // ~4-measure primed lookahead is built from the stale pre-swap progression.
+        it('runs validate → syncWorker → flushBuffers in that order (#1120)', () => {
+            refreshArrangerUI();
+            const validateOrder = vi.mocked(validateProgression).mock.invocationCallOrder[0];
+            const syncOrder = vi.mocked(syncWorker).mock.invocationCallOrder[0];
+            const flushOrder = vi.mocked(flushBuffers).mock.invocationCallOrder[0];
+            expect(syncOrder).toBeGreaterThan(validateOrder);
+            expect(flushOrder).toBeGreaterThan(syncOrder);
+        });
     });
 
     describe('onSectionUpdate', () => {

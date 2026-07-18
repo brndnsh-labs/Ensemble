@@ -63,6 +63,18 @@ export function clearChordPresetHighlight(): void {
     // Keeping this function as a no-op to maintain API compatibility
 }
 
+/**
+ * The canonical "arrangement changed — resync everything" sequence. Any UI that
+ * mutates the progression/meter/key should end in this single call rather than
+ * hand-copying the steps (the divergence #1128 consolidated).
+ *
+ * #1120 — the order is load-bearing: `syncWorker()` must run BEFORE
+ * `flushBuffers()`. flushBuffers() bundles a worker FLUSH that synchronously
+ * refills buffers from `getSyncState()`; run before the SYNC_STATE patch lands,
+ * that refill (and its ~4-measure lookahead) generates from the OLD
+ * progression. dispatch()/validateAndAnalyze() are synchronous, so ordering
+ * flush last costs nothing perceptible on the note-kill.
+ */
 export function refreshArrangerUI(): void {
     validateAndAnalyze();
     syncWorker();

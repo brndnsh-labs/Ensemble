@@ -8,7 +8,6 @@ import { dispatch } from '../state.js';
 import { ACTIONS, type InstrumentModule } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import type { StyleObject } from '../ui-types.js';
-import { syncWorker } from '../worker-client.js';
 import { Icon, type IconName } from './Icon.jsx';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
@@ -91,7 +90,9 @@ function setGenre(genreName: string) {
         ...config,
     };
     dispatch(ACTIONS.SET_GENRE_FEEL, payload);
-    syncWorker(ACTIONS.SET_GENRE_FEEL, payload);
+    // #1128 — no explicit syncWorker here: main.ts's subscribe block forwards
+    // every dispatch to the worker (syncWorker(action, payload)), so a manual
+    // call sent the SET_GENRE_FEEL delta twice.
     // #856 — the soloist phrasing mode is now derived from the lead voice + genre
     // by `resolveAutoVoices` (the SET_GENRE_FEEL effect), which respects the user's
     // Auto/pin flag. The old #567 explicit `SET_SOLOIST_MODE` dispatch here is gone:

@@ -38,9 +38,8 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
         return !!(p.get('s') || p.get('prog'));
     });
     const isNarrow = useMediaQuery(NARROW_MQ);
-    const { chartLocked, isPlaying } = useEnsembleState((s) => ({
+    const { chartLocked } = useEnsembleState((s) => ({
         chartLocked: s.playback.chartLocked,
-        isPlaying: s.playback.isPlaying,
     }));
 
     const openModal = (modal: string) => dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
@@ -48,15 +47,10 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
     // Unlock-while-playing pauses the band (the music-stand metaphor:
     // you don't rewrite the chart mid-take). Lock-while-stopped just locks.
     const toggleLock = useCallback(() => {
-        if (!chartLocked) {
-            dispatch(ACTIONS.SET_CHART_LOCKED, true);
-            return;
-        }
-        if (isPlaying) {
-            dispatch(ACTIONS.TOGGLE_PLAY, undefined);
-        }
-        dispatch(ACTIONS.SET_CHART_LOCKED, false);
-    }, [chartLocked, isPlaying]);
+        // Unlock-pauses-playback is centralized in the SET_CHART_LOCKED effect
+        // (#1128) — this is now a plain toggle.
+        dispatch(ACTIONS.SET_CHART_LOCKED, !chartLocked);
+    }, [chartLocked]);
 
     const closeViz = useCallback(() => setIsVizOpen(false), []);
 

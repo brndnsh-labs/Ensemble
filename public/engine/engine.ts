@@ -654,6 +654,28 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
     bus.gain.gain.setTargetAtTime(target, t, 0.04);
 }
 
+/**
+ * Live-ramp the master bus to `playback.masterVolume`. Sibling of
+ * `syncBusVolume` — #1128 moved this out of `Settings.tsx handleMasterVolume`
+ * (which reached through a module-level `getState()` capture) into a
+ * `handleEffects` case, so any non-slider writer (preset apply, restore) also
+ * gets the ramp. Ramp math is preserved verbatim (exponential to target over
+ * 40ms) so slider feel is unchanged.
+ */
+export function syncMasterVolume(state: EnsembleState): void {
+    const { playback } = state;
+    const graph = playback.audioGraph;
+    if (!playback.audio || !graph) {
+        return;
+    }
+    const masterGain = graph.master.gain;
+    const target = Math.max(0.0001, (playback.masterVolume ?? 0.5) * MIXER_GAIN_MULTIPLIERS.master);
+    const t = playback.audio.currentTime;
+    masterGain.gain.cancelScheduledValues(t);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, t);
+    masterGain.gain.exponentialRampToValueAtTime(target, t + 0.04);
+}
+
 let lastAudioTime = 0;
 let lastPerfTime = 0;
 

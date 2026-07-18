@@ -27,15 +27,8 @@ vi.mock('../../../public/persistence.js', () => ({
 }));
 
 vi.mock('../../../public/arranger-controller.js', () => ({
-    validateAndAnalyze: vi.fn(),
-}));
-
-vi.mock('../../../public/instrument-controller.js', () => ({
-    flushBuffers: vi.fn(),
-}));
-
-vi.mock('../../../public/worker-client.js', () => ({
-    syncWorker: vi.fn(),
+    appendSections: vi.fn(),
+    refreshArrangerUI: vi.fn(),
 }));
 
 vi.mock('../../../public/ui.js', () => ({
@@ -70,10 +63,8 @@ vi.mock('../../../public/utils.js', () => ({
     }),
 }));
 
-import { validateAndAnalyze } from '../../../public/arranger-controller.js';
+import { refreshArrangerUI } from '../../../public/arranger-controller.js';
 import { PresetLibrary } from '../../../public/components/PresetLibrary.jsx';
-import { flushBuffers } from '../../../public/instrument-controller.js';
-import { syncWorker } from '../../../public/worker-client.js';
 
 describe('PresetLibrary', () => {
     let container;
@@ -273,7 +264,7 @@ describe('PresetLibrary', () => {
         expect(mockDispatch).toHaveBeenCalledWith('SET_BPM', 140);
     });
 
-    it('resyncs and re-primes the worker AFTER validateAndAnalyze on a replace-mode preset-select (#1120)', async () => {
+    it('delegates the worker resync to refreshArrangerUI AFTER swapping the arrangement (#1120)', async () => {
         await act(async () => {
             render(<PresetLibrary />, container);
             await new Promise((resolve) => setTimeout(resolve, 0));
@@ -287,25 +278,20 @@ describe('PresetLibrary', () => {
             autumnLeavesButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        // A bare syncWorker() call (no action) sends a full snapshot patch, and
-        // flushBuffers() bundles its own worker FLUSH (which synchronously refills
-        // buffers from getSyncState()) — both must fire so neither the mirrored
-        // state NOR the primed buffers can be built from the stale pre-swap
-        // progression. This can't inspect the worker payload itself (that's proven
-        // by code trace, not this component-level test) — it verifies both calls
-        // happen, exactly once, at the right point in the sequence.
-        expect(syncWorker).toHaveBeenCalledWith();
-        expect(syncWorker).toHaveBeenCalledTimes(1);
-        expect(flushBuffers).toHaveBeenCalledTimes(1);
+        // #1128 consolidated the hand-copied resync ritual onto refreshArrangerUI().
+        // The component's contract is now: dispatch the new arrangement, then hand
+        // off to the canonical resync exactly once — and only AFTER the swap, never
+        // before (that was the #1120 bug). The #1120-safe internal order
+        // (validate → syncWorker → flushBuffers) is guarded in
+        // arranger-controller.test, where that order now lives.
+        expect(refreshArrangerUI).toHaveBeenCalledTimes(1);
 
-        // Order matters: both must happen AFTER validateAndAnalyze() has
-        // recomputed the new arrangement, not before (that was the bug —
-        // flushBuffers() used to run first, priming the worker's buffers from the
-        // OLD progression before the new one even existed).
-        const validateOrder = vi.mocked(validateAndAnalyze).mock.invocationCallOrder[0];
-        const syncOrder = vi.mocked(syncWorker).mock.invocationCallOrder[0];
-        const flushOrder = vi.mocked(flushBuffers).mock.invocationCallOrder[0];
-        expect(syncOrder).toBeGreaterThan(validateOrder);
-        expect(flushOrder).toBeGreaterThan(validateOrder);
+        const arrangementCallIdx = mockDispatch.mock.calls.findIndex(
+            ([action]) => action === 'SET_ARRANGEMENT',
+        );
+        expect(arrangementCallIdx).toBeGreaterThanOrEqual(0);
+        const arrangementOrder = mockDispatch.mock.invocationCallOrder[arrangementCallIdx];
+        const refreshOrder = vi.mocked(refreshArrangerUI).mock.invocationCallOrder[0];
+        expect(refreshOrder).toBeGreaterThan(arrangementOrder);
     });
 });

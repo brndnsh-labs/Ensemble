@@ -22,10 +22,10 @@ vi.mock('../../../public/ui-bridge.js', () => ({
 
 // Mock arranger-controller
 vi.mock('../../../public/arranger-controller.js', () => ({
+    refreshArrangerUI: vi.fn(),
     setKeyCenter: vi.fn(),
     switchToRelativeKey: vi.fn(),
     transposeKey: vi.fn(),
-    validateAndAnalyze: vi.fn(),
 }));
 
 // Mock config
@@ -76,15 +76,13 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 import {
+    refreshArrangerUI,
     setKeyCenter,
     switchToRelativeKey,
     transposeKey,
-    validateAndAnalyze,
 } from '../../../public/arranger-controller.js';
 import { KeySignatureControls } from '../../../public/components/KeySignatureControls.jsx';
-import { flushBuffers, loadDrumPreset } from '../../../public/instrument-controller.js';
-import { saveCurrentState } from '../../../public/persistence.js';
-import { syncWorker } from '../../../public/worker-client.js';
+import { loadDrumPreset } from '../../../public/instrument-controller.js';
 
 describe('KeySignatureControls Component', () => {
     let container;
@@ -188,13 +186,12 @@ describe('KeySignatureControls Component', () => {
 
         expect(mockDispatch).toHaveBeenCalledWith('SET_GROUPING', null);
         expect(loadDrumPreset).not.toHaveBeenCalled();
-        expect(validateAndAnalyze).toHaveBeenCalled();
-        // #1030: a mid-playback meter change must flush + full-sync the worker
-        // (no SET_TIME_SIGNATURE/PROG_VALIDATED delta case), mirroring cycleGrouping —
+        // #1030/#1128: a mid-playback meter change delegates to refreshArrangerUI(),
+        // which flushes + full-syncs the worker (no SET_TIME_SIGNATURE delta case) —
         // otherwise the worker keeps generating on the stale meter until stop→play.
-        expect(flushBuffers).toHaveBeenCalled();
-        expect(syncWorker).toHaveBeenCalled();
-        expect(saveCurrentState).toHaveBeenCalled();
+        // The internal validate→syncWorker→flushBuffers order is guarded in
+        // arranger-controller.test (#1120).
+        expect(refreshArrangerUI).toHaveBeenCalled();
     });
 
     it('handles time signature change with lastDrumPreset', async () => {
@@ -261,9 +258,8 @@ describe('KeySignatureControls Component', () => {
             { timeout: 1000, interval: 5 },
         );
 
-        expect(flushBuffers).toHaveBeenCalled();
-        expect(syncWorker).toHaveBeenCalled();
-        expect(saveCurrentState).toHaveBeenCalled();
+        // #1128: cycling grouping delegates the worker resync to refreshArrangerUI().
+        expect(refreshArrangerUI).toHaveBeenCalled();
     });
 
     it('does nothing when toggling grouping on unsupported time signature', async () => {
