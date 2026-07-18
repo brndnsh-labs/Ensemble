@@ -76,7 +76,9 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
  * Values are by-ear starting points (July 2026 pocket sweep, owner priority
  * "a consistent pocket the entire band respects"); expect ±few-ms tuning.
  */
-const GENRE_POCKET: Record<string, number> = {
+// Exported for the #1130 genreFeel-routing completeness guard
+// (tests/standards/genre-feel-canon-guard.test.ts).
+export const GENRE_POCKET: Record<string, number> = {
     // why: Dilla drag — the signature laid-back neo-soul feel is the band sitting
     // way behind the kick. 25 ms is the deepest lean in the palette (kept from the
     // pre-#1005 conductor pocket block). This is the audible melodic-lane drag. (A

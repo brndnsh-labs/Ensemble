@@ -414,7 +414,9 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
     {} as Record<string, StyleConfig>,
 );
 
-const GENRE_STYLE_MAPPING: Record<string, string> = {
+// Exported for the #1130 genreFeel-routing completeness guard
+// (tests/standards/genre-feel-canon-guard.test.ts).
+export const GENRE_STYLE_MAPPING: Record<string, string> = {
     Rock: 'rock',
     Jazz: 'jazz',
     Funk: 'funk',
@@ -422,12 +424,13 @@ const GENRE_STYLE_MAPPING: Record<string, string> = {
     'Neo-Soul': 'neo',
     'Hip Hop': 'hiphop',
     Disco: 'disco',
-    Bossa: 'bossa',
+    // Bossa genre's feel is 'Bossa Nova' (smart-genres.ts).
     'Bossa Nova': 'bossa',
     Acoustic: 'acoustic',
     Reggae: 'reggae',
     Country: 'country',
-    'Ska-Punk': 'ska',
+    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts); 'Bossa'/'Ska-Punk' were
+    // dead keys (never a genreFeel value). #1130.
     Ska: 'ska',
     Metal: 'metal',
 };

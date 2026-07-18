@@ -174,7 +174,8 @@ export const SMART_BASS_STYLE_MAP = {
     'Hip Hop': 'hiphop',
     Country: 'country',
     Metal: 'metal',
-    'Ska-Punk': 'walking-ska',
+    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts); the old 'Ska-Punk' key
+    // was dead — neither a genreFeel nor a drum-preset name. #1130.
     Ska: 'walking-ska',
 };
 
@@ -185,14 +186,18 @@ export const SMART_SCALE_STYLE_MAP = {
     Blues: 'blues',
     'Neo-Soul': 'neo',
     Disco: 'disco',
-    Bossa: 'bossa',
+    // Surfaced by #1130: Hip Hop had no scale-map entry and silently fell through
+    // to resolveMappedStyle's 'rock' fallback. Made explicit (behavior-preserving)
+    // — revisit by ear whether hip-hop wants its own scale character.
+    'Hip Hop': 'rock',
+    // Bossa genre's feel is 'Bossa Nova' (smart-genres.ts).
     'Bossa Nova': 'bossa',
     Acoustic: 'minimal',
     Reggae: 'minimal',
     Country: 'country',
     Metal: 'metal',
-    'Rock/Metal': 'metal',
-    'Ska-Punk': 'rock',
+    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts). The old 'Rock/Metal' and
+    // 'Ska-Punk' keys were dead (never a genreFeel value). #1130.
     Ska: 'rock',
 };
 

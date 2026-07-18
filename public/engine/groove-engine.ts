@@ -22,7 +22,9 @@ import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-overrides.js';
 
-const strategies: Record<string, any> = {
+// Exported for the #1130 genreFeel-routing completeness guard
+// (tests/standards/genre-feel-canon-guard.test.ts).
+export const strategies: Record<string, any> = {
     Jazz: jazz,
     Blues: blues,
     Rock: rock,
