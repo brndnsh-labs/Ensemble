@@ -35,17 +35,11 @@ const SYMBOL_LABELS: Record<string, string> = {
 interface SymbolMenuProps {
     onSelect: (sym: string) => void;
     onClose?: () => void;
-    variant?: 'dropdown' | 'row';
 }
 
-export function SymbolMenu({ onSelect, onClose, variant = 'dropdown' }: SymbolMenuProps) {
-    const isRow = variant === 'row';
-
+export function SymbolMenu({ onSelect, onClose }: SymbolMenuProps) {
     return (
-        <div
-            class={isRow ? 'symbol-row' : 'symbol-dropdown'}
-            onClick={isRow ? undefined : (e) => e.stopPropagation()}
-        >
+        <div class="symbol-row">
             {SYMBOLS.map((sym) => (
                 <button
                     key={sym}

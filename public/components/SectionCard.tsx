@@ -444,7 +444,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                     </div>
                 </div>
 
-                {isFocused && <SymbolMenu variant="row" onSelect={insertSymbol} />}
+                {isFocused && <SymbolMenu onSelect={insertSymbol} />}
 
                 <textarea
                     ref={textareaRef}

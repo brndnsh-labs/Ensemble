@@ -1996,22 +1996,6 @@ input[type="range"] {
     border-bottom-color: var(--accent-color);
 }
 
-.symbol-dropdown {
-    position: absolute;
-    top: 100%; /* Directly below the button */
-    right: 0;
-    background: var(--panel-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 0.5rem;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.4rem;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
-    z-index: var(--z-floating);
-    min-width: 180px;
-}
-
 .symbol-btn {
     padding: 0.4rem;
     font-size: 0.9rem;
