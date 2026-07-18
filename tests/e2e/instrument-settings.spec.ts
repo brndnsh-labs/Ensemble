@@ -180,6 +180,27 @@ test.describe('Instrument settings — mobile @mobile', () => {
         await expect(firstVolume).toBeVisible();
     });
 
+    // #1129 regression: Escape in a nested instrument-settings sheet must close
+    // ONLY that sheet, not the Mix sheet it's stacked on. Before the shared
+    // overlay stack, both sheets' Escape listeners fired (stopPropagation can't
+    // stop sibling listeners), so one Escape dumped the user out of both levels.
+    test('Escape closes only the top instrument-settings sheet, not the Mix sheet', async ({
+        page,
+    }) => {
+        await openMobileMixSheet(page);
+
+        const sheet = page.locator('.mobile-mix-sheet');
+        await sheet.getByRole('button', { name: 'Chords settings' }).click();
+        const settings = settingsSurfaceFor(page, 'Chords');
+        await expect(settings).toBeVisible();
+
+        await page.keyboard.press('Escape');
+
+        // Top sheet (settings) closes; the Mix sheet it was stacked on stays open.
+        await expect(settings).toBeHidden();
+        await expect(sheet).toBeVisible();
+    });
+
     test('soloist settings inside mix sheet remain reachable on narrow viewport', async ({
         page,
     }) => {

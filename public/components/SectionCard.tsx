@@ -80,7 +80,9 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
         const menuRef = useRef<HTMLDivElement | null>(null);
         const settingsPanelRef = useRef<HTMLDivElement | null>(null);
 
-        useModalA11y(settingsPanelRef, isMenuOpen, () => setIsMenuOpen(false), 'Section settings');
+        useModalA11y(settingsPanelRef, isMenuOpen, () => setIsMenuOpen(false), 'Section settings', {
+            modal: false,
+        });
 
         useEffect(() => {
             if (!isMenuOpen) {
@@ -334,7 +336,14 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                 ⋮
                             </button>
                             {isMenuOpen && (
-                                <div class="section-actions-menu" ref={settingsPanelRef}>
+                                // role="dialog" self-declared: #1129 made the hook
+                                // non-modal (no forced role / aria-modal / trap), so
+                                // this dialog-like settings panel owns its own role.
+                                <div
+                                    class="section-actions-menu"
+                                    ref={settingsPanelRef}
+                                    role="dialog"
+                                >
                                     <div class="section-actions-menu__row">
                                         <span class="section-actions-menu__label">Repeat</span>
                                         <input

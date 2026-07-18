@@ -146,7 +146,11 @@ export function StudioSurface({
     const surfaceRef = useRef<HTMLDivElement | null>(null);
     const [surfaceStyle, setSurfaceStyle] = useState<StyleObject | undefined>(undefined);
 
-    useModalA11y(surfaceRef, isOpen, onClose, title);
+    // Non-modal: the StudioSurface sheets nest (mobile Mix sheet → an
+    // instrument-settings sheet), so they must NOT each claim aria-modal or trap
+    // focus; the shared overlay stack (Escape closes only the topmost) handles
+    // the nesting. #1129.
+    useModalA11y(surfaceRef, isOpen, onClose, title, { modal: false });
 
     useLayoutEffect(() => {
         if (!isOpen || isCompactViewport || typeof window === 'undefined') {
@@ -234,6 +238,10 @@ export function StudioSurface({
             />
             <div
                 ref={surfaceRef}
+                // role="dialog" self-declared: #1129 made useModalA11y non-modal
+                // here (for the nested Mix→settings sheet fix), so the surface owns
+                // its own role — keeps dialog semantics + announces the aria-label.
+                role="dialog"
                 class={`workspace-studio-surface ${modeClass} workspace-studio-surface--${accent} ${className} is-open`}
                 style={surfaceStyle}
             >

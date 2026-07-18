@@ -251,7 +251,9 @@ test.describe('ChartSurface @ui', () => {
         // #1082: the section kebab's settings panel (Repeat/Key/Time) is a
         // hand-rolled dropdown wired onto useModalA11y for Escape-to-close.
         // The existing mousedown click-outside handler on `.section-kebab-wrap`
-        // stays in place; the hook only adds Escape/focus-trap/focus-restore.
+        // stays in place. #1129 made the hook non-modal here (no forced role /
+        // aria-modal / focus-trap); the panel self-declares role="dialog", and
+        // Escape now routes through the shared overlay stack (topmost-only).
         test('opens via kebab and closes on Escape', async ({ page }) => {
             await page.setViewportSize({ width: 1440, height: 900 });
             await page.getByRole('button', { name: 'Unlock chart to edit' }).click();

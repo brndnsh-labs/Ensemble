@@ -11,6 +11,7 @@ import {
 import type { Section, SectionInstrumentKey } from '../../types.js';
 import { useEnsembleState } from '../../ui-bridge.js';
 import { Icon, type IconName } from '../Icon.jsx';
+import { useModalA11y } from '../use-modal-a11y.js';
 
 interface Lane {
     key: SectionInstrumentKey;
@@ -144,6 +145,19 @@ export function SectionHeaderStrip({ section, compact = false }: SectionHeaderSt
     const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
     const practiceRef = useRef<HTMLDivElement | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
+    // #1129 — the practice menu skipped a11y wiring entirely (no Escape, no
+    // focus management, and portaled so Tab never reached it). Non-modal: Escape
+    // (via the shared overlay stack) + focus-in-on-open + focus-restore, without
+    // trapping the chart behind it. Keeps the mousedown/scroll dismissal below.
+    useModalA11y(
+        menuRef,
+        isPracticeOpen,
+        () => setIsPracticeOpen(false),
+        `Practice ${section.label}`,
+        {
+            modal: false,
+        },
+    );
     useEffect(() => {
         if (!isPracticeOpen) {
             return;

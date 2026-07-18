@@ -225,6 +225,23 @@ export function ChordPicker({
         };
     }, [onClose]);
 
+    // #1129 — move focus into the picker on open, restore to the opener on close.
+    // The dismiss effect above already owns Escape + click-outside; this is
+    // mount-only so a re-render (dialing a root/quality) doesn't yank focus back.
+    useEffect(() => {
+        const opener = document.activeElement as HTMLElement | null;
+        const focusable = rootRef.current?.querySelector<HTMLElement>('button:not([disabled])');
+        const t = focusable ? setTimeout(() => focusable.focus(), 0) : undefined;
+        return () => {
+            if (t) {
+                clearTimeout(t);
+            }
+            if (opener && typeof opener.focus === 'function') {
+                opener.focus();
+            }
+        };
+    }, []);
+
     const quality = QUALITIES.find((q) => q.id === qualityId) || QUALITIES[0];
 
     const apply = (next: { degree?: number; accidental?: '' | 'b' | '#'; qualityId?: string }) => {

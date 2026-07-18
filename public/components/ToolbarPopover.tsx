@@ -42,7 +42,7 @@ export function ToolbarPopover({
         setIsOpen(false);
     };
 
-    useModalA11y(panelRef, isOpen, closePopover, panelLabel);
+    useModalA11y(panelRef, isOpen, closePopover, panelLabel, { modal: false });
 
     const handleFocusExit = (event: FocusEvent) => {
         const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;

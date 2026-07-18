@@ -25,7 +25,9 @@ export function InlineEditor() {
     const [showConfirmClear, setShowConfirmClear] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
 
-    useModalA11y(menuRef, isMenuOpen, () => setIsMenuOpen(false), 'Arrangement tools');
+    useModalA11y(menuRef, isMenuOpen, () => setIsMenuOpen(false), 'Arrangement tools', {
+        modal: false,
+    });
 
     const handleAddSection = () => {
         setIsMenuOpen(false);
@@ -135,6 +137,10 @@ export function InlineEditor() {
                     </button>
                     <div
                         ref={menuRef}
+                        // role="dialog" self-declared: #1129 made useModalA11y
+                        // non-modal here, so the menu owns its own role (keeps the
+                        // aria-label announced).
+                        role="dialog"
                         class={`action-menu-content editor-action-menu ${isMenuOpen ? 'open' : ''}`}
                     >
                         <div class="menu-section-header">Structure</div>
