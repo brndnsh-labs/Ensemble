@@ -10,7 +10,7 @@ Everything happens on one surface — the chart is always in front of you.
 2.  **Type Chords:** Tap **✏️ Edit** in the topbar (or press `E`) to unlock the chart, then enter your progression (e.g., `C | F G`).
 3.  **Press Start:** Hit play — the chart re-locks and the band begins playing immediately.
 4.  **Keep Going:** Tweak the genre, the per-instrument mix, the key, or the tempo on the fly — the music never stops, and nothing covers the chart.
-*✨ **Pro Tip:** The `⋯` overflow menu in the topbar holds share, library, transpose, soloist seed, and the Manual — all without leaving the lead sheet.*
+*✨ **Pro Tip:** The `⋯` overflow menu in the topbar holds Library, Settings, and the Manual — all without leaving the lead sheet. Share is a button right in the topbar, and transpose lives in the key menu.*
 
 ---
 
@@ -19,7 +19,7 @@ Everything happens on one surface — the chart is always in front of you.
 ### Understanding the Surface
 Ensemble is a single chart-first surface — there are no separate views to switch between. Everything radiates out from the lead sheet:
 - **The Chart (center):** Your lead sheet for chords and form. It's **locked by default** — your music stand. Tap **✏️ Edit** (or press `E`) to unlock it for writing; the lock re-engages when you press play. While locked, the currently-playing chord is highlighted as the band moves through the form.
-- **The Topbar:** The transport (play/stop, BPM, tap tempo) sits on the left; key, time signature, and the song seed (🎲) in the center; quick actions — Library, Edit, Share, and the **🌈 Visualizer** — on the right. The `⋯` overflow holds transpose, soloist seed, and the Manual.
+- **The Topbar:** The transport (play/stop, BPM, tap tempo) sits on the left; key, time signature, and the song seed (🎲) in the center; quick actions — Library, Edit, Share, and the **🌈 Visualizer** — on the right. The `⋯` overflow holds Library, Settings, and the Manual. (Transpose lives in the key menu; the song seed 🎲 sits in the center.)
 - **The Live Mix Rail:** The band, along one edge. See which of the five instruments are active, toggle each on or off, and open per-instrument settings (register, style, drum preset, trading). A genre chooser at the top sets the whole-band feel and intensity.
 - **🌈 Visualizer:** A full-screen overlay with a real-time piano-roll of every instrument, color-coded by track and chord tone. Open it any time; playback keeps running underneath.
 - **On a phone:** the rail collapses into a bottom action bar — 🎚️ Mix · 📤 Share · 🌈 Visuals — and the topbar reflows so the chart stays front and center.
@@ -29,6 +29,13 @@ Ensemble is built for improvisation.
 - **Trade Mode:** In the **Live mix** rail, open the Soloist settings and enable **Trade Sections**. The band will play for one section, then hand off the lead to you for the next.
 - **Status Indicator:** Watch the Soloist state pill in the rail. **On** means the AI is active, and **Queued** means the soloist is waiting for the next trading section.
 - **Soloist Performance:** Press `S` to launch **Soloist Performance**. This lets you play the soloist instrument manually using your keyboard, with notes automatically mapped to the current and upcoming chords.
+- **Play along on a real keyboard:** Plug in a MIDI keyboard, then in **Settings** enable **Play-Along (Note Input)** and choose your device. The band becomes your backing group while *you* take an instrument in the room — the hands-on inverse of Trade Mode.
+
+### "I want to woodshed a section"
+Drill one tricky part until it's under your fingers — the **section label** on the chart is the control, and it works mid-play.
+- **Jump or loop:** Tap any section label to open the practice popover. **▶ Start from here** jumps the band to that section; **🔁 Loop this section** arms a repeat of just that part (no auto-play — it waits for you).
+- **Tempo ramp (the drill):** Once you're looping, the popover expands to a tempo ramp. Set **Start at** — a percentage of your goal tempo, so you begin slow — and **Climb** — how many BPM to add each pass. The band starts under tempo and speeds up a notch every loop until you're at speed; the BPM readout shows a ramp indicator while it climbs.
+- **Release:** Reopen the label and hit **⏹ Stop looping** to drop back to the full form at your set tempo.
 
 ### "I want the soloist to sound more intentional"
 The AI Soloist uses a **Dynamic Head** system to provide thematic direction to each session. Every time you press play, the soloist generates a unique "seed melody" that fits your specific chord progression.
@@ -53,8 +60,9 @@ The chart is locked by default — your music stand. Tap **🔒 Edit** in the to
 - **Per-section direction:** Each section header shows a dynamic-mark button (`pp` / `mp` / `mf` / `ff`) and five instrument dots (D · B · C · H · S) — tap to dial intensity per-section or mute an instrument just inside that section.
 
 ### "I want to record into my DAW"
-Ensemble can act as a high-precision MIDI controller for Logic, Ableton, or hardware synths.
-- **Enable MIDI:** Go to **Settings > Enable Web MIDI Output**.
+Ensemble talks MIDI in **both** directions — drive your DAW with the band, or play into Ensemble from a controller.
+- **MIDI out:** Go to **Settings > Enable Web MIDI Output** to stream the band's performance to Logic, Ableton, or hardware synths as a high-precision MIDI controller.
+- **MIDI in (play-along):** In the same panel, enable **Play-Along (Note Input)** and pick your device to play an instrument *into* Ensemble while the band backs you.
 - **Latency:** Use the **Latency Compensation** slider to perfectly sync Ensemble's timing with your DAW.
 - **Automation:** The AI sends **Expression (CC 11)** and **Modulation (CC 1)** data automatically, making your virtual instruments sound "alive."
 
