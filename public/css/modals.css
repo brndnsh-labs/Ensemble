@@ -234,7 +234,7 @@ body.modal-open {
     align-items: center;
     gap: 0.4rem;
     font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
 }
 
 .surprise-me-top-row-field select {
@@ -251,12 +251,12 @@ body.modal-open {
 
 .surprise-me-apply-label {
     font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
 }
 
 .surprise-me-divider {
     border: 0;
-    border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    border-top: 1px solid var(--border-color);
     margin: 0.25rem 0;
 }
 
@@ -293,7 +293,7 @@ body.modal-open {
     align-items: center;
     gap: 0.35rem;
     font-size: 0.8rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
 }
 
 .surprise-me-role-field select {
@@ -305,7 +305,7 @@ body.modal-open {
     appearance: none;
     background: var(--input-bg, rgba(255, 255, 255, 0.04));
     border: 1px dashed var(--border-color, rgba(255, 255, 255, 0.15));
-    color: var(--text-mid, rgba(255, 255, 255, 0.65));
+    color: var(--text-secondary);
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
     cursor: pointer;
@@ -361,7 +361,7 @@ body.modal-open {
     align-items: center;
     padding: 0.25rem 0.55rem;
     border-radius: var(--radius-pill);
-    background: rgba(99, 102, 241, 0.15);
+    background: color-mix(in srgb, var(--accent-color) 15%, transparent);
     color: var(--text-color);
     font-size: 0.85rem;
     font-family: var(--font-mono, monospace);
@@ -399,7 +399,7 @@ body.modal-open {
     border-radius: var(--radius-pill);
     background: transparent;
     border: 1px solid var(--border-color);
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 0.8rem;
     font-family: var(--font-mono, monospace);
@@ -420,7 +420,7 @@ body.modal-open {
     appearance: none;
     background: transparent;
     border: 0;
-    color: var(--text-mid, rgba(255, 255, 255, 0.65));
+    color: var(--text-secondary);
     cursor: pointer;
     text-align: left;
     padding: 0.3rem 0;
@@ -464,7 +464,7 @@ body.modal-open {
 }
 
 .surprise-me-pull-item:hover {
-    background: rgba(99, 102, 241, 0.12);
+    background: color-mix(in srgb, var(--accent-color) 12%, transparent);
 }
 
 .surprise-me-pull-item-label {
@@ -488,7 +488,7 @@ body.modal-open {
 
 .surprise-me-field-label {
     font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
 }
 
 .surprise-me-pill-row {
@@ -500,7 +500,7 @@ body.modal-open {
 
 .surprise-me-pill-label {
     font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
     min-width: 3.5rem;
 }
 
@@ -540,7 +540,7 @@ body.modal-open {
     flex-direction: column;
     gap: 0.35rem;
     font-size: 0.85rem;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
 }
 
 .surprise-me-field select,
@@ -1083,9 +1083,9 @@ body.modal-open {
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.5rem;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border: 1px solid color-mix(in srgb, var(--error-color) 20%, transparent);
     border-radius: 8px;
-    background: rgba(239, 68, 68, 0.1);
+    background: color-mix(in srgb, var(--error-color) 10%, transparent);
 }
 
 .settings-reset-copy {
@@ -1225,7 +1225,7 @@ input[type="range"] {
 .section-card.drag-over {
     border-color: var(--accent-color);
     transform: scale(1.01);
-    box-shadow: 0 0 0 2px var(--accent-color-alpha);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color), transparent 50%);
     z-index: 10;
 }
 
@@ -1377,7 +1377,7 @@ input[type="range"] {
     min-width: 11rem;
     padding: 0.25rem;
     background: var(--panel-color);
-    border: 1px solid var(--border-strong, var(--border-color));
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
 }
@@ -1743,8 +1743,8 @@ input[type="range"] {
     z-index: var(--z-popover, 1000);
     width: 280px;
     padding: 0.6rem;
-    background: var(--bg-elevated, #20232b);
-    border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md, 8px);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
     display: flex;
@@ -1768,9 +1768,9 @@ input[type="range"] {
 .chord-picker__root,
 .chord-picker__quality {
     appearance: none;
-    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    border: 1px solid var(--border-color);
     background: transparent;
-    color: var(--text-mid, rgba(255, 255, 255, 0.78));
+    color: var(--text-secondary);
     border-radius: var(--radius-sm, 6px);
     padding: 0.4rem 0.25rem;
     font-size: 0.78rem;
@@ -1787,14 +1787,14 @@ input[type="range"] {
 .chord-picker__root:hover,
 .chord-picker__quality:hover {
     border-color: var(--accent-color);
-    color: var(--text-high, #fff);
+    color: var(--text-color);
 }
 
 .chord-picker__root.is-active,
 .chord-picker__quality.is-active {
     background: var(--accent-color);
     border-color: var(--accent-color);
-    color: var(--bg-base, #1a1a1f);
+    color: var(--bg-color);
 }
 
 .section-title-row {
@@ -2085,7 +2085,7 @@ input[type="range"] {
 @keyframes mutated-pulse {
     0% {
         border-color: var(--accent-color);
-        box-shadow: 0 0 0 0 var(--accent-color-alpha);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-color), transparent 50%);
     }
     50% {
         border-color: var(--accent-hover);
@@ -2297,8 +2297,8 @@ input[type="range"] {
     grid-column: 1 / -1;
     padding: 0.7rem;
     margin: 0;
-    background: rgba(255, 0, 0, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.22);
+    background: color-mix(in srgb, var(--error-color) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--error-color) 22%, transparent);
     border-radius: 10px;
 }
 

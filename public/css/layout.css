@@ -66,11 +66,11 @@ body::after {
 
 /* --- Layout --- */
 .stepper-btn:hover {
-    background: rgba(147, 161, 161, 0.1);
+    background: color-mix(in srgb, var(--text-color) 10%, transparent);
 }
 
 .stepper-btn:active {
-    background: rgba(147, 161, 161, 0.2);
+    background: color-mix(in srgb, var(--text-color) 20%, transparent);
 }
 
 .stepper-control {
