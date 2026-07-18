@@ -42,6 +42,13 @@ export function ShareModal() {
     const [numLoops, setNumLoops] = useState(1);
     const [addEnding, setAddEnding] = useState(true);
 
+    // Opt-in per-link: when on, the shared link lands on the AuditionOverlay
+    // (VISION.md teacher→student flow — the band ready to play in one tap).
+    // Defaults OFF so the plain-editor landing stays the unsurprising default
+    // (Brandon's call at #1126 review). Ignored by MIDI/WAV export; only
+    // `generateShareUrl` reads it (appends `autoplay=1`).
+    const [autoplayOnOpen, setAutoplayOnOpen] = useState(false);
+
     const [filename, setFilename] = useState('My Song');
 
     const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -69,6 +76,7 @@ export function ShareModal() {
         includeDrums,
         numLoops,
         addEnding,
+        autoplay: autoplayOnOpen,
         filename: filename.replace(/[^a-zA-Z0-9\s\-_()]/g, '').trim() || 'My Song',
     });
 
@@ -323,6 +331,17 @@ export function ShareModal() {
                                     Generates a unique URL containing your exact mixer levels and
                                     instrument choices.
                                 </p>
+                                <SettingRow
+                                    label="Start playing on open"
+                                    description="The link lands with the band ready — one tap and it plays."
+                                >
+                                    <Toggle
+                                        id="autoplayShareToggle"
+                                        checked={autoplayOnOpen}
+                                        onChange={setAutoplayOnOpen}
+                                        ariaLabel="Start playing on open"
+                                    />
+                                </SettingRow>
                                 <div class="flex-row share-actions">
                                     <button
                                         class="primary-btn flex-1 share-action-btn"

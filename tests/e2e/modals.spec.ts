@@ -212,6 +212,55 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#shareOverlay', { state: 'hidden' });
     });
 
+    // #1126: the marquee teacher→student flow (VISION.md) — a shared link that
+    // lands with the band already playing. The autoplay flow was fully built
+    // (sharing.ts + AuditionOverlay) but had zero UI producers until this toggle.
+    // The toggle defaults OFF (plain-editor landing stays the default); turning
+    // it on opts a link into the autoplay landing.
+    test('Cloud Link opts into autoplay=1 only when the toggle is on', async ({ page }) => {
+        // Capture what Copy Link writes by stubbing writeText, rather than reading
+        // the clipboard back: navigator.clipboard.readText() rejects with
+        // "Document is not focused" in headless CI (the page has no focus), so a
+        // clipboard-read assertion passes locally but flakes in CI.
+        await page.evaluate(() => {
+            const w = window as unknown as { __copied: string[] };
+            w.__copied = [];
+            navigator.clipboard.writeText = (t: string) => {
+                w.__copied.push(t);
+                return Promise.resolve();
+            };
+        });
+        const lastCopied = () =>
+            page.evaluate(() => {
+                const copied = (window as unknown as { __copied: string[] }).__copied;
+                return copied[copied.length - 1] ?? '';
+            });
+
+        await page.locator('.chart-surface__share-btn').click();
+        await page.waitForSelector('#shareOverlay', { state: 'visible' });
+
+        // Defaults OFF → the copied link lands on the plain editor (no flag).
+        const toggle = page.getByRole('switch', { name: 'Start playing on open' });
+        // The checkbox itself is visually hidden behind the slider; the label
+        // forwards clicks to it.
+        const toggleLabel = page.locator('label[for="autoplayShareToggle"]');
+        await expect(toggle).not.toBeChecked();
+        await page.getByRole('button', { name: 'Copy Link' }).click();
+        await expect.poll(lastCopied).not.toContain('autoplay');
+
+        // Turning it on adds the flag — the link lands on the AuditionOverlay.
+        await toggleLabel.click();
+        await expect(toggle).toBeChecked();
+        await page.getByRole('button', { name: 'Copy Link' }).click();
+        await expect.poll(lastCopied).toContain('autoplay=1');
+    });
+
+    test('a shared link with autoplay=1 lands on the AuditionOverlay', async ({ page }) => {
+        await gotoHydrated(page, '/?autoplay=1');
+        await expect(page.locator('.audition-overlay')).toBeVisible();
+        await expect(page.getByTestId('audition-play')).toBeVisible();
+    });
+
     test('Library — three modes accessible from the topbar', async ({ page }) => {
         // Topbar 📚 Library on desktop; overflow → Library on mobile.
         const topbarBtn = page
