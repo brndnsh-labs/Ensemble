@@ -56,9 +56,26 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
    trace whether `FLUSH` reaches the thing you're resetting before assuming it's a fresh-start
    concern only.
 
+6. **`recursiveSafeSync` (`engine/worker-utils.ts`, called from `logic-worker.ts`) DEEP-MERGES
+   object-valued synced fields into the worker's existing mirror in place** — it replaces arrays
+   and scalars wholesale but recurses
+   into plain objects, mutating the *same* worker-side object rather than swapping in the fresh
+   one from the main thread. So after a mid-play change regenerates an object field (e.g. the
+   soloist session seed on a key/tempo change), the worker's copy has **new contents but the same
+   object identity**. Any cache keyed on that identity — a `WeakMap<seed, …>`, an
+   `if (obj === lastObj)` guard — is therefore a silent staleness bug: the key is reference-equal,
+   so the cache serves the *old* digest against the *new* contents, and it only manifests after a
+   live change (never at playback-start, never in a fresh-object unit test). Fix: stamp a **content
+   token** into the object at generation time (a djb2/content hash — `seedId` on `SoloistSessionSeed`
+   is the precedent) and key/validate the cache on that token, not on object identity. This bit the
+   #1157 Q&A-hang digest cache; the regression guard is `tests/unit/engine/qa-hang-digest-cache.test.ts`,
+   which mutates a seed **in place** to reproduce what the deep-merge does. When adding any
+   identity-keyed cache over a synced object field, assume its identity is stable across content
+   changes and reach for a content token instead.
+
 ## Effects & reactivity (`state-effects.ts`)
 
-6. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single
+7. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single
    dispatch.** During playback the auto-conductor (`autoIntensity`, default ON) dispatches
    `SET_BAND_INTENSITY` / `UPDATE_CONDUCTOR_DECISION` / `UPDATE_HB` roughly every step while an
    intensity ramp is in flight (driven from `scheduler-core.ts`'s per-step
@@ -72,7 +89,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
    `playback.step` itself is not a dispatch (`// @direct-mutation` in `scheduler-core.ts`), so
    it's the conductor's ramp dispatches to watch for, not the tick.
 
-7. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
+8. **Audio-up side effects belong on `initAudio()` (`engine.ts`), not on the
    `ACTIONS.INIT_AUDIO` dispatch.** `dispatch(ACTIONS.INIT_AUDIO)` fires from exactly one place
    (`PacksSettings.tsx`'s `ensureAudio()`, opening the Sounds panel) and is handled by exactly
    one `state-effects.ts` case. Every other way audio comes up — the play path
@@ -85,7 +102,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
 
 ## Practice loop / step framing (`section-overrides.ts`, `practice-controller.ts`)
 
-8. **The worker consumes a monotonic absolute `step`** — it buckets notes by `n.step` and its
+9. **The worker consumes a monotonic absolute `step`** — it buckets notes by `n.step` and its
    per-instrument buffer-head bookkeeping only ever advances forward. Section-practice looping
    (`foldPracticeStep` in `engine/section-overrides.ts`) therefore does **not** wrap
    `playback.step` itself; it folds only the *musical* position (`chord`/`section` lookups,
@@ -96,26 +113,26 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
    no loop is active (`loopStartStep < 0`), which is what keeps normal (non-looping) playback
    byte-for-byte unchanged.
 
-9. **A new live-audio-handle field on any state slice (`GainNode`, a voice handle closing over
-   the live `AudioContext`) must be nulled in *both* offline-render clone hosts**, not just
-   declared: `audio-export.ts`'s `cloneStateForRender` and `scripts/mix-report.ts`'s inline
-   clone. Both spread the whole slice then explicitly null the known handle fields
-   (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `activeChordVoices`/`lastChordKey`
-   on `playback`). A new handle rides through the spread un-nulled and its first
-   choke/ramp during an offline render pokes a **live-context** node — usually silent (the
-   choke's try/catch swallows the `InvalidStateError`), so nothing crashes, it's just a stale
-   cross-context reference. When adding a live-handle field, grep an existing one on that slice
+10. **A new live-audio-handle field on any state slice (`GainNode`, a voice handle closing over
+    the live `AudioContext`) must be nulled in *both* offline-render clone hosts**, not just
+    declared: `audio-export.ts`'s `cloneStateForRender` and `scripts/mix-report.ts`'s inline
+    clone. Both spread the whole slice then explicitly null the known handle fields
+    (`lastHatGain`/`lastRideGain`/`lastCrashGain` on `groove`; `activeChordVoices`/`lastChordKey`
+    on `playback`). A new handle rides through the spread un-nulled and its first
+    choke/ramp during an offline render pokes a **live-context** node — usually silent (the
+    choke's try/catch swallows the `InvalidStateError`), so nothing crashes, it's just a stale
+    cross-context reference. When adding a live-handle field, grep an existing one on that slice
    to enumerate every reset site and add the new field at each.
 
 ## Persistence / versioning
 
-10. **App version display is build-time, not hand-maintained.** `config.ts`'s `APP_VERSION`
+11. **App version display is build-time, not hand-maintained.** `config.ts`'s `APP_VERSION`
     reads `typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'` — a Vite `define`
     injects the real CalVer + git-REV literal at build time; the `typeof` guard exists because
     Vitest doesn't apply Vite's `define`, and a bare reference to the global would throw across
     the whole suite (`config.ts` is imported repo-wide). Don't hand-bump a version constant here.
 
-11. **The build REV is dirty-aware** (`vite.config.ts` `computeBuildRev()`): a clean tree
+12. **The build REV is dirty-aware** (`vite.config.ts` `computeBuildRev()`): a clean tree
     stamps the bare short SHA; a dirty tree stamps `<head>-<sig>` where `<sig>` hashes
     `git diff HEAD` + the porcelain list, so a redeploy of uncommitted work is distinguishable
     from the last one. When verifying a test/prod deploy landed, check the **printed Built
@@ -124,7 +141,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
 
 ## Gating dev-only code
 
-12. **Gate main-thread code that must not ship to prod on `import.meta.env.DEV`, not
+13. **Gate main-thread code that must not ship to prod on `import.meta.env.DEV`, not
     `import.meta.env.MODE`.** `npm run build` runs `vite build --mode test`, so `MODE === 'test'`
     in the *production* bundle too — a `MODE`-gated branch ships live. `DEV` is `true` under the
     Playwright e2e dev server and `false` under `vite build`, so a `DEV`-gated branch (e.g.
@@ -136,7 +153,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
 
 ## Product-identity constraint on this layer
 
-13. **Ensemble is "a fancy metronome at its core"** — stable, predictable time is a load-bearing
+14. **Ensemble is "a fancy metronome at its core"** — stable, predictable time is a load-bearing
     product promise (the practicing-musician persona mutes their own instrument and plays along;
     it cannot lock to a reference that moves). Any change that destabilizes tempo/timing by
     default — anywhere in this layer's transport/BPM path (`app-controller.ts` `setBpm`,
@@ -146,7 +163,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
 
 ## Config-semantics changes
 
-14. **Changing what a config value *means*** (units, scaling, denomination — e.g. the BPM-unit
+15. **Changing what a config value *means*** (units, scaling, denomination — e.g. the BPM-unit
     change for compound meters) **must migrate authored data in the same commit, not just code.**
     Grep `data/` and any `presets.ts`/`fixtures.ts`/`defaults.ts` for the changed field; a
     built-in preset's numeric value was tuned under the *old* interpretation and critique tests
