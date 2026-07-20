@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../form-analysis.js';
-import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
+import type { EnsembleState, Mutable, SoloistExpression, SoloistQaHang } from '../types.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveSoloistStyle } from './soloist-config.js';
@@ -60,6 +60,208 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 // the envelope is always on in normal playback (default `true`). Kept off the state
 // slice deliberately: it isn't persisted, synced, or user-settable, just a test hook.
 export const SOLOIST_VELOCITY_ENVELOPE = { enabled: true };
+
+// --- #1157 — Q&A hang windows for the comper's answering gesture ---
+// The seed plans each 4-bar block's question→answer pair (#1009): the question
+// cadence hangs on a pinned tension, rings into a carved breath, and the answer
+// half re-enters after it. This helper is the ONE place that maps those seed
+// positions into the live step frame (the same `loopLengthSteps` modulo the
+// emit path uses — NOT `arranger.totalSteps`), so tick-logic can publish a
+// digested window through the coordination context and the comper never touches
+// the raw seed. Everything here is a pure function of (seed, step) — no session
+// state, no PRNG — so the live and MIDI-export hosts agree by construction.
+
+/** In-loop precomputed window (cached per seed — see qaWindowCache). */
+interface QaWindowInLoop {
+    pc: number;
+    drawSalt: number;
+    hangStart: number;
+    echo: number;
+    answerEntry: number;
+    resolutionBarStart: number;
+    resolutionBarEnd: number;
+}
+
+// Cache the O(notes²) pairing scan per seed. Validity is (seedId, stepsPerBeat,
+// stepsPerMeasure, totalSteps) — recomputed on any mismatch.
+//
+// `seedId` is NOT redundant with the WeakMap's identity key: on the WORKER a
+// regenerated seed arrives through `recursiveSafeSync`, which deep-merges a
+// plain-object field into the existing target instead of replacing it, so
+// `soloist.session.seed` keeps its object identity while its `notes` are swapped
+// underneath (mid-playback key change / chart edit — `regenerateSessionSeeds` in
+// state-effects.ts). Identity alone would serve the OLD seed's hang pitch classes
+// against the NEW line until stop→play. The token changes every generation, so it
+// catches exactly that case; the meter/length fields cover re-keying when the
+// grid changes. (Seeds with no `seedId` — hand-built test fixtures — fall back to
+// identity-only caching, which is correct for immutable fixtures.)
+const qaWindowCache = new WeakMap<
+    object,
+    { seedId: number; spb: number; spm: number; total: number; windows: QaWindowInLoop[] }
+>();
+
+function computeQaWindows(
+    seed: { notes: any[]; loopLengthSteps: number },
+    spb: number,
+    spm: number,
+    totalSteps: number,
+): QaWindowInLoop[] {
+    const loopLen = seed.loopLengthSteps || 64;
+    const windows: QaWindowInLoop[] = [];
+    if (!seed.notes?.length || loopLen <= 0) {
+        return windows;
+    }
+    const inLoop = (s: number) => ((s % loopLen) + loopLen) % loopLen;
+
+    // Session salt for the comper's participation draw: the seed's content hash
+    // (`seedId`, stamped by generateSessionSeed over every note), so which
+    // questions get answered varies with the generated line instead of being
+    // frozen to chart position — and is stable for as long as that line is.
+    // Falls back to the form length for hand-built fixtures with no seedId.
+    const drawSalt = (seed as { seedId?: number }).seedId ?? seed.loopLengthSteps | 0;
+
+    // Apex positions per development-cycle window, mirroring the live engine's
+    // signature-peak scan in getSoloistNotePhraseFirst (TARGET_PEAK_WINDOW_STEPS
+    // = 192, loopsPerWindow, cycleLen — keep the constants in lockstep with
+    // that block). Needed because the live `qaRole === 'question'` branch
+    // APEX-DOVETAILS the last question within 2 bars of its window's apex —
+    // overriding the hang to the money note's lower neighbor — so the seed pc
+    // is NOT what sounds there. Those windows are excluded below: the apex
+    // itself answers that question, and the comper must not step on the peak.
+    const effTotal = totalSteps > 0 ? totalSteps : loopLen;
+    const loopsPerWindow = Math.max(1, Math.round(192 / effTotal));
+    const cycleLen = loopsPerWindow * effTotal;
+    const apexByCycle = new Map<number, { midi: number; step: number }>();
+    for (const n of seed.notes) {
+        if (n.step < 0) {
+            continue;
+        }
+        const sIL = inLoop(n.step);
+        const cyc = Math.floor(sIL / cycleLen);
+        const cur = apexByCycle.get(cyc);
+        if (!cur || n.midi > cur.midi) {
+            apexByCycle.set(cyc, { midi: n.midi, step: sIL });
+        }
+    }
+
+    for (const q of seed.notes) {
+        if (q.qaRole !== 'question' || q.step < 0) {
+            continue;
+        }
+        const qIL = inLoop(q.step);
+        // Dovetail exclusion — mirror the live gate exactly: apex strictly
+        // ahead of the question, within 2 bars.
+        const apex = apexByCycle.get(Math.floor(qIL / cycleLen));
+        if (apex) {
+            const stepsToApex = (((apex.step - qIL) % loopLen) + loopLen) % loopLen;
+            if (stepsToApex > 0 && stepsToApex <= spm * 2) {
+                continue;
+            }
+        }
+        const hangEnd = qIL + (q.durationSteps || 1);
+        // Paired answer cadence: the nearest 'answer' after this question within
+        // the same 4-bar block. The seeder never half-applies a pair (#1009), so
+        // an unpaired question here just means the block layout was unusual —
+        // skip rather than guess.
+        let answerIL = -1;
+        let entryIL = -1;
+        for (const m of seed.notes) {
+            if (m.step < 0) {
+                continue;
+            }
+            const mIL = inLoop(m.step);
+            if (m.qaRole === 'answer' && mIL > qIL && mIL - qIL <= 4 * spm) {
+                if (answerIL < 0 || mIL < answerIL) {
+                    answerIL = mIL;
+                }
+            }
+            // Soloist re-entry: the first sounding note strictly after the hang
+            // (the breath is carved silence, so this IS the answer half's start).
+            if (mIL > hangEnd && (entryIL < 0 || mIL < entryIL)) {
+                entryIL = mIL;
+            }
+        }
+        if (answerIL < 0) {
+            continue;
+        }
+        if (entryIL < 0 || entryIL > answerIL) {
+            entryIL = answerIL;
+        }
+        // Echo one beat into the hang — the comper lets the question breathe
+        // before the nod — and always strictly inside the soloist's silence.
+        const echo = Math.min(qIL + spb, entryIL - 1);
+        if (echo <= qIL) {
+            continue; // no room to interject — skip the window entirely
+        }
+        const resolutionBarStart = Math.floor(answerIL / spm) * spm;
+        windows.push({
+            pc: ((q.midi % 12) + 12) % 12,
+            drawSalt,
+            hangStart: qIL,
+            echo,
+            answerEntry: entryIL,
+            resolutionBarStart,
+            resolutionBarEnd: resolutionBarStart + spm,
+        });
+    }
+    windows.sort((a, b) => a.hangStart - b.hangStart);
+    return windows;
+}
+
+/**
+ * The Q&A window covering `step`, or null. Coverage runs from the question
+ * cadence through the end of the answer cadence's bar; blocks tile without
+ * overlap, so at most one window contains any step.
+ */
+export function getQaHangAt(
+    seed: { notes: any[]; loopLengthSteps: number; seedId?: number } | null,
+    step: number,
+    stepsPerBeat: number,
+    stepsPerMeasure: number,
+    totalSteps: number,
+): SoloistQaHang | null {
+    if (!seed || stepsPerBeat <= 0 || stepsPerMeasure <= 0) {
+        return null;
+    }
+    const seedId = seed.seedId ?? 0;
+    let cached = qaWindowCache.get(seed);
+    if (
+        !cached ||
+        cached.seedId !== seedId ||
+        cached.spb !== stepsPerBeat ||
+        cached.spm !== stepsPerMeasure ||
+        cached.total !== totalSteps
+    ) {
+        cached = {
+            seedId,
+            spb: stepsPerBeat,
+            spm: stepsPerMeasure,
+            total: totalSteps,
+            windows: computeQaWindows(seed, stepsPerBeat, stepsPerMeasure, totalSteps),
+        };
+        qaWindowCache.set(seed, cached);
+    }
+    const loopLen = seed.loopLengthSteps || 64;
+    const stepInLoop = ((step % loopLen) + loopLen) % loopLen;
+    const loopBase = step - stepInLoop;
+    for (const w of cached.windows) {
+        if (stepInLoop >= w.hangStart && stepInLoop < w.resolutionBarEnd) {
+            return {
+                pc: w.pc,
+                drawSalt: w.drawSalt,
+                hangStartStep: loopBase + w.hangStart,
+                echoStep: loopBase + w.echo,
+                answerEntryStep: loopBase + w.answerEntry,
+                resolutionBarStart: loopBase + w.resolutionBarStart,
+                resolutionBarEnd: loopBase + w.resolutionBarEnd,
+            };
+        }
+        if (w.hangStart > stepInLoop) {
+            break; // sorted — nothing later can contain this step
+        }
+    }
+    return null;
+}
 
 // --- Key / diatonic vocabulary (self-contained, like the rest of this engine) ---
 // Note-name → pitch class, including the sharp spellings the arranger emits.

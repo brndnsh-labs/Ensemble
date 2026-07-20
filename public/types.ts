@@ -420,6 +420,51 @@ export interface SeedNote {
 export interface SoloistSessionSeed {
     notes: SeedNote[];
     loopLengthSteps: number;
+    /**
+     * #1157 — monotonic generation token, stamped by `generateSessionSeed`.
+     * Load-bearing on the WORKER: `recursiveSafeSync` deep-merges a regenerated
+     * seed INTO the existing object, so seed identity is NOT a reliable "is this
+     * still the same seed" signal there (a mid-playback key change swaps `notes`
+     * under a stable object reference). Any worker-side cache derived from the
+     * seed must include this in its validity check — see `getQaHangAt`'s
+     * `qaWindowCache` in soloist-phrase-first.ts. Optional so hand-built test
+     * fixtures and any legacy persisted shape still typecheck.
+     */
+    seedId?: number;
+}
+
+/**
+ * #1157 — a digested soloist Q&A window, in ABSOLUTE (monotonic transport)
+ * steps. Derived per tick from the session seed by `getQaHangAt`
+ * (soloist-phrase-first.ts) and published through the coordination context
+ * (`soloistQaHang`) so the comper can answer the question without reading the
+ * raw seed. Worker-internal — never crosses to the main thread.
+ */
+export interface SoloistQaHang {
+    /** Pitch class (0-11) of the question's hanging tension tone. Development
+     *  preserves non-dovetail questions verbatim modulo octave folding, so the
+     *  PC is depth-stable even though the sounding octave may shift. Questions
+     *  the live engine apex-dovetails (the last hang before a cycle's peak is
+     *  overridden to the money note's neighbor — see the `qaRole === 'question'`
+     *  branch in getSoloistNotePhraseFirst) sound a DIFFERENT pitch than the
+     *  seed pin, so the digest excludes those windows entirely. */
+    pc: number;
+    /** Session-seed-derived salt folded into the comper's participation draw,
+     *  so which questions get answered varies per session instead of being
+     *  chart-frozen. Stable within a session (pure function of the seed). */
+    drawSalt: number;
+    /** Step where the question cadence lands and starts ringing. */
+    hangStartStep: number;
+    /** Step for the comper's echo interjection (~a beat into the hang, always
+     *  strictly before the soloist re-enters). */
+    echoStep: number;
+    /** Step where the soloist re-enters (first sounding answer-half note). */
+    answerEntryStep: number;
+    /** [start, end) of the bar containing the answer cadence — the window where
+     *  a comp top voice may resolve onto a pillar with the soloist. */
+    resolutionBarStart: number;
+    /** Exclusive end of the resolution bar. */
+    resolutionBarEnd: number;
 }
 
 /**

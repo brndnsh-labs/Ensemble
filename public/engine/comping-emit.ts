@@ -1,8 +1,10 @@
 import type { TimeSignatureConfig } from '../config.js';
-import type { Chord, EnsembleState, StepInfo } from '../types.js';
+import type { Chord, EnsembleState, SoloistQaHang, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import type { CompingState } from './comping-state.js';
 import { getBandPocket } from './coordination-engine.js';
+import { scrambleHash } from './hash-utils.js';
+import { chordTargetTones } from './soloist-pitch-engine.js';
 import {
     buildResolvingAlteredVoicing,
     getMidiVoicing,
@@ -47,6 +49,12 @@ export interface AccompanimentCoordination {
     soloistBusy?: boolean;
     soloistActive?: boolean;
     soloistMidi?: number;
+    // writer: tick-logic soloist producer (digested from the session seed by
+    // getQaHangAt — the comper never reads the raw seed)
+    // why (#1157): the soloist's question is hanging (or resolving) right now —
+    // the comper may CATCH it: one lean echo of the hang tone in the carved
+    // breath, and a top-voice re-landing with the soloist's answer.
+    soloistQaHang?: SoloistQaHang | null;
     bassHit?: boolean;
     bassMidi?: number;
     kickHit?: boolean;
@@ -513,6 +521,63 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         compingState.ringSuppressChordKey = null;
     }
 
+    // --- #1157: the comper CATCHES the soloist's question ---
+    // #1009 carves a real breath after every question cadence — the design's
+    // "implied other voice" gap. When a window is live (soloistQaHang, digested
+    // from the seed by the soloist producer), the comper may answer it: ONE lean
+    // echo of the hang tone placed a beat into the ring, and a top-voice
+    // re-landing during the answer bar (the voicing block below does both). The
+    // echo is a forced attack, deliberately overriding the phrase-end breath
+    // above — the comper pulls back with the soloist, then places one nod into
+    // the silence. Ring genres only: the echo must sustain into the resolution
+    // to read as an answer rather than a stray stab. Participation is a
+    // deterministic per-question-occurrence draw that warms with the session
+    // (mirroring loopLift's entrance ramp): the band talks more once it has
+    // settled in. Stateless by design — a pure function of (seed, step,
+    // loopCount), no carryover — so live playback and MIDI export render the
+    // same gesture from the same inputs. (One shared caveat, common to every
+    // loop-keyed feature: `currentLoopCount` reaches the live worker via the
+    // LOOP_BOUNDARY delta while buffers fill a lookahead ahead, so a question
+    // whose echo sits right at an arrangement-lap boundary can draw against an
+    // adjacent loop tier live vs export. Boundary windows only.)
+    const qaHang = coordination.soloistQaHang;
+    let qaEcho = false;
+    let qaResolution = false;
+    // Style gate: 'smart' AND 'jazz' both land in this standard emit lane —
+    // Smart Genres sets style 'jazz' (not 'smart') for Jazz/Blues (see the
+    // Style Override in accompaniment.ts), so gating on 'smart' alone would
+    // leave the gesture dead on the production genre-picker path (review P0).
+    // 'arp'/'pad' stay excluded: they own their own isHit contracts above and
+    // a forced attack would break the pluck-per-beat / single-strike idioms.
+    // (Acoustic therefore only gets the catch under manually-picked Smart
+    // Comping — its genre default is 'arp'.) Bossa also carries style 'jazz'
+    // but keeps genre 'Bossa Nova' through the override, so the RING gate
+    // still excludes it.
+    const qaStyleLive = chords.style === 'smart' || chords.style === 'jazz';
+    if (qaHang && RING_THROUGH_GENRES.has(genre) && qaStyleLive) {
+        const qaLoop = Math.min(Math.max(playback.currentLoopCount ?? 0, 0), 3);
+        // ~25% of questions answered on loop 0 → ~55% by loop 3+.
+        const answerRate = 0.25 + 0.1 * qaLoop;
+        // Keyed on the hang's absolute step XOR the seed's salt: every
+        // occurrence of every question draws independently and reproducibly
+        // WITHIN a session, but a fresh session seed reshuffles which
+        // questions get answered — without the salt the draw is chart-frozen
+        // (the same questions answered or permanently ignored on every
+        // pass through a chart, the dead-ceiling trap; review P1).
+        if (scrambleHash((qaHang.hangStartStep * 13 + 41) ^ qaHang.drawSalt) < answerRate) {
+            if (step === qaHang.echoStep) {
+                qaEcho = true;
+                isHit = true; // insert if the cell was silent, re-voice if not
+            } else if (
+                isHit &&
+                step >= qaHang.resolutionBarStart &&
+                step < qaHang.resolutionBarEnd
+            ) {
+                qaResolution = true;
+            }
+        }
+    }
+
     if (isHit) {
         const isDownbeat = stepInfo ? stepInfo.isBeatStart : measureStep % ts.stepsPerBeat === 0;
         const isStructural = stepInfo
@@ -603,7 +668,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
 
         // Expanded dynamic range: 0.5 + intensity * 0.9 (Range: 0.5 to 1.4)
         const intensityFactor = 0.5 + intensity * 0.9;
-        const velocity = (isStructural ? 0.6 : isDownbeat ? 0.5 : 0.35) * intensityFactor;
+        let velocity = (isStructural ? 0.6 : isDownbeat ? 0.5 : 0.35) * intensityFactor;
 
         // Tighten up durations at high intensity/tempo
         if (intensity > 0.7) {
@@ -866,7 +931,11 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         // leaner, moving answer on offbeat repeats of the same chord, so the bar
         // breathes instead of re-striking the same notes. Sustained-comp genres
         // only; the percussive-identity lanes early-return well before here.
-        if (SUSTAINED_COMP_GENRES.has(genre) && finalVoicingMidis.length > 0) {
+        // `!qaEcho` (#1157): the echo replaces the voicing wholesale below —
+        // running the economy first would pollute the statement memory with a
+        // statement that never sounds, and the ring decision could suppress a
+        // future real hit on behalf of a 2-voice interjection.
+        if (SUSTAINED_COMP_GENRES.has(genre) && finalVoicingMidis.length > 0 && !qaEcho) {
             // Capture the statement key BEFORE the economy updates it, so we can
             // tell whether THIS hit is the statement (the ring is decided on
             // statements only — see below).
@@ -944,6 +1013,104 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                     durationSteps = Math.max(durationSteps, ringSteps);
                     compingState.ringSuppressStep = step + suppressOff;
                     compingState.ringSuppressChordKey = ringChordKey;
+                }
+            }
+        }
+
+        // --- #1157: Q&A response voicing (see the catch block above) ---
+        if (qaEcho && qaHang) {
+            // ECHO — catch the hang. A lean two-voice fragment: the question's
+            // own tension PC on top, folded near the comp's current ceiling so
+            // it sits UNDER the soloist's sounding hang, with one guide tone
+            // below for harmonic footing. The tension against the chord is the
+            // point — the comper agrees the question is open — but the voicing
+            // must not turn agreement into mud: the support sits 3-11 semitones
+            // under the top (nearest a 5th — the classic shell distance), never
+            // a semitone/minor-9th rub (wrong outside dom♭9 contexts), never a
+            // unison/octave double. No support in range → a single-tone echo.
+            const refTop = finalVoicingMidis.length > 0 ? Math.max(...finalVoicingMidis) : 76;
+            const pcAtOrBelow = refTop - (((refTop % 12) - qaHang.pc + 12) % 12);
+            let echoTop = refTop - pcAtOrBelow <= 6 ? pcAtOrBelow : pcAtOrBelow + 12;
+            while (echoTop > 84) {
+                echoTop -= 12;
+            }
+            while (echoTop < 60) {
+                echoTop += 12;
+            }
+            // Don't land in exact unison with the soloist's held hang — a
+            // sustained piano/lead unison phases; an octave below reads as the
+            // catch. (soloistMidi is the last emitted lead note — during the
+            // hang, that IS the question tone.)
+            const heldSoloMidi = coordination.soloistMidi || 0;
+            if (heldSoloMidi > 0 && echoTop === heldSoloMidi && echoTop - 12 >= 52) {
+                echoTop -= 12;
+            }
+            const { guides, pillars } = chordTargetTones(chord.rootMidi, chord.quality);
+            let support = -1;
+            let bestSpread = Number.POSITIVE_INFINITY;
+            for (const pc of [...guides, ...pillars]) {
+                const cand = echoTop - (((((echoTop % 12) - pc) % 12) + 12) % 12);
+                const dist = echoTop - cand;
+                if (dist < 3 || dist > 11 || cand < 52) {
+                    continue;
+                }
+                const spread = Math.abs(dist - 7);
+                if (spread < bestSpread) {
+                    bestSpread = spread;
+                    support = cand;
+                }
+            }
+            voicing =
+                support > 0
+                    ? [getFrequency(support), getFrequency(echoTop)]
+                    : [getFrequency(echoTop)];
+            // Lean interjection: the offbeat tier regardless of where the echo
+            // landed metrically — a nod under the band, not a new statement.
+            velocity = Math.min(velocity, 0.35 * intensityFactor);
+            // Ring TOWARD the soloist's answer. In practice the #707 clamp
+            // below usually releases the echo at the chord boundary just
+            // before the answer lands (no pedal across the change — correct);
+            // the connection the listener hears is the sustained decay into
+            // the re-entry, not a literal overlap.
+            durationSteps = Math.max(durationSteps, qaHang.answerEntryStep - step + 0.5);
+        } else if (qaResolution && qaHang) {
+            // RESOLUTION — re-land WITH the soloist: if this hit's emitted top
+            // voice is a non-pillar, snap it down onto the nearest pillar PC so
+            // the comp agrees with the answer instead of re-tensioning over it.
+            // Bar-wide (any hit in the answer cadence's bar) and pitch-only —
+            // hit count, rhythm, and the #715 economy stay untouched.
+            const resMidis = getMidiVoicing(voicing);
+            if (resMidis.length > 0) {
+                resMidis.sort((a, b) => a - b);
+                const top = resMidis[resMidis.length - 1];
+                const { pillars } = chordTargetTones(chord.rootMidi, chord.quality);
+                if (!pillars.includes(((top % 12) + 12) % 12)) {
+                    // Scan down for the nearest pillar that doesn't collide
+                    // with an already-voiced tone (within 2 semitones — that
+                    // covers both the literal double and the m2 rub the echo
+                    // block forbids, e.g. snapping onto the F♯ of a ♯11
+                    // voicing). If every pillar below is taken, DROP the
+                    // tension top instead — the remaining voicing is all
+                    // chord tones, the most pianistic "agree" available.
+                    let snapped = -1;
+                    for (let down = 1; down <= 11; down++) {
+                        const cand = top - down;
+                        if (!pillars.includes(((cand % 12) + 12) % 12)) {
+                            continue;
+                        }
+                        if (resMidis.some((m) => m !== top && Math.abs(m - cand) <= 2)) {
+                            continue;
+                        }
+                        snapped = cand;
+                        break;
+                    }
+                    if (snapped > 0) {
+                        resMidis[resMidis.length - 1] = snapped;
+                        voicing = resMidis.map((m) => getFrequency(m));
+                    } else if (resMidis.length > 1) {
+                        resMidis.pop();
+                        voicing = resMidis.map((m) => getFrequency(m));
+                    }
                 }
             }
         }

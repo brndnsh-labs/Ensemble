@@ -13,7 +13,7 @@ import {
 import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { isPowerChordChordsVoice } from './instrument-registry.js';
-import { getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
+import { getQaHangAt, getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
 import { getChordAtStep } from './worker-utils.js';
 
 // #698 — Metal's crunch power chords anchor to E2 (MIDI 40), the standard-tuning
@@ -185,6 +185,19 @@ export function generateNotesForStep(
             // this tick, sees this tick's session state.
             coordination.soloistSharedHookBuffer = soloist.session.memory.sharedHookBuffer ?? [];
             coordination.soloistSeed = soloist.session.seed ?? null;
+            // why (#1157): digested Q&A window so the comper can answer the
+            // question's hang (see the soloistQaHang field comment in
+            // createCoordinationContext). Published every soloist tick — inside
+            // a window it carries the hang; outside (or pre-seed) it's null, so
+            // the comper's gesture self-disables with the soloist lane.
+            // writer: soloist producer (this line); readable-after: soloist producer (chords, harmony)
+            coordination.soloistQaHang = getQaHangAt(
+                soloist.session.seed ?? null,
+                step,
+                ts.stepsPerBeat,
+                ts.beats * ts.stepsPerBeat,
+                arranger.totalSteps,
+            );
         }
     }
 

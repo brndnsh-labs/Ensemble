@@ -620,15 +620,45 @@ function polishCadenceLandings(
  * @param _intensity - Reserved for future intensity-aware seeding; currently unused.
  * @param seedStr - Optional PRNG seed string.  Omit for a random seed each call.
  * @returns `notes` is sorted ascending by `step`.  `loopLengthSteps` is the total length of one
- *   arrangement loop in scheduler steps (matches the arranger's unrolled length).
+ *   arrangement loop in scheduler steps (matches the arranger's unrolled length).  `seedId` is a
+ *   content hash of the emitted notes — see {@link computeSeedId}.
  */
+// #1157 — content token stamped on every session seed.
+//
+// why it exists: the WORKER does not see a regenerated seed as a NEW OBJECT.
+// `recursiveSafeSync` (worker-utils.ts) deep-merges a plain-object field into
+// the existing target rather than replacing it, so `soloist.session.seed` keeps
+// its identity across a mid-playback regeneration (a key change / chart edit
+// while playing — see `regenerateSessionSeeds` in state-effects.ts) while its
+// `notes` are swapped underneath. Any worker-side consumer that caches by seed
+// IDENTITY (the Q&A window digest in soloist-phrase-first.ts) would therefore
+// keep serving the OLD seed's derived data against the new line.
+//
+// why CONTENT-derived and not a counter: a counter would make this function
+// impure (same inputs, different output every call) — against the determinism
+// rule, and it breaks value-equality between two identical generations. A hash
+// over the emitted notes invalidates a cache exactly when the music changed,
+// which is the property the cache actually wants. djb2 over the fields that
+// define a note musically; `loopLengthSteps` seeds it so two same-note seeds on
+// different form lengths still differ.
+function computeSeedId(notes: SeedNote[], loopLengthSteps: number): number {
+    let h = (5381 ^ loopLengthSteps) | 0;
+    for (let i = 0; i < notes.length; i++) {
+        const n = notes[i];
+        h = (Math.imul(h, 33) ^ (n.step | 0)) | 0;
+        h = (Math.imul(h, 33) ^ (n.midi | 0)) | 0;
+        h = (Math.imul(h, 33) ^ (n.durationSteps | 0)) | 0;
+    }
+    return h;
+}
+
 export function generateSessionSeed(
     state: EnsembleState,
     arranger: ArrangerState,
     style: string,
     _intensity?: number,
     seedStr?: string,
-): { notes: SeedNote[]; loopLengthSteps: number } {
+): { notes: SeedNote[]; loopLengthSteps: number; seedId: number } {
     style = resolveSoloistStyle(style, state?.groove?.genreFeel);
 
     // Unroll the arrangement for virtual macro-form (max 128 bars for performance)
@@ -636,7 +666,7 @@ export function generateSessionSeed(
     const { stepMap, sectionMap, totalSteps } = unrolled;
 
     if (!stepMap || stepMap.length === 0) {
-        return { notes: [], loopLengthSteps: 0 };
+        return { notes: [], loopLengthSteps: 0, seedId: computeSeedId([], 0) };
     }
 
     // Seed-generation diagnostics — silent unless the soloist debug flag is on,
@@ -674,7 +704,11 @@ export function generateSessionSeed(
             : sectionMap[sectionMap.length - 1]?.end || 0;
 
     if (!sectionMap || sectionMap.length === 0 || actualTotalSteps === 0) {
-        return { notes: [], loopLengthSteps: actualTotalSteps };
+        return {
+            notes: [],
+            loopLengthSteps: actualTotalSteps,
+            seedId: computeSeedId([], actualTotalSteps),
+        };
     }
 
     // To ensure repetition across identical sections (e.g. AABA form),
@@ -2611,5 +2645,9 @@ export function generateSessionSeed(
     polishedNotes.sort((a: SeedNote, b: SeedNote) => a.step - b.step);
 
     logSeed(`[Seeder Debug] Finished generation. Total seed notes: ${polishedNotes.length}.`);
-    return { notes: polishedNotes, loopLengthSteps: actualTotalSteps };
+    return {
+        notes: polishedNotes,
+        loopLengthSteps: actualTotalSteps,
+        seedId: computeSeedId(polishedNotes, actualTotalSteps),
+    };
 }

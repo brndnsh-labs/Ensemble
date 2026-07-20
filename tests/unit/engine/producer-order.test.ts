@@ -32,6 +32,9 @@ let harmonyCoordinationArg: any = null;
 // reordering regression. We only need the producer to have written
 // coordination.soloistMidi before harmony runs.
 vi.mock('../../../public/engine/soloist-phrase-first.js', () => ({
+    // #1157 — tick-logic's soloist producer digests Q&A windows through this;
+    // null = "no window live", which keeps the comper's catch gesture inert.
+    getQaHangAt: vi.fn(() => null),
     getSoloistNotePhraseFirst: vi.fn(() => ({
         midi: 72,
         freq: 523.25,

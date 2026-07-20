@@ -59,6 +59,9 @@ const harmonySpy = vi.fn(() => [{ midi: 67, freq: 392.0, velocity: 0.5, duration
 // Mock THE production soloist producer (tick-logic calls getSoloistNotePhraseFirst,
 // not the retired legacy getSoloistNote; epic #10).
 vi.mock('../../public/engine/soloist-phrase-first.js', () => ({
+    // #1157 — tick-logic's soloist producer digests Q&A windows through this;
+    // null = "no window live", which keeps the comper's catch gesture inert.
+    getQaHangAt: () => null,
     getSoloistNotePhraseFirst: (...a: any[]) => soloistSpy(...a),
 }));
 vi.mock('../../public/engine/bass-engine.js', () => ({

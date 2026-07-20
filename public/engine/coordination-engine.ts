@@ -1,5 +1,5 @@
 import { getSectionEnergy } from '../form-analysis.js';
-import type { SoloistHook, SoloistSessionSeed, StepInfo } from '../types.js';
+import type { SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
 
 /**
  * Coordination Context Management and Contract Enforcement
@@ -516,6 +516,15 @@ export function createCoordinationContext(
         // readable-after: soloist producer (harmony can read this)
         soloistSharedHookBuffer: [] as SoloistHook[],
         soloistSeed: null as SoloistSessionSeed | null,
+        // why (#1157): the comper's answering gesture. A digested view of the
+        // seed's Q&A window covering the current step (getQaHangAt in
+        // soloist-phrase-first.ts — the frame math lives with the soloist, the
+        // comper reads only this contract surface), or null outside a window /
+        // pre-seed / soloist-disabled. Null default matches soloistSeed's boot
+        // value: no seed, no question, no answer.
+        // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
+        // readable-after: soloist producer (chords/harmony can read this)
+        soloistQaHang: null as SoloistQaHang | null,
         // why: epic-deferred-followups S1(a) — section-boundary lookahead.
         // `upcomingSectionFirstChord` (above) already publishes WHICH chord
         // the next section opens on; these three fields publish the surrounding
