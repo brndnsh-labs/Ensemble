@@ -439,6 +439,41 @@ function snapToNearestPc(midi: number, pcSet: Set<number>): number {
     return midi;
 }
 
+/**
+ * The seed note that OWNS a step: a planned Q&A cadence first, then the hook, else
+ * simply the first note there.
+ *
+ * #1162 — array order at a step is an accident of seed post-processing, not a
+ * musical ranking. The flair pass's Device-1 dotted split (`soloist-seeder.ts`)
+ * re-articulates a long note by emitting its second half at
+ * `step + stepsPerBeat * 1.5` with no occupancy check; that fragment carries the
+ * PARENT's pitch and is produced while the parent is being processed, so it sits
+ * ahead of a cadence that lands on the same step. (The split guard `!qaRole` only
+ * protects the note being split, not wherever its tail lands.) Measured at ~1 seed
+ * in 90 across every preset x 10 genres x both modes; always a `durationSteps: 2`
+ * fragment in front of the cadence, never a hook.
+ *
+ * Reading the role off the fragment cost the cadence both its pinned pitch and its
+ * density-gate exemption — so a question hang could be gated to silence outright —
+ * while `emitsAt`, `isAnchor` and `computeQaWindows` all scan every note at the step
+ * and still expected it to sound. This is the one selector they now share, so the
+ * live emit and its lookahead paths cannot drift apart again.
+ *
+ * Cadence outranks hook because the cadence has a CROSS-LANE contract: the comper
+ * echoes the question's own pitch class via `computeQaWindows`, so losing it makes
+ * another instrument answer a tone the lead never played. A hook loss is contained
+ * inside this lane. (They can't collide in practice — the hook lives at a block's
+ * measure 0, cadences at the end of each half.)
+ */
+function ownerOfStep(atStep: any[]): any {
+    return (
+        atStep.find((n: any) => n?.qaRole === 'question' || n?.qaRole === 'answer') ??
+        atStep.find((n: any) => n?.hookRole) ??
+        atStep[0] ??
+        null
+    );
+}
+
 export function getSoloistNotePhraseFirst(
     state: EnsembleState,
     currentChord: any,
@@ -550,16 +585,25 @@ export function getSoloistNotePhraseFirst(
     const isApexStep = stepInLoop === apexStepInLoop;
 
     // On the apex step, the note we develop is the highest one here (a double-stop
-    // could otherwise hand us a lower voice); elsewhere the first note is fine.
+    // could otherwise hand us a lower voice); elsewhere the note that OWNS the step
+    // (#1162 — see `ownerOfStep`: a planned cadence/hook outranks a split fragment
+    // that merely happens to sit first in the array).
+    //
+    // Preferring the cadence NOTE, not merely reading its role off a different note,
+    // is what keeps the pitch consistent too: `computeQaWindows` digests the question
+    // note's own midi, so the comper's echo would otherwise answer a tone the lead
+    // never played. The apex still outranks both — and a question sharing the apex
+    // step loses nothing, since `computeQaWindows` excludes those windows entirely.
     const primary = isApexStep
         ? here.reduce((hi: any, n: any) => (n.midi > hi.midi ? n : hi), here[0])
-        : here[0];
+        : ownerOfStep(here);
     const isAnchor = here.some((n: any) => n?.isAnchor);
     // #1009 — the seed-planned question/answer cadence role of the note sounding here
     // (set on the LAST note of each half of a 4-bar block; absent otherwise). Drives
     // the density-gate exemption (a cadence never gets eroded) and the development
     // asymmetry in the pitch block below (answers re-land at every depth; questions
-    // roam). Read off `primary` — the note this tick actually develops.
+    // roam). Read off `primary` — which #1162 makes the cadence note whenever one
+    // shares this step, so this can no longer miss it.
     const qaRole = (primary as any)?.qaRole as 'question' | 'answer' | undefined;
     const isQaCadence = qaRole === 'question' || qaRole === 'answer';
     // #1056 — the seed-planned hook figure (the first few notes of a block's measure 0,
@@ -877,20 +921,23 @@ export function getSoloistNotePhraseFirst(
         if (sIL === apexStepInLoop) {
             return moneyNote;
         }
-        // Use the FIRST seed note at that step — mirrors the live non-apex emit
-        // (`primary = here[0]`), so the predicted target matches what will sound
-        // (they'd diverge only on a double-stop). Approximations accepted for this
-        // bounded lookahead: it ignores the density gate (may aim at a step the
-        // gate rests) and re-develops at the CURRENT loop's depth (a next-bar
-        // target across a loop seam will actually voice at the next depth). Both
-        // are rare and only nudge an approach note by a scale step — harmless.
-        let p: any = null;
+        // Use the note that OWNS that step — the same `ownerOfStep` selector the live
+        // emit uses — so the predicted target matches what will actually sound. #1162:
+        // this previously took the first note at the step while the live emit now
+        // prefers a cadence, which would aim an approach 16th at a split fragment's
+        // developed pitch while the beat sounded the cadence's pinned hang — a leading
+        // tone resolving into a note that isn't there. Approximations still accepted
+        // for this bounded lookahead: it ignores the density gate (may aim at a step
+        // the gate rests) and re-develops at the CURRENT loop's depth (a next-bar
+        // target across a loop seam will actually voice at the next depth). Both are
+        // rare and only nudge an approach note by a scale step — harmless.
+        const atStep: any[] = [];
         for (const n of seed.notes as any[]) {
             if (((n.step % loopLen) + loopLen) % loopLen === sIL) {
-                p = n;
-                break;
+                atStep.push(n);
             }
         }
+        const p = ownerOfStep(atStep);
         if (!p || !chord) {
             return null;
         }
