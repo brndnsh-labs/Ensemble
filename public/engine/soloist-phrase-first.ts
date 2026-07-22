@@ -123,11 +123,17 @@ function computeQaWindows(
     // Apex positions per development-cycle window, mirroring the live engine's
     // signature-peak scan in getSoloistNotePhraseFirst (TARGET_PEAK_WINDOW_STEPS
     // = 192, loopsPerWindow, cycleLen — keep the constants in lockstep with
-    // that block). Needed because the live `qaRole === 'question'` branch
-    // APEX-DOVETAILS the last question within 2 bars of its window's apex —
-    // overriding the hang to the money note's lower neighbor — so the seed pc
-    // is NOT what sounds there. Those windows are excluded below: the apex
-    // itself answers that question, and the comper must not step on the peak.
+    // that block). Needed because TWO live branches override a question's hang
+    // pitch near the apex, so the seed pc is NOT what sounds there:
+    //   • the question IS the apex (`stepsToApex === 0`) — `isApexStep` is tested
+    //     BEFORE the `qaRole` branch, so the lead emits the money note, a resolved
+    //     tonic/5th, not the seed's soft-color hang;
+    //   • the APEX DOVETAIL — the last question within 2 bars of the apex is aimed
+    //     at the money note's lower neighbor.
+    // Both are excluded below, for one musical reason: the apex itself answers
+    // that question, and the comper must not step on the peak. (#1159 — the
+    // apex-coincident half was missed on the first cut, so the comper echoed a
+    // soft-color tone the lead never played, right over the climax.)
     const effTotal = totalSteps > 0 ? totalSteps : loopLen;
     const loopsPerWindow = Math.max(1, Math.round(192 / effTotal));
     const cycleLen = loopsPerWindow * effTotal;
@@ -149,12 +155,12 @@ function computeQaWindows(
             continue;
         }
         const qIL = inLoop(q.step);
-        // Dovetail exclusion — mirror the live gate exactly: apex strictly
-        // ahead of the question, within 2 bars.
+        // Apex exclusion — mirror BOTH live overrides: the apex step itself
+        // (distance 0) and the dovetail into it (within 2 bars ahead).
         const apex = apexByCycle.get(Math.floor(qIL / cycleLen));
         if (apex) {
             const stepsToApex = (((apex.step - qIL) % loopLen) + loopLen) % loopLen;
-            if (stepsToApex > 0 && stepsToApex <= spm * 2) {
+            if (stepsToApex <= spm * 2) {
                 continue;
             }
         }

@@ -25,6 +25,7 @@
 //   • windows    — Q&A windows the seed actually planned (sanity: harness can see)
 //   • fired      — windows whose echo is a real paired diff (the catch, live)
 //   • pcMatch    — fired echoes carry the hang PC on top (it echoes, not stabs)
+//   • livePc     — the digest pc IS what the soloist sounds (#1159 cross-check)
 //   • delta      — attacks(on) - attacks(off) ≤ inserted echoes (no spam)
 //   • ramp       — late-lap windows (tier 3+) fire more often than laps 0-1
 //   • resolution — fired windows' answer-bar top voices land chord pillars
@@ -33,7 +34,10 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
-import { getQaHangAt } from '../../public/engine/soloist-phrase-first.js';
+import {
+    getQaHangAt,
+    getSoloistNotePhraseFirst,
+} from '../../public/engine/soloist-phrase-first.js';
 import { chordTargetTones } from '../../public/engine/soloist-pitch-engine.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../../public/state.js';
@@ -194,6 +198,90 @@ function pairRuns(on, off) {
     return { fired, inserted, pcMatches };
 }
 
+/**
+ * #1159 — LIVE-vs-digest cross-check. The `pcMatch` metric above compares the
+ * comp echo against the same `getQaHangAt` digest the engine consumes, so it
+ * proves the plumbing, not "the echo matches what the soloist actually sounds."
+ * This drives the real `getSoloistNotePhraseFirst` at each fired window's
+ * `hangStartStep` and compares its emitted pitch class to the digest pc.
+ *
+ * It is EXACT, by construction: at a `qaRole === 'question'` step the live
+ * engine pins `primary.midi + bodyOctaveFold` (octave-only, so the pc
+ * survives), and both branches that override the hang near the apex — the apex
+ * step itself and the 2-bar dovetail into it — are exactly what
+ * `computeQaWindows` excludes from its window list. So this is a real guard,
+ * not a restatement: a soloist-side pitch override at a question cadence would
+ * silently make the comper echo a tone the lead never played, and only this
+ * assertion sees it. It already caught one — the apex-coincident window, fixed
+ * in the same pass (#1159); a 14.5k-window sweep across every preset × 7 genres
+ * is clean after that fix.
+ *
+ * Mismatches are collected as DESCRIPTORS, not just counted, so a future
+ * failure names its own cause. That matters here specifically: a
+ * `soloist-seeder.ts` change that shifts the PRNG stream re-rolls every seed
+ * (reference: the stream-shift attribution trap), and a bare count would send
+ * the author hunting in their own diff instead of at the digest/live gate pair.
+ *
+ * Known non-coverage, deliberate: the harness runs `mode: 'monophonic'`, so the
+ * double-stop return shape (`[harmony, lead]`, lead last) never fires here —
+ * reading the last voice is future-proofing, not an exercised path. The probe
+ * also passes `coordination = {}`, disabling the #1020 seam terms; those move
+ * density and velocity only, never pitch, so the probe stays pitch-faithful.
+ */
+function probeLiveHangPc(state, seed, on, firedSet, acc) {
+    const total = state.arranger.totalSteps;
+    const stepMap = state.arranger.stepMap;
+    const chordAt = (abs) => {
+        const w = ((abs % total) + total) % total;
+        return stepMap.find((e) => w >= e.start && w < e.end) || null;
+    };
+    state.soloist.session.seed = seed;
+    state.soloist.session.phrasing.isResting = false;
+    for (const [hangStart, w] of on.windows) {
+        if (!firedSet.has(hangStart)) {
+            continue;
+        }
+        const entry = chordAt(hangStart);
+        if (!entry?.chord) {
+            continue;
+        }
+        state.playback.currentLoopCount = Math.floor(hangStart / total);
+        const res = getSoloistNotePhraseFirst(
+            state,
+            entry.chord,
+            chordAt(hangStart + 1)?.chord ?? null,
+            hangStart,
+            null,
+            state.soloist.octave,
+            'smart',
+            (((hangStart % total) + total) % total) - entry.start,
+            {},
+            null,
+        );
+        acc.liveProbed++;
+        const voices = res ? (Array.isArray(res) ? res : [res]) : [];
+        const lead = voices[voices.length - 1];
+        // A rest here is a miss, and a loud one: a question cadence is exempt
+        // from the density gate precisely so the hang always sounds.
+        const livePc = typeof lead?.midi === 'number' ? ((lead.midi % 12) + 12) % 12 : -1;
+        if (livePc === w.pc) {
+            acc.liveMatched++;
+            continue;
+        }
+        // Diagnostics that separate the two known divergence mechanisms: an
+        // apex/dovetail override the digest failed to exclude (`here` holds one
+        // note, the question), vs. the live gate reading `qaRole` off `here[0]`
+        // when several seed notes share the step and the question isn't first.
+        const loopLen = seed.loopLengthSteps || total;
+        const sIL = ((hangStart % loopLen) + loopLen) % loopLen;
+        const here = seed.notes.filter((n) => ((n.step % loopLen) + loopLen) % loopLen === sIL);
+        acc.liveMismatches.push(
+            `@${hangStart} live=${livePc === -1 ? 'REST' : livePc} digest=${w.pc}` +
+                ` here=${here.length} here[0].qaRole=${here[0]?.qaRole ?? '-'}`,
+        );
+    }
+}
+
 function measureCase(presetName, genre, bpm, chordStyle, seedCount) {
     const acc = {
         windows: 0,
@@ -212,6 +300,9 @@ function measureCase(presetName, genre, bpm, chordStyle, seedCount) {
         resolutionPillarTops: 0,
         resolutionOffTops: 0,
         resolutionOffPillarTops: 0,
+        liveProbed: 0,
+        liveMatched: 0,
+        liveMismatches: [],
     };
     for (let i = 0; i < seedCount; i++) {
         const state = buildState(presetName, genre, bpm, chordStyle);
@@ -286,6 +377,10 @@ function measureCase(presetName, genre, bpm, chordStyle, seedCount) {
                 }
             }
         }
+
+        // #1159 — run LAST: it assigns the session seed onto `state`, and every
+        // comper run above must see the same state the paired baseline did.
+        probeLiveHangPc(state, seed, on, firedSet, acc);
     }
     return acc;
 }
@@ -319,6 +414,7 @@ describe('Comper Q&A response critique (#1157)', () => {
                     `[Attack delta on-off]    ${delta}  (Cap: ≤ inserted = ${r.inserted})\n` +
                     `[Ramp pinned 0 → 3]      ${r.rampLowFired} → ${r.rampHighFired} fired  (natural laps, info: ${(100 * earlyRate).toFixed(1)}% early → ${(100 * lateRate).toFixed(1)}% late)\n` +
                     `[Resolution pillar tops] ${(100 * resolutionRate).toFixed(1)}% on vs ${(100 * resolutionOffRate).toFixed(1)}% off  (Target: ≥ 80% and ≥ baseline)\n` +
+                    `[Live hang pc == digest] ${r.liveMatched}/${r.liveProbed}  (Target: exact)\n` +
                     '-------------------------------------------------------\n',
             );
 
@@ -350,6 +446,14 @@ describe('Comper Q&A response critique (#1157)', () => {
             // un-snapped baseline (the paired lift is what the snap provides).
             expect(resolutionRate).toBeGreaterThanOrEqual(0.8);
             expect(resolutionRate).toBeGreaterThanOrEqual(resolutionOffRate);
+            // #1159 — the echo echoes the LEAD, not just the digest: driving the
+            // real soloist at each fired hang step reproduces the digest pc
+            // exactly. Guards a soloist-side pitch override at a question cadence
+            // silently diverging the two — the comper would answer a tone the lead
+            // never played, and every metric above would stay green. Asserted on
+            // the descriptor list, not a count, so a failure names its own cause.
+            expect(r.liveProbed).toBeGreaterThan(0);
+            expect(r.liveMismatches).toEqual([]);
         });
     }
 
