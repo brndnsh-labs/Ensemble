@@ -56,7 +56,7 @@ vi.mock('../../../public/engine/chords-engine.js', async (importOriginal) => {
 import { getBestInversion } from '../../../public/engine/chords-engine.js';
 import {
     clearHarmonyMemory,
-    generateCompingPattern,
+    generateHarmonyCompingPattern,
     getGuideTones,
     getHarmonyNotes,
     getSafeVoicings,
@@ -236,13 +236,13 @@ describe('Harmony Engine Logic', () => {
 
     describe('Rhythmic Comping', () => {
         it('should generate patterns for Jazz', () => {
-            const pattern = generateCompingPattern('jazz', 12345);
+            const pattern = generateHarmonyCompingPattern('jazz', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
         });
 
         it('should generate patterns for Funk', () => {
-            const pattern = generateCompingPattern('funk16', 12345);
+            const pattern = generateHarmonyCompingPattern('funk16', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern[0]).toBe(1);
             const hasDynamics = pattern.some((v) => v > 1);
@@ -250,7 +250,7 @@ describe('Harmony Engine Logic', () => {
         });
 
         it('should return 32-step pattern for Reggae', () => {
-            const pattern = generateCompingPattern('reggae', 12345);
+            const pattern = generateHarmonyCompingPattern('reggae', 12345);
             expect(pattern.length).toBe(32);
             expect(pattern[4]).toBe(1);
             expect(pattern[12]).toBe(1);
@@ -262,14 +262,20 @@ describe('Harmony Engine Logic', () => {
         // grew the array and broke every `step % length`. Now expressed in beat
         // terms with bounds guards.
         it('Bossa reproduces the authentic 4/4 figure', () => {
-            const pattern = generateCompingPattern('bossa', 1, { beats: 4, stepsPerBeat: 4 });
+            const pattern = generateHarmonyCompingPattern('bossa', 1, {
+                beats: 4,
+                stepsPerBeat: 4,
+            });
             expect(pattern.length).toBe(32);
             const onsets = pattern.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
             expect(onsets).toEqual([0, 6, 12, 18, 24, 30]);
         });
 
         it('Bossa does not overrun its array in 3/4 (B12)', () => {
-            const pattern = generateCompingPattern('bossa', 1, { beats: 3, stepsPerBeat: 4 });
+            const pattern = generateHarmonyCompingPattern('bossa', 1, {
+                beats: 3,
+                stepsPerBeat: 4,
+            });
             // spm = 3*4 = 12; the array is spm*2 = 24 and must NOT grow.
             expect(pattern.length).toBe(24);
             const onsets = pattern.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);

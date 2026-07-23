@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateCompingPattern, getHarmonyNotes } from '../../public/engine/harmonies.js';
+import { generateHarmonyCompingPattern, getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getState } from '../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -48,14 +48,14 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
     // Skank backbeats (beats 2 and 4 of each bar across the 2-bar period).
     const SKANK_STEPS = [4, 12, 20, 28];
 
-    it('generateCompingPattern: organ activeStyle produces bubble offbeats, no skank', () => {
+    it('generateHarmonyCompingPattern: organ activeStyle produces bubble offbeats, no skank', () => {
         // why: 30-section reliability sweep — each section_id seeds a
         // different pseudoRandom() draw for the optional-dyad accents, so
         // a degenerate seed (e.g. one where the accent always fires) can't
         // mask a missing bubble step.
         const ts = { beats: 4, stepsPerBeat: 4 };
         for (let s = 0; s < 30; s++) {
-            const pattern = generateCompingPattern('reggae', s * 7919 + 1, ts, 'organ');
+            const pattern = generateHarmonyCompingPattern('reggae', s * 7919 + 1, ts, 'organ');
             expect(pattern.length).toBe(32);
             // Every bubble step should fire (tag 1 base, occasionally upgraded
             // to tag 2 dyad — either way the slot is non-zero).
@@ -70,14 +70,14 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
         }
     });
 
-    it('generateCompingPattern: non-organ activeStyle (or undefined) keeps backbeat skank', () => {
+    it('generateHarmonyCompingPattern: non-organ activeStyle (or undefined) keeps backbeat skank', () => {
         // why: harmony route to non-organ (e.g. user forces strings/horns
         // on Reggae) means the harmony channel is acting as a horn-stab
         // layer, not an organ-bubble layer. The original backbeat pattern
         // is the right idiom there — this guard prevents the bubble from
         // accidentally taking over every Reggae harmony route.
         const ts = { beats: 4, stepsPerBeat: 4 };
-        const pattern = generateCompingPattern('reggae', 12345, ts);
+        const pattern = generateHarmonyCompingPattern('reggae', 12345, ts);
         // Falls into the else branch — backbeats present.
         expect(pattern[4]).toBe(1);
         expect(pattern[12]).toBe(1);

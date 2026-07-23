@@ -248,7 +248,7 @@ function selectTensionSupportIntervals(intervals: number[], includeRoot: boolean
  * lives in HARMONY_GENRE_PROFILES (harmony-styles.ts), so this function stays a
  * pure renderer and a genre can be repointed without touching it.
  */
-export function generateCompingPattern(
+export function generateHarmonyCompingPattern(
     patternKey: HarmonyPatternKey,
     seed: number,
     tsConfig?: TimeSignatureConfig,
@@ -1288,7 +1288,7 @@ export function getHarmonyNotes(
     }
 
     // 2. CONTEXT OBJECT
-    // why: key on every input that branches generateCompingPattern's body.
+    // why: key on every input that branches generateHarmonyCompingPattern's body.
     //   - feel: the top-level feel branches produce completely different
     //     patterns (Jazz Charleston vs Funk 16ths vs Reggae bubble vs …).
     //   - activeStyle: Reggae organ-bubble (S1.b) branches on activeStyle.
@@ -1307,7 +1307,7 @@ export function getHarmonyNotes(
                 ?.split('')
                 .reduce((a: number, b: string) => (a << 5) - a + b.charCodeAt(0), 0) || 0,
         );
-        const pattern = generateCompingPattern(profile.patternKey, seed, ts, activeStyle);
+        const pattern = generateHarmonyCompingPattern(profile.patternKey, seed, ts, activeStyle);
 
         // Calculate a broad rhythmic mask for UI/Consistency based on "Base" hits only
         let rhythmicMask = 0;

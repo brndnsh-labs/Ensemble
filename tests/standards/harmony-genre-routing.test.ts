@@ -11,11 +11,11 @@
  * commit — a diff to this table is the visible record that behavior changed.
  *
  * The comping-pattern golden arrays were captured at seed 12345 / 4-4 from the
- * pre-refactor generateCompingPattern (deterministic given seed).
+ * pre-refactor generateHarmonyCompingPattern (deterministic given seed).
  */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { generateCompingPattern } from '../../public/engine/harmonies.js';
+import { generateHarmonyCompingPattern } from '../../public/engine/harmonies.js';
 import {
     DEFAULT_HARMONY_PROFILE,
     HARMONY_GENRE_PROFILES,
@@ -44,7 +44,7 @@ const EXPECTED_PROFILE: Record<string, Omit<HarmonyGenreProfile, 'voicing'>> = {
     Ska: { smartStyle: 'horns', rhythmicStyle: 'stabs', patternKey: 'ska' },
 };
 
-// Pre-refactor generateCompingPattern output, captured at seed 12345 / 4-4.
+// Pre-refactor generateHarmonyCompingPattern output, captured at seed 12345 / 4-4.
 const DEFAULT_PATTERN = [
     1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
 ];
@@ -97,7 +97,12 @@ describe('Harmony genre routing (characterization)', () => {
     it.each(feels)('%s renders the pinned comping pattern', (feel) => {
         const profile = resolveHarmonyProfile(feel);
         // Under smart, the rendered activeStyle is the profile's smartStyle.
-        const pattern = generateCompingPattern(profile.patternKey, SEED, TS, profile.smartStyle);
+        const pattern = generateHarmonyCompingPattern(
+            profile.patternKey,
+            SEED,
+            TS,
+            profile.smartStyle,
+        );
         expect(pattern).toEqual(GOLDEN_PATTERN[feel]);
     });
 

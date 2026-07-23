@@ -49,7 +49,7 @@ describe('Reggae Harmony Critique', () => {
         // Bubble offbeats — eighth-note positions between skank backbeats.
         // NOTE: BUBBLE_STEPS/SKANK_STEPS are intentionally duplicated in
         // reggae-harmony-organ-critique.test.ts. That sibling exercises a
-        // different engine entry point (generateCompingPattern unit) vs this
+        // different engine entry point (generateHarmonyCompingPattern unit) vs this
         // file's getHarmonyNotes integration path; the only overlap is these
         // two constant arrays. Hoisting them to a shared util would couple two
         // otherwise-independent critique files for ~2 lines — not worth it.

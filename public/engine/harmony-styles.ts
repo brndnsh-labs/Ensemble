@@ -11,7 +11,7 @@
  *   2. `rhythmicStyle`  — the resolved pads-vs-stabs decision under 'smart'. 'pads'
  *                         routes to playSeaMode (sustained swells); 'stabs' routes to
  *                         playComperMode (rhythmic comping).
- *   3. `patternKey`     — which onset template `generateCompingPattern` renders.
+ *   3. `patternKey`     — which onset template `generateHarmonyCompingPattern` renders.
  *
  * The `voicing` slot is the per-genre character layer the child stories populate
  * (rock 3rds/6ths, metal power-doubling, acoustic open/add9, country pedal-steel).
@@ -25,7 +25,7 @@ export type HarmonySmartStyle = 'organ' | 'strings' | 'horns' | 'plucks' | 'coun
 export type HarmonyRhythmicStyle = 'pads' | 'stabs';
 
 /**
- * Onset-template selector for `generateCompingPattern`. Named by rhythmic idiom,
+ * Onset-template selector for `generateHarmonyCompingPattern`. Named by rhythmic idiom,
  * not genre, so multiple genres can share a template and a genre can be repointed
  * (e.g. Ska: 'ska' backbeat → 'offbeat' skank) without touching the renderer.
  */

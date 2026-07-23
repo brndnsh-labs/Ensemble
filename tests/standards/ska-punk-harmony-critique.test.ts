@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
-import { generateCompingPattern, getHarmonyNotes } from '../../public/engine/harmonies.js';
+import { generateHarmonyCompingPattern, getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getState } from '../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -45,11 +45,11 @@ describe('Ska Harmony Critique', () => {
     // Beats 1–4 of each bar (the former backbeat lived at 4/12/20/28).
     const DOWNBEAT_STEPS = [0, 4, 8, 12, 16, 20, 24, 28];
 
-    it('generateCompingPattern: ska key places stabs on the offbeats of 2 & 4, not the beat', () => {
+    it('generateHarmonyCompingPattern: ska key places stabs on the offbeats of 2 & 4, not the beat', () => {
         const ts = TIME_SIGNATURES['4/4'];
         // Deterministic regardless of seed (no pseudoRandom branch in the ska key).
         for (let s = 0; s < 30; s++) {
-            const pattern = generateCompingPattern('ska', s * 7919 + 1, ts);
+            const pattern = generateHarmonyCompingPattern('ska', s * 7919 + 1, ts);
             expect(pattern.length).toBe(32);
             for (const step of SKA_STAB_STEPS) {
                 expect(pattern[step]).toBeGreaterThan(0);
