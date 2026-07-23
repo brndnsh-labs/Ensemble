@@ -124,6 +124,16 @@ export class UnifiedVisualizer {
         }
     }
 
+    // #1168 — SET_FILL used to be the one visualizer message that bypassed this
+    // proxy, posted straight from Visualizer.tsx via `(vizRef.current as any).worker`.
+    // An agent reading the proxy surface would never learn one message skipped it.
+    // The worker reads the `active` key (visualizer-worker.ts SET_FILL case).
+    setFill(active: boolean): void {
+        if (this.worker) {
+            this.worker.postMessage({ type: 'SET_FILL', active }, []);
+        }
+    }
+
     pushNote(name: string, event: any): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_NOTE', name, event: this.toRaw(event) }, []);

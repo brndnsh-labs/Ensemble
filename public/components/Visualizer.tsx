@@ -347,11 +347,8 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                         vizRef.current.pushNote(trackId, ev);
                     }
                 } else if (ev.type === 'fill') {
-                    if (enabled && playback.isDrawing && (vizRef.current as any)?.worker) {
-                        (vizRef.current as any).worker.postMessage({
-                            type: 'SET_FILL',
-                            active: ev.active,
-                        });
+                    if (enabled && playback.isDrawing) {
+                        vizRef.current?.setFill(ev.active);
                     }
                 }
             }
