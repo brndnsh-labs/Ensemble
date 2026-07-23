@@ -97,7 +97,7 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/engine/coordination-engine.ts` | 184 | ✅ | `StepInfo` import type; `createCoordinationContext` returns inferred object |
 | `public/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
 | `public/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
-| `public/state.ts` | 293 | ✅ | `dispatch` overloads on `ActionPayloadMap`; `StateMap = EnsembleState` compat alias |
+| `public/state.ts` | 293 | ✅ | `dispatch` overloads on `ActionPayloadMap`; `StateMap = EnsembleState` compat alias (retired 2026-07, #1172) |
 | `public/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
 | `public/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
 | `public/worker-client.ts` | 303 | ✅ | `declare const WORKER_PATH: string`; typed handler callbacks |
@@ -160,7 +160,7 @@ All 28 Preact component files renamed `.jsx` → `.tsx` and converted to TypeScr
 | `public/components/EditorModal.tsx` | 321 | ✅ | Module-level `getState()` between imports (kept as-is) |
 | `public/components/SectionCard.tsx` | 379 | ✅ | `forwardRef<SectionCardHandle, SectionCardProps>`; `useImperativeHandle` |
 | `public/components/InstrumentSettings.tsx` | 420 | ✅ | `StudioInstrumentModule` type; module-level `getState()` |
-| `public/components/Visualizer.tsx` | 422 | ✅ | `partitionDrawQueue` typed; `import type { StateMap }` |
+| `public/components/Visualizer.tsx` | 422 | ✅ | `partitionDrawQueue` typed; `import type { EnsembleState }` (was `StateMap` until #1172) |
 | `public/components/ChordVisualizer.tsx` | 449 | ✅ | `memo` from `preact/compat`; `className` kept throughout |
 | `public/components/GenerateSongModal.tsx` | 567 | ✅ | `useState<string \| null>(null)` for confirmTemplate |
 | `public/components/InstrumentRail.tsx` | 719 | ✅ | `ActiveSurface` type; `StudioSurface` exported; `StyleObject` |

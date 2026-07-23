@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { resolveMode } from '../app-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
 import { switchMeasure } from '../instrument-controller.js';
-import type { StateMap } from '../state.js';
 import { dispatch, getState, stateMap } from '../state.js';
+import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
@@ -67,7 +67,7 @@ export function partitionDrawQueue(
 
 interface VisualizerProps {
     enabled: boolean;
-    getVisualTime: (stateMap: StateMap) => number;
+    getVisualTime: (stateMap: EnsembleState) => number;
 }
 
 export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
@@ -266,7 +266,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                 return;
             }
 
-            const typedStateMap: StateMap = stateMap;
+            const typedStateMap: EnsembleState = stateMap;
             const now = getVisualTime(typedStateMap);
             if (enabled && vizRef.current) {
                 vizRef.current.syncClock(now, performance.now());
@@ -367,7 +367,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
         };
 
         if (isPlaying) {
-            const typedStateMap2: StateMap = stateMap;
+            const typedStateMap2: EnsembleState = stateMap;
             dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'isDrawing', value: true });
             if (enabled) {
                 const { playback, arranger } = typedStateMap2;

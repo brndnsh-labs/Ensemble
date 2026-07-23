@@ -20,9 +20,6 @@ import type {
     SoloistState,
 } from './types.js';
 
-/** @deprecated Use EnsembleState directly */
-export type StateMap = EnsembleState;
-
 export const stateMap: EnsembleState = {
     playback,
     chords,
