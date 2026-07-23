@@ -373,10 +373,18 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             }
                                         >
                                             <option value="">Auto</option>
+                                            {/*
+                                             * #1174 — the 'm' suffix must reflect THIS section's
+                                             * minor override when it has one, not the global chart
+                                             * flag. The engine honors `section.isMinor`
+                                             * (chords-engine.ts) and share URLs serialize it
+                                             * (utils.ts), so a chart arriving via a share link with
+                                             * per-section overrides showed the wrong labels here.
+                                             */}
                                             {KEY_ORDER.map((k) => (
                                                 <option key={k} value={k}>
                                                     {formatUnicodeSymbols(k)}
-                                                    {isMinor ? 'm' : ''}
+                                                    {(section.isMinor ?? isMinor) ? 'm' : ''}
                                                 </option>
                                             ))}
                                         </select>

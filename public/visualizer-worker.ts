@@ -209,17 +209,6 @@ if (typeof self !== 'undefined') {
                 // current step rather than waiting for the index to roll over.
                 lastReducedStepIndex = -1;
                 break;
-
-            case 'STOP':
-                isRunning = false;
-                break;
-
-            case 'START':
-                if (!isRunning) {
-                    isRunning = true;
-                    requestAnimationFrame(tick);
-                }
-                break;
         }
     };
 }

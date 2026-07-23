@@ -5,7 +5,7 @@ import { ACTIONS } from '../types.js';
 export type { ArrangerState, Section };
 
 export const arranger = deepSignal<ArrangerState>({
-    sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', color: '#3b82f6', repeat: 1 }],
+    sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', repeat: 1 }],
     progression: [],
     key: 'C',
     timeSignature: '4/4',
@@ -41,7 +41,6 @@ export function arrangerReducer(action: Action): boolean {
                     id: 's1',
                     label: 'Intro',
                     value: 'I | V | vi | IV',
-                    color: '#3b82f6',
                     repeat: 1,
                 },
             ];

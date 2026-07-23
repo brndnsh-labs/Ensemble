@@ -216,7 +216,6 @@ export function hydrateState(): void {
                     ? savedState.applyPresetSettings
                     : false,
             masterVolume: clamp(savedState.masterVolume, 0, 1, 0.4),
-            stopAtEnd: false,
         });
 
         (vizState as Mutable<typeof vizState>).enabled =

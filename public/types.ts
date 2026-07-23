@@ -101,8 +101,6 @@ export interface Section {
     label: string;
     /** The chord progression string (e.g., "I | IV"). */
     value: string;
-    /** Optional color hex code for UI accent. */
-    color?: string;
     /** Number of times to repeat this section (default 1). */
     repeat?: number;
     /** Local key for this section (e.g., "G"). */
@@ -840,7 +838,6 @@ export interface SoloistState {
     /** Slider for how dynamic/articulated the phrasing is. */
     readonly phrasingIntensity: number;
     /** Probability of playing double stops. */
-    readonly doubleStopProb: number;
     /** Mode for trading fours ('manual', 'auto'). */
     readonly tradeMode: string;
     // `motifTracking` and `pinnedProfile` were removed in #866 — both were inert
@@ -1133,7 +1130,6 @@ export interface GlobalContext {
     /** The performance.now() timestamp when playback started. */
     readonly sessionStartTime: number;
     /** Whether to stop at the end of the current progression/loop. */
-    readonly stopAtEnd: boolean;
     /** Whether the resolution sequence is about to trigger. */
     readonly isEndingPending: boolean;
     /** Current rhythmic intent (syncopation, anticipation, etc). */
@@ -1416,7 +1412,6 @@ export type ActionPayloadUpdateSB = Partial<{
     reverb: number;
     complexity: number;
     phrasingIntensity: number;
-    doubleStopProb: number;
     tradeMode: string;
     sessionSeed: SoloistSessionSeed | null;
     sessionSteps: number;
@@ -1509,7 +1504,6 @@ export interface ActionPayloadMap {
     SET_NOTATION: string;
     SET_SESSION_TIMER: number;
     SET_SONG_MODE: boolean;
-    SET_STOP_AT_END: boolean;
     SET_ENDING_PENDING: boolean;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
@@ -1606,7 +1600,6 @@ export const ACTIONS = {
     SET_NOTATION: 'SET_NOTATION',
     SET_SESSION_TIMER: 'SET_SESSION_TIMER',
     SET_SONG_MODE: 'SET_SONG_MODE',
-    SET_STOP_AT_END: 'SET_STOP_AT_END',
     SET_ENDING_PENDING: 'SET_ENDING_PENDING',
     SET_START_STEP: 'SET_START_STEP',
     SET_PRACTICE_LOOP: 'SET_PRACTICE_LOOP',

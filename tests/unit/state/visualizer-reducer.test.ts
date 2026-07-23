@@ -18,25 +18,37 @@ describe('Visualizer State Reducer', () => {
     });
 
     describe('setVizParam via reducer', () => {
-        it('should update all supported parameters', () => {
-            const params = {
-                enabled: true,
-                theme: 'neon',
-                mode: 'matrix',
-                fullscreen: true,
-                fps: 60,
-                showGrid: false,
-                showNotes: true,
-                showChords: true,
-            };
+        // #1174 — this used to assert 8 params (theme/mode/fullscreen/fps/showGrid/
+        // showNotes/showChords). Only `enabled` exists on VisualizerState; the rest
+        // "passed" purely via the reducer's `(vizState as any)[param] = value`
+        // passthrough, so the test asserted its own write-back and guarded nothing.
+        it('should update the supported parameter', () => {
+            vizReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: { module: 'vizState', param: 'enabled', value: true },
+            });
+            expect(vizState.enabled).toBe(true);
 
-            for (const [param, value] of Object.entries(params)) {
-                vizReducer({
-                    type: ACTIONS.SET_PARAM,
-                    payload: { module: 'vizState', param, value },
-                });
-                expect((vizState as any)[param]).toBe(value);
-            }
+            vizReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: { module: 'vizState', param: 'enabled', value: false },
+            });
+            expect(vizState.enabled).toBe(false);
+        });
+
+        // #1174 — the reducer used to also accept `module: 'viz'`. Nothing dispatched
+        // it (togglePower normalizes to 'vizState' first), so the alias was dead.
+        it('ignores the retired `viz` module alias', () => {
+            vizReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: { module: 'vizState', param: 'enabled', value: true },
+            });
+            const handled = vizReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: { module: 'viz', param: 'enabled', value: false },
+            });
+            expect(handled).toBe(false);
+            expect(vizState.enabled).toBe(true);
         });
     });
 });

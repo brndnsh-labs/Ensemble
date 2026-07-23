@@ -80,7 +80,6 @@ export const soloist = deepSignal<SoloistState>({
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
     complexity: 0.5,
     phrasingIntensity: 0.5,
-    doubleStopProb: 1.0,
     tradeMode: 'manual',
 
     // === Engine runtime ===
@@ -193,7 +192,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     reverb: { kind: 'config', key: 'reverb' },
     complexity: { kind: 'config', key: 'complexity' },
     phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
-    doubleStopProb: { kind: 'config', key: 'doubleStopProb' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
 
     // --- Session (top-level) ---

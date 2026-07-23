@@ -57,9 +57,6 @@ describe('Playback Reducer', () => {
         playbackReducer({ type: ACTIONS.SET_SESSION_TIMER, payload: 10 });
         expect(playback.sessionTimer).toBe(10);
 
-        playbackReducer({ type: ACTIONS.SET_STOP_AT_END, payload: true });
-        expect(playback.stopAtEnd).toBe(true);
-
         playbackReducer({ type: ACTIONS.SET_ENDING_PENDING, payload: true });
         expect(playback.isEndingPending).toBe(true);
     });
@@ -337,7 +334,6 @@ describe('Playback Reducer', () => {
                 loopLimit: 10,
                 currentLoopCount: 5,
                 sessionStartTime: 1000,
-                stopAtEnd: true,
                 isEndingPending: true,
                 intent: { density: 0.9 },
                 lastActiveDrumElements: [],

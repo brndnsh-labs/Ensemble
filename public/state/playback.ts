@@ -41,7 +41,6 @@ export const playback = deepSignal<GlobalContext>({
     loopLimit: 0,
     currentLoopCount: 0,
     sessionStartTime: 0,
-    stopAtEnd: false,
     isEndingPending: false,
     intent: {
         anticipation: 0.2,
@@ -190,9 +189,6 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_SESSION_TIMER:
             p.sessionTimer = action.payload;
-            return true;
-        case ACTIONS.SET_STOP_AT_END:
-            p.stopAtEnd = action.payload;
             return true;
         case ACTIONS.SET_ENDING_PENDING:
             p.isEndingPending = action.payload;

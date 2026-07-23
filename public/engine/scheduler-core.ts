@@ -198,7 +198,6 @@ export function togglePlay(
         (playback as Mutable<typeof playback>).isScheduling = false; // @direct-mutation
         if (dispatch) {
             dispatch(ACTIONS.SET_ENDING_PENDING, false);
-            dispatch(ACTIONS.SET_STOP_AT_END, false);
         }
         if (dispatch) {
             dispatch(ACTIONS.VIS_RESET);
@@ -398,7 +397,7 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 }
 
                 // --- Resolution Trigger Logic ---
-                // If ending is pending or stopAtEnd is active, check for appropriate boundary (Next Chorus)
+                // If an ending is pending, check for the appropriate boundary (Next Chorus)
                 // #1016 — while drilling a section, `step` keeps climbing
                 // monotonically but the music is folded within the loop window,
                 // so a form-loop boundary here would be spurious. Suspend
@@ -423,14 +422,9 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                         }
                     }
 
-                    if (
-                        playback.isEndingPending ||
-                        playback.stopAtEnd ||
-                        playback.resolutionTriggered
-                    ) {
+                    if (playback.isEndingPending || playback.resolutionTriggered) {
                         if (!playback.resolutionTriggered) {
                             (playback as Mutable<typeof playback>).resolutionTriggered = true; // @direct-mutation
-                            (playback as Mutable<typeof playback>).stopAtEnd = false; // @direct-mutation
                             triggerResolution(state, playback.nextNoteTime, dispatch);
                         }
                         return; // Stop scheduling
