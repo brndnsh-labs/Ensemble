@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
 import { generateSong, predictStructure } from '../../../public/song-generator.js';
 
 describe('Song Generator', () => {
@@ -218,5 +219,49 @@ describe('Song Generator', () => {
         if (verses.length >= 2) {
             expect(verses[0].value).toBe(verses[1].value);
         }
+    });
+
+    // --- #1165: the canon-vs-feel axis guard ---------------------------------
+    //
+    // `generateSong` resolves `options.feel` against FEEL_BASE_POOL, which is keyed on the
+    // CANON genre names (GENRE_NAMES). Anything else trips the `!FEEL_BASE_POOL[feel]` guard
+    // and is silently replaced by `rand(GENRE_NAMES)` — a uniformly random genre.
+    //
+    // Detection: with Math.random pinned, a rerolled feel produces byte-identical output to a
+    // feel string that is definitely not a genre. An honored feel picks its own base pool, so
+    // it differs from that reroll baseline at any pin where the reroll lands on a different
+    // pool. Two pins are enough to cover all three pools (0.05 -> Rock/pop, 0.42 -> Blues/blues).
+    const REROLL_PINS = [0.05, 0.42];
+    const NOT_A_GENRE = '__definitely-not-a-genre__';
+
+    const renderWithPin = (feel: string, pin: number): string => {
+        const spy = vi.spyOn(Math, 'random').mockReturnValue(pin);
+        try {
+            return generateSong({ feel, key: 'C', bpm: 100 })
+                .map((section) => section.value)
+                .join(' | ');
+        } finally {
+            spy.mockRestore();
+        }
+    };
+
+    // True only when a feel took the reroll branch at every pin we probe.
+    const wasRerolled = (feel: string): boolean =>
+        REROLL_PINS.every((pin) => renderWithPin(feel, pin) === renderWithPin(NOT_A_GENRE, pin));
+
+    it('honors every canonical genre name (none is silently rerolled)', () => {
+        const rerolled = GENRE_NAMES.filter((genre) => wasRerolled(genre));
+        expect(rerolled, 'canon genres that fell through to a random reroll').toEqual([]);
+    });
+
+    it('rerolls the runtime genreFeel strings that diverge from canon', () => {
+        // The control that keeps the test above non-vacuous: these two ARE rejected, which is
+        // exactly why feeding `groove.genreFeel` (rather than the canon `groove.lastSmartGenre`)
+        // made Surprise Me's "Match my groove" randomize for Bossa and Ska-Punk.
+        expect(wasRerolled('Bossa Nova')).toBe(true);
+        expect(wasRerolled('Ska')).toBe(true);
+        // ...and their canon spellings are not.
+        expect(wasRerolled('Bossa')).toBe(false);
+        expect(wasRerolled('Ska-Punk')).toBe(false);
     });
 });

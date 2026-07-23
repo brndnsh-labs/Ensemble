@@ -5,6 +5,7 @@
 import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SurpriseMe } from '../../../public/components/SurpriseMe.jsx';
+import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
 
 const mockDispatch = vi.fn();
 const mockClearChordPresetHighlight = vi.fn();
@@ -46,12 +47,18 @@ vi.mock('../../../public/utils.js', () => ({
     generateId: () => mockGenerateId(),
 }));
 
+// #1165: the groove slice is mutable per-test so the canon-name vs runtime-feel axis can be
+// exercised. `genreFeel` and `lastSmartGenre` diverge for exactly 2 of the 13 genres.
+const { mockGroove } = vi.hoisted(() => ({
+    mockGroove: { genreFeel: 'Rock', lastSmartGenre: 'Rock' } as Record<string, string>,
+}));
+
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector: any) =>
         selector({
             playback: { modals: { surpriseMe: true }, bpm: 100 },
             arranger: { key: 'C', isMinor: false, timeSignature: '4/4', sections: [] },
-            groove: { genreFeel: 'Rock' },
+            groove: mockGroove,
         }),
 }));
 
@@ -84,6 +91,8 @@ describe('SurpriseMe', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         document.body.innerHTML = '<div id="app"></div>';
+        mockGroove.genreFeel = 'Rock';
+        mockGroove.lastSmartGenre = 'Rock';
     });
 
     function mount() {
@@ -124,7 +133,7 @@ describe('SurpriseMe', () => {
             timeSignature: '4/4',
             bpm: 100,
             form: 'verse-chorus',
-            feel: 'Rock', // resolved from groove.genreFeel
+            feel: 'Rock', // resolved from groove.lastSmartGenre (canon axis, #1165)
             targetMinutes: 3,
         });
         // No seed at zero answers.
@@ -258,4 +267,34 @@ describe('SurpriseMe', () => {
             document.querySelector('[data-testid="preset-library"]').getAttribute('data-mode'),
         ).toBe('append');
     });
+
+    // --- #1165 regression -----------------------------------------------------
+    //
+    // "Match my groove" must feed song-generator the CANON genre name. Its FEEL_BASE_POOL is
+    // keyed on GENRE_NAMES, and anything else is silently rerolled to a uniformly random genre.
+    // `groove.genreFeel` is the runtime FEEL string, which diverges from canon for exactly two
+    // genres — so reading it made "Match my groove" randomize for Bossa and Ska-Punk.
+    // The generator-side half of this guard lives in tests/unit/engine/song-generator.test.ts.
+    it.each([
+        { genreFeel: 'Bossa Nova', lastSmartGenre: 'Bossa' },
+        { genreFeel: 'Ska', lastSmartGenre: 'Ska-Punk' },
+        { genreFeel: 'Jazz', lastSmartGenre: 'Jazz' },
+    ])(
+        'passes the canon genre name for a $lastSmartGenre groove, not the runtime feel',
+        async ({ genreFeel, lastSmartGenre }) => {
+            mockGroove.genreFeel = genreFeel;
+            mockGroove.lastSmartGenre = lastSmartGenre;
+
+            mount();
+            await tick();
+            switchTo('Roll');
+            await tick();
+            document.querySelector('.surprise-me-dice').click();
+
+            expect(mockGenerateSong).toHaveBeenCalledTimes(1);
+            const { feel } = mockGenerateSong.mock.calls[0][0];
+            expect(feel).toBe(lastSmartGenre);
+            expect(GENRE_NAMES).toContain(feel);
+        },
+    );
 });

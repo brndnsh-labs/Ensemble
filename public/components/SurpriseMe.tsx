@@ -115,14 +115,20 @@ function showRollToast(message: string): void {
 }
 
 export function SurpriseMe() {
-    const { isOpen, currentKey, currentIsMinor, currentTS, currentBpm, currentFeel, sections } =
+    const { isOpen, currentKey, currentIsMinor, currentTS, currentBpm, currentGenre, sections } =
         useEnsembleState((s) => ({
             isOpen: s.playback.modals.surpriseMe,
             currentKey: s.arranger.key,
             currentIsMinor: s.arranger.isMinor,
             currentTS: s.arranger.timeSignature,
             currentBpm: s.playback.bpm,
-            currentFeel: s.groove.genreFeel,
+            // #1165: this feeds song-generator's FEEL_BASE_POOL, which is keyed on CANON genre
+            // names (GENRE_NAMES). `groove.genreFeel` is the runtime FEEL string, and two of the
+            // 13 genres diverge — Bossa's feel is 'Bossa Nova', Ska-Punk's is 'Ska'. Feeding the
+            // feel axis made the generator's `!FEEL_BASE_POOL[feel]` guard reroll those two to a
+            // uniformly random genre, so "Match my groove" did the opposite of its label.
+            // `lastSmartGenre` is the canon-name field (same one InstrumentRail/PacksSettings read).
+            currentGenre: s.groove.lastSmartGenre,
             sections: s.arranger.sections ?? [],
         }));
 
@@ -170,7 +176,7 @@ export function SurpriseMe() {
 
     const resolveFeel = (): string => {
         if (feel === FEEL_GROOVE) {
-            return currentFeel || 'Rock';
+            return currentGenre || 'Rock';
         }
         return feel;
     };
@@ -643,7 +649,7 @@ export function SurpriseMe() {
                                     onChange={(e) => setFeel((e.target as HTMLSelectElement).value)}
                                 >
                                     <option value={FEEL_GROOVE}>
-                                        My groove ({currentFeel || 'Rock'})
+                                        My groove ({currentGenre || 'Rock'})
                                     </option>
                                     {GENRE_NAMES.map((g) => (
                                         <option key={g} value={g}>
