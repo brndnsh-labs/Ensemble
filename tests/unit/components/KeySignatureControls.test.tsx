@@ -299,7 +299,10 @@ describe('KeySignatureControls Component', () => {
         });
 
         expect(switchToRelativeKey).toHaveBeenCalled();
-        expect(mockDispatch).toHaveBeenCalledWith('REL_KEY_TOGGLE');
+        // #1166: the button used to fire a trailing dispatch('REL_KEY_TOGGLE') that no reducer
+        // arm or listener consumed. switchToRelativeKey() already does the real work (SET_PARAM
+        // + refreshArrangerUI). Guard against the inert dispatch coming back.
+        expect(mockDispatch).not.toHaveBeenCalledWith('REL_KEY_TOGGLE');
     });
 
     it('handles transpose buttons', () => {
@@ -315,13 +318,14 @@ describe('KeySignatureControls Component', () => {
         });
 
         expect(transposeKey).toHaveBeenCalledWith(-1);
-        expect(mockDispatch).toHaveBeenCalledWith('TRANSPOSE');
+        // #1166: no trailing inert dispatch — transposeKey() owns the state write.
+        expect(mockDispatch).not.toHaveBeenCalledWith('TRANSPOSE');
 
         act(() => {
             transUpBtn.dispatchEvent(new Event('click', { bubbles: true }));
         });
 
         expect(transposeKey).toHaveBeenCalledWith(1);
-        expect(mockDispatch).toHaveBeenCalledWith('TRANSPOSE');
+        expect(mockDispatch).not.toHaveBeenCalledWith('TRANSPOSE');
     });
 });

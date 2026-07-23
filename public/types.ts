@@ -1523,8 +1523,6 @@ export interface ActionPayloadMap {
     HYDRATE?: undefined;
     TOAST_EXPIRED?: undefined;
     FLASH_EXPIRED?: undefined;
-    REL_KEY_TOGGLE?: undefined;
-    TRANSPOSE?: undefined;
     VIS_RESET?: undefined;
     VIS_UPDATE?: unknown;
     PROG_VALIDATED?: undefined;
@@ -1616,8 +1614,6 @@ export const ACTIONS = {
     HYDRATE: 'HYDRATE',
     TOAST_EXPIRED: 'TOAST_EXPIRED',
     FLASH_EXPIRED: 'FLASH_EXPIRED',
-    REL_KEY_TOGGLE: 'REL_KEY_TOGGLE',
-    TRANSPOSE: 'TRANSPOSE',
     VIS_RESET: 'VIS_RESET',
     VIS_UPDATE: 'VIS_UPDATE',
     PROG_VALIDATED: 'PROG_VALIDATED',

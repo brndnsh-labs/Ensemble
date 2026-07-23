@@ -74,15 +74,16 @@ describe('State Integrity Audit', () => {
 
             // Special exceptions for actions that might be dynamically generated or used in ways this regex misses.
             // Notification-only signals (no reducer case): HYDRATE, TOAST_EXPIRED, FLASH_EXPIRED,
-            // REL_KEY_TOGGLE, TRANSPOSE, VIS_RESET, VIS_UPDATE, PROG_VALIDATED, DRUM_PRESET_LOADED
-            // — observed by listeners (state-effects, worker-client) rather than handled in slices.
+            // VIS_RESET, VIS_UPDATE, PROG_VALIDATED, DRUM_PRESET_LOADED — observed by listeners
+            // (state-effects, worker-client) rather than handled in slices.
+            // REL_KEY_TOGGLE and TRANSPOSE were on this list too, but had no reducer arm AND no
+            // listener — genuinely inert. Removed in #1166; don't re-add an exception without
+            // pointing at the consumer that justifies it.
             const exceptions = [
                 'HYDRATE',
                 'TOAST_EXPIRED',
                 'FLASH_EXPIRED',
                 'SET_AUTO_INTENSITY',
-                'REL_KEY_TOGGLE',
-                'TRANSPOSE',
                 'VIS_RESET',
                 'VIS_UPDATE',
                 'PROG_VALIDATED',

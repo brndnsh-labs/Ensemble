@@ -177,7 +177,9 @@ interface KeySignatureMenuControlProps {
 export function KeySignatureMenuControl({
     showTranspose = true,
 }: KeySignatureMenuControlProps = {}) {
-    const dispatch = useDispatch();
+    // No dispatch here by design (#1166): every control in this component routes through an
+    // arranger-controller helper (switchToRelativeKey / transposeKey) that owns its own state
+    // writes. The trailing REL_KEY_TOGGLE / TRANSPOSE dispatches this used to fire were inert.
     const { arrangerKey, isMinor } = useEnsembleState((s) => ({
         arrangerKey: s.arranger.key,
         isMinor: s.arranger.isMinor,
@@ -234,7 +236,6 @@ export function KeySignatureMenuControl({
                     aria-label={getRelativeKeyActionLabel(isMinor)}
                     onClick={() => {
                         switchToRelativeKey();
-                        dispatch(ACTIONS.REL_KEY_TOGGLE);
                     }}
                 >
                     {getRelativeKeyActionLabel(isMinor)}
@@ -253,7 +254,6 @@ export function KeySignatureMenuControl({
                             aria-label="Transpose Down"
                             onClick={() => {
                                 transposeKey(-1);
-                                dispatch(ACTIONS.TRANSPOSE);
                             }}
                         >
                             ♭ Down
@@ -267,7 +267,6 @@ export function KeySignatureMenuControl({
                             aria-label="Transpose Up"
                             onClick={() => {
                                 transposeKey(1);
-                                dispatch(ACTIONS.TRANSPOSE);
                             }}
                         >
                             ♯ Up
