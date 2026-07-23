@@ -24,8 +24,8 @@ vi.mock('../../../public/engine/fills.js', () => ({
 }));
 
 import { initAudio } from '../../../public/engine/engine.js';
+import { clampFreq, createSoftClipCurve } from '../../../public/engine/synth-utils.js';
 import { dispatch, getState } from '../../../public/state.js';
-import { clampFreq, createSoftClipCurve } from '../../../public/utils.js';
 
 const { playback, chords, bass } = getState();
 

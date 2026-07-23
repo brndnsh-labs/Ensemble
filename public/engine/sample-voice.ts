@@ -14,8 +14,12 @@
  * `playSampledNote`.
  */
 
-import { safeDisconnect } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
+// NOTE: `synth-utils.ts` imports `foldToSampledCeiling`/`pickZone` from this
+// module, so this is a deliberate import cycle. It is safe because both sides
+// only touch the other's bindings from inside function bodies, and
+// `safeDisconnect` is a hoisted function declaration.
+import { safeDisconnect } from './synth-utils.js';
 
 /**
  * Sanity ceiling on the envelope peak (see `playSampledNote`). Lets a loudness-

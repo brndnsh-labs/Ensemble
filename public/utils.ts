@@ -1,12 +1,21 @@
 import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
+import { stringHash33 } from './engine/hash-utils.js';
 import type { Section } from './state/arranger.js';
 import type { StepInfo } from './types.js';
 
 /**
  * Creates a seeded pseudo-random number generator (Mulberry32).
+ *
+ * String seeds are folded with the canonical djb2 ×33 hash
+ * ({@link stringHash33}) and coerced **unsigned** (`>>> 0`). The unsigned
+ * coercion is load-bearing history, not decoration: the local `hashString`
+ * this replaced returned `hash >>> 0`, and every seeded stream in the repo was
+ * tuned against that starting value. `stringHash33` returns the signed (`| 0`)
+ * form of the identical accumulator, so `>>> 0` reproduces the old seed
+ * bit-for-bit — do not "simplify" it to `| 0`.
  */
 export function createPRNG(seed: number | string): () => number {
-    let s = typeof seed === 'string' ? hashString(seed) : seed;
+    let s = typeof seed === 'string' ? stringHash33(seed) >>> 0 : seed;
     return () => {
         s |= 0;
         s = (s + 0x6d2b79f5) | 0;
@@ -17,14 +26,22 @@ export function createPRNG(seed: number | string): () => number {
 }
 
 /**
- * Simple string hash function (djb2).
+ * Clamps a value into the unit interval [0, 1].
+ *
+ * The canonical clamp for the repo's 0..1 scalars (velocity, intensity,
+ * normalized envelope positions). Written as nested ternaries rather than
+ * `Math.max(0, Math.min(1, x))` so it stays allocation- and call-free on the
+ * per-note hot paths that use it (soloist velocity shaping, drum voices).
+ *
+ * Edge cases: `NaN` passes through unchanged (as it does for the `Math.*`
+ * form); `-0` is returned as `-0` rather than being normalized to `+0`.
+ *
+ * NOTE: the per-sample / per-frame loops in `wav-encoder.ts` and
+ * `visualizer-engine.ts` deliberately keep their clamp inlined — don't route
+ * those through here.
  */
-function hashString(str: string): number {
-    let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-        hash = (hash << 5) + hash + str.charCodeAt(i);
-    }
-    return hash >>> 0;
+export function clamp01(x: number): number {
+    return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 
 /**
@@ -736,20 +753,10 @@ export function getStepInfo(
     };
 }
 
-/**
- * Safely disconnects multiple Web Audio nodes.
- */
-export function safeDisconnect(nodes: AudioNode[]): void {
-    nodes.forEach((node) => {
-        if (node) {
-            try {
-                node.disconnect();
-            } catch {
-                /* ignore disconnect error */
-            }
-        }
-    });
-}
+// safeDisconnect / createSoftClipCurve / clampFreq moved to
+// `public/engine/synth-utils.ts` (#1176) — they are Web Audio graph helpers and
+// belong beside their peers (createSimplePanner / killActiveVoices / rampGain),
+// not in this DOM/audio-free shared-primitives module.
 
 const REGEX_SHARP = /#/g;
 const REGEX_FLAT1 = /([A-G])b/g;
@@ -763,34 +770,6 @@ export function formatUnicodeSymbols(str: string): string {
         return str;
     }
     return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
-}
-
-let cachedSoftClipCurve: Float32Array<ArrayBuffer> | null = null;
-
-/**
- * Creates a soft-clipping curve for the WaveShaperNode. Cached for performance.
- */
-export function createSoftClipCurve(): Float32Array<ArrayBuffer> {
-    if (cachedSoftClipCurve) {
-        return cachedSoftClipCurve;
-    }
-    const n_samples = 44100;
-    const curve = new Float32Array(n_samples);
-    for (let i = 0; i < n_samples; ++i) {
-        const x = (i * 2) / n_samples - 1;
-        // Normalized monotonic cubic: f(x) = (3x - x^3) / 2
-        curve[i] = (3 * x - x * x * x) / 2;
-    }
-    cachedSoftClipCurve = curve;
-    return curve;
-}
-
-/**
- * Clamps a frequency value to be within the safe range for Web Audio BiquadFilters.
- */
-export function clampFreq(freq: number, max = 24000): number {
-    // Nominal range for most browser implementations of BiquadFilter is [0, 24000]
-    return Math.min(Math.max(0, freq), max);
 }
 
 // calculateTimingOffset (the gravity-era pocket formula: globalDrive / tightness /

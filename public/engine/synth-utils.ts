@@ -1,5 +1,5 @@
 import type { AudioGraph, EnsembleState } from '../types.js';
-import { safeDisconnect } from '../utils.js';
+import { getMidi } from '../utils.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import { getPackZones } from './pack-runtime.js';
 import { foldToSampledCeiling, pickZone, type SampleZone } from './sample-voice.js';
@@ -7,6 +7,49 @@ import { foldToSampledCeiling, pickZone, type SampleZone } from './sample-voice.
 /**
  * Standardized WebAudio utilities for instrument synthesis.
  */
+
+/**
+ * Safely disconnects multiple Web Audio nodes.
+ */
+export function safeDisconnect(nodes: AudioNode[]): void {
+    nodes.forEach((node) => {
+        if (node) {
+            try {
+                node.disconnect();
+            } catch {
+                /* ignore disconnect error */
+            }
+        }
+    });
+}
+
+let cachedSoftClipCurve: Float32Array<ArrayBuffer> | null = null;
+
+/**
+ * Creates a soft-clipping curve for the WaveShaperNode. Cached for performance.
+ */
+export function createSoftClipCurve(): Float32Array<ArrayBuffer> {
+    if (cachedSoftClipCurve) {
+        return cachedSoftClipCurve;
+    }
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    for (let i = 0; i < n_samples; ++i) {
+        const x = (i * 2) / n_samples - 1;
+        // Normalized monotonic cubic: f(x) = (3x - x^3) / 2
+        curve[i] = (3 * x - x * x * x) / 2;
+    }
+    cachedSoftClipCurve = curve;
+    return curve;
+}
+
+/**
+ * Clamps a frequency value to be within the safe range for Web Audio BiquadFilters.
+ */
+export function clampFreq(freq: number, max = 24000): number {
+    // Nominal range for most browser implementations of BiquadFilter is [0, 24000]
+    return Math.min(Math.max(0, freq), max);
+}
 
 export interface ResolvedSampledZone {
     audio: AudioContext;
@@ -35,7 +78,9 @@ export function resolveSampledZone(
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
         return null;
     }
-    const targetMidi = foldToSampledCeiling(Math.round(69 + 12 * Math.log2(freq / 440)), zones);
+    // `getMidi`'s null path is unreachable here: the guard above already
+    // rejects non-finite and non-positive `freq`.
+    const targetMidi = foldToSampledCeiling(getMidi(freq) as number, zones);
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
         return null;

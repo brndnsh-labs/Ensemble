@@ -1,10 +1,9 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
+import { clampFreq, createSoftClipCurve } from '../../../public/engine/synth-utils.js';
 import {
-    clampFreq,
     compressSections,
-    createSoftClipCurve,
     decompressSections,
     formatUnicodeSymbols,
     getChordMidiNotes,

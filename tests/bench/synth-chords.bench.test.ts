@@ -2,8 +2,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getState } from '../../public/state.js';
 
-// Mock utils
-vi.mock('../../public/utils.js', () => ({
+// Mock the audio-graph helpers (they moved to engine/synth-utils.js in #1176)
+vi.mock('../../public/engine/synth-utils.js', async (importOriginal) => ({
+    ...(await importOriginal<any>()),
     safeDisconnect: () => {},
 }));
 

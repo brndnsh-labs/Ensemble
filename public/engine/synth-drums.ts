@@ -1,7 +1,7 @@
 import { gainForPack } from '../data/sound-packs.js';
 import type { GrooveState } from '../state/groove.js';
 import type { EnsembleState, Mutable } from '../types.js';
-import { safeDisconnect } from '../utils.js';
+import { clamp01 } from '../utils.js';
 import { scrambleHash } from './hash-utils.js';
 import {
     getPackBufferVariants,
@@ -15,6 +15,7 @@ import {
     playPercussiveStrike,
     playResonantTone,
     rampGain,
+    safeDisconnect,
     updateDensityDucking,
     velocityTimbre,
 } from './synth-utils.js';
@@ -558,10 +559,6 @@ const TOM_VOICE_PROFILES: Record<TomRegister, TomVoiceProfile> = {
         shellAttack: 0.012,
     },
 };
-
-function clamp01(value: number): number {
-    return Math.max(0, Math.min(1, value));
-}
 
 function getCymbalBuffer(groove: GrooveState, name: CymbalName): AudioBuffer | null {
     const profile = CYMBAL_BUFFER_PROFILES[name];

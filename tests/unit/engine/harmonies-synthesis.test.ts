@@ -72,15 +72,16 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-// Mock utils
-vi.mock('../../../public/utils.js', () => ({
+// Mock the audio-graph helpers (they moved to engine/synth-utils.js in #1176)
+vi.mock('../../../public/engine/synth-utils.js', async (importOriginal) => ({
+    ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
     clampFreq: vi.fn((f) => f),
 }));
 
 import { killHarmonyNote, playHarmonyNote } from '../../../public/engine/synth-harmonies.js';
+import { safeDisconnect } from '../../../public/engine/synth-utils.js';
 import { getState } from '../../../public/state.js';
-import { safeDisconnect } from '../../../public/utils.js';
 
 const { playback, harmony, groove } = getState();
 

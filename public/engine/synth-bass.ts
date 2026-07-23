@@ -1,12 +1,13 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
-import { createSoftClipCurve, safeDisconnect } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { playSampledNote } from './sample-voice.js';
 import {
+    createSoftClipCurve,
     playPercussiveStrike,
     rampGain,
     resolveSampledZone,
+    safeDisconnect,
     velocityTimbre,
 } from './synth-utils.js';
 

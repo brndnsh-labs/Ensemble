@@ -1,6 +1,6 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
-import { safeDisconnect } from '../utils.js';
+import { getMidi } from '../utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
@@ -12,6 +12,7 @@ import {
     playPercussiveStrike,
     playResonantTone,
     rampGain,
+    safeDisconnect,
     velocityTimbre,
 } from './synth-utils.js';
 
@@ -188,7 +189,9 @@ function playSampledChord(
     if (!audio || !dest || !zones || zones.length === 0 || !Number.isFinite(freq) || freq <= 0) {
         return null;
     }
-    const targetMidi = Math.round(69 + 12 * Math.log2(freq / 440));
+    // `getMidi`'s null path is unreachable here: the guard above already
+    // rejects non-finite and non-positive `freq`.
+    const targetMidi = getMidi(freq) as number;
     const zone = pickZone(zones, targetMidi);
     if (!zone) {
         return null;

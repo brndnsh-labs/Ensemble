@@ -1,6 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression, SoloistQaHang } from '../types.js';
+import { clamp01 } from '../utils.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveSoloistStyle } from './soloist-config.js';
@@ -50,8 +51,6 @@ import { chordTargetTones } from './soloist-pitch-engine.js';
  * rests (returns null) — a guard test proves every canonical genre seeds non-empty
  * for a real chart, so that rest path is unreachable in normal playback.
  */
-
-const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 
 // #1006 — within-phrase velocity envelope test seam (§4.6). The envelope is a pure
 // function of metric/apex POSITION, so there is no production input that turns it
