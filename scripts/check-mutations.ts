@@ -7,8 +7,12 @@ if (args.length === 0) {
 
 const files = args.flatMap((arg) => (arg.includes('*') ? globSync(arg) : [arg]));
 
+// The `(?<!graph\.)` anchor keeps AUDIO-NODE writes off the state-mutation radar:
+// `conductor.ts` aliases `playback.audioGraph` to `graph`, so `graph.bass.eq.type = 'highpass'`
+// matched the bare slice-name alternation and read as a `bass` state mutation. A
+// `state.<slice>.field =` write is still caught — only the `graph.` alias is excluded.
 const mutationRegex =
-    /(playback|chords|bass|soloist|harmony|groove|midi|vizState|arranger|conductor)(\.[a-zA-Z0-9_]+)+ = /;
+    /(?<!graph\.)\b(playback|chords|bass|soloist|harmony|groove|midi|vizState|arranger|conductor)(\.[a-zA-Z0-9_]+)+ = /;
 
 let hasError = false;
 

@@ -9,10 +9,10 @@
  * identical — see notes on `stringHash33` vs `stringHash31` below — while
  * removing the dead-helper duplication.
  *
- * NOTE: soloist.ts still carries its own byte-identical local `scrambleHash`.
- * Migrating the soloist's draw sites is deferred to FOLLOWUPS §F (the
- * soloist-picker scrambleHash migration, its own opus story) so S9 did not
- * disturb the seeded streams S10 had just stabilized.
+ * The consolidation is complete: `scrambleHash` is defined here and nowhere
+ * else. The soloist migrated with it — `soloist-phrase-first.ts` imports the
+ * canonical helper, and the old `soloist.ts` that carried a byte-identical
+ * local copy no longer exists.
  *
  * why two string hashes, not one: changing which djb2 variant an engine feeds
  * into its seeded RNG shifts the distribution flowing into the critique gates

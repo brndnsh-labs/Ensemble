@@ -168,10 +168,10 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
         if (graph.chords.panner) {
             graph.chords.panner.pan.setTargetAtTime(-0.2, time, ramp);
         }
-        graph.bass.eq.type = 'highpass'; // @direct-mutation
+        graph.bass.eq.type = 'highpass';
         graph.bass.eq.frequency.setTargetAtTime(40, time, ramp);
 
-        graph.soloist.eq.type = 'highshelf'; // @direct-mutation
+        graph.soloist.eq.type = 'highshelf';
         graph.soloist.eq.frequency.setTargetAtTime(8000, time, ramp);
         graph.soloist.eq.gain.setTargetAtTime(-3, time, ramp); // Tame harshness
 

@@ -1,11 +1,11 @@
 # Follow-ups & Deferred Work
 
-> **⛔ FROZEN ARCHIVE (2026-06-18).** Follow-ups are now `finding`/`backlog` issues on **GitHub Project
-> #2**, not appended here. The by-ear cluster (§E + the "left-as-is by decision" items) was migrated to a
+> **⛔ FROZEN ARCHIVE (2026-06-18).** Follow-ups are now `finding`/`backlog` issues on the **Forgejo
+> tracker** (`brandon/Ensemble`; GitHub is a push-mirror backup only), not appended here. The by-ear cluster (§E + the "left-as-is by decision" items) was migrated to a
 > single umbrella backlog issue (Track `musical`, `needs-ear`); the ~3 mechanical items were already
 > shipped or are documented limits. Kept for historical context; do **not** treat as the live backlog.
 
-Captures every "shippable but flagged" item that surfaced during audit work — items that don't justify a fresh story yet but shouldn't be lost to grep. The 2026-05-16 audit cycle that originated most of these is archived at [`docs/archive/musical-audit-2026-05/`](../archive/musical-audit-2026-05/); this file is the LIVE follow-up backlog and survives the archive pass.
+Captures every "shippable but flagged" item that surfaced during audit work — items that don't justify a fresh story yet but shouldn't be lost to grep. The 2026-05-16 audit cycle that originated most of these is archived at [`docs/archive/musical-audit-2026-05/`](../archive/musical-audit-2026-05/); this file is frozen alongside it — see the banner above for where follow-ups live now.
 
 Each entry: **location** · what it is · why it's deferred · size estimate · provenance (which story or review surfaced it).
 

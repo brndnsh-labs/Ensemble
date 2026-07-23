@@ -2,12 +2,12 @@
 
 Reusable recipes for keeping the Ensemble bundle lean without breaking behavior. Captured from the May 2026 bundle-audit cycle — these are the rules that proved durable across the 8 shipped stories.
 
-If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth, dead-code investigation), start here. The cycle workflow itself lives in the `/bundle-cycle` skill and the `bundle-hygiene-reviewer` subagent.
+If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth, dead-code investigation), start here. The cycle workflow itself lives in the `/cycle` skill (Track `bundle` routes the KB-delta DoD) and the `bundle-hygiene-reviewer` subagent.
 
 ## Related
 
 - `docs/archive/BUNDLE_AUDIT.md` — completed audit chapter (history, story-by-story status). Frozen.
-- `.claude/skills/bundle-cycle/SKILL.md` — per-story workflow (pick → implement → measure → review → commit).
+- `.claude/skills/cycle/SKILL.md` — per-story workflow (implement → review → patch → done); Track `bundle` gates it on the measured KB delta.
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
 - `.size-limit.json` — current budgets (baselines, not targets — see below).
 - `package.json` — `npm run build:size` (size-limit), `npm run knip` (unused exports), `npm run build` (emits `stats.html` at the repo root).
@@ -89,12 +89,12 @@ When converting a feature import to `import()` (the S3 pattern):
 Three layers. Order matters (most-mechanized first):
 
 1. **`size-limit` in `validate` script.** Fails `npm run validate` when any chunk exceeds budget. The single most valuable line in this whole guide — turn this on as soon as the budgets are sane.
-2. **`bundle-hygiene-reviewer` subagent.** Invoke after any large feature merge or on demand; the agent knows the playbook (measure first, behavioral equivalence, attack biggest module, forbidden moves). The `/bundle-cycle` skill wires this in automatically; for ad-hoc work, invoke it manually against the uncommitted diff.
+2. **`bundle-hygiene-reviewer` subagent.** Invoke after any large feature merge or on demand; the agent knows the playbook (measure first, behavioral equivalence, attack biggest module, forbidden moves). The `/review` step of `/cycle` wires this in automatically for Track `bundle`; for ad-hoc work, invoke it manually against the uncommitted diff.
 3. **Optional periodic `/loop` or scheduled agent.** Weekly build + delta report. Only valuable if (1) isn't catching things; revisit after a quarter of (1) being on.
 
 ## When a "shrink" story grows the bundle
 
-Never commit a bundle-cycle story that grew the *target* chunk. Either the technique was wrong, scope-crept, or accidentally introduced a side effect (a new eager import, a new module boundary that defeats tree-shaking).
+Never commit a bundle story that grew the *target* chunk. Either the technique was wrong, scope-crept, or accidentally introduced a side effect (a new eager import, a new module boundary that defeats tree-shaking).
 
 Common causes:
 

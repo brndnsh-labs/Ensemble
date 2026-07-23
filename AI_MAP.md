@@ -189,6 +189,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
 | `public/utils.ts` | General-purpose musical and math utilities. | `getFrequency` |
+| `public/utils/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
 | `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
 | `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
 

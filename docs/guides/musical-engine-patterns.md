@@ -9,7 +9,7 @@ If you're picking up new engine work and not sure how to shape the change, start
 - `docs/archive/MUSICAL_AUDIT.md` — Epics 1-8 history snapshot. Frozen.
 - `docs/archive/musical-audit-2026-05/` — full cycle archive (EPICS.md, 12 epic-*.md files, LISTEN_TESTS.md, 6 source-finding audit reports). Frozen 2026-05-25 after all 80 stories shipped.
 - `docs/audit/EPICS.md` — tombstone pointer; the next audit cycle (if any) re-fills this.
-- `docs/audit/FOLLOWUPS.md` — ongoing follow-up backlog (~28 open items, mostly NIT/listen-only). Live.
+- `docs/audit/FOLLOWUPS.md` — the old markdown follow-up backlog. **Frozen archive (2026-06-18)**; follow-ups now live as `finding`/`backlog` issues on the Forgejo tracker (see CLAUDE.md § Work Pipeline).
 - `tests/standards/CRITIQUE_GUIDELINES.md` — original critique-test principles and target thresholds.
 - `CLAUDE.md` § Musical Logic & Generative Standards — operating rules for engine work.
 
@@ -130,6 +130,6 @@ The audit docs (`docs/audit/<area>.md`) are smart but not omniscient. Recurring 
 - **Layer mismatch** — the recipe names a file/line but the actual signal lives elsewhere (seed-time when the signal is per-tick; pitch-engine when the gate is at the dispatcher). Trace the signal to its actual home before implementing.
 - **Premise breaks under review** — the recipe is logically sketched but the engine's gate set, runtime path, or coordination plumbing doesn't match the recipe's assumptions. ~60% P0 rate during the May 2026 cycle came from this. Always run the reviewer; budget for premise-fix patches.
 - **"Document or fix" hides a load-bearing musical decision** — a P2 doc-pass item ("undocumented gate at line X") can require a dispatcher-level musical-design call to literally satisfy its acceptance criterion. The Epic 8 S5 case: lowering the named floor required also dropping a Jazz carve-out at a different file to honor the audit's "ballad-intensity jazz/blues" language.
-- **Implementer's out-of-scope observations are gold** — when a sub-agent flags adjacent issues ("I noticed 3 more undocumented thresholds at lines X/Y/Z but they're out of scope"), capture them in `FOLLOWUPS.md` immediately. Two times during the audit, these flagged items became the next session's most valuable work.
+- **Implementer's out-of-scope observations are gold** — when a sub-agent flags adjacent issues ("I noticed 3 more undocumented thresholds at lines X/Y/Z but they're out of scope"), file them on the Forgejo tracker as `finding`/`backlog` issues immediately. Two times during the audit, these flagged items became the next session's most valuable work.
 
 See [[feedback-audit-doc-premise-breaks]] and [[feedback-audit-doc-layer-mismatch]] for the matched-pair memory entries.
