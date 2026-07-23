@@ -18,7 +18,6 @@ export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.04, // Even tighter for a rock-solid shuffle pocket
     blockAdjacentSnare: true,
-    backbeatCrack: false,
 };
 
 /**

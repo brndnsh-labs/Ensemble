@@ -17,7 +17,6 @@ import {
 export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.05, // Rock solid precision
-    blockAdjacentSnare: false,
     backbeatCrack: true,
     // why: S8(b) — Metal already splashes China on downbeats at high intensity
     // (see the Crash branch ~line 171); the post-turnaround section-boundary

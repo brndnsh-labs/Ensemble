@@ -1,6 +1,8 @@
 # public/engine/grooves/ — per-genre drum strategy files
 
-13 genre-specific drum strategy modules (`rock.ts` … `metal.ts`) dispatched by `getStrategy()` in `../groove-engine.ts`, plus `utils.ts` (the shared contract: `GrooveContext`, `DrumStepBase`, `DEFAULT_CONFIG`, `binaryTier`/`makeMotifSelector`, `applyStandardBase`, `placementSkew`, `scaleVelocity`, `isBackbeatAdjacentStep`). Every file here exports `config`, `getMotif` (built via `makeMotifSelector`), and `applyOverrides(context, state): DrumStepBase` — a new genre file must implement all three to be reachable from dispatch.
+13 genre-specific drum strategy modules (`rock.ts` … `metal.ts`) dispatched by `getStrategy()` in `../groove-engine.ts`, plus `utils.ts` (the shared contract: `GrooveContext`, `DrumStepBase`, `DEFAULT_CONFIG`, `binaryTier`/`makeMotifSelector`, `applyStandardBase`, `placementSkew`, `scaleVelocity`, `isBackbeatAdjacentStep`). Every file here exports `config`, `getMotif`, and `applyOverrides(context, state): DrumStepBase` — a new genre file must implement all three to be reachable from dispatch.
+
+**`getMotif` is built via `makeMotifSelector` in every genre except one sanctioned hand-roll: `disco.ts`.** Disco hand-rolls it specifically to bypass the factory's `intensityFloor` guard (default `INTENSITY_BANDS.LOW`), which would force motif 0 below intensity 0.35 — #997 deliberately made disco's busy/foundation choice intensity-INVARIANT (seed drives density; intensity only scales velocity). Any *new* genre file should use `makeMotifSelector`; hand-rolling needs the same kind of documented musical reason, stated at the function.
 
 ## Canonical-key routing (read `../../../CLAUDE.md` § Naming/Canonicalization first)
 

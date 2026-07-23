@@ -8,6 +8,7 @@ import {
     getPhraseSeed,
     humanizeDraw,
     INTENSITY_BANDS,
+    makeMotifSelector,
     placementSkew,
     roll,
     rollSeed,
@@ -19,36 +20,30 @@ export const config = {
 };
 
 /**
- * Maps intensity to motif complexity for Neo-Soul / Hip Hop.
+ * Maps intensity to motif complexity for Neo-Soul. (Hip Hop is a separate genre
+ * with its own strategy file — `hiphop.ts`.)
  * 0: Classic Boom Bap (Solid & Grounded)
  * 1: Ghost Note Heavy (Busy ghosting)
  * 2: Dilla Skips (Heavy syncopation / drunken swing)
  * 3: Modern Hybrid (Percussive & Expressive)
+ *
+ * why: the two core motifs (0/1) own the bottom 60% of the seed space at every
+ * intensity — Neo-Soul's identity is the pocket, so a boom-bap/ghosting default
+ * is always the most likely draw. The top 40% of the seed space is the only
+ * place the expressive motifs (Dilla skips, modern hybrid) can appear, and they
+ * are additionally gated to intensity >= 0.7: below that the same seeds fall
+ * back onto the core pair (0 for seed < 0.8, 1 above) so a quiet section reads
+ * as laid-back rather than busy.
  */
-export function getMotif(seed: number, complexity: number, intensity = 1.0): number {
-    if (complexity < 0.3 || intensity < INTENSITY_BANDS.LOW) {
-        return 0; // Solid Boom Bap at low intensity
-    }
-
-    // Stable seed ranges for core motifs
-    if (seed < 0.3) {
-        return 0;
-    }
-    if (seed < 0.6) {
-        return 1;
-    }
-
-    // For seeds > 0.6, we only allow complex motifs at high intensity
-    if (intensity < 0.7) {
-        // Fallback to core motifs
-        return seed < 0.8 ? 0 : 1;
-    }
-
-    if (seed < 0.8) {
-        return 2;
-    }
-    return 3;
-}
+export const getMotif = makeMotifSelector([
+    {
+        maxIntensity: 0.7,
+        picks: [[0.3, 0], [0.6, 1], [0.8, 0], 1],
+    },
+    {
+        picks: [[0.3, 0], [0.6, 1], [0.8, 2], 3],
+    },
+]);
 
 export function applyOverrides(context: GrooveContext, state: DrumStepBase): DrumStepBase {
     const result = applyStandardBase(context, state);

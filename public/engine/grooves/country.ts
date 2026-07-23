@@ -14,8 +14,6 @@ import {
 export const config = {
     ...DEFAULT_CONFIG,
     entropyMultiplier: 0.04, // Rock solid timing
-    blockAdjacentSnare: false,
-    backbeatCrack: false,
 };
 
 /**

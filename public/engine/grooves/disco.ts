@@ -36,9 +36,14 @@ export const config = {
  * seed-driven (density axis) and intensity governs velocity only via
  * scaleVelocity calls below — never gates which lane fires.
  */
-// Deliberately ignores intensity (unlike sibling grooves' makeMotifSelector gate) — the
-// 4-motif index is load-bearing for synth-drums velocity scaling; gating it here would
-// change that scaling. Decided 2026-05-28 (docs/audit/FOLLOWUPS.md §E); see #997.
+// Sanctioned hand-roll: this is the one strategy that does NOT build `getMotif` via
+// `makeMotifSelector`, because that factory's `intensityFloor` gate (default
+// INTENSITY_BANDS.LOW) would force motif 0 whenever intensity < 0.35 — re-coupling
+// density to intensity, which is exactly what #997 removed. Disco's busy/foundation
+// choice must stay intensity-INVARIANT (seed drives density; intensity only scales
+// velocity, via the scaleVelocity/roll calls in applyOverrides). The complexity gate
+// below is kept because it mirrors the factory's other guard.
+// Decided 2026-05-28 (docs/audit/FOLLOWUPS.md §E); see #997.
 export function getMotif(seed: number, complexity: number, _intensity = 1.0): number {
     // why: low-complexity sections still collapse to foundation. `complexity`
     // is the orchestration-driven drum-complexity signal (capped motif / 3, or
