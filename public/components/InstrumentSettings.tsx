@@ -298,26 +298,37 @@ interface SoloistControlsProps {
 function SoloistControls({ state }: SoloistControlsProps) {
     return (
         <Fragment>
+            {/*
+             * #1167 — this slider writes `phrasingIntensity`, NOT `complexity`.
+             * `soloist.complexity` is absent from `buildSoloistSyncPayload`
+             * (state.ts) and read by no engine, so the control was inert.
+             * `phrasingIntensity` IS synced, is manifest-classified
+             * `{ delta: 'SET_PARAM' }`, and feeds `intensityLift` in
+             * `getSoloistNotePhraseFirst` — i.e. the worker contract was already
+             * expecting a UI writer that did not exist.
+             * The HarmonyControls slider above still writes `complexity`; that one
+             * is live (harmony.complexity is worker-synced and persisted).
+             */}
             <SettingRow
                 label="Complexity"
                 id="soloistComplexity"
                 description="Higher plays busier, more adventurous lines."
-                valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                valueDisplay={`${Math.round((state.phrasingIntensity ?? 0.5) * 100)}%`}
             >
                 <Slider
                     id="soloistComplexity"
                     min="0"
                     max="1"
                     step="0.05"
-                    value={state.complexity !== undefined ? state.complexity : 0.5}
+                    value={state.phrasingIntensity !== undefined ? state.phrasingIntensity : 0.5}
                     onInput={(val) => {
                         dispatch(ACTIONS.SET_PARAM, {
                             module: 'soloist',
-                            param: 'complexity',
+                            param: 'phrasingIntensity',
                             value: parseFloat(val),
                         });
                     }}
-                    ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
+                    ariaValueText={`${Math.round((state.phrasingIntensity ?? 0.5) * 100)}%`}
                 />
             </SettingRow>
 

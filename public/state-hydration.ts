@@ -298,6 +298,10 @@ export function hydrateState(): void {
                     typeof savedState.soloist.autoMode === 'boolean'
                         ? savedState.soloist.autoMode
                         : true,
+                // #1167 — pre-#1167 saves have no `phrasingIntensity` (and may carry
+                // a stale, always-inert `complexity`); clamp() falls back to the 0.5
+                // default when the key is missing or out of range.
+                phrasingIntensity: clamp(savedState.soloist.phrasingIntensity, 0, 1, 0.5),
             });
         }
         if (savedState.harmony) {

@@ -148,4 +148,60 @@ describe('InstrumentSettings Component', () => {
         expect(humanizeSlider.hasAttribute('aria-valuetext')).toBe(true);
         expect(humanizeSlider.getAttribute('aria-valuetext')).toBe('40%');
     });
+
+    // --- #1167 regression -----------------------------------------------------
+    //
+    // The soloist "Complexity" slider used to dispatch SET_PARAM `complexity`, but
+    // `soloist.complexity` is absent from `buildSoloistSyncPayload` and read by no
+    // engine — the control was inert. It now writes `phrasingIntensity`, which IS
+    // synced to the worker and drives `intensityLift` in the phrase-first soloist.
+    it('soloist Complexity slider reads and writes phrasingIntensity, not the dead complexity field', () => {
+        mockUseEnsembleState.mockImplementation((cb) =>
+            cb({
+                soloist: {
+                    // Deliberately divergent so a read of the wrong field is visible:
+                    // the slider must show 70%, never 20%.
+                    phrasingIntensity: 0.7,
+                    complexity: 0.2,
+                    mode: 'monophonic',
+                    autoMode: false,
+                    style: 'smart',
+                    tradeMode: 'manual',
+                    voice: 'synth',
+                    autoSound: true,
+                },
+                // InstrumentSpecificSettings also renders InstrumentSoundSource,
+                // which reads groove.lastSmartGenre.
+                groove: { lastSmartGenre: 'Jazz' },
+                playback: {},
+            }),
+        );
+
+        act(() => {
+            render(<InstrumentSpecificSettings module="soloist" />, container);
+        });
+
+        const slider = container.querySelector('#soloistComplexity');
+        expect(slider).not.toBeNull();
+        expect(slider.value).toBe('0.7');
+        expect(slider.getAttribute('aria-valuetext')).toBe('70%');
+
+        act(() => {
+            slider.value = '0.45';
+            slider.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+
+        const call = mockDispatch.mock.calls.find(
+            ([, payload]) =>
+                payload?.module === 'soloist' && payload?.param === 'phrasingIntensity',
+        );
+        expect(call, 'slider should dispatch SET_PARAM soloist.phrasingIntensity').toBeTruthy();
+        expect(call[1].value).toBeCloseTo(0.45);
+
+        // ...and must no longer write the inert field.
+        const stale = mockDispatch.mock.calls.find(
+            ([, payload]) => payload?.module === 'soloist' && payload?.param === 'complexity',
+        );
+        expect(stale, 'slider must not write the dead soloist.complexity').toBeUndefined();
+    });
 });
