@@ -177,9 +177,17 @@ export interface ConductorState {
     readonly stepSize: number;
     /** Structural analysis of the song arrangement. */
     readonly form: object | null;
-    /** Number of times the current section has looped. */
-    readonly loopCount: number;
-    /** Number of times the entire song has looped. */
+    /**
+     * Number of times the entire song form has looped. Incremented at
+     * `isLoopEnd` in `applyConductor`, never at a section boundary.
+     *
+     * #1171 collapsed a duplicate `loopCount` field into this one. That field
+     * was documented as "times the current SECTION has looped", but the only
+     * writer incremented it in the same dispatch as `formIteration`, at the end
+     * of the whole arrangement — so its doc was wrong and the two were provably
+     * always equal. If per-section loop counting is ever wanted, it needs a real
+     * writer at a section boundary, not this field back.
+     */
     readonly formIteration: number;
 }
 

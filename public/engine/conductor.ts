@@ -396,10 +396,8 @@ export function checkSectionTransition(
             }
 
             if (isLoopEnd && shouldFill) {
-                const nextLoopCount = conductor.loopCount + 1;
                 const nextFormIteration = conductor.formIteration + 1;
                 dispatch(ACTIONS.UPDATE_CONDUCTOR_STATE, {
-                    loopCount: nextLoopCount,
                     formIteration: nextFormIteration,
                 });
 
@@ -414,7 +412,7 @@ export function checkSectionTransition(
                     // Low intensity = fill every 4 loops.
                     const loopFrequency =
                         playback.bandIntensity > 0.75 ? 1 : playback.bandIntensity > 0.4 ? 2 : 4;
-                    shouldFill = nextLoopCount % loopFrequency === 0;
+                    shouldFill = nextFormIteration % loopFrequency === 0;
                 }
             }
 

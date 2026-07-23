@@ -8,7 +8,6 @@ export const conductor = deepSignal<ConductorState>({
     targetIntensity: 0.35,
     stepSize: 0.0005,
     form: null,
-    loopCount: 0,
     formIteration: 0,
 });
 
@@ -25,9 +24,6 @@ export function conductorReducer(action: Action): boolean {
             if (action.payload.form !== undefined) {
                 c.form = action.payload.form;
             }
-            if (action.payload.loopCount !== undefined) {
-                c.loopCount = action.payload.loopCount;
-            }
             if (action.payload.formIteration !== undefined) {
                 c.formIteration = action.payload.formIteration;
             }
@@ -35,7 +31,6 @@ export function conductorReducer(action: Action): boolean {
         case ACTIONS.RESET_STATE:
             c.targetIntensity = 0.35;
             c.stepSize = 0.0005;
-            c.loopCount = 0;
             c.formIteration = 0;
             return true;
     }

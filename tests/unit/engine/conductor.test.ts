@@ -26,7 +26,6 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
         targetIntensity: 0.35,
         stepSize: 0.0005,
         form: null,
-        loopCount: 0,
         formIteration: 0,
     };
     const mockGroove = { ...groove };
@@ -114,7 +113,6 @@ describe('Conductor Logic', () => {
         conductor.targetIntensity = 0.5;
         conductor.stepSize = 0.01;
         conductor.formIteration = 0;
-        conductor.loopCount = 0;
 
         groove.fillMap = null;
         groove.orchestrationMap = null;

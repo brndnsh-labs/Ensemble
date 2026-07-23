@@ -33,7 +33,6 @@ describe('Session Timer Intensity Arc', () => {
 
         // Reset conductor state
         mockState.conductor.formIteration = 0;
-        mockState.conductor.loopCount = 0;
 
         // Mock performance.now to control time
         vi.spyOn(performance, 'now');

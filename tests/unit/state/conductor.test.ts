@@ -5,7 +5,7 @@ import { ACTIONS } from '../../../public/types.js';
 describe('Conductor State Slice', () => {
     it('should have initial state', () => {
         expect(conductor.targetIntensity).toBe(0.35);
-        expect(conductor.loopCount).toBe(0);
+        expect(conductor.formIteration).toBe(0);
     });
 
     it('should update state via UPDATE_CONDUCTOR_STATE', () => {
@@ -24,7 +24,7 @@ describe('Conductor State Slice', () => {
             type: ACTIONS.UPDATE_CONDUCTOR_STATE,
             payload: {
                 targetIntensity: 0.9,
-                loopCount: 10,
+                formIteration: 10,
             },
         });
 
@@ -32,6 +32,6 @@ describe('Conductor State Slice', () => {
         conductorReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
 
         expect(conductor.targetIntensity).toBe(0.35);
-        expect(conductor.loopCount).toBe(0);
+        expect(conductor.formIteration).toBe(0);
     });
 });

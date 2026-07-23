@@ -91,7 +91,6 @@ describe('Time Signature Transitions', () => {
         conductor.targetIntensity = 0.5;
         conductor.stepSize = 0;
         conductor.formIteration = 0;
-        conductor.loopCount = 0;
         groove.enabled = true;
     });
 
@@ -119,10 +118,12 @@ describe('Time Signature Transitions', () => {
         const stepsPerMeasure = 20;
         // 4 bars of 5/4 = 80 steps
         // The dynamic threshold is `stepsPerMeasure * 4` = 80 steps
-        // This is a "short loop", so `shouldFill` logic triggers based on `conductor.loopCount` logic
-        // For intensity 0.5 (playback.bandIntensity = 0.5), freq is 2. Loop count needs to be % 2 === 0
-        // We ensure loop count allows the fill target re-calculation.
-        conductor.loopCount = 1;
+        // This is a "short loop", so `shouldFill` triggers off the form-loop counter
+        // For intensity 0.5 (playback.bandIntensity = 0.5), freq is 2. The counter's NEXT
+        // value must be % 2 === 0, so seed it at 1 and the loop-end bump makes it 2.
+        // (#1171: this used to seed the duplicate `conductor.loopCount`, which the engine
+        // read while `formIteration` tracked it in lockstep. One counter now.)
+        conductor.formIteration = 1;
 
         arranger.totalSteps = 80;
         arranger.stepMap = [];
@@ -137,7 +138,8 @@ describe('Time Signature Transitions', () => {
         // Check at the start of the last measure (step 60)
         checkSectionTransition(getState(), 60, stepsPerMeasure, dispatch);
 
-        expect(conductor.formIteration).toBe(1);
+        // Seeded at 1 above; the loop-end branch ran and advanced it.
+        expect(conductor.formIteration).toBe(2);
         expect(conductor.targetIntensity).not.toBe(0.5);
     });
 
