@@ -54,11 +54,48 @@ const SECTION_ENERGY_MAP: Record<string, number> = {
     breakdown: 0.3,
 };
 
+/**
+ * Labels that must be matched as a WHOLE WORD rather than by substring, checked
+ * ahead of `SECTION_ENERGY_MAP`. This exists for labels too short to be safe as
+ * substring keys — a bare `'b'` in the map above would be contained in
+ * `bridge`, `build` and `breakdown` and, since the first contained key wins,
+ * would hijack all three.
+ *
+ * Keep this list tiny. A label belongs here only when it is genuinely a single
+ * letter or otherwise a substring of unrelated section names; anything longer
+ * should be an ordinary `SECTION_ENERGY_MAP` key.
+ */
+const SECTION_ENERGY_EXACT: [RegExp, number][] = [
+    // why 0.6, the same seat as 'bridge': in an AABA form the B section IS the
+    // bridge — the middle-eight of a 32-bar standard, and the form's only
+    // structural departure. Unmapped it sat at the 0.5 verse default, so the
+    // bridge of every jazz/bossa/neo-soul tune got zero conductor lift and a
+    // band-pocket scale of exactly 1.0 — identical to the head it is supposed
+    // to contrast against.
+    //
+    // The rest of the codebase already reads 'B' this way: `analyzeForm` below
+    // maps it to the 'Bridge' role, and `isDepartureCategory` in
+    // engine/soloist-seeder.ts lists it as a departure. This aligns the energy
+    // map with both.
+    //
+    // `^b\b` deliberately anchors at the start and requires a word boundary, so
+    // it catches the generator's bare 'B' (AABA_FORMS in song-generator.ts) and
+    // the shipped preset spellings 'B (G)' / 'B (E)' / 'B (Bb)' / 'B (A)' in
+    // data/chord-presets.ts, while 'bridge' / 'build' / 'breakdown' fall
+    // through to the substring map untouched. (#1205)
+    [/^b\b/, 0.6],
+];
+
 export function getSectionEnergy(label: string | null | undefined): number {
     if (!label) {
         return 0.5;
     }
     const lower = label.toLowerCase();
+    for (const [pattern, val] of SECTION_ENERGY_EXACT) {
+        if (pattern.test(lower)) {
+            return val;
+        }
+    }
     for (const [key, val] of Object.entries(SECTION_ENERGY_MAP)) {
         if (lower.includes(key)) {
             return val;

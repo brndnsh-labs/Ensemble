@@ -43,6 +43,37 @@ describe('Form Analysis Engine', () => {
             expect(getSectionEnergy('Hook')).toBe(getSectionEnergy('Chorus'));
         });
 
+        // In an AABA form the B section IS the bridge — the middle-eight, and
+        // the form's only structural departure. Jazz/Bossa/Neo-Soul are the
+        // genres routed to AABA_FORMS, so this was the whole contrast of a
+        // standard reading as verse-energy.
+        it("seats 'B' at bridge energy — the B section IS the middle-eight (#1205)", () => {
+            expect(getSectionEnergy('B')).toBe(0.6);
+            expect(getSectionEnergy('B')).toBe(getSectionEnergy('Bridge'));
+        });
+
+        // The shipped standards presets spell it with the key appended.
+        it.each(['B (G)', 'B (E)', 'B (Bb)', 'B (A)', 'B (B)'])(
+            "seats the preset spelling '%s' at bridge energy (#1205)",
+            (label) => {
+                expect(getSectionEnergy(label)).toBe(0.6);
+            },
+        );
+
+        // The reason 'b' could never be a plain SECTION_ENERGY_MAP key: it is a
+        // substring of three unrelated section names, and the first contained
+        // key wins. This is the regression guard for the exact-match pre-pass
+        // reaching too far — without it, all three would silently read 0.6.
+        it("bare-'B' matching does not hijack bridge/build/breakdown (#1205)", () => {
+            expect(getSectionEnergy('Build')).toBe(0.7);
+            expect(getSectionEnergy('Breakdown')).toBe(0.3);
+            // Bridge is 0.6 on its own merits, not by falling through to the
+            // exact-match arm — assert it still comes from the substring map by
+            // checking a label the pre-pass cannot match.
+            expect(getSectionEnergy('Bridge')).toBe(0.6);
+            expect(getSectionEnergy('The Bridge')).toBe(0.6);
+        });
+
         // The durable guard, and the one that would have caught BOTH bugs
         // above: an unmapped label doesn't throw, it resolves to a plausible
         // 0.5 — so a vocabulary gap is invisible until someone notices the
@@ -77,21 +108,10 @@ describe('Form Analysis Engine', () => {
             const TRULY_NEUTRAL = /^(a\d*|main|verse)$/;
 
             // KNOWN GAPS — labels that reach the 0.5 default and SHOULDN'T.
-            // Listed explicitly so the guard neither hides them nor blocks this
-            // commit, and so the next reader has to confront the claim rather
-            // than inherit a blanket allowlist. Each entry needs a filed issue.
-            //
-            //   'B' — in AABA_FORMS the B section IS the bridge (the
-            //         middle-eight of a 32-bar standard), and this very file
-            //         already agrees: `analyzeForm` maps `label === 'b'` to the
-            //         'Bridge' role, and soloist-seeder lists category 'b' as a
-            //         departure. The map seats `bridge: 0.6` but 'B' resolves to
-            //         0.5, so Jazz/Bossa/Neo-Soul — the three genres routed to
-            //         AABA — get zero lift into the only structural contrast in
-            //         the tune. It cannot be fixed with a substring key ('b'
-            //         would hijack bridge/build/breakdown); it needs an
-            //         exact-match pre-pass, which is its own change. See #1205.
-            const KNOWN_GAPS = ['B'];
+            // Empty as of #1205 (the last entry, 'B', was fixed there). Keep the
+            // list rather than inlining `[]`: a future gap gets an explicit,
+            // commented home with a filed issue instead of a blanket allowlist.
+            const KNOWN_GAPS: string[] = [];
 
             const unmapped = [...emitted]
                 .filter((l) => !TRULY_NEUTRAL.test(l.toLowerCase()))
