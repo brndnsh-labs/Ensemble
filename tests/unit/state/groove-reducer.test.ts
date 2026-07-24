@@ -143,4 +143,82 @@ describe('Groove Reducer', () => {
             }
         });
     });
+
+    // #1182: this slice is the SINGLE authority for SET_PARAM/SET_VOLUME/SET_REVERB
+    // on the groove lane. `state.ts` runs instrumentReducer and grooveReducer back
+    // to back and ignores their boolean returns, so before this both wrote groove
+    // state on every one of these actions.
+    describe('#1182 sole authority over the groove lane', () => {
+        // The two reducers used to accept DIFFERENT aliases — instrumentStateMap had
+        // `groove` + `gb`, this one had `groove` + `drum` + `drums`. Handing the lane
+        // over without covering `gb` here would have made a gb-keyed dispatch a silent
+        // no-op, so every alias is pinned.
+        for (const module of ['groove', 'drum', 'drums', 'gb']) {
+            it(`owns SET_PARAM / SET_VOLUME / SET_REVERB for module '${module}'`, () => {
+                expect(
+                    grooveReducer(
+                        {
+                            type: ACTIONS.SET_PARAM,
+                            payload: { module, param: 'measures', value: 3 },
+                        },
+                        {},
+                    ),
+                ).toBe(true);
+                expect(groove.measures).toBe(3);
+
+                expect(
+                    grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module, value: 0.42 } }),
+                ).toBe(true);
+                expect(groove.volume).toBe(0.42);
+
+                expect(
+                    grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module, value: 0.11 } }),
+                ).toBe(true);
+                expect(groove.reverb).toBe(0.11);
+            });
+        }
+
+        it('instrumentReducer declines the groove lane instead of double-writing it', async () => {
+            const { instrumentReducer } = await import('../../../public/state/instruments.js');
+
+            for (const module of ['groove', 'gb']) {
+                expect(
+                    instrumentReducer({
+                        type: ACTIONS.SET_VOLUME,
+                        payload: { module, value: 0.99 },
+                    } as any),
+                ).toBe(false);
+                expect(
+                    instrumentReducer({
+                        type: ACTIONS.SET_REVERB,
+                        payload: { module, value: 0.99 },
+                    } as any),
+                ).toBe(false);
+                expect(
+                    instrumentReducer({
+                        type: ACTIONS.SET_PARAM,
+                        payload: { module, param: 'measures', value: 99 },
+                    } as any),
+                ).toBe(false);
+            }
+
+            // Declining must mean "didn't touch it", not "wrote it and reported false".
+            expect(groove.volume).not.toBe(0.99);
+            expect(groove.reverb).not.toBe(0.99);
+            expect(groove.measures).not.toBe(99);
+        });
+
+        it('still routes non-groove modules to instrumentReducer', async () => {
+            const { instrumentReducer, chords } = await import(
+                '../../../public/state/instruments.js'
+            );
+            expect(
+                instrumentReducer({
+                    type: ACTIONS.SET_VOLUME,
+                    payload: { module: 'chords', value: 0.33 },
+                } as any),
+            ).toBe(true);
+            expect(chords.volume).toBe(0.33);
+        });
+    });
 });

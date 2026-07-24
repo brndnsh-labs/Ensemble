@@ -58,6 +58,32 @@ export const groove = deepSignal<GrooveState>({
     variations: null,
 });
 
+/**
+ * Every module alias that addresses the groove/drum lane on a `SET_PARAM` /
+ * `SET_VOLUME` / `SET_REVERB` payload.
+ *
+ * This slice is the single authority for those three actions (#1182): the
+ * `instrumentStateMap` arms in `instruments.ts` used to write groove state too,
+ * and since `state.ts` runs both reducers unconditionally (it ignores their
+ * boolean return), every groove volume/reverb/param change was written twice —
+ * with this one landing second and winning. The aliases had also drifted apart:
+ * `instrumentStateMap` carried `groove` + `gb` while this reducer took `groove`
+ * + `drum` + `drums`, so `gb` was handled ONLY over there and `drum`/`drums`
+ * ONLY here. Both sides now consult this set, which is why `gb` is in it —
+ * dropping it from the instrument side without adding it here would have turned
+ * a `gb`-keyed dispatch into a silent no-op.
+ *
+ * (`gb` has no dispatcher left in the repo; it's kept for stale persisted
+ * payloads. `groove` STAYS in `instrumentStateMap` regardless — the
+ * `SET_INSTRUMENT_VOICE` A/B voice switch resolves through that map.)
+ */
+const GROOVE_MODULE_KEYS = new Set(['groove', 'drum', 'drums', 'gb']);
+
+/** True when a dispatch payload's `module` addresses the groove/drum lane. */
+export function isGrooveModule(module: unknown): boolean {
+    return typeof module === 'string' && GROOVE_MODULE_KEYS.has(module);
+}
+
 export function grooveReducer(action: Action, playback: GlobalContext): boolean {
     const g = groove as Mutable<typeof groove>;
     switch (action.type) {
@@ -69,11 +95,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             }
             return true;
         case ACTIONS.SET_PARAM:
-            if (
-                action.payload.module === 'groove' ||
-                action.payload.module === 'drum' ||
-                action.payload.module === 'drums'
-            ) {
+            if (isGrooveModule(action.payload.module)) {
                 (groove as Record<string, unknown>)[action.payload.param] = action.payload.value;
                 return true;
             }
@@ -122,21 +144,13 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.humanize = action.payload;
             return true;
         case ACTIONS.SET_VOLUME:
-            if (
-                action.payload.module === 'groove' ||
-                action.payload.module === 'drum' ||
-                action.payload.module === 'drums'
-            ) {
+            if (isGrooveModule(action.payload.module)) {
                 g.volume = action.payload.value;
                 return true;
             }
             return false;
         case ACTIONS.SET_REVERB:
-            if (
-                action.payload.module === 'groove' ||
-                action.payload.module === 'drum' ||
-                action.payload.module === 'drums'
-            ) {
+            if (isGrooveModule(action.payload.module)) {
                 g.reverb = action.payload.value;
                 return true;
             }

@@ -12,7 +12,7 @@ import { ACTIONS } from '../types.js';
 
 export type { BassState, ChordState, HarmonyState, SoloistState };
 
-import { groove } from './groove.js';
+import { groove, isGrooveModule } from './groove.js';
 
 export const MIXER_SETTINGS_VERSION = 2;
 
@@ -314,6 +314,10 @@ export function instrumentReducer(action: Action): boolean {
                 applySoloistPayload(soloist, { [action.payload.param]: action.payload.value });
                 return true;
             }
+            // grooveReducer owns the groove lane for this action (#1182).
+            if (isGrooveModule(modKey)) {
+                return false;
+            }
             if (instrumentStateMap[modKey]) {
                 instrumentStateMap[modKey][action.payload.param] = action.payload.value;
                 return true;
@@ -431,11 +435,19 @@ export function instrumentReducer(action: Action): boolean {
             c.density = action.payload;
             return true;
         case ACTIONS.SET_VOLUME:
+            // grooveReducer owns the groove lane for this action (#1182).
+            if (isGrooveModule(action.payload.module)) {
+                return false;
+            }
             if (instrumentStateMap[action.payload.module]) {
                 instrumentStateMap[action.payload.module].volume = action.payload.value;
             }
             return true;
         case ACTIONS.SET_REVERB:
+            // grooveReducer owns the groove lane for this action (#1182).
+            if (isGrooveModule(action.payload.module)) {
+                return false;
+            }
             if (instrumentStateMap[action.payload.module]) {
                 instrumentStateMap[action.payload.module].reverb = action.payload.value;
             }
