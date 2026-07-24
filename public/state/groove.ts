@@ -1,8 +1,8 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, GlobalContext, GrooveState, Instrument, Mutable } from '../types.js';
+import type { Action, GlobalContext, GrooveState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export type { GrooveState, Instrument };
+export type { GrooveState };
 
 export const groove = deepSignal<GrooveState>({
     enabled: true,

@@ -17,8 +17,6 @@ import {
     velocityTimbre,
 } from './synth-utils.js';
 
-export type { SoloistVoice } from '../types.js';
-
 type SoloistState = EnsembleState['soloist'];
 
 interface VibratoNodes {

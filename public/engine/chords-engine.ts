@@ -6,14 +6,16 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
-import type { Chord, ChordNamePart, FormattedChordNames, Mutable } from '../types.js';
+import type { Chord, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
 import { transposeChordText } from './transpose.js';
 import { getBassSpaceFloor, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
-export type { Chord, ChordNamePart, FormattedChordNames };
+// `FormattedChordNames` stays: it's the return type of the exported
+// `getFormattedChordNames`, so consumers need to be able to name it from here.
+export type { FormattedChordNames };
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;

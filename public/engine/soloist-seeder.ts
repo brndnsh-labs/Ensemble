@@ -13,12 +13,7 @@ import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './
 import { classifyChordQuality } from './soloist-pitch-engine.js';
 import { getKeyContext, getScaleForChord } from './theory-scales.js';
 
-export type {
-    SeedGuitarSupportHint,
-    SeedNote,
-    SeedSupportHints,
-    SeedSupportRole,
-} from '../types.js';
+export type { SeedGuitarSupportHint, SeedNote, SeedSupportRole } from '../types.js';
 
 export interface SeedSupportHintOverrides {
     role?: SeedSupportRole;

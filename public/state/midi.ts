@@ -1,8 +1,8 @@
 import { deepSignal } from 'deepsignal';
-import type { Action, MidiOutput, MidiState } from '../types.js';
+import type { Action, MidiState } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export type { MidiOutput, MidiState };
+export type { MidiState };
 
 export const midi = deepSignal<MidiState>({
     enabled: false,

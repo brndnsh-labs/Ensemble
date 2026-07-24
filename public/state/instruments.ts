@@ -6,20 +6,11 @@ import type {
     ChordState,
     HarmonyState,
     Mutable,
-    SoloistPhraseContext,
-    SoloistSessionSeed,
     SoloistState,
 } from '../types.js';
 import { ACTIONS } from '../types.js';
 
-export type {
-    BassState,
-    ChordState,
-    HarmonyState,
-    SoloistPhraseContext,
-    SoloistSessionSeed,
-    SoloistState,
-};
+export type { BassState, ChordState, HarmonyState, SoloistState };
 
 import { groove } from './groove.js';
 

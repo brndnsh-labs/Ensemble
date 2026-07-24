@@ -31,10 +31,11 @@ import {
 
 // Comp-memory struct extracted to comping-state.ts (#1014). Re-exported here so
 // the workers (logic-worker.ts, midi-worker-logic.ts) and the ~15 tests that import
-// `compingState`/`resetCompingState`/`CompingState` from accompaniment.ts keep working
-// untouched. `compingState` is a MUTATED SHARED SINGLETON — this re-export preserves
-// the single object identity every consumer relies on.
-export { type CompingState, compingState, resetCompingState } from './comping-state.js';
+// `compingState`/`resetCompingState` from accompaniment.ts keep working untouched.
+// `compingState` is a MUTATED SHARED SINGLETON — this re-export preserves the single
+// object identity every consumer relies on. The `CompingState` TYPE is deliberately
+// not re-exported: nothing imports it via this path (name it from comping-state.js).
+export { compingState, resetCompingState } from './comping-state.js';
 
 // why: STICKY genres retain the comping cell across multiple bars instead of
 //      re-rolling every bar in `updateRhythmicIntent`. Funk was the original
