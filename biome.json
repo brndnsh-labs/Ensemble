@@ -93,7 +93,8 @@
                 "noExplicitAny": "off",
                 "noShadowRestrictedNames": "off",
                 "noPrototypeBuiltins": "off",
-                "useIterableCallbackReturn": "off"
+                "useIterableCallbackReturn": "off",
+                "noImportCycles": "error"
             }
         }
     },
@@ -105,7 +106,9 @@
                     "suspicious": {
                         "noConsole": {
                             "level": "error",
-                            "options": { "allow": ["warn", "error"] }
+                            "options": {
+                                "allow": ["warn", "error"]
+                            }
                         }
                     }
                 }

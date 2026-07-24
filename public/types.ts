@@ -91,7 +91,8 @@ export interface ModalsState {
 
 // ---------------------------------------------------------------------------
 // State-slice interfaces (lifted here from `state/*.ts` to break the
-// state ↔ types cycle that depcruise was flagging).
+// state ↔ types cycle the circular-import gate was flagging — dependency-cruiser
+// at the time, Biome's `noImportCycles` since #1191).
 // ---------------------------------------------------------------------------
 
 export interface Section {
