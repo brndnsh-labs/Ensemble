@@ -167,7 +167,7 @@ The apex is exempt from the breath gate (the climax never gets gated out) and **
 
 **Fallback under loops / vamps / edits (must be specified before Slice 1 — Slice 1's ballad may itself be a short loop):**
 - **Single-section loop or single-chord vamp:** there are no narrative sections to map a curve onto, so the arc runs on a **loop-count-keyed curve with a defined period** (e.g. an N-loop rise-and-resolve cycle) rather than collapsing to flat.
-- **Mid-song section add/remove/edit & key/time changes:** today these re-fire `regenerateSessionSeeds` (`state-effects.ts:170-219`) and rebuild the seed. The live arc must define how it *re-anchors* (preserve the climax target and current cell where musically possible, rather than restart cold).
+- **Mid-song section add/remove/edit & key/time changes:** today these re-fire `regenerateSessionSeeds` (`public/state/state-effects.ts`) and rebuild the seed. The live arc must define how it *re-anchors* (preserve the climax target and current cell where musically possible, rather than restart cold).
 - **User section-jump:** the arc must map the new position sensibly (don't replay the entrance from the top mid-song).
 
 ---

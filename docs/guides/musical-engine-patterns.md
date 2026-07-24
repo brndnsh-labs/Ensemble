@@ -85,11 +85,11 @@ Source of truth: `public/engine/coordination-engine.ts`. When a consumer engine 
 
 When you want an engine to vary its behavior across loop passes ("Chorus Evolution"), the proven recipe:
 
-1. **Read `playback.currentLoopCount` at per-tick time**, not at seed time. The slot lives in `playback` state (`types.ts:162`), maintained by the conductor at iteration boundaries (`conductor.ts:319-322`), and flowed into every per-tick engine via the `playback` arg. No new context field or state slice is needed — the data plumbing is universal.
+1. **Read `playback.currentLoopCount` at per-tick time**, not at seed time. The slot lives in `playback` state (`public/types.ts`), maintained by the conductor's iteration-boundary update (`public/engine/conductor.ts`), and flowed into every per-tick engine via the `playback` arg. No new context field or state slice is needed — the data plumbing is universal.
 
-2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`arranger-utils.ts:81-92`). The seeder's `index` maxes out at ~5 regardless of loop count.
+2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`public/engine/arranger-utils.ts`). The seeder's `index` maxes out at ~5 regardless of loop count.
 
-3. **Reference consumers:** `groove-engine.ts:520` (motif complexity cap, via the exported `loopMotifCeiling()` helper defined at `groove-engine.ts:308`); `soloist-phrase-first.ts:342-373` (per-loop `loopLift` shaping note density via `activityAt`, keyed off `playback.currentLoopCount`).
+3. **Reference consumers:** `loopMotifCeiling()` in `public/engine/groove-engine.ts` — the motif complexity cap, exported and applied within the same module; `loopLift`/`activityAt` in `public/engine/soloist-phrase-first.ts` — per-loop note-density shaping, keyed off `playback.currentLoopCount`.
 
 > **Historical note:** earlier versions of this guide cited `soloist-pitch-engine.ts:235, 861-877, 999-1056` (the legacy weighted picker `selectPitchAndDevices`) as the loop-awareness reference consumer. That picker was removed in the phrase-first migration (epic #10/#866); `soloist-pitch-engine.ts` is now a 124-line helper module (`chordTargetTones`/`classifyChordQuality`) with no loop-count read — the *pattern* remains the guidance, only its concrete carrier changed.
 
@@ -105,7 +105,7 @@ The pattern generalizes to any engine where an activation predicate gates a sepa
 
 ### Final-stage multiplier discipline (canonical placement)
 
-For any weight-based picker (e.g. `getBassNote` in `bass-engine.ts:300-352`, drum/soloist selectors with multiple bias contributions), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line.
+For any weight-based picker (e.g. `getBassNote` (`public/engine/bass-engine.ts`), drum/soloist selectors with multiple bias contributions), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line.
 
 > **Historical note:** earlier versions of this guide cited the legacy `selectPitchAndDevices` picker in `soloist-pitch-engine.ts` as the canonical example. It was removed in the phrase-first migration (epic #10/#866) — `getBassNote` is CLAUDE.md's current canonical example of this pattern.
 

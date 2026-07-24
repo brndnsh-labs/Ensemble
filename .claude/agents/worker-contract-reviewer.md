@@ -12,7 +12,7 @@ You do not edit code. You read, grep, reason, and report.
 
 The logic worker (`public/logic-worker.ts`) runs on a separate thread and maintains a **partial mirror** of the main-thread state — specifically the slices `arranger`, `chords`, `bass`, `soloist`, `harmony`, `groove`, and `playback`. The mirror is refreshed via two paths:
 
-1. **Initial / full snapshot.** `public/state.ts:40 getSyncState()` builds the payload. `syncWorker()` in `public/worker-client.ts:163` ships it via `WORKER_MSG.SYNC_STATE`. The worker applies it in the `case WORKER_MSG.SYNC_STATE:` branch at `public/logic-worker.ts:50`.
+1. **Initial / full snapshot.** `getSyncState()` (`public/state.ts`) builds the payload. `syncWorker()` (`public/worker-client.ts`) ships it via `WORKER_MSG.SYNC_STATE`. The worker applies it in the `case WORKER_MSG.SYNC_STATE:` branch (`public/logic-worker.ts`).
 2. **Incremental deltas.** `syncWorker(action, payload)` is called on every dispatch from `public/main.ts` to ship a partial update through the same message type.
 
 Source of truth for message constants: `public/worker-types.ts`. Source of truth for the contract shape: `docs/guides/WORKER_CONTRACT.md`.
@@ -22,16 +22,16 @@ Source of truth for message constants: `public/worker-types.ts`. Source of truth
 1. The slice definition (`public/state/<slice>.ts`) and its type in `public/types.ts`.
 2. `getSyncState()` in `public/state.ts` — the field must be included in the snapshot payload.
 3. `syncWorker()` in `public/worker-client.ts` — delta updates must propagate the field when it changes.
-4. The worker's sync handler (`public/logic-worker.ts:50` and any per-slice apply helpers) — must read and apply the field from the incoming payload.
+4. The worker's sync handler (the `case WORKER_MSG.SYNC_STATE` handler in `public/logic-worker.ts` and any per-slice apply helpers) — must read and apply the field from the incoming payload.
 
 Miss any one and the worker silently runs on a snapshot from before the change. Bugs often hide because dev-time reload re-syncs everything; the failure shows up only when a *mid-session* state change doesn't propagate.
 
 ## What to read
 
 - **The diff first.** Anything under `public/state/`, `public/state.ts`, `public/worker-client.ts`, `public/logic-worker.ts`, `public/worker-types.ts`, `public/types.ts`, or any engine module the worker imports (`public/engine/soloist-phrase-first.ts`, `bass-engine.ts`, `harmonies.ts`, `accompaniment.ts`, `chords-engine.ts`, `tick-logic.ts`, etc.).
-- **`public/state.ts:40`** — `getSyncState()`. Inspect what the snapshot includes for each mirrored slice. Pay attention to spread patterns (`...slice`) vs. explicit field lists — spread captures new fields automatically, explicit lists do not.
-- **`public/worker-client.ts:163`** — `syncWorker()`. Inspect how deltas are decided. If it just re-runs `getSyncState()`, full snapshot is shipped on every dispatch (correct but expensive). If it ships a partial keyed on the action, the partial must include every field the action could have touched.
-- **`public/logic-worker.ts:50`** — `case WORKER_MSG.SYNC_STATE` handler. Inspect how the incoming payload is applied to the worker's local signal copies. Spread vs. explicit assignment matters here too.
+- **`getSyncState()`** (`public/state.ts`) — inspect what the snapshot includes for each mirrored slice. Pay attention to spread patterns (`...slice`) vs. explicit field lists — spread captures new fields automatically, explicit lists do not.
+- **`syncWorker()`** (`public/worker-client.ts`) — inspect how deltas are decided. If it just re-runs `getSyncState()`, full snapshot is shipped on every dispatch (correct but expensive). If it ships a partial keyed on the action, the partial must include every field the action could have touched.
+- **the `case WORKER_MSG.SYNC_STATE` handler** (`public/logic-worker.ts`) — inspect how the incoming payload is applied to the worker's local signal copies. Spread vs. explicit assignment matters here too.
 - **`public/worker-types.ts`** — the `WORKER_MSG.*` constants. Any new message type added to the diff must exist here.
 - **`docs/guides/WORKER_CONTRACT.md`** — the canonical contract. If the diff drifts from what this doc claims, either the diff is wrong or the doc needs updating in the same change.
 
