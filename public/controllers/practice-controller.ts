@@ -16,8 +16,8 @@
  * all run exactly as a top-of-chart start does.
  */
 
-import { dispatch, getState } from './state.js';
-import { ACTIONS } from './types.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
 
 export interface SectionStepBounds {
     /** First absolute step of the section, within `[0, totalSteps)`. */

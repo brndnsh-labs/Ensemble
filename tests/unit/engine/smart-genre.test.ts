@@ -34,12 +34,12 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     togglePower: vi.fn(),
 }));
 
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
     applyTheme: vi.fn(),
 }));

@@ -27,7 +27,7 @@ vi.mock('../../public/state.js', async (importOriginal) => {
 });
 
 // Mock app-controller
-vi.mock('../../public/app-controller.js', () => ({
+vi.mock('../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn((val) => {
         playback.bpm = parseInt(val, 10);
     }),

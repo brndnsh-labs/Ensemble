@@ -1,7 +1,7 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { beforeEach, describe, it, vi } from 'vitest';
-import { onSectionUpdate } from '../../public/arranger-controller.js';
+import { onSectionUpdate } from '../../public/controllers/arranger-controller.js';
 import { getState } from '../../public/state.js';
 
 const { arranger } = getState();
@@ -13,7 +13,7 @@ vi.mock('../../public/engine/chords-engine.js', () => ({
     transformRelativeProgression: vi.fn(),
 }));
 
-vi.mock('../../public/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
+vi.mock('../../public/controllers/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/persistence.js', () => ({ saveCurrentState: vi.fn() }));

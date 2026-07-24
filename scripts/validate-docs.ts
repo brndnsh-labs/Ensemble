@@ -40,6 +40,7 @@ const CORE_DIRECTORIES = [
     'public/data',
     'public/song', // #1178 phase 1
     'public/export', // #1178 phase 1
+    'public/controllers', // #1178 phase 2
 ];
 
 const IGNORE_EXTENSIONS = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];

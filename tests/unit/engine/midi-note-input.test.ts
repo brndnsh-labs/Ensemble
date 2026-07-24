@@ -35,19 +35,19 @@ vi.mock('../../../public/state.js', () => {
 
 // Mock the performance-controller triggers so we assert call args without
 // touching the real audio engine.
-vi.mock('../../../public/performance-controller.js', () => ({
+vi.mock('../../../public/controllers/performance-controller.js', () => ({
     triggerSoloNote: vi.fn(),
     triggerDrumSound: vi.fn(),
     stopSoloist: vi.fn(),
     stopDrums: vi.fn(),
 }));
 
-import { initMIDI } from '../../../public/midi-controller.js';
+import { initMIDI } from '../../../public/controllers/midi-controller.js';
 import {
     stopSoloist,
     triggerDrumSound,
     triggerSoloNote,
-} from '../../../public/performance-controller.js';
+} from '../../../public/controllers/performance-controller.js';
 import { getFrequency } from '../../../public/utils.js';
 
 const { midi, dispatch } = getState();

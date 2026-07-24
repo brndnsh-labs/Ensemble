@@ -3,8 +3,8 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as InstrumentController from '../../../public/controllers/instrument-controller.js';
 import * as Engine from '../../../public/engine/engine.js';
-import * as InstrumentController from '../../../public/instrument-controller.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 import * as WorkerClient from '../../../public/worker-client.js';

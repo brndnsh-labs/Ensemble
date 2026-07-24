@@ -23,7 +23,7 @@ vi.mock('../../../public/state.js', () => ({
     getState: () => ({}),
 }));
 
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     appendSections: (...args: any[]) => mockAppendSections(...args),
     clearChordPresetHighlight: () => mockClearChordPresetHighlight(),
     refreshArrangerUI: () => mockRefreshArrangerUI(),

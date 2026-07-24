@@ -8,7 +8,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock side-effect modules to prevent EnvironmentTeardownErrors from dynamic imports in state.js
-vi.mock('../../public/app-controller.js', () => ({
+vi.mock('../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
     applyTheme: vi.fn(),
 }));

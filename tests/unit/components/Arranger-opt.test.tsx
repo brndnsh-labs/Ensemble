@@ -14,7 +14,7 @@ vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
 }));
 
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
     onSectionDelete: vi.fn(),
     onSectionDuplicate: vi.fn(),

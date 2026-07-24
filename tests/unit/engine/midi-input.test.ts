@@ -32,7 +32,7 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-import { initMIDI } from '../../../public/midi-controller.js';
+import { initMIDI } from '../../../public/controllers/midi-controller.js';
 
 const { midi, dispatch } = getState();
 

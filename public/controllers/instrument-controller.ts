@@ -10,12 +10,12 @@ import {
     killSoloistBus,
     killSoloistNote,
     restoreGains,
-} from './engine/engine.js';
-import { dispatch, getState, getSyncState, stateMap } from './state.js';
-import type { Mutable } from './types.js';
-import { ACTIONS } from './types.js';
-import { getStepsPerMeasure } from './utils.js';
-import { flushWorker, syncWorker } from './worker-client.js';
+} from '../engine/engine.js';
+import { dispatch, getState, getSyncState, stateMap } from '../state.js';
+import type { Mutable } from '../types.js';
+import { ACTIONS } from '../types.js';
+import { getStepsPerMeasure } from '../utils.js';
+import { flushWorker, syncWorker } from '../worker-client.js';
 
 export function setInstrumentControllerRefs(_scheduler: any): void {}
 
@@ -29,7 +29,7 @@ export function switchMeasure(idx: number): void {
 
 export async function loadDrumPreset(name: string): Promise<void> {
     const { groove, arranger } = getState();
-    const { DRUM_PRESETS } = await import('./data/drum-presets.js');
+    const { DRUM_PRESETS } = await import('../data/drum-presets.js');
     let p: any = (DRUM_PRESETS as any)[name];
     if (p[arranger.timeSignature]) {
         p = { ...p, ...p[arranger.timeSignature] };

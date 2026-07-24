@@ -1,12 +1,12 @@
+import { TIME_SIGNATURES } from '../config.js';
 import {
     refreshArrangerUI,
     setKeyCenter,
     switchToRelativeKey,
     transposeKey,
-} from '../arranger-controller.js';
-import { TIME_SIGNATURES } from '../config.js';
+} from '../controllers/arranger-controller.js';
+import { loadDrumPreset } from '../controllers/instrument-controller.js';
 import { getCanonicalMeters } from '../data/smart-genres.js';
-import { loadDrumPreset } from '../instrument-controller.js';
 import { formatUnicodeSymbols } from '../sanitize.js';
 import { arranger } from '../state.js';
 import { ACTIONS } from '../types.js';

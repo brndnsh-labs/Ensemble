@@ -26,7 +26,7 @@ vi.mock('../../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     appendSections: vi.fn(),
     refreshArrangerUI: vi.fn(),
 }));
@@ -66,8 +66,8 @@ vi.mock('../../../public/utils.js', () => ({
     }),
 }));
 
-import { refreshArrangerUI } from '../../../public/arranger-controller.js';
 import { PresetLibrary } from '../../../public/components/PresetLibrary.jsx';
+import { refreshArrangerUI } from '../../../public/controllers/arranger-controller.js';
 
 describe('PresetLibrary', () => {
     let container;

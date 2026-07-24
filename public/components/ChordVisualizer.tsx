@@ -1,7 +1,7 @@
 import { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { replaceChordInSection } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
+import { replaceChordInSection } from '../controllers/arranger-controller.js';
 import { formatUnicodeSymbols } from '../sanitize.js';
 import {
     buildLeadSheetRows,

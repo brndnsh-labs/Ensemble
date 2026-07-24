@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setBpm, setMode, setPalette } from '../../../public/app-controller.js';
+import { setBpm, setMode, setPalette } from '../../../public/controllers/app-controller.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { syncWorker } from '../../../public/worker-client.js';
 

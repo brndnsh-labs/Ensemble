@@ -22,7 +22,7 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn((chords) => chords()),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 

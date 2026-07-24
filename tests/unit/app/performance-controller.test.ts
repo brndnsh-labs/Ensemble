@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    stopDrums,
+    stopSoloist,
+    triggerDrumSound,
+    triggerSoloNote,
+} from '../../../public/controllers/performance-controller.js';
+import {
     initAudio,
     killDrumNote,
     killSoloistNote,
     playDrumSound,
     playSoloNote,
 } from '../../../public/engine/engine.js';
-import {
-    stopDrums,
-    stopSoloist,
-    triggerDrumSound,
-    triggerSoloNote,
-} from '../../../public/performance-controller.js';
 import { stateMap } from '../../../public/state.js';
 
 // Mock the state

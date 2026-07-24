@@ -31,14 +31,14 @@ import * as uiModule from '../../../public/ui.js';
 
 const mockUi = (uiModule as any).ui;
 
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     applyTheme: vi.fn(),
     setBpm: vi.fn((bpm) => {
         playback.bpm = parseInt(bpm, 10);
     }),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
     restoreGains: vi.fn(),

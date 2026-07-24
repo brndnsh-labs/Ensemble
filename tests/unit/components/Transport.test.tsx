@@ -27,7 +27,7 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ vi.mock('../../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn(),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     handleTap: vi.fn(),
 }));
 

@@ -21,7 +21,7 @@ vi.mock('../../../public/ui-bridge.js', () => ({
 }));
 
 // Mock arranger-controller
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     refreshArrangerUI: vi.fn(),
     setKeyCenter: vi.fn(),
     switchToRelativeKey: vi.fn(),
@@ -43,7 +43,7 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 // Mock instrument-controller
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
     loadDrumPreset: vi.fn(),
 }));
@@ -75,14 +75,14 @@ vi.mock('../../../public/state.js', () => ({
     arranger: mockArranger,
 }));
 
+import { KeySignatureControls } from '../../../public/components/KeySignatureControls.jsx';
 import {
     refreshArrangerUI,
     setKeyCenter,
     switchToRelativeKey,
     transposeKey,
-} from '../../../public/arranger-controller.js';
-import { KeySignatureControls } from '../../../public/components/KeySignatureControls.jsx';
-import { loadDrumPreset } from '../../../public/instrument-controller.js';
+} from '../../../public/controllers/arranger-controller.js';
+import { loadDrumPreset } from '../../../public/controllers/instrument-controller.js';
 
 describe('KeySignatureControls Component', () => {
     let container;

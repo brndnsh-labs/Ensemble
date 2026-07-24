@@ -15,11 +15,11 @@ import { ACTIONS } from '../../public/types.js';
 vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
-vi.mock('../../public/app-controller.js', () => ({
+vi.mock('../../public/controllers/app-controller.js', () => ({
     applyTheme: vi.fn(),
     setBpm: vi.fn(),
 }));
-vi.mock('../../public/midi-controller.js', () => ({
+vi.mock('../../public/controllers/midi-controller.js', () => ({
     initMIDI: vi.fn(),
     panic: vi.fn(),
 }));
@@ -29,7 +29,7 @@ vi.mock('../../public/engine/engine.js', () => ({
 vi.mock('../../public/engine/scheduler-core.js', () => ({
     togglePlay: vi.fn(),
 }));
-vi.mock('../../public/instrument-controller.js', () => ({
+vi.mock('../../public/controllers/instrument-controller.js', () => ({
     handleTap: vi.fn(),
     togglePower: vi.fn(),
 }));

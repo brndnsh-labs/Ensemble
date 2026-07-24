@@ -7,7 +7,11 @@ import '@fontsource/hanken-grotesk/latin-400.css';
 import '@fontsource/hanken-grotesk/latin-500.css';
 import '@fontsource/hanken-grotesk/latin-700.css';
 import '@fontsource/geist-mono/latin-400.css';
-import { applyThemeToDom } from './app-controller.js';
+import { applyThemeToDom } from './controllers/app-controller.js';
+import {
+    loadDrumPreset,
+    setInstrumentControllerRefs,
+} from './controllers/instrument-controller.js';
 import { installE2EGlobals } from './e2e-tools.js';
 import { validateProgression } from './engine/chords-engine.js';
 import { analyzeFormUI } from './engine/conductor.js';
@@ -15,7 +19,6 @@ import { getVisualTime, initAudio, playNote } from './engine/engine.js';
 import { detectInstalledPacks, warmPacksForVoices } from './engine/pack-runtime.js';
 import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
-import { loadDrumPreset, setInstrumentControllerRefs } from './instrument-controller.js';
 import { maybeShowPackInstallNudge } from './pack-nudge.js';
 import { saveCurrentState } from './persistence.js';
 import { initPWA } from './pwa.js';

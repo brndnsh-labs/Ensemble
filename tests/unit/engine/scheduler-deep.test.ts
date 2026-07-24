@@ -43,7 +43,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     releaseHarmonyVoicing: vi.fn(),
 }));
 
-vi.mock('../../../public/midi-controller.js', () => ({
+vi.mock('../../../public/controllers/midi-controller.js', () => ({
     panic: vi.fn(),
     sendMIDITransport: vi.fn(),
     sendMIDINote: vi.fn(),
@@ -57,7 +57,7 @@ vi.mock('../../../public/engine/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
     loadDrumPreset: vi.fn(),
 }));

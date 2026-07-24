@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
-import { resolveMode } from '../app-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
-import { switchMeasure } from '../instrument-controller.js';
+import { resolveMode } from '../controllers/app-controller.js';
+import { switchMeasure } from '../controllers/instrument-controller.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';

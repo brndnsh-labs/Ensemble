@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
+import { loadDrumPreset } from '../public/controllers/instrument-controller.js';
 import { DRUM_PRESETS } from '../public/data/drum-presets.js';
 import { SMART_GENRES } from '../public/data/smart-genres.js';
 import { generateDrumFills, generateDrumOrchestration } from '../public/engine/drum-seeder.js';
@@ -7,7 +8,6 @@ import { createPRNG } from '../public/engine/hash-utils.js';
 import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { applyWorkerTransition, generateNotesForStep } from '../public/engine/tick-logic.js';
-import { loadDrumPreset } from '../public/instrument-controller.js';
 import { dispatch } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
 import { getStepInfo } from '../public/utils.js';

@@ -25,7 +25,7 @@ vi.mock('../../../public/state.js', () => ({
     listeners: new Set(),
 }));
 
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     applyTheme: vi.fn(),
 }));
 

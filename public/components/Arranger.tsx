@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
-import { onSectionUpdate } from '../arranger-controller.js';
+import { onSectionUpdate } from '../controllers/arranger-controller.js';
 import type { Section } from '../state/arranger.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import type { SectionCardHandle } from './SectionCard.js';

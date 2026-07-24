@@ -33,11 +33,11 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     applyTheme: vi.fn(),
 }));
 
-vi.mock('../../../public/midi-controller.js', () => ({
+vi.mock('../../../public/controllers/midi-controller.js', () => ({
     initMIDI: vi.fn(),
 }));
 

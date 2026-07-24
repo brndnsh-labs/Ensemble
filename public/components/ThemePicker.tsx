@@ -1,4 +1,4 @@
-import { setMode, setPalette } from '../app-controller.js';
+import { setMode, setPalette } from '../controllers/app-controller.js';
 import type { Palette, ThemeMode } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 

@@ -1,4 +1,6 @@
-import { applyThemeToDom, setBpm } from './app-controller.js';
+import { applyThemeToDom, setBpm } from './controllers/app-controller.js';
+import { loadDrumPreset } from './controllers/instrument-controller.js';
+import { initMIDI } from './controllers/midi-controller.js';
 import { autoVoiceForGenre } from './data/genre-sound-map.js';
 import { SMART_GENRES } from './data/smart-genres.js';
 import { validateProgression } from './engine/chords-engine.js';
@@ -19,8 +21,6 @@ import { ensurePackLoaded } from './engine/pack-runtime.js';
 import { togglePlay } from './engine/scheduler-core.js';
 import { deriveSoloistMode } from './engine/soloist-mode-policy.js';
 import { generateSessionSeed } from './engine/soloist-seeder.js';
-import { loadDrumPreset } from './instrument-controller.js';
-import { initMIDI } from './midi-controller.js';
 import { debounceSaveState } from './persistence.js';
 import type { EnsembleState, InstrumentModule, InstrumentVoice } from './types.js';
 import { ACTIONS } from './types.js';

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'preact/hooks';
 import { APP_VERSION, BUILD_REV, KOFI_URL } from '../config.js';
+import { dispatchMidiInputConfig, initMIDI, panic } from '../controllers/midi-controller.js';
 import { getEffectiveLoopLimit } from '../engine/arc.js';
-import { dispatchMidiInputConfig, initMIDI, panic } from '../midi-controller.js';
 import { triggerInstall } from '../pwa.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';

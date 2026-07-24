@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { togglePower } from '../../../public/instrument-controller.js';
+import { togglePower } from '../../../public/controllers/instrument-controller.js';
 import { getState } from '../../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(

@@ -6,7 +6,7 @@ import { render } from 'preact';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SectionHeaderStrip } from '../../../public/components/editor/SectionHeaderStrip.jsx';
 
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     setSectionIntensity: vi.fn(),
     setSectionInstrumentEnabled: vi.fn(),
 }));
@@ -28,7 +28,7 @@ describe('SectionHeaderStrip', () => {
     let setSectionInstrumentEnabled: any;
 
     beforeEach(async () => {
-        const controller = await import('../../../public/arranger-controller.js');
+        const controller = await import('../../../public/controllers/arranger-controller.js');
         setSectionIntensity = controller.setSectionIntensity;
         setSectionInstrumentEnabled = controller.setSectionInstrumentEnabled;
         vi.clearAllMocks();

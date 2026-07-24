@@ -1,11 +1,11 @@
 import { Fragment } from 'preact';
 import { useEffect } from 'preact/hooks';
-import { applyThemeToDom } from './app-controller.js';
 import { ChartSurface } from './components/ChartSurface.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { Modals } from './components/Modals.jsx';
 import { NotificationLayer } from './components/NotificationLayer.jsx';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner.jsx';
+import { applyThemeToDom } from './controllers/app-controller.js';
 import { useEnsembleState } from './ui-bridge.js';
 
 interface AppProps {

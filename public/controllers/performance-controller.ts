@@ -4,8 +4,8 @@ import {
     killSoloistNote,
     playDrumSound,
     playSoloNote,
-} from './engine/engine.js';
-import { stateMap } from './state.js';
+} from '../engine/engine.js';
+import { stateMap } from '../state.js';
 
 // Monotonic counter so each manually-triggered solo note gets a distinct
 // humanization seed (epic-3-soloist S5) — otherwise every manual note would

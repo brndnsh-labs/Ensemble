@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sendMIDITransport } from '../../../public/midi-controller.js';
+import { sendMIDITransport } from '../../../public/controllers/midi-controller.js';
 import { getState } from '../../../public/state.js';
 
 vi.mock('../../../public/state.js', () => ({

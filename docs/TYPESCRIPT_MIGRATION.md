@@ -76,8 +76,8 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/engine/worker-buffer-manager.ts` | 88 | ✅ | |
 | `public/engine/soloist-mode-policy.ts` | 68 | ✅ | `Record<string,string>` alias map; TS cast for return |
 | `public/data/manual-metadata.ts` | 93 | ✅ | `StyleEntry[]` param; `SMART_GENRES` cast to `any` (untyped source) |
-| `public/app-controller.ts` | 63 | ✅ | `viz?: any` (visualizer types not settled yet) |
-| `public/performance-controller.ts` | 58 | ✅ | |
+| `public/controllers/app-controller.ts` | 63 | ✅ | `viz?: any` (visualizer types not settled yet) |
+| `public/controllers/performance-controller.ts` | 58 | ✅ | |
 | `public/pwa.ts` | ~50 | ✅ | `deferredPrompt: any`; `triggerInstall(): Promise<boolean>` |
 | `public/ui-bridge.ts` | 57 | ✅ | Generic `useEnsembleState<T>`; `useDispatch` return typed |
 | `public/history.ts` | 46 | ✅ | `undo(refreshArrangerUI?: () => void)` |
@@ -101,13 +101,13 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
 | `public/export/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
 | `public/worker-client.ts` | 303 | ✅ | `declare const WORKER_PATH: string`; typed handler callbacks |
-| `public/midi-controller.ts` | 401 | ✅ | `Map<string, {id, endTime}>` for note-offs; `MidiState` import type |
+| `public/controllers/midi-controller.ts` | 401 | ✅ | `Map<string, {id, endTime}>` for note-offs; `MidiState` import type |
 | `public/engine/chords-styles.ts` | 358 | ✅ | `EnsembleState` param; `safeExtensions: Record<string, number[]>` |
 | `public/engine/drum-seeder.ts` | 348 | ✅ | `OrchestrationMapEntry`, `FillMapEntry`, `AccentCatch` exported interfaces |
 | `public/engine/groove-engine.ts` | 381 | ✅ | `strategies: Record<string, any>`; `binarySearchMap` return annotated `: any` |
 | `public/state-hydration.ts` | 497 | ✅ | `(TIME_SIGNATURES as any)` casts; `clamp`/`normalizeSoloistPreset` typed |
 | `public/state-effects.ts` | 196 | ✅ | `EnsembleState` param; `handleEffects` typed |
-| `public/arranger-controller.ts` | 304 | ✅ | `NOTE_MATCH_PATTERN` moved after imports; `isMusicalNotation` inner fn typed |
+| `public/controllers/arranger-controller.ts` | 304 | ✅ | `NOTE_MATCH_PATTERN` moved after imports; `isMusicalNotation` inner fn typed |
 | `public/state/arranger.ts` | ~111 | ✅ | `Section` + `ArrangerState` interfaces; pulled forward with state slices |
 | `public/state/groove.ts` | ~250 | ✅ | `Instrument`, `PocketState`, `GrooveState`; `grooveReducer` takes `GlobalContext` |
 | `public/state/playback.ts` | 291 | ✅ | `GlobalContext` (50+ props); circular `import type` with `types.ts` is fine |
@@ -207,7 +207,7 @@ During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` fil
 | `public/engine/midi-scheduler.ts` | 191 | ✅ | All dispatch functions typed |
 | `public/engine/synth-chords.ts` | 342 | ✅ | `ChordInstrumentPreset` + `PlayNoteOptions` interfaces; inner `stopNote` typed |
 | `public/engine/resolution.ts` | 281 | ✅ | `CadenceStep` + `GenreConfig` interfaces; `generateResolutionNotes` typed |
-| `public/instrument-controller.ts` | 244 | ✅ | `handleTap(setBpmRef: (bpm: number) => void)` |
+| `public/controllers/instrument-controller.ts` | 244 | ✅ | `handleTap(setBpmRef: (bpm: number) => void)` |
 | `public/visualizer-proxy.ts` | 207 | ✅ | `WorkerLike` interface; `declare const VIZ_WORKER_PATH`; class properties declared |
 
 ### Batch D — Grooves ✅

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import {
     appendSections,
     clearChordPresetHighlight,
     refreshArrangerUI,
-} from '../arranger-controller.js';
-import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
+} from '../controllers/arranger-controller.js';
 import { GENRE_NAMES } from '../data/smart-genres.js';
 import { SONG_TEMPLATES } from '../data/song-templates.js';
 import { pushHistory, undo } from '../history.js';

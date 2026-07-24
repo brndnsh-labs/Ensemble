@@ -8,7 +8,7 @@ import {
     sendMIDIDrum,
     sendMIDINote,
     sendMIDIPitchBend,
-} from '../../../public/midi-controller.js';
+} from '../../../public/controllers/midi-controller.js';
 import { getState } from '../../../public/state.js';
 
 const { playback, midi } = getState();

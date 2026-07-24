@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyThemeToDom, setBpm } from '../../../public/app-controller.js';
+import { applyThemeToDom, setBpm } from '../../../public/controllers/app-controller.js';
+import { loadDrumPreset } from '../../../public/controllers/instrument-controller.js';
+import { initMIDI } from '../../../public/controllers/midi-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import {
     initAudio,
@@ -13,8 +15,6 @@ import {
     markPackInstalled,
 } from '../../../public/engine/instrument-registry.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
-import { loadDrumPreset } from '../../../public/instrument-controller.js';
-import { initMIDI } from '../../../public/midi-controller.js';
 import { handleEffects } from '../../../public/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -25,11 +25,11 @@ vi.mock('../../../public/engine/scheduler-core.js', () => ({
 vi.mock('../../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn(),
 }));
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
     applyThemeToDom: vi.fn(),
 }));
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
 }));
 vi.mock('../../../public/engine/engine.js', () => ({
@@ -38,7 +38,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     syncBusReverbSend: vi.fn(),
     syncBusVolume: vi.fn(),
 }));
-vi.mock('../../../public/midi-controller.js', () => ({
+vi.mock('../../../public/controllers/midi-controller.js', () => ({
     initMIDI: vi.fn(),
 }));
 

@@ -1,7 +1,11 @@
 import { forwardRef } from 'preact/compat';
 import { useEffect, useImperativeHandle, useRef, useState } from 'preact/hooks';
-import { onSectionDelete, onSectionDuplicate, onSectionUpdate } from '../arranger-controller.js';
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
+import {
+    onSectionDelete,
+    onSectionDuplicate,
+    onSectionUpdate,
+} from '../controllers/arranger-controller.js';
 import { formatUnicodeSymbols } from '../sanitize.js';
 import type { Section } from '../state/arranger.js';
 import { ACTIONS } from '../types.js';

@@ -17,12 +17,12 @@ import {
     switchToRelativeKey,
     transposeKey,
     validateAndAnalyze,
-} from '../../../public/arranger-controller.js';
+} from '../../../public/controllers/arranger-controller.js';
+import { flushBuffers } from '../../../public/controllers/instrument-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { analyzeFormUI } from '../../../public/engine/conductor.js';
 import { restoreGains } from '../../../public/engine/engine.js';
 import { pushHistory } from '../../../public/history.js';
-import { flushBuffers } from '../../../public/instrument-controller.js';
 import { saveCurrentState } from '../../../public/persistence.js';
 import { getState, stateMap } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
@@ -72,7 +72,7 @@ vi.mock('../../../public/history.js', () => ({
     pushHistory: vi.fn(),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 

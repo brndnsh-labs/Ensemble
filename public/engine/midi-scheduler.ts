@@ -4,7 +4,7 @@ import {
     sendMIDIDrum,
     sendMIDINote,
     sendMIDITransport,
-} from '../midi-controller.js';
+} from '../controllers/midi-controller.js';
 import type { EnsembleState, StepInfo } from '../types.js';
 import { getMidi } from '../utils.js';
 import { normalizeMidiVelocity } from './midi-utils.js';

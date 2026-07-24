@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
-import { appendSections, refreshArrangerUI } from '../arranger-controller.js';
+import { appendSections, refreshArrangerUI } from '../controllers/arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import type { Section } from '../state/arranger.js';
 import { decompressSections, generateId } from '../state/share-codec.js';

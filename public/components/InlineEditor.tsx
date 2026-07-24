@@ -5,7 +5,7 @@ import {
     mutateProgression,
     refreshArrangerUI,
     saveProgression,
-} from '../arranger-controller.js';
+} from '../controllers/arranger-controller.js';
 import { pushHistory, undo } from '../history.js';
 import { generateId } from '../state/share-codec.js';
 import { arranger, dispatch } from '../state.js';

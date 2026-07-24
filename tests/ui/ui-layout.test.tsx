@@ -18,10 +18,10 @@ import { ChordVisualizer } from '../../public/components/ChordVisualizer.jsx';
 vi.mock('../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
-vi.mock('../../public/instrument-controller.js', () => ({
+vi.mock('../../public/controllers/instrument-controller.js', () => ({
     togglePower: vi.fn(),
 }));
-vi.mock('../../public/arranger-controller.js', () => ({
+vi.mock('../../public/controllers/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
     onSectionDelete: vi.fn(),
     onSectionDuplicate: vi.fn(),

@@ -125,7 +125,7 @@ vi.mock('../../../public/ui.js', () => ({
     triggerFlash: vi.fn(),
 }));
 
-vi.mock('../../../public/instrument-controller.js', () => ({
+vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
     flushBuffers: vi.fn(),
 }));

@@ -1,8 +1,10 @@
 # public/ — state, worker bridge, controllers
 
 The main-thread plumbing layer: `state.ts` + `state/*.ts` slices, `state-effects.ts`,
-`state-hydration.ts`, `worker-client.ts`, `app-controller.ts`, `arranger-controller.ts`,
-`instrument-controller.ts`, `history.ts`, `persistence.ts`, `config.ts`. For the worker's
+`state-hydration.ts`, `worker-client.ts`, the `controllers/*.ts` family
+(`controllers/app-controller.ts`, `controllers/arranger-controller.ts`,
+`controllers/instrument-controller.ts`, …), `history.ts`, `persistence.ts`,
+`config.ts`. For the worker's
 message *schema*, see `docs/guides/WORKER_CONTRACT.md`; for the generative engines
 themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit either.
 

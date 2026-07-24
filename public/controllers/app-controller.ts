@@ -1,8 +1,8 @@
-import { dispatch, getState } from './state.js';
-import type { Mutable, Palette, ThemeMode } from './types.js';
-import { ACTIONS } from './types.js';
-import { getStepsPerMeasure } from './utils.js';
-import { syncWorker } from './worker-client.js';
+import { dispatch, getState } from '../state.js';
+import type { Mutable, Palette, ThemeMode } from '../types.js';
+import { ACTIONS } from '../types.js';
+import { getStepsPerMeasure } from '../utils.js';
+import { syncWorker } from '../worker-client.js';
 
 /** Resolve a light/dark preference to a concrete mode. 'auto' follows the OS. */
 export function resolveMode(mode: ThemeMode): 'light' | 'dark' {

@@ -1,25 +1,25 @@
-import { KEY_ORDER } from './config.js';
+import { KEY_ORDER } from '../config.js';
 import {
     mutateProgression,
     transformRelativeProgression,
     validateProgression,
-} from './engine/chords-engine.js';
-import { transposeChordText } from './engine/transpose.js';
+} from '../engine/chords-engine.js';
+import { transposeChordText } from '../engine/transpose.js';
 
 export { mutateProgression };
 
-import { analyzeFormUI } from './engine/conductor.js';
-import { restoreGains } from './engine/engine.js';
-import { pushHistory } from './history.js';
+import { analyzeFormUI } from '../engine/conductor.js';
+import { restoreGains } from '../engine/engine.js';
+import { pushHistory } from '../history.js';
+import { saveCurrentState } from '../persistence.js';
+import { compressSections, generateId } from '../state/share-codec.js';
+import { dispatch, getState, stateMap } from '../state.js';
+import type { Chord, Section, SectionInstrumentKey } from '../types.js';
+import { ACTIONS } from '../types.js';
+import { showToast } from '../ui.js';
+import { normalizeKey } from '../utils.js';
+import { syncWorker } from '../worker-client.js';
 import { flushBuffers } from './instrument-controller.js';
-import { saveCurrentState } from './persistence.js';
-import { compressSections, generateId } from './state/share-codec.js';
-import { dispatch, getState, stateMap } from './state.js';
-import type { Chord, Section, SectionInstrumentKey } from './types.js';
-import { ACTIONS } from './types.js';
-import { showToast } from './ui.js';
-import { normalizeKey } from './utils.js';
-import { syncWorker } from './worker-client.js';
 
 export function saveProgression(): void {
     const { arranger } = getState();

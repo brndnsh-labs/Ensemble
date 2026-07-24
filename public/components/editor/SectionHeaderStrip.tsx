@@ -1,13 +1,16 @@
 import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { setSectionInstrumentEnabled, setSectionIntensity } from '../../arranger-controller.js';
+import {
+    setSectionInstrumentEnabled,
+    setSectionIntensity,
+} from '../../controllers/arranger-controller.js';
 import {
     clearPracticeLoop,
     getSectionStepBounds,
     loopSection,
     setPracticeRamp,
     startSectionFromHere,
-} from '../../practice-controller.js';
+} from '../../controllers/practice-controller.js';
 import type { Section, SectionInstrumentKey } from '../../types.js';
 import { useEnsembleState } from '../../ui-bridge.js';
 import { Icon, type IconName } from '../Icon.jsx';

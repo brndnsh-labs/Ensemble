@@ -1,10 +1,10 @@
-import { DRUM_MAP } from './engine/midi-constants.js';
-import { normalizeMidiVelocity } from './engine/midi-utils.js';
+import { DRUM_MAP } from '../engine/midi-constants.js';
+import { normalizeMidiVelocity } from '../engine/midi-utils.js';
+import { dispatch, getState } from '../state.js';
+import type { ActionPayloadSetMidiConfig, MidiState } from '../types.js';
+import { ACTIONS } from '../types.js';
+import { getFrequency } from '../utils.js';
 import { stopSoloist, triggerDrumSound, triggerSoloNote } from './performance-controller.js';
-import { dispatch, getState } from './state.js';
-import type { ActionPayloadSetMidiConfig, MidiState } from './types.js';
-import { ACTIONS } from './types.js';
-import { getFrequency } from './utils.js';
 
 let midiAccess: any = null;
 

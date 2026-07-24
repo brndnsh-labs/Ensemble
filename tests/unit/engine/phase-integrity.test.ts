@@ -139,7 +139,7 @@ vi.mock('../../../public/engine/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
-vi.mock('../../../public/midi-controller.js', () => ({
+vi.mock('../../../public/controllers/midi-controller.js', () => ({
     sendMIDICC: vi.fn(),
     sendMIDINote: vi.fn(),
     sendMIDIDrum: vi.fn(),

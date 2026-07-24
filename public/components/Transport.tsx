@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { handleTap } from '../instrument-controller.js';
+import { handleTap } from '../controllers/instrument-controller.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';

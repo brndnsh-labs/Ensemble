@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { flushBuffers, loadDrumPreset } from '../instrument-controller.js';
+import { flushBuffers, loadDrumPreset } from '../controllers/instrument-controller.js';
 import {
     buildArrangerSyncPayload,
     buildBassSyncPayload,

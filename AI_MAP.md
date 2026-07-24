@@ -24,7 +24,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui-types.ts` | Shared UI component prop definitions. | `SelectOption` |
 | `public/breakpoints.ts` | Shared viewport breakpoint constants for the compact/narrow UI experience. | `COMPACT_MQ` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
-| `public/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
+| `public/controllers/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
 
@@ -178,11 +178,11 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/arranger-controller.ts` | High-level song structure manipulation. |
-| `public/instrument-controller.ts` | Per-instrument state and preset routing. |
-| `public/performance-controller.ts` | Real-time keyboard performance logic. |
-| `public/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
-| `public/midi-controller.ts` | WebMIDI bridging and DAW sync. |
+| `public/controllers/arranger-controller.ts` | High-level song structure manipulation. |
+| `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
+| `public/controllers/performance-controller.ts` | Real-time keyboard performance logic. |
+| `public/controllers/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
+| `public/controllers/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/export/midi-export.ts` | Main-thread MIDI file triggers. |
 | `public/export/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
 | `public/song/song-generator.ts` | Algorithmic song structure generation. |

@@ -10,7 +10,7 @@ import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock side-effect modules to prevent EnvironmentTeardownErrors from dynamic imports in state.js
-vi.mock('../../../public/app-controller.js', () => ({
+vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
     applyTheme: vi.fn(),
 }));

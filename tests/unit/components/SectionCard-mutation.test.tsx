@@ -8,7 +8,7 @@ import { SectionCard } from '../../../public/components/SectionCard.jsx';
 import { dispatch } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
-vi.mock('../../../public/arranger-controller.js', () => ({
+vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     onSectionUpdate: vi.fn(),
     onSectionDelete: vi.fn(),
     onSectionDuplicate: vi.fn(),
