@@ -753,10 +753,11 @@ export function getStepInfo(
     };
 }
 
-// safeDisconnect / createSoftClipCurve / clampFreq moved to
-// `public/engine/synth-utils.ts` (#1176) — they are Web Audio graph helpers and
-// belong beside their peers (createSimplePanner / killActiveVoices / rampGain),
-// not in this DOM/audio-free shared-primitives module.
+// safeDisconnect / createSoftClipCurve / clampFreq live in
+// `public/engine/audio-graph-utils.ts` — they are Web Audio graph helpers, not
+// part of this DOM/audio-free shared-primitives module. They went to
+// `synth-utils.ts` first (#1176) to sit beside their peers, but that formed an
+// import cycle with `sample-voice.ts`, so #1192 split them into a leaf module.
 
 const REGEX_SHARP = /#/g;
 const REGEX_FLAT1 = /([A-G])b/g;

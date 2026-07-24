@@ -1,6 +1,7 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { getMidi } from '../utils.js';
+import { safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
@@ -12,7 +13,6 @@ import {
     playPercussiveStrike,
     playResonantTone,
     rampGain,
-    safeDisconnect,
     velocityTimbre,
 } from './synth-utils.js';
 

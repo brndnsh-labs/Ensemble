@@ -91,6 +91,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, seeded humanization). | `rampGain`, `killActiveVoices`, `humanizeNote` |
+| `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `public/engine/coordination-engine.ts` | Inter-instrument rhythmic yielding. | `createCoordinationContext` |
 | `public/engine/section-overrides.ts` | Per-section intensity + instrument-enabled override lookup. | `sectionAtStep`, `effectiveTargetIntensity`, `isInstrumentActiveAtStep` |
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |

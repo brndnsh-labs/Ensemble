@@ -1,5 +1,6 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable, SoloistExpression, SoloistVoice } from '../types.js';
+import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { clampFrac, playSampledNote, type SampleBend, type SampleVibrato } from './sample-voice.js';
@@ -10,11 +11,9 @@ import {
     isSoloistMonophonicMode,
 } from './soloist-mode-policy.js';
 import {
-    clampFreq,
     createSimplePanner,
     killActiveVoices,
     resolveSampledZone,
-    safeDisconnect,
     velocityTimbre,
 } from './synth-utils.js';
 

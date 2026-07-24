@@ -74,8 +74,8 @@ vi.mock('../../../public/config.js', () => ({
     TIME_SIGNATURES: {},
 }));
 
-// Mock the audio-graph helpers (they moved to engine/synth-utils.js in #1176)
-vi.mock('../../../public/engine/synth-utils.js', async (importOriginal) => ({
+// Mock the audio-graph helpers (they moved to engine/audio-graph-utils.js in #1176)
+vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) => ({
     ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
     createSoftClipCurve: vi.fn(() => new Float32Array(1024)),

@@ -1,13 +1,9 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
+import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { playSampledNote } from './sample-voice.js';
-import {
-    clampFreq,
-    createSimplePanner,
-    resolveSampledZone,
-    safeDisconnect,
-} from './synth-utils.js';
+import { createSimplePanner, resolveSampledZone } from './synth-utils.js';
 
 /**
  * Polyphonic Synthesizer for the Harmony Module (harmony).

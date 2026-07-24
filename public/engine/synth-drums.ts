@@ -2,6 +2,7 @@ import { gainForPack } from '../data/sound-packs.js';
 import type { GrooveState } from '../state/groove.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { clamp01 } from '../utils.js';
+import { safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import {
     getPackBufferVariants,
@@ -15,7 +16,6 @@ import {
     playPercussiveStrike,
     playResonantTone,
     rampGain,
-    safeDisconnect,
     updateDensityDucking,
     velocityTimbre,
 } from './synth-utils.js';

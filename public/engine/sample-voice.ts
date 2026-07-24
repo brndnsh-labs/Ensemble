@@ -14,12 +14,12 @@
  * `playSampledNote`.
  */
 
+// From the LEAF module, deliberately — not from `synth-utils.ts`.
+// `synth-utils.ts` imports `foldToSampledCeiling`/`pickZone` from this file, so
+// importing back from it is what created the #1176 cycle. Keep this pointed at
+// `audio-graph-utils.js`. (#1192)
+import { safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
-// NOTE: `synth-utils.ts` imports `foldToSampledCeiling`/`pickZone` from this
-// module, so this is a deliberate import cycle. It is safe because both sides
-// only touch the other's bindings from inside function bodies, and
-// `safeDisconnect` is a hoisted function declaration.
-import { safeDisconnect } from './synth-utils.js';
 
 /**
  * Sanity ceiling on the envelope peak (see `playSampledNote`). Lets a loudness-

@@ -23,8 +23,8 @@ vi.mock('../../../public/engine/fills.js', () => ({
     generateProceduralFill: vi.fn(() => ({})),
 }));
 
+import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { initAudio } from '../../../public/engine/engine.js';
-import { clampFreq, createSoftClipCurve } from '../../../public/engine/synth-utils.js';
 import { dispatch, getState } from '../../../public/state.js';
 
 const { playback, chords, bass } = getState();

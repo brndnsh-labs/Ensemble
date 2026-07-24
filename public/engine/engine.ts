@@ -11,6 +11,7 @@ import type {
     InstrumentVoice,
     Mutable,
 } from '../types.js';
+import { createSoftClipCurve } from './audio-graph-utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { MODULE_BUS_KEY, packIdFromVoice } from './instrument-registry.js';
 import { ensurePacksForVoices } from './pack-runtime.js';
@@ -21,7 +22,6 @@ import { killAllPianoNotes, playNote, updateSustain } from './synth-chords.js';
 import { killDrumNote, playDrumSound } from './synth-drums.js';
 import { killHarmonyNote, playHarmonyNote, releaseHarmonyVoicing } from './synth-harmonies.js';
 import { killSoloistNote, playSoloNote } from './synth-soloist.js';
-import { createSoftClipCurve } from './synth-utils.js';
 
 export {
     killAllPianoNotes,
