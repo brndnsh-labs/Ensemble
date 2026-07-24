@@ -78,7 +78,8 @@ export const strategies: Record<string, any> = {
 // original universal suppression remains correct — the hat wasn't part of the
 // spine to begin with, so silencing it on the final bar reads as the intended
 // "let the swell breathe" gesture.
-const HAT_SPINE_GENRES = new Set([
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const HAT_SPINE_GENRES = new Set([
     'Disco',
     'Funk',
     'Rock',

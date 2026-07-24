@@ -18,7 +18,8 @@ import { effectiveTargetIntensity, RAMP_INTENSITY_MULTIPLIER } from './section-o
  * room. Slow, open, harmonically rich styles want a long tail — punchy,
  * percussive styles want the groove to stay articulate.
  */
-const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic']);
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', 'Acoustic']);
 
 /**
  * Genres whose interior-phrase "breathing" is NOT a driving snare lead-in, so
@@ -52,7 +53,8 @@ type Dispatch = (action: any, payload?: any) => void;
  * Values are starting points (audit doc 2026-05-17 listening test); expect
  * ±0.05 tuning once we measure realized bandIntensity in critique tests.
  */
-const GENRE_INTENSITY_FLOORS: Record<string, number> = {
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // why: funk pocket needs to crack — Snare gate at 0.3, floor at 0.45 keeps
     // backbeat well above with headroom for verse breakdowns.
     Funk: 0.45,

@@ -48,7 +48,8 @@ export { type CompingState, compingState, resetCompingState } from './comping-st
 // 'Neo-Soul', already present). No code resolves a genre to bare 'Soul', so the
 // entry was dead. Per CLAUDE.md, Soul/Minimal/Shred/Latin/Afrobeat are
 // non-canonical keys being retired, not the supported 13.
-const STICKY_GENRES = ['Funk', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const STICKY_GENRES = ['Funk', 'Reggae', 'Neo-Soul', 'Ska', 'Jazz', 'Bossa Nova', 'Blues'];
 
 // why: comping styles that idiomatically land on offbeats — these are the genres
 // where pre-voicing the upcoming chord on the "and-of-4" reads as anticipation

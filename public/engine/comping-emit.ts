@@ -142,7 +142,8 @@ const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11'
 // to the shared smart lane but is left out of this set. Either way they keep
 // their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
 // stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
-const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
 
 // why (#766): genres whose comp may RING a hit through the next answer (sustain
 // instead of re-attack). A subset of SUSTAINED_COMP_GENRES: Bossa Nova is
@@ -151,7 +152,8 @@ const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic'
 // mirrors Bossa's exclusion from PHRASE_END_THIN_GENRES (the 2026-05-23 Epic 12 S4
 // decision: Bossa's "breath comes from the cells themselves, not a separate gate").
 // Jazz/Blues/Acoustic are idiomatic sustain-through comps.
-const RING_THROUGH_GENRES = new Set(['Jazz', 'Blues', 'Acoustic']);
+// Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
+export const RING_THROUGH_GENRES = new Set(['Jazz', 'Blues', 'Acoustic']);
 
 /**
  * Per-hit comp economy (#715). A real comper doesn't re-strike the full voicing

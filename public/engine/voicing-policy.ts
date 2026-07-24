@@ -1,8 +1,11 @@
 import type { EnsembleState } from '../types.js';
 import { getMidi } from '../utils.js';
 
-const BASS_SPACE_FEELS = new Set([
-    'Swing',
+// Keyed by the runtime `groove.genreFeel` (smart-genres.ts `feel`), never a UI
+// genre name — pinned by tests/standards/genre-feel-canon-guard.test.ts (#1208).
+// #1208: 'Swing' removed — never a canonical feel (Jazz carries the swing
+// idiom), so the key could never match and was dead weight, not behavior.
+export const BASS_SPACE_FEELS = new Set([
     'Jazz',
     'Neo-Soul',
     'Funk',

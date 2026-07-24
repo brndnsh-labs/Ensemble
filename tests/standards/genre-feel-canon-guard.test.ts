@@ -2,10 +2,16 @@
 import { describe, expect, it } from 'vitest';
 import { SMART_BASS_STYLE_MAP, SMART_SCALE_STYLE_MAP } from '../../public/config.js';
 import { GENRE_FEELS } from '../../public/data/smart-genres.js';
+import { STICKY_GENRES } from '../../public/engine/accompaniment.js';
+import { SUBTRACTION_PILOT_GENRES } from '../../public/engine/arrangement-layering.js';
+import { RING_THROUGH_GENRES, SUSTAINED_COMP_GENRES } from '../../public/engine/comping-emit.js';
+import { GENRE_INTENSITY_FLOORS, HALL_GENRES } from '../../public/engine/conductor.js';
 import { GENRE_POCKET } from '../../public/engine/coordination-engine.js';
 import { DROP_FRIENDLY_GENRES } from '../../public/engine/drop-mechanic.js';
-import { strategies } from '../../public/engine/groove-engine.js';
+import { HAT_SPINE_GENRES, strategies } from '../../public/engine/groove-engine.js';
+import { HARMONY_GENRE_PROFILES } from '../../public/engine/harmony-styles.js';
 import { GENRE_STYLE_MAPPING } from '../../public/engine/soloist-config.js';
+import { BASS_SPACE_FEELS } from '../../public/engine/voicing-policy.js';
 
 // #1130 — genreFeel-routing completeness guard, the feel-keyspace companion to
 // genre-canon-guard (#544, which guards the genre-NAME keyspace via GENRE_NAMES).
@@ -71,14 +77,54 @@ describe('genreFeel routing canon (#1130)', () => {
     // substring-matched against needles 'hip-hop'/'hiphop', neither of which is
     // contained in the real feel 'Hip Hop' — so the drop/breakdown cut was dead
     // for hip-hop, the genre it is most idiomatic for. Now exact-match + pinned.
-    const FEEL_SUBSETS: Record<string, ReadonlySet<string>> = {
-        DROP_FRIENDLY_GENRES,
+    //
+    // #1208 extends the subset guard from that single table to every sibling
+    // genre-subset collection in the engine. Each entry below is normalized to
+    // its list of MEMBERS (a Set's values, an array's elements, a Record's keys)
+    // because the bug class is identical whichever container is used: a member
+    // that isn't a real feel silently disables the behavior for that genre.
+    //
+    // These are all VALIDITY-ONLY, never exhaustive — deliberately so. "Which
+    // feels reserve bass space / ring a comp through / get the hall reverb / get
+    // an intensity floor" are curated musical-idiom subsets, and every one of
+    // them has a documented default for the feels it omits. Adding any of them
+    // to FEEL_KEYED above would assert "all 13 genres must opt in", which is a
+    // false failure — the omissions are the design.
+    //
+    // Verified feel-keyed at the call sites (not assumed):
+    //   BASS_SPACE_FEELS        isBassSpaceFeel(feel) ← chords-styles/harmonies/
+    //                           comping-emit, all reading `groove.genreFeel`
+    //   HAT_SPINE_GENRES        .has(groove.genreFeel)
+    //   STICKY_GENRES           .includes(genre) where genre = groove.genreFeel
+    //                           (chords.style override remaps only to feels)
+    //   SUSTAINED/RING_THROUGH  .has(genre), threaded from that same variable
+    //   HALL_GENRES             .has(groove.genreFeel)
+    //   GENRE_INTENSITY_FLOORS  [groove.genreFeel]
+    //   SUBTRACTION_PILOT       .has(genreFeel)
+    //   HARMONY_GENRE_PROFILES  resolveHarmonyProfile(groove.genreFeel)
+    const FEEL_SUBSETS: Record<string, readonly string[]> = {
+        DROP_FRIENDLY_GENRES: [...DROP_FRIENDLY_GENRES],
+        BASS_SPACE_FEELS: [...BASS_SPACE_FEELS],
+        HAT_SPINE_GENRES: [...HAT_SPINE_GENRES],
+        STICKY_GENRES: [...STICKY_GENRES],
+        SUSTAINED_COMP_GENRES: [...SUSTAINED_COMP_GENRES],
+        RING_THROUGH_GENRES: [...RING_THROUGH_GENRES],
+        HALL_GENRES: [...HALL_GENRES],
+        SUBTRACTION_PILOT_GENRES: [...SUBTRACTION_PILOT_GENRES],
+        // Record-shaped subsets: the KEYS are the membership. A bogus key here
+        // is dead exactly like a bogus Set member — the genre silently takes the
+        // fallback (DEFAULT_HARMONY_PROFILE / the no-floor macro-arc path).
+        // HARMONY_GENRE_PROFILES happens to be full today; its exhaustiveness is
+        // pinned separately in harmony-genre-routing.test.ts, not here, because
+        // the table is a fallback-backed subset by construction.
+        GENRE_INTENSITY_FLOORS: Object.keys(GENRE_INTENSITY_FLOORS),
+        HARMONY_GENRE_PROFILES: Object.keys(HARMONY_GENRE_PROFILES),
     };
 
     it.each(Object.entries(FEEL_SUBSETS))(
         '%s carries only real canonical feels (no unmatchable member)',
-        (name, set) => {
-            const unmatchable = [...set].filter((feel) => !GENRE_FEELS.includes(feel));
+        (name, members) => {
+            const unmatchable = members.filter((feel) => !GENRE_FEELS.includes(feel));
             expect(
                 unmatchable,
                 `${name} has member(s) that can never match a genreFeel: ${unmatchable.join(', ')}`,
@@ -145,9 +191,11 @@ describe('genreFeel routing canon (#1130)', () => {
                 );
             }
         }
-        for (const [name, set] of Object.entries(FEEL_SUBSETS)) {
+        for (const [name, members] of Object.entries(FEEL_SUBSETS)) {
             for (const phantom of PHANTOMS) {
-                expect(set.has(phantom), `${name} must not contain '${phantom}'`).toBe(false);
+                expect(members.includes(phantom), `${name} must not contain '${phantom}'`).toBe(
+                    false,
+                );
             }
         }
     });
