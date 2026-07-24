@@ -1,6 +1,10 @@
 // @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
-import { compingState, getAccompanimentNotes } from '../public/engine/accompaniment.js';
+import {
+    compingState,
+    getAccompanimentNotes,
+    STICKY_GENRES,
+} from '../public/engine/accompaniment.js';
 import { validateProgression } from '../public/engine/chords-engine.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
@@ -15,7 +19,9 @@ import {
 // cspell:ignore neosoul
 
 const DEFAULT_SEED = 'CHORD_AUDIT';
-const STICKY_GENRES = new Set(['Funk', 'Soul', 'Reggae', 'Neo-Soul', 'Ska']);
+// STICKY_GENRES is imported from accompaniment.ts (the engine's authority) — a local copy
+// drifted (retired 'Soul' key + missing Jazz/Bossa Nova/Blues), so this harness measured a
+// different sticky set than the engine used. #1215.
 
 /**
  * @typedef {{
@@ -750,7 +756,7 @@ export function simulateChordLoops({
  */
 export function buildMeasureAudit(capture, loop) {
     const rows = [];
-    const stickyGenre = STICKY_GENRES.has(capture.resolvedGenre);
+    const stickyGenre = STICKY_GENRES.includes(capture.resolvedGenre);
 
     for (let measureIndex = 0; measureIndex < capture.arrangement.measuresPerLoop; measureIndex++) {
         const measure = capture.arrangement.measurePlan[measureIndex];
