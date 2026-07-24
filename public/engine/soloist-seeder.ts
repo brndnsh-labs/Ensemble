@@ -373,6 +373,21 @@ function getSectionCategory(label: string | undefined, style: string): string {
     if (normalized.includes('intro')) {
         return 'intro';
     }
+    // MUST stay ahead of the 'chorus' test below, and ahead of the jazz-style
+    // collapse further down. 'Pre-Chorus' *contains* 'chorus', so without this
+    // the more specific label lost the substring race and a pre-chorus was
+    // filed under the SAME `sectionMotifs` entry as the real chorus — the
+    // soloist played the chorus line during the pre-chorus and then again in
+    // the chorus. The wizard's bare 'Pre' missed in the other direction: it
+    // fell through to the generic `replace(/[^a-z]/g,'')` tail as category
+    // 'pre', which `isDepartureCategory` doesn't list, so it was treated as a
+    // statement. Both spellings now resolve here, to the same category.
+    //
+    // `\bpre` (not `startsWith`) so a hand-typed 'The Pre-Chorus' also lands,
+    // while 'impressive' and friends don't. (#1206)
+    if (/\bpre/.test(normalized)) {
+        return 'prechorus';
+    }
     if (normalized.includes('chorus') || normalized.includes('drop')) {
         return 'chorus';
     }
@@ -387,6 +402,16 @@ function getSectionCategory(label: string | undefined, style: string): string {
     return category || 'main';
 }
 
+/**
+ * A departure section leaves the statement rather than restating it — it takes
+ * the register lift, gets rhythmic contrast against the verse motif, and is
+ * exempt from the end-of-section pull onto a stable chord tone.
+ *
+ * `'prechorus'` was UNREACHABLE dead code until #1206: nothing could produce
+ * that string, because the `replace(/[^a-z]/g,'')` tail that would have built
+ * it sat downstream of the `includes('chorus')` short-circuit. `getSectionCategory`
+ * now emits it directly.
+ */
 function isDepartureCategory(category: string): boolean {
     return (
         category === 'chorus' ||
