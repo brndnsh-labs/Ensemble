@@ -12,8 +12,8 @@ import {
     VISUALIZER_CHORD_SWATCHES,
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
-} from '../visualizer-events.js';
-import { UnifiedVisualizer } from '../visualizer-proxy.js';
+} from '../visualizer/visualizer-events.js';
+import { UnifiedVisualizer } from '../visualizer/visualizer-proxy.js';
 
 let lastFrameTime = 0;
 let missedFrames = 0;

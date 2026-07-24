@@ -63,7 +63,7 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
 | `public/platform.ts` | 67 | ✅ | `PlatformState` interface; return types on all functions |
-| `public/visualizer-utils.ts` | 70 | ✅ | `RingBuffer<T>` generic class; `INTERVAL_CATEGORY` typed |
+| `public/visualizer/visualizer-utils.ts` | 70 | ✅ | `RingBuffer<T>` generic class; `INTERVAL_CATEGORY` typed |
 
 ---
 
@@ -93,7 +93,7 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
-| `public/visualizer-events.ts` | 365 | ✅ | `VisualizerTrackId` union; 4 event interfaces; generic `queueVisualizerEvent<T>` |
+| `public/visualizer/visualizer-events.ts` | 365 | ✅ | `VisualizerTrackId` union; 4 event interfaces; generic `queueVisualizerEvent<T>` |
 | `public/engine/coordination-engine.ts` | 184 | ✅ | `StepInfo` import type; `createCoordinationContext` returns inferred object |
 | `public/song/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
 | `public/song/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
@@ -208,7 +208,7 @@ During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` fil
 | `public/engine/synth-chords.ts` | 342 | ✅ | `ChordInstrumentPreset` + `PlayNoteOptions` interfaces; inner `stopNote` typed |
 | `public/engine/resolution.ts` | 281 | ✅ | `CadenceStep` + `GenreConfig` interfaces; `generateResolutionNotes` typed |
 | `public/controllers/instrument-controller.ts` | 244 | ✅ | `handleTap(setBpmRef: (bpm: number) => void)` |
-| `public/visualizer-proxy.ts` | 207 | ✅ | `WorkerLike` interface; `declare const VIZ_WORKER_PATH`; class properties declared |
+| `public/visualizer/visualizer-proxy.ts` | 207 | ✅ | `WorkerLike` interface; `declare const VIZ_WORKER_PATH`; class properties declared |
 
 ### Batch D — Grooves ✅
 
@@ -243,7 +243,7 @@ Convert `utils.ts` first (imported by 15+ files).
 | `public/engine/engine.ts` | 471 | ✅ | Depends on utils, synth-* |
 | `public/engine/synth-harmonies.ts` | 442 | ✅ | |
 | `public/engine/bass-styles.ts` | 952 | ✅ | Depends on config, utils |
-| `public/visualizer-engine.ts` | 885 | ✅ | Depends on constants.ts, visualizer-events.ts, visualizer-utils.ts |
+| `public/visualizer/visualizer-engine.ts` | 885 | ✅ | Depends on constants.ts, visualizer-events.ts, visualizer-utils.ts |
 
 ---
 

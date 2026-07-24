@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { VisualizerEngine } from './visualizer-engine.js';
+import { VisualizerEngine } from './visualizer/visualizer-engine.js';
 
 interface TimeSignatureConfig {
     beats: number;

@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MODULES } from '../../../public/constants.js';
-import { VisualizerEngine } from '../../../public/visualizer-engine.js';
+import { VisualizerEngine } from '../../../public/visualizer/visualizer-engine.js';
 
 describe('VisualizerEngine Rendering Deep Dive', () => {
     let engine;

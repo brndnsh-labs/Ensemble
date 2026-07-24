@@ -7,7 +7,7 @@ import {
     queueVisualizerStepEvent,
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
-} from '../../../public/visualizer-events.js';
+} from '../../../public/visualizer/visualizer-events.js';
 
 describe('visualizer event contract', () => {
     it('uses the Studio-aligned track order and color tokens', () => {

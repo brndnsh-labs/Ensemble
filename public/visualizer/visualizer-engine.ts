@@ -1,4 +1,4 @@
-import { MODULES } from './constants.js';
+import { MODULES } from '../constants.js';
 import {
     VISUALIZER_CHORD_SWATCHES,
     VISUALIZER_TRACK_ORDER,

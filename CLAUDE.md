@@ -94,7 +94,7 @@ Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches
 
 ### Visualizer Pipeline (separate OffscreenCanvas worker)
 
-- `public/visualizer-proxy.ts` — main-thread wrapper.
+- `public/visualizer/visualizer-proxy.ts` — main-thread wrapper.
 - `public/visualizer-worker.ts` — `VisualizerEngine` with `OffscreenCanvas`.
 - Clock sync is message-based; the worker interpolates time locally.
 

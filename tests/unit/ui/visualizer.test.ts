@@ -4,8 +4,8 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { VisualizerEngine } from '../../../public/visualizer-engine.js';
-import { UnifiedVisualizer } from '../../../public/visualizer-proxy.js';
+import { VisualizerEngine } from '../../../public/visualizer/visualizer-engine.js';
+import { UnifiedVisualizer } from '../../../public/visualizer/visualizer-proxy.js';
 import { reducedMotionStepIndex } from '../../../public/visualizer-worker.js';
 
 describe('Visualizer System', () => {

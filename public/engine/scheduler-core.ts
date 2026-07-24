@@ -27,7 +27,7 @@ import {
     queueVisualizerFillEvent,
     queueVisualizerNoteEvent,
     queueVisualizerStepEvent,
-} from '../visualizer-events.js';
+} from '../visualizer/visualizer-events.js';
 import {
     flushWorker,
     requestBuffer,

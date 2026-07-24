@@ -34,7 +34,7 @@ export class UnifiedVisualizer {
             return;
         }
 
-        this.worker = new Worker(new URL('./visualizer-worker.ts', import.meta.url), {
+        this.worker = new Worker(new URL('../visualizer-worker.ts', import.meta.url), {
             type: 'module',
         });
 

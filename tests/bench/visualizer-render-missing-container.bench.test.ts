@@ -1,7 +1,7 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, it } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer-proxy.js';
+import { UnifiedVisualizer } from '../../public/visualizer/visualizer-proxy.js';
 
 describe('UnifiedVisualizer Missing Container Benchmark', () => {
     let visualizer;

@@ -6,7 +6,7 @@ import {
     VISUALIZER_CHORD_SWATCHES,
     VISUALIZER_TRACK_ORDER,
     VISUALIZER_TRACKS,
-} from '../visualizer-events.js';
+} from '../visualizer/visualizer-events.js';
 import { useModalA11y } from './use-modal-a11y.js';
 import { Visualizer } from './Visualizer.jsx';
 

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { bench, describe } from 'vitest';
-import { UnifiedVisualizer } from '../../public/visualizer-proxy.js';
+import { UnifiedVisualizer } from '../../public/visualizer/visualizer-proxy.js';
 
 describe('UnifiedVisualizer PushNote Performance', () => {
     // Mock container

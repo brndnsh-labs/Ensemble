@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { VisualizerEngine } from '../../public/visualizer-engine.js';
+import { VisualizerEngine } from '../../public/visualizer/visualizer-engine.js';
 
 // Mock Canvas Context
 const mockCtx = {

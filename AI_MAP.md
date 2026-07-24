@@ -17,7 +17,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/main.ts` | App entry point, worker init, global events. | `init` |
 | `public/logic-worker.ts` | Main generative thread & orchestration. | `fillBuffers`, `processMessage` |
 | `public/visualizer-worker.ts` | Background rendering thread for 60fps visuals. | `engine.render` |
-| `public/visualizer-engine.ts` | `VisualizerEngine` class instantiated inside the worker; owns all Canvas rendering. (Worker-internal — only imported by `visualizer-worker.ts`.) | `VisualizerEngine` |
+| `public/visualizer/visualizer-engine.ts` | `VisualizerEngine` class instantiated inside the worker; owns all Canvas rendering. (Worker-internal — only imported by `visualizer-worker.ts`.) | `VisualizerEngine` |
 | `public/sw.ts` | Service worker — Workbox `precacheAndRoute(self.__WB_MANIFEST)`. | `activate`, `message` |
 | `public/state.ts` | Central Redux-like state store. | `getState`, `dispatch`, `subscribe` |
 | `public/types.ts` | Global Action constants and shared types. | `ACTIONS` |
@@ -195,8 +195,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
 | `public/data/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
-| `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
-| `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
+| `public/visualizer/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
+| `public/visualizer/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
 
 ## Infrastructure & Lifecycle (Internal)
 
@@ -209,7 +209,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.ts` | Global timing and musical constants. |
 | `public/constants.ts` | Global visual and UI state constants. |
-| `public/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
+| `public/visualizer/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 
 ## Documentation, Parsing & Testing
 
