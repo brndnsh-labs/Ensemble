@@ -77,6 +77,10 @@ export const DEFAULT_HARMONY_PROFILE: HarmonyGenreProfile = {
  * The genre table. Values reproduce the pre-refactor smart routing exactly
  * (guarded by `tests/standards/harmony-genre-routing.test.ts`); child stories
  * change a profile to give a genre its own idiom.
+ *
+ * Keys are `groove.genreFeel` values, not picker names — see the
+ * GENRE-NAMING AUTHORITY block in `data/smart-genres.ts` for why the two
+ * keyspaces differ and how to translate.
  */
 export const HARMONY_GENRE_PROFILES: Record<string, HarmonyGenreProfile> = {
     Rock: {

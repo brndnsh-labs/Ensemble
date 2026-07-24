@@ -197,7 +197,6 @@ export const DEFAULT_CONFIG = {
     blockAdjacentSnare: false,
     exemptFromPulseShaping: false,
     backbeatCrack: false,
-    isLatin: false,
     // why: epic-deferred-followups S8(b) — the post-turnaround section-boundary
     // splash + soloist crash-catch hard-coded `'Crash'`. On Metal at high
     // intensity the genre already splashes China on every downbeat (metal.ts

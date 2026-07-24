@@ -13,10 +13,16 @@ import {
     scaleVelocity,
 } from './utils.js';
 
-export const config = {
-    ...DEFAULT_CONFIG,
-    isLatin: true,
-};
+// why (#1177): the old `isLatin: true` flag lived here as a second spelling of
+// "this genre is Latin-family", read by the groove engine's entropy snare gate.
+// The canonical predicate is now `isLatinGrooveFamily` (data/smart-genres.ts),
+// derived from the genre→strategy-key authority, so kit dispatch and every
+// Latin-family exemption resolve from one place.
+// Byte-identical to DEFAULT_CONFIG today — bossa's character lives entirely in
+// getMotif/applyOverrides. KEEP IT ANYWAY: groove-engine reads
+// `config = strategy.config`, so deleting this as "redundant" breaks dispatch.
+// It's also where a bossa-specific entropy floor would go (cf. Jazz's 0.45).
+export const config = { ...DEFAULT_CONFIG };
 
 /**
  * Maps intensity to motif complexity for Latin / Bossa.

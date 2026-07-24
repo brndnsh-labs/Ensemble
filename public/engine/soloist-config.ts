@@ -1,4 +1,4 @@
-import { SMART_GENRES } from '../data/smart-genres.js';
+import { resolveGenre, SMART_GENRES } from '../data/smart-genres.js';
 
 export interface SeedTriplets {
     enabled: boolean;
@@ -414,8 +414,20 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
     {} as Record<string, StyleConfig>,
 );
 
-// Exported for the #1130 genreFeel-routing completeness guard
-// (tests/standards/genre-feel-canon-guard.test.ts).
+/**
+ * genreFeel → soloist profile, the fallback when a genre declares no `soloist`
+ * (or declares one this file has no STYLE_CONFIG for). NOT derived from
+ * `GENRE_OVERRIDES[*].soloist`: this table speaks STYLE_CONFIG keys, and one
+ * genre's declared style is a UI-facing alias of a different profile name
+ * (Ska-Punk declares 'ska-horns', which aliases to the 'ska' profile).
+ *
+ * Keys are FEELS. The two that diverge from their picker name ('Bossa Nova',
+ * 'Ska') are reconciled by the naming authority in `data/smart-genres.ts` — see
+ * the GENRE-NAMING AUTHORITY block there rather than restating the alias here.
+ *
+ * Exported for the #1130 genreFeel-routing completeness guard
+ * (tests/standards/genre-feel-canon-guard.test.ts).
+ */
 export const GENRE_STYLE_MAPPING: Record<string, string> = {
     Rock: 'rock',
     Jazz: 'jazz',
@@ -424,13 +436,10 @@ export const GENRE_STYLE_MAPPING: Record<string, string> = {
     'Neo-Soul': 'neo',
     'Hip Hop': 'hiphop',
     Disco: 'disco',
-    // Bossa genre's feel is 'Bossa Nova' (smart-genres.ts).
     'Bossa Nova': 'bossa',
     Acoustic: 'acoustic',
     Reggae: 'reggae',
     Country: 'country',
-    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts); 'Bossa'/'Ska-Punk' were
-    // dead keys (never a genreFeel value). #1130.
     Ska: 'ska',
     Metal: 'metal',
 };
@@ -647,11 +656,21 @@ const SOLOIST_STYLE_ALIASES: Record<string, string> = {
 };
 
 function getSmartGenreSoloistStyle(genreFeel: string | undefined): string | null {
-    if (!genreFeel || !Object.hasOwn(SMART_GENRES, genreFeel)) {
+    // why (#1177): SMART_GENRES is keyed by canon genre NAME while this function is
+    // handed a FEEL, so before the authority existed the lookup silently missed for
+    // the two genres whose feel ≠ name (Bossa → 'Bossa Nova', Ska-Punk → 'Ska') and
+    // they reached their profile only via the GENRE_STYLE_MAPPING fallback below.
+    // `resolveGenre` normalizes EITHER keyspace to the canon name, which keeps the
+    // old accidental name-tolerance (callers/harnesses that pass a picker name here)
+    // while making the feel path a deliberate hit. Behavior-frozen: all 13 genres
+    // converged to the same profile either way — pinned by
+    // tests/standards/soloist-routing-guard.test.ts.
+    const genreName = resolveGenre(genreFeel)?.name;
+    if (!genreName || !Object.hasOwn(SMART_GENRES, genreName)) {
         return null;
     }
 
-    const config = Reflect.get(SMART_GENRES, genreFeel);
+    const config = Reflect.get(SMART_GENRES, genreName);
     if (
         !config ||
         typeof config !== 'object' ||

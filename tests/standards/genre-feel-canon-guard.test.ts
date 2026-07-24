@@ -29,6 +29,21 @@ import { BASS_SPACE_FEELS } from '../../public/engine/voicing-policy.js';
 // matches a real genreFeel and silently falls through to a genre-specific default
 // (rock bass, rock scale, DEFAULT_CONFIG groove, 'scalar' soloist). GENRE_NAMES
 // is loudly gated; this extends the same discipline to the feel keyspace.
+/*
+ * #1177 NOTE — coverage moved, read this before counting on it.
+ *
+ * `strategies` (groove-engine) and `SMART_BASS_STYLE_MAP` (config) are now
+ * DERIVED from the genre table, so this file's "maps every canonical feel",
+ * "carries no dead non-feel keys", and phantom-key assertions can no longer
+ * fail for those two. That is the point of #1177 — it eliminates the
+ * hand-keyed dead-key bug class (#1130's `'Ska-Punk'`) rather than guarding it.
+ *
+ * The hand-maintained surface that DOES still need guarding moved to
+ * `GROOVE_STRATEGY_BY_GENRE` in `data/smart-genres.ts`, pinned by
+ * `genre-naming-authority.test.ts`. The real guards remaining HERE are
+ * `SMART_SCALE_STYLE_MAP`, `GENRE_STYLE_MAPPING`, `GENRE_POCKET` and the
+ * genre-subset tables — those are all still hand-written.
+ */
 describe('genreFeel routing canon (#1130)', () => {
     // Every table keyed by groove.genreFeel. A missing feel here does NOT crash —
     // it silently routes to a genre-specific fallback, which is the bug.

@@ -139,7 +139,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | Path | Responsibility | Key Data |
 | :--- | :--- | :--- |
 | `public/data/drum-presets.ts` | Drum patterns and expansion logic. | `DRUM_PRESETS` |
-| `public/data/smart-genres.ts` | High-level genre configurations. | `SMART_GENRES` |
+| `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name ↔ feel ↔ groove strategy key). | `SMART_GENRES`, `canonToFeel`, `feelToCanon`, `GROOVE_STRATEGY_BY_GENRE`, `isLatinGrooveFamily` |
 | `public/data/chord-presets.ts` | Library chord progressions. | `CHORD_PRESETS` |
 | `public/data/song-templates.ts` | Full song structure templates. | `SONG_TEMPLATES` |
 | `public/data/instrument-styles.ts` | UI menu definitions for instruments. | `CHORD_STYLES`, `BASS_STYLES` |

@@ -35,10 +35,9 @@
  *
  * Keys are **exact `groove.genreFeel` values**, matching every other
  * genre-subset table in the engine (`HAT_SPINE_GENRES` in `groove-engine.ts`,
- * `SUBTRACTION_PILOT_GENRES` in `arrangement-layering.ts`, …). Two feels are
- * NOT their genre's picker name — the Ska-Punk genre's feel is `'Ska'` and
- * Bossa's is `'Bossa Nova'` (the alias lives only in `GENRE_OVERRIDES[name].feel`,
- * `smart-genres.ts`).
+ * `SUBTRACTION_PILOT_GENRES` in `arrangement-layering.ts`, …) — NOT picker
+ * names. See the GENRE-NAMING AUTHORITY block in `data/smart-genres.ts` for the
+ * two keyspaces and the `canonToFeel`/`feelToCanon` translators.
  *
  * why exact-match and not the case-insensitive substring test this used to do:
  * `'Hip Hop'` (the real feel) contains neither `'hip-hop'` nor `'hiphop'`, so

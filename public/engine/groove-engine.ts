@@ -1,3 +1,8 @@
+import {
+    GROOVE_STRATEGY_BY_FEEL,
+    type GrooveStrategyKey,
+    isLatinGrooveFamily,
+} from '../data/smart-genres.js';
 import type { EnsembleState } from '../types.js';
 import {
     binarySearchMap,
@@ -22,33 +27,46 @@ import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-overrides.js';
 
-// Exported for the #1130 genreFeel-routing completeness guard
-// (tests/standards/genre-feel-canon-guard.test.ts).
-export const strategies: Record<string, any> = {
-    Jazz: jazz,
-    Blues: blues,
-    Rock: rock,
-    Funk: funk,
-    'Neo-Soul': neoSoul,
-    'Hip Hop': hiphop,
-    Acoustic: acoustic,
-    Disco: disco,
-    Reggae: reggae,
-    // why: Bossa is the single selectable Latin-family genre (smart-genres.ts →
-    // feel 'Bossa Nova'); the `latin` groove strategy powers it, including the
-    // compound-meter Bembé bell timeline when Bossa is set to 6/8 or 12/8. #628
-    // retired the unreachable generic `Latin` feel and the dormant World/Latin
-    // drum bank (Latin/Salsa, Afro-Cuban 6/8, Samba, Afrobeat); `latin.ts` itself
-    // stays because it IS the Bossa engine. See git history if World/Latin is ever
-    // surfaced as real genres — it deserves a fresh, fully-wired story.
-    'Bossa Nova': latin,
-    // why: the Ska-Punk smart-genre sets genreFeel='Ska' (smart-genres.ts), so
-    // the strategy table must be keyed 'Ska'. Was 'Ska-Punk' (the preset name) —
-    // a dead key that fell through to DEFAULT_CONFIG in production. Epic 2 S1.
-    Ska: skaPunk,
-    Country: country,
-    Metal: metal,
+/**
+ * Groove strategy key → its implementing module. The KEYS are owned by
+ * `GrooveStrategyKey` in `smart-genres.ts`; a key added there without a module
+ * here (or a module here with no key) is a typecheck error, which is the point.
+ *
+ * why `latin` has no genre of its own: Bossa is the single selectable
+ * Latin-family genre and `latin.ts` is its live engine, including the
+ * compound-meter Bembé bell timeline in 6/8 and 12/8. #628 retired the
+ * unreachable generic `Latin` genre/feel and the dormant World/Latin drum bank
+ * (Salsa, Afro-Cuban 6/8, Samba, Afrobeat). See git history if World/Latin is
+ * ever surfaced as real genres — it deserves a fresh, fully-wired story.
+ */
+const STRATEGY_MODULES: Record<GrooveStrategyKey, any> = {
+    acoustic,
+    blues,
+    country,
+    disco,
+    funk,
+    hiphop,
+    jazz,
+    latin,
+    metal,
+    'neo-soul': neoSoul,
+    reggae,
+    rock,
+    'ska-punk': skaPunk,
 };
+
+/**
+ * genreFeel → strategy module, DERIVED from the naming authority
+ * (`GROOVE_STRATEGY_BY_FEEL`, `smart-genres.ts`) rather than hand-keyed — the
+ * two feels that diverge from their genre name ('Bossa Nova', 'Ska') are
+ * reconciled there, once, instead of by a comment at every table.
+ *
+ * Exported for the #1130 genreFeel-routing completeness guard
+ * (tests/standards/genre-feel-canon-guard.test.ts).
+ */
+export const strategies: Record<string, any> = Object.fromEntries(
+    Object.entries(GROOVE_STRATEGY_BY_FEEL).map(([feel, key]) => [feel, STRATEGY_MODULES[key]]),
+);
 
 // why (Epic 12 S6 B6): genres whose hat is part of the foundational spine —
 // either a constant 8th/16th ticker or, in ska-punk's skank case, the genre-
@@ -252,11 +270,13 @@ function getFinalBarTreatment(genreFeel: string | undefined): FinalBarTreatment 
 }
 
 function getStrategy(groove: any): any {
-    // why (#628): Bossa is the single selectable Latin-family genre; it sets
-    // genreFeel='Bossa Nova' (lastSmartGenre='Bossa'). The `latin` strategy
-    // powers it. The retired World/Latin drum presets are no longer checked.
-    const isLatinStyle = groove.genreFeel === 'Bossa Nova' || groove.lastSmartGenre === 'Bossa';
-    if (isLatinStyle) {
+    // why (#628 / #1177): the Latin-family pre-check runs ahead of the feel table
+    // so a groove slice carrying only the canon name (`lastSmartGenre='Bossa'`,
+    // e.g. a partially-synced mock) still reaches Bossa's own kit instead of
+    // falling through to DEFAULT_CONFIG. `isLatinGrooveFamily` is the single
+    // canonical predicate (smart-genres.ts) — the same one the snare-syncopation
+    // exemption below uses, so a future Latin-family genre updates both at once.
+    if (isLatinGrooveFamily(groove.genreFeel, groove.lastSmartGenre)) {
         return latin;
     }
 
@@ -403,6 +423,12 @@ export function applyGrooveOverrides(
 
     const strategy = getStrategy(groove);
     const config = strategy ? strategy.config : DEFAULT_CONFIG;
+    // why (#1177): ONE Latin-family predicate for the whole file — kit dispatch
+    // (getStrategy) and the entropy snare exemption below read the same call, so
+    // a second Latin-family genre can't update one and silently miss the other.
+    // Replaces the strategy-config `isLatin` flag, which was a second spelling of
+    // exactly this condition and drifted independently.
+    const isLatinFamily = isLatinGrooveFamily(groove.genreFeel, groove.lastSmartGenre);
 
     let pulseWeight = 1.0;
     if ((inst.name === 'HiHat' || inst.name === 'Open') && !config.exemptFromPulseShaping) {
@@ -622,9 +648,9 @@ export function applyGrooveOverrides(
     // at 0.5, Jazz ride emptiness at 0.45, Acoustic ballad at 0.5 all need
     // entropy fully off so the silence reads as silence. `suppressEntropyBelow`
     // defaults to 0 (legacy behavior — entropy always runs); per-genre overrides
-    // live in each grooves/*.ts config. Bossa/Latin already exempt via isLatin
-    // gating the Snare branch below; this is the broader gate that also covers
-    // the HiHat/Open branch.
+    // live in each grooves/*.ts config. Bossa/Latin already exempt via the
+    // `isLatinFamily` predicate gating the Snare branch below; this is the
+    // broader gate that also covers the HiHat/Open branch.
     const entropyFloor = config.suppressEntropyBelow ?? 0;
     // why: strict `>` so the floor value itself is suppressed. The audit's
     // canonical case (drums.md P0 #2) is "Reggae One Drop at intensity 0.5":
@@ -706,7 +732,7 @@ export function applyGrooveOverrides(
         const isEOfBeatCheck = stepsPerBar === 16 && (loopStep === 1 || loopStep === 9);
         const blockSnare = config.blockAdjacentSnare && (isBackbeatAdjacent || isEOfBeatCheck);
 
-        if (inst.name === 'Snare' && isSyncopated && !blockSnare && !config.isLatin) {
+        if (inst.name === 'Snare' && isSyncopated && !blockSnare && !isLatinFamily) {
             currentState.shouldPlay = true;
             // why: draw 2 (discriminator 3) — ghost snare velocity in [0.1, 0.25).
             // Must be distinct from draw 1 to avoid correlation; discriminator 3

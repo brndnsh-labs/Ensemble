@@ -72,9 +72,9 @@ export const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // and brush ride ARE the genre identity at low intensity. Floor still
     // present so we don't bottom out at 0.1 (dead-air) on a moody chart.
     Jazz: 0.3,
-    // why: canonical `groove.genreFeel` is 'Bossa Nova' (see the `strategies` table
-    // in groove-engine.ts and the 'Bossa Nova' preset key in drum-presets.ts) —
-    // 'Bossa' key alone would never match in production.
+    // why: this table is keyed by `groove.genreFeel`, not the picker name — see
+    // the GENRE-NAMING AUTHORITY block in data/smart-genres.ts. A 'Bossa' key
+    // would never match in production.
     'Bossa Nova': 0.3,
     // why: ska-punk's signature upbeat-crack (offbeat hat + snare-on-2-and-4) is
     // genre identity; without a floor the conductor can park bandIntensity below

@@ -44,11 +44,13 @@ const CADENCE_PROFILES: Record<string, CadenceStep[]> = {
     ],
 };
 
-// why: keyed by genreFeel (see :72). Epic 2 S3 fixed three dead/missing keys:
-//   - 'Bossa' → 'Bossa Nova' (the canonical feel; the old key never matched, so
-//     bossa charts got the Rock button instead of their jazz ritardando).
-//   - 'Ska-Punk' → 'Ska' (the Ska-Punk genre's feel; punk-ska ends hard, so the
-//     BUTTON value is unchanged — the rekey just makes it reachable/explicit).
+// why: keyed by `groove.genreFeel`, not the picker name — see the
+// GENRE-NAMING AUTHORITY block in data/smart-genres.ts. Epic 2 S3 fixed three
+// dead/missing keys:
+//   - Bossa: rekeyed to its feel (the picker-name key never matched, so bossa
+//     charts got the Rock button instead of their jazz ritardando).
+//   - Ska-Punk: rekeyed to its feel; punk-ska ends hard, so the BUTTON value is
+//     unchanged — the rekey just makes it reachable/explicit.
 //   - Added 'Hip Hop' and 'Country' (both were absent → Rock button fallback).
 //     Hip Hop keeps a hard BUTTON cut: it's metronomic loop music, a ritardando
 //     (tempo slow-down) would read as wrong. Country resolves with a clear V-I

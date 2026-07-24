@@ -8,6 +8,8 @@
 // The `typeof` guard keeps these safe under Vitest, which doesn't apply Vite's
 // `define`: the build folds `__APP_VERSION__` to its literal (so the guard picks
 // the real value), while in tests the bare identifier resolves to `'dev'`.
+import { BASS_STYLE_BY_FEEL } from './data/smart-genres.js';
+
 export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 export const BUILD_REV = typeof __BUILD_REV__ !== 'undefined' ? __BUILD_REV__ : 'dev';
 // Ensemble is free + open. A no-pressure "support this project" link in
@@ -161,24 +163,40 @@ export const MIXER_GAIN_MULTIPLIERS = {
     drums: 0.38, // Mix-pass 2026-05-23: drums +3.3 dB; rhythmic anchor was 7-9 dB under full mix in non-jazz scenes, making the beat hard to track. Iter 2 (+1.5 dB on top of iter 1) brings rock/blues/funk into the -4 to -5 dB target window; jazz stays naturally quieter (brushes/ride)
 };
 
-export const SMART_BASS_STYLE_MAP = {
-    Rock: 'rock',
-    Jazz: 'quarter',
-    Funk: 'funk',
-    Disco: 'disco',
-    Reggae: 'dub',
-    'Neo-Soul': 'neo',
-    'Bossa Nova': 'bossa',
-    Blues: 'blues',
-    Acoustic: 'acoustic',
-    'Hip Hop': 'hiphop',
-    Country: 'country',
-    Metal: 'metal',
-    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts); the old 'Ska-Punk' key
-    // was dead — neither a genreFeel nor a drum-preset name. #1130.
-    Ska: 'walking-ska',
-};
+/**
+ * genreFeel → bass style for `style: 'smart'` playback.
+ *
+ * DERIVED (#1177) from `GENRE_OVERRIDES[*].bass` in `data/smart-genres.ts` — the
+ * genre config already declares each genre's bass style, and this table used to
+ * hand-parallel it. They agreed, but only by hand; deriving removes the fork.
+ * The feel keyspace (`'Bossa Nova'`, `'Ska'` rather than the picker names) comes
+ * from the same authority, so no per-key alias comment is needed here.
+ *
+ * `resolveMappedStyle` also accepts `groove.lastDrumPreset` as a SECONDARY key,
+ * which is why several drum-preset names (Jazz, Funk, Disco, Reggae, Neo-Soul,
+ * Acoustic, Hip Hop, Bossa Nova, Ska) resolve here too — they happen to equal a
+ * feel. That is load-bearing: a drum preset alone can select a bass style.
+ */
+export const SMART_BASS_STYLE_MAP: Record<string, string> = BASS_STYLE_BY_FEEL;
 
+/**
+ * genreFeel → scale character. Hand-curated, NOT derivable from
+ * `GENRE_OVERRIDES[*].soloist`: FIVE genres deliberately disagree with their
+ * soloist profile, because the scale bank and the phrasing profile are
+ * different axes. Jazz is the clearest illustration — soloist `'bird'` is a
+ * bebop VOCABULARY/phrasing profile while scale `'jazz'` is the note bank;
+ * collapsing them would be exactly the "one axis, two jobs" error. The rest:
+ * Acoustic (soloist `'acoustic'`, scale `'minimal'`), Hip Hop and Ska (both on
+ * the `'rock'` scale), Reggae (`'minimal'`).
+ *
+ * (Pre-existing, unrelated to the mapping: `'minimal'` has no branch in
+ * `theory-scales.ts`, so Acoustic and Reggae fall through to the generic
+ * diatonic path.)
+ *
+ * Keys are FEELS. The two that diverge from their picker name ('Bossa Nova',
+ * 'Ska') are reconciled by the naming authority in `data/smart-genres.ts` — see
+ * the GENRE-NAMING AUTHORITY block there rather than restating the alias here.
+ */
 export const SMART_SCALE_STYLE_MAP = {
     Rock: 'rock',
     Jazz: 'jazz',
@@ -190,14 +208,11 @@ export const SMART_SCALE_STYLE_MAP = {
     // to resolveMappedStyle's 'rock' fallback. Made explicit (behavior-preserving)
     // — revisit by ear whether hip-hop wants its own scale character.
     'Hip Hop': 'rock',
-    // Bossa genre's feel is 'Bossa Nova' (smart-genres.ts).
     'Bossa Nova': 'bossa',
     Acoustic: 'minimal',
     Reggae: 'minimal',
     Country: 'country',
     Metal: 'metal',
-    // Ska-Punk genre's feel is 'Ska' (smart-genres.ts). The old 'Rock/Metal' and
-    // 'Ska-Punk' keys were dead (never a genreFeel value). #1130.
     Ska: 'rock',
 };
 

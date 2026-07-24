@@ -53,9 +53,9 @@ const ALT_EXTENSIONS_BY_QUALITY: Record<string, readonly number[]> = {
  * A "pocket" is a FIXED time offset (seconds, ± around the beat) that the whole
  * melodic band (bass, comper/chords, harmony, soloist) leans by RELATIVE to the
  * drum grid. Positive = behind the beat (laid-back drag); negative = on top /
- * ahead (driving push). Keyed by `groove.genreFeel` (the drum-strategy key: note
- * 'Bossa Nova' and 'Ska', NOT 'Bossa'/'Ska-Punk' — see the `strategies` table in
- * groove-engine.ts and CANONICAL_METERS_BY_FEEL in smart-genres.ts).
+ * ahead (driving push). Keyed by `groove.genreFeel`, NOT the picker name — see
+ * the GENRE-NAMING AUTHORITY block in `data/smart-genres.ts` (`feelToCanon` /
+ * `canonToFeel`) for the two keyspaces and how to translate between them.
  *
  * WHY this is the single source of truth: before #1005 each lane carried its own
  * scattered feel constant (bass +5 ms, comp +4 ms, harmony a Neo-Soul-only +20 ms)

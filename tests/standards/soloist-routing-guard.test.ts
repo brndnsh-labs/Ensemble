@@ -16,9 +16,17 @@ import { resolveSoloistStyle, STYLE_CONFIG } from '../../public/engine/soloist-c
  * The value asserted is what a user ACTUALLY hears: `resolveSoloistStyle('smart',
  * genreFeel)` — the production resolution path, keyed by `groove.genreFeel`. Note
  * two genres whose `feel` differs from their genre name (Bossa → 'Bossa Nova',
- * Ska-Punk → 'Ska') resolve via the GENRE_STYLE_MAPPING fallback rather than their
- * SMART_GENRES entry; both still converge to the right profile, and this guard
- * pins that so the convergence can't quietly break.
+ * Ska-Punk → 'Ska'). Before #1177 they MISSED their SMART_GENRES entry (a feel
+ * was fed to a name-keyed table) and reached their profile only via the
+ * GENRE_STYLE_MAPPING fallback. Since #1177 a genre's own declared `soloist`
+ * field is authoritative for all 13; the fallback is no longer on their path.
+ * Output is unchanged for every genre — this guard is what proves that.
+ *
+ * Consequence worth knowing: Ska-Punk's profile now depends on 'ska-horns'
+ * NOT existing in STYLE_OVERRIDES (it aliases to 'ska'). Adding a dedicated
+ * ska-horns profile — an obvious future story — WILL flip Ska-Punk's soloist
+ * and is an audible change needing an ear pass. This guard going red at that
+ * point is correct; don't "fix the test".
  */
 describe('soloist genre→profile routing guard (#592)', () => {
     // The agreed canonical table: genre name → [genreFeel, profile a user hears].
@@ -36,7 +44,9 @@ describe('soloist genre→profile routing guard (#592)', () => {
         Bossa: { feel: 'Bossa Nova', profile: 'bossa' }, // feel≠name → GENRE_STYLE_MAPPING
         Country: { feel: 'Country', profile: 'country' },
         Metal: { feel: 'Metal', profile: 'metal' },
-        'Ska-Punk': { feel: 'Ska', profile: 'ska' }, // feel≠name → SMART_GENRES['Ska'] misses → GENRE_STYLE_MAPPING['Ska']='ska'
+        // #1177: now SMART_GENRES['Ska-Punk'].soloist='ska-horns' → alias → 'ska'.
+        // (Pre-#1177 this went SMART_GENRES['Ska'] miss → GENRE_STYLE_MAPPING['Ska'].)
+        'Ska-Punk': { feel: 'Ska', profile: 'ska' },
     };
 
     it('covers every SMART_GENRES entry (no genre left unguarded)', () => {
