@@ -7,7 +7,6 @@ import {
 } from '../controllers/arranger-controller.js';
 import { GENRE_NAMES } from '../data/smart-genres.js';
 import { SONG_TEMPLATES } from '../data/song-templates.js';
-import { pushHistory, undo } from '../history.js';
 import {
     type GenerateSongOptions,
     type GenerateSongRole,
@@ -15,6 +14,7 @@ import {
     predictStructure,
 } from '../song/song-generator.js';
 import { chordsFromSectionValue, parseSeedText } from '../song/song-generator-seed.js';
+import { pushHistory, undo } from '../state/history.js';
 import { generateId } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';

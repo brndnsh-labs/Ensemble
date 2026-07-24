@@ -1,7 +1,7 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadFromUrl } from '../../../public/state-hydration.js';
+import { loadFromUrl } from '../../../public/state/state-hydration.js';
 import { ACTIONS } from '../../../public/types.js';
 
 const { dispatchSpy, decodeSpy, mockState } = vi.hoisted(() => {

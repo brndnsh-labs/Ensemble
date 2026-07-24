@@ -10,8 +10,8 @@ export { mutateProgression };
 
 import { analyzeFormUI } from '../engine/conductor.js';
 import { restoreGains } from '../engine/engine.js';
-import { pushHistory } from '../history.js';
-import { saveCurrentState } from '../persistence.js';
+import { pushHistory } from '../state/history.js';
+import { saveCurrentState } from '../state/persistence.js';
 import { compressSections, generateId } from '../state/share-codec.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import type { Chord, Section, SectionInstrumentKey } from '../types.js';

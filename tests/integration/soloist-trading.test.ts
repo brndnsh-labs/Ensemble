@@ -96,7 +96,7 @@ vi.mock('../../public/state.js', () => {
 });
 
 // Mock dependencies
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     debounceSaveState: vi.fn(),
     saveCurrentState: vi.fn(),
 }));

@@ -77,11 +77,11 @@ vi.mock('../../../public/ui.js', () => ({
 vi.mock('../../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../../public/controllers/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
     debounceSaveState: vi.fn(),
 }));
-vi.mock('../../../public/history.js', () => ({ pushHistory: vi.fn() }));
+vi.mock('../../../public/state/history.js', () => ({ pushHistory: vi.fn() }));
 
 import { addSection, onSectionUpdate } from '../../../public/controllers/arranger-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';

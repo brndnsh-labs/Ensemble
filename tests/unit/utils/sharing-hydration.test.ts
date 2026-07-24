@@ -9,7 +9,7 @@ const { arranger, playback, groove, chords, bass, soloist, harmony } = getState(
 
 import { SMART_GENRES } from '../../../public/data/smart-genres.js';
 import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
-import { loadFromUrl } from '../../../public/state-hydration.js';
+import { loadFromUrl } from '../../../public/state/state-hydration.js';
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
@@ -44,7 +44,7 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     restoreGains: vi.fn(),
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 

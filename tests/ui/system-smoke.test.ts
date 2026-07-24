@@ -207,7 +207,7 @@ vi.mock('../../public/engine/engine.js', () => ({
     getVisualTime: () => 0,
 }));
 
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
     loadSavedState: vi.fn(),
     debounceSaveState: vi.fn(),

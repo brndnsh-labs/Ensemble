@@ -15,7 +15,7 @@ import {
     markPackInstalled,
 } from '../../../public/engine/instrument-registry.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
-import { handleEffects } from '../../../public/state-effects.js';
+import { handleEffects } from '../../../public/state/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock all the imported functions

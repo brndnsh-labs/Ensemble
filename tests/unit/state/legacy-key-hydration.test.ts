@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hydrateState } from '../../../public/state/state-hydration.js';
 import { arranger, getState, playback } from '../../../public/state.js';
-import { hydrateState } from '../../../public/state-hydration.js';
 
 // Map-backed localStorage so this node-env test exercises the real hydration
 // path (matches the pack-nudge.test.ts pattern).

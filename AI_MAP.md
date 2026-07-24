@@ -40,8 +40,10 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `decompressSections`, `encodeBase64Unicode`, `generateId` |
-| `public/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
-| `public/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
+| `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
+| `public/state/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
+| `public/state/persistence.ts` | LocalStorage session saving. | `saveCurrentState`, `debounceSaveState` |
+| `public/state/history.ts` | Session history and undo/redo logic. | `pushHistory`, `undo` |
 
 ## Generative Engines (Worker Thread)
 
@@ -188,7 +190,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/song/song-generator.ts` | Algorithmic song structure generation. |
 | `public/song/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
-| `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/export/sharing.ts` | URL-based song sharing. | `getShareURL` |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
@@ -208,7 +209,6 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.ts` | Global timing and musical constants. |
 | `public/constants.ts` | Global visual and UI state constants. |
-| `public/history.ts` | Session history and undo/redo logic. |
 | `public/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 
 ## Documentation, Parsing & Testing

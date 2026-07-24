@@ -23,7 +23,7 @@ write.
    | :- | :- |
    | `public/engine/**` (generative engines), `public/data/**`, or `tests/standards/**` | **`music-theory-reviewer`** (musical correctness, weight placement, idiom — Track musical) |
    | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph wiring | **`synth-graph-reviewer`** (Web Audio graph hygiene — Track synth) |
-   | `public/state/*.ts`, `public/state-effects.ts`, components that dispatch, OR `coordination-engine.ts` | **`state-discipline-reviewer`** (direct-mutation / dispatch discipline / `@direct-mutation` abuse) |
+   | `public/state/*.ts`, `public/state/state-effects.ts`, components that dispatch, OR `coordination-engine.ts` | **`state-discipline-reviewer`** (direct-mutation / dispatch discipline / `@direct-mutation` abuse) |
    | worker-mirrored slices (`arranger/chords/bass/soloist/harmony/groove/playback`), `logic-worker.ts`, `worker-client.ts`, OR `getSyncState`/`syncWorker`/`WORKER_MSG.*` changes | **`worker-contract-reviewer`** (half-synced fields) |
    | A bundle-shrink / dead-code diff (Track bundle) | **`bundle-hygiene-reviewer`** (no behavior change, real shrink, tree-shake-safe) |
    | **Test-only diff** — *every* changed file is a test | the **test-quality lens** (below) — *not* the bug-hunt inline pass, which returns `(none)` on tests. For a `tests/standards/` critique test, route to the `critique-test-author` agent's lens (the 5 smells); otherwise `/code-review`'s test angle. **+** the **Sonnet angle**. |

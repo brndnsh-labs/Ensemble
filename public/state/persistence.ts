@@ -1,5 +1,5 @@
-import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
-import { getState, storage } from './state.js';
+import { getState, storage } from '../state.js';
+import { MIXER_SETTINGS_VERSION } from './instruments.js';
 
 let saveTimeout: ReturnType<typeof setTimeout> | undefined;
 

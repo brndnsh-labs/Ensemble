@@ -1,21 +1,21 @@
-import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
+import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import {
     BASS_STYLES,
     CHORD_STYLES,
     HARMONY_STYLES,
     SOLOIST_STYLES,
-} from './data/instrument-styles.js';
-import { GENRE_FEELS, resolveGenre } from './data/smart-genres.js';
-import { hydrateVoice } from './engine/instrument-registry.js';
-import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
+} from '../data/instrument-styles.js';
+import { GENRE_FEELS, resolveGenre } from '../data/smart-genres.js';
+import { hydrateVoice } from '../engine/instrument-registry.js';
+import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
+import { escapeHTML, stripDangerousChars } from '../sanitize.js';
+import { dispatch, getState, storage } from '../state.js';
+import type { InstrumentVoice, Mutable, Palette, ThemeMode } from '../types.js';
+import { ACTIONS } from '../types.js';
+import { normalizeKey } from '../utils.js';
+import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './instruments.js';
 import { saveCurrentState } from './persistence.js';
-import { escapeHTML, stripDangerousChars } from './sanitize.js';
-import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
-import { decodeBase64Unicode, decompressSections, generateId } from './state/share-codec.js';
-import { dispatch, getState, storage } from './state.js';
-import type { InstrumentVoice, Mutable, Palette, ThemeMode } from './types.js';
-import { ACTIONS } from './types.js';
-import { normalizeKey } from './utils.js';
+import { decodeBase64Unicode, decompressSections, generateId } from './share-codec.js';
 
 const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);

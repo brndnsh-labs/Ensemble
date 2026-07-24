@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { debounceSaveState, saveCurrentState } from '../../../public/persistence.js';
+import { debounceSaveState, saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, storage } from '../../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(

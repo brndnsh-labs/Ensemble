@@ -12,7 +12,7 @@ import { dispatch } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 
 // Mock dependencies
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/controllers/app-controller.js', () => ({

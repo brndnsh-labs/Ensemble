@@ -1,6 +1,6 @@
-import { dispatch, getState } from './state.js';
-import { ACTIONS } from './types.js';
-import { showToast } from './ui.js';
+import { dispatch, getState } from '../state.js';
+import { ACTIONS } from '../types.js';
+import { showToast } from '../ui.js';
 
 export function pushHistory(): void {
     const { arranger } = getState();

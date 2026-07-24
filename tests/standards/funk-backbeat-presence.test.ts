@@ -51,7 +51,7 @@ vi.mock('../../public/ui.js', () => ({
     triggerFlash: vi.fn(),
 }));
 
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     debounceSaveState: vi.fn(),
     saveCurrentState: vi.fn(),
 }));

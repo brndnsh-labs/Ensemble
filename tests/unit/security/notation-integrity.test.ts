@@ -1,8 +1,8 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { hydrateState, loadFromUrl } from '../../../public/state/state-hydration.js';
 import * as stateModule from '../../../public/state.js';
-import { hydrateState, loadFromUrl } from '../../../public/state-hydration.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),

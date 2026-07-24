@@ -4,8 +4,8 @@
  *
  * Persistence round-trip reachability gate (#1127).
  *
- * The failure class this closes: `saveCurrentState()` (public/persistence.ts) and
- * the hydration restore in `public/state-hydration.ts` are two hand-maintained
+ * The failure class this closes: `saveCurrentState()` (public/state/persistence.ts) and
+ * the hydration restore in `public/state/state-hydration.ts` are two hand-maintained
  * parallel lists. They had already drifted into silent data discard — `metronome`
  * and `autoIntensity` are SAVED but hydration hardcodes them (metronome→false,
  * autoIntensity→true), throwing the saved values away. A missed restore is
@@ -82,7 +82,7 @@ vi.mock('../../../public/state.js', () => ({
     },
 }));
 
-import { saveCurrentState } from '../../../public/persistence.js';
+import { saveCurrentState } from '../../../public/state/persistence.js';
 
 /**
  * Every top-level key `saveCurrentState` emits, classified. Keep in lock-step

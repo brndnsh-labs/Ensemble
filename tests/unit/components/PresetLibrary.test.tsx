@@ -22,7 +22,7 @@ vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => selector(mockState),
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 

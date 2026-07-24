@@ -10,7 +10,7 @@ vi.mock('../../../public/state.js', () => ({
 }));
 
 import { hydrateVoice } from '../../../public/engine/instrument-registry.js';
-import { saveCurrentState } from '../../../public/persistence.js';
+import { saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, storage } from '../../../public/state.js';
 
 // The Sounds source picker writes the chosen voice (synth | pack:<id>) and calls

@@ -4,7 +4,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { saveCurrentState } from '../../../public/persistence.js';
+import { saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, storage } from '../../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(

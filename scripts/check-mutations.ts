@@ -60,13 +60,27 @@ function isAnnotated(lines: string[], index: number): boolean {
 
 let hasError = false;
 
+// The exemption is for files that DECLARE a slice — those are the legitimate
+// state writers. It is deliberately CONTENT-based, not path-based: a blanket
+// `state/` path skip silently exempts every non-slice module that happens to
+// live alongside the slices (`state/state-hydration.ts`, `state/history.ts`,
+// `state/persistence.ts`, `state/share-codec.ts` — consumers that must
+// dispatch, one of them carrying nine `@direct-mutation` markers). Keying on
+// `deepSignal<` is self-maintaining in both directions: a new slice is exempt
+// the moment it declares its signal, and a new non-slice landing in `state/`
+// is scanned from the moment it lands.
+const SLICE_DECL = /deepSignal</;
+
 for (const file of files) {
-    if (file.includes('state/') || file.includes('reducer')) {
+    if (file.includes('reducer')) {
         continue;
     }
 
     try {
         const content = readFileSync(file, 'utf8');
+        if (SLICE_DECL.test(content)) {
+            continue;
+        }
         const lines = content.split('\n');
 
         const aliases = new Set<string>();

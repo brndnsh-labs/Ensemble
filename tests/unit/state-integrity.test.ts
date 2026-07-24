@@ -34,6 +34,16 @@ function getFiles(dir, files = []) {
 const allFiles = getFiles(PUBLIC_DIR);
 const fileContents = allFiles.map((f) => ({ path: f, content: fs.readFileSync(f, 'utf8') }));
 
+// "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
+// also holds non-slice plumbing (`state-effects`, `state-hydration`, `history`,
+// `persistence`, `share-codec`) that dispatches like any other consumer. Keying on the
+// `deepSignal<` declaration keeps the dispatch/handler split honest as files move in and
+// out of that directory. Same discriminator as `scripts/check-mutations.ts`.
+const isSlice = (f) => /deepSignal</.test(f.content);
+// The effect/hydration listeners handle actions with `case` arms outside any slice.
+const HANDLER_FILES = ['state-effects.ts', 'state-hydration.ts'];
+const isHandlerFile = (f) => isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
+
 // Extract ACTIONS keys from public/types.js
 const typesContent = fs.readFileSync(TYPES_FILE, 'utf8');
 const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const;/);
@@ -51,7 +61,7 @@ describe('State Integrity Audit', () => {
             // Check for ACTIONS.KEY usage (dispatched/referenced outside slices)
             const dispatchRegex = new RegExp(`\\bACTIONS\\.${key}\\b`);
             const isDispatched = fileContents.some((f) => {
-                if (f.path.includes('public/state/') || f.path === TYPES_FILE) {
+                if (isSlice(f) || f.path === TYPES_FILE) {
                     return false;
                 }
                 return dispatchRegex.test(f.content);
@@ -60,13 +70,7 @@ describe('State Integrity Audit', () => {
             // Check for case ACTIONS.KEY: (handled in state slices or effects)
             const handlerRegex = new RegExp(`case\\s+ACTIONS\\.${key}\\b`);
             const isHandled = fileContents.some((f) => {
-                const isHandlerFile =
-                    f.path.includes('public/state/') ||
-                    f.path.includes('public/state-effects.js') ||
-                    f.path.includes('public/state-effects.ts') ||
-                    f.path.includes('public/state-hydration.js') ||
-                    f.path.includes('public/state-hydration.ts');
-                if (!isHandlerFile) {
+                if (!isHandlerFile(f)) {
                     return false;
                 }
                 return handlerRegex.test(f.content);

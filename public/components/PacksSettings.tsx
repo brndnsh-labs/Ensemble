@@ -9,8 +9,8 @@ import {
 } from '../engine/instrument-registry.js';
 import { ensurePackLoaded, getPackZones } from '../engine/pack-runtime.js';
 import { pickZone, playSampledNote } from '../engine/sample-voice.js';
+import { resolveAutoVoices } from '../state/state-effects.js';
 import { dispatch, getState } from '../state.js';
-import { resolveAutoVoices } from '../state-effects.js';
 import { ACTIONS, type InstrumentModule, type InstrumentVoice } from '../types.js';
 import { Icon } from './Icon.jsx';
 import { SettingGroup } from './UIControls.jsx';

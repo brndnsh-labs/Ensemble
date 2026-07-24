@@ -8,7 +8,7 @@ import {
     deriveSoloistMode,
     isGuitarSoloistVoice,
 } from '../../../public/engine/soloist-mode-policy.js';
-import { resolveAutoVoices } from '../../../public/state-effects.js';
+import { resolveAutoVoices } from '../../../public/state/state-effects.js';
 import { ACTIONS, type EnsembleState } from '../../../public/types.js';
 
 // #683 — installing a pack must upgrade the *current* genre's Auto lanes right

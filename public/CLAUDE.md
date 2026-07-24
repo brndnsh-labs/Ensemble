@@ -1,10 +1,13 @@
 # public/ — state, worker bridge, controllers
 
-The main-thread plumbing layer: `state.ts` + `state/*.ts` slices, `state-effects.ts`,
-`state-hydration.ts`, `worker-client.ts`, the `controllers/*.ts` family
+The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
+slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`,
+`state/state-hydration.ts`, `state/history.ts`, `state/persistence.ts`,
+`state/share-codec.ts`) — `worker-client.ts`, the `controllers/*.ts` family
 (`controllers/app-controller.ts`, `controllers/arranger-controller.ts`,
-`controllers/instrument-controller.ts`, …), `history.ts`, `persistence.ts`,
-`config.ts`. For the worker's
+`controllers/instrument-controller.ts`, …), and
+`config.ts`. Only the slice files are exempt from `npm run check-mutations`; the
+plumbing dispatches like any other consumer. For the worker's
 message *schema*, see `docs/guides/WORKER_CONTRACT.md`; for the generative engines
 themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit either.
 
@@ -75,7 +78,7 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
    identity-keyed cache over a synced object field, assume its identity is stable across content
    changes and reach for a content token instead.
 
-## Effects & reactivity (`state-effects.ts`)
+## Effects & reactivity (`state/state-effects.ts`)
 
 7. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single
    dispatch.** During playback the auto-conductor (`autoIntensity`, default ON) dispatches

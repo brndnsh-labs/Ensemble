@@ -15,7 +15,7 @@ vi.mock('../../../public/ui.js', () => ({
     },
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     debounceSaveState: vi.fn(),
 }));
 

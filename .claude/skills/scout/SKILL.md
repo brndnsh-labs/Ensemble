@@ -90,7 +90,7 @@ This is a client-only PWA: no auth, no payments, no server. The real surface is 
   that trusts shape without validation (a malformed payload that can crash the app or inject through
   to the DOM/`innerHTML`); service-worker/`workbox` cache that could serve stale or poisoned assets;
   any `dangerouslySetInnerHTML`-equivalent or unsanitized user-derived string reaching the DOM.
-- **Where:** `public/state-hydration.ts`, share/URL encode-decode, the persisted-session reader,
+- **Where:** `public/state/state-hydration.ts`, share/URL encode-decode, the persisted-session reader,
   the service worker, anywhere URL/`localStorage` data crosses into state or markup.
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
   **code-level input-parsing change** is a judgment call — file it, route to a human `/cycle` with a

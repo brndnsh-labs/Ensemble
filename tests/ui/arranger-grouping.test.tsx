@@ -13,7 +13,7 @@ import { getState } from '../../public/state.js';
 const { arranger } = getState();
 
 // Mock dependencies
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/controllers/arranger-controller.js', () => ({

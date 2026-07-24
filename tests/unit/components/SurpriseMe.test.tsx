@@ -29,7 +29,7 @@ vi.mock('../../../public/controllers/arranger-controller.js', () => ({
     refreshArrangerUI: () => mockRefreshArrangerUI(),
 }));
 
-vi.mock('../../../public/history.js', () => ({
+vi.mock('../../../public/state/history.js', () => ({
     pushHistory: () => mockPushHistory(),
     undo: (...args: any[]) => mockUndo(...args),
 }));

@@ -7,7 +7,7 @@ import { getState } from '../../../public/state.js';
 
 const { arranger } = getState();
 
-import { pushHistory, undo } from '../../../public/history.js';
+import { pushHistory, undo } from '../../../public/state/history.js';
 
 // Mock UI and dependencies
 vi.mock('../../../public/ui.js', () => ({
@@ -26,7 +26,7 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 

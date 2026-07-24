@@ -15,7 +15,7 @@ import { Arranger } from '../../public/components/Arranger.jsx';
 import { ChordVisualizer } from '../../public/components/ChordVisualizer.jsx';
 
 // Mock dependencies that we don't need for layout testing
-vi.mock('../../public/persistence.js', () => ({
+vi.mock('../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 vi.mock('../../public/controllers/instrument-controller.js', () => ({

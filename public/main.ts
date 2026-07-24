@@ -20,11 +20,11 @@ import { detectInstalledPacks, warmPacksForVoices } from './engine/pack-runtime.
 import { scheduler } from './engine/scheduler-core.js';
 import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { maybeShowPackInstallNudge } from './pack-nudge.js';
-import { saveCurrentState } from './persistence.js';
 import { initPWA } from './pwa.js';
+import { saveCurrentState } from './state/persistence.js';
+import { deriveSoloistModeOnBoot, handleEffects } from './state/state-effects.js';
+import { hydrateState, loadFromUrl } from './state/state-hydration.js';
 import { dispatch, getState, subscribe } from './state.js';
-import { deriveSoloistModeOnBoot, handleEffects } from './state-effects.js';
-import { hydrateState, loadFromUrl } from './state-hydration.js';
 import { mountComponents } from './ui-root.jsx';
 import { initWorker, syncWorker } from './worker-client.js';
 

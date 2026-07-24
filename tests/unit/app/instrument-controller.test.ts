@@ -37,7 +37,7 @@ vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn(),
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
     debounceSaveState: vi.fn(),
 }));

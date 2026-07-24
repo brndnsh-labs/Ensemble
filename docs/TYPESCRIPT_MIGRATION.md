@@ -80,7 +80,7 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/controllers/performance-controller.ts` | 58 | ✅ | |
 | `public/pwa.ts` | ~50 | ✅ | `deferredPrompt: any`; `triggerInstall(): Promise<boolean>` |
 | `public/ui-bridge.ts` | 57 | ✅ | Generic `useEnsembleState<T>`; `useDispatch` return typed |
-| `public/history.ts` | 46 | ✅ | `undo(refreshArrangerUI?: () => void)` |
+| `public/state/history.ts` | 46 | ✅ | `undo(refreshArrangerUI?: () => void)` |
 | `public/state/conductor.ts` | 54 | ✅ | `ConductorState` interface |
 | `public/state/midi.ts` | 66 | ✅ | `MidiOutput` + `MidiState` interfaces |
 | `public/state/visualizer.ts` | 29 | ✅ | `VisualizerState` interface |
@@ -98,15 +98,15 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/song/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
 | `public/song/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
 | `public/state.ts` | 293 | ✅ | `dispatch` overloads on `ActionPayloadMap`; `StateMap = EnsembleState` compat alias (retired 2026-07, #1172) |
-| `public/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
+| `public/state/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
 | `public/export/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
 | `public/worker-client.ts` | 303 | ✅ | `declare const WORKER_PATH: string`; typed handler callbacks |
 | `public/controllers/midi-controller.ts` | 401 | ✅ | `Map<string, {id, endTime}>` for note-offs; `MidiState` import type |
 | `public/engine/chords-styles.ts` | 358 | ✅ | `EnsembleState` param; `safeExtensions: Record<string, number[]>` |
 | `public/engine/drum-seeder.ts` | 348 | ✅ | `OrchestrationMapEntry`, `FillMapEntry`, `AccentCatch` exported interfaces |
 | `public/engine/groove-engine.ts` | 381 | ✅ | `strategies: Record<string, any>`; `binarySearchMap` return annotated `: any` |
-| `public/state-hydration.ts` | 497 | ✅ | `(TIME_SIGNATURES as any)` casts; `clamp`/`normalizeSoloistPreset` typed |
-| `public/state-effects.ts` | 196 | ✅ | `EnsembleState` param; `handleEffects` typed |
+| `public/state/state-hydration.ts` | 497 | ✅ | `(TIME_SIGNATURES as any)` casts; `clamp`/`normalizeSoloistPreset` typed |
+| `public/state/state-effects.ts` | 196 | ✅ | `EnsembleState` param; `handleEffects` typed |
 | `public/controllers/arranger-controller.ts` | 304 | ✅ | `NOTE_MATCH_PATTERN` moved after imports; `isMusicalNotation` inner fn typed |
 | `public/state/arranger.ts` | ~111 | ✅ | `Section` + `ArrangerState` interfaces; pulled forward with state slices |
 | `public/state/groove.ts` | ~250 | ✅ | `Instrument`, `PocketState`, `GrooveState`; `grooveReducer` takes `GlobalContext` |

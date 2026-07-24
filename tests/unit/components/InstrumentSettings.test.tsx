@@ -43,7 +43,7 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 // Mock persistence
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 

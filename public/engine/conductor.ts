@@ -1,6 +1,6 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { saveCurrentState } from '../persistence.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../song/form-analysis.js';
+import { saveCurrentState } from '../state/persistence.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';

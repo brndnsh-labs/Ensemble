@@ -22,8 +22,8 @@ import { flushBuffers } from '../../../public/controllers/instrument-controller.
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import { analyzeFormUI } from '../../../public/engine/conductor.js';
 import { restoreGains } from '../../../public/engine/engine.js';
-import { pushHistory } from '../../../public/history.js';
-import { saveCurrentState } from '../../../public/persistence.js';
+import { pushHistory } from '../../../public/state/history.js';
+import { saveCurrentState } from '../../../public/state/persistence.js';
 import { getState, stateMap } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
 import { syncWorker } from '../../../public/worker-client.js';
@@ -68,7 +68,7 @@ vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
 }));
 
-vi.mock('../../../public/history.js', () => ({
+vi.mock('../../../public/state/history.js', () => ({
     pushHistory: vi.fn(),
 }));
 
@@ -76,7 +76,7 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     flushBuffers: vi.fn(),
 }));
 
-vi.mock('../../../public/persistence.js', () => ({
+vi.mock('../../../public/state/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 

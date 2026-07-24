@@ -7,7 +7,7 @@ import { getState } from '../../public/state.js';
 const { arranger } = getState();
 
 // Mock dependencies to isolate performance of the reorder logic
-vi.mock('../../public/history.js', () => ({ pushHistory: vi.fn() }));
+vi.mock('../../public/state/history.js', () => ({ pushHistory: vi.fn() }));
 vi.mock('../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn((_s, _d, cb) => cb?.()),
     transformRelativeProgression: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('../../public/engine/chords-engine.js', () => ({
 vi.mock('../../public/controllers/instrument-controller.js', () => ({ flushBuffers: vi.fn() }));
 vi.mock('../../public/engine/engine.js', () => ({ restoreGains: vi.fn() }));
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
-vi.mock('../../public/persistence.js', () => ({ saveCurrentState: vi.fn() }));
+vi.mock('../../public/state/persistence.js', () => ({ saveCurrentState: vi.fn() }));
 vi.mock('../../public/song/form-analysis.js', () => ({ analyzeForm: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ showToast: vi.fn() }));
 
