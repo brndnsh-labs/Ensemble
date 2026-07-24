@@ -33,20 +33,28 @@
  * genre; Disco is its closest four-on-the-floor relative and is included.
  * Ska-Punk's stop-time breakdowns make it a natural fit too.
  *
- * Match is case-insensitive substring on `groove.genreFeel`.
+ * Keys are **exact `groove.genreFeel` values**, matching every other
+ * genre-subset table in the engine (`HAT_SPINE_GENRES` in `groove-engine.ts`,
+ * `SUBTRACTION_PILOT_GENRES` in `arrangement-layering.ts`, …). Two feels are
+ * NOT their genre's picker name — the Ska-Punk genre's feel is `'Ska'` and
+ * Bossa's is `'Bossa Nova'` (the alias lives only in `GENRE_OVERRIDES[name].feel`,
+ * `smart-genres.ts`).
+ *
+ * why exact-match and not the case-insensitive substring test this used to do:
+ * `'Hip Hop'` (the real feel) contains neither `'hip-hop'` nor `'hiphop'`, so
+ * hip-hop — the genre the mechanic is most idiomatic for — never fired a drop
+ * at all (#1169). Substring matching fails in both directions: it silently
+ * misses a real feel whose punctuation differs, and it can false-positive on
+ * any future feel that merely contains a needle. Exact-match kills both, and
+ * `genre-feel-canon-guard.test.ts` now pins every member to a canonical feel.
  */
-const DROP_FRIENDLY_GENRES: readonly string[] = [
-    'rock',
-    'metal',
-    'hip-hop',
-    'hiphop',
-    'disco',
-    // why: genreFeel for the Ska-Punk genre is 'Ska' (smart-genres.ts). The
-    // needle must be 'ska' — with 'ska-punk', `'ska'.includes('ska-punk')` is
-    // false (haystack shorter than needle), so Ska-Punk got no stop-time drops
-    // despite the doc above. No other feel contains 'ska'. Epic 2 S1.
-    'ska',
-];
+export const DROP_FRIENDLY_GENRES: ReadonlySet<string> = new Set([
+    'Rock',
+    'Metal',
+    'Hip Hop',
+    'Disco',
+    'Ska',
+]);
 
 /**
  * Energy-delta threshold (from `form-analysis.ts`'s 0..1 energy map) above which
@@ -88,11 +96,7 @@ const DROP_INFERRED_MIN_FORM_PROGRESS = 0.6;
  * `genreFeel` is the canonical genre string on `groove.genreFeel`.
  */
 function isDropFriendlyGenre(genreFeel: string | undefined | null): boolean {
-    if (!genreFeel) {
-        return false;
-    }
-    const g = genreFeel.toLowerCase();
-    return DROP_FRIENDLY_GENRES.some((name) => g.includes(name));
+    return !!genreFeel && DROP_FRIENDLY_GENRES.has(genreFeel);
 }
 
 /**

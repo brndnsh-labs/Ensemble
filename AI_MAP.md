@@ -66,7 +66,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/resolution.ts` | Harmonic resolution and transition logic. | `generateResolutionNotes` |
 | `public/engine/arranger-utils.ts` | Arrangement unrolling and form utilities. | `unrollArrangement` |
 | `public/engine/arrangement-layering.ts` | Per-engine intro/outro mute schedule (S5). | `INTRO_MUTES`, `OUTRO_MUTES`, `isIntroSectionLabel` |
-| `public/engine/drop-mechanic.ts` | Drop/Breakdown structural-cut gate (genre + energy-delta). | `shouldFireDropMute` |
+| `public/engine/drop-mechanic.ts` | Drop/Breakdown structural-cut gate (genre + energy-delta). | `shouldFireDropMute`, `DROP_FRIENDLY_GENRES` |
 
 ## Engine Styles (Genre Logic)
 

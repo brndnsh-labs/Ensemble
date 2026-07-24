@@ -77,6 +77,8 @@ vi.mock('../../public/engine/harmonies.js', () => ({
 }));
 
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { GENRE_FEELS } from '../../public/data/smart-genres.js';
+import { DROP_FRIENDLY_GENRES } from '../../public/engine/drop-mechanic.js';
 import { generateNotesForStep } from '../../public/engine/tick-logic.js';
 
 const TS = TIME_SIGNATURES['4/4'];
@@ -509,6 +511,75 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         }
         expect(totalNotes).toBeGreaterThan(0);
     });
+
+    // #1169 — the genre gate used a case-insensitive SUBSTRING test against
+    // needles like 'hip-hop'/'hiphop'. The real `groove.genreFeel` for the Hip
+    // Hop genre is 'Hip Hop' (with a space, `smart-genres.ts`), which contains
+    // neither needle — so the drop/breakdown cut was silently dead for the one
+    // genre it is most idiomatic for, while Rock/Metal/Disco/Ska all fired.
+    //
+    // This case is deliberately a HARD-CODED literal, not driven off
+    // `DROP_FRIENDLY_GENRES` — a case list derived from the set under test can
+    // never notice the genre being dropped from that set (the tautology smell,
+    // musical-engine-patterns.md § Methodology). This one goes red the moment
+    // hip-hop stops cutting, whatever the mechanism.
+    it("FIRES the cut for genreFeel 'Hip Hop' (#1169 regression)", () => {
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Hip Hop' });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            expect(r.coordination.dropMuteActive).toBe(true);
+        }
+        // Same contract as the Rock cut bar: total band silence, gate
+        // short-circuits before any producer runs.
+        expect(totalNotes).toBe(0);
+        expect(soloistSpy).not.toHaveBeenCalled();
+        expect(bassSpy).not.toHaveBeenCalled();
+        expect(accompSpy).not.toHaveBeenCalled();
+        expect(harmonySpy).not.toHaveBeenCalled();
+    });
+
+    // The set-driven sweep is the COMPLEMENT of the literal case above: it can't
+    // guard membership, but it does guard that every feel the set does list
+    // actually reaches `dropMuteActive` end-to-end through tick-logic — i.e. no
+    // listed member is inert for some other reason.
+    it.each([...DROP_FRIENDLY_GENRES])(
+        'FIRES the cut for drop-friendly genreFeel %s (#1169 — exact-match gate)',
+        (genreFeel) => {
+            const state = makeState({ nextLabel: 'Drop', genreFeel });
+            const cursors = freshCursors();
+
+            let totalNotes = 0;
+            for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+                const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+                totalNotes += r.notes.length;
+                expect(r.coordination.dropMuteActive).toBe(true);
+            }
+            expect(totalNotes).toBe(0);
+        },
+    );
+
+    // Every canonical feel OUTSIDE the set must stay silent — the other half of
+    // the exact-match contract. The old substring gate could false-positive on
+    // any future feel that merely contained a needle; this pins the complement.
+    it.each(GENRE_FEELS.filter((feel) => !DROP_FRIENDLY_GENRES.has(feel)))(
+        'does NOT fire for non-drop-friendly genreFeel %s even into a Drop',
+        (genreFeel) => {
+            const state = makeState({ nextLabel: 'Drop', genreFeel });
+            const cursors = freshCursors();
+
+            let totalNotes = 0;
+            for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+                const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+                totalNotes += r.notes.length;
+                expect(r.coordination.dropMuteActive).toBe(false);
+            }
+            expect(totalNotes).toBeGreaterThan(0);
+        },
+    );
 
     it('does NOT fire for a non-drop-friendly genre (Jazz) even into a Drop', () => {
         // why: a 1-bar full-band cut is idiomatic for rock/metal/EDM/hip-hop and
