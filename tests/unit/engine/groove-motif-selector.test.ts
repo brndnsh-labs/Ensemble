@@ -251,6 +251,39 @@ describe('Groove files use makeMotifSelector correctly', () => {
         expect(getMotif(0.1, 0.8, 0.9)).toBe(1); // Trap Foundation
     });
 
+    it('neo-soul getMotif pins both tiers (mid tier folds back onto the core pair)', async () => {
+        const { getMotif } = await import('../../../public/engine/grooves/neo-soul.js');
+        expect(typeof getMotif).toBe('function');
+        expect(getMotif(0.9, 0.2, 0.9)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< INTENSITY_BANDS.LOW)
+        // mid tier (intensity < 0.7): expressive motifs are gated off, seeds fold to 0/1.
+        // Seeds bracket each threshold exactly (pickBySeed is strict `<`) so a shifted
+        // ceiling can't slip through.
+        expect(getMotif(0.299, 0.8, 0.5)).toBe(0); // seed < 0.3 → Boom Bap
+        expect(getMotif(0.3, 0.8, 0.5)).toBe(1); // seed 0.3–0.6 → Ghost Note Heavy
+        expect(getMotif(0.599, 0.8, 0.5)).toBe(1);
+        expect(getMotif(0.6, 0.8, 0.5)).toBe(0); // seed 0.6–0.8 → back to Boom Bap
+        expect(getMotif(0.799, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.8, 0.8, 0.5)).toBe(1); // seed >= 0.8 → Ghost Note Heavy
+        // high tier (intensity >= 0.7): the top 40% of seed space unlocks 2/3
+        expect(getMotif(0.299, 0.8, 0.9)).toBe(0); // seed < 0.3 → Boom Bap
+        expect(getMotif(0.3, 0.8, 0.9)).toBe(1); // seed 0.3–0.6 → Ghost Note Heavy
+        expect(getMotif(0.599, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.6, 0.8, 0.9)).toBe(2); // seed 0.6–0.8 → Dilla Skips
+        expect(getMotif(0.799, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.8, 0.8, 0.9)).toBe(3); // seed >= 0.8 → Modern Hybrid
+    });
+
+    it('neo-soul getMotif treats intensity exactly 0.7 as the high tier', async () => {
+        const { getMotif } = await import('../../../public/engine/grooves/neo-soul.js');
+        // Tier selection is strict `<`, so 0.7 is NOT in the maxIntensity-0.7 tier.
+        expect(getMotif(0.7, 0.8, 0.7)).toBe(2); // high tier → Dilla Skips
+        expect(getMotif(0.9, 0.8, 0.7)).toBe(3); // high tier → Modern Hybrid
+        // ...and one step below the boundary still folds back onto the core pair.
+        expect(getMotif(0.7, 0.8, 0.69)).toBe(0);
+        expect(getMotif(0.9, 0.8, 0.69)).toBe(1);
+    });
+
     it('country getMotif stays at most 2 motifs', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/country.js');
         expect(getMotif(0.9, 0.8, 0.9)).toBe(2);
