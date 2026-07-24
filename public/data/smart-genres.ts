@@ -183,6 +183,51 @@ export const SMART_GENRES: Record<string, SmartGenre> = Object.keys(GENRE_OVERRI
 export const GENRE_NAMES = Object.keys(GENRE_OVERRIDES);
 export const GENRE_FEELS = Object.values(GENRE_OVERRIDES).map((g) => g.feel);
 
+/**
+ * Reverse feel → canonical-genre-name lookup. Eleven genres have `name === feel`;
+ * exactly two diverge — `Ska-Punk` → `Ska` and `Bossa` → `Bossa Nova` — which is why
+ * anything receiving a genre string from outside (share URLs, persisted sessions)
+ * must translate rather than assume the two keyspaces are the same.
+ */
+const GENRE_NAME_BY_FEEL: Record<string, string> = Object.entries(GENRE_OVERRIDES).reduce<
+    Record<string, string>
+>((acc, [name, override]) => {
+    if (override.feel) {
+        acc[override.feel] = name;
+    }
+    return acc;
+}, {});
+
+/**
+ * Normalize a genre string arriving in *either* keyspace into the canonical pair.
+ *
+ * The UI and `groove.lastSmartGenre` speak genre NAMES; the engine and
+ * `groove.genreFeel` speak FEELS, and every feel-keyed table (`GENRE_POCKET`, the
+ * groove `strategies` map, `SMART_SCALE_STYLE_MAP`, `DROP_FRIENDLY_GENRES`, harmony
+ * styles) misses on a name. Share URLs carry the feel (`sharing.ts` emits
+ * `groove.genreFeel`), but hand-written and older links carry the name — accept both,
+ * and return `null` for anything in neither keyspace so callers reject it instead of
+ * writing a phantom key into `genreFeel` (#1130 / #1200).
+ */
+export function resolveGenre(
+    input: string | null | undefined,
+): { name: string; feel: string } | null {
+    if (!input) {
+        return null;
+    }
+    // Feel-space first: no feel collides with another genre's name, so order is
+    // only a matter of which lookup is the common case (the share writer's output).
+    const nameForFeel = GENRE_NAME_BY_FEEL[input];
+    if (nameForFeel) {
+        return { name: nameForFeel, feel: input };
+    }
+    const feelForName = GENRE_OVERRIDES[input]?.feel;
+    if (feelForName) {
+        return { name: input, feel: feelForName };
+    }
+    return null;
+}
+
 const DEFAULT_GENRE_METERS = ['4/4'];
 
 /**

@@ -5,7 +5,7 @@ import {
     HARMONY_STYLES,
     SOLOIST_STYLES,
 } from './data/instrument-styles.js';
-import { GENRE_FEELS, GENRE_NAMES } from './data/smart-genres.js';
+import { GENRE_FEELS, resolveGenre } from './data/smart-genres.js';
 import { hydrateVoice } from './engine/instrument-registry.js';
 import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
 import { saveCurrentState } from './persistence.js';
@@ -350,9 +350,7 @@ export function hydrateState(): void {
                         : 'Rock',
                 lastSmartGenre:
                     savedState.groove.lastSmartGenre ||
-                    GENRE_NAMES.find(
-                        (k) => GENRE_FEELS[GENRE_NAMES.indexOf(k)] === savedState.groove.genreFeel,
-                    ) ||
+                    resolveGenre(savedState.groove.genreFeel)?.name ||
                     'Rock',
                 sectionSeedMap: savedState.groove.sectionSeedMap || {},
                 currentMeasure: 0,
@@ -470,9 +468,15 @@ export function loadFromUrl(): void {
 
     const genreParam = params.get('genre');
     if (genreParam) {
-        if (GENRE_NAMES.includes(genreParam)) {
-            (groove as Mutable<typeof groove>).lastSmartGenre = genreParam; // @direct-mutation
-            (groove as Mutable<typeof groove>).genreFeel = genreParam; // @direct-mutation
+        // #1200 — the share writer emits the FEEL (`groove.genreFeel`), while older
+        // and hand-written links carry the genre NAME. Accept either keyspace and land
+        // each half canonically; validating a feel against the name list silently
+        // dropped Ska-Punk ('Ska') and Bossa ('Bossa Nova') back to the Rock default,
+        // and writing a name straight into `genreFeel` misses every feel-keyed table.
+        const resolvedGenre = resolveGenre(genreParam);
+        if (resolvedGenre) {
+            (groove as Mutable<typeof groove>).lastSmartGenre = resolvedGenre.name; // @direct-mutation
+            (groove as Mutable<typeof groove>).genreFeel = resolvedGenre.feel; // @direct-mutation
         }
     }
 

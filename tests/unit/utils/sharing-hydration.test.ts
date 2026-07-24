@@ -7,7 +7,8 @@ import { getState } from '../../../public/state.js';
 
 const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
-import { shareProgression } from '../../../public/sharing.js';
+import { SMART_GENRES } from '../../../public/data/smart-genres.js';
+import { generateShareUrl, shareProgression } from '../../../public/sharing.js';
 import { loadFromUrl } from '../../../public/state-hydration.js';
 
 vi.mock('../../../public/ui.js', () => ({
@@ -251,5 +252,66 @@ describe('Sharing & Hydration Round-trip', () => {
         loadFromUrl();
 
         expect(soloist.mode).toBe('monophonic');
+    });
+});
+
+describe('Genre share round-trip (#1200)', () => {
+    // The writer emits `groove.genreFeel` (the engine's keyspace); the reader must
+    // land BOTH halves canonically — a canonical feel in `genreFeel` and a canonical
+    // name in `lastSmartGenre` — no matter which keyspace arrived in the URL.
+    const GENRE_PAIRS = Object.keys(SMART_GENRES).map((name) => ({
+        name,
+        feel: SMART_GENRES[name].feel as string,
+    }));
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubGlobal('location', new URL('http://localhost'));
+    });
+
+    it('covers all 13 canonical genres', () => {
+        expect(GENRE_PAIRS).toHaveLength(13);
+    });
+
+    it.each(GENRE_PAIRS)('round-trips $name (feel "$feel")', ({ name, feel }) => {
+        groove.genreFeel = feel;
+        groove.lastSmartGenre = name;
+
+        const url = generateShareUrl();
+        expect(new URL(url).searchParams.get('genre')).toBe(feel);
+
+        // Reset to a DIFFERENT genre than the one under test, so hydrating back to
+        // the original is never vacuously true (Rock is the default fallback).
+        const decoy = name === 'Rock' ? 'Jazz' : 'Rock';
+        groove.genreFeel = SMART_GENRES[decoy].feel as string;
+        groove.lastSmartGenre = decoy;
+
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        expect(groove.genreFeel).toBe(feel);
+        expect(groove.lastSmartGenre).toBe(name);
+    });
+
+    it('accepts a genre NAME in the url for back-compat and normalizes it to the feel', () => {
+        groove.genreFeel = 'Rock';
+        groove.lastSmartGenre = 'Rock';
+
+        vi.stubGlobal('location', new URL('http://localhost/?genre=Ska-Punk'));
+        loadFromUrl();
+
+        expect(groove.genreFeel).toBe('Ska');
+        expect(groove.lastSmartGenre).toBe('Ska-Punk');
+    });
+
+    it('ignores a genre param in neither keyspace', () => {
+        groove.genreFeel = 'Funk';
+        groove.lastSmartGenre = 'Funk';
+
+        vi.stubGlobal('location', new URL('http://localhost/?genre=Polka'));
+        loadFromUrl();
+
+        expect(groove.genreFeel).toBe('Funk');
+        expect(groove.lastSmartGenre).toBe('Funk');
     });
 });
