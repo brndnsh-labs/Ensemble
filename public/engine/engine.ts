@@ -116,7 +116,7 @@ export function initAudio(
                 await killAllNotes(state);
                 if (pbState.audio) {
                     pbState.audio.close().then(() => {
-                        (pbState as Mutable<GlobalContext>).audio = null; // @worker-mutation
+                        (pbState as Mutable<GlobalContext>).audio = null; // @direct-mutation
                         initAudio(state);
                         restoreGains(state);
                         const recoveredMaster = pbState.audioGraph?.master.gain;
@@ -485,7 +485,10 @@ export function initAudio(
         for (let i = 0; i < bufSize; i++) {
             data[i] = Math.random() * 2 - 1;
         }
-        (groove.audioBuffers as unknown as Record<string, AudioBuffer>).noise = buffer;
+        // The white-noise buffer is a one-shot audio asset cached on the slice during
+        // initAudio(), before any dispatch subscriber exists — the same init-only
+        // sanctioned category as the `audioGraph` write above.
+        (groove.audioBuffers as unknown as Record<string, AudioBuffer>).noise = buffer; // @direct-mutation
     }
     if (!usingOfflineContext && playback.audio && playback.audio.state === 'suspended') {
         if (playback.audio) {

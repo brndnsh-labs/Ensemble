@@ -128,7 +128,7 @@ function flushBuffer(type: string): void {
     const { playback, chords, bass, soloist, harmony } = getState();
     if (type === 'bass' || type === 'all') {
         if (bass.lastPlayedFreq !== null) {
-            (bass as Mutable<typeof bass>).lastFreq = bass.lastPlayedFreq; // @worker-mutation
+            (bass as Mutable<typeof bass>).lastFreq = bass.lastPlayedFreq; // @direct-mutation
         }
         bass.buffer.clear();
         killBassNote(stateMap);
@@ -137,7 +137,7 @@ function flushBuffer(type: string): void {
     if (type === 'soloist' || type === 'all') {
         if (soloist.audio.lastPlayedFreq !== null) {
             (soloist.audio as Mutable<typeof soloist.audio>).lastFreq =
-                soloist.audio.lastPlayedFreq; // @worker-mutation
+                soloist.audio.lastPlayedFreq; // @direct-mutation
         }
         soloist.audio.buffer.clear();
         killSoloistNote(stateMap);

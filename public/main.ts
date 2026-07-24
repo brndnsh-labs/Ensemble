@@ -22,7 +22,6 @@ import { initPWA } from './pwa.js';
 import { dispatch, getState, subscribe } from './state.js';
 import { deriveSoloistModeOnBoot, handleEffects } from './state-effects.js';
 import { hydrateState, loadFromUrl } from './state-hydration.js';
-import type { Mutable } from './types.js';
 import { mountComponents } from './ui-root.jsx';
 import { initWorker, syncWorker } from './worker-client.js';
 
@@ -218,15 +217,20 @@ window.previewChord = (index: number) => {
     if (!chord) {
         return;
     }
-    const wasSustainActive = playback.sustainActive;
-    (playback as Mutable<typeof playback>).sustainActive = false; // @direct-mutation
     const now = playback.audio?.currentTime || 0;
     if (playback.audio) {
+        // #1180: `ignoreSustain` keeps a preview note from ringing on under a
+        // held pedal. This used to force `playback.sustainActive = false` and
+        // restore it afterwards — two direct state writes, and a transient the
+        // whole app could observe mid-preview.
         chord.freqs.forEach((f: number) =>
-            playNote(getState(), f, now, 1.0, { vol: 0.15, instrument: 'Piano' }),
+            playNote(getState(), f, now, 1.0, {
+                vol: 0.15,
+                instrument: 'Piano',
+                ignoreSustain: true,
+            }),
         );
     }
-    (playback as Mutable<typeof playback>).sustainActive = wasSustainActive; // @direct-mutation
     const cards = document.querySelectorAll('.chord-card');
     if (cards[index]) {
         cards[index].classList.add('active');

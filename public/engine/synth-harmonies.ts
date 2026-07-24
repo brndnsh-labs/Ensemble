@@ -220,7 +220,7 @@ function stealHarmonyPitchVoice(
     killHarmonyVoice(existing, playTime, profile.fadeTime);
     const idx = harmony.activeVoices.indexOf(existing);
     if (idx !== -1) {
-        harmony.activeVoices.splice(idx, 1); // @worker-mutation
+        harmony.activeVoices.splice(idx, 1); // @direct-mutation
     }
     return profile;
 }
@@ -328,9 +328,9 @@ export function releaseHarmonyVoicing(
         }
     }
     // Rebuild in-place so the worker keeps the same array reference.
-    voices.length = 0; // @worker-mutation
+    voices.length = 0; // @direct-mutation
     for (const v of survivors) {
-        voices.push(v); // @worker-mutation
+        voices.push(v); // @direct-mutation
     }
 }
 
@@ -479,7 +479,7 @@ function playHarmonyNoteNew(
         const voice = harmony.activeVoices[i];
         const lastAttackTime = voice.lastExtendedAt ?? voice.time;
         if (lastAttackTime + voice.duration + 1.0 <= playTime) {
-            harmony.activeVoices.splice(i, 1); // @worker-mutation
+            harmony.activeVoices.splice(i, 1); // @direct-mutation
         }
     }
 

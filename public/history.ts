@@ -1,5 +1,5 @@
-import { getState } from './state.js';
-import type { Mutable } from './types.js';
+import { dispatch, getState } from './state.js';
+import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
 
 export function pushHistory(): void {
@@ -22,7 +22,16 @@ export function undo(refreshArrangerUI?: () => void): void {
     try {
         const parsed = JSON.parse(last);
         if (Array.isArray(parsed)) {
-            (arranger as Mutable<typeof arranger>).sections = parsed; // @direct-mutation
+            // #1180: restore through the reducer rather than writing the slice
+            // directly. `refreshArrangerUI()` below still re-syncs the worker and
+            // refills its buffers; routing through dispatch additionally emits the
+            // `arranger.sections` delta, so the worker isn't left generating over
+            // the pre-undo progression in the window before that refresh lands.
+            dispatch(ACTIONS.SET_PARAM, {
+                module: 'arranger',
+                param: 'sections',
+                value: parsed,
+            });
         } else {
             console.warn('[History] Undo failed: Snapshot is not an array');
             return;

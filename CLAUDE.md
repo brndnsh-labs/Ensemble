@@ -75,10 +75,15 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
 
-- **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis.
+- **Sanctioned (real-time hot paths):** `public/engine/scheduler-core.ts` and the `synth-*.ts` family — direct audio param writes for scheduling and synthesis. Also `public/app-controller.ts`'s BPM reschedule (`nextNoteTime`/`unswungNextNoteTime`) and `public/instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, which are the same real-time class outside the engine dir.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
 - **Sanctioned exception (pre-mount only):** `public/state-hydration.ts` — runs before Preact mounts, so no reactive listeners are attached yet.
-- **Everything else routes through reducers.** History/undo, audio export, conductor non-tick paths, and any site not in the three categories above must dispatch. (Migration of currently non-compliant sites is Batch 9.)
+- **Sanctioned exception (detached render clone):** `public/audio-export.ts`'s `cloneStateForRender` output and `scripts/mix-report.ts`'s inline clone. These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
+- **Everything else routes through reducers.** Any site not in the four categories above must dispatch.
+
+Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation`/`@worker-mutation` marker anywhere in the statement as the exemption. `state/` and `*reducer*` are skipped as the legitimate writers. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard — `history.ts`'s `arranger.history.push/shift/pop` is unmarked and unenforced.
+
+`// @worker-mutation` is the sibling marker for writes to the **worker's own copy** of the tree — reconstructed from `getSyncState()`, never round-tripped back to the main thread. It is *not* interchangeable with `@direct-mutation`: using it on a main-thread file sends the next reader hunting for a worker boundary that doesn't exist.
 
 ### Generative Engine Pipeline (worker thread)
 

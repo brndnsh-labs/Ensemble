@@ -76,11 +76,15 @@ export function clearChordPresetHighlight(): void {
  * flush last costs nothing perceptible on the note-kill.
  *
  * #1144 — saveCurrentState() stays here (not folded into the #1127
- * chokepoint's caller-side dispatch) because `history.ts` `undo()` reaches
- * this function via a direct `@direct-mutation` array restore with NO
- * preceding dispatch — the chokepoint never fires for that caller, so this is
- * the only save undo gets. Every other caller here dispatches SET_PARAM right
- * before calling this, making this save redundant-but-harmless for them.
+ * chokepoint's caller-side dispatch). It used to be load-bearing for exactly
+ * one caller: `history.ts` `undo()` restored the sections array with a direct
+ * `@direct-mutation` write and no preceding dispatch, so the chokepoint never
+ * fired for it and this was the only save undo got. #1180 migrated that
+ * restore to `dispatch(SET_PARAM, …)`, so the chokepoint now fires for undo
+ * too and this save is redundant-but-harmless for EVERY caller. Kept
+ * deliberately as the belt to the debounce's suspenders — removing it would
+ * make persistence depend solely on a debounced effect that the auto-conductor
+ * can starve during playback (see public/CLAUDE.md §7).
  */
 export function refreshArrangerUI(): void {
     validateAndAnalyze();

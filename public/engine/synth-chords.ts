@@ -148,6 +148,16 @@ interface PlayNoteOptions {
     instrument?: string;
     muted?: boolean;
     numVoices?: number;
+    /**
+     * Play this note as if the sustain pedal were up, without touching the
+     * global `playback.sustainActive` flag (#1180). One caller needs it: the
+     * chord-chart preview in `main.ts`, which must not leave a preview note
+     * ringing under a held pedal. It used to force the global flag false and
+     * restore it afterwards — a direct state mutation, and one that made the
+     * transient globally observable mid-preview. Defaults false, so every
+     * other call site is byte-identical.
+     */
+    ignoreSustain?: boolean;
 }
 
 // Trim on the synth chord voice (#649/Epic 6). Brings the synth chords down a
@@ -247,7 +257,14 @@ const CHORD_STRUM_JITTER = 0.15; // humanize scale — keeps jitter well under o
 
 function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
-    const { vol = 0.1, index = 0, instrument = 'Piano', muted = false, numVoices = 1 } = opts;
+    const {
+        vol = 0.1,
+        index = 0,
+        instrument = 'Piano',
+        muted = false,
+        numVoices = 1,
+        ignoreSustain = false,
+    } = opts;
     const { playback, groove } = state;
 
     // Bail to the delegate's own guard if the context is unusable — never
@@ -366,7 +383,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
     // throw here would abort every later note in the chord, not just this
     // one. `playNoteCurrent` has the equivalent guard around its own body.
     try {
-        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted, ignoreSustain);
     } catch (err) {
         console.error('playNote (new) additive-body error:', err);
         return null;
@@ -388,6 +405,7 @@ function playAdditiveBody(
     duration: number,
     finalVol: number,
     muted: boolean,
+    ignoreSustain = false,
 ): ChordVoiceHandle | null {
     const { playback } = state;
     if (!playback.audio || !playback.audioGraph) {
@@ -510,7 +528,7 @@ function playAdditiveBody(
     const effectiveDuration = muted ? 0.015 : duration;
     const naturalStop = startTime + effectiveDuration + 0.6;
 
-    if (playback.sustainActive && !muted) {
+    if (playback.sustainActive && !muted && !ignoreSustain) {
         // Pedal down: the note rings on the per-partial decay, bounded only
         // by pedal-up or the 64-note cap — exactly the legacy behavior.
         const noteRef = { stop: stopBody };
@@ -570,6 +588,7 @@ function playNoteCurrent(
         instrument = 'Piano',
         muted = false,
         numVoices = 1,
+        ignoreSustain = false,
     }: PlayNoteOptions = {},
 ): ChordVoiceHandle | null {
     const { playback, groove } = state;
@@ -686,7 +705,7 @@ function playNoteCurrent(
             }
         };
 
-        if (playback.sustainActive && !muted) {
+        if (playback.sustainActive && !muted && !ignoreSustain) {
             const noteRef = { stop: stopNote };
             playback.heldNotes.add(noteRef);
             if (playback.heldNotes.size > 64) {
@@ -752,7 +771,7 @@ function playNoteCurrent(
         // No-pedal natural end — hoisted so the release handle can clamp its
         // early stop into the live window (never push the stop later).
         const naturalStop = startTime + (muted ? 0.1 : duration + 1.0);
-        if (!playback.sustainActive || muted) {
+        if (!playback.sustainActive || muted || ignoreSustain) {
             osc.stop(naturalStop);
             if (unisonOsc) {
                 unisonOsc.stop(naturalStop);
