@@ -1,11 +1,12 @@
 // @ts-nocheck
 import { TIME_SIGNATURES } from '../public/config.js';
+import { createPRNG } from '../public/engine/hash-utils.js';
 import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
 import { getSoloistNotePhraseFirst as getSoloistNote } from '../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../public/engine/soloist-seeder.js';
 import { dispatch, getState } from '../public/state.js';
 import { ACTIONS } from '../public/types.js';
-import { createPRNG, getStepInfo, midiToNote } from '../public/utils.js';
+import { getStepInfo, midiToNote } from '../public/utils.js';
 
 const QUALITY_INTERVALS = {
     maj7: [0, 4, 7, 11],

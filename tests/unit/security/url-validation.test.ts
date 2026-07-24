@@ -29,10 +29,10 @@ vi.mock('../../../public/app-controller.js', () => ({
     applyTheme: vi.fn(),
 }));
 
-// Preserve real utils; wrap decodeBase64Unicode in a spy so we can assert the
-// `bnd` size-cap short-circuits BEFORE the (expensive) decode attempt.
-vi.mock('../../../public/utils.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../../public/utils.js')>();
+// Preserve the real share codec; wrap decodeBase64Unicode in a spy so we can
+// assert the `bnd` size-cap short-circuits BEFORE the (expensive) decode attempt.
+vi.mock('../../../public/state/share-codec.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../public/state/share-codec.js')>();
     return {
         ...actual,
         decodeBase64Unicode: (s: string) => {

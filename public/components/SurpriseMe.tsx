@@ -15,11 +15,11 @@ import {
     predictStructure,
 } from '../song-generator.js';
 import { chordsFromSectionValue, parseSeedText } from '../song-generator-seed.js';
+import { generateId } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { generateId } from '../utils.js';
 import { Icon } from './Icon.jsx';
 import { PresetLibrary } from './PresetLibrary.jsx';
 import { ButtonGroup } from './UIControls.jsx';

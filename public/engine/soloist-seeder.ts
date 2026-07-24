@@ -7,8 +7,9 @@ import type {
     SeedSupportHints,
     SeedSupportRole,
 } from '../types.js';
-import { binarySearchMap, createPRNG, generateRandomSeed, isSectionTurnaround } from '../utils.js';
+import { binarySearchMap, generateRandomSeed, isSectionTurnaround } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
+import { createPRNG } from './hash-utils.js';
 import { getSoloistRegisterProfile, resolveSoloistStyle, STYLE_CONFIG } from './soloist-config.js';
 import { classifyChordQuality } from './soloist-pitch-engine.js';
 import { getKeyContext, getScaleForChord } from './theory-scales.js';

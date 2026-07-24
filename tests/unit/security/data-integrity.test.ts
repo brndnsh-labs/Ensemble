@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
-import { decompressSections, escapeHTML } from '../../../public/utils.js';
+import { escapeHTML } from '../../../public/sanitize.js';
+import { decompressSections } from '../../../public/state/share-codec.js';
 
 describe('Security: Data Integrity & Sanitization', () => {
     describe('HTML Sanitization (escapeHTML)', () => {

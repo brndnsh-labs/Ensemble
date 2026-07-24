@@ -39,6 +39,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/midi.ts` | WebMIDI routing and local muting state. | `midi` |
 | `public/state/visualizer.ts` | Rendering settings and UI overlays. | `vizState` |
 | `public/state/conductor.ts` | Macro-arc, intensity drift, and form iteration state. | `conductor` |
+| `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `decompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state-hydration.ts` | Initial state loading and validation logic. | `hydrateState` |
 
@@ -96,7 +97,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/section-overrides.ts` | Per-section intensity + instrument-enabled override lookup. | `sectionAtStep`, `effectiveTargetIntensity`, `isInstrumentActiveAtStep` |
 | `public/engine/voicing-policy.ts` | Shared bass-space and auto-grounding rules for comping voices. | `shouldReserveBassSpace`, `shouldPreferGroundedPracticeVoicing` |
 | `public/engine/groove-engine.ts` | Rhythmic drum patterns (strategy routing, motifs, fills). | `getDrumMotif`, `applyGrooveOverrides` |
-| `public/engine/hash-utils.ts` | Canonical deterministic hash helpers shared across engines. | `scrambleHash`, `stringHash33`, `stringHash31` |
+| `public/engine/hash-utils.ts` | Canonical deterministic hash + seeded-RNG helpers shared across engines. `scrambleHash` (stateless, seed-tuple-indexed) and `createPRNG` (stateful stream) are deliberately distinct — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31`, `createPRNG` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/clave.ts` | Canonical bossa son-clave spine + the offbeat clave cells (&-of-2/3/4) the lead accents. | `BOSSA_CLAVE_STEPS_4_4`, `BOSSA_OFFBEAT_CELL_STEPS_4_4`, `isBossaClaveStep` |
 | `public/engine/soloist-pitch-engine.ts` | Chord-target-tones helper (guide/pillar tones by chord quality) for the phrase-first realizer; legacy `selectPitchAndDevices` picker removed in epic #10/#866. | `chordTargetTones` |
@@ -190,7 +191,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
-| `public/utils.ts` | General-purpose musical and math utilities. | `getFrequency` |
+| `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
+| `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
 | `public/utils/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
 | `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
 | `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |

@@ -1,29 +1,21 @@
 import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
-import { stringHash33 } from './engine/hash-utils.js';
-import type { Section } from './state/arranger.js';
 import type { StepInfo } from './types.js';
 
 /**
- * Creates a seeded pseudo-random number generator (Mulberry32).
+ * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free so the
+ * logic worker can import it freely.
  *
- * String seeds are folded with the canonical djb2 ×33 hash
- * ({@link stringHash33}) and coerced **unsigned** (`>>> 0`). The unsigned
- * coercion is load-bearing history, not decoration: the local `hashString`
- * this replaced returned `hash >>> 0`, and every seeded stream in the repo was
- * tuned against that starting value. `stringHash33` returns the signed (`| 0`)
- * form of the identical accumulator, so `>>> 0` reproduces the old seed
- * bit-for-bit — do not "simplify" it to `| 0`.
+ * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`,
+ * `midiToNote`, `getChordMidiNotes`) and the step/meter timing core
+ * (`getStepInfo`, `secondsPerStepFor`, `getStepsPerMeasure`, `binarySearchMap`,
+ * `normalizeKey`) — the things every lane's generator needs.
+ *
+ * What does NOT belong here (#1179 split): seeded RNG/hashing lives in
+ * `engine/hash-utils.ts`; share-URL and preset encoding lives in
+ * `state/share-codec.ts`; HTML escaping and display glyph formatting live in
+ * `sanitize.ts`; Web Audio graph helpers live in `engine/audio-graph-utils.ts`.
+ * Anything DOM-touching would break the worker bundle — keep it out.
  */
-export function createPRNG(seed: number | string): () => number {
-    let s = typeof seed === 'string' ? stringHash33(seed) >>> 0 : seed;
-    return () => {
-        s |= 0;
-        s = (s + 0x6d2b79f5) | 0;
-        let t = Math.imul(s ^ (s >>> 15), 1 | s);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) | 0;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 /**
  * Clamps a value into the unit interval [0, 1].
@@ -78,50 +70,6 @@ export function transposeKeyName(key: string, semitoneShift: number): string {
         return normalized;
     }
     return KEY_ORDER[(((currentIndex + semitoneShift) % 12) + 12) % 12];
-}
-
-const REGEX_AMP = /&/g;
-const REGEX_LT = /</g;
-const REGEX_GT = />/g;
-const REGEX_QUOT = /"/g;
-const REGEX_APOS = /'/g;
-const REGEX_BACKTICK = /`/g;
-
-/**
- * Escapes unsafe HTML characters to prevent XSS.
- */
-export function escapeHTML(str: string): string {
-    if (str === null || str === undefined) {
-        return '';
-    }
-    if (typeof str !== 'string') {
-        return String(str);
-    }
-
-    return str
-        .replace(REGEX_AMP, '&amp;')
-        .replace(REGEX_LT, '&lt;')
-        .replace(REGEX_GT, '&gt;')
-        .replace(REGEX_QUOT, '&quot;')
-        .replace(REGEX_APOS, '&#39;')
-        .replace(REGEX_BACKTICK, '&#96;');
-}
-
-const REGEX_DANGEROUS = /[<>"=`]/g;
-
-/**
- * Strips dangerous characters from musical input strings to prevent XSS.
- * Allows common musical symbols but removes HTML/Script vectors.
- */
-export function stripDangerousChars(str: string): string {
-    if (!str) {
-        return '';
-    }
-    if (typeof str !== 'string') {
-        return String(str);
-    }
-    // Remove < > " ` (Keep ' and & for text validity, relying on escaping for those)
-    return str.replace(REGEX_DANGEROUS, '');
 }
 
 // Pre-calculate frequencies for standard MIDI range (0-127) to avoid expensive Math.pow calls
@@ -185,23 +133,6 @@ export function getMidi(freq: number): number | null {
         return null;
     }
     return Math.round(12 * Math.log2(freq / 440) + 69);
-}
-
-/**
- * Generates a unique ID for sections.
- */
-export function generateId(): string {
-    // 🛡️ Sentinel: Security Enhancement - Cryptographically Secure UUID
-    // Date.now() + Math.random() is susceptible to collisions and is not secure.
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return `id-${crypto.randomUUID()}`;
-    }
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const array = new Uint32Array(2);
-        crypto.getRandomValues(array);
-        return `id-${array[0].toString(36)}${array[1].toString(36)}`;
-    }
-    return `id-${Date.now().toString(36)}${Math.random().toString(36).substr(2)}`;
 }
 
 /**
@@ -324,146 +255,6 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
     }
 
     return notes;
-}
-
-/**
- * Unicode-safe Base64 encode: JSON string → UTF-8 bytes → binary string → btoa.
- * Shared by the share-URL payloads (sections + band settings).
- */
-export function encodeBase64Unicode(json: string): string {
-    const bytes = new TextEncoder().encode(json);
-    const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
-    return btoa(binString);
-}
-
-/**
- * Unicode-safe Base64 decode: atob → binary string → UTF-8 bytes → JSON string.
- * The inverse of {@link encodeBase64Unicode}. Callers own size guards and JSON.parse.
- */
-export function decodeBase64Unicode(str: string): string {
-    const binString = atob(str);
-    const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
-    return new TextDecoder().decode(bytes);
-}
-
-/**
- * Compresses the sections array into a Base64 string, handling Unicode.
- */
-export function compressSections(sections: Section[]): string {
-    const minified = sections.map((s) => {
-        const m: Record<string, unknown> = { l: s.label, v: s.value };
-        if (s.key) {
-            m.k = s.key;
-        }
-        if (typeof s.isMinor === 'boolean') {
-            m.m = s.isMinor ? 1 : 0;
-        }
-        if (s.repeat && s.repeat > 1) {
-            m.r = s.repeat;
-        }
-        if (s.timeSignature) {
-            m.t = s.timeSignature;
-        }
-        if (s.seamless) {
-            m.s = 1;
-        }
-        if (typeof s.targetIntensity === 'number') {
-            m.i = Math.max(0, Math.min(1, s.targetIntensity));
-        }
-        if (s.instruments && Object.keys(s.instruments).length > 0) {
-            const e: Record<string, 0 | 1> = {};
-            for (const [k, v] of Object.entries(s.instruments)) {
-                if (typeof v === 'boolean') {
-                    e[k] = v ? 1 : 0;
-                }
-            }
-            if (Object.keys(e).length > 0) {
-                m.e = e;
-            }
-        }
-        return m;
-    });
-    const json = JSON.stringify(minified);
-    return encodeBase64Unicode(json);
-}
-
-/**
- * Decompresses the Base64 string back into sections, handling Unicode.
- */
-export function decompressSections(str: string): Section[] {
-    try {
-        if (!str || typeof str !== 'string') {
-            throw new Error('Invalid input');
-        }
-        // Limit input size to 100KB to prevent memory exhaustion
-        if (str.length > 102400) {
-            throw new Error('Payload too large');
-        }
-
-        const json = decodeBase64Unicode(str);
-        const minified = JSON.parse(json);
-
-        if (!Array.isArray(minified)) {
-            throw new Error('Invalid format: expected array');
-        }
-        // Limit number of sections to prevent DoS
-        const safeMinified = minified.slice(0, 500);
-
-        return safeMinified.map((s: any, i: number) => {
-            // Sanitize label to prevent XSS (even though likely handled by UI framework, defense in depth)
-            let safeLabel = escapeHTML(s.l || `Section ${i + 1}`);
-            if (safeLabel.length > 100) {
-                safeLabel = safeLabel.substring(0, 100);
-            }
-
-            // Clamp value length
-            let safeValue = typeof s.v === 'string' ? s.v : '';
-            if (safeValue.length > 1000) {
-                safeValue = safeValue.substring(0, 1000);
-            }
-
-            safeValue = stripDangerousChars(safeValue);
-
-            const out: Section = {
-                id: generateId(),
-                label: safeLabel,
-                value: safeValue,
-                key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
-                isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
-                repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
-                timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
-                seamless: !!s.s,
-            };
-            if (typeof s.i === 'number' && Number.isFinite(s.i)) {
-                out.targetIntensity = Math.max(0, Math.min(1, s.i));
-            }
-            if (s.e && typeof s.e === 'object') {
-                const allowed: Section['instruments'] = {};
-                const keys: Array<keyof NonNullable<Section['instruments']>> = [
-                    'groove',
-                    'bass',
-                    'chords',
-                    'harmony',
-                    'soloist',
-                ];
-                for (const k of keys) {
-                    const raw = (s.e as Record<string, unknown>)[k];
-                    if (raw === 0 || raw === 1) {
-                        allowed[k] = raw === 1;
-                    } else if (typeof raw === 'boolean') {
-                        allowed[k] = raw;
-                    }
-                }
-                if (Object.keys(allowed).length > 0) {
-                    out.instruments = allowed;
-                }
-            }
-            return out;
-        });
-    } catch (e) {
-        console.error('Failed to decompress sections', e);
-        return [{ id: generateId(), label: 'Intro', value: 'I | IV' }];
-    }
 }
 
 /**
@@ -759,19 +550,16 @@ export function getStepInfo(
 // `synth-utils.ts` first (#1176) to sit beside their peers, but that formed an
 // import cycle with `sample-voice.ts`, so #1192 split them into a leaf module.
 
-const REGEX_SHARP = /#/g;
-const REGEX_FLAT1 = /([A-G])b/g;
-const REGEX_FLAT2 = /b(?=[0-9IVivm\-/])/g;
-
-/**
- * Replaces ASCII # and b with Unicode ♯ and ♭ for display.
- */
-export function formatUnicodeSymbols(str: string): string {
-    if (!str) {
-        return str;
-    }
-    return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
-}
+// escapeHTML / stripDangerousChars / formatUnicodeSymbols live in
+// `public/sanitize.ts` — DOM-adjacent display concerns, main-thread only, moved
+// out in #1179 so nothing DOM-shaped can drift back into this worker-safe module.
+//
+// encodeBase64Unicode / decodeBase64Unicode / compressSections /
+// decompressSections / generateId live in `public/state/share-codec.ts` —
+// persistence + share-URL wire format, also #1179.
+//
+// createPRNG lives in `public/engine/hash-utils.ts` beside its `stringHash33`
+// fold and the other determinism primitives (#1179).
 
 // calculateTimingOffset (the gravity-era pocket formula: globalDrive / tightness /
 // per-instrument gravity) removed in #1063 — post-#714 its output was added to the

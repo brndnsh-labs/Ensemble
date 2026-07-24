@@ -88,9 +88,12 @@ vi.mock('../../../public/worker-client.js', () => ({
     syncWorker: vi.fn(),
 }));
 
-vi.mock('../../../public/utils.js', () => ({
+vi.mock('../../../public/state/share-codec.js', () => ({
     compressSections: vi.fn((sections) => sections), // Just pass through for tests
     generateId: vi.fn(() => 'new-id'),
+}));
+
+vi.mock('../../../public/utils.js', () => ({
     normalizeKey: vi.fn((k) => {
         const map = { 'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb' };
         return map[k] || k;

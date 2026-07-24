@@ -1,9 +1,10 @@
 import { TIME_SIGNATURES } from '../config.js';
 import type { ArrangerState } from '../state/arranger.js';
 import type { EnsembleState } from '../types.js';
-import { createPRNG, generateRandomSeed } from '../utils.js';
+import { generateRandomSeed } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
 import { generateDeterministicFill } from './fills.js';
+import { createPRNG } from './hash-utils.js';
 
 /**
  * Drum Seeder Module (Phase 1, 2 & 3)

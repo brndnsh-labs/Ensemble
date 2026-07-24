@@ -2,10 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
+import { formatUnicodeSymbols } from '../../../public/sanitize.js';
+import { compressSections, decompressSections } from '../../../public/state/share-codec.js';
 import {
-    compressSections,
-    decompressSections,
-    formatUnicodeSymbols,
     getChordMidiNotes,
     getFrequency,
     getMidi,

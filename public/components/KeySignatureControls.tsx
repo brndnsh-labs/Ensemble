@@ -7,10 +7,10 @@ import {
 import { TIME_SIGNATURES } from '../config.js';
 import { getCanonicalMeters } from '../data/smart-genres.js';
 import { loadDrumPreset } from '../instrument-controller.js';
+import { formatUnicodeSymbols } from '../sanitize.js';
 import { arranger } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
-import { formatUnicodeSymbols } from '../utils.js';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
 
 const GROUPING_OPTIONS: Record<string, number[][]> = {

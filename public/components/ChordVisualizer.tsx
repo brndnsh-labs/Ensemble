@@ -10,9 +10,9 @@ import {
     type LeadSheetRow,
     type LeadSheetRowMeasure,
 } from '../lead-sheet-model.js';
+import { formatUnicodeSymbols } from '../sanitize.js';
 import type { Section } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { formatUnicodeSymbols } from '../utils.js';
 import { ChordPicker } from './editor/ChordPicker.jsx';
 import { SectionHeaderStrip } from './editor/SectionHeaderStrip.jsx';
 

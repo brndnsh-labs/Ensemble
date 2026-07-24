@@ -4,12 +4,12 @@ import { saveCurrentState } from '../persistence.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
-import { binarySearchMap, binarySearchMapIndex, createPRNG } from '../utils.js';
+import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
 import { loopArcMultiplier } from './arc.js';
 import { macroArcLadder } from './coordination-engine.js';
 import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
-import { deriveSectionSeed, stringHash31 } from './hash-utils.js';
+import { createPRNG, deriveSectionSeed, stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
 import { effectiveTargetIntensity, RAMP_INTENSITY_MULTIPLIER } from './section-overrides.js';
 

@@ -55,9 +55,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition, MACRO_JITTER_RANGE } from '../../public/engine/conductor.js';
+import { createPRNG } from '../../public/engine/hash-utils.js';
 import { getJamMacroArc, JAM_CYCLE_LENGTHS } from '../../public/form-analysis.js';
 import { ACTIONS } from '../../public/types.js';
-import { createPRNG } from '../../public/utils.js';
 
 // The exact deterministic macro jitter the conductor applies at the fixture's
 // (formIteration, currentStep). #793 seeds the jitter on

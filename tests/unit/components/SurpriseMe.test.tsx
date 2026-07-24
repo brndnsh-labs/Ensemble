@@ -43,7 +43,7 @@ vi.mock('../../../public/ui.js', () => ({
     showToast: (...args: any[]) => mockShowToast(...args),
 }));
 
-vi.mock('../../../public/utils.js', () => ({
+vi.mock('../../../public/state/share-codec.js', () => ({
     generateId: () => mockGenerateId(),
 }));
 

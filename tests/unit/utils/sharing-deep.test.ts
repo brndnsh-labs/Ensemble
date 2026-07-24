@@ -18,7 +18,7 @@ vi.mock('../../../public/ui.js', () => ({
     showToast: vi.fn(),
 }));
 
-vi.mock('../../../public/utils.js', () => ({
+vi.mock('../../../public/state/share-codec.js', () => ({
     compressSections: vi.fn(() => 'compressed-sections'),
     encodeBase64Unicode: vi.fn(() => 'encoded-band'),
 }));

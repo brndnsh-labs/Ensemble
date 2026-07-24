@@ -1,7 +1,7 @@
 import { MIXER_SETTINGS_VERSION } from './state/instruments.js';
+import { compressSections, encodeBase64Unicode } from './state/share-codec.js';
 import { getState } from './state.js';
 import { showToast } from './ui.js';
-import { compressSections, encodeBase64Unicode } from './utils.js';
 
 export interface ShareOptions {
     includeSolo?: boolean;

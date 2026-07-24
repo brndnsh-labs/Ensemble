@@ -53,8 +53,8 @@ vi.mock('../../../public/persistence.js', () => ({
     saveCurrentState: vi.fn(),
 }));
 
-// Mock utils
-vi.mock('../../../public/utils.js', () => ({
+// Mock sanitize
+vi.mock('../../../public/sanitize.js', () => ({
     formatUnicodeSymbols: (str) => str,
 }));
 

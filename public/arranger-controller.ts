@@ -13,11 +13,12 @@ import { restoreGains } from './engine/engine.js';
 import { pushHistory } from './history.js';
 import { flushBuffers } from './instrument-controller.js';
 import { saveCurrentState } from './persistence.js';
+import { compressSections, generateId } from './state/share-codec.js';
 import { dispatch, getState, stateMap } from './state.js';
 import type { Chord, Section, SectionInstrumentKey } from './types.js';
 import { ACTIONS } from './types.js';
 import { showToast } from './ui.js';
-import { compressSections, generateId, normalizeKey } from './utils.js';
+import { normalizeKey } from './utils.js';
 import { syncWorker } from './worker-client.js';
 
 export function saveProgression(): void {

@@ -53,9 +53,12 @@ vi.mock('../../../public/data/chord-presets.js', () => ({
     ],
 }));
 
-vi.mock('../../../public/utils.js', () => ({
+vi.mock('../../../public/state/share-codec.js', () => ({
     decompressSections: vi.fn((sections) => sections),
     generateId: vi.fn(() => 'generated-section-id'),
+}));
+
+vi.mock('../../../public/utils.js', () => ({
     transposeKeyName: vi.fn((key, shift) => {
         const keys = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
         const index = keys.indexOf(key);

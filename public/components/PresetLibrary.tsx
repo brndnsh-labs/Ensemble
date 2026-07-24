@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { appendSections, refreshArrangerUI } from '../arranger-controller.js';
 import { CHORD_PRESETS } from '../data/chord-presets.js';
 import type { Section } from '../state/arranger.js';
+import { decompressSections, generateId } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { decompressSections, generateId, transposeKeyName } from '../utils.js';
+import { transposeKeyName } from '../utils.js';
 import { Icon } from './Icon.jsx';
 
 const USER_PRESETS_STORAGE_KEY = 'ensemble_userPresets';

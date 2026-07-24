@@ -7,9 +7,9 @@ import {
     saveProgression,
 } from '../arranger-controller.js';
 import { pushHistory, undo } from '../history.js';
+import { generateId } from '../state/share-codec.js';
 import { arranger, dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { generateId } from '../utils.js';
 import { Arranger } from './Arranger.jsx';
 import { Icon } from './Icon.jsx';
 import { useModalA11y } from './use-modal-a11y.js';

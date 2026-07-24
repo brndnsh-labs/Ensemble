@@ -9,19 +9,13 @@ import { GENRE_FEELS, resolveGenre } from './data/smart-genres.js';
 import { hydrateVoice } from './engine/instrument-registry.js';
 import { resolveSoloistMode } from './engine/soloist-mode-policy.js';
 import { saveCurrentState } from './persistence.js';
+import { escapeHTML, stripDangerousChars } from './sanitize.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './state/instruments.js';
-
+import { decodeBase64Unicode, decompressSections, generateId } from './state/share-codec.js';
 import { dispatch, getState, storage } from './state.js';
 import type { InstrumentVoice, Mutable, Palette, ThemeMode } from './types.js';
 import { ACTIONS } from './types.js';
-import {
-    decodeBase64Unicode,
-    decompressSections,
-    escapeHTML,
-    generateId,
-    normalizeKey,
-    stripDangerousChars,
-} from './utils.js';
+import { normalizeKey } from './utils.js';
 
 const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);

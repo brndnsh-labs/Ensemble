@@ -1,6 +1,23 @@
 /**
- * hash-utils.ts — canonical deterministic hash helpers shared across the
- * generative engines (bass, drums/groove, harmony, accompaniment).
+ * hash-utils.ts — canonical deterministic hash + seeded-RNG helpers shared
+ * across the generative engines (bass, drums/groove, harmony, accompaniment,
+ * soloist/drum seeders, conductor).
+ *
+ * What belongs here: pure, dependency-free determinism primitives — string
+ * folds, stateless scrambles, and seeded generators. Nothing in this module may
+ * import anything else in the repo; it is deliberately a leaf so both worker
+ * and main thread can use it freely.
+ *
+ * What does NOT belong here: musical interpretation of a seeded draw (that's
+ * the engine that owns the decision), step/meter math (`../utils.js`), string
+ * sanitization (`../sanitize.js`), or share/persistence encoding
+ * (`../state/share-codec.js`).
+ *
+ * **The two RNG idioms here stay distinct on purpose** — see
+ * `public/engine/CLAUDE.md` §27. `scrambleHash` is *stateless*, indexed by an
+ * explicit seed tuple; `createPRNG` is a *stateful, sequential* stream whose
+ * draw count is load-bearing. Do not unify them, and do not change how many
+ * draws any call path consumes.
  *
  * Before Epic 11 S9 `scrambleHash` was copy-pasted into four engines
  * (bass-engine, groove-engine, harmonies, plus accompaniment's
@@ -97,3 +114,32 @@ export const stringHash31 = (str: string): number => {
  */
 export const deriveSectionSeed = (sectionId: string, songSeed: string): number =>
     scrambleHash((stringHash31(sectionId) ^ stringHash31(songSeed)) | 0);
+
+/**
+ * Creates a seeded pseudo-random number generator (Mulberry32).
+ *
+ * Distinct from {@link scrambleHash} and not interchangeable with it: this is a
+ * **stateful, sequential** stream used for seed-time generation (the soloist and
+ * drum seeders, the conductor's macro jitter). Every consumer sharing a stream
+ * depends on the exact number of draws taken before it, so adding or removing a
+ * `prng()` call anywhere upstream reseats everything downstream — see
+ * `public/engine/CLAUDE.md` §27 before touching a call path's draw count.
+ *
+ * String seeds are folded with the canonical djb2 ×33 hash
+ * ({@link stringHash33}) and coerced **unsigned** (`>>> 0`). The unsigned
+ * coercion is load-bearing history, not decoration: the local `hashString`
+ * this replaced returned `hash >>> 0`, and every seeded stream in the repo was
+ * tuned against that starting value. `stringHash33` returns the signed (`| 0`)
+ * form of the identical accumulator, so `>>> 0` reproduces the old seed
+ * bit-for-bit — do not "simplify" it to `| 0`.
+ */
+export function createPRNG(seed: number | string): () => number {
+    let s = typeof seed === 'string' ? stringHash33(seed) >>> 0 : seed;
+    return () => {
+        s |= 0;
+        s = (s + 0x6d2b79f5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) | 0;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
