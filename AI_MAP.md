@@ -105,6 +105,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/worker-buffer-manager.ts` | Generative buffer orchestration. | `fillBuffers` |
 | `public/engine/tick-logic.ts` | Unified generative tick and transition logic. | `generateNotesForStep`, `applyWorkerTransition` |
 | `public/engine/drums-tick.ts` | Lane-free drum preamble + drum-block tick (keeps heavy lane generators off the main chunk; real-time scheduler imports this). | `runDrumTick`, `generateDrumsForStep` |
+| `public/engine/tick-types.ts` | Import-free leaf holding the shapes `tick-logic.ts` and `drums-tick.ts` share, so that pair stays one-directional. | `TickCursors`, `DrumHitInfo` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
 | `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |

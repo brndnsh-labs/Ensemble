@@ -14,17 +14,13 @@ import { runDrumTick } from './drums-tick.js';
 import { getHarmonyNotes } from './harmonies.js';
 import { isPowerChordChordsVoice } from './instrument-registry.js';
 import { getQaHangAt, getSoloistNotePhraseFirst } from './soloist-phrase-first.js';
+import type { DrumHitInfo, TickCursors } from './tick-types.js';
 import { getChordAtStep } from './worker-utils.js';
 
 // #698 — Metal's crunch power chords anchor to E2 (MIDI 40), the standard-tuning
 // low-E chug, dropping into the bass register on purpose (bass doubles the root).
 // Paired with the 'chords-guitar-low' register slot in coordination-engine.
 const METAL_POWER_CHORD_ANCHOR = 40;
-
-export interface TickCursors {
-    mainCursor: { index: number; sectionIndex: number };
-    lookaheadCursor: { index: number; sectionIndex: number };
-}
 
 export interface NoteResult {
     module: string;
@@ -43,14 +39,6 @@ export interface NoteResult {
     dry?: boolean;
     ccEvents?: any;
     muted?: boolean;
-}
-
-export interface DrumHitInfo {
-    shouldPlay: boolean;
-    velocity: number;
-    soundName: string;
-    instTimeOffset: number;
-    inst: any;
 }
 
 export interface GenerateNotesOptions {

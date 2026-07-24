@@ -18,7 +18,7 @@ import {
 import { shouldFireDropMute } from './drop-mechanic.js';
 import { applyGrooveOverrides } from './groove-engine.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
-import type { DrumHitInfo, TickCursors } from './tick-logic.js';
+import type { DrumHitInfo, TickCursors } from './tick-types.js';
 import { type ChordAtStep, getChordAtStep } from './worker-utils.js';
 
 /**
