@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
 import { analyzeForm, getSectionEnergy } from '../../../public/form-analysis.js';
+import { predictStructure } from '../../../public/song-generator.js';
 
 describe('Form Analysis Engine', () => {
     describe('getSectionEnergy', () => {
@@ -17,6 +19,99 @@ describe('Form Analysis Engine', () => {
         it('should return default energy for unknown labels', () => {
             expect(getSectionEnergy('Unknown')).toBe(0.5);
             expect(getSectionEnergy(null)).toBe(0.5);
+        });
+
+        // #1199 — the wizard emits the bare label 'Pre', which matched no key
+        // and silently sat at the 0.5 verse default. A pre-chorus IS the build
+        // into the chorus, so it belongs above a verse; and the drop mechanic's
+        // strict `>0.3` threshold is calibrated on the assumption that
+        // Pre→Chorus is +0.3 EXACTLY. At 0.5 it was +0.4 and fired a full-band
+        // cut before every back-half chorus.
+        it("seats the wizard's bare 'Pre' at the pre-chorus energy, not the verse default (#1199)", () => {
+            expect(getSectionEnergy('Pre')).toBe(0.6);
+            // Both spellings must agree — 'Pre-Chorus' is listed first in the
+            // map precisely so the more specific key wins the substring race.
+            expect(getSectionEnergy('Pre')).toBe(getSectionEnergy('Pre-Chorus'));
+            // The arithmetic the drop mechanic depends on.
+            expect(getSectionEnergy('Chorus') - getSectionEnergy('Pre')).toBeCloseTo(0.3, 5);
+        });
+
+        // #1201 — 'hook' is hip-hop's (and much of pop's) own word for the
+        // chorus, not a lesser section. Unmapped it read as verse-energy.
+        it("seats 'Hook' at chorus energy — it IS the chorus in hip-hop (#1201)", () => {
+            expect(getSectionEnergy('Hook')).toBe(0.9);
+            expect(getSectionEnergy('Hook')).toBe(getSectionEnergy('Chorus'));
+        });
+
+        // The durable guard, and the one that would have caught BOTH bugs
+        // above: an unmapped label doesn't throw, it resolves to a plausible
+        // 0.5 — so a vocabulary gap is invisible until someone notices the
+        // music isn't building. Drive the labels the app ACTUALLY EMITS
+        // (`predictStructure` is the wizard's own structure picker) and require
+        // every one to be deliberate, rather than trusting the default.
+        it('maps every section label the song generator can emit (#1199/#1201)', () => {
+            const emitted = new Set<string>();
+            for (const form of ['verse-chorus', 'loop'] as const) {
+                for (const feel of GENRE_NAMES) {
+                    // Sweep target length — the wizard picks the template whose
+                    // bar count is closest to BPM × minutes, so short and long
+                    // targets reach different templates (the 'Pre' one is the
+                    // longest VERSE_CHORUS_FORMS entry and only appears here).
+                    for (const minutes of [0.5, 1, 2, 3, 5, 8]) {
+                        for (const bpm of [60, 90, 120, 160, 200]) {
+                            for (const label of predictStructure(minutes, bpm, '4/4', form, feel)) {
+                                emitted.add(label);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 0.5 is CORRECT for these, not a fallthrough:
+            //   'A1'..'A4' — the AABA head. An A section states the tune; it
+            //                carries no build claim, so neutral is the answer.
+            //   'Main'     — the one-section loop chart. 0.5 is the exact
+            //                pocket-neutral point (getBandPocket scale 1.0) and
+            //                every delta in a single-section form is 0 anyway.
+            //   'Verse'    — genuinely mapped to 0.5 by design.
+            const TRULY_NEUTRAL = /^(a\d*|main|verse)$/;
+
+            // KNOWN GAPS — labels that reach the 0.5 default and SHOULDN'T.
+            // Listed explicitly so the guard neither hides them nor blocks this
+            // commit, and so the next reader has to confront the claim rather
+            // than inherit a blanket allowlist. Each entry needs a filed issue.
+            //
+            //   'B' — in AABA_FORMS the B section IS the bridge (the
+            //         middle-eight of a 32-bar standard), and this very file
+            //         already agrees: `analyzeForm` maps `label === 'b'` to the
+            //         'Bridge' role, and soloist-seeder lists category 'b' as a
+            //         departure. The map seats `bridge: 0.6` but 'B' resolves to
+            //         0.5, so Jazz/Bossa/Neo-Soul — the three genres routed to
+            //         AABA — get zero lift into the only structural contrast in
+            //         the tune. It cannot be fixed with a substring key ('b'
+            //         would hijack bridge/build/breakdown); it needs an
+            //         exact-match pre-pass, which is its own change. See #1205.
+            const KNOWN_GAPS = ['B'];
+
+            const unmapped = [...emitted]
+                .filter((l) => !TRULY_NEUTRAL.test(l.toLowerCase()))
+                .filter((l) => getSectionEnergy(l) === 0.5);
+
+            // Asserting EQUALITY with the known-gap list, not merely "no new
+            // ones": when a gap is fixed the test goes red until its entry is
+            // removed, so a stale exemption can't quietly outlive the bug.
+            expect(
+                unmapped.sort(),
+                `generator-emitted labels landing on the 0.5 default changed. Either map the ` +
+                    `label in SECTION_ENERGY_MAP, add it to TRULY_NEUTRAL with a musical reason, ` +
+                    `or — if you just FIXED one — drop it from KNOWN_GAPS. Got: ${unmapped.join(', ')}`,
+            ).toEqual([...KNOWN_GAPS].sort());
+
+            // Sanity: the sweep must actually be reaching the vocabulary,
+            // otherwise the assertion above is vacuous.
+            expect(emitted.has('Pre')).toBe(true);
+            expect(emitted.has('Chorus')).toBe(true);
+            expect(emitted.size).toBeGreaterThan(5);
         });
     });
 

@@ -581,6 +581,39 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         },
     );
 
+    // #1199 — the sibling case above drives `'Pre-Chorus'`, a label the app
+    // NEVER PRODUCES. The wizard emits the bare `'Pre'` (`roleToLabel` +
+    // VERSE_CHORUS_FORMS in song-generator.ts), which matched no
+    // SECTION_ENERGY_MAP key and fell through to the 0.5 verse default — making
+    // the real Pre→Chorus lift +0.4, clearing the strict `>0.3` gate and firing
+    // the cut before every back-half chorus. The guard passed the whole time
+    // because it asserted the exclusion on a hand-typed spelling.
+    //
+    // This case drives the PRODUCTION label. Keep both: the 'Pre-Chorus' one
+    // pins the threshold arithmetic, this one pins that production vocabulary
+    // actually reaches it (tests/CLAUDE.md — pair the synthetic shape with a
+    // production-faithful one).
+    it("does NOT fire on the wizard's own 'Pre'→Chorus label (+0.3 — #1199)", () => {
+        const state = makeState({
+            currentLabel: 'Pre',
+            nextLabel: 'Chorus',
+            genreFeel: 'Rock',
+            firstSectionBars: 7,
+        });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 6 * SPB; step < 7 * SPB; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            // The whole point: 'Pre' must land on the same 0.6 energy seat as
+            // 'Pre-Chorus', making this delta +0.3 exactly — not +0.4.
+            expect(r.coordination.upcomingSectionEnergyDelta).toBeCloseTo(0.3, 5);
+            expect(r.coordination.dropMuteActive).toBe(false);
+        }
+        expect(totalNotes).toBeGreaterThan(0);
+    });
+
     it('does NOT fire for a non-drop-friendly genre (Jazz) even into a Drop', () => {
         // why: a 1-bar full-band cut is idiomatic for rock/metal/EDM/hip-hop and
         // alien to jazz — the genre gate must hold even when the label says Drop.

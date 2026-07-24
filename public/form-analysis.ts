@@ -2,12 +2,48 @@ import { scrambleHash } from './engine/hash-utils.js';
 import type { ArrangerState } from './state/arranger.js';
 import type { Chord } from './types.js';
 
+/**
+ * Section label → 0..1 energy. Matched by SUBSTRING against the lowercased
+ * label (see `getSectionEnergy`), so **insertion order is load-bearing**: the
+ * first key contained in the label wins. Longer, more specific keys must come
+ * before any key that is a prefix of them — `'pre-chorus'` before `'pre'`.
+ *
+ * why this map must cover the vocabulary the app actually EMITS, not just the
+ * vocabulary a developer would type: an unmatched label silently resolves to
+ * the 0.5 default, which is a *plausible* number, so a gap here never surfaces
+ * as an error — only as music that doesn't build. Two such gaps shipped (#1199,
+ * #1201); grep `roleToLabel` and the `*_FORMS` templates in `song-generator.ts`
+ * before assuming a label is unreachable.
+ */
 const SECTION_ENERGY_MAP: Record<string, number> = {
     intro: 0.4,
     verse: 0.5,
+    // MUST stay ahead of the bare 'pre' key below — 'pre-chorus' is the more
+    // specific match and both must resolve to the same 0.6 seat.
     'pre-chorus': 0.6,
+    // why 0.6, matching 'pre-chorus': the wizard emits the bare label 'Pre'
+    // (`roleToLabel` + the longest VERSE_CHORUS_FORMS template in
+    // song-generator.ts), which matched NO key and silently sat at the 0.5
+    // verse default — so a pre-chorus had exactly a verse's energy and the
+    // Pre→Chorus lift measured +0.4 instead of the intended +0.3. That is not
+    // a cosmetic difference: the drop mechanic's threshold is a strict `>0.3`
+    // chosen precisely so the canonical pre-chorus→chorus lift does NOT fire a
+    // full-band cut (see DROP_ENERGY_DELTA_THRESHOLD in drop-mechanic.ts) — at
+    // +0.4 it fired on every back-half chorus, the exact "gesture becomes
+    // ambient instead of a signpost" failure that constant's doc warns about.
+    // A pre-chorus IS the build into the chorus, so 0.6 (above verse, below
+    // chorus) is also simply the musically right seat on its own terms. (#1199)
+    pre: 0.6,
     build: 0.7,
     chorus: 0.9,
+    // why 0.9, the same seat as 'chorus': in hip-hop and much of pop the
+    // chorus IS called the hook — it's the idiom's own word for the section,
+    // not a near-synonym for something lesser. Unmapped it sat at the 0.5
+    // verse default, so a chart labelled with hip-hop vocabulary got no lift
+    // into its biggest section and never triggered the energy-delta drop. Only
+    // reachable via a user-typed section name today (no generator emits it),
+    // which is exactly why it went unnoticed. (#1201)
+    hook: 0.9,
     drop: 1.0,
     bridge: 0.6,
     solo: 0.8,
