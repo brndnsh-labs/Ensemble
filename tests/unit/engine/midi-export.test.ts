@@ -19,7 +19,7 @@ vi.mock('../../../public/ui.js', () => ({
     showToast: vi.fn(),
 }));
 
-import { exportToMidi } from '../../../public/midi-export.js';
+import { exportToMidi } from '../../../public/export/midi-export.js';
 
 describe('MIDI Export Logic', () => {
     beforeEach(() => {

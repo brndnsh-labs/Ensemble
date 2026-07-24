@@ -2,6 +2,7 @@ import { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { replaceChordInSection } from '../arranger-controller.js';
 import { TIME_SIGNATURES } from '../config.js';
+import { formatUnicodeSymbols } from '../sanitize.js';
 import {
     buildLeadSheetRows,
     buildLeadSheetSections,
@@ -9,8 +10,7 @@ import {
     type LeadSheetChord,
     type LeadSheetRow,
     type LeadSheetRowMeasure,
-} from '../lead-sheet-model.js';
-import { formatUnicodeSymbols } from '../sanitize.js';
+} from '../song/lead-sheet-model.js';
 import type { Section } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { ChordPicker } from './editor/ChordPicker.jsx';

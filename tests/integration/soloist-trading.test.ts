@@ -106,7 +106,7 @@ vi.mock('../../public/ui.js', () => ({ triggerFlash: vi.fn() }));
 // Partial mock: stub getSectionEnergy but keep the real getJamMacroArc — the
 // conductor's timer-less fallback (Epic 11 S3) calls it directly, and it is a
 // pure, dep-light helper that needs no stubbing.
-vi.mock('../../public/form-analysis.js', async (importOriginal) => ({
+vi.mock('../../public/song/form-analysis.js', async (importOriginal) => ({
     ...(await importOriginal()),
     getSectionEnergy: vi.fn(() => 0.5),
 }));

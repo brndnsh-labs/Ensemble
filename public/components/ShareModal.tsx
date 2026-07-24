@@ -4,9 +4,9 @@ import {
     renderCurrentSessionToWav,
     renderStemsToWav,
     type StemInstrument,
-} from '../audio-export.js';
-import { exportToMidi } from '../midi-export.js';
-import { generateShareUrl } from '../sharing.js';
+} from '../export/audio-export.js';
+import { exportToMidi } from '../export/midi-export.js';
+import { generateShareUrl } from '../export/sharing.js';
 import { dispatch, getState } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';

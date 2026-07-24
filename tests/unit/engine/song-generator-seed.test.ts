@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chordsFromSectionValue, parseSeedText } from '../../../public/song-generator-seed.js';
+import { chordsFromSectionValue, parseSeedText } from '../../../public/song/song-generator-seed.js';
 
 describe('parseSeedText', () => {
     it('parses Roman numerals separated by spaces', () => {

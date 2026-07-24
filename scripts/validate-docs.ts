@@ -25,12 +25,21 @@ const DOCS_TO_SCAN = [
     'tests/README.md',
 ];
 
+// Phase 2 (unmapped-shadow-file detection) only scans what's listed here, so a
+// directory missing from this list is a directory where new files can land
+// without ever being flagged as absent from AI_MAP.md.
+//
+// #1178 is moving `public/` root files into family directories. EVERY new family
+// dir must be added here in the phase that creates it — otherwise the reorg
+// quietly retires this guard for exactly the files it just relocated.
 const CORE_DIRECTORIES = [
     'public',
     'public/engine',
     'public/state',
     'public/components',
     'public/data',
+    'public/song', // #1178 phase 1
+    'public/export', // #1178 phase 1
 ];
 
 const IGNORE_EXTENSIONS = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];

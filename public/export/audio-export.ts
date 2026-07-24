@@ -1,9 +1,9 @@
-import { validateProgression } from './engine/chords-engine.js';
-import { initAudio } from './engine/engine.js';
-import { scheduleGlobalEvent } from './engine/scheduler-core.js';
-import { generateNotesForStep } from './engine/tick-logic.js';
-import { encodeWav } from './engine/wav-encoder.js';
-import { getState } from './state.js';
+import { validateProgression } from '../engine/chords-engine.js';
+import { initAudio } from '../engine/engine.js';
+import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
+import { generateNotesForStep } from '../engine/tick-logic.js';
+import { encodeWav } from '../engine/wav-encoder.js';
+import { getState } from '../state.js';
 
 export interface AudioExportOptions {
     /** How many times to repeat the current chord progression. Defaults to 1. */

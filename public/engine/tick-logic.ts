@@ -1,4 +1,4 @@
-import { getJamMacroArc } from '../form-analysis.js';
+import { getJamMacroArc } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression } from '../types.js';
 import { binarySearchMap, getFrequency, getMidi } from '../utils.js';
 import { applyPowerChordVoicing, getAccompanimentNotes } from './accompaniment.js';

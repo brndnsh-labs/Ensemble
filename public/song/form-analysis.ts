@@ -1,6 +1,6 @@
-import { scrambleHash } from './engine/hash-utils.js';
-import type { ArrangerState } from './state/arranger.js';
-import type { Chord } from './types.js';
+import { scrambleHash } from '../engine/hash-utils.js';
+import type { ArrangerState } from '../state/arranger.js';
+import type { Chord } from '../types.js';
 
 /**
  * Section label → 0..1 energy. Matched by SUBSTRING against the lowercased

@@ -183,17 +183,17 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/performance-controller.ts` | Real-time keyboard performance logic. |
 | `public/practice-controller.ts` | Section practice — start-from-here / loop-a-section entry points (#1016). |
 | `public/midi-controller.ts` | WebMIDI bridging and DAW sync. |
-| `public/midi-export.ts` | Main-thread MIDI file triggers. |
-| `public/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
-| `public/song-generator.ts` | Algorithmic song structure generation. |
-| `public/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
-| `public/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
+| `public/export/midi-export.ts` | Main-thread MIDI file triggers. |
+| `public/export/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
+| `public/song/song-generator.ts` | Algorithmic song structure generation. |
+| `public/song/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
+| `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/persistence.ts` | LocalStorage session saving. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/sharing.ts` | URL-based song sharing. | `getShareURL` |
+| `public/export/sharing.ts` | URL-based song sharing. | `getShareURL` |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
-| `public/utils/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
+| `public/data/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
 | `public/visualizer-events.ts` | Canonical visual event contract and track metadata for the Visuals workspace. | `VISUALIZER_TRACK_ORDER`, `queueVisualizerNoteEvent` |
 | `public/visualizer-proxy.ts` | Main-thread bridge to visualizer worker. |
 
@@ -221,7 +221,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `docs/guides/musical-engine-patterns.md` | Reusable recipes for generative-engine work (5 smells, coordination, loop-awareness, final-stage multiplier discipline, seeded determinism). |
 | `docs/guides/bundle-hygiene.md` | Reusable recipes for bundle-size + dead-code work (budgets-as-baselines, statically-DCE'd expectations, pre-flight grep tripwire, knip blind spots, code-splitting discipline). |
 | `public/MANUAL.md` | User-facing guide with auto-generated tables. |
-| `public/form-analysis.ts` | Song section and structure detection. |
+| `public/song/form-analysis.ts` | Song section and structure detection. |
 | `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |
 | `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |

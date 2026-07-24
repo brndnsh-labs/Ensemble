@@ -4,9 +4,9 @@ import {
     HARMONY_STYLES,
     SOLOIST_STYLES,
     type StyleEntry,
-} from '../data/instrument-styles.js';
-import { SHORTCUT_CONFIG } from '../data/shortcut-config.js';
-import { SMART_GENRES } from '../data/smart-genres.js';
+} from './instrument-styles.js';
+import { SHORTCUT_CONFIG } from './shortcut-config.js';
+import { SMART_GENRES } from './smart-genres.js';
 
 export function generateGenreTable(): string {
     let html = '<div class="table-container"><table class="notation-table">\n';

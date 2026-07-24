@@ -1,5 +1,5 @@
-import { showToast } from './ui.js';
-import { startExport, syncWorker } from './worker-client.js';
+import { showToast } from '../ui.js';
+import { startExport, syncWorker } from '../worker-client.js';
 
 export function exportToMidi(options: Record<string, any> = {}) {
     showToast('Starting MIDI Export...');

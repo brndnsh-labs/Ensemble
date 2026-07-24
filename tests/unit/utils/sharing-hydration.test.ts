@@ -8,7 +8,7 @@ import { getState } from '../../../public/state.js';
 const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
 import { SMART_GENRES } from '../../../public/data/smart-genres.js';
-import { generateShareUrl, shareProgression } from '../../../public/sharing.js';
+import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
 import { loadFromUrl } from '../../../public/state-hydration.js';
 
 vi.mock('../../../public/ui.js', () => ({

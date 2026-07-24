@@ -85,7 +85,7 @@ vi.mock('../../../public/history.js', () => ({ pushHistory: vi.fn() }));
 
 import { addSection, onSectionUpdate } from '../../../public/arranger-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
-import { analyzeForm, getSectionEnergy } from '../../../public/form-analysis.js';
+import { analyzeForm, getSectionEnergy } from '../../../public/song/form-analysis.js';
 import { getState } from '../../../public/state.js';
 
 const { arranger } = getState();

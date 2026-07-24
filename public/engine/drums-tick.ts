@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getSectionEnergy } from '../form-analysis.js';
+import { getSectionEnergy } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { getStepInfo, isSectionTurnaround } from '../utils.js';
 import {

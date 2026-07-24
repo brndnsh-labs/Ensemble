@@ -7,7 +7,7 @@ import {
     generateShortcutTable,
     generateSoloistStylesMD,
     injectManualMetadata,
-} from '../../../public/utils/manual-metadata.js';
+} from '../../../public/data/manual-metadata.js';
 
 describe('Manual Metadata Utilities', () => {
     it('generateGenreTable should return a valid HTML table', () => {

@@ -1,4 +1,4 @@
-import type { Chord, Section } from './types.js';
+import type { Chord, Section } from '../types.js';
 
 const LEAD_SHEET_MEASURES_PER_ROW = 4;
 

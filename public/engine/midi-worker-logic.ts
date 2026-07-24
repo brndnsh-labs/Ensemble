@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { analyzeForm } from '../form-analysis.js';
+import { analyzeForm } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, getStepInfo, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';

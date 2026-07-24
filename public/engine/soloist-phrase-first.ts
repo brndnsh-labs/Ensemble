@@ -1,5 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
-import { getSectionEnergy } from '../form-analysis.js';
+import { getSectionEnergy } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, SoloistExpression, SoloistQaHang } from '../types.js';
 import { clamp01 } from '../utils.js';
 import { getBandPocket } from './coordination-engine.js';

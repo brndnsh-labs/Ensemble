@@ -1,4 +1,4 @@
-import { getSectionEnergy } from '../form-analysis.js';
+import { getSectionEnergy } from '../song/form-analysis.js';
 import type { SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
 
 /**

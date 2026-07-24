@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { injectManualMetadata } from '../data/manual-metadata.js';
 import { escapeHTML } from '../sanitize.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
-import { injectManualMetadata } from '../utils/manual-metadata.js';
 import { useModalA11y } from './use-modal-a11y.js';
 
 /**

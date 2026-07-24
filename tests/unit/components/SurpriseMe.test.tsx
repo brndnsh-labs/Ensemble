@@ -34,7 +34,7 @@ vi.mock('../../../public/history.js', () => ({
     undo: (...args: any[]) => mockUndo(...args),
 }));
 
-vi.mock('../../../public/song-generator.js', () => ({
+vi.mock('../../../public/song/song-generator.js', () => ({
     generateSong: (...args: any[]) => mockGenerateSong(...args),
     predictStructure: () => ['Verse', 'Chorus', 'Verse', 'Chorus'],
 }));

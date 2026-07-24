@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { generateShareUrl, shareProgression } from '../../../public/sharing.js';
+import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
 import { getState } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
 

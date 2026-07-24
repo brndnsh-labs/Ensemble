@@ -6,7 +6,7 @@ import {
     getLeadSheetDensity,
     getLeadSheetLayoutProfile,
     getLeadSheetViewport,
-} from '../../../public/lead-sheet-model.js';
+} from '../../../public/song/lead-sheet-model.js';
 
 describe('lead-sheet-model', () => {
     const timeSignature = { beats: 4, stepsPerBeat: 4 };

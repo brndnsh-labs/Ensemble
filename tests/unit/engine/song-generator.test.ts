@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
-import { generateSong, predictStructure } from '../../../public/song-generator.js';
+import { generateSong, predictStructure } from '../../../public/song/song-generator.js';
 
 describe('Song Generator', () => {
     it('generates a song with default options', () => {

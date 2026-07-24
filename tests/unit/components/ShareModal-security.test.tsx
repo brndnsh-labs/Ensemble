@@ -33,7 +33,7 @@ vi.mock('../../../public/state.js', () => ({
     },
 }));
 
-vi.mock('../../../public/midi-export.js', () => ({
+vi.mock('../../../public/export/midi-export.js', () => ({
     exportToMidi: mockExportToMidi,
 }));
 

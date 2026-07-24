@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
-import { analyzeForm, getSectionEnergy } from '../../../public/form-analysis.js';
-import { predictStructure } from '../../../public/song-generator.js';
+import { analyzeForm, getSectionEnergy } from '../../../public/song/form-analysis.js';
+import { predictStructure } from '../../../public/song/song-generator.js';
 
 describe('Form Analysis Engine', () => {
     describe('getSectionEnergy', () => {

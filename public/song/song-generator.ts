@@ -1,6 +1,6 @@
-import { KEY_ORDER, TIME_SIGNATURES } from './config.js';
-import { GENRE_NAMES } from './data/smart-genres.js';
-import { generateId } from './state/share-codec.js';
+import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
+import { GENRE_NAMES } from '../data/smart-genres.js';
+import { generateId } from '../state/share-codec.js';
 
 // Canonical chord pools by base style. The wizard's Feel selector maps each
 // genre to one of these pools and then layers a quality tilt on top.

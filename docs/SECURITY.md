@@ -12,8 +12,8 @@ The real attack surface is **client-side**: untrusted input reaching a dangerous
 
 | Surface | Files | Status |
 | :- | :- | :- |
-| Share-URL / persisted-state deserialization | `state-hydration.ts`, `sharing.ts`, `state/share-codec.ts` (`compress/decompressSections`) | **Well defended.** Allowlists + `clamp()` + length caps + schema validation on every field; 100KB payload cap against memory exhaustion. |
-| The one HTML-injection sink | `components/ManualModal.tsx` (`dangerouslySetInnerHTML`), `utils/manual-metadata.ts` | **Defended (defense-in-depth).** Input is same-origin static (`MANUAL.md` + repo config), not user-controlled at runtime; `escapeHTML` runs before markdown transforms; link schemes blocked. See F1/F2. |
+| Share-URL / persisted-state deserialization | `state-hydration.ts`, `export/sharing.ts`, `state/share-codec.ts` (`compress/decompressSections`) | **Well defended.** Allowlists + `clamp()` + length caps + schema validation on every field; 100KB payload cap against memory exhaustion. |
+| The one HTML-injection sink | `components/ManualModal.tsx` (`dangerouslySetInnerHTML`), `data/manual-metadata.ts` | **Defended (defense-in-depth).** Input is same-origin static (`MANUAL.md` + repo config), not user-controlled at runtime; `escapeHTML` runs before markdown transforms; link schemes blocked. See F1/F2. |
 | Content-Security-Policy | `public/index.html` `<meta>` | **Strong but `<meta>`-only.** `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`. Cannot carry `frame-ancestors`/HSTS — see F5. |
 | Service worker (PWA cache) | `public/sw.ts` | **Clean.** Workbox precache + `cleanupOutdatedCaches`; standard `SKIP_WAITING`/`clients.claim`. |
 | Web MIDI | `midi-controller.ts` | Low risk — permission-gated, local devices, no data egress. |

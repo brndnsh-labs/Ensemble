@@ -125,7 +125,7 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         vi.doMock('../../public/state.js', () => ({
             getState: () => makeLiveState(),
         }));
-        const { renderStemsToWav } = await import('../../public/audio-export.js');
+        const { renderStemsToWav } = await import('../../public/export/audio-export.js');
 
         const results = await renderStemsToWav(['soloist', 'bass', 'drums'], {
             filename: 'my-song',
@@ -162,7 +162,7 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         vi.doMock('../../public/state.js', () => ({
             getState: () => makeLiveState(),
         }));
-        const { renderStemsToWav } = await import('../../public/audio-export.js');
+        const { renderStemsToWav } = await import('../../public/export/audio-export.js');
 
         const results = await renderStemsToWav(['chords', 'harmony']);
 
@@ -177,7 +177,9 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         vi.doMock('../../public/state.js', () => ({
             getState: () => makeLiveState(),
         }));
-        const { renderStemsToWav, STEM_INSTRUMENTS } = await import('../../public/audio-export.js');
+        const { renderStemsToWav, STEM_INSTRUMENTS } = await import(
+            '../../public/export/audio-export.js'
+        );
 
         const results = await renderStemsToWav();
 
@@ -188,7 +190,7 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         vi.doMock('../../public/state.js', () => ({
             getState: () => makeLiveState(),
         }));
-        const { renderStemsToWav } = await import('../../public/audio-export.js');
+        const { renderStemsToWav } = await import('../../public/export/audio-export.js');
 
         await renderStemsToWav(['soloist', 'harmony']);
 

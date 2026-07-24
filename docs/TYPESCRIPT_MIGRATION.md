@@ -75,7 +75,7 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 | `public/engine/worker-orchestrator.ts` | 52 | ✅ | `WorkerContext` interface; `EnsembleState` import |
 | `public/engine/worker-buffer-manager.ts` | 88 | ✅ | |
 | `public/engine/soloist-mode-policy.ts` | 68 | ✅ | `Record<string,string>` alias map; TS cast for return |
-| `public/utils/manual-metadata.ts` | 93 | ✅ | `StyleEntry[]` param; `SMART_GENRES` cast to `any` (untyped source) |
+| `public/data/manual-metadata.ts` | 93 | ✅ | `StyleEntry[]` param; `SMART_GENRES` cast to `any` (untyped source) |
 | `public/app-controller.ts` | 63 | ✅ | `viz?: any` (visualizer types not settled yet) |
 | `public/performance-controller.ts` | 58 | ✅ | |
 | `public/pwa.ts` | ~50 | ✅ | `deferredPrompt: any`; `triggerInstall(): Promise<boolean>` |
@@ -95,11 +95,11 @@ These files contain only types — no runtime logic. Highest payoff per line cha
 |------|-------|--------|-------|
 | `public/visualizer-events.ts` | 365 | ✅ | `VisualizerTrackId` union; 4 event interfaces; generic `queueVisualizerEvent<T>` |
 | `public/engine/coordination-engine.ts` | 184 | ✅ | `StepInfo` import type; `createCoordinationContext` returns inferred object |
-| `public/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
-| `public/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
+| `public/song/song-generator.ts` | 301 | ✅ | `STRUCTURES/PROGRESSIONS` as `Record<string, ...>`; `GeneratedSection` interface |
+| `public/song/lead-sheet-model.ts` | 474 | ✅ | Local `Density`/`Viewport` type aliases; `LEAD_SHEET_FIT_ROW_BUDGET` typed |
 | `public/state.ts` | 293 | ✅ | `dispatch` overloads on `ActionPayloadMap`; `StateMap = EnsembleState` compat alias (retired 2026-07, #1172) |
 | `public/persistence.ts` | 111 | ✅ | `saveTimeout: ReturnType<typeof setTimeout>` |
-| `public/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
+| `public/export/sharing.ts` | 122 | ✅ | `ShareOptions` interface; typed `generateShareUrl` |
 | `public/worker-client.ts` | 303 | ✅ | `declare const WORKER_PATH: string`; typed handler callbacks |
 | `public/midi-controller.ts` | 401 | ✅ | `Map<string, {id, endTime}>` for note-offs; `MidiState` import type |
 | `public/engine/chords-styles.ts` | 358 | ✅ | `EnsembleState` param; `safeExtensions: Record<string, number[]>` |
@@ -178,7 +178,7 @@ During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` fil
 | File | Lines | Status | Notes |
 |------|-------|--------|-------|
 | `public/ui.ts` | 13 | ✅ | Added `msg: string` param |
-| `public/midi-export.ts` | 20 | ✅ | `options: Record<string, any> = {}` |
+| `public/export/midi-export.ts` | 20 | ✅ | `options: Record<string, any> = {}` |
 | `public/data/smart-genres.ts` | ~50 | ✅ | `GenreOverride` + `SmartGenre` interfaces; typed maps |
 | `public/data/chord-presets.ts` | ~100 | ✅ | Pure data rename |
 | `public/data/drum-presets.ts` | ~100 | ✅ | `deepMerge(target: any, source: any): any`; `DRUM_PRESETS: Record<string, any>` |
@@ -195,7 +195,7 @@ During Phase 7 planning, the tracker was found to be incomplete — 62 `.js` fil
 | `public/engine/audio-recovery.ts` | 164 | ✅ | `Float32Array<ArrayBuffer>` for TS 5.x; `onRecover` callback typed |
 | `public/engine/synth-bass.ts` | 188 | ✅ | `killBassNote`, `playBassNote` typed |
 | `public/engine/synth-utils.ts` | 249 | ✅ | `MixState`, `PercussiveStrikeOptions`, `ResonantToneOptions` interfaces |
-| `public/form-analysis.ts` | 171 | ✅ | |
+| `public/song/form-analysis.ts` | 171 | ✅ | |
 
 ### Batch C — Medium leaf engines ✅
 

@@ -116,7 +116,7 @@ This is the workflow path for handing a clip to another model
 (Gemini, GPT, etc.) for a second-opinion listen — no API integration
 required, just drag the file into another chat.
 
-Implementation: `public/audio-export.ts` + the shared
+Implementation: `public/export/audio-export.ts` + the shared
 `public/engine/wav-encoder.ts`.
 
 ## Why these are separate commands
