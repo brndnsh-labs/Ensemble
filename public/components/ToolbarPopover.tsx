@@ -47,9 +47,16 @@ export function ToolbarPopover({
     const handleFocusExit = (event: FocusEvent) => {
         const relatedTarget = event.relatedTarget instanceof Node ? event.relatedTarget : null;
 
+        // A null relatedTarget means focus left to nothing — which is exactly what tapping a
+        // <button> produces on WebKit/iOS (Safari + iOS Chrome don't move focus to a tapped
+        // button). Dismissing here would close the menu mid-tap, before the item's click commits,
+        // so the tapped action (Library/Edit) silently never fires. Stay open on null-blur; real
+        // outside-dismissal is already covered by the window pointerdown listener below and
+        // Escape via useModalA11y, so this path is redundant for genuine dismissal anyway.
         if (
-            relatedTarget &&
-            (rootRef.current?.contains(relatedTarget) || panelRef.current?.contains(relatedTarget))
+            !relatedTarget ||
+            rootRef.current?.contains(relatedTarget) ||
+            panelRef.current?.contains(relatedTarget)
         ) {
             return;
         }
