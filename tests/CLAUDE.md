@@ -141,9 +141,12 @@ and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32),
   source paths that only resolve against a dev server, so a full reversion isn't free either. All
   specs route hydration waits through `gotoHydrated`/`HYDRATION_TIMEOUT`
   (`tests/e2e/helpers/nav.ts`) — tune the timeout there, not per-spec.
-- **`docs/FLAKY_TESTS.md` + the `/flake` skill are the canonical flake workflow** — three classes:
+- **`docs/FLAKY_TESTS.md` + the `/flake` skill are the canonical flake workflow** — four classes:
   unseeded-statistical (fix: `installSeededRandom()`), ordering-dependent (fix: the leaking file's
-  missing `afterEach`/`restoreAllMocks`), e2e-timing. Distinguish class 1 from class 2 by running
-  the repro both standalone and in-batch. If a pre-commit hook's `vitest related` fails on a
-  critique test unrelated to your diff, suspect a flake and re-run standalone before assuming a
-  regression.
+  missing `afterEach`/`restoreAllMocks`), e2e-timing, and slow-legitimate (a production-faithful
+  sweep whose real runtime crowds the 30s `testTimeout` and tips over under load — fix: raise the
+  timeout at the tightest scope, per-test `it(name, { timeout: 60_000 }, fn)`, never globally and
+  never by shrinking the sample). Distinguish class 1 from class 2 by running the repro both
+  standalone and in-batch; class 4 announces itself as "test timed out" with no failed assertion.
+  If a pre-commit hook's `vitest related` fails on a critique test unrelated to your diff, suspect
+  a flake and re-run standalone before assuming a regression.

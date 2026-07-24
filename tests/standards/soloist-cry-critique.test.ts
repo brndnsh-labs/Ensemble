@@ -86,7 +86,18 @@ function cryStats(notes: any[]) {
 }
 
 describe('Soloist cry — bend-and-release (#869)', () => {
-    it('fires sparingly on sustained blues landings, targeting a chord tone', () => {
+    // 60s timeout (#1188): this test drives the real seeder + live phrase-first
+    // engine over a 6-seed sweep of ~3.5 loops each — ~17s idle, ~21s in-suite on
+    // a 7-core box, against the global 30s testTimeout. That margin evaporates
+    // under machine load (a concurrent test process roughly doubles wall time),
+    // so it reddened full runs intermittently on any branch. The runtime is
+    // legitimate work, not a hang — the assertions below are seeded and
+    // deterministic. Raised here per-test rather than globally so a genuine hang
+    // anywhere else still trips at 30s. The other two tests in this file (~1-4s)
+    // deliberately keep the global limit.
+    it('fires sparingly on sustained blues landings, targeting a chord tone', {
+        timeout: 60_000,
+    }, () => {
         // 6-seed sweep (#1058): a single seed now yields only ~8-10 cries — far too
         // small a sample for the hold-vs-release ratio below to mean anything (the
         // flutter is a fixed 25% per-(step,loop) hash in the engine, so which cries

@@ -24,7 +24,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — ongoing follow-up backlog from the completed musical audit (~20 NIT/listen-only items). The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).
 - [`public/MANUAL.md`](../public/MANUAL.md) — in-app manual.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
-- [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the three flake classes (unseeded-statistical / ordering-dependent / e2e-timing), and their fixes. Diagnose new flakes with the `/flake` skill.
+- [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.
 
 ## Historical references
 

@@ -11,7 +11,7 @@ generative engines + statistical critique bounds + a live dev server for e2e),
 so flakes recur — this skill makes diagnosis repeatable instead of re-derived.
 
 The tracker is [`docs/FLAKY_TESTS.md`](../../../docs/FLAKY_TESTS.md). Read its
-"three flake classes" table first — it's the classifier this skill applies.
+"flake classes" table first — it's the classifier this skill applies.
 
 ## When to use
 
@@ -80,13 +80,14 @@ you'll measure) before running anything long.
    shares an engine with). A flake that only appears in the batch is
    ordering-dependent, not statistical.
 
-2. **Classify** against the three classes in `docs/FLAKY_TESTS.md`:
+2. **Classify** against the classes in `docs/FLAKY_TESTS.md`:
 
    | Observation | Class |
    |---|---|
    | Logged values **vary** across standalone runs; the failing assertion is a statistical bound | **unseeded-statistical** (the engine rolls raw `Math.random` on this path) |
    | Logged values **identical** standalone, fails only in a multi-file run | **ordering-dependent** (a prior file leaked a spy / global signal / stale mock) |
    | Playwright hydration-wait timeout, or whole-run import crash | **e2e-timing** |
+   | **No failed assertion** — vitest reports "test timed out", and the test's own duration is already a large fraction of `testTimeout` when idle | **slow-legitimate** (real work crowding the limit; raise the timeout at the tightest scope — never globally, never by shrinking the sample) |
 
    The variance check in step 1 already did the disambiguation: a test whose
    values are identical standalone is deterministic on its path, so a failure
