@@ -257,11 +257,29 @@ poll takes minutes; a foreground `sleep` is harness-blocked):
 ```bash
 # Waits for CI to REGISTER + FINISH on the PR's head sha, then merges (squash + delete branch)
 # ONLY if the combined commit-status is `success`; on failure it prints each failing check's run
-# URL and exits non-zero. Add --dry-run to poll + decide without merging.
+# URL, plus the TAIL OF THAT JOB'S LOG, and exits non-zero. Add --dry-run to poll + decide
+# without merging.
 node scripts/forgejo-merge.mjs <pr> &
 ```
 The gate is the verified `GET /commits/{sha}/status` endpoint (combined `state` + per-job
-`statuses[]` — the `gh statusCheckRollup` replacement). After a safe merge, `Closes #<n>` already
+`statuses[]` — the `gh statusCheckRollup` replacement).
+
+**Reading a red gate (2026-07-24).** This Forgejo build (15.0.3~gitea-1.22.0) exposes **no
+job-log API** — every documented `/actions/.../logs` route 404s even with a valid token. Logs
+come from **`ci-logs`** (a global command from `~/code/dotfiles`, wrapping `fj-ex`, which scrapes
+the web UI with a session cookie). Repo is inferred from the current checkout's `origin`:
+```bash
+ci-logs --failed        # the most recent FAILED run — "what broke"
+ci-logs <run> <job>     # one job of one run (indices come straight off the target_url
+                        #   the merge guard prints: /…/actions/runs/<run>/jobs/<job>)
+ci-logs --list          # recent runs + status
+```
+The merge guard prints the failing tail automatically, so a red gate is usually self-explaining
+without running anything. **A red CI is now diagnosable, so "retry and see" is no longer an
+acceptable first move** — read the log, then decide transient-vs-real (§5 still makes an
+unexplained red a hard stop). Setup is one-time: `cargo install forgejo-cli-ex` then
+`fj-ex auth login --host git.brndn.zip --username brandon` (TOTP, not a security key); if the
+session cookie expires the guard degrades to printing the URL alone and says so. After a safe merge, `Closes #<n>` already
 closed the issue = done (§1 — no Shipped field to set). Just **sync local main** (`git checkout main
 && git fetch origin && git reset --hard origin/main`) and prune the branch.
 

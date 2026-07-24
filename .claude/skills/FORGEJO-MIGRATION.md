@@ -24,6 +24,8 @@ mapping for porting a work-loop skill off `gh`. Read the (already-migrated) `DOC
 | `gh pr list` | `node scripts/forgejo.mjs pr list [--state open\|closed\|all]` |
 | `gh pr close <n>` | `node scripts/forgejo.mjs pr close <n>` |
 | the `gh pr checks --watch && gh pr merge` snippet | `node scripts/forgejo-merge.mjs <pr> &` (background; poll-then-merge guard, DOCTRINE §6) |
+| `gh run list` | `ci-logs --list` (global command from `~/code/dotfiles`) |
+| `gh run view <n> --log` / `--log-failed` | `ci-logs <run> [job]` / `ci-logs --failed` — **not** the REST API: this Forgejo serves no job logs (DOCTRINE §6 "Reading a red gate") |
 
 `--body` accepts `@file` or `@-` (stdin) for long markdown bodies (mirrors `gh -F`).
 
