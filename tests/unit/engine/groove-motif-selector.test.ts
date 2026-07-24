@@ -222,33 +222,139 @@ describe('makeMotifSelector factory', () => {
 });
 
 describe('Groove files use makeMotifSelector correctly', () => {
-    it('funk getMotif is a function', async () => {
+    it('funk getMotif pins both tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/funk.js');
         expect(typeof getMotif).toBe('function');
-        expect(getMotif(0.5, 0.5, 0.2)).toBe(0); // low intensity guard
-        expect(getMotif(0.4, 0.5, 0.8)).toBe(1); // high intensity, seed=0.4 < 0.5 → motif 1
-        expect(getMotif(0.6, 0.5, 0.8)).toBe(2); // high intensity, seed=0.6 → motif 2
+        // Source (funk.ts): binaryTier(0.7, 0.4) then high tier picks
+        // [[0.2,0],[0.5,1],[0.75,2], 3]. Guards: complexity < 0.3 or
+        // intensity < INTENSITY_BANDS.LOW (0.35) → 0.
+        expect(getMotif(0.9, 0.2, 0.8)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // mid tier (intensity < 0.7): binaryTier, seed < 0.4 → 0, else → 1.
+        expect(getMotif(0.399, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.4, 0.8, 0.5)).toBe(1);
+        // high tier (intensity >= 0.7): 0.2 / 0.5 / 0.75 seed ceilings → 0/1/2/3.
+        expect(getMotif(0.199, 0.8, 0.8)).toBe(0);
+        expect(getMotif(0.2, 0.8, 0.8)).toBe(1);
+        expect(getMotif(0.499, 0.8, 0.8)).toBe(1);
+        expect(getMotif(0.5, 0.8, 0.8)).toBe(2);
+        expect(getMotif(0.749, 0.8, 0.8)).toBe(2);
+        expect(getMotif(0.75, 0.8, 0.8)).toBe(3);
+        // tier boundary: maxIntensity 0.7 belongs to the HIGHER tier (strict <).
+        expect(getMotif(0.5, 0.8, 0.699)).toBe(1); // mid tier → binaryTier
+        expect(getMotif(0.5, 0.8, 0.7)).toBe(2); // high tier
     });
 
-    it('rock getMotif is a function', async () => {
+    it('rock getMotif pins all three tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/rock.js');
         expect(typeof getMotif).toBe('function');
-        expect(getMotif(0.5, 0.2, 0.8)).toBe(0); // low complexity guard
+        // Source (rock.ts): binaryTier(0.6, 0.6); mid tier (maxIntensity HIGH=0.85)
+        // picks [[0.3,0],[0.6,1],[0.85,2], 3]; high tier picks [[0.2,1],[0.5,2], 3].
+        expect(getMotif(0.9, 0.2, 0.8)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // low tier (intensity < 0.6): seed < 0.6 → 0, else → 1.
+        expect(getMotif(0.599, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.6, 0.8, 0.5)).toBe(1);
+        // mid tier (0.6 <= intensity < 0.85): 0.3 / 0.6 / 0.85 ceilings → 0/1/2/3.
+        expect(getMotif(0.299, 0.8, 0.7)).toBe(0);
+        expect(getMotif(0.3, 0.8, 0.7)).toBe(1);
+        expect(getMotif(0.599, 0.8, 0.7)).toBe(1);
+        expect(getMotif(0.6, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.849, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.85, 0.8, 0.7)).toBe(3);
+        // high tier (intensity >= 0.85): 0.2 / 0.5 ceilings, lowest motif is 1 → 1/2/3.
+        expect(getMotif(0.199, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.2, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.499, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.5, 0.8, 0.9)).toBe(3);
+        // tier boundaries belong to the HIGHER tier (strict <).
+        expect(getMotif(0.3, 0.8, 0.599)).toBe(0); // low tier
+        expect(getMotif(0.3, 0.8, 0.6)).toBe(1); // mid tier
+        expect(getMotif(0.2, 0.8, 0.849)).toBe(0); // mid tier
+        expect(getMotif(0.2, 0.8, 0.85)).toBe(2); // high tier
     });
 
-    it('jazz getMotif returns 4 at max seed + high intensity', async () => {
+    it('jazz getMotif pins all three tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/jazz.js');
-        expect(getMotif(0.9, 0.8, 0.95)).toBe(4);
+        expect(typeof getMotif).toBe('function');
+        // Source (jazz.ts): binaryTier(0.6, 0.75); mid tier (maxIntensity HIGH=0.85)
+        // picks [[0.3,0],[0.6,1],[0.85,2], 3]; high tier picks
+        // [[0.2,0],[0.4,1],[0.6,2],[0.8,3], 4].
+        expect(getMotif(0.9, 0.2, 0.8)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // low tier (intensity < 0.6): seed < 0.75 → 0, else → 1.
+        expect(getMotif(0.749, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.75, 0.8, 0.5)).toBe(1);
+        // mid tier (0.6 <= intensity < 0.85): 0.3 / 0.6 / 0.85 ceilings → 0/1/2/3.
+        expect(getMotif(0.299, 0.8, 0.7)).toBe(0);
+        expect(getMotif(0.3, 0.8, 0.7)).toBe(1);
+        expect(getMotif(0.599, 0.8, 0.7)).toBe(1);
+        expect(getMotif(0.6, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.849, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.85, 0.8, 0.7)).toBe(3);
+        // high tier (intensity >= 0.85): 0.2 / 0.4 / 0.6 / 0.8 ceilings → 0/1/2/3/4.
+        expect(getMotif(0.199, 0.8, 0.9)).toBe(0);
+        expect(getMotif(0.2, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.399, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.4, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.599, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.6, 0.8, 0.9)).toBe(3);
+        expect(getMotif(0.799, 0.8, 0.9)).toBe(3);
+        expect(getMotif(0.8, 0.8, 0.9)).toBe(4);
+        // tier boundaries belong to the HIGHER tier (strict <).
+        expect(getMotif(0.5, 0.8, 0.599)).toBe(0); // low tier
+        expect(getMotif(0.5, 0.8, 0.6)).toBe(1); // mid tier
+        expect(getMotif(0.2, 0.8, 0.849)).toBe(0); // mid tier
+        expect(getMotif(0.2, 0.8, 0.85)).toBe(1); // high tier
     });
 
-    it('metal getMotif returns blast beat (4) at max seed + high intensity', async () => {
+    it('metal getMotif pins all three tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/metal.js');
-        expect(getMotif(0.9, 0.8, 0.95)).toBe(4);
+        expect(typeof getMotif).toBe('function');
+        // Source (metal.ts): binaryTier(0.65, 0.6); mid tier (maxIntensity HIGH=0.85)
+        // picks [[0.3,1],[0.7,2], 3] (skips motif 0); high tier picks
+        // [[0.25,2],[0.6,3], 4].
+        expect(getMotif(0.9, 0.2, 0.8)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // low tier (intensity < 0.65): seed < 0.6 → 0, else → 1.
+        expect(getMotif(0.599, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.6, 0.8, 0.5)).toBe(1);
+        // mid tier (0.65 <= intensity < 0.85): 0.3 / 0.7 ceilings, lowest motif 1 → 1/2/3.
+        expect(getMotif(0.299, 0.8, 0.7)).toBe(1);
+        expect(getMotif(0.3, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.699, 0.8, 0.7)).toBe(2);
+        expect(getMotif(0.7, 0.8, 0.7)).toBe(3);
+        // high tier (intensity >= 0.85): 0.25 / 0.6 ceilings, lowest motif 2 → 2/3/4.
+        expect(getMotif(0.249, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.25, 0.8, 0.9)).toBe(3);
+        expect(getMotif(0.599, 0.8, 0.9)).toBe(3);
+        expect(getMotif(0.6, 0.8, 0.9)).toBe(4); // blast beat
+        // tier boundaries belong to the HIGHER tier (strict <).
+        expect(getMotif(0.1, 0.8, 0.649)).toBe(0); // low tier
+        expect(getMotif(0.1, 0.8, 0.65)).toBe(1); // mid tier
+        expect(getMotif(0.1, 0.8, 0.849)).toBe(1); // mid tier
+        expect(getMotif(0.1, 0.8, 0.85)).toBe(2); // high tier
     });
 
-    it('hiphop getMotif returns 1 as lowest motif at high intensity', async () => {
+    it('hiphop getMotif pins both tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/hiphop.js');
+        expect(typeof getMotif).toBe('function');
+        // Source (hiphop.ts): binaryTier(0.65, 0.6); high tier picks
+        // [[0.3,1],[0.7,2], 3] (lowest motif is 1, Trap Foundation).
+        expect(getMotif(0.9, 0.2, 0.8)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // low tier (intensity < 0.65): seed < 0.6 → 0, else → 1.
+        expect(getMotif(0.599, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.6, 0.8, 0.5)).toBe(1);
+        // high tier (intensity >= 0.65): 0.3 / 0.7 ceilings, lowest motif 1 → 1/2/3.
         expect(getMotif(0.1, 0.8, 0.9)).toBe(1); // Trap Foundation
+        expect(getMotif(0.299, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.3, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.699, 0.8, 0.9)).toBe(2);
+        expect(getMotif(0.7, 0.8, 0.9)).toBe(3);
+        // tier boundary: maxIntensity 0.65 belongs to the HIGHER tier (strict <).
+        expect(getMotif(0.1, 0.8, 0.649)).toBe(0); // low tier
+        expect(getMotif(0.1, 0.8, 0.65)).toBe(1); // high tier
     });
 
     it('neo-soul getMotif pins both tiers (mid tier folds back onto the core pair)', async () => {
@@ -284,10 +390,23 @@ describe('Groove files use makeMotifSelector correctly', () => {
         expect(getMotif(0.9, 0.8, 0.69)).toBe(1);
     });
 
-    it('country getMotif stays at most 2 motifs', async () => {
+    it('country getMotif pins both tiers against the source tier table', async () => {
         const { getMotif } = await import('../../../public/engine/grooves/country.js');
-        expect(getMotif(0.9, 0.8, 0.9)).toBe(2);
-        expect(getMotif(0.5, 0.8, 0.9)).toBe(1);
-        expect(getMotif(0.1, 0.8, 0.9)).toBe(0);
+        expect(typeof getMotif).toBe('function');
+        // Source (country.ts): binaryTier(0.6, 0.6); high tier picks
+        // [[0.3,0],[0.8,1], 2] — at most motif 2.
+        expect(getMotif(0.9, 0.2, 0.9)).toBe(0); // low complexity guard
+        expect(getMotif(0.9, 0.8, 0.3)).toBe(0); // low intensity guard (< 0.35)
+        // low tier (intensity < 0.6): seed < 0.6 → 0, else → 1.
+        expect(getMotif(0.599, 0.8, 0.5)).toBe(0);
+        expect(getMotif(0.6, 0.8, 0.5)).toBe(1);
+        // high tier (intensity >= 0.6): 0.3 / 0.8 ceilings → 0/1/2.
+        expect(getMotif(0.299, 0.8, 0.9)).toBe(0);
+        expect(getMotif(0.3, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.799, 0.8, 0.9)).toBe(1);
+        expect(getMotif(0.8, 0.8, 0.9)).toBe(2);
+        // tier boundary: maxIntensity 0.6 belongs to the HIGHER tier (strict <).
+        expect(getMotif(0.3, 0.8, 0.599)).toBe(0); // low tier
+        expect(getMotif(0.3, 0.8, 0.6)).toBe(1); // high tier
     });
 });
