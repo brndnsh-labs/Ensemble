@@ -335,6 +335,10 @@ export function instrumentReducer(action: Action): boolean {
             c.density = 'standard';
             c.voice = 'synth';
             c.autoSound = true;
+            // #1259 — the chords lane was the one instrument whose `style` this case
+            // forgot (bass/soloist/harmony all had it), so a reset chart kept the old
+            // comping style. That was the worst *realistic* outcome of the whole gap.
+            c.style = 'smart';
 
             b.enabled = true;
             b.volume = 1.0;
@@ -353,6 +357,10 @@ export function instrumentReducer(action: Action): boolean {
             s.octave = 72;
             s.style = 'smart';
             s.mode = 'monophonic';
+            // #1259 — hydrated (#856) but never reset. Left false, the `mode` this case
+            // just set back to 'monophonic' would stay manually pinned instead of
+            // re-deriving from the voice on the next fresh session.
+            s.autoMode = true;
             s.complexity = 0.5;
             s.tradeMode = 'manual';
             s.phrasingIntensity = 0.5;

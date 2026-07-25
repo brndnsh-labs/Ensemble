@@ -35,10 +35,13 @@ Synchronizes the worker's internal state with the global state. Supports partial
     "soloist": { ... },
     "harmony": { ... },
     "groove": { ... },
-    "playback": { ... }
+    "playback": { ... },
+    "midi": { ... }
   }
 }
 ```
+
+`midi` is a first-class synced slice — `getSyncState()` ships `buildMidiSyncPayload(midi)` and the worker applies it via `recursiveSafeSync(midi, data.midi, 'midi')` in both its `syncState` and `flush` handlers. It was missing from this list until #1259; see rule 8 for the four config fields deliberately held back from the payload.
 
 ### `requestBuffer`
 Explicitly requests the worker to fill the musical buffers for a specific step.
@@ -177,4 +180,8 @@ Reports an internal worker error.
 
 8.  **Main-Thread-Only Synced Fields**: A synced field can be shipped in the full snapshot for symmetry without having a delta-sync case if no worker code reads it. `arranger.seed` (the song's PRNG seed driving soloist + drum generation) is the current example — it is consumed only on the main thread in `public/state/state-effects.ts` to derive `sessionSeed` and drum orchestration/fills/accents, all of which cross to the worker via their own `UPDATE_SB` / `UPDATE_GB` delta cases. Editing the seed mid-session therefore needs no `SET_SONG_SEED` delta in `syncWorker()`; the next derived dispatch carries the freshly-seeded output. If a future engine change starts reading `arranger.seed` on the worker side, add a `case 'SET_SONG_SEED'` delta there at the same time.
 
-    A second example: `playback.chartLocked` is pure UI state (controls whether the chord chart renders the inline editor) — read only by main-thread components (`ChartSurface.tsx`, `ChordVisualizer.tsx`, `GlobalShortcuts.tsx`, `state-effects.ts`) and intentionally excluded from `getSyncState().playback`. The `SET_CHART_LOCKED` action does **not** need a delta case in `syncWorker()`; if a future engine change ever reads `chartLocked` worker-side, add both the snapshot field and the delta in the same commit.
+    The `midi` slice is the third: `buildMidiSyncPayload` ships the channels, octave offsets, `latency`, `velocitySensitivity` and `enabled`, but deliberately holds back `selectedOutputId`, `selectedInputId`, `inputEnabled` and `muteLocal` — device routing and local-audio muting are main-thread concerns (`controllers/midi-controller.ts`, `engine/engine.ts`, `engine/midi-scheduler.ts`), and the worker holds no `MIDIAccess`. `midi.outputs` / `midi.inputs` are excluded for a different reason again: they are a *mirror of live hardware enumeration*, rebuilt by `syncMIDIOutputs`/`syncMIDIInputs` from the controller's `midiAccess`, so they are neither persisted nor part of any reset's inverse (#1259).
+
+    **`RESET_STATE` is boot-only by contract.** It has no delta case in `syncWorker()`'s switch, so a `RESET_STATE` dispatched after `initWorker()` posts nothing and leaves the worker generating over the entire pre-reset chart. Today that is safe because its only two production dispatch sites are in `state/state-hydration.ts`, which runs at `main.ts:36` — well before `initWorker()`. It now resets ~18 worker-synced fields, so if you ever wire it to a "New Session" control, follow it with `flushBuffers()`, **not** a bare `syncWorker()`: per rule 4 only `flush` resets cursors and buffer heads, which is exactly what a reset needs. Don't add a partial `case 'RESET_STATE'` delta — the correct payload for a reset is the whole snapshot plus a cursor reset.
+
+    A further example: `playback.chartLocked` is pure UI state (controls whether the chord chart renders the inline editor) — read only by main-thread components (`ChartSurface.tsx`, `ChordVisualizer.tsx`, `GlobalShortcuts.tsx`, `state-effects.ts`) and intentionally excluded from `getSyncState().playback`. The `SET_CHART_LOCKED` action does **not** need a delta case in `syncWorker()`; if a future engine change ever reads `chartLocked` worker-side, add both the snapshot field and the delta in the same commit.

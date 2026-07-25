@@ -726,4 +726,134 @@ describe('Security: Hydration & Storage Resilience', () => {
             consoleError.mockRestore();
         });
     });
+
+    /**
+     * #1259 — the persisted MIDI block has to survive a round-trip.
+     *
+     * `harmonyOctave` was saved by `persistence.ts` on every write and simply absent
+     * from hydration's `SET_MIDI_CONFIG` payload, so the setting was silently discarded
+     * on every load while its four sibling octave offsets restored fine. Nothing failed
+     * loudly — the field just quietly went back to 0 on each boot.
+     *
+     * Asserted on the dispatched payload rather than resulting state because that
+     * payload IS the reader's whole contract here: the mocked `dispatch` means the real
+     * `midiReducer` never runs, so a key missing from the payload is exactly the defect.
+     */
+    describe('persisted MIDI config round-trips (#1259)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+        const MIDI_OCTAVE_KEYS = [
+            'chordsOctave',
+            'bassOctave',
+            'soloistOctave',
+            'harmonyOctave',
+            'drumsOctave',
+        ] as const;
+
+        it.each(MIDI_OCTAVE_KEYS)('restores midi.%s from the saved payload', (key) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    midi: { [key]: 2 },
+                }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.dispatch).toHaveBeenCalledWith(
+                ACTIONS.SET_MIDI_CONFIG,
+                expect.objectContaining({ [key]: 2 }),
+            );
+        });
+
+        // The whole block, not just the octaves — a key added to `saveCurrentState()`'s
+        // midi literal and forgotten here would be dropped just as quietly.
+        it('restores every key persistence.ts writes for midi', () => {
+            const saved = {
+                enabled: true,
+                selectedOutputId: 'out-1',
+                inputEnabled: true,
+                selectedInputId: 'in-1',
+                chordsChannel: 5,
+                bassChannel: 6,
+                soloistChannel: 7,
+                harmonyChannel: 8,
+                drumsChannel: 9,
+                chordsOctave: 1,
+                bassOctave: -1,
+                soloistOctave: 2,
+                harmonyOctave: -2,
+                drumsOctave: 1,
+                latency: 12,
+                muteLocal: false,
+                velocitySensitivity: 0.75,
+            };
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], midi: saved }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.dispatch).toHaveBeenCalledWith(
+                ACTIONS.SET_MIDI_CONFIG,
+                expect.objectContaining(saved),
+            );
+        });
+    });
+
+    /**
+     * #1259 — `vizState.enabled` was the least-validated write in `hydrateSavedState()`:
+     * `savedState.vizEnabled !== undefined ? savedState.vizEnabled : false` put any JSON
+     * value straight into a field typed `boolean`.
+     *
+     * It matters more than a stray type because of *where* it sits. The write is early,
+     * so it survives a throw almost anywhere later in the function; a truthy non-boolean
+     * makes the scheduler emit visualizer events every step; and `saveCurrentState()`
+     * writes the value back out unchanged — so the bad value outlives the very reload
+     * that was supposed to clear it. Coercion at the read is what breaks that cycle.
+     */
+    describe('vizState.enabled is coerced to a real boolean (#1259)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        const hydrateWith = (vizEnabled: unknown) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], vizEnabled }),
+            );
+            hydrateState();
+            return stateModule.getState().vizState.enabled;
+        };
+
+        it.each([
+            ['a non-empty string', 'true'],
+            ['a truthy number', 1],
+            ['an object', { on: true }],
+            ['an array', [1]],
+        ])('coerces %s to true, not the raw value', (_label, value) => {
+            const enabled = hydrateWith(value);
+            expect(enabled).toBe(true);
+            expect(typeof enabled).toBe('boolean');
+        });
+
+        it.each([
+            ['an empty string', ''],
+            ['zero', 0],
+            ['null', null],
+        ])('coerces %s to false', (_label, value) => {
+            expect(hydrateWith(value)).toBe(false);
+        });
+
+        // The missing-key case has to keep behaving exactly as the old ternary did —
+        // `!!undefined` is false, which is the point of replacing it rather than
+        // adding a guard around it.
+        it('defaults to false when the key is absent', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection] }),
+            );
+            hydrateState();
+            expect(stateModule.getState().vizState.enabled).toBe(false);
+        });
+    });
 });

@@ -3,6 +3,31 @@ import { vizReducer, vizState } from '../../../public/state/visualizer.js';
 import { ACTIONS } from '../../../public/types.js';
 
 describe('Visualizer State Reducer', () => {
+    /**
+     * #1259 — this slice had no `RESET_STATE` case, which made `enabled` the stickiest
+     * survivor of the corrupt-payload fallback: hydration writes it very early (so it
+     * outlives a throw almost anywhere later), and `saveCurrentState()` writes it back
+     * out — so a bad value survived the reload meant to clear it.
+     *
+     * The value, not just the coverage: `reset-state-inverse.test.ts` uses the post-reset
+     * manifest as its baseline, so a case that reset `enabled` to `true` would pass there.
+     * Defaulting the visualizer *on* would make the scheduler emit viz events every step
+     * for a user who never asked for it.
+     */
+    describe('RESET_STATE (#1259)', () => {
+        it('restores enabled to false', () => {
+            vizReducer({
+                type: ACTIONS.SET_PARAM,
+                payload: { module: 'vizState', param: 'enabled', value: true },
+            });
+
+            const handled = vizReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+
+            expect(handled).toBe(true);
+            expect(vizState.enabled).toBe(false);
+        });
+    });
+
     it('should handle generic SET_PARAM action', () => {
         vizReducer({
             type: ACTIONS.SET_PARAM,

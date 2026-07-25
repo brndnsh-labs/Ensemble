@@ -292,6 +292,12 @@ function hydrateSavedState(): void {
             bpm: clamp(savedState.bpm, 20, 300, 100),
             bandIntensity: clamp(savedState.bandIntensity, 0, 1, 0.35),
             complexity: clamp(savedState.complexity, 0, 1, 0.3),
+            // `autoIntensity` and `metronome` are persisted by `saveCurrentState()` but
+            // deliberately NOT restored — every session starts with the conductor on and
+            // the click off, regardless of how the last one ended. Stated here because
+            // this is otherwise indistinguishable from the `harmonyOctave` bug fixed in
+            // #1259 (saved on every write, silently dropped on every load), and the next
+            // person diffing writer against reader will land on exactly these two lines.
             autoIntensity: true,
             practiceMode: savedState.practiceMode !== undefined ? savedState.practiceMode : true,
             metronome: false,
@@ -307,8 +313,13 @@ function hydrateSavedState(): void {
             masterVolume: clamp(savedState.masterVolume, 0, 1, 0.4),
         });
 
-        (vizState as Mutable<typeof vizState>).enabled =
-            savedState.vizEnabled !== undefined ? savedState.vizEnabled : false; // @direct-mutation
+        // #1259 — coerced, not passed through. This was the least-validated write in the
+        // whole function: the old `!== undefined ? … : false` accepted any JSON value
+        // (a string, an object) into a field typed `boolean`. A garbage-truthy value made
+        // the scheduler emit visualizer events on every step, and `saveCurrentState()`
+        // wrote it straight back, so it outlived the reload meant to clear it. `!!` also
+        // covers the missing-key case identically to the old ternary.
+        (vizState as Mutable<typeof vizState>).enabled = !!savedState.vizEnabled; // @direct-mutation
 
         if (savedState.chords) {
             Object.assign(chords, {
@@ -497,6 +508,12 @@ function hydrateSavedState(): void {
                 chordsOctave: savedState.midi.chordsOctave || 0,
                 bassOctave: savedState.midi.bassOctave || 0,
                 soloistOctave: savedState.midi.soloistOctave || 0,
+                // #1259 — `harmonyOctave` was missing here while `persistence.ts` saved
+                // it, `Settings.tsx` exposes a control for it and `midi-scheduler.ts`
+                // transposes by it: the setting was written on every save and silently
+                // dropped on every load. Found by diffing the persisted manifest against
+                // this reader, which is exactly what this issue's regression guard does.
+                harmonyOctave: savedState.midi.harmonyOctave || 0,
                 drumsOctave: savedState.midi.drumsOctave || 0,
                 velocitySensitivity:
                     savedState.midi.velocitySensitivity !== undefined

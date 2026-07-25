@@ -96,6 +96,13 @@ export function playbackReducer(action: Action): boolean {
             p.applyPresetSettings = false;
             p.conductorVelocity = 1.0;
             p.updateAvailable = false;
+            // #1259 — hydrated fields that RESET_STATE used to skip. `masterVolume` is
+            // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
+            // the fallback and booted the app **silent** — a silent app on top of a
+            // deliberately silent recovery is the worst case to debug.
+            p.practiceMode = true;
+            p.songMode = true;
+            p.masterVolume = 0.4;
             return true;
         case ACTIONS.SET_UPDATE_AVAILABLE:
             p.updateAvailable = !!action.payload;

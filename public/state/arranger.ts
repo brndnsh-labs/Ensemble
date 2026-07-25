@@ -52,6 +52,12 @@ export function arrangerReducer(action: Action): boolean {
             a.history = [];
             a.grouping = null;
             a.seed = '';
+            // #1259 — these two are hydrated from the persisted payload, so leaving
+            // them out made RESET_STATE an incomplete inverse: the corrupt-payload
+            // fallback in `hydrateState()` promises a fresh session and delivered a
+            // default chart still carrying the old preset name.
+            a.lastChordPreset = 'Pop (Standard)';
+            a.randomizeSeed = true;
             return true;
         case ACTIONS.SET_NOTATION:
             a.notation = action.payload;
