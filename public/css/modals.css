@@ -1991,9 +1991,10 @@ input[type="range"] {
     transition: border-color 0.2s;
 }
 
-.section-label-input:focus {
+.section-label-input:focus-visible {
     outline: none;
     border-bottom-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
 }
 
 .symbol-btn {
@@ -2082,9 +2083,11 @@ input[type="range"] {
     }
 }
 
-.section-prog-input:focus {
+.section-prog-input:focus-visible {
     outline: none;
     border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--focus-ring-color);
+    border-radius: var(--radius-sm);
 }
 
 /* Arrangement Editor: Section Settings */

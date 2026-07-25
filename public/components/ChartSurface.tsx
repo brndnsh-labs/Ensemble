@@ -111,6 +111,8 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                 type="button"
                                 class={`header-btn header-btn--icon chart-surface__viz-btn${isVizOpen ? ' active' : ''}`}
                                 aria-label="Open visualizer"
+                                aria-haspopup="dialog"
+                                aria-expanded={isVizOpen}
                                 onClick={() => setIsVizOpen(true)}
                             >
                                 <Icon name="visualizer" />
