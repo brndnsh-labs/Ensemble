@@ -6,7 +6,7 @@ import { ACTIONS } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { stopSoloist, triggerDrumSound, triggerSoloNote } from './performance-controller.js';
 
-let midiAccess: any = null;
+let midiAccess: MIDIAccess | null = null;
 
 // Reverse of DRUM_MAP for incoming Note On → drum-name lookup (play-along).
 // Several instrument names share one GM note (e.g. HiHat/HiHatQuarter both
@@ -55,9 +55,11 @@ const sentBendValues = new Map<number, number>();
 /**
  * Handles incoming MIDI messages from controllers.
  */
-function handleMIDIMessage(event: any, inputId?: string): void {
+function handleMIDIMessage(event: MIDIMessageEvent, inputId?: string): void {
     const { midi } = getState();
-    if (!midi.enabled) {
+    // `MIDIMessageEvent.data` is `Uint8Array | null` — a null-data message
+    // would throw at the destructure below, so it no-ops here instead.
+    if (!midi.enabled || !event.data) {
         return;
     }
 
@@ -193,7 +195,7 @@ function attachInputListeners(): void {
         return;
     }
     for (const input of midiAccess.inputs.values()) {
-        input.onmidimessage = (event: any) => handleMIDIMessage(event, input.id);
+        input.onmidimessage = (event: MIDIMessageEvent) => handleMIDIMessage(event, input.id);
     }
 }
 
@@ -206,7 +208,8 @@ function syncMIDIOutputs(): void {
     }
     const outputs: { id: string; name: string }[] = [];
     for (const output of midiAccess.outputs.values()) {
-        outputs.push({ id: output.id, name: output.name });
+        // `MIDIPort.name` is spec'd `string | null`; the picker needs a label.
+        outputs.push({ id: output.id, name: output.name ?? 'Unknown Device' });
     }
     dispatch(ACTIONS.SET_MIDI_CONFIG, { outputs });
 }
@@ -229,7 +232,8 @@ function syncMIDIInputs(validateSelection = false): void {
     }
     const inputs: { id: string; name: string }[] = [];
     for (const input of midiAccess.inputs.values()) {
-        inputs.push({ id: input.id, name: input.name });
+        // `MIDIPort.name` is spec'd `string | null`; the picker needs a label.
+        inputs.push({ id: input.id, name: input.name ?? 'Unknown Device' });
     }
     const payload: ActionPayloadSetMidiConfig = { inputs };
     if (validateSelection) {
@@ -247,7 +251,7 @@ function syncMIDIInputs(validateSelection = false): void {
  */
 function getMIDIOutputAndTimestamp(
     time: number,
-): { output: any; midiTime: number; midiState: MidiState } | null {
+): { output: MIDIOutput; midiTime: number; midiState: MidiState } | null {
     const { playback, midi } = getState();
     if (!midi.enabled || !midi.selectedOutputId || !midiAccess) {
         return null;
