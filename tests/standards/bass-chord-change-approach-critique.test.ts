@@ -363,7 +363,7 @@ const measureBendRate = (
     numBars: number,
     genreFeel: string,
     bassStyle: string,
-): { bentCount: number; sampleCount: number } => {
+): { bentCount: number; sampleCount: number; chromaticCount: number } => {
     const stepMap = makeStepMap(numBars);
     const mockState = makeMockState(genreFeel);
     mockState.arranger.totalSteps = numBars * 16;
@@ -374,6 +374,7 @@ const measureBendRate = (
     const totalSteps = numBars * 16;
     let bentCount = 0;
     let sampleCount = 0;
+    let chromaticCount = 0;
     let lastMidi: number | null = null;
 
     for (let i = 0; i < totalSteps; i++) {
@@ -413,8 +414,24 @@ const measureBendRate = (
             typeof note.approachTargetRoot === 'number'
         ) {
             sampleCount++;
-            if (note.bendStartInterval) {
-                bentCount++;
+            // #1254 — the denominator must be CHROMATIC approaches only. `getBassNote` has
+            // two approach branches and BOTH set `approachTargetRoot`: the chromatic
+            // leading-tone branch (which can bend) and a fallback that picks targetRoot
+            // ±5/±7 (which passes bend `0` unconditionally). Counting both made this
+            // metric `chromaticProb × bendProb`, so a musically-motivated retune of Jazz's
+            // `chromaticProb` — touching no bend logic at all — would have reddened the
+            // *bend* test with a misleading failure. Filtering to leading-tone landings
+            // makes the rate equal `bendProb` alone, which is what the test's name claims.
+            //
+            // Compared mod 12 because the chromatic branch runs its candidate through
+            // `clampAndNormalizeMidi`, which may octave-shift it; the fallback branch's
+            // ±5/±7 are 5 or 7 mod 12 and so can never be mistaken for a leading tone.
+            const semitonesFromTarget = Math.abs(note.midi - note.approachTargetRoot) % 12;
+            if (semitonesFromTarget === 1 || semitonesFromTarget === 11) {
+                chromaticCount++;
+                if (note.bendStartInterval) {
+                    bentCount++;
+                }
             }
         }
 
@@ -423,7 +440,7 @@ const measureBendRate = (
         }
     }
 
-    return { bentCount, sampleCount };
+    return { bentCount, sampleCount, chromaticCount };
 };
 
 // --- Tests ---
@@ -634,27 +651,70 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
     // typo or an accidentally-emptied allowlist would pass every other
     // assertion in this file silently — this is the regression guard for that.
     it('approach bend fires for an allowlisted genre (Jazz) and never for an excluded genre (Rock)', () => {
-        const numBars = 128;
+        const numBars = 1024;
         const jazz = measureBendRate(numBars, 'Jazz', 'quarter');
         const rock = measureBendRate(numBars, 'Rock', 'quarter');
-        const jazzRate = jazz.bentCount / (jazz.sampleCount || 1);
+        const jazzRate = jazz.bentCount / (jazz.chromaticCount || 1);
 
         console.log(
             '\n--- APPROACH-BEND GENRE GATE REPORT ---\n' +
-                `[Jazz samples] ${jazz.sampleCount}  bent=${jazz.bentCount}  rate=${(jazzRate * 100).toFixed(1)}%\n` +
-                `[Rock samples] ${rock.sampleCount}  bent=${rock.bentCount}\n` +
-                '[Required]     Jazz rate 5-35%, Rock bent=0\n' +
+                `[Jazz samples] ${jazz.sampleCount} approaches, ${jazz.chromaticCount} chromatic  bent=${jazz.bentCount}  rate=${(jazzRate * 100).toFixed(1)}%\n` +
+                `[Rock samples] ${rock.sampleCount} approaches, ${rock.chromaticCount} chromatic  bent=${rock.bentCount}\n` +
+                '[Required]     Jazz bend rate 13-32% of chromatic approaches, Rock bent=0\n' +
                 '----------------------------------------\n',
         );
 
-        expect(jazz.sampleCount).toBeGreaterThan(20);
-        expect(rock.sampleCount).toBeGreaterThan(20);
-        // why: approachBend fires at a flat 20% rate whenever the chromatic
-        // branch is taken; Jazz at intensity 0.8 forces chromaticProb to 0.95,
-        // so ~19% of all approach-branch samples should show a nonzero bend.
-        // Wide floor/ceiling for stochastic variance.
-        expect(jazzRate).toBeGreaterThan(0.05);
-        expect(jazzRate).toBeLessThan(0.35);
+        // Harness integrity, not statistics. The total approach count is structurally
+        // deterministic — the step-14 activity gate runs on `scrambleHash(step, loopCount)`,
+        // not `Math.random`, so it is invariant under the seeded spy AND under any
+        // bend/chromatic constant (verified 476 at five different bend probabilities).
+        // Asserted exactly, so a future change to `makeStepMap` or the approach gate that
+        // collapses the sample set fails here loudly instead of silently widening the band.
+        expect(jazz.sampleCount).toBe(476);
+        expect(rock.sampleCount).toBe(476);
+        // The chromatic subset IS stochastic — it scales with `chromaticProb` (370 of 476
+        // at the current 0.95). This floor is a COLLAPSE detector only, set far below any
+        // plausible retune on purpose: dropping `chromaticProb` to 0.7 yields ~270 and must
+        // NOT redden this test, because the bend rate is the thing under measurement here
+        // and the file already has a dedicated chromatic-rate test. An earlier draft used
+        // `> 300`, which re-coupled the two concerns that re-denominating the metric had
+        // just separated — verified by mutation: at `chromaticProb = 0.7` the rate stays in
+        // band at 17.6% but a 300-floor fails.
+        expect(jazz.chromaticCount).toBeGreaterThan(100);
+
+        // The musical claim (#1254): the scoop into the chromatic leading tone is an
+        // OCCASIONAL expressive gesture — roughly one approach in five. `approachBend`
+        // rolls a flat `Math.random() < 0.2` (`bass-styles.ts`), whose own comment is
+        // explicit that firing on every approach "reads as a mannerism".
+        //
+        // The band is set from the AUDIBLE boundaries, not from σ. The listener-distinct
+        // categories are: ~0-5% the articulation is effectively gone; ~10% rare; ~20%
+        // occasional; ~40%+ a tic. Nobody hears the difference between 15% and 25% —
+        // roughly 9 versus 15 scoops across a 128-bar stretch — so a band that reddened
+        // there would be flagging a change no ear can detect, and would eventually be
+        // loosened by someone who was right to loosen it.
+        //
+        // Measured seeded rates across a bend-probability sweep at n≈370: p=0.10 → 10.3%,
+        // 0.15 → 15.4%, 0.20 → 21.6%, 0.25 → 27.8%, 0.30 → 34.1%, 0.40 → 43.2%.
+        // [0.13, 0.32] therefore FAILS p=0.10 and p≥0.30 (the audible category changes)
+        // and TOLERATES p=0.15/0.25 (the inaudible ones) — which is the intended
+        // discrimination, not a weakness. Statistically the floor is 3.4σ below the 20%
+        // mean (sd 2.08% at this n) and the ceiling 5.8σ above, so stream-shift false-fail
+        // risk is negligible on both edges.
+        //
+        // Honest about power: the ceiling catches p=0.40 essentially always, but p=0.30
+        // only ~20% of stream positions (its mean of 30% sits under 0.32; this seed drew
+        // 1.7σ high). That is the accepted cost of not gating on inaudible differences —
+        // a doubling of the gesture rate is caught, a 50% increase may not be.
+        //
+        // Why the old [0.05, 0.35] was a fence: at the previous 128-bar sample (n≈62,
+        // sd 5.1%) a measured 6% and a measured 34% both passed — a bass that almost never
+        // scoops and one that bends into every other chord change. The #1254 reviewer
+        // proposed [0.12, 0.28], the right instinct but un-derivable at n=62 (±1.4σ → ~8%
+        // false-fail on any stream shift). Growing the sample is what made an honest band
+        // possible at all; the 8× longer run costs ~300ms.
+        expect(jazzRate).toBeGreaterThan(0.13);
+        expect(jazzRate).toBeLessThan(0.32);
         // why: Rock is not in EXPRESSIVE_BEND_GENRES — this must stay exactly
         // 0. A genre-string typo or an emptied allowlist would leak a nonzero
         // bend here without tripping any other test in this file.
