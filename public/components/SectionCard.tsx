@@ -299,7 +299,13 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                         value={section.label}
                         aria-label="Section Name"
                         maxLength={100}
-                        onChange={(e: any) => onSectionUpdate(section.id, 'label', e.target.value)}
+                        onChange={(e) =>
+                            onSectionUpdate(
+                                section.id,
+                                'label',
+                                (e.target as HTMLInputElement).value,
+                            )
+                        }
                     />
                     {section.seamless && <span class="section-status-chip">Linked</span>}
                     <div class="section-title-actions">
@@ -357,11 +363,14 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             min="1"
                                             max="8"
                                             aria-label="Repeat Count"
-                                            onChange={(e: any) =>
+                                            onChange={(e) =>
                                                 onSectionUpdate(
                                                     section.id,
                                                     'repeat',
-                                                    parseInt(e.target.value, 10),
+                                                    parseInt(
+                                                        (e.target as HTMLInputElement).value,
+                                                        10,
+                                                    ),
                                                 )
                                             }
                                         />
@@ -372,8 +381,12 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             class="section-key-select"
                                             value={section.key || ''}
                                             aria-label="Section Key"
-                                            onChange={(e: any) =>
-                                                onSectionUpdate(section.id, 'key', e.target.value)
+                                            onChange={(e) =>
+                                                onSectionUpdate(
+                                                    section.id,
+                                                    'key',
+                                                    (e.target as HTMLSelectElement).value,
+                                                )
                                             }
                                         >
                                             <option value="">Auto</option>
@@ -399,11 +412,11 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             class="section-ts-select"
                                             value={section.timeSignature || ''}
                                             aria-label="Time Signature"
-                                            onChange={(e: any) =>
+                                            onChange={(e) =>
                                                 onSectionUpdate(
                                                     section.id,
                                                     'timeSignature',
-                                                    e.target.value,
+                                                    (e.target as HTMLSelectElement).value,
                                                 )
                                             }
                                         >
@@ -465,7 +478,7 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                     aria-label="Chord Progression"
                     maxLength={1000}
                     placeholder="Enter chords (e.g. C Am F G)"
-                    onInput={(e: any) => {
+                    onInput={(e) => {
                         const ta = e.target as HTMLTextAreaElement;
                         const result = applyAutocomplete(ta.value, ta.selectionStart || 0);
                         onSectionUpdate(section.id, 'value', result.value);

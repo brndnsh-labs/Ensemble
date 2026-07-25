@@ -66,7 +66,7 @@ export function ToolbarPopover({
 
     useEffect(() => {
         if (panelRef.current && 'inert' in panelRef.current) {
-            (panelRef.current as any).inert = !isOpen;
+            panelRef.current.inert = !isOpen;
         }
     }, [isOpen]);
 

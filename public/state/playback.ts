@@ -60,7 +60,7 @@ export const playback = deepSignal<GlobalContext>({
     visualFlash: false,
     haptic: false,
     qualityColors: true, // color chord symbols by harmonic quality on the chart
-    toasts: [] as any[],
+    toasts: [],
     flashIntensity: 0,
     updateAvailable: false,
     resolutionTriggered: false,
@@ -143,6 +143,11 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_MODAL_OPEN:
             if (Object.hasOwn(playback.modals, action.payload.modal)) {
+                // `as any` is load-bearing here: deepSignal types each modal flag as
+                // `Signal<boolean> & true | Signal<boolean> & false`, so a dynamic-key
+                // WRITE won't accept a plain boolean under a `keyof` narrow (TS2322).
+                // The read-side sibling in GlobalShortcuts.tsx narrows fine; this one
+                // can't. Guarded by the `Object.hasOwn` check above.
                 (playback.modals as any)[action.payload.modal] = !!action.payload.open;
                 return true;
             }
