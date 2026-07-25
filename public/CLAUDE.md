@@ -163,8 +163,10 @@ themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit
     it cannot lock to a reference that moves). Any change that destabilizes tempo/timing by
     default — anywhere in this layer's transport/BPM path (`app-controller.ts` `setBpm`,
     `playback` slice) — needs to ship **opt-in**, not default-on, even when it makes the band
-    sound more human. The one shipped precedent (tempo breathing, #1010) is gated behind an
-    explicit "Expressive timing" toggle, off during practice.
+    sound more human. Tempo breathing (#1010) is the standing design in this space and is
+    **still parked** — if it ships it must be opt-in and off during practice. No
+    expressive-timing toggle exists today, so there is **no prior art** here to cite: don't
+    read this constraint as "we already ship opt-in tempo drift."
 
 ## Config-semantics changes
 

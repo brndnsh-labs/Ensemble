@@ -39,7 +39,10 @@ npm test             # mutation check + Biome + docs lint + Vitest (node/happy-d
 npm run test:browser # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
 npm run test:e2e     # run Playwright against a `vite preview` build of the shipped bundle
 npm run validate     # typecheck + knip + jscpd + format + npm test
+npm run depcheck     # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 ```
+
+`npm run depcheck` is the circular-import gate (`biome lint --only=suspicious/noImportCycles`). It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
 
 Targeted tests:
 
@@ -109,6 +112,8 @@ Single chart-first surface (`ChartSurface`): the chord chart is always visible, 
 - UI metadata (menus, categories): `public/data/instrument-styles.ts`
 - Generative behavior: `public/engine/bass-styles.ts`, `public/engine/chords-styles.ts`, `public/engine/grooves/`
 - `public/styles.css` is an import manifest only — put feature CSS in `public/css/`.
+
+**Layering (documented, deliberately not gated).** UI components should reach the engine through data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus `scheduler-core.ts`'s sanctioned real-time state import. Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
 
 ## Musical Logic & Generative Standards
 
