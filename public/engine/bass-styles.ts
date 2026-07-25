@@ -1159,14 +1159,25 @@ export function getBassNoteStyle(
             // Probability of octave increases with intensity
             const octaveProb = 0.4 + intensity * 0.6;
             if (Math.random() < octaveProb) {
-                let note = baseRoot + 12;
-                // Smart Octave Flipping: stay within bass slot
-                if (note > absMax) {
-                    note = baseRoot - 12;
-                }
-                // Final safety
-                if (note < absMin) {
-                    note = baseRoot;
+                const note = baseRoot + 12;
+                // #1271 — the pump is UPWARD by definition: low root on the beat, octave
+                // as the lift above it. This used to fold an overflowing octave DOWN
+                // (`note = baseRoot - 12`), which inverted the gesture — and when the
+                // register anchor had drifted up an octave, `baseRoot - 12` landed on the
+                // downbeat's own pitch and emitted a unison from a roll that had
+                // succeeded. Both were then scored as perfect by the critique test's
+                // `Math.abs(diff) === 12`.
+                //
+                // `PUMP_ANCHOR_STYLES` in `bass-engine.ts` now picks an anchor whose
+                // octave partner is guaranteed to fit (ceiling `absMax - 12`), so this
+                // never fires. It stays as a non-inverting fallback rather than an
+                // assertion because a missed pump on one upbeat is a small blemish while
+                // an inverted one contradicts the line's identity — and the branch cannot
+                // fix it properly itself, since lowering the PAIR needs the downbeat this
+                // upbeat has already been played against. Same shape as the gallop's fold
+                // below and the funk slap-pop's.
+                if (note > absMax || note < absMin) {
+                    return result(getFrequency(baseRoot), 0.8, 1.15);
                 }
 
                 return result(getFrequency(note), 0.8, 1.15);
