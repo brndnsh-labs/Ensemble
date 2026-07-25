@@ -26,6 +26,7 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getFrequency, getStepInfo } from '../../public/utils.js';
+import { installSeededRandom } from '../utils/seeded-random.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
 
@@ -428,6 +429,15 @@ const measureBendRate = (
 // --- Tests ---
 
 describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
+    // why: `approachBend` rolls a flat raw `Math.random() < 0.2` whenever the chromatic
+    // branch is taken (`bass-styles.ts`), so the measured bend rate is an unseeded
+    // binomial. Measured over 50 isolated runs: mean 19.1% (matching the designed
+    // ~19%), sd 5.3%, range 9.7-33.9% — wide enough that CI run 283 crossed the 35%
+    // ceiling at 35.5% (a +3.1σ draw). A mulberry32-seeded spy collapses every
+    // assertion in this file to one deterministic run. See docs/FLAKY_TESTS.md
+    // (unseeded-statistical class).
+    installSeededRandom();
+
     // why: S2 regression — jazz rate must stay above the prior threshold.
     // Before S2 the gate was: Jazz/Blues always eligible. After S2 it's: always eligible,
     // Jazz/Blues get 0.95 override at high intensity. Net effect on Jazz: identical.
@@ -453,9 +463,11 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         // (±1) have 80% weight in the picker, so expected rate ≈ 0.95 × 0.8 ≈ 76%.
         // However the quarter-style walking path on step 14 is an isEighthSkip, and
         // the approach branch competes with the isJazz beat-2 path and the overall
-        // quarter-note fallback structure. Empirically we observe 22-35% at 128 bars.
-        // 20% floor gives ~2pt headroom below the observed minimum — guards against
-        // regressions without being so tight it flakes on stochastic runs.
+        // quarter-note fallback structure. Re-measured 2026-07-24 over 60 unseeded
+        // runs: 31.5-43.3% at 128 bars (mean 37.7%, sd 2.6%) — the "22-35%" this
+        // comment used to claim was stale, and the seeded draw of 41.7% would have
+        // read as a regression against it. The 20% floor now sits ~11pt below the
+        // observed minimum, so it guards only a gross break of the branch.
         expect(rate).toBeGreaterThan(0.2);
     });
 
@@ -485,10 +497,11 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         expect(chordChangeCount).toBeGreaterThan(100);
         // why: audit acceptance is "5-15% of chord-change beat-4-ands" (bass.md P1 #4).
         // 5% floor confirms the gate is gone; 25% ceiling = audit's 15% target + 10pp
-        // headroom for stochastic upper tail (observed 11-22% across 60-run loops on
-        // 256-bar charts; a 2× regression to ~30% would trip this). Preserves the
-        // "non-jazz/blues gets 0.5× probability" musical claim from bass-engine.ts:697-700
-        // — Jazz still measures 22-35% on the same window, well above this ceiling.
+        // headroom for stochastic upper tail (re-measured 2026-07-24: 11.4-20.4% over
+        // 60 unseeded runs on 256-bar charts, mean 15.3%; a 2× regression to ~30% would
+        // trip this). Preserves the "non-jazz/blues gets 0.5× probability" musical claim
+        // from `getBassNote`'s chromaticProb block in bass-engine.ts — Jazz measures
+        // 31.5-43.3% on its own 128-bar window, well above this ceiling.
         expect(rate).toBeGreaterThan(0.05);
         expect(rate).toBeLessThan(0.25);
     });
@@ -540,7 +553,11 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         // why: funk approach branch (bass-styles.ts:612-622) fires on stepInBeat === 3 with
         // intensity > 0.75 and a 60% raw probability gate; both ±1 outcomes are chromatic.
         // Theoretical ceiling ≈ 60% but the branch competes with other funk fills and slap
-        // gestures — empirically 22-27% across 30-run loops. 10% floor guards against the
+        // gestures — a constant 24.71%, because this funk path rolls `scrambleHash`, not
+        // `Math.random`, so it was already fully deterministic before this file was
+        // seeded (verified: sd 0 across 60 unseeded runs and identical at 4 seeds).
+        // The old "22-27% across 30-run loops" implied a spread that does not exist.
+        // 10% floor guards against the
         // branch silently breaking; 30% ceiling guards against the funk slap idiom being
         // accidentally amplified (matches the same "no over-jazzing" discipline as Rock).
         expect(rate).toBeGreaterThan(0.1);
