@@ -2,14 +2,18 @@
 /**
  * @vitest-environment happy-dom
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getState } from '../../../public/state.js';
 
 const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { SMART_GENRES } from '../../../public/data/smart-genres.js';
+import { calculateStepDuration } from '../../../public/engine/groove-engine.js';
 import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
-import { loadFromUrl } from '../../../public/state/state-hydration.js';
+import { MIXER_SETTINGS_VERSION } from '../../../public/state/instruments.js';
+import { encodeBase64Unicode } from '../../../public/state/share-codec.js';
+import { loadFromUrl, normalizeSwingSub } from '../../../public/state/state-hydration.js';
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
@@ -173,7 +177,10 @@ describe('Sharing & Hydration Round-trip', () => {
                 v: 0.5,
                 r: 0.4,
                 sw: 0,
-                ss: 8,
+                // '8th', not the number 8: no writer has ever emitted a numeric `ss`
+                // (#1257). This fixture's old numeric value mirrored the buggy reader's
+                // expectation and is very likely where that guard came from.
+                ss: '8th',
                 hu: 20,
             },
         };
@@ -313,5 +320,243 @@ describe('Genre share round-trip (#1200)', () => {
 
         expect(groove.genreFeel).toBe('Funk');
         expect(groove.lastSmartGenre).toBe('Funk');
+    });
+});
+
+describe('swingSub share round-trip (#1257)', () => {
+    // Self-contained setup: this suite calls shareProgression(), which writes to
+    // navigator.clipboard. Do NOT rely on a sibling describe's vi.stubGlobal leaking
+    // in — stubs persist across describes, so a reorder or a .only elsewhere would
+    // silently strand these tests without a clipboard.
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubGlobal('navigator', {
+            clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+        });
+        vi.stubGlobal('location', new URL('http://localhost'));
+        arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
+        arranger.key = 'C';
+        arranger.timeSignature = '4/4';
+        playback.bpm = 120;
+    });
+
+    // The suite stubs globals; restore them so nothing appended after this describe
+    // inherits them (Vitest isolates per file, but not per describe).
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    // why (#1257): the share writer emits `swingSub` as the canonical STRING
+    // ('8th' | '16th') but the reader used to validate it against NUMBERS
+    // (`[4, 8, 16].includes(...)`), so the check never matched and every share link
+    // landed the number 8 — permanently disabling the 16th-note swing grid for that
+    // session. The absence of any swing coverage in this round-trip suite is why it
+    // survived; these are that gap closed. Per the repo's swing doctrine the grid
+    // (8th vs 16th subdivision) *is* the feel, so this changed the pocket a recipient
+    // heard versus what the sender shared.
+    /** Shares current state and returns the generated URL string. */
+    const roundTripUrl = () => {
+        shareProgression();
+        const calls = vi.mocked(navigator.clipboard.writeText).mock.calls;
+        return calls[calls.length - 1][0] as string;
+    };
+
+    it('preserves a 16th-note swing grid across a share round-trip', () => {
+        groove.swing = 50;
+        groove.swingSub = '16th';
+        const url = roundTripUrl();
+
+        // Reset to the default before loading, so a pass can't come from
+        // the value simply never having been touched.
+        groove.swingSub = '8th';
+        groove.swing = 0;
+
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        expect(groove.swingSub).toBe('16th');
+        expect(groove.swing).toBe(50);
+    });
+
+    // This replaced a round-trip test asserting that '8th' survives a share, which was
+    // vacuous: '8th' is both a keyspace member AND the fallback, so narrowing the guard
+    // to reject '8th' outright left every test green. Worth being precise about why —
+    // that mutant (`value === '16th' ? value : '8th'`) is **semantically equivalent** to
+    // the real implementation for every possible input, so no test can distinguish it
+    // and none should try. The claims that ARE observable, and are asserted here:
+    // '16th' is accepted, and everything outside the keyspace normalizes to '8th'.
+    it('normalizes the swingSub keyspace: accepts 16th, rejects everything out-of-keyspace', () => {
+        expect(normalizeSwingSub('16th')).toBe('16th');
+        expect(normalizeSwingSub('8th')).toBe('8th');
+
+        // Reject branch, incl. the numbers the old broken guard was written for.
+        for (const bad of [8, 16, 4, '8', 'eighth', '', null, undefined, {}, ['16th']]) {
+            expect(normalizeSwingSub(bad)).toBe('8th');
+        }
+    });
+
+    // why: asserting the field alone would still have passed if the reader wrote
+    // some other truthy value. This asserts the *consumer* branch is reachable —
+    // `calculateStepDuration`'s 16th path alternates ±shift per step (so steps 0
+    // and 2 come out equal), while the 8th path applies the loping weights
+    // [1.5, 0.5, -0.5, -1.5] (so steps 0 and 2 differ). That signature is what
+    // actually distinguishes the two feels, and it is float-robust.
+    it('makes the 16th-note branch of calculateStepDuration reachable after a share load', () => {
+        groove.swing = 50;
+        groove.swingSub = '16th';
+        const url = roundTripUrl();
+
+        groove.swingSub = '8th';
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        const ts = TIME_SIGNATURES['4/4'];
+        const d = [0, 1, 2, 3].map((step) => calculateStepDuration(step, 120, ts, groove));
+
+        // 16th signature: alternating, so 0 === 2 and 1 === 3, long-short.
+        expect(d[0]).toBeCloseTo(d[2], 10);
+        expect(d[1]).toBeCloseTo(d[3], 10);
+        expect(d[0]).toBeGreaterThan(d[1]);
+
+        // Control: the 8th path over the same steps is NOT alternating, which is
+        // what the bug forced every shared session into.
+        groove.swingSub = '8th';
+        const eighth = [0, 1, 2, 3].map((step) => calculateStepDuration(step, 120, ts, groove));
+        expect(eighth[0]).not.toBeCloseTo(eighth[2], 10);
+    });
+
+    it('falls back to the string 8th — never a number — for a payload in neither keyspace', () => {
+        groove.swingSub = '16th';
+
+        // A hand-forged `bnd` payload carrying the numeric value the old guard
+        // was (wrongly) written for. It must not be accepted.
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({ mv: MIXER_SETTINGS_VERSION, g: { e: 1, sw: 0, ss: 8, hu: 20 } }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(groove.swingSub).toBe('8th');
+        // The historical failure was a *number* leaking into a string field, which
+        // broke every `=== '16th'` comparison downstream.
+        expect(typeof groove.swingSub).toBe('string');
+    });
+});
+
+// why (#1257): found by auditing the rest of the `band.*` reader for the same
+// writer/reader keyspace mismatch that broke `swingSub`. Both of these were live bugs
+// on every share link, and neither had any coverage.
+describe('band.c share round-trip — the same mismatch class (#1257)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubGlobal('navigator', {
+            clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+        });
+        vi.stubGlobal('location', new URL('http://localhost'));
+        arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
+        arranger.key = 'C';
+        arranger.timeSignature = '4/4';
+        playback.bpm = 120;
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    const roundTripUrl = () => {
+        shareProgression();
+        const calls = vi.mocked(navigator.clipboard.writeText).mock.calls;
+        return calls[calls.length - 1][0] as string;
+    };
+
+    // `chords.density` is a string ('thin'|'standard'|'rich') but the reader ran it
+    // through `clamp`, so `parseFloat('rich')` → NaN → the numeric default 0.5 landed
+    // in a string field. `chords-styles.ts` compares `density === 'rich'` / `=== 'thin'`,
+    // both then permanently false, collapsing a shared voicing choice to standard.
+    it.each(['rich', 'thin', 'standard'])('preserves chord density %s across a share', (d) => {
+        chords.density = d;
+        const url = roundTripUrl();
+
+        chords.density = d === 'standard' ? 'rich' : 'standard';
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        expect(chords.density).toBe(d);
+        expect(typeof chords.density).toBe('string');
+    });
+
+    it('falls back to the string standard — never a number — for an out-of-keyspace density', () => {
+        chords.density = 'rich';
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({ mv: MIXER_SETTINGS_VERSION, c: { e: 1, s: 'smart', o: 48, d: 0.5 } }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(chords.density).toBe('standard');
+    });
+
+    // `'arp'` is routed by the Acoustic genre (`chord: 'arp'` in smart-genres) and read
+    // by `comping-emit.ts` via `chords.style === 'arp'`, but it is deliberately not in
+    // the CHORD_STYLES *picker* list — so validating against the picker rejected a live
+    // style and dropped a shared Acoustic session's fingerpick arpeggio.
+    it("preserves the genre-routed 'arp' chord style across a share round-trip", () => {
+        chords.style = 'arp';
+        const url = roundTripUrl();
+
+        chords.style = 'smart';
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        expect(chords.style).toBe('arp');
+    });
+
+    // why a hand-forged payload rather than a full round-trip: `generateShareUrl` sets
+    // BOTH `?style=` and `bnd`, and `?style=` is handled first, so a round-trip cannot
+    // isolate the `bnd` reader — if `bnd` rejects the style, its fallback is
+    // `chords.style`, which the `?style=` handler has *already* set correctly. That
+    // masking is real: mutating only the `bnd` site left the round-trip test green.
+    it("accepts a genre-routed 'arp' in the bnd payload with no ?style= to mask it", () => {
+        chords.style = 'smart';
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({
+                mv: MIXER_SETTINGS_VERSION,
+                c: { e: 1, s: 'arp', o: 48, d: 'standard' },
+            }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(chords.style).toBe('arp');
+    });
+
+    it('rejects an unknown style in the bnd payload, preserving the current one', () => {
+        chords.style = 'jazz';
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({
+                mv: MIXER_SETTINGS_VERSION,
+                c: { e: 1, s: 'not-a-style', o: 48, d: 'standard' },
+            }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(chords.style).toBe('jazz');
+    });
+
+    it("accepts 'arp' from a ?style= permalink too", () => {
+        chords.style = 'smart';
+        vi.stubGlobal('location', new URL('http://localhost/?style=arp'));
+        loadFromUrl();
+
+        expect(chords.style).toBe('arp');
+    });
+
+    it('still rejects a chord style in neither the picker list nor the genre table', () => {
+        chords.style = 'jazz';
+        vi.stubGlobal('location', new URL('http://localhost/?style=definitely-not-a-style'));
+        loadFromUrl();
+
+        expect(chords.style).toBe('jazz');
     });
 });

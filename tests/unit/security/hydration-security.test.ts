@@ -193,6 +193,38 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(state.groove.humanize).toBe(0);
         });
 
+        // why (#1257): the recovery half of the share-URL `swingSub` bug. The broken
+        // share reader wrote the *number* 8 into this string field; `saveCurrentState()`
+        // then persisted it, and this persist reader used to pass it straight back
+        // through unguarded — so anyone who had once opened a share link stayed locked
+        // to 8th-note swing on every subsequent boot, with no share URL involved.
+        // Normalizing here is what actually un-sticks them.
+        it('recovers a persisted numeric swingSub written by the pre-fix share reader', () => {
+            const payload = {
+                sections: [{ id: '1', label: 'A', value: 'I' }],
+                groove: { swingSub: 8 },
+            };
+            localStorage.setItem('ensemble_currentState', JSON.stringify(payload));
+
+            hydrateState();
+
+            const state = stateModule.getState();
+            expect(state.groove.swingSub).toBe('8th');
+            expect(typeof state.groove.swingSub).toBe('string');
+        });
+
+        it('still restores a valid persisted 16th swingSub (the accept direction)', () => {
+            const payload = {
+                sections: [{ id: '1', label: 'A', value: 'I' }],
+                groove: { swingSub: '16th' },
+            };
+            localStorage.setItem('ensemble_currentState', JSON.stringify(payload));
+
+            hydrateState();
+
+            expect(stateModule.getState().groove.swingSub).toBe('16th');
+        });
+
         it('should treat retired classic soloist preset values as unsupported', () => {
             const payload = {
                 sections: [{ id: '1', label: 'A', value: 'I' }],

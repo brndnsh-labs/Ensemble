@@ -1,3 +1,5 @@
+import { SMART_GENRES } from './smart-genres.js';
+
 export interface StyleEntry {
     id: string;
     name: string;
@@ -66,3 +68,34 @@ export const HARMONY_STYLES: StyleEntry[] = [
     { id: 'plucks', name: 'Modern Synth (Plucks)', category: 'Electronic' },
     { id: 'counter', name: 'Contrapuntal', category: 'Jazz' },
 ];
+
+const KNOWN_CHORD_STYLES: ReadonlySet<string> = new Set([
+    ...CHORD_STYLES.map((s) => s.id),
+    ...Object.values(SMART_GENRES).map((g) => g.chord),
+]);
+
+/**
+ * Is `id` a chord style the app can legitimately hold?
+ *
+ * why (#1257): `CHORD_STYLES` is the **picker** list — UI metadata. It is NOT the
+ * set of values `chords.style` can hold, because the genre table routes styles the
+ * picker doesn't offer: Acoustic sets `chord: 'arp'` (see `GENRE_OVERRIDES` in
+ * smart-genres.ts), which `comping-emit.ts` reads via `chords.style === 'arp'` to
+ * emit the fingerpick arpeggio. Validating untrusted input against the picker list
+ * alone therefore *rejects a live style* — sharing an Acoustic session silently
+ * dropped its arpeggio and landed the recipient's current comp style instead. The
+ * share reader is not re-applying the genre either (it writes `genreFeel` without
+ * dispatching `SET_GENRE_FEEL`), so nothing downstream restores it.
+ *
+ * Union the two so the predicate means "a value the engine can act on", which is
+ * what a validating reader actually wants. Kept here, next to the list it corrects,
+ * rather than inlined at each call site — per CLAUDE.md, alias/validity knowledge
+ * lives with the data that owns the concept.
+ *
+ * Note this deliberately does **not** add `'arp'` to `CHORD_STYLES`: whether the
+ * arpeggio should also become a user-selectable picker entry is a product question,
+ * separate from the reader accepting a value the engine already produces.
+ */
+export function isKnownChordStyle(id: unknown): boolean {
+    return typeof id === 'string' && KNOWN_CHORD_STYLES.has(id);
+}

@@ -1,8 +1,8 @@
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import {
     BASS_STYLES,
-    CHORD_STYLES,
     HARMONY_STYLES,
+    isKnownChordStyle,
     SOLOIST_STYLES,
 } from '../data/instrument-styles.js';
 import { GENRE_FEELS, resolveGenre } from '../data/smart-genres.js';
@@ -41,6 +41,36 @@ const SUPPORTED_SOLOIST_PRESETS = new Set(['trumpet']);
 
 function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
     return typeof preset === 'string' && SUPPORTED_SOLOIST_PRESETS.has(preset) ? preset : fallback;
+}
+
+/**
+ * The swing-subdivision keyspace, and the one authority that normalizes into it.
+ *
+ * why (#1257): `swingSub` is a **string** ('8th' | '16th') — the swing-base `<select>`
+ * in `InstrumentSettings.tsx` only ever dispatches those two, and the branching
+ * consumer `calculateStepDuration` compares `=== '16th'`. The share reader used to
+ * validate it against **numbers** (`[4, 8, 16].includes(...)`), which matched nothing
+ * the writer has ever emitted (verified across all of git history: the writer's line
+ * has only ever been `ss: groove.swingSub`). So *every* share link landed the number
+ * 8 and locked the session to 8th-note swing. Per the repo's swing doctrine the grid
+ * (8th vs 16th subdivision) *is* the feel, so a shared Funk or Neo-Soul session
+ * reached the recipient with a different pocket than the sender heard. The swing-base
+ * dropdown also showed an unmatched value, so it was visibly desynced from what was
+ * playing — wrong, but not literally invisible.
+ *
+ * Used by **both** readers on purpose. The share path is where the corruption
+ * originated, but `saveCurrentState()` then persisted the poisoned value and the
+ * persist path passed it straight back through unguarded, so anyone who had already
+ * opened a share link stayed stuck at 8th-note swing on every subsequent boot, with
+ * no share URL involved. Fixing only the share reader would leave them there.
+ */
+const SWING_SUBS: ReadonlySet<string> = new Set(['8th', '16th']);
+
+/** Chord voicing-density keyspace — see the `density` reader below (#1257). */
+const DENSITIES: ReadonlySet<string> = new Set(['thin', 'standard', 'rich']);
+
+export function normalizeSwingSub(value: unknown): string {
+    return typeof value === 'string' && SWING_SUBS.has(value) ? value : '8th';
 }
 
 const VALID_PALETTES = new Set<Palette>([
@@ -369,7 +399,10 @@ function hydrateSavedState(): void {
                     ? INSTRUMENT_REVERB_DEFAULTS.groove
                     : clamp(savedState.groove.reverb, 0, 1, INSTRUMENT_REVERB_DEFAULTS.groove),
                 swing: clamp(savedState.groove.swing, 0, 100, 0),
-                swingSub: savedState.groove.swingSub,
+                // Normalized, not passed through: a pre-fix share load could have
+                // persisted the number 8 here (see `normalizeSwingSub`), and an
+                // unguarded passthrough would restore it on every boot forever.
+                swingSub: normalizeSwingSub(savedState.groove.swingSub),
                 measures: clamp(savedState.groove.measures, 1, 8, 1),
                 humanize: clamp(savedState.groove.humanize, 0, 100, 20),
                 followPlayback:
@@ -502,7 +535,8 @@ export function loadFromUrl(): void {
 
     const styleParam = params.get('style');
     if (styleParam) {
-        if (CHORD_STYLES.some((s) => s.id === styleParam)) {
+        // Same union as the `bnd` reader — a `?style=arp` permalink is legitimate.
+        if (isKnownChordStyle(styleParam)) {
             dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: styleParam });
         }
     }
@@ -591,13 +625,29 @@ export function loadFromUrl(): void {
             if (band.c) {
                 Object.assign(chords, {
                     enabled: !!band.c.e,
-                    style: CHORD_STYLES.some((s) => s.id === band.c.s) ? band.c.s : chords.style,
+                    // isKnownChordStyle, not the CHORD_STYLES picker list: the genre table
+                    // routes `chord: 'arp'` (Acoustic), which the picker doesn't offer, so
+                    // validating against the picker alone REJECTED a live style and dropped
+                    // a shared Acoustic session's arpeggio (#1257).
+                    style: isKnownChordStyle(band.c.s) ? band.c.s : chords.style,
                     octave: clamp(band.c.o, 0, 127, 48),
                     volume: hasMixerVersion ? clamp(band.c.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
                         ? clamp(band.c.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.chords)
                         : INSTRUMENT_REVERB_DEFAULTS.chords,
-                    density: clamp(band.c.d, 0, 1, 0.5),
+                    // why (#1257): the exact same writer/reader keyspace mismatch as
+                    // `swingSub` above, found by auditing the rest of this block for it.
+                    // `chords.density` is a STRING ('thin' | 'standard' | 'rich'), the
+                    // writer emits it verbatim, and `clamp` does `parseFloat('rich')` →
+                    // NaN → returns its numeric default, so every share link landed the
+                    // number 0.5. The branching consumers in `chords-styles.ts` compare
+                    // `density === 'rich'` / `=== 'thin'`, both then permanently false, so
+                    // a sender's rich (5+ note) or thin (3-note) voicing collapsed to
+                    // standard on the recipient. Only partly masked by `applyConductor`
+                    // rewriting density from intensity — that runs via
+                    // `updateAutoConductor`, which early-returns unless a ramp is actually
+                    // in flight, and a share URL sets `int=` directly.
+                    density: DENSITIES.has(band.c.d) ? band.c.d : 'standard',
                 });
             }
             if (band.h) {
@@ -620,7 +670,7 @@ export function loadFromUrl(): void {
                         ? clamp(band.g.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.groove)
                         : INSTRUMENT_REVERB_DEFAULTS.groove,
                     swing: clamp(band.g.sw, 0, 100, 0),
-                    swingSub: [4, 8, 16].includes(band.g.ss) ? band.g.ss : 8,
+                    swingSub: normalizeSwingSub(band.g.ss),
                     humanize: clamp(band.g.hu, 0, 100, 20),
                 });
             }
