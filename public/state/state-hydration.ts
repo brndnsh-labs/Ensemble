@@ -149,10 +149,51 @@ function validateSections(sections: any[]): any[] {
     });
 }
 
+/**
+ * Load the persisted session, falling back to a fresh one if it can't be read.
+ *
+ * The fallback is structural, not belt-and-suspenders. `hydrateState()` runs
+ * inside `init()`'s outer `try` in `main.ts`, and `mountComponents()` runs inside
+ * that *same* `try` — so a throw here doesn't degrade to a default session, it
+ * skips the mount entirely. The Preact tree never renders, which means
+ * `ui-root.tsx`'s `<ErrorBoundary>` never renders either, and the user gets a
+ * blank page with no on-screen error and no recovery path short of clearing site
+ * storage from devtools. One unguarded field anywhere in `hydrateSavedState()`
+ * is enough to do that, so the blast radius is capped here once rather than
+ * re-litigated per field.
+ *
+ * Silent by design: a user whose saved session just failed to load is better
+ * served by a working app than by a toast about a storage error they can't act
+ * on. The console error is for us. The corrupt payload is left in place — the
+ * next `saveCurrentState()` overwrites it, and deleting a user's data on a read
+ * failure we may have misdiagnosed is the more destructive default.
+ */
 export function hydrateState(): void {
+    try {
+        hydrateSavedState();
+    } catch (e) {
+        console.error('[Hydration] Saved session could not be loaded; starting fresh:', e);
+        dispatch(ACTIONS.RESET_STATE);
+    }
+    dispatch(ACTIONS.HYDRATE);
+}
+
+function hydrateSavedState(): void {
     const { playback, chords, bass, soloist, harmony, groove, arranger, vizState } = getState();
     const savedState = storage.get('currentState');
-    if (savedState?.sections) {
+    // Array.isArray, not truthiness — and this gate is the one the try/catch below
+    // structurally cannot cover, because a wrong-shape `sections` doesn't throw.
+    // A string or `{length: n}` here is truthy, so hydration used to proceed while
+    // `validateSections` correctly returned `[]`, booting an empty chart and never
+    // reaching the RESET_STATE `else`. `saveCurrentState()` then persisted the empty
+    // chart, making it permanent. Routing wrong-shape to the `else` gives the user
+    // the default song instead.
+    //
+    // Deliberately NOT `&& length > 0`: a legitimately empty `sections` array is a
+    // reachable user state, and sending it to RESET_STATE would discard their BPM,
+    // genre and mixer along with the empty chart. Wrong shape is the bug; empty is
+    // just empty.
+    if (Array.isArray(savedState?.sections)) {
         const shouldResetMixer = Number(savedState.mixerVersion) !== MIXER_SETTINGS_VERSION;
         const validatedSections = validateSections(savedState.sections);
 
@@ -350,10 +391,17 @@ export function hydrateState(): void {
                 currentMeasure: 0,
             });
 
-            if (savedState.groove.pattern && savedState.groove.pattern.length > 0) {
+            // Array.isArray, not a truthy `.length` check: a persisted payload that
+            // is valid JSON but the wrong shape (a partial write, a rollback across a
+            // schema change) can hand us a string or an object here, whose truthy
+            // `.length` passes the old guard and whose missing `.forEach` then throws.
+            // Same reasoning for `savedInst.steps` — and note it gates the `fill(0)`
+            // too, so an instrument with an unreadable pattern keeps its default steps
+            // rather than being blanked.
+            if (Array.isArray(savedState.groove.pattern) && savedState.groove.pattern.length > 0) {
                 savedState.groove.pattern.forEach((savedInst: any) => {
-                    const inst = groove.instruments.find((i) => i.name === savedInst.name);
-                    if (inst) {
+                    const inst = groove.instruments.find((i) => i.name === savedInst?.name);
+                    if (inst && Array.isArray(savedInst.steps)) {
                         inst.steps.fill(0);
                         savedInst.steps.forEach((v: any, i: number) => {
                             if (i < 128) {
@@ -399,7 +447,6 @@ export function hydrateState(): void {
     } else {
         dispatch(ACTIONS.RESET_STATE);
     }
-    dispatch(ACTIONS.HYDRATE);
 }
 
 export function loadFromUrl(): void {

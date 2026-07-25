@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { hydrateState } from '../../../public/state/state-hydration.js';
 import * as stateModule from '../../../public/state.js';
+import { ACTIONS } from '../../../public/types.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
@@ -271,6 +272,199 @@ describe('Security: Hydration & Storage Resilience', () => {
             const state = stateModule.getState();
             expect(state.arranger.key).toBe('C');
             expect(state.arranger.timeSignature).toBe('4/4');
+        });
+    });
+
+    // #1244 — a saved payload that is valid JSON but the wrong shape used to throw
+    // out of hydrateState(), which runs inside the same `try` as mountComponents()
+    // in main.ts. The throw skipped the mount, so the user got a blank page with no
+    // ErrorBoundary and no recovery path. Two layers are covered here: the specific
+    // groove.pattern guard, and the structural fallback that caps the blast radius
+    // of any *other* unguarded field in the function.
+    describe('Malformed persisted shapes (#1244)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        /** Give the mock a real drum lane so the inner steps loop is reachable. */
+        function seedInstrument(steps: number[]) {
+            const state = stateModule.getState();
+            state.groove.instruments = [{ name: 'Kick', steps }];
+            return state.groove.instruments[0];
+        }
+
+        /**
+         * Assert the *guards* handled the payload, not the try/catch fallback.
+         * Without this the part-1 tests are vacuous: part 2 swallows the throw, so
+         * "does not throw" alone passes even with every `Array.isArray` reverted.
+         */
+        function expectNoFallback() {
+            expect(stateModule.dispatch).not.toHaveBeenCalledWith(ACTIONS.RESET_STATE);
+        }
+
+        it('survives a non-array groove.pattern', () => {
+            seedInstrument(new Array(16).fill(0));
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    // A string has a truthy `.length` and no `.forEach` — the exact
+                    // shape that passed the old guard and then threw.
+                    groove: { pattern: 'corrupted' },
+                }),
+            );
+
+            expect(() => hydrateState()).not.toThrow();
+            expectNoFallback();
+            // Hydration completed rather than bailing: a sibling field still landed.
+            expect(stateModule.getState().arranger.sections.length).toBe(1);
+        });
+
+        it('survives an object-shaped groove.pattern from a partial write', () => {
+            seedInstrument(new Array(16).fill(0));
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    groove: { pattern: { 0: { name: 'Kick' }, length: 1 } },
+                }),
+            );
+
+            expect(() => hydrateState()).not.toThrow();
+            expectNoFallback();
+        });
+
+        it('skips an entry whose steps are not an array, leaving the lane untouched', () => {
+            const inst = seedInstrument(new Array(16).fill(0));
+            inst.steps[0] = 1;
+
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    groove: { pattern: [{ name: 'Kick', steps: 'nope' }] },
+                }),
+            );
+
+            expect(() => hydrateState()).not.toThrow();
+            expectNoFallback();
+            // The guard gates the `fill(0)` as well, so an unreadable saved pattern
+            // preserves the live default rather than blanking the lane to silence.
+            expect(inst.steps[0]).toBe(1);
+        });
+
+        it('tolerates a null entry inside an otherwise valid pattern array', () => {
+            const inst = seedInstrument(new Array(16).fill(0));
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    groove: { pattern: [null, { name: 'Kick', steps: [1, 0, 1, 0] }] },
+                }),
+            );
+
+            expect(() => hydrateState()).not.toThrow();
+            expectNoFallback();
+            // The valid sibling still applied — the guard rejects bad entries, not the batch.
+            expect(inst.steps[0]).toBe(1);
+            expect(inst.steps[2]).toBe(1);
+        });
+
+        // Control for the three tests above: proves the guards reject only malformed
+        // shapes. Without this, an `Array.isArray` that always returned false would
+        // pass every "does not throw" assertion.
+        it('still hydrates a well-formed pattern', () => {
+            const inst = seedInstrument(new Array(16).fill(0));
+            inst.steps[5] = 1;
+
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    groove: { pattern: [{ name: 'Kick', steps: [1, 0, 0, 1] }] },
+                }),
+            );
+
+            hydrateState();
+
+            expect(inst.steps[0]).toBe(1);
+            expect(inst.steps[3]).toBe(1);
+            // The stale live step outside the saved range was cleared by `fill(0)`.
+            expect(inst.steps[5]).toBe(0);
+        });
+
+        // Asserts the fallback is *signalled*, not that the resulting state is
+        // fully coherent: `dispatch` is a bare spy in this file's mock, so no
+        // reducer runs. RESET_STATE's completeness as an inverse of hydration is
+        // a separate concern (see the groove RESET_STATE case, #1244).
+        it('dispatches RESET_STATE instead of throwing when a field throws mid-hydration', () => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            // Simulate an unguarded field we have NOT specifically hardened: the
+            // point of the fallback is that it does not depend on knowing which one.
+            // `groove` is read late, so arranger/playback are already partly applied
+            // when this throws — i.e. recovery from a *partial* hydration.
+            vi.mocked(stateModule.storage.get).mockReturnValueOnce({
+                sections: [validSection],
+                get groove(): never {
+                    throw new TypeError('savedState.groove.pattern.forEach is not a function');
+                },
+            });
+
+            expect(() => hydrateState()).not.toThrow();
+            expect(stateModule.dispatch).toHaveBeenCalledWith(ACTIONS.RESET_STATE);
+            expect(consoleError).toHaveBeenCalled();
+
+            consoleError.mockRestore();
+        });
+
+        it('routes a wrong-shape sections field to the fresh-session fallback', () => {
+            // The one bad shape the try/catch cannot catch, because it never throws:
+            // a truthy non-array passed the old gate, validateSections returned [],
+            // and the app booted an empty chart that the next save made permanent.
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: 'corrupt', bpm: 140 }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.dispatch).toHaveBeenCalledWith(ACTIONS.RESET_STATE);
+        });
+
+        it('still hydrates a session whose sections array is legitimately empty', () => {
+            // Guards a deliberate choice: an empty chart is a reachable user state,
+            // not corruption, so it keeps the rest of the saved session rather than
+            // being reset along with it.
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [], bpm: 140 }),
+            );
+
+            hydrateState();
+
+            expectNoFallback();
+            expect(stateModule.getState().playback.bpm).toBe(140);
+        });
+
+        it('always dispatches HYDRATE, on the failure path as well as the success one', () => {
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            vi.mocked(stateModule.storage.get).mockReturnValueOnce({
+                sections: [validSection],
+                get groove(): never {
+                    throw new TypeError('boom');
+                },
+            });
+
+            hydrateState();
+
+            // Nothing observes HYDRATE at this point in boot — `subscribe()`'s only
+            // call site (main.ts) attaches long after hydrateState() runs, so the
+            // listener list is empty and state-effects' `case 'HYDRATE'` never fires
+            // here. The guard is against a successor moving that subscribe earlier
+            // and finding the action silently absent on the recovery path.
+            expect(stateModule.dispatch).toHaveBeenCalledWith(ACTIONS.HYDRATE);
+
+            consoleError.mockRestore();
         });
     });
 });

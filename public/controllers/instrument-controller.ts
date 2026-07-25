@@ -30,7 +30,16 @@ export function switchMeasure(idx: number): void {
 export async function loadDrumPreset(name: string): Promise<void> {
     const { groove, arranger } = getState();
     const { DRUM_PRESETS } = await import('../data/drum-presets.js');
-    let p: any = (DRUM_PRESETS as any)[name];
+    // #1244 — an unknown name falls back instead of throwing. This is a public
+    // entrypoint whose main.ts call site passes the *persisted* `lastDrumPreset`,
+    // which a corrupt or rolled-back payload can leave holding anything. The throw
+    // was invisible when it happened: this function is `async` and that call site
+    // neither awaits nor voids it, so a bad name surfaced as an unhandled rejection
+    // and a silently empty drum grid rather than an error anyone could see.
+    // `Object.hasOwn`, not `??` — a name like 'toString' would otherwise resolve to
+    // an inherited prototype member and read as a (nonsense) preset.
+    const presets = DRUM_PRESETS as any;
+    let p: any = Object.hasOwn(presets, name) ? presets[name] : presets['Basic Rock'];
     if (p[arranger.timeSignature]) {
         p = { ...p, ...p[arranger.timeSignature] };
     }

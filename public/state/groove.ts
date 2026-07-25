@@ -110,6 +110,15 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.swingSub = '8th';
             g.genreFeel = 'Rock';
             g.lastSmartGenre = 'Rock';
+            // #1244 — hydrateState()'s corrupt-payload fallback dispatches RESET_STATE
+            // expecting a genuinely fresh session, so a field hydration can write from
+            // the persisted payload has to be restored here or it survives the reset.
+            // `lastDrumPreset` is the one with teeth: the reset blanks every lane below,
+            // so main.ts sees no drum pattern and feeds this value straight into
+            // loadDrumPreset().
+            g.humanize = 20;
+            g.followPlayback = true;
+            g.lastDrumPreset = 'Basic Rock';
             g.measures = 1;
             g.currentMeasure = 0;
             g.orchestrationMap = null;
