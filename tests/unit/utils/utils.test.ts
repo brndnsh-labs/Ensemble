@@ -317,6 +317,31 @@ describe('Utility Functions', () => {
             expect(decompressed[0].id).not.toBe('1');
         });
 
+        // why (#1258): `decompressSections`'s output goes straight into state with no
+        // `validateSections` pass, so its section-meter guard is the only one on the `?s=`
+        // path — and it checked LENGTH, not membership, so '__proto__' (9 chars),
+        // 'toString' (8) and 'valueOf' (7) all slipped under `length < 10`. Two readers of
+        // one field disagreeing on its keyspace is the defect; `validateSections` requires
+        // table membership, so this now does too.
+        it.each(['__proto__', 'toString', 'valueOf', 'constructor', 'not-a-meter'])(
+            'drops a section timeSignature of %s on the ?s= path',
+            (bad) => {
+                const compressed = compressSections([
+                    { id: '1', label: 'Verse', value: 'C', timeSignature: bad },
+                ]);
+
+                expect(decompressSections(compressed)[0].timeSignature).toBe('');
+            },
+        );
+
+        it('still preserves a valid section timeSignature (the accept direction)', () => {
+            const compressed = compressSections([
+                { id: '1', label: 'Verse', value: 'C', timeSignature: '7/8' },
+            ]);
+
+            expect(decompressSections(compressed)[0].timeSignature).toBe('7/8');
+        });
+
         it('should correctly preserve Unicode characters (like emojis) during section compression/decompression cycle', () => {
             const sections = [{ id: '1', label: 'Intro 🎵', value: 'Cm7' }];
             const compressed = compressSections(sections);

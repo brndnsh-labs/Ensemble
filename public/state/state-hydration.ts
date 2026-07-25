@@ -17,9 +17,21 @@ import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './instrument
 import { saveCurrentState } from './persistence.js';
 import { decodeBase64Unicode, decompressSections, generateId } from './share-codec.js';
 
+/**
+ * Clamp an untrusted numeric field, falling back to `defaultVal` for anything that
+ * isn't a real number.
+ *
+ * why the explicit type test (#1258): this used to do `Number(val)`, which coerces
+ * `null`/`false`/`[]`/`''` to **0** rather than `NaN` — so a forged payload with
+ * `v: null` didn't get the intended `1.0` default, it got clamped to `min` and
+ * **silently muted the instrument**. `o: null` likewise gave octave 0. Only genuine
+ * numbers and numeric strings should pass; everything else is the default.
+ * `Number.isFinite` (not `!isNaN`) so `Infinity` also lands on the default instead of
+ * pinning to `max`.
+ */
 const clamp = (val: any, min: number, max: number, defaultVal: number): number => {
-    const num = typeof val === 'string' ? parseFloat(val) : Number(val);
-    if (Number.isNaN(num)) {
+    const num = typeof val === 'string' ? parseFloat(val) : typeof val === 'number' ? val : NaN;
+    if (!Number.isFinite(num)) {
         return defaultVal;
     }
     return Math.min(Math.max(min, num), max);
@@ -85,15 +97,22 @@ const VALID_PALETTES = new Set<Palette>([
 // Theme migration (2026-05-31) — the single `theme` value split into two axes:
 // `palette` (color identity) + `mode` (auto/light/dark). Map any legacy `theme`
 // from an older saved session onto the new pair so sessions keep their look.
-const LEGACY_THEME_MAP: Record<string, { palette: Palette; mode: ThemeMode }> = {
-    auto: { palette: 'after-hours', mode: 'auto' },
-    'after-hours': { palette: 'after-hours', mode: 'dark' },
-    dark: { palette: 'after-hours', mode: 'dark' },
-    'lead-sheet': { palette: 'after-hours', mode: 'light' },
-    light: { palette: 'after-hours', mode: 'light' },
-    midnight: { palette: 'midnight', mode: 'dark' },
-    'high-contrast': { palette: 'high-contrast', mode: 'dark' },
-};
+// Null-prototype for the same reason as TIME_SIGNATURES (#1258): `migrateTheme` indexes
+// this with a persisted `theme` string, and on a plain literal
+// `LEGACY_THEME_MAP['constructor']` returns the `Object` constructor — a truthy hit that
+// sails past the `??` and yields `{ palette: undefined, mode: undefined }`.
+const LEGACY_THEME_MAP: Record<string, { palette: Palette; mode: ThemeMode }> = Object.assign(
+    Object.create(null),
+    {
+        auto: { palette: 'after-hours', mode: 'auto' },
+        'after-hours': { palette: 'after-hours', mode: 'dark' },
+        dark: { palette: 'after-hours', mode: 'dark' },
+        'lead-sheet': { palette: 'after-hours', mode: 'light' },
+        light: { palette: 'after-hours', mode: 'light' },
+        midnight: { palette: 'midnight', mode: 'dark' },
+        'high-contrast': { palette: 'high-contrast', mode: 'dark' },
+    },
+);
 
 function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
     // Prefer the new two-axis fields when present.
@@ -164,7 +183,13 @@ function validateSections(sections: any[]): any[] {
         }
 
         return {
-            id: s.id || generateId(),
+            // why (#1258): type-check, don't just truthiness-check. Section ids key
+            // `sectionSeedMap` in groove-engine; an object-valued id stringifies to
+            // "[object Object]" and therefore *collides* across every section that
+            // carries one, silently collapsing their independent groove seeds into one.
+            // `decompressSections` always mints fresh ids, so only the persist path
+            // could supply a caller-controlled id — but it's a one-word fix.
+            id: typeof s.id === 'string' && s.id ? s.id : generateId(),
             label: safeLabel,
             value: safeValue,
             key: safeKey,
@@ -305,7 +330,15 @@ function hydrateSavedState(): void {
                         : savedState.chords.style || 'smart',
                 instrument: 'Piano',
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
-                density: savedState.chords.density,
+                // Normalized, same reasoning as `swingSub` below (#1257/#1258): every
+                // share link before #1257 landed the *number* 0.5 here, `persistence.ts`
+                // wrote it back verbatim, and an unguarded read restores it on every boot
+                // — so that population stays pinned to standard voicing forever. Also
+                // stops a pre-#1257 save with no `density` key from overwriting the
+                // slice's 'standard' default with `undefined`.
+                density: DENSITIES.has(savedState.chords.density)
+                    ? savedState.chords.density
+                    : 'standard',
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.chords.volume, 0, 1, 1.0),
                 reverb: shouldResetMixer
                     ? INSTRUMENT_REVERB_DEFAULTS.chords
@@ -607,8 +640,18 @@ export function loadFromUrl(): void {
                     // #856 — older share URLs have no `am`; default to Auto.
                     autoMode: band.s.am === undefined ? true : !!band.s.am,
                 });
+                // why (#1258): sanitize + cap, matching the top-level `?seed=` sibling
+                // below. This route previously accepted any string up to the payload's
+                // ~100KB ceiling, and that value is then persisted, re-shared, and fed
+                // per-section into `deriveSectionSeed` — so an oversized seed was a
+                // hashing-cost and data-hygiene problem carried forward indefinitely.
+                // (Not XSS: Preact escapes it at render.) Two readers of the same field
+                // disagreeing on its bounds is the actual defect.
                 if (typeof band.s.sd === 'string') {
-                    Object.assign(arranger, { seed: band.s.sd });
+                    const safeSeed = stripDangerousChars(band.s.sd).slice(0, 64);
+                    if (safeSeed) {
+                        Object.assign(arranger, { seed: safeSeed });
+                    }
                 }
             }
             if (band.b) {

@@ -8,7 +8,11 @@ import { getState } from '../../../public/state.js';
 const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
 import { TIME_SIGNATURES } from '../../../public/config.js';
-import { SMART_GENRES } from '../../../public/data/smart-genres.js';
+import {
+    getCanonicalMeters,
+    resolveGenre,
+    SMART_GENRES,
+} from '../../../public/data/smart-genres.js';
 import { calculateStepDuration } from '../../../public/engine/groove-engine.js';
 import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
 import { MIXER_SETTINGS_VERSION } from '../../../public/state/instruments.js';
@@ -558,5 +562,105 @@ describe('band.c share round-trip — the same mismatch class (#1257)', () => {
         loadFromUrl();
 
         expect(chords.style).toBe('jazz');
+    });
+});
+
+// why (#1258): the `?ts=` route is the one reachable straight from an attacker-supplied
+// URL, with no length check at all (`'__proto__'` is 9 chars, so even the share-code
+// route's `length < 10` guard wouldn't have stopped it). The poisoned value was then
+// persisted and re-accepted on the next boot, so a single link left a visitor's saved
+// session permanently non-playing.
+describe('untrusted URL input hardening (#1258)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubGlobal('navigator', {
+            clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+        });
+        vi.stubGlobal('location', new URL('http://localhost'));
+        arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
+        arranger.timeSignature = '4/4';
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it.each(['__proto__', 'constructor', 'toString'])('ignores ?ts=%s', (key) => {
+        arranger.timeSignature = '4/4';
+        vi.stubGlobal('location', new URL(`http://localhost/?ts=${encodeURIComponent(key)}`));
+        loadFromUrl();
+
+        expect(arranger.timeSignature).toBe('4/4');
+        // Assert the *derived* meter too: the bug's consequence was NaN meter math via a
+        // truthy-but-wrong config, which a string-only assertion would miss.
+        const cfg = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        expect(cfg.beats * cfg.stepsPerBeat).toBe(16);
+    });
+
+    // why (#1258, P0 found in review): the `?genre=` route is the same
+    // `SOME_MAP[untrusted]` truthiness bug and a HARDER failure than `?ts=`.
+    // `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel]) || null` over a plain object,
+    // so a prototype key returned a *hit* and `groove.genreFeel` was set to '__proto__'
+    // before Preact mounted. `getCanonicalMeters` then returned `Object.prototype` in
+    // place of an array (same defeated `||`), so `canonicalMeters.includes(...)` in
+    // KeySignatureControls threw during the initial render and dropped the whole app to
+    // the ErrorBoundary — whose Refresh reloads the same URL and crashes again. Fixed by
+    // null-prototyping the feel-keyed reduce seeds in smart-genres.
+    it.each(['__proto__', 'constructor', 'toString', 'valueOf'])('ignores ?genre=%s', (key) => {
+        groove.genreFeel = 'Rock';
+        groove.lastSmartGenre = 'Rock';
+        vi.stubGlobal('location', new URL(`http://localhost/?genre=${encodeURIComponent(key)}`));
+        loadFromUrl();
+
+        expect(groove.genreFeel).toBe('Rock');
+        expect(groove.lastSmartGenre).toBe('Rock');
+
+        // The crash was downstream of the poisoned feel, so assert the derived value is
+        // still a usable array -- a string-only assertion would miss it.
+        const meters = getCanonicalMeters(groove.genreFeel);
+        expect(Array.isArray(meters)).toBe(true);
+        expect(meters.includes('4/4')).toBe(true);
+    });
+
+    it('resolveGenre returns null for prototype-shaped input', () => {
+        for (const key of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+            expect(resolveGenre(key)).toBeNull();
+        }
+        // Accept direction: both keyspaces still resolve.
+        expect(resolveGenre('Ska-Punk')).toEqual({ name: 'Ska-Punk', feel: 'Ska' });
+        expect(resolveGenre('Ska')).toEqual({ name: 'Ska-Punk', feel: 'Ska' });
+    });
+
+    // Both-directions control: a valid meter from the same param must still apply.
+    it('still applies a valid ?ts= meter', () => {
+        arranger.timeSignature = '4/4';
+        vi.stubGlobal('location', new URL('http://localhost/?ts=7%2F8'));
+        loadFromUrl();
+
+        expect(arranger.timeSignature).toBe('7/8');
+    });
+
+    // The `bnd.s.sd` route accepted any string up to the payload's ~100KB ceiling, while
+    // its `?seed=` sibling sanitized and capped at 64. That value is persisted, re-shared,
+    // and fed per-section into deriveSectionSeed, so the drift carried forward forever.
+    it('sanitizes and caps a bnd seed the same way ?seed= does', () => {
+        const longSeed = 'a'.repeat(500);
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({ mv: MIXER_SETTINGS_VERSION, s: { e: 1, sd: longSeed } }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(arranger.seed.length).toBe(64);
+    });
+
+    it('still accepts a normal bnd seed unchanged (the accept direction)', () => {
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({ mv: MIXER_SETTINGS_VERSION, s: { e: 1, sd: 'blue-note-42' } }),
+        );
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+
+        expect(arranger.seed).toBe('blue-note-42');
     });
 });

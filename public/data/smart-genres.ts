@@ -201,7 +201,7 @@ export const SMART_GENRES: Record<string, SmartGenre> = Object.entries(GENRES).r
 >((acc, [key, override]) => {
     acc[key] = { ...GENRE_DEFAULTS, ...override } as SmartGenre;
     return acc;
-}, {});
+}, Object.create(null));
 
 export const GENRE_NAMES: string[] = Object.keys(GENRES);
 // filter, not `as string`: a genre missing `feel` would otherwise put a literal
@@ -243,6 +243,20 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  * exactly two diverge — `Ska-Punk` → `Ska` and `Bossa` → `Bossa Nova` — which is why
  * anything receiving a genre string from outside (share URLs, persisted sessions)
  * must translate rather than assume the two keyspaces are the same.
+ *
+ * **Reduced into `Object.create(null)`, not `{}`** (#1258) — as are the four sibling
+ * feel-keyed tables in this file. All of them are indexed with a genre string that can
+ * arrive from outside, and on a plain object every `Object.prototype` member reads as
+ * truthy. That mattered most here: `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel])
+ * || null`, so `?genre=__proto__` made `resolveGenre` return a *hit* instead of `null`
+ * and `groove.genreFeel` was set to `'__proto__'` before the Preact tree mounted.
+ * Downstream, `getCanonicalMeters` has the same defeated-`||` shape and returned
+ * `Object.prototype` in place of an array — so `canonicalMeters.includes(...)` in
+ * `KeySignatureControls` threw during the initial render, took out `ChartSurface`, and
+ * left the app on the ErrorBoundary's "Refresh App" screen, which reloads the same URL
+ * and crashes again. Every other feel-keyed table was poisoned in the same session too
+ * (`GENRE_POCKET` → NaN scheduler timing, `strategies[genreFeel]` → a bogus groove
+ * strategy). Fixing the seeds is what makes the *next* feel-keyed table safe by default.
  */
 const GENRE_NAME_BY_FEEL: Record<string, string> = Object.entries(GENRES).reduce<
     Record<string, string>
@@ -251,7 +265,7 @@ const GENRE_NAME_BY_FEEL: Record<string, string> = Object.entries(GENRES).reduce
         acc[override.feel] = name;
     }
     return acc;
-}, {});
+}, Object.create(null));
 
 /** Canon genre NAME → runtime FEEL. `null` for anything outside the canon. */
 export function canonToFeel(name: string | null | undefined): string | null {
@@ -324,7 +338,7 @@ export const GROOVE_STRATEGY_BY_FEEL: Record<string, GrooveStrategyKey> = Object
         acc[feel] = key;
     }
     return acc;
-}, {});
+}, Object.create(null));
 
 const STRATEGY_BY_GENRE_LOOKUP: Record<string, GrooveStrategyKey> = GROOVE_STRATEGY_BY_GENRE;
 
@@ -362,7 +376,7 @@ export const BASS_STYLE_BY_FEEL: Record<string, string> = Object.values(GENRES).
         acc[override.feel] = override.bass;
     }
     return acc;
-}, {});
+}, Object.create(null));
 
 /**
  * Normalize a genre string arriving in *either* keyspace into the canonical pair.
@@ -409,7 +423,7 @@ export const CANONICAL_METERS_BY_FEEL: Record<string, string[]> = Object.values(
         acc[override.feel] = override.meters ?? DEFAULT_GENRE_METERS;
     }
     return acc;
-}, {});
+}, Object.create(null));
 
 /** Idiomatic meters for a genre feel; falls back to 4/4 for unknown feels. */
 export function getCanonicalMeters(genreFeel: string | undefined): string[] {

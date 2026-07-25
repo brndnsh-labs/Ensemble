@@ -13,6 +13,7 @@
  * runs one way only, share-codec → sanitize, never back).
  */
 
+import { TIME_SIGNATURES } from '../config.js';
 import { escapeHTML, stripDangerousChars } from '../sanitize.js';
 import type { Section } from './arranger.js';
 
@@ -138,7 +139,21 @@ export function decompressSections(str: string): Section[] {
                 key: typeof s.k === 'string' ? escapeHTML(s.k) : '',
                 isMinor: typeof s.m === 'number' ? s.m === 1 : undefined,
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
-                timeSignature: typeof s.t === 'string' && s.t.length < 10 ? s.t : '',
+                // Membership, not just length (#1258). `decompressSections`'s output goes
+                // straight into state with no `validateSections` pass, so this is the ONLY
+                // guard on the `?s=` path — and '__proto__' (9), 'toString' (8) and
+                // 'valueOf' (7) all slipped under a `length < 10` check. TIME_SIGNATURES is
+                // null-prototype now so the consequence is already neutralized downstream,
+                // but two readers of one field disagreeing on its keyspace is the defect:
+                // `validateSections` requires table membership, so this should too.
+                // Membership, not just length (#1258). `decompressSections`'s output goes
+                // straight into state with no `validateSections` pass, so this is the ONLY
+                // guard on the `?s=` path — and '__proto__' (9), 'toString' (8) and
+                // 'valueOf' (7) all slipped under a `length < 10` check. TIME_SIGNATURES is
+                // null-prototype now so the consequence is already neutralized downstream,
+                // but two readers of one field disagreeing on its keyspace is the defect:
+                // `validateSections` requires table membership, so this should too.
+                timeSignature: typeof s.t === 'string' && TIME_SIGNATURES[s.t] ? s.t : '',
                 seamless: !!s.s,
             };
             if (typeof s.i === 'number' && Number.isFinite(s.i)) {

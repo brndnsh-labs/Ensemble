@@ -85,74 +85,98 @@ export interface TimeSignatureConfig {
     isCompound?: boolean;
 }
 
-export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = {
-    '2/4': {
-        beats: 2,
-        stepsPerBeat: 4,
-        subdivision: '16th',
-        pulse: [0, 4],
-        grouping: [2],
-        backbeat: [1],
+/**
+ * Meter table. **Null-prototype on purpose** (#1258) — do not "simplify" this back to a
+ * plain object literal; `tests/unit/security/hydration-security.test.ts` pins it.
+ *
+ * why: this table is indexed by *untrusted* values — a persisted `timeSignature`, a
+ * share payload's section meter, and the `?ts=` URL param. On a plain literal every
+ * `Object.prototype` member resolves through the prototype chain and reads as truthy, so
+ * `TIME_SIGNATURES['__proto__']` was a valid-looking hit. Worse, that defeated the
+ * fallback the ~17 consumers all rely on: `TIME_SIGNATURES[x] || TIME_SIGNATURES['4/4']`
+ * never fires when the left side is `Object.prototype`, so `ts.beats * ts.stepsPerBeat`
+ * became `NaN` and meter math was *poisoned* rather than defaulting to 4/4. That
+ * degrades rather than crashes (`for (let i = 0; i < NaN; i++)` simply never runs), and
+ * it persisted: the poisoned value was saved and re-accepted on the next boot, so a
+ * single `?ts=__proto__` link left a visitor's session permanently non-playing.
+ *
+ * A null prototype fixes every one of those call sites at the declaration instead of
+ * patching each guard, which is what makes the *next* lookup correct by default too.
+ * `Object.keys`, spread, and `JSON.stringify` all behave identically; only inherited
+ * members disappear, and nothing reads those (verified — no `.hasOwnProperty`/`in`
+ * usage against this table anywhere in `public/`, `scripts/`, or `tests/`).
+ */
+export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = Object.assign(
+    Object.create(null),
+    {
+        '2/4': {
+            beats: 2,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4],
+            grouping: [2],
+            backbeat: [1],
+        },
+        '3/4': {
+            beats: 3,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8],
+            grouping: [3],
+            backbeat: [2],
+        },
+        '4/4': {
+            beats: 4,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12],
+            grouping: [2, 2],
+            backbeat: [1, 3],
+        },
+        '5/4': {
+            beats: 5,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12, 16],
+            grouping: [3, 2],
+            backbeat: [1, 3],
+        },
+        '6/8': {
+            beats: 6,
+            stepsPerBeat: 2,
+            subdivision: '8th',
+            pulse: [0, 6],
+            grouping: [3, 3],
+            isCompound: true,
+            backbeat: [1],
+        },
+        '7/8': {
+            beats: 7,
+            stepsPerBeat: 2,
+            subdivision: '8th',
+            pulse: [0, 4, 8],
+            grouping: [2, 2, 3],
+            backbeat: [1, 2],
+        },
+        '7/4': {
+            beats: 7,
+            stepsPerBeat: 4,
+            subdivision: '16th',
+            pulse: [0, 4, 8, 12, 16, 20, 24],
+            grouping: [4, 3],
+            backbeat: [1, 3, 5],
+        },
+        '12/8': {
+            beats: 12,
+            stepsPerBeat: 2,
+            subdivision: '8th',
+            pulse: [0, 6, 12, 18],
+            grouping: [3, 3, 3, 3],
+            isCompound: true,
+            backbeat: [1, 3],
+        },
     },
-    '3/4': {
-        beats: 3,
-        stepsPerBeat: 4,
-        subdivision: '16th',
-        pulse: [0, 4, 8],
-        grouping: [3],
-        backbeat: [2],
-    },
-    '4/4': {
-        beats: 4,
-        stepsPerBeat: 4,
-        subdivision: '16th',
-        pulse: [0, 4, 8, 12],
-        grouping: [2, 2],
-        backbeat: [1, 3],
-    },
-    '5/4': {
-        beats: 5,
-        stepsPerBeat: 4,
-        subdivision: '16th',
-        pulse: [0, 4, 8, 12, 16],
-        grouping: [3, 2],
-        backbeat: [1, 3],
-    },
-    '6/8': {
-        beats: 6,
-        stepsPerBeat: 2,
-        subdivision: '8th',
-        pulse: [0, 6],
-        grouping: [3, 3],
-        isCompound: true,
-        backbeat: [1],
-    },
-    '7/8': {
-        beats: 7,
-        stepsPerBeat: 2,
-        subdivision: '8th',
-        pulse: [0, 4, 8],
-        grouping: [2, 2, 3],
-        backbeat: [1, 2],
-    },
-    '7/4': {
-        beats: 7,
-        stepsPerBeat: 4,
-        subdivision: '16th',
-        pulse: [0, 4, 8, 12, 16, 20, 24],
-        grouping: [4, 3],
-        backbeat: [1, 3, 5],
-    },
-    '12/8': {
-        beats: 12,
-        stepsPerBeat: 2,
-        subdivision: '8th',
-        pulse: [0, 6, 12, 18],
-        grouping: [3, 3, 3, 3],
-        isCompound: true,
-        backbeat: [1, 3],
-    },
-};
+);
 
 export const MIXER_GAIN_MULTIPLIERS = {
     master: 0.85,

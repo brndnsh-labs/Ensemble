@@ -1,6 +1,7 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { hydrateState } from '../../../public/state/state-hydration.js';
 import * as stateModule from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -249,6 +250,232 @@ describe('Security: Hydration & Storage Resilience', () => {
             const state = stateModule.getState();
             expect(state.groove.volume).toBe(1.0);
             expect(state.groove.swing).toBe(100);
+        });
+    });
+
+    // why (#1258): four allowlist checks validated untrusted input by indexing a plain
+    // object literal and testing truthiness. Every `Object.prototype` member resolves
+    // through the prototype chain and reads as truthy, so `TIME_SIGNATURES['__proto__']`
+    // was a valid-looking hit — and because `Object.prototype` is truthy it ALSO defeated
+    // the `TIME_SIGNATURES[x] || TIME_SIGNATURES['4/4']` fallback that ~17 consumers rely
+    // on, poisoning meter math into NaN instead of defaulting to 4/4. Fixed at the two
+    // declarations (null prototype) rather than at the guards, so the next lookup is
+    // correct by default too.
+    describe('Prototype-pollution-shaped keys in allowlist lookups (#1258)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        // The pin. A null prototype looks like a stylistic quirk, so a future "simplify
+        // this back to a plain literal" would silently reopen every case below. Only
+        // TIME_SIGNATURES is asserted directly (LEGACY_THEME_MAP is module-private); that
+        // one is covered behaviorally by the `theme: 'constructor'` test further down.
+        it('keeps the untrusted-input lookup tables prototype-less', () => {
+            expect(Object.getPrototypeOf(TIME_SIGNATURES)).toBeNull();
+
+            // Indexed through a variable, not a literal — both because Biome's
+            // `noProto`/`useLiteralKeys` rules reject the literal form, and because the
+            // dynamic read is the shape that actually matters here: these keys arrive at
+            // runtime from a persisted value or a URL param.
+            for (const key of ['__proto__', 'constructor', 'toString', 'valueOf']) {
+                expect(TIME_SIGNATURES[key]).toBeUndefined();
+
+                // The consequence that made this worth fixing: `Object.prototype` is
+                // truthy, so it defeated the `|| fallback` every consumer relies on.
+                expect(TIME_SIGNATURES[key] || TIME_SIGNATURES['4/4']).toBe(TIME_SIGNATURES['4/4']);
+            }
+
+            // ...without breaking ordinary reads, which is why this is safe to do here.
+            expect(Object.keys(TIME_SIGNATURES)).toContain('4/4');
+            expect(TIME_SIGNATURES['4/4'].beats).toBe(4);
+        });
+
+        it.each(['__proto__', 'constructor', 'toString'])(
+            'falls back to 4/4 for a persisted timeSignature of %s',
+            (key) => {
+                localStorage.setItem(
+                    'ensemble_currentState',
+                    JSON.stringify({ sections: [validSection], timeSignature: key }),
+                );
+
+                hydrateState();
+
+                const ts = stateModule.getState().arranger.timeSignature;
+                expect(ts).toBe('4/4');
+                // The consequence was NaN meter math, so assert the derived value too --
+                // asserting the string alone would miss a fallback that returns a
+                // truthy-but-wrong config.
+                const cfg = TIME_SIGNATURES[ts] || TIME_SIGNATURES['4/4'];
+                expect(cfg.beats * cfg.stepsPerBeat).toBe(16);
+            },
+        );
+
+        // The both-directions control: a *valid* meter must still load. Without this, a
+        // guard that rejected everything would pass the assertions above.
+        it('still loads a valid non-4/4 persisted timeSignature', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], timeSignature: '7/8' }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().arranger.timeSignature).toBe('7/8');
+        });
+
+        it('rejects a prototype-shaped section timeSignature from a persisted payload', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [{ ...validSection, timeSignature: '__proto__' }],
+                }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().arranger.sections[0].timeSignature).toBe('');
+        });
+
+        it('falls back to the default theme for a persisted theme of constructor', () => {
+            // LEGACY_THEME_MAP['constructor'] used to return the Object constructor -- a
+            // truthy hit that sailed past the `??` and produced
+            // { palette: undefined, mode: undefined }.
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], theme: 'constructor' }),
+            );
+
+            hydrateState();
+
+            // migrateTheme's result lands on the playback slice.
+            const { palette, mode } = stateModule.getState().playback;
+            expect(palette).toBe('after-hours');
+            expect(mode).toBe('auto');
+        });
+    });
+
+    // why (#1258): `clamp` coerced with `Number()`, so null/false/[] became 0 rather than
+    // NaN -- landing on `min` instead of the intended default. For a volume field that
+    // meant a silently muted instrument, which is worse than the default it skipped.
+    describe('clamp() rejects non-numbers instead of coercing them to zero (#1258)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        it.each([
+            ['null', null],
+            ['false', false],
+            ['an empty array', []],
+            ['an object', {}],
+        ])('uses the default volume, not the minimum, for %s', (_label, bad) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [validSection],
+                    mixerVersion: 2,
+                    chords: { volume: bad },
+                }),
+            );
+
+            hydrateState();
+
+            // The bug: Number(null) === 0 -> clamped to min -> muted. Assert the actual
+            // contract (the 1.0 default), not merely "not muted" -- `not.toBe(0)` would
+            // also pass on 0.5 or NaN.
+            expect(stateModule.getState().chords.volume).toBe(1.0);
+        });
+
+        it('still accepts a legitimate numeric string (the accept direction)', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], bpm: '140' }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().playback.bpm).toBe(140);
+        });
+    });
+
+    // why (#1258): section ids key `sectionSeedMap` in groove-engine. The old
+    // `s.id || generateId()` was a truthiness check, so a non-string id passed straight
+    // through; an object-valued id stringifies to "[object Object]" and therefore
+    // COLLIDES across every section carrying one, silently collapsing their independent
+    // groove seeds into a single shared one.
+    // why (#1257 residue, caught in #1258's review): the share reader validated density
+    // but the persist reader passed it through raw -- so every user who opened a share
+    // link before #1257 had the number 0.5 written to disk and restored on every boot,
+    // pinned to standard voicing with no share URL involved. Same asymmetry the swingSub
+    // fix already called fatal.
+    describe('chords.density persist recovery (#1257 residue)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        it('recovers a persisted numeric density written by the pre-fix share reader', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], chords: { density: 0.5 } }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().chords.density).toBe('standard');
+        });
+
+        it('still restores a valid persisted density (the accept direction)', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], chords: { density: 'rich' } }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().chords.density).toBe('rich');
+        });
+
+        it('falls back to standard when a pre-#1257 save has no density key at all', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], chords: { volume: 1 } }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().chords.density).toBe('standard');
+        });
+    });
+
+    describe('validateSections type-checks section ids (#1258)', () => {
+        it.each([
+            ['an object', {}],
+            ['a number', 7],
+            ['an array', []],
+            ['true', true],
+        ])('mints a fresh string id when the persisted id is %s', (_label, badId) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [
+                        { id: badId, label: 'A', value: 'I' },
+                        { id: badId, label: 'B', value: 'IV' },
+                    ],
+                }),
+            );
+
+            hydrateState();
+
+            const [a, b] = stateModule.getState().arranger.sections;
+            expect(typeof a.id).toBe('string');
+            expect(typeof b.id).toBe('string');
+            // The actual defect was collision, not just the wrong type.
+            expect(a.id).not.toBe(b.id);
+            expect(a.id).not.toBe('[object Object]');
+        });
+
+        it('preserves a legitimate string id (the accept direction)', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [{ id: 'sec-abc', label: 'A', value: 'I' }] }),
+            );
+
+            hydrateState();
+
+            expect(stateModule.getState().arranger.sections[0].id).toBe('sec-abc');
         });
     });
 
