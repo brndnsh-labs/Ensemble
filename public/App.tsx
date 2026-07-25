@@ -1,6 +1,7 @@
 import { Fragment } from 'preact';
 import { useEffect } from 'preact/hooks';
 import { ChartSurface } from './components/ChartSurface.jsx';
+import { FlashOverlay } from './components/FlashOverlay.jsx';
 import { GlobalShortcuts } from './components/GlobalShortcuts.jsx';
 import { Modals } from './components/Modals.jsx';
 import { NotificationLayer } from './components/NotificationLayer.jsx';
@@ -36,6 +37,7 @@ export function App({ getVisualTime }: AppProps) {
             <GlobalShortcuts />
             <ChartSurface getVisualTime={getVisualTime} />
             <Modals />
+            <FlashOverlay />
             <NotificationLayer />
             <PWAUpdateBanner />
         </Fragment>

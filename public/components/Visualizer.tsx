@@ -310,11 +310,12 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
                 if (ev.type === 'step') {
                     const stepMeasure = Math.floor(ev.step / spm);
-                    if (
-                        groove.followPlayback &&
-                        stepMeasure !== groove.currentMeasure &&
-                        playback.isPlaying
-                    ) {
+                    // #1181: `groove.followPlayback` gated this and was removed — it had
+                    // been persisted and hydrated but no control could set it since the
+                    // chart-first migration, so the false branch was unreachable and the
+                    // pinned-measure behavior is the only one anyone has seen. Inlined
+                    // as always-on rather than resurrecting a hidden toggle.
+                    if (stepMeasure !== groove.currentMeasure && playback.isPlaying) {
                         switchMeasure(stepMeasure);
                     }
                     dispatch(ACTIONS.SET_PARAM, {

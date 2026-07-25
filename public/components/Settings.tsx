@@ -28,7 +28,6 @@ export function Settings() {
         metronome,
         practiceMode,
         visualFlash,
-        haptic,
         qualityColors,
         sessionTimer,
         loopLimit,
@@ -49,7 +48,6 @@ export function Settings() {
         metronome: s.playback.metronome,
         practiceMode: s.playback.practiceMode,
         visualFlash: s.playback.visualFlash,
-        haptic: s.playback.haptic,
         qualityColors: s.playback.qualityColors,
         sessionTimer: s.playback.sessionTimer,
         loopLimit: s.playback.loopLimit,
@@ -297,20 +295,6 @@ export function Settings() {
                                             dispatch(ACTIONS.SET_PARAM, {
                                                 module: 'playback',
                                                 param: 'visualFlash',
-                                                value: val,
-                                            });
-                                        }}
-                                    />
-                                </SettingRow>
-
-                                <SettingRow label="Haptic Feedback" id="hapticCheck">
-                                    <Toggle
-                                        id="hapticCheck"
-                                        checked={haptic}
-                                        onChange={(val) => {
-                                            dispatch(ACTIONS.SET_PARAM, {
-                                                module: 'playback',
-                                                param: 'haptic',
                                                 value: val,
                                             });
                                         }}

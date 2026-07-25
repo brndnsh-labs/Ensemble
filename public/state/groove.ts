@@ -27,7 +27,6 @@ export const groove = deepSignal<GrooveState>({
     reverb: 0.2,
     measures: 1,
     currentMeasure: 0,
-    followPlayback: true,
     humanize: 20,
     swing: 0,
     swingSub: '8th',
@@ -117,7 +116,6 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             // so main.ts sees no drum pattern and feeds this value straight into
             // loadDrumPreset().
             g.humanize = 20;
-            g.followPlayback = true;
             g.lastDrumPreset = 'Basic Rock';
             g.measures = 1;
             g.currentMeasure = 0;

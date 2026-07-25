@@ -406,6 +406,48 @@ export const SectionCard = forwardRef<SectionCardHandle, SectionCardProps>(
                                             ))}
                                         </select>
                                     </div>
+                                    {/*
+                                     * #1181 — the authoring UI for the per-section minor
+                                     * override. The engine has always honored
+                                     * `section.isMinor` (chords-engine.ts) and share URLs
+                                     * have always serialized it, but nothing could SET it,
+                                     * so only hand-built share links ever exercised it.
+                                     *
+                                     * Tri-state, matching the Key select's "Auto" convention
+                                     * directly above: `undefined` inherits the chart's global
+                                     * `arranger.isMinor`, while `true`/`false` pin this
+                                     * section regardless. That inherit case is the reason this
+                                     * is a select and not a checkbox — a two-state control
+                                     * can't express "follow the chart", and collapsing
+                                     * undefined into false would silently pin every existing
+                                     * section to major.
+                                     */}
+                                    <div class="section-actions-menu__row">
+                                        <span class="section-actions-menu__label">Quality</span>
+                                        <select
+                                            class="section-key-select"
+                                            value={
+                                                section.isMinor === undefined
+                                                    ? ''
+                                                    : section.isMinor
+                                                      ? 'minor'
+                                                      : 'major'
+                                            }
+                                            aria-label="Section Quality"
+                                            onChange={(e) => {
+                                                const raw = (e.target as HTMLSelectElement).value;
+                                                onSectionUpdate(
+                                                    section.id,
+                                                    'isMinor',
+                                                    raw === '' ? undefined : raw === 'minor',
+                                                );
+                                            }}
+                                        >
+                                            <option value="">Auto</option>
+                                            <option value="major">Major</option>
+                                            <option value="minor">Minor</option>
+                                        </select>
+                                    </div>
                                     <div class="section-actions-menu__row">
                                         <span class="section-actions-menu__label">Time</span>
                                         <select

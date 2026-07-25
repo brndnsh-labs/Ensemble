@@ -58,7 +58,6 @@ export const playback = deepSignal<GlobalContext>({
     masterVolume: 0.4,
     countIn: true,
     visualFlash: false,
-    haptic: false,
     qualityColors: true, // color chord symbols by harmonic quality on the chart
     toasts: [],
     flashIntensity: 0,
@@ -92,7 +91,6 @@ export function playbackReducer(action: Action): boolean {
             p.metronome = false;
             p.countIn = true;
             p.visualFlash = false;
-            p.haptic = false;
             p.qualityColors = true;
             p.sessionTimer = 5;
             p.applyPresetSettings = false;

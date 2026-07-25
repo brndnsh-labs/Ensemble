@@ -471,7 +471,13 @@ function applyPendingGenre(state: EnsembleState): void {
     (playback as Mutable<typeof playback>).nextNoteTime = playback.unswungNextNoteTime; // @direct-mutation
 
     syncAndFlushWorker(state, playback.step);
-    triggerFlash(0.15);
+    // Gated to match the four sibling triggerFlash sites (#1181) — this one was the
+    // only unconditional flash, so a genre switch pulsed the screen even with
+    // "Visual Flash" off. FlashOverlay also gates on the flag, so this is about not
+    // dispatching + scheduling a 50ms timeout for a flash nobody will see.
+    if (playback.visualFlash) {
+        triggerFlash(0.15);
+    }
 }
 
 function advanceCountIn(state: EnsembleState): void {

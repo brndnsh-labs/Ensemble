@@ -68,7 +68,6 @@ const setupMinimalDOM = () => {
             <input id="countInCheck" type="checkbox" />
             <input id="metronomeCheck" type="checkbox" />
             <input id="visualFlashCheck" type="checkbox" />
-            <input id="hapticCheck" type="checkbox" />
             <input id="autoIntensityCheck" type="checkbox" />
             <input id="soloistDoubleStops" type="checkbox" />
             
@@ -112,7 +111,6 @@ const setupMinimalDOM = () => {
             <div id="drumPresets"></div>
             <div id="userDrumPresetsContainer"></div>
             <button id="cloneMeasureBtn"></button>
-            <input id="autoFollowCheck" type="checkbox" />
             <input id="humanizeSlider" value="0" />
             <button id="saveDrumBtn"></button>
             <div id="smartDrumPresets"></div>

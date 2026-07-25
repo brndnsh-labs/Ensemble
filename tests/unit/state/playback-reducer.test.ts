@@ -347,7 +347,6 @@ describe('Playback Reducer', () => {
                 masterVolume: 0.7,
                 countIn: false,
                 visualFlash: true,
-                haptic: true,
                 toasts: [],
                 flashIntensity: 0.1,
                 updateAvailable: true,

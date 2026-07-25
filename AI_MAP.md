@@ -154,7 +154,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 | Category | Path | Responsibility |
 | :--- | :--- | :--- |
-| **Containers** | `public/App.tsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, and notification layers. |
+| **Containers** | `public/App.tsx` | Root application shell — renders ChartSurface, GlobalShortcuts, Modals, FlashOverlay, and notification layers. |
+| **Containers** | `public/components/FlashOverlay.tsx` | Full-screen "Visual Flash" beat/accent pulse — reads `playback.flashIntensity`, gated on `playback.visualFlash` (#1181). |
 | **Surface** | `public/components/ChartSurface.tsx` | Chart-first single surface. Branches on `playback.chartLocked`: locked → `ChordVisualizer` (read-only), unlocked → `InlineEditor`. Topbar lock toggle pauses playback when unlocking. |
 | **Surface** | `public/components/InlineEditor.tsx` | Inline section-card editor mounted on ChartSurface when unlocked. Hosts the Arranger + slim toolbar (Add Section, Tools menu, inspiration drawer). Replaces the deleted EditorModal. |
 | **Controls** | `public/components/editor/SectionHeaderStrip.tsx` | Per-section direction strip — intensity slider + 5 tri-state instrument dots (D/B/C/H/S). Mounted above each section in both ChordVisualizer (locked) and SectionCard (unlocked). |

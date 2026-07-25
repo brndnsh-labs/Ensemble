@@ -44,7 +44,6 @@ vi.mock('../../../public/state.js', () => {
         instruments: [],
         measures: 1,
         fillActive: false,
-        followPlayback: false,
     };
     const mockArranger = {
         timeSignature: '4/4',

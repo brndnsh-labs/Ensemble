@@ -117,7 +117,6 @@ describe('Groove Reducer', () => {
                 reverb: 0.1,
                 measures: 4,
                 currentMeasure: 1,
-                followPlayback: false,
                 humanize: 50,
                 swing: 10,
                 swingSub: '16th',

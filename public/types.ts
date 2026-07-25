@@ -232,7 +232,6 @@ export interface GrooveState {
     /** Currently visible measure for editing. */
     readonly currentMeasure: number;
     /** Whether to scroll grid during playback. */
-    readonly followPlayback: boolean;
     /** Humanization percentage (0-100). */
     readonly humanize: number;
     /** Swing percentage (0-100). */
@@ -1164,8 +1163,6 @@ export interface GlobalContext {
     readonly countIn: boolean;
     /** Whether visual flashing is enabled. */
     readonly visualFlash: boolean;
-    /** Whether haptic feedback is enabled. */
-    readonly haptic: boolean;
     /** Whether chord symbols are tinted by harmonic quality on the chart. */
     readonly qualityColors: boolean;
     /** List of active toast notifications. */

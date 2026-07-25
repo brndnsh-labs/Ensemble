@@ -66,7 +66,6 @@ describe('Accessibility (A11y) & Interactive Integrity', () => {
             'countInCheck',
             'metronomeCheck',
             'visualFlashCheck',
-            'hapticCheck',
             'applyPresetSettingsCheck',
             'swingBaseSelect',
             'closeSettingsBtn',

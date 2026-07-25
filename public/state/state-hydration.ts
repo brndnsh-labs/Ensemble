@@ -296,7 +296,6 @@ function hydrateSavedState(): void {
             practiceMode: savedState.practiceMode !== undefined ? savedState.practiceMode : true,
             metronome: false,
             visualFlash: savedState.visualFlash !== undefined ? savedState.visualFlash : false,
-            haptic: savedState.haptic !== undefined ? savedState.haptic : false,
             qualityColors: savedState.qualityColors !== undefined ? savedState.qualityColors : true,
             countIn: savedState.countIn !== undefined ? savedState.countIn : true,
             sessionTimer: clamp(savedState.sessionTimer, 0, 60, 5),
@@ -438,12 +437,11 @@ function hydrateSavedState(): void {
                 swingSub: normalizeSwingSub(savedState.groove.swingSub),
                 measures: clamp(savedState.groove.measures, 1, 8, 1),
                 humanize: clamp(savedState.groove.humanize, 0, 100, 20),
-                followPlayback:
-                    savedState.groove.followPlayback !== undefined
-                        ? savedState.groove.followPlayback
-                        : savedState.groove.autoFollow !== undefined
-                          ? savedState.groove.autoFollow
-                          : true,
+                // #1181: `followPlayback` (and its even older `autoFollow` alias) removed —
+                // no control has been able to set it since the chart-first migration, so
+                // the reader in Visualizer is now inlined as always-on. Both stale keys are
+                // simply ignored here rather than migrated: an unread extra key in a
+                // persisted payload is harmless, and the next save drops it.
                 lastDrumPreset: savedState.groove.lastDrumPreset || 'Basic Rock',
                 genreFeel:
                     savedState.groove.genreFeel && GENRE_FEELS.includes(savedState.groove.genreFeel)

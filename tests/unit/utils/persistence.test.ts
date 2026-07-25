@@ -96,7 +96,6 @@ describe('Persistence Integrity', () => {
 
         // Specific checks for persistence keys
         expect(savedData.chords).toHaveProperty('density');
-        expect(savedData.groove).toHaveProperty('followPlayback');
         expect(savedData.groove).toHaveProperty('humanize');
         expect(savedData.groove).toHaveProperty('sectionSeedMap');
     });
