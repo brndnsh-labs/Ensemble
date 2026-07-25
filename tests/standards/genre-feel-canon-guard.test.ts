@@ -7,7 +7,10 @@ import { SUBTRACTION_PILOT_GENRES } from '../../public/engine/arrangement-layeri
 import { RING_THROUGH_GENRES, SUSTAINED_COMP_GENRES } from '../../public/engine/comping-emit.js';
 import { GENRE_INTENSITY_FLOORS, HALL_GENRES } from '../../public/engine/conductor.js';
 import { GENRE_POCKET } from '../../public/engine/coordination-engine.js';
-import { DROP_FRIENDLY_GENRES } from '../../public/engine/drop-mechanic.js';
+import {
+    DROP_FRIENDLY_GENRES,
+    PITCHED_ONLY_DROP_GENRES,
+} from '../../public/engine/drop-mechanic.js';
 import { HAT_SPINE_GENRES, strategies } from '../../public/engine/groove-engine.js';
 import { HARMONY_GENRE_PROFILES } from '../../public/engine/harmony-styles.js';
 import { GENRE_STYLE_MAPPING } from '../../public/engine/soloist-config.js';
@@ -119,6 +122,7 @@ describe('genreFeel routing canon (#1130)', () => {
     //   HARMONY_GENRE_PROFILES  resolveHarmonyProfile(groove.genreFeel)
     const FEEL_SUBSETS: Record<string, readonly string[]> = {
         DROP_FRIENDLY_GENRES: [...DROP_FRIENDLY_GENRES],
+        PITCHED_ONLY_DROP_GENRES: [...PITCHED_ONLY_DROP_GENRES],
         BASS_SPACE_FEELS: [...BASS_SPACE_FEELS],
         HAT_SPINE_GENRES: [...HAT_SPINE_GENRES],
         STICKY_GENRES: [...STICKY_GENRES],
@@ -169,12 +173,30 @@ describe('genreFeel routing canon (#1130)', () => {
     //   OUT — Reggae: a dub drop-out KEEPS drum and bass — that's the whole
     //         gesture. This mechanic cuts the kit too, so Reggae here would
     //         produce the opposite of dub.
-    //   OUT — Funk: the strongest omission case (the James Brown break IS this
-    //         gesture), but a funk break keeps the drummer going and re-enters
-    //         on a stab. Adding it as-is gives funk a rock-shaped hole with a
-    //         crash in it — it wants its own variant, not this set.
+    //   OUT — Funk: the strongest omission case, but a funk break keeps the
+    //         drummer going. Adding it here would give funk a rock-shaped hole
+    //         with a crash in it. It got its own variant instead (#1202) — see
+    //         PITCHED_ONLY_DROP_GENRES below. Funk DOES fire a cut bar; it is
+    //         out of *this* set, not out of the mechanic.
     //   OUT — Neo-Soul (pocket continuity), Jazz/Blues/Bossa/Acoustic/Country
     //         (a hard mid-form cut reads as a mistake, not a build).
+    // #1202 — the funk-break set gets its own membership pin, for the same reason its
+    // sibling has one: the idiom argument is the whole content of the set, so a change
+    // to it should be a reviewed edit rather than a one-word diff.
+    //
+    // This pin is load-bearing in a way the sibling's is not. The set-driven sweeps in
+    // drop-breakdown-mechanic.test.ts drive `genreFeel` FROM this set, so they are
+    // tautological with respect to its members: typo 'Funk' to 'Funky' and the direct
+    // sweep still passes (it asks whether its own member fires), while the complement
+    // sweep also passes (real 'Funk' lands in the complement and correctly does not
+    // fire). What actually catches that typo today is the pair of tests that hardcode
+    // `genreFeel: 'Funk'` — verified by mutation. This pin makes the guard explicit
+    // instead of incidental, and FEEL_SUBSETS above independently rejects any member
+    // that is not a real canonical feel.
+    it('PITCHED_ONLY_DROP_GENRES membership is exactly the funk-break idiom set', () => {
+        expect([...PITCHED_ONLY_DROP_GENRES].sort()).toEqual(['Funk']);
+    });
+
     it('DROP_FRIENDLY_GENRES membership is exactly the curated idiom set', () => {
         expect([...DROP_FRIENDLY_GENRES].sort()).toEqual([
             'Disco',

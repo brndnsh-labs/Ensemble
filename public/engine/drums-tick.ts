@@ -15,7 +15,7 @@ import {
     getAltPitchClasses,
     isTensionChordForSoloist,
 } from './coordination-engine.js';
-import { shouldFireDropMute } from './drop-mechanic.js';
+import { dropMuteStyleFor, shouldFireDropMute } from './drop-mechanic.js';
 import { applyGrooveOverrides } from './groove-engine.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import type { DrumHitInfo, TickCursors } from './tick-types.js';
@@ -222,11 +222,28 @@ export function runDrumTick(
             )
         ) {
             coordination.dropMuteActive = true;
+            // #1202 — which of the two cut-bar gestures this genre plays.
+            //
+            // Falls back to `'silence'` when the kit is not playing at this step
+            // (`groove.enabled === false`, or a per-section groove override). The funk
+            // break's entire premise is that the drums carry the bar; with no drums it
+            // degenerates into a rock-shaped hole with the crash ALSO suppressed — an
+            // *unmarked* void, which is strictly worse than the gesture it was avoiding.
+            // Falling back keeps the bar marked. `includeDrums` is the same
+            // `isInstrumentActiveAtStep` result the emission block below gates on, so
+            // the flag and the audible outcome cannot disagree.
+            const dropStyle = includeDrums ? dropMuteStyleFor(groove.genreFeel) : 'silence';
+            coordination.dropMuteStyle = dropStyle;
             // why: the crash marks the START of the empty bar — fire it on the
             // measure downbeat only, then leave the rest of the bar silent.
-            coordination.dropCrashPending = stepInfo
-                ? stepInfo.isMeasureStart
-                : step % stepsPerMeasure === 0;
+            //
+            // #1202 — suppressed entirely for the funk break. There is no void to
+            // mark when the kit is still playing, and a crash over a continuing
+            // groove reads as a transition accent, which is the opposite of "the
+            // band dropped out".
+            coordination.dropCrashPending =
+                dropStyle === 'silence' &&
+                (stepInfo ? stepInfo.isMeasureStart : step % stepsPerMeasure === 0);
         }
 
         // --- Section-occurrence publication (epic-form-arrangement S2) ---
@@ -388,7 +405,14 @@ export function runDrumTick(
     // them sees the silence honestly. Drum genres that are drop-friendly only
     // — `shouldFireDropMute` already gated `dropMuteActive` on genre.
     const dropMuteActive = coordination.dropMuteActive === true;
-    if (dropMuteActive) {
+    // #1202 — the funk break. `dropMuteActive` still mutes the pitched lanes (that
+    // gate lives in tick-logic.ts and is style-agnostic), but the KIT PLAYS THROUGH:
+    // that is the whole gesture. The horns and guitar drop out and the drummer keeps the
+    // groove, which is what the band slams back onto. Suppressing the pattern here as
+    // well would give funk a rock-shaped hole. (This is the 1-bar TRANSITION break, not
+    // the multi-bar "give the drummer some" drum feature — see PITCHED_ONLY_DROP_GENRES.)
+    const dropSilencesKit = dropMuteActive && coordination.dropMuteStyle !== 'pitched-only';
+    if (dropSilencesKit) {
         if (includeDrums && coordination.dropCrashPending === true) {
             const crashInst = groove.instruments.find((i) => i.name === 'Crash') || {
                 name: 'Crash',
@@ -413,6 +437,13 @@ export function runDrumTick(
         fillPlayed = true; // suppress the base pattern + any scheduled fill below
     }
 
+    // Gated on `dropMuteActive`, not `dropSilencesKit` (#1202): scheduled FILLS stay
+    // suppressed in a funk break bar even though the base groove plays through it. The
+    // break exposes the groove — the thing the band slams back onto — so the drummer
+    // holds the pattern rather than taking a flourish. A fill here would also collide
+    // with the re-entry on the very next downbeat. James Brown said it on the *Funky
+    // Drummer* break itself: "you don't have to do no soloing, brother, just keep what
+    // you got." (A drum FEATURE is a different, multi-bar gesture — not this one.)
     if (!dropMuteActive && groove.fillActive) {
         const fillStep = step - (groove.fillStartStep || 0);
 

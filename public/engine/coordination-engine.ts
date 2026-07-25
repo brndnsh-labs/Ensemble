@@ -1,5 +1,6 @@
 import { getSectionEnergy } from '../song/form-analysis.js';
 import type { SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
+import type { DropMuteStyle } from './drop-mechanic.js';
 
 /**
  * Coordination Context Management and Contract Enforcement
@@ -582,6 +583,24 @@ export function createCoordinationContext(
         // readable-after: chord-data preamble (any producer)
         dropMuteActive: false,
         dropCrashPending: false,
+        // why: #1202 — the cut bar has TWO idiomatic voicings, sharing this one
+        // trigger and lookahead:
+        //
+        //   - `'silence'` (default, the rock/EDM drop): the whole band cuts and
+        //     `dropCrashPending` marks the void. The hole IS the gesture.
+        //   - `'pitched-only'` (the funk/soul TRANSITION break): pitched lanes
+        //     drop out and the KIT PLAYS THROUGH. No crash: there is no void to
+        //     mark, and a crash over a continuing groove reads as a transition
+        //     accent rather than a break. Not the multi-bar drum feature — see
+        //     `PITCHED_ONLY_DROP_GENRES` in drop-mechanic.ts.
+        //
+        // Read by the drum layer (to decide whether to suppress its own pattern)
+        // and by nothing else — the pitched producers mute on `dropMuteActive`
+        // alone, identically in both styles.
+        //
+        // writer: drums-tick.ts (chord-data preamble, alongside dropMuteActive)
+        // readable-after: chord-data preamble (any producer)
+        dropMuteStyle: 'silence' as DropMuteStyle,
     };
 }
 
@@ -604,6 +623,9 @@ export function createCoordinationContext(
  *                                   (Epic 3 S12 approach window), −1 = not resolvable
  *   - `dropMuteActive`            — true every step of the 1-bar pre-drop cut window
  *   - `dropCrashPending`          — true only on the downbeat of the mute bar
+ *   - `dropMuteStyle`             — how that cut bar is voiced: 'silence' (whole band
+ *                                   out, crash marks the void) or 'pitched-only' (the
+ *                                   funk break — kit plays through, no crash)
  *
  * Source: docs/audit/FOLLOWUPS.md §G "CoordinationContext interface" NIT;
  *         docs/audit/epic-deferred-followups.md S1(a)/(b).

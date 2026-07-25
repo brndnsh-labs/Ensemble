@@ -78,7 +78,10 @@ vi.mock('../../public/engine/harmonies.js', () => ({
 
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { GENRE_FEELS } from '../../public/data/smart-genres.js';
-import { DROP_FRIENDLY_GENRES } from '../../public/engine/drop-mechanic.js';
+import {
+    DROP_FRIENDLY_GENRES,
+    PITCHED_ONLY_DROP_GENRES,
+} from '../../public/engine/drop-mechanic.js';
 import { generateNotesForStep } from '../../public/engine/tick-logic.js';
 
 const TS = TIME_SIGNATURES['4/4'];
@@ -562,24 +565,51 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         },
     );
 
-    // Every canonical feel OUTSIDE the set must stay silent — the other half of
-    // the exact-match contract. The old substring gate could false-positive on
-    // any future feel that merely contained a needle; this pins the complement.
-    it.each(GENRE_FEELS.filter((feel) => !DROP_FRIENDLY_GENRES.has(feel)))(
-        'does NOT fire for non-drop-friendly genreFeel %s even into a Drop',
+    // The same completeness sweep for the funk-break set (#1202). Separate `it.each`
+    // rather than a widened one because the two gestures assert different things
+    // about the kit — see the funk-break describe block below.
+    it.each([...PITCHED_ONLY_DROP_GENRES])(
+        'FIRES a pitched-only cut for genreFeel %s (#1202)',
         (genreFeel) => {
-            const state = makeState({ nextLabel: 'Drop', genreFeel });
+            // `includeDrums` is load-bearing, not incidental: with the kit inactive the
+            // style deliberately falls back to 'silence' (see the fallback test below),
+            // so a kit-less fixture would assert the fallback, not the funk break.
+            const state = makeState({ nextLabel: 'Drop', genreFeel, includeDrums: true });
             const cursors = freshCursors();
 
-            let totalNotes = 0;
             for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
                 const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
-                totalNotes += r.notes.length;
-                expect(r.coordination.dropMuteActive).toBe(false);
+                expect(r.coordination.dropMuteActive).toBe(true);
+                expect(r.coordination.dropMuteStyle).toBe('pitched-only');
             }
-            expect(totalNotes).toBeGreaterThan(0);
         },
     );
+
+    // Every canonical feel outside BOTH gesture sets must stay silent — the other half
+    // of the exact-match contract. The old substring gate could false-positive on any
+    // future feel that merely contained a needle; this pins the complement.
+    //
+    // #1202 — the filter spans both sets deliberately. It used to derive from
+    // `DROP_FRIENDLY_GENRES` alone, which is exactly why adding the funk break broke
+    // it: Funk fires a cut without being a member of that set. A complement built from
+    // one of two sets is a complement of nothing. Any future third gesture must be
+    // added here too, or this sweep will assert that it doesn't fire while it does.
+    it.each(
+        GENRE_FEELS.filter(
+            (feel) => !DROP_FRIENDLY_GENRES.has(feel) && !PITCHED_ONLY_DROP_GENRES.has(feel),
+        ),
+    )('does NOT fire any cut for genreFeel %s even into a Drop', (genreFeel) => {
+        const state = makeState({ nextLabel: 'Drop', genreFeel });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            expect(r.coordination.dropMuteActive).toBe(false);
+        }
+        expect(totalNotes).toBeGreaterThan(0);
+    });
 
     // #1199 — the sibling case above drives `'Pre-Chorus'`, a label the app
     // NEVER PRODUCES. The wizard emits the bare `'Pre'` (`roleToLabel` +
@@ -629,6 +659,162 @@ describe('Drop/Breakdown S1(b) — trigger gating', () => {
         // Jazz plays straight through the boundary — no cut.
         expect(totalNotes).toBeGreaterThan(0);
         expect(soloistSpy).toHaveBeenCalled();
+    });
+});
+
+// --- #1202 — the funk break: a SECOND cut-bar gesture, not a membership change --
+//
+// The funk/soul TRANSITION break: the pitched lanes drop out for the bar before a
+// section lift and the DRUMMER KEEPS GOING. Dropping Funk into DROP_FRIENDLY_GENRES
+// would have given it a rock-shaped hole with a crash in it — the gesture in funk
+// clothing, not the funk gesture. So Funk gets `dropMuteStyle: 'pitched-only'` over
+// the same trigger, lookahead and re-entry.
+//
+// Not to be confused with the multi-bar "give the drummer some" drum feature, which
+// is a different device and is NOT built — see PITCHED_ONLY_DROP_GENRES' doc.
+describe('Drop/Breakdown #1202 — the funk break (pitched-only cut)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('CUTS the pitched lanes for the whole break bar', () => {
+        // includeDrums: the pitched-only style requires a live kit — see the fallback
+        // test below.
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Funk', includeDrums: true });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            expect(r.coordination.dropMuteActive).toBe(true);
+            expect(r.coordination.dropMuteStyle).toBe('pitched-only');
+        }
+
+        // Identical to the silence gesture on the pitched side — that gate lives in
+        // tick-logic and is deliberately style-agnostic. Only the kit differs.
+        expect(totalNotes).toBe(0);
+        expect(soloistSpy).not.toHaveBeenCalled();
+        expect(bassSpy).not.toHaveBeenCalled();
+        expect(accompSpy).not.toHaveBeenCalled();
+        expect(harmonySpy).not.toHaveBeenCalled();
+    });
+
+    it('KEEPS THE KIT PLAYING through the break bar, and fires no crash', () => {
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Funk', includeDrums: true });
+        const cursors = freshCursors();
+
+        const crashSteps: number[] = [];
+        let baseGrooveHits = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, {
+                ...ALL_ENGINES,
+                includeDrums: true,
+            });
+            const played = r.drumHits.filter((h: any) => h.shouldPlay);
+            if (played.some((h: any) => h.soundName === 'Crash')) {
+                crashSteps.push(step);
+            }
+            baseGrooveHits += played.filter((h: any) => h.soundName !== 'Crash').length;
+            // Asserted on the FLAG, not only on the audible outcome. The crash emission
+            // sits inside the kit-silencing branch, so for a pitched-only cut it is
+            // unreachable anyway — meaning a bug that wrongly set `dropCrashPending`
+            // during a funk break would be invisible to the `crashSteps` assertion
+            // below (verified by mutation: forcing the flag true keeps every audible
+            // assertion green). The flag is published band-wide, so its value has to be
+            // correct on its own terms, not just harmless at today's only consumer.
+            expect(r.coordination.dropCrashPending).toBe(false);
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+            `[funk break] base-groove hits across the break bar: ${baseGrooveHits}; ` +
+                `crash steps: ${crashSteps.length === 0 ? 'none' : crashSteps.join(',')}`,
+        );
+
+        // THE POINT OF THE WHOLE STORY. The rock gesture asserts `baseGrooveHits === 0`
+        // for this same bar; funk asserts the opposite. If this ever goes to 0, the funk
+        // break has silently become the rock break.
+        expect(baseGrooveHits).toBeGreaterThan(0);
+
+        // No crash: there is no void to mark. Over a groove that is still playing, a
+        // crash reads as a transition accent — the opposite of "the band dropped out".
+        expect(crashSteps).toEqual([]);
+    });
+
+    it('SLAMS BACK — every pitched lane re-enters on the One after the break', () => {
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Funk' });
+        const cursors = freshCursors();
+
+        // Play through the break bar so the un-mute is reached in sequence.
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            generateNotesForStep(state, step, cursors, ALL_ENGINES);
+        }
+        vi.clearAllMocks();
+
+        const r = generateNotesForStep(state, VERSE_STEPS, cursors, ALL_ENGINES);
+
+        // The re-entry needs no bespoke emission path: `dropMuteActive` goes false at
+        // the boundary, so the first downbeat of the new section is already the
+        // slam-back. All four lanes run on the same step — that IS the unison attack.
+        expect(r.coordination.dropMuteActive).toBe(false);
+        expect(soloistSpy).toHaveBeenCalled();
+        expect(bassSpy).toHaveBeenCalled();
+        expect(accompSpy).toHaveBeenCalled();
+        expect(harmonySpy).toHaveBeenCalled();
+        expect(r.notes.length).toBeGreaterThan(0);
+    });
+
+    it('leaves the silence gesture untouched for a DROP_FRIENDLY genre', () => {
+        // Paired-site guard: the two styles share one trigger, so a change to the
+        // funk branch that leaked into the shared path would show up here as a rock
+        // break that stopped silencing its kit.
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Rock', includeDrums: true });
+        const cursors = freshCursors();
+
+        let baseGrooveHits = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, {
+                ...ALL_ENGINES,
+                includeDrums: true,
+            });
+            expect(r.coordination.dropMuteStyle).toBe('silence');
+            baseGrooveHits += r.drumHits
+                .filter((h: any) => h.shouldPlay)
+                .filter((h: any) => h.soundName !== 'Crash').length;
+        }
+        expect(baseGrooveHits).toBe(0);
+    });
+
+    it('falls back to the SILENCE style when the kit is not playing', () => {
+        // The funk break's premise is that the drums carry the bar. With the kit
+        // inactive (`groove.enabled: false`, or a per-section groove override) the
+        // pitched-only style degenerates into a bar with NOTHING in it — and, because
+        // the funk style also suppresses the crash, an *unmarked* void: strictly worse
+        // than the rock gesture it was designed to avoid. Falling back keeps the bar
+        // marked.
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Funk', includeDrums: false });
+        const cursors = freshCursors();
+
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            expect(r.coordination.dropMuteActive).toBe(true);
+            expect(r.coordination.dropMuteStyle).toBe('silence');
+        }
+    });
+
+    it('does NOT fire for Funk when the trigger itself does not qualify', () => {
+        // The style flag must not become a second trigger: Verse→Verse is no lift, so
+        // Funk plays straight through exactly as every other genre does.
+        const state = makeState({ nextLabel: 'Verse', genreFeel: 'Funk' });
+        const cursors = freshCursors();
+
+        let totalNotes = 0;
+        for (let step = 3 * SPB; step < VERSE_STEPS; step++) {
+            const r = generateNotesForStep(state, step, cursors, ALL_ENGINES);
+            totalNotes += r.notes.length;
+            expect(r.coordination.dropMuteActive).toBe(false);
+        }
+        expect(totalNotes).toBeGreaterThan(0);
     });
 });
 

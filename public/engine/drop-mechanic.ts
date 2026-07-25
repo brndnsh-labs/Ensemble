@@ -56,6 +56,71 @@ export const DROP_FRIENDLY_GENRES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * How the cut bar is voiced. Two genuinely different musical gestures share one
+ * trigger, one lookahead and one re-entry point (#1202).
+ *
+ * - `'silence'` — the rock/EDM drop: the WHOLE band cuts, a single crash marks the
+ *   void, everyone slams back on the next downbeat. The hole is the gesture.
+ * - `'pitched-only'` — the funk/soul **transition break**: the pitched lanes drop
+ *   out for the bar and **the drummer keeps going**.
+ *
+ * The style axis is really "which lanes stay" — this enum collapses it to two
+ * points because those are the two gestures that exist today. The known third
+ * member is `'rhythm-section-only'` (drums AND bass stay), which is what a dub
+ * drop-out and a 12"-disco breakdown actually do. If reggae or disco ever wants
+ * in, that is the value to add: widening `'pitched-only'` to reggae would ship
+ * the exact inverse of dub, since dub keeps the bass.
+ */
+export type DropMuteStyle = 'silence' | 'pitched-only';
+
+/**
+ * Genres whose break is a `'pitched-only'` cut rather than a full silence.
+ *
+ * why Funk is here and deliberately NOT in `DROP_FRIENDLY_GENRES` (#1202): a funk
+ * break is almost never silence. The horns and guitar drop out and the drummer
+ * plays through it. Dropping Funk into `DROP_FRIENDLY_GENRES` as-is would have
+ * given it a rock-shaped hole with a crash in it — the gesture in funk clothing,
+ * not the funk gesture (#1169's reviewer recommended exactly this split rather
+ * than widening the existing set).
+ *
+ * BE PRECISE ABOUT WHICH GESTURE THIS IS. The James Brown lineage (*Cold Sweat*,
+ * *Sex Machine*) covers two different devices, and only one of them shipped:
+ *
+ *   - the **1-bar transition break** — pitched lanes out for the bar before a
+ *     section lift, band back in on the One. THIS is what this style implements,
+ *     and it is a real, common funk/soul device.
+ *   - the **multi-bar drum feature** — "give the drummer some": the band clears
+ *     out and the drummer plays alone for several bars. NOT built. It has a
+ *     different musical function (a feature, not an anticipation) and would need
+ *     its own multi-bar window, so don't read this style as covering it.
+ *
+ * In practice this fires almost entirely via the energy-delta-inferred path
+ * rather than an authored label, because only the EDM/Loop template emits a
+ * literal `'Drop'` section (`data/song-templates.ts`). "The bar before the late
+ * chorus" IS the transition-break idiom, so that is the right home for it — but
+ * it means the gesture is inferred, not authored, on every real funk chart.
+ *
+ * Kept as a separate set, not a widening, for a second reason: the membership of
+ * `DROP_FRIENDLY_GENRES` is pinned by `genre-feel-canon-guard.test.ts` precisely
+ * so the silence gesture's reach can't drift unnoticed. This set carries its own
+ * pin there for the same reason — note that the set-driven sweeps in
+ * `drop-breakdown-mechanic.test.ts` cannot serve that purpose, because they drive
+ * `genreFeel` from this set's own members and so pass for any spelling.
+ *
+ * Keys are exact `groove.genreFeel` values — see the sibling set's doc for why
+ * exact-match and not substring.
+ */
+export const PITCHED_ONLY_DROP_GENRES: ReadonlySet<string> = new Set(['Funk']);
+
+/**
+ * The cut-bar style for a genre. Only meaningful when `shouldFireDropMute`
+ * returned true; `'silence'` is the default for every drop-friendly genre.
+ */
+export function dropMuteStyleFor(genreFeel: string | undefined | null): DropMuteStyle {
+    return genreFeel && PITCHED_ONLY_DROP_GENRES.has(genreFeel) ? 'pitched-only' : 'silence';
+}
+
+/**
  * Energy-delta threshold (from `form-analysis.ts`'s 0..1 energy map) above which
  * an approaching section change is promoted to a full drop, even if the next
  * label is not literally "drop"/"breakdown".
@@ -96,6 +161,21 @@ const DROP_INFERRED_MIN_FORM_PROGRESS = 0.6;
  */
 function isDropFriendlyGenre(genreFeel: string | undefined | null): boolean {
     return !!genreFeel && DROP_FRIENDLY_GENRES.has(genreFeel);
+}
+
+/**
+ * True iff the genre fires a cut bar at all, in EITHER style (#1202).
+ *
+ * The trigger, the section-boundary lookahead and the energy-delta threshold are
+ * shared by both gestures — only the voicing of the cut bar differs, which is
+ * `dropMuteStyleFor`'s job. Keeping the two sets separate but the gate unified is
+ * what lets Funk fire a break without appearing in `DROP_FRIENDLY_GENRES` (whose
+ * exact membership is pinned).
+ */
+function firesCutBar(genreFeel: string | undefined | null): boolean {
+    return (
+        isDropFriendlyGenre(genreFeel) || (!!genreFeel && PITCHED_ONLY_DROP_GENRES.has(genreFeel))
+    );
 }
 
 /**
@@ -160,7 +240,7 @@ export function shouldFireDropMute(
     upcomingEnergyDelta: number,
     formProgress: number,
 ): boolean {
-    if (!isDropFriendlyGenre(genreFeel)) {
+    if (!firesCutBar(genreFeel)) {
         return false;
     }
     // Only the last bar before the boundary is the cut bar.
