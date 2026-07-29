@@ -191,6 +191,144 @@ schedule site with the actual play time, which is what a ±25 ms match needs.
 Velocity is only on the payload for lanes that pass it today (drums, chords) —
 the others report NOT VERIFIABLE rather than assuming a value.
 
+## `npm run --silent mix:spectro -- --scene=<id>`
+
+Emits a **spectrogram contact sheet**: every stem stacked vertically on one shared,
+bar-numbered time axis, as a single PNG. Where `mix:verify` answers questions that
+reduce to a scalar, this one exists for the ones that do not — density, masking,
+mud. "The chords are smearing the snare" is a claim about two lanes occupying the
+same band at the same instant, and the honest way to settle it is to look at both.
+
+```bash
+npm run --silent mix:spectro -- --scene=funk-pocket
+npm run --silent mix:spectro -- --scene=jazz-ride --stems=bass,drums,full
+npm run --silent mix:spectro -- --scene=funk-pocket --range=bar3..bar5   # the click-hunting zoom
+npm run --silent mix:spectro -- --from=tmp/ears --out=tmp/sheet.png      # replay an existing render dir
+```
+
+It drives one `mix:report --write-wav --write-events` render (or replays a directory
+with `--from`), draws one `showspectrumpic` panel per stem, and composites its own
+grid, bar numbers and stem labels on top. Defaults to `tmp/spectro/`.
+
+**Two decisions worth not undoing:**
+
+- **`legend=0`, always.** With ffmpeg's legend on, the plot is inset by undocumented
+  margins and a grid drawn in image pixels lands off the audio it annotates — a bar
+  line that is confidently, invisibly wrong. With it off the image *is* the plot, and
+  the mapping becomes *knowable* — which is not the same as trivial. It is **not**
+  `x = (t - windowStart) / windowDuration * width`; that is wrong by two terms, and
+  wrong by a *different* amount on a `--range` zoom of the same render, so the same
+  instant sits at two different columns on two sheets whose only purpose is to be
+  compared. `timeToPixel` corrects for both: `showspectrumpic` advances an integer
+  `floor(windowSamples / width)` samples per column (so the picture spans slightly
+  less than the window), and the FFT window's centring adds a constant
+  sample-domain lag. Measured residual after both: **under 1 px, envelope ±1.5 px**,
+  end-to-end against ffmpeg in `tests/scripts/spectro-calibration.test.ts` — which
+  brackets both edges of the picture, because the error this replaced was zero in
+  the middle. The axis is ours, rasterized in `scripts/spectro-grid.ts` — this
+  repo's ffmpeg has no `drawtext`.
+- **The scales are pinned in one place** (`SPECTRO_SCALE`). Two sheets are only
+  comparable while the color mapping and dB window are identical, because
+  `color=intensity` maps dB to hue: move `drange` and the same audio changes color
+  with no marker that the scale moved. Changing any value there invalidates
+  comparison against every sheet generated before it.
+
+**The grid is drawn from the event dump's `meta`, and the lead-in is load-bearing** —
+`mix-report` renders 0.25 s of silence first, so bar 1 does not start at t=0. Bars are
+assumed 4/4 (16 steps); `RenderMeta` carries no time signature, so a non-4/4 scene gets
+a grid that is right about seconds and wrong about bar numbers.
+
+**Window rules worth knowing before you read a sheet:**
+
+- **One scene per sheet, enforced.** `--scene` has no default, so a bare
+  `npm run mix:spectro` renders every default scene (96/104/118/138 bpm) into one
+  directory. That used to draw one scene's grid over all four; it now fails and tells
+  you to pass `--scene=<id>`. Same for `mix:plant --from`, where a multi-scene
+  directory silently turned "one defect per lane" into one per lane *per scene*.
+- **The default window stops at the last bar**, not at the end of the file.
+  `mix-report` renders a 2 s tail past the form (~10% of a default scene), and those
+  pixels annotated nothing. Each window is then extended by exactly one beat, because
+  a window that *ends* on its closing bar line cannot draw that line — the picture's
+  right edge sits a few columns short of the window's own last instant.
+- **`--range` is clamped to the render.** A range running past the end used to emit
+  `apad` silence under a confident caption, and `--range=bar90..bar99` on a 4-bar
+  render exited 0 with a black sheet. The far end now clamps to the last step and a
+  start past the form is refused by name.
+
+## `npm run --silent mix:plant -- --from=<dir> --out=<dir>`
+
+The calibration deck for the above. A clean sheet looks like a clean sheet whether
+the tool works or not, so this takes a real render and writes a copy with **known**
+defects planted — one per lane, each a pure deterministic transform — plus a
+`defects.json` answer key naming the type, stem and exact time range.
+
+```bash
+npm run --silent mix:verify -- --scene=funk-pocket --keep=tmp/ears
+npm run --silent mix:plant -- --from=tmp/ears --out=tmp/ears-defective
+npm run --silent mix:spectro -- --from=tmp/ears-defective     # read it
+npm run --silent mix:spectro -- --from=tmp/ears               # against the control
+```
+
+| Class | What it plants |
+| :- | :- |
+| `mute-region` | one beat of one stem silenced — a dropped note |
+| `click` | a single full-scale sample against its neighbors, 7 ms off the grid |
+| `drop-lane` | an entire stem silenced |
+| `flatten-accents` | dynamic range compressed 8:1 with +18 dB capped make-up — accents eaten |
+
+`flatten-accents` plants compression and **nothing else**: the gain is derived from the
+louder of the envelope and the sample it multiplies, so the transform cannot overshoot
+full scale. It previously did, and the ±1 clamp that caught it hard-clipped 0.36% of
+the drums stem (0.73% of `full`, peak 2.57) in runs up to 1.3 ms — broadband distortion
+at every transient, under a manifest that claimed only "accents eaten", confounding
+exactly the masking calibration this deck exists to support.
+
+It deliberately does **not** grade the read. Whether a planted defect was visible is
+a judgment for whoever looks at the sheet, and would be worthless coming from the
+same code that placed it.
+
+### What the images can and cannot show (measured 2026-07-28)
+
+The point of planting known defects is to find out how far the image channel can be
+trusted, rather than assuming a spectrogram is legible because spectrograms usually
+are. Read on `funk-pocket`, full sheet plus a `--range=bar5..bar6` zoom:
+
+| Class | Verdict | What it looks like |
+| :- | :- | :- |
+| `drop-lane` | **readable alone** | the panel is black end to end; needs no control |
+| `mute-region` | **readable alone** | a vertical black gap in a lane you expect to be continuous — and the bar grid makes it *addressable* ("bass, second half of bar 3") without counting pixels |
+| `flatten-accents` | **A/B unambiguous; easy to miss alone** | the inter-hit space fills with an even haze — the control's dark background lifts to red across the whole panel — and the low band loses its gaps. Beside the control it is obvious. Alone, the uniformly raised floor *is* the tell, but it is easy to write off as a busier kit or a hotter mix |
+| `click` | **not readable — metrics only** | never located it, at full form *or* zoomed to two bars, while knowing the exact bar and beat |
+
+**The click result is the load-bearing one, and it is a floor, not a ceiling.** A
+single-sample discontinuity carries almost no energy inside a ~20 ms FFT window, and
+every panel is already full of vertical transients from real percussion — so a
+broadband streak has nothing to distinguish it from a snare. Do not go click-hunting
+on these images. `mix:verify`'s `discontinuity` metric owns that class and does detect
+it. This is a genuine division of labour between the two tools, not a gap to close by
+tuning the color scale.
+
+**`flatten-accents` is why the pinned scale earns its keep** — that verdict is only
+available because two sheets are directly comparable. It is also the class most likely
+to be *missed* in practice, since it needs the discipline of rendering the control
+alongside.
+
+**Method caveat, so nobody over-trusts the table.** The read was informed, not blind:
+an earlier deck had already revealed which stem carries which defect, and an attempt to
+re-randomize by shuffling the request order failed silently — each defect's preferred
+stem is distinct and always free, so order cannot change the assignment. That weakens
+the two positive calls (`drop-lane`, `mute-region`), which are in any case plain image
+facts anyone can re-check. It **strengthens** the two negative ones: knowing exactly
+where the click was and still not finding it is worse for the image channel than a
+blind miss would be, and the same holds for judging the drum flattening hard to spot in
+isolation while knowing it was planted.
+
+The `flatten-accents` row was re-read after that transform was fixed to stop clipping.
+The first version overshot into a hard clamp on every attack, so the panel carried
+broadband distortion the manifest never claimed — which is exactly the kind of second,
+undocumented difference that quietly invalidates an A/B. The verdict above is the one
+measured against the corrected transform.
+
 ## Share modal → Download .wav
 
 In addition to the CLI tools above, the in-app **Share & Export** modal
@@ -206,6 +344,13 @@ required, just drag the file into another chat.
 
 Implementation: `public/export/audio-export.ts` + the shared
 `public/engine/wav-encoder.ts`.
+
+The encoder quantizes with a **round** against a symmetric `0x8000` scale (clamped at
+`+0x7fff`), which makes `int16 → float → int16` the exact identity for all 65 536
+values. It used to truncate against `0x7fff`, so every strictly-positive sample lost
+one LSB per round trip — inaudible on its own (-90 dBFS), but it meant any tool that
+decodes a render, edits a region and writes it back changed the *whole* file:
+`mix:plant` claiming to touch 2 samples of the `full` stem moved 871 754 of them.
 
 ## Why these are separate commands
 

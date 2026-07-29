@@ -26,11 +26,12 @@ describe('encodeWav', () => {
         expect(view.getUint32(40, true)).toBe(samples.length * 2);
         expect(buffer.byteLength).toBe(44 + samples.length * 2);
 
-        // Positive samples use the asymmetric 16-bit range: s * 0x7fff (32767).
-        // 0.5 → floor(0.5 * 32767) = 16383.
-        expect(view.getInt16(44 + 2, true)).toBe(16383);
-        // Negative samples use s * 0x8000 (32768). -0.5 → -16384 exactly.
+        // One symmetric 0x8000 scale, matching what every decoder divides by:
+        // 0.5 → 16384, -0.5 → -16384. Full scale is the one asymmetric case,
+        // clamped from 32768 down to 32767 rather than wrapping to -32768.
+        expect(view.getInt16(44 + 2, true)).toBe(16384);
         expect(view.getInt16(44 + 4, true)).toBe(-16384);
+        expect(view.getInt16(44 + 6, true)).toBe(32767);
     });
 
     it('interleaves stereo channels and reports byte rate / block align', () => {
@@ -43,10 +44,8 @@ describe('encodeWav', () => {
         expect(view.getUint16(32, true)).toBe(4); // blockAlign = 2 ch * 2 bytes
         expect(view.getUint32(28, true)).toBe(44100 * 4); // byteRate
 
-        // Interleaving: L0, R0, L1, R1.
-        // 0.25 * 32767 = 8191.75 → 8191 (truncated by setInt16).
-        // -0.25 * 32768 = -8192 exactly.
-        expect(view.getInt16(44 + 0, true)).toBe(8191);
+        // Interleaving: L0, R0, L1, R1. ±0.25 * 32768 = ±8192 exactly.
+        expect(view.getInt16(44 + 0, true)).toBe(8192);
         expect(view.getInt16(44 + 2, true)).toBe(0);
         expect(view.getInt16(44 + 4, true)).toBe(0);
         expect(view.getInt16(44 + 6, true)).toBe(-8192);
@@ -59,6 +58,31 @@ describe('encodeWav', () => {
 
         expect(view.getInt16(44, true)).toBe(0x7fff); // clamped to +1
         expect(view.getInt16(46, true)).toBe(-0x8000); // clamped to -1
+    });
+
+    it('round-trips every one of the 65 536 int16 values exactly', () => {
+        // The contract any re-encoding tool rests on (`scripts/plant-defects.ts`
+        // decodes a render, edits one region, and writes the whole file back): if
+        // `int16 → float → int16` is not the identity, EVERY sample outside the
+        // edited region moves too, and the manifest's claimed range is a fiction.
+        //
+        // Bracketing the whole domain rather than sampling it, because the two
+        // failure modes this replaced were value-dependent and would have survived
+        // a spot check: truncation lost an LSB on every positive value, and
+        // rounding against an 0x7fff scale still lost one on every |i| > 16384.
+        const values = new Float32Array(65536);
+        for (let i = -32768; i <= 32767; i++) {
+            values[i + 32768] = i / 0x8000;
+        }
+        const view = new DataView(encodeWav([values], 44100));
+        const mismatches: string[] = [];
+        for (let i = -32768; i <= 32767; i++) {
+            const decoded = view.getInt16(44 + (i + 32768) * 2, true);
+            if (decoded !== i) {
+                mismatches.push(`${i}→${decoded}`);
+            }
+        }
+        expect(mismatches).toEqual([]);
     });
 
     it('rejects mismatched channel lengths', () => {

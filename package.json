@@ -34,6 +34,8 @@
         "mix:diff": "tsx scripts/mix-diff.ts",
         "mix:analyze": "tsx scripts/mix-analyze.ts",
         "mix:verify": "tsx scripts/mix-verify.ts",
+        "mix:spectro": "tsx scripts/mix-spectro.ts",
+        "mix:plant": "tsx scripts/plant-defects.ts",
         "audition-link": "tsx scripts/audition-link.ts",
         "screenshots": "tsx scripts/capture-screenshots.ts",
         "size": "size-limit",

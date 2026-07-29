@@ -45,12 +45,27 @@ export function encodeWav(channels: Float32Array[], sampleRate: number): ArrayBu
     writeAscii(view, 36, 'data');
     view.setUint32(40, dataSize, true);
 
+    // Float → int16 with a ROUND and a symmetric 0x8000 scale, clamped at the top.
+    //
+    // Both halves of that are load-bearing, and the obvious-looking alternatives are
+    // each lossy in a way that is invisible until something re-reads the file.
+    // `DataView.setInt16` truncates toward zero, so the original `clamped * 0x7fff`
+    // wrote int16 1000 back as 999 — every strictly-positive sample losing one LSB
+    // per round trip through a decoder that divides by 0x8000. Rounding alone does
+    // not fix it either: `i/0x8000 * 0x7fff` is `i - i/0x8000`, which still rounds
+    // down for every |i| > 16384, so 16 383 of the 65 536 values stay wrong. Scaling
+    // by 0x8000 to match the decoder makes `int16 → float → int16` the exact
+    // identity across the whole range (`tests/scripts/wav-encoder.test.ts` asserts
+    // all 65 536 of them), which is what lets a tool re-encode a decoded file and
+    // claim it changed only what it says it changed (`scripts/plant-defects.ts`).
+    // The clamp is then what keeps float 1.0 from wrapping to -32768.
     let offset = 44;
     for (let i = 0; i < numSamples; i++) {
         for (let ch = 0; ch < numChannels; ch++) {
             const raw = channels[ch][i];
             const clamped = raw < -1 ? -1 : raw > 1 ? 1 : raw;
-            view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+            const quantized = Math.round(clamped * 0x8000);
+            view.setInt16(offset, quantized > 0x7fff ? 0x7fff : quantized, true);
             offset += 2;
         }
     }
