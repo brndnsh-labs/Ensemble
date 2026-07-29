@@ -1168,7 +1168,8 @@ export function getBassNoteStyle(
                 // succeeded. Both were then scored as perfect by the critique test's
                 // `Math.abs(diff) === 12`.
                 //
-                // `PUMP_ANCHOR_STYLES` in `bass-engine.ts` now picks an anchor whose
+                // `PUMP_ANCHOR_STYLES` in `bass-pump.ts` (#1291 moved it out of
+                // `bass-engine.ts`) now picks an anchor whose
                 // octave partner is guaranteed to fit (ceiling `absMax - 12`), so this
                 // never fires. It stays as a non-inverting fallback rather than an
                 // assertion because a missed pump on one upbeat is a small blemish while
@@ -1193,6 +1194,11 @@ export function getBassNoteStyle(
             if (Math.random() < gallopProb - 0.1) {
                 // Usually repeat the root or octave ghosted
                 const note = Math.random() < 0.7 ? baseRoot : baseRoot + 12;
+                // Unreachable for a pump style, for the same reason as the fold above:
+                // `baseRoot` is pinned to [28, 39], so `note` is at most 51 and `absMax` is
+                // 57. Kept as a non-inverting fallback rather than deleted, on the same
+                // terms — no mutation of it can redden a test, so what pins it is the
+                // anchor-window precondition, not this line.
                 const finalNote = note > absMax ? baseRoot : note;
                 return result(getFrequency(finalNote), 0.5, 0.6, 1);
             }

@@ -61,6 +61,12 @@ describe('Disco Bassist Critique', () => {
      *     chord-entry guard: with one chord per bar every chord entry is also a bar's One
      *     and the two guards are indistinguishable.
      *   - `timeSignature` — for the compound-meter characterization case.
+     *   - `bassMidis` — #1291 review. The SLASH BASS of each chord, indexed alongside
+     *     `roots`, so a chord can be `C/E` rather than `C`. Without it this harness emitted
+     *     `bassMidi: undefined` on every chord and the whole file was blind to slash
+     *     chords — which is how the `fifth` variation shipped voicing a major 7th under
+     *     one. Defaults to `null` (what `chords-engine.ts` writes for a plain chord), which
+     *     is byte-identical to the old `undefined` at every reader.
      */
     const simulatePerformance = (
         numBars,
@@ -91,8 +97,10 @@ describe('Disco Bassist Critique', () => {
         const barsPerChord = opts.barsPerChord ?? 1;
         const stepsPerChord = Math.round(stepsPerBar * barsPerChord);
         const roots = opts.roots || [rootMidi];
+        const bassMidis = opts.bassMidis || null;
         const chordAt = (chordIndex) => ({
             rootMidi: roots[chordIndex % roots.length],
+            bassMidi: bassMidis ? bassMidis[chordIndex % bassMidis.length] : null,
             intervals: [0, 4, 7],
             quality: opts.quality || 'maj',
             beats: tsConfig.beats * barsPerChord,
@@ -276,13 +284,17 @@ describe('Disco Bassist Critique', () => {
      *            always fires.
      *   fifth  — a beat → "and" delta of exactly +7. The pump's only other legal moves are
      *            0 (the `octaveProb` roll declining) and +12.
-     *   octave — a beat-start pitch away from the anchor. At occurrence 1 the anchor is a
-     *            pure function of the chord root, so there is exactly one (asserted as
-     *            `distinctBeatMidis === 1` throughout this file).
      *
-     * The anchor is taken as the MODAL beat-start pitch, not the minimum: the variation
-     * touches one beat per 4-bar phrase, so the un-displaced anchor is always the strict
-     * majority, and a downward displacement would make `min` report the displaced pitch.
+     * #1291 removed the third kind. `octave` was detected as a beat-start pitch away from
+     * the anchor; with the pair displacement retired, no repeat pass ever moves a beat's
+     * pitch, so that detector could only ever report zero. It is deleted rather than kept
+     * as a permanently-zero row — the claim it used to make ("the anchor never moves") is
+     * now asserted directly as `distinctBeatMidis === 1` on the repeat pass, and as the
+     * flat 28-51 register bound.
+     *
+     * The anchor is the MODAL beat-start pitch. Since #1291 every beat of a single-chord
+     * run carries the same pitch, so modal and minimum agree; modal is kept because it is
+     * the reading that stays correct if a future gesture displaces a beat downward.
      *
      * KNOWN UNDER-COUNT, deliberately not repaired: `fifth` is detected as a beat → "and"
      * delta of +7, so it is invisible on the ~6-10% of target beats where the `octaveProb`
@@ -291,8 +303,8 @@ describe('Disco Bassist Critique', () => {
      * ceiling on fifths or a difference between two sequences, and an under-count can only
      * make both harder to pass) — but it does mean the PRINTED distribution under-reports
      * `fifth` by that margin. Don't read the report as evidence the draw is uniform, or as
-     * a measurement of the 0.5/0.3/0.2 weighting; it is a floor on the fifth's share, not
-     * an estimate of it.
+     * a measurement of the 0.7/0.3 weighting; it is a floor on the fifth's share, not an
+     * estimate of it.
      */
     const summarizeVariations = (performance, numBars, timeSignature = '4/4') => {
         const ts = TIME_SIGNATURES[timeSignature];
@@ -313,7 +325,6 @@ describe('Disco Bassist Critique', () => {
         const kindAtBeat = new Map();
         const dropped = [];
         const fifths = [];
-        const shifted = [];
         for (let b = 0; b < totalBeats; b++) {
             const beat = byStep.get(b * stepsPerBeat);
             if (!beat) {
@@ -321,11 +332,6 @@ describe('Disco Bassist Critique', () => {
                 kindAtBeat.set(b, 'drop');
                 dropped.push(b);
                 continue;
-            }
-            if (beat.note.midi !== anchor) {
-                kinds.add('octave');
-                kindAtBeat.set(b, 'octave');
-                shifted.push(b);
             }
             const and = byStep.get(b * stepsPerBeat + stepsPerBeat / 2);
             if (and && and.note.midi - beat.note.midi === 7) {
@@ -361,7 +367,6 @@ describe('Disco Bassist Critique', () => {
             ),
             dropped,
             fifths,
-            shifted,
             pitches: [...new Set(performance.map((p) => p.note.midi))].sort((a, b) => a - b),
         };
     };
@@ -650,7 +655,13 @@ describe('Disco Bassist Critique', () => {
     // #1276 — the shift is now one of three outcomes on the target beat (drop / fifth /
     // octave), so this test keeps the same claim but reads it off the whole menu: the beat
     // varies, and whichever way it varies the pump survives the variation.
-    it('keeps the pump intact through the repeat-pass variation (#1271, #1276)', () => {
+    //
+    // #1291 — `octave` is gone, so the menu is drop / fifth and the single-note-displacement
+    // failure mode this test was built around is now unreachable by construction rather than
+    // by assertion. The claim inverts accordingly: the repeat pass must NOT move the anchor
+    // at all (`distinctBeatMidis === 1` on both passes), and the non-vacuity job passes
+    // entirely to the classifier, which must still see both kinds.
+    it('keeps the pump intact through the repeat-pass variation (#1271, #1276, #1291)', () => {
         const BARS = 128;
         const PHRASES = BARS / 4; // one variation target beat per 4-bar phrase
         const first = simulatePerformance(BARS, {
@@ -671,18 +682,24 @@ describe('Disco Bassist Critique', () => {
                 `${(repeat.liftRate * 100).toFixed(1)}% total lift, ${repeat.distinctBeatMidis} anchor(s), ` +
                 `${repeat.inversions} inverted, ${repeat.fifthLifts} +7 lift(s) — kinds ` +
                 `[${v.kinds.join(', ')}] over ${PHRASES} phrases: ${v.dropped.length} dropped ` +
-                `beat(s), ${v.fifths.length} fifth beat(s), ${v.shifted.length} displaced beat(s)`,
+                `beat(s), ${v.fifths.length} fifth beat(s)`,
         );
 
         // The gesture fires: pass 2 does things pass 1 structurally cannot. This is the
-        // non-vacuity guard — if the pump path silently no-op'd (e.g. a headroom test done
-        // in the comfort range, where 36 - 12 = 24 has none), pass 2 would be
+        // non-vacuity guard — if the pump path silently no-op'd, pass 2 would be
         // indistinguishable from pass 1 and the variation would be quietly gone for the
-        // genre. Two independent readings of that, because #1276 makes the octave shift
-        // only one third of the menu: the anchor count (as in #1271) and the classifier.
-        expect(firstScore.distinctBeatMidis).toBe(1);
-        expect(repeat.distinctBeatMidis).toBe(2);
+        // genre. #1291 moves that whole job onto the classifier: with the pair displacement
+        // retired, the anchor count no longer distinguishes the passes at all, so `kinds`
+        // has to carry it alone and is therefore required to show BOTH members of the menu
+        // rather than merely two of three.
         expect(v.kinds.length).toBeGreaterThanOrEqual(2);
+        // #1291 — and the anchor count becomes the opposite claim to the one it made in
+        // #1271: not "the repeat pass moved the pair" but "no repeat pass ever moves the
+        // beat's pitch". One anchor on BOTH passes, in a key (C, anchor 36) whose retired
+        // octave outcome could only ever have thumped down to 24. That is the register
+        // half of acceptance 1, read as a count rather than as a bound.
+        expect(firstScore.distinctBeatMidis).toBe(1);
+        expect(repeat.distinctBeatMidis).toBe(1);
         // The occurrence-1 control for the widened `illegalDeltas` vocabulary, on this
         // test's own pass-1 run — completing the "every occurrence-1 test asserts
         // `fifthLifts === 0`" claim documented at `scoreOctaveAlternation`.
@@ -690,8 +707,8 @@ describe('Disco Bassist Critique', () => {
 
         // ...and it fires as phrasing, not a jolt.
         //
-        // `illegalDeltas` is the assertion that catches the single-note variant, and it is
-        // worth being precise about why, because an earlier draft credited `inversions`
+        // `illegalDeltas` is the assertion that catches a single-note displacement, and it
+        // is worth being precise about why, because an earlier draft credited `inversions`
         // and that was wrong. Displacing the downbeat alone gives delta 0 in the up
         // direction (36 → 48 against an "and" still at 48) and +24 in the down direction
         // (24 against 48). NEITHER is negative, so `inversions` stays 0 through the exact
@@ -701,27 +718,34 @@ describe('Disco Bassist Critique', () => {
         expect(repeat.inversions).toBe(0);
 
         // The +7 vocabulary widening, as a BAND rather than the structural ceiling. `<=
-        // PHRASES` (32) is near-tautological against an observed 18 — the fifth can only
-        // land on the phrase's one target beat, so that bound holds for any implementation,
-        // including a menu degenerated to always-`fifth`.
+        // PHRASES` (32) is near-tautological — the fifth can only land on the phrase's one
+        // target beat, so that bound holds for any implementation, including a menu
+        // degenerated to always-`fifth`.
         //
-        // Both ends are derived, not guessed. RE-DERIVED for the #1276 follow-up that made
-        // `isPumpTargetBeat` select only from non-One beats: the earlier band was centred on
-        // 0.8 because occurrence 2's target used to land on a bar's One, where `drop` was
-        // forbidden and the ladder routed its 0.3 into the fifth. With the One excluded from
-        // the candidate set, every outcome is legal at every target this can pick, so the
-        // fifth gets its own weight and nothing else — 0.5 × 32 = 16 phrases; observed 18
-        // (32 phrases split 18 fifth / 8 drop / 6 octave against an expected 16 / 9.6 / 6.4).
-        // A menu degenerated to always-`fifth` reads 32 (every phrase), MEASURED by
-        // temporarily forcing the draw, so `< 29` catches it with 3 phrases of margin; a
-        // fifth that never fires reads 0, so `> 8` catches that. Both ends sit ~2.8σ off the
-        // observed value at binomial sd 2.83 — the value is deterministic, so the width is
-        // there to tolerate a re-weighting, not sampling noise.
+        // Both ends are derived, not guessed. RE-DERIVED for #1291's two-item menu: the
+        // fifth's weight went 0.5 → 0.7 when `octave` retired and handed it the whole
+        // remaining band, so the centre moves 16 → 22.4 phrases. Observed 23 (32 phrases
+        // split 23 fifth / 7 drop / 2 undetected against an expected 22.4 / 9.6).
         //
-        // The primary catcher for the degenerate menu is `distinctBeatMidis === 2` above
-        // (always-`fifth` never displaces a beat, so it reads 1 — verified by the same
-        // mutation). This band is a second, independent reading of the same failure.
-        expect(repeat.fifthLifts).toBeGreaterThan(8);
+        // A menu degenerated to always-`fifth` MEASURES 30 here — verified by temporarily
+        // forcing the draw — so `< 29` catches it; a fifth that never fires reads 0, so
+        // `> 14` catches that. Binomial sd at n=32, p=0.7 is 2.6, so the ends sit ~3.4σ and
+        // ~2.3σ off the observed value; the value is deterministic, so that width is there
+        // to tolerate a re-weighting, not sampling noise.
+        //
+        // #1291 review — be honest about the top end specifically. 30 is 32 phrases less the
+        // two whose `octaveProb` roll declined on the target beat, and that 2 is a property
+        // of the PINNED STREAM, not of the engine: the structural value is 32, and the
+        // detector's under-count is binomial (n=32, p=0.94 → ~1.9 expected, sd ~1.3). Under
+        // a different stream a degenerate menu could measure 28 and slip under this bound.
+        // So `< 29` is a real second reading of the failure, not a margin with structure
+        // behind it — read "one phrase to spare" as luck, and don't lean on it.
+        //
+        // The reliable catcher for the degenerate menu is `kinds.length >= 2` above: an
+        // always-`fifth` menu produces no hole AT ALL, so the classifier reads one kind
+        // regardless of the stream. Verified by the same mutation, which reddens 14 tests in
+        // this file.
+        expect(repeat.fifthLifts).toBeGreaterThan(14);
         expect(repeat.fifthLifts).toBeLessThan(29);
 
         // Rate holds through the variation — the varied beats are not paying for it. Read
@@ -735,9 +759,10 @@ describe('Disco Bassist Critique', () => {
         //
         // The floor is set from the gesture's structural worst case, not from the observed
         // number. The variation touches 32 of 512 pairs, so even if EVERY target beat were
-        // a non-octave the rate could only fall from pass 1's 91.6% to ~85.4% (the
-        // always-`fifth` mutation measured 87.9%). Observed here: 90.9%. 0.84 sits below
-        // that structural bound and far above anything that would mean the pump broke.
+        // a fifth the rate could only fall from pass 1's 91.6% to ~85.4% (the always-`fifth`
+        // mutation measured 88.3%). Observed here: 89.9% — 1pt below the pre-#1291 90.9%,
+        // which is the fifth's larger share showing up exactly where it should. 0.84 sits
+        // below that structural bound and far above anything that would mean the pump broke.
         expect(repeat.score).toBeGreaterThan(0.84);
     });
 
@@ -764,12 +789,12 @@ describe('Disco Bassist Critique', () => {
         console.log(
             `[Disco Critique] ${name} repeat pass: anchor ${restatement.anchor}, ` +
                 `kinds [${restatement.kinds.join(', ')}] — ${restatement.dropped.length} dropped, ` +
-                `${restatement.fifths.length} fifth, ${restatement.shifted.length} displaced ` +
+                `${restatement.fifths.length} fifth ` +
                 `(occurrence 1 kinds [${statement.kinds.join(', ')}])`,
         );
 
         // The control, and the proof the classifier isn't just reading noise: at occurrence
-        // 1 the mechanism is a no-op end to end, so none of the three artifacts can occur.
+        // 1 the mechanism is a no-op end to end, so neither artifact can occur.
         expect(statement.kinds).toEqual([]);
         // ...and at occurrence 2 at least one does, for every root without exception.
         expect(restatement.kinds.length).toBeGreaterThanOrEqual(1);
@@ -790,7 +815,29 @@ describe('Disco Bassist Critique', () => {
     // defect #1276 exists to fix — and each occurrence would still show a mixture of kinds,
     // the union would still be 3, and the assertion would still pass. Mutation-verified
     // against the sequence form: stripping `sectionOccurrence` reddens it in every root.
-    it('gives every root at least two variation kinds across repeats (#1276)', () => {
+    //
+    // #1291 acceptance 2 — the same sweep now also carries half of the KEY-INVARIANCE claim,
+    // which is the whole point of retiring `octave`. Both surviving gestures are
+    // headroom-free, so nothing in the menu, the draw or the resolution can read the chord
+    // root. Under #1276 that was false and had to be — Bb (anchor 34) had no octave headroom,
+    // its `octave` draws degraded to the next rung, and it therefore ran a different menu
+    // from the other eleven (`{drop|fifth}` against `{drop|fifth|octave}`).
+    //
+    // What is asserted HERE is the DROP POSITIONS: the twelve roots must drop the identical
+    // beats. Not the phrase-kind sequence, and the distinction is load-bearing rather than a
+    // matter of taste — `fifth` is detected as a rendered +7, so at this test's intensity it
+    // is invisible whenever the `octaveProb` roll declines on the target beat, and which
+    // beats lose their "and" is a property of this file's ONE shared seeded stream in call
+    // order, not of the engine. The sequence therefore genuinely differs per root here (the
+    // `?` entries in the report below), and asserting it would be asserting the harness. A
+    // dropped beat has no such dependence: it never reaches `bass-styles.ts`'s disco branch
+    // at all, so its detection is exact.
+    //
+    // The other half — that the twelve roots run the identical VOCABULARY, in the identical
+    // places, which is the claim that actually distinguishes post-#1291 Bb from pre-#1291 Bb
+    // — needs the fifth detector to be exact, so it lives in its own test below at an
+    // intensity where it is.
+    it('gives every root at least two variation kinds across repeats (#1276, #1291)', () => {
         const BARS = 32;
         const PHRASES = BARS / 4;
         const settings = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
@@ -810,26 +857,65 @@ describe('Disco Bassist Critique', () => {
             return { name, kinds, perOcc };
         });
 
+        // #1291 review — `?`, not `n`. The classifier's `'none'` bucket is "the detector saw
+        // no artifact", which under a `maj` chart is almost never the engine's `'none'`
+        // outcome: it is an UNDETECTED fifth, the ~6% of target beats whose `octaveProb` roll
+        // declined so the beat played root → root with no upper note to read a +7 off. Printed
+        // as `n` it made the visible V4/V5 divergence between roots read as engine
+        // key-dependence, when it is the harness's shared stream position.
+        const glyph = (kind) => (kind === 'none' ? '?' : kind[0]);
         console.log(
             `[Disco Critique] Variation kinds over occurrences 2-5 ` +
-                `(phrase sequence, d=drop f=fifth o=octave n=none):\n  ` +
+                `(phrase sequence, d=drop f=fifth ?=undetected, usually a fifth whose ` +
+                `octave roll declined):\n  ` +
                 rows
                     .map(
                         (row) =>
                             `${row.name}: {${row.kinds.join('|')}} ` +
                             `[${row.perOcc
-                                .map(
-                                    (o) => `V${o.occ}:${o.v.phraseKinds.map((k) => k[0]).join('')}`,
-                                )
+                                .map((o) => `V${o.occ}:${o.v.phraseKinds.map(glyph).join('')}`)
                                 .join(' ')}]`,
                     )
                     .join('\n  '),
         );
 
+        // #1291 acceptance 2 — the twelve roots drop the identical BEATS. Nothing downstream
+        // of the menu draw can see the chord root any more (both surviving gestures are
+        // headroom-free), so the drop rate across keys is not merely "similar": it is the
+        // same beats in the same places.
+        //
+        // Honest about what this catches. It is a PIN, not a fix-catcher: verified by
+        // running this file against the pre-#1291 engine, where it still passes, because
+        // #1276 already drew over a constant vocabulary and routed Bb's unavailable `octave`
+        // to `fifth` rather than to `drop`. The ~50% Bb drop surplus this guards against
+        // belonged to the earlier draft that re-divided the seed range on unavailability —
+        // the failure mode named at the menu draw in `bass-engine.ts`, and the one a future
+        // re-weighting is most likely to reintroduce. What #1291 actually changes is one
+        // level up: `kinds` below is now key-invariant too, where #1276 left Bb with a
+        // two-item menu against everyone else's three.
+        //
+        // Asserted on the drop POSITIONS rather than on the phrase-kind sequence, and that
+        // choice is load-bearing. `fifth` is detected as a rendered +7, so it is invisible
+        // whenever the `octaveProb` roll declines on the target beat — and this file installs
+        // ONE seeded `Math.random` stream per test, shared by all 48 runs below in call
+        // order, so which beats lose their "and" genuinely does differ per root here. That is
+        // a property of the harness, not of the engine. A dropped beat has no such
+        // dependence: it never reaches `bass-styles.ts`'s disco branch at all, so its
+        // detection is exact.
+        const dropSignature = (row) => row.perOcc.map((o) => o.v.dropped.join(',')).join(' | ');
+        const reference = dropSignature(rows[0]);
+        for (const row of rows.slice(1)) {
+            expect(
+                dropSignature(row),
+                `${row.name} drops different beats from ${rows[0].name}`,
+            ).toEqual(reference);
+        }
+
         for (const row of rows) {
             // intent: two outcomes is the minimum that makes "V4 ≠ V2" a statement about
-            // the gesture rather than about its placement. Bb reaches it on a two-item menu
-            // (drop + fifth); every other root has three available.
+            // the gesture rather than about its placement. Since #1291 the menu has exactly
+            // two members, so this now says every root uses ALL of it — including Bb, whose
+            // menu #1276 left one item short.
             expect(row.kinds.length).toBeGreaterThanOrEqual(2);
 
             // ...and the actual "V4 ≠ V2" claim: each occurrence's per-phrase kind sequence
@@ -855,39 +941,94 @@ describe('Disco Bassist Critique', () => {
                 // The fifth stays a once-per-phrase gesture in every key.
                 expect(r.fifthLifts, where).toBeLessThanOrEqual(PHRASES);
 
-                // The line's whole vocabulary, stated as a set. Anything the varied line
-                // plays is the anchor, its octave, the fifth above the anchor, or the
-                // displaced pair — nothing else, in any key, on any repeat.
+                // #1291 acceptance 1 — the register bound, asserted flat.
                 //
-                // Acceptance 3 asks for "every sounding note inside 28-51" and that is
-                // true of the unvaried line and of the `fifth` variation by construction
-                // (`baseRoot + 7 <= 46`), but NOT of the `octave` variation, which #1271
-                // deliberately measures against the ABSOLUTE slot: at anchor 36 the
-                // octave-down thump lands on 24, five semitones below comfortMin, and a
-                // comfort-range headroom test would leave the whole genre with no gesture
-                // at all. So the hard bound asserted here is the bass register slot
-                // (23-57), plus an explicit check that the ONLY thing ever outside 28-51
-                // is that one displaced pair. Widening the comfort exception any further
-                // would need re-opening #1271's headroom argument.
-                const allowed = new Set([
-                    v.anchor - 12,
-                    v.anchor,
-                    v.anchor + 7,
-                    v.anchor + 12,
-                    v.anchor + 24,
-                ]);
+                // #1276 could not say this. It had to assert the absolute bass slot (23-57)
+                // and then bolt on an allowed-pitch-set clause plus an "the only thing
+                // outside 28-51 is the displaced pair" escape, purely to accommodate the
+                // `octave` thump: at anchor 36 the octave-down landed on 24, five semitones
+                // below comfortMin, and a comfort-range headroom test would have left the
+                // whole genre with no gesture at all. That escape was the test-side shape of
+                // the defect. With `octave` retired the pump's entire vocabulary is
+                // `baseRoot` ∈ [28, 39], `baseRoot + 7` ∈ [35, 46] and `baseRoot + 12` ∈
+                // [40, 51], so the direct statement is available and is strictly stronger
+                // than what it replaces — it rules out the sub-basement thump AND the
+                // comper-register leap without naming either.
                 for (const midi of v.pitches) {
-                    expect(midi, `${where} register slot`).toBeGreaterThanOrEqual(23);
-                    expect(midi, `${where} register slot`).toBeLessThanOrEqual(57);
-                    expect(allowed.has(midi), `${where} plays ${midi}`).toBe(true);
-                    if (midi < 28 || midi > 51) {
-                        expect(
-                            midi === v.anchor - 12 || midi === v.anchor + 24,
-                            `${where}: ${midi} is outside comfort and is not the displaced pair`,
-                        ).toBe(true);
-                    }
+                    expect(midi, `${where} register`).toBeGreaterThanOrEqual(28);
+                    expect(midi, `${where} register`).toBeLessThanOrEqual(51);
                 }
             }
+        }
+    });
+
+    // #1291 review (P1) — the KEY-INVARIANCE claim itself, stated as a whole rather than in
+    // the one piece the harness above can read exactly.
+    //
+    // The claim is "Bb's menu is now the same as every other key's", and neither existing
+    // assertion carries it. `kinds.length >= 2` sits exactly at the value the defect
+    // produced: Bb scored 2 under #1276 (a two-item menu, `octave` degraded away) and scores
+    // 2 now (a two-item menu, all of it), so it cannot tell the fix from the defect. The
+    // drop-position pin above is exact but blind to the fifth side — it would pass an engine
+    // that silently gave one pitch class no fifth at all, as long as the holes matched.
+    //
+    // What makes the whole vocabulary readable is intensity 1.0, and it is worth being
+    // explicit about why, because it looks like an arbitrary knob. `fifth` is detected as a
+    // rendered +7, so it is invisible whenever `bass-styles.ts`'s upbeat roll
+    // (`octaveProb = 0.4 + intensity * 0.6`) declines and the beat plays root → root with no
+    // upper note at all. At 0.9 that is ~6% of target beats, distributed by this file's
+    // shared seeded stream in call order — i.e. per-root noise from the HARNESS. At 1.0 the
+    // probability is exactly 1.0 and `installSeededRandom`'s mulberry32 returns [0, 1), so
+    // every upbeat lifts, every fifth renders, and the per-phrase kind sequence becomes an
+    // exact transcript of what the engine decided. That is what lets this assert the strong
+    // form: the twelve roots produce the byte-identical sequence over four occurrences.
+    //
+    // The `'none'` check is the integrity half — it proves the transcript really is complete
+    // rather than quietly full of undetected fifths. Under a `maj` chart with the target beat
+    // never a bar One and never a chord entry, both gestures are always available, so every
+    // phrase must classify as a real gesture.
+    it('gives every root the identical variation vocabulary (#1291)', () => {
+        const BARS = 32;
+        // why: 1.0, not the file's usual 0.9 — see above. This is the one test in the file
+        // whose reading depends on `octaveProb` saturating, so it is also the one place that
+        // number is load-bearing rather than incidental.
+        const settings = { playback: { bandIntensity: 1.0, complexity: 0.5, bpm: 124 } };
+        const rows = PITCH_CLASSES.map(([name, rootMidi]) => {
+            const sequence = [];
+            for (let occ = 2; occ <= 5; occ++) {
+                const v = summarizeVariations(
+                    simulatePerformance(BARS, settings, rootMidi, {
+                        stepCoordination: { sectionOccurrence: occ },
+                    }),
+                    BARS,
+                );
+                sequence.push(`V${occ}:${v.phraseKinds.map((k) => k[0]).join('')}`);
+            }
+            return { name, sequence: sequence.join(' ') };
+        });
+
+        console.log(
+            `[Disco Critique] Variation vocabulary at saturated octaveProb ` +
+                `(d=drop f=fifth n=none):\n  ` +
+                rows.map((row) => `${row.name}: ${row.sequence}`).join('\n  '),
+        );
+
+        // Sample integrity, and the reason this test can make the strong claim: no phrase
+        // classifies as `none`, so the detector missed nothing and the sequences below are
+        // complete transcripts rather than partial ones.
+        expect(rows.filter((row) => row.sequence.includes('n')).map((row) => row.name)).toEqual([]);
+        // ...and non-vacuity: the transcript has to contain BOTH gestures, or "identical
+        // across roots" would be satisfied by an engine that never varies at all.
+        expect(rows[0].sequence).toMatch(/d/);
+        expect(rows[0].sequence).toMatch(/f/);
+
+        // The claim. Every root plays the same gesture in the same phrase of the same
+        // occurrence — Bb included, which is the pitch class #1276 could not say this of.
+        for (const row of rows.slice(1)) {
+            expect(
+                row.sequence,
+                `${row.name} runs a different vocabulary from ${rows[0].name}`,
+            ).toEqual(rows[0].sequence);
         }
     });
 
@@ -1052,11 +1193,11 @@ describe('Disco Bassist Critique', () => {
                     ),
                     BARS,
                 );
-                // The occurrence's target beat, read off the ROOT-INDEPENDENT artifacts
-                // only. `shifted`/`kinds` compare beat pitches against one modal anchor and
-                // are meaningless under a progression — every chord has its own anchor — so
-                // they are deliberately excluded here. A drop and a +7 lift are both
-                // root-independent.
+                // The occurrence's target beat. Both artifacts are ROOT-INDEPENDENT — a
+                // silent beat and a +7 lift are readable under a progression, where every
+                // chord has its own anchor and any pitch-vs-anchor comparison would not be.
+                // (#1276 had a third, `shifted`, which had to be excluded here for exactly
+                // that reason; #1291 retired the gesture it detected.)
                 const targets = [
                     ...new Set([...v.dropped, ...v.fifths].map((b) => b % PHRASE_BEATS)),
                 ];
@@ -1070,9 +1211,9 @@ describe('Disco Bassist Critique', () => {
         };
 
         // --- The placement rule, read off the selection itself ---
-        // Single unchanging chord, so all THREE artifacts are root-independent here and the
-        // target beat is readable on every occurrence no matter which gesture the phrase
-        // drew. Wide sweep because the claim is about the candidate SET: 199 occurrences
+        // Single unchanging chord, so the target beat is readable on every occurrence no
+        // matter which gesture the phrase drew. Wide sweep because the claim is about the
+        // candidate SET: 199 occurrences
         // over 12 legal positions is enough to assert full coverage as well as the
         // exclusion, and coverage is what proves the sweep explores the space rather than
         // an engine that happens to freeze on one safe beat.
@@ -1084,9 +1225,7 @@ describe('Disco Bassist Critique', () => {
                 }),
                 BARS,
             );
-            const targets = [
-                ...new Set([...v.dropped, ...v.fifths, ...v.shifted].map((b) => b % PHRASE_BEATS)),
-            ];
+            const targets = [...new Set([...v.dropped, ...v.fifths].map((b) => b % PHRASE_BEATS))];
             selectionTargets.push({ occ, target: targets.length === 1 ? targets[0] : null });
         }
         const onBarOne = selectionTargets.filter(
@@ -1153,7 +1292,15 @@ describe('Disco Bassist Critique', () => {
         // occurrence 96 came up with zero drops and reddened a claim that is true.
         const GUARDED_BARS = 128;
         const ENTRANCE_STEP = 4; // beat 1 of bar 0 — a section beginning mid-bar
-        const OCCURRENCES = 200;
+        // why: 500, widened from #1276's 200 in #1291. The coincidence this test needs is
+        // unchanged in RATE (target beat = beat 1 of bar 0, 1 in 12, AND phrase 0 drawing
+        // `drop`, still weighted 0.3 → ~2% of occurrences), but retiring `octave` moved the
+        // drop's seed band from [0.5, 0.8) to [0.7, 1.0), so a different — and here smaller —
+        // set of occurrences qualifies. 200 happened to yield 3 before and 1 after, which is
+        // sampling luck on a ~4-expected count either way, not a behavior change. 500 puts
+        // the expectation near 10 so the non-vacuity floor below is cleared by margin
+        // rather than by draw.
+        const OCCURRENCES = 500;
         const settings = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
         const wouldDropEntrance = [];
         for (let occ = 2; occ <= OCCURRENCES; occ++) {
@@ -1173,7 +1320,8 @@ describe('Disco Bassist Critique', () => {
         // silencing this entrance needs the occurrence's target beat to be beat 1 of bar 0
         // (1 in 12, since the selection only draws from the phrase's non-One beats) AND
         // phrase 0's menu draw to be `drop` (0.3), so it lands on ~2% of occurrences. A
-        // narrow sweep passes vacuously — 2-40 found exactly one.
+        // narrow sweep passes vacuously — 2-40 found exactly one, and 2-200 found one after
+        // #1291 re-sited the drop's seed band (see OCCURRENCES).
         expect(wouldDropEntrance.length).toBeGreaterThan(2);
         for (const occ of wouldDropEntrance) {
             const guarded = simulatePerformance(GUARDED_BARS, settings, 48, {
@@ -1219,9 +1367,13 @@ describe('Disco Bassist Critique', () => {
         ['7b9', true],
     ])('fires the fifth only where the chord has one — %s (#1276)', (quality, hasFifth) => {
         const BARS = 32;
+        const PHRASES = BARS / 4;
+        const OCCURRENCES = 5; // 2..6
+        const TARGET_BEATS = PHRASES * OCCURRENCES; // one per phrase, per occurrence
         const settings = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
         let fifthLifts = 0;
         let varied = 0;
+        let drops = 0;
         const illegalDeltas = [];
         for (let occ = 2; occ <= 6; occ++) {
             const perf = simulatePerformance(
@@ -1234,12 +1386,14 @@ describe('Disco Bassist Critique', () => {
             const r = scoreOctaveAlternation(perf);
             const v = summarizeVariations(perf, BARS);
             fifthLifts += r.fifthLifts;
-            varied += v.dropped.length + v.shifted.length + v.fifths.length;
+            varied += v.dropped.length + v.fifths.length;
+            drops += v.dropped.length;
             illegalDeltas.push(...r.illegalDeltas);
         }
         console.log(
             `[Disco Critique] Quality ${quality} over occurrences 2-6: ${fifthLifts} fifth ` +
-                `lift(s), ${varied} varied beat(s), ${illegalDeltas.length} illegal delta(s)`,
+                `lift(s), ${drops} dropped of ${TARGET_BEATS} target beat(s), ${varied} ` +
+                `varied beat(s), ${illegalDeltas.length} illegal delta(s)`,
         );
 
         if (hasFifth) {
@@ -1247,12 +1401,120 @@ describe('Disco Bassist Critique', () => {
         } else {
             // No natural 5 anywhere in the line, on any repeat.
             expect(fifthLifts).toBe(0);
-            // ...and the beat still varies some other way — the ladder substitutes, it does
-            // not silently turn the repeat back into the Statement.
+            // ...and the repeat pass is still a repeat pass: the target beat still varies,
+            // it just varies less often. #1291 review — this used to read "the resolution
+            // substitutes the drop", which was true of the code and wrong as a design. A
+            // drawn `fifth` that can't sound now resolves to `none`, NOT to `drop`.
             expect(varied).toBeGreaterThan(0);
         }
+        // #1291 review — the density guard, and the reason the sentence above changed.
+        // `canFifth` is a property of the CHORD, so on an altered-fifth chart it is false
+        // for every target beat of the whole passage: routing a drawn `fifth` to `drop`
+        // made EVERY target beat a hole (measured: all 40 of them, a 1.0 hole density
+        // against the 0.3 that was auditioned), which is a worse defect than the mis-voiced
+        // fifth the guard exists to prevent. Bounded rather than pinned: the 0.3 weight
+        // predicts 12 of 40 and every quality here measures 13 (the drop decision reads no
+        // chord data at all, so it is identical in all six rows), while the regression
+        // reads the full 40. 20 sits clear of both.
+        expect(drops).toBeLessThan(20);
+        expect(drops).toBeGreaterThan(4);
         // The rest of the pump's vocabulary is unchanged in every quality.
         expect(illegalDeltas).toEqual([]);
+    });
+
+    // #1291 review (P1) — the `fifth` must never fire under a SLASH chord.
+    //
+    // `chordHasPerfectFifth` describes intervals above the chord ROOT, but the pump anchors
+    // to the slash bass (`bass-engine.ts` hands `bassMidi ?? rootMidi` to `anchorFor`), so on
+    // a slash chord `baseRoot + 7` is a fifth above the PEDAL and not the chord's fifth at
+    // all. On the commonest shape — a chord over its own third — it is always the chord's
+    // MAJOR SEVENTH, and `maj` passes `chordHasPerfectFifth`, so nothing else stopped it:
+    //
+    //     C/E → anchor 28 (E1), lift 35 (B1) under a C chord
+    //     F/A → anchor 33 (A1), lift 40 (E2) under an F chord
+    //     G/B → anchor 35 (B1), lift 42 (F#2) under a G chord
+    //
+    // A natural 7th at MIDI 35-42 on an accented disco upbeat, a semitone under the root the
+    // comper is stating.
+    //
+    // The whole file was blind to this because `chordAt` never set `bassMidi` — the harness
+    // could not build a slash chord. `opts.bassMidis` is the repair, and this test is the
+    // reason it exists.
+    //
+    // Non-vacuous by construction: the CONTROL runs the identical chord with a root-position
+    // bass and must produce fifths. It sets that bass an octave BELOW the root rather than
+    // omitting it, so the control exercises the pitch-class comparison in `canFifth` (and
+    // the anchor, being pitch-class-only, is byte-identical between the two runs) instead of
+    // the `bassMidi === null` short-circuit that every other test in this file already
+    // covers.
+    it.each([
+        ['C/E', 48, 52],
+        ['F/A', 53, 57],
+        ['G/B', 55, 59],
+    ])('never voices a fifth above a slash bass — %s (#1291)', (name, rootMidi, bassMidi) => {
+        const BARS = 32;
+        const settings = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
+        const run = (bassMidis) => {
+            let fifthLifts = 0;
+            const illegalDeltas = [];
+            const dropped = [];
+            const pitches = new Set();
+            for (let occ = 2; occ <= 6; occ++) {
+                const perf = simulatePerformance(
+                    BARS,
+                    settings,
+                    rootMidi,
+                    { stepCoordination: { sectionOccurrence: occ } },
+                    { roots: [rootMidi], bassMidis },
+                );
+                const r = scoreOctaveAlternation(perf);
+                const v = summarizeVariations(perf, BARS);
+                fifthLifts += r.fifthLifts;
+                illegalDeltas.push(...r.illegalDeltas);
+                dropped.push(`V${occ}:${v.dropped.join(',')}`);
+                for (const midi of v.pitches) {
+                    pitches.add(midi);
+                }
+            }
+            return { fifthLifts, illegalDeltas, dropped: dropped.join(' | '), pitches };
+        };
+        // Order matters only for the report: `dropped` is stream-independent (a dropped beat
+        // never reaches `bass-styles.ts` and consumes no `Math.random` draw), and the two
+        // runs emit at the identical steps, so they consume the identical stream anyway.
+        const slash = run([bassMidi]);
+        const rootPosition = run([rootMidi - 12]);
+        console.log(
+            `[Disco Critique] ${name} over occurrences 2-6: ${slash.fifthLifts} fifth lift(s) ` +
+                `on the slash bass vs ${rootPosition.fifthLifts} with the root in the bass; ` +
+                `pitches [${[...slash.pitches].sort((a, b) => a - b).join(',')}]`,
+        );
+
+        // The finding: not one +7 anywhere in the line, on any repeat, under a slash chord.
+        expect(slash.fifthLifts).toBe(0);
+        // The control that zero needs — the same chord, the same anchor, the same target
+        // beats, differing only in whether the pedal IS the root.
+        expect(rootPosition.fifthLifts).toBeGreaterThan(0);
+        // ...and the beat that lost its fifth plays the Statement's shape, which means the
+        // pump's ordinary two moves and nothing else. A slash chord must not widen the
+        // vocabulary by some other route.
+        expect(slash.illegalDeltas).toEqual([]);
+        expect(rootPosition.illegalDeltas).toEqual([]);
+
+        // #1291 review, finding 2 — the density regression guard, and the reason a drawn
+        // `fifth` resolves to `none` rather than to `drop`. `canFifth` is false for the
+        // whole slash-chord passage, so routing it to `drop` would make EVERY target beat a
+        // hole for as long as that chord sounds — the 0.3 hole density becomes 1.0 and the
+        // section turns into a string of gaps, a worse defect than the one being fixed.
+        //
+        // Asserted as EQUALITY against the root-position control rather than as a band,
+        // because the drop decision reads no chord data at all: same target beat, same menu
+        // draw, same `canDrop`. So the two runs must drop the identical beats, and a
+        // `fifth` → `drop` routing reddens this with a readable diff rather than a
+        // threshold argument.
+        expect(
+            slash.dropped,
+            `${name} drops different beats from its root-position control`,
+        ).toEqual(rootPosition.dropped);
     });
 
     // #1276 (P1 review) — the hole has to be part of the RIFF, not scatter.

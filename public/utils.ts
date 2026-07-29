@@ -154,9 +154,13 @@ const AUGMENTED_QUALITIES = ['augmented', 'aug', '+'];
  * Does this chord quality contain a natural (perfect) fifth?
  *
  * why: any generator that wants to voice a bare "root + 5th" — the disco pump's `fifth`
- * variation in `bass-engine.ts` is the first — must not emit a natural 5 over a chord whose
+ * variation in `bass-pump.ts` is the first — must not emit a natural 5 over a chord whose
  * fifth is flatted or sharped. On a `dim7`/`m7b5`/`aug`/`7alt` the comper is stating ♭5 or
  * ♯5 and a natural 5 in the bass grinds a semitone against it on an accented upbeat.
+ *
+ * NOTE this is an interval above the chord ROOT. A caller building the interval up from
+ * some other pitch — a slash bass, say — needs its own separate check that the two coincide;
+ * this predicate cannot see the difference. `canFifth` in `bass-pump.ts` is the precedent.
  *
  * NOTE for the bass in particular: "just play the altered fifth instead" is the wrong repair.
  * The bass sits at MIDI 34-46 under a pump, and down there a ♭5/♯5 fights the root it is
