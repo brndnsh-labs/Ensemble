@@ -51,6 +51,7 @@ describe('mix report utilities', () => {
             '--focus-from=report.json',
             '--focus-limit=4',
             '--write-wav=tmp/audio',
+            '--write-events=tmp/events',
         ]);
 
         expect(options.seeds).toEqual(['ALPHA', 'BETA']);
@@ -60,9 +61,11 @@ describe('mix report utilities', () => {
         expect(options.focusFrom).toBe('report.json');
         expect(options.focusLimit).toBe(4);
         expect(options.writeWav).toBe('tmp/audio');
+        expect(options.writeEvents).toBe('tmp/events');
 
         const defaults = resolveMixReportCliOptions([]);
         expect(defaults.writeWav).toBeNull();
+        expect(defaults.writeEvents).toBeNull();
         expect(defaults.loops).toBe(1);
 
         const looped = resolveMixReportCliOptions(['--loops=4']);

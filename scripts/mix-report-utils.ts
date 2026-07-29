@@ -367,6 +367,12 @@ export function resolveMixReportCliOptions(argv = []) {
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
         writeWav: readStringOption(options, 'write-wav', '') || null,
+        // `--write-events=<dir>` → dump each stem's scheduled note events (post-
+        // humanization play times, every lane including drums) beside the WAVs, so
+        // `mix:verify` can reconcile what the engine decided to play against what
+        // the render actually produced. Capture requires the visualizer event queue,
+        // which the render clone otherwise disables.
+        writeEvents: readStringOption(options, 'write-events', '') || null,
         // Render each scene through N loops of its progression so the
         // soloist's chorus-evolution architecture (Loop 0 head → Loop 1
         // themed → Loop 2+ exploratory) actually expresses. The per-loop

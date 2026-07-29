@@ -287,16 +287,33 @@ function printHumanMixReport(report) {
     }
 }
 
-async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePack, cohesion }) {
+async function renderSceneReports({
+    scenes,
+    seeds,
+    writeWav,
+    writeEvents,
+    loops,
+    calibratePack,
+    cohesion,
+}) {
     const loopCount = Math.max(1, Math.floor(loops || 1));
     const { server, port } = await createStaticServer(DIST_DIR, REQUESTED_PORT);
     const baseUrl = `http://${HOST}:${port}`;
     const writtenWavPaths = [];
+    const writtenEventPaths = [];
 
     let wavDir = null;
     if (writeWav) {
         wavDir = path.isAbsolute(writeWav) ? writeWav : path.resolve(REPO_ROOT, writeWav);
         await mkdir(wavDir, { recursive: true });
+    }
+
+    let eventDir = null;
+    if (writeEvents) {
+        eventDir = path.isAbsolute(writeEvents)
+            ? writeEvents
+            : path.resolve(REPO_ROOT, writeEvents);
+        await mkdir(eventDir, { recursive: true });
     }
 
     try {
@@ -324,6 +341,14 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                 });
             }
 
+            if (eventDir) {
+                await page.exposeFunction('__writeEvents', async (fileName, payload) => {
+                    const outPath = path.join(eventDir, fileName);
+                    await writeFile(outPath, JSON.stringify(payload, null, 2));
+                    writtenEventPaths.push(outPath);
+                });
+            }
+
             await page.goto(baseUrl, { waitUntil: 'networkidle' });
             await page.waitForFunction(
                 () =>
@@ -334,7 +359,16 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
             );
 
             const evaluated = await page.evaluate(
-                async ({ scenes, stems, seeds, writeWav, loops, calibratePack, cohesionBand }) => {
+                async ({
+                    scenes,
+                    stems,
+                    seeds,
+                    writeWav,
+                    writeEvents,
+                    loops,
+                    calibratePack,
+                    cohesionBand,
+                }) => {
                     const ensemble = /** @type {any} */ (window).ensemble;
                     const {
                         getState,
@@ -448,7 +482,14 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 buffer: new Map(),
                                 activeVoices: [],
                             },
-                            vizState: { ...liveState.vizState, enabled: false },
+                            // Normally off: the render has no visualizer to draw to.
+                            // `--write-events` turns it on purely as a capture tap —
+                            // `queueVisualizerNoteEvent` fires at every lane's actual
+                            // schedule site (drums included, which never enter the note
+                            // buffer) with post-humanization play times, which is exactly
+                            // the event stream a render-vs-intent check needs. The queued
+                            // events are inert data; nothing consumes them mid-render.
+                            vizState: { ...liveState.vizState, enabled: Boolean(writeEvents) },
                             midi: { ...liveState.midi, enabled: false, muteLocal: true },
                             conductor: {
                                 ...liveState.conductor,
@@ -1072,6 +1113,56 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                                 );
                             }
 
+                            // Skipped for voice-override renders (`--calibrate-pack` /
+                            // `--cohesion`): those render the SAME scene/stem/seed twice
+                            // to compare voices, so both writes would land on one
+                            // filename and the second would silently win.
+                            if (writeEvents && !voiceOverride) {
+                                const enabledTracks = Object.keys(stem.enabled).filter(
+                                    (track) => stem.enabled[track],
+                                );
+                                const events = (state.playback.drawQueue || [])
+                                    .filter(
+                                        (event) =>
+                                            event &&
+                                            event.type === 'note' &&
+                                            enabledTracks.includes(event.track),
+                                    )
+                                    .map((event) => ({
+                                        track: event.track,
+                                        time: event.time,
+                                        midi: event.midi,
+                                        duration: event.duration ?? null,
+                                        // Present only on lanes whose visualizer payload
+                                        // carries it (drums, chords today) — the consumer
+                                        // reports the gap rather than inventing a value.
+                                        velocity:
+                                            typeof event.velocity === 'number'
+                                                ? event.velocity
+                                                : null,
+                                    }))
+                                    .sort((a, b) => a.time - b.time);
+
+                                await /** @type {any} */ (window).__writeEvents(
+                                    `${scene.id}-${stem.id}-${seedLabel}.events.json`,
+                                    {
+                                        scene: scene.id,
+                                        stem: stem.id,
+                                        seed: seedLabel,
+                                        tracks: enabledTracks,
+                                        meta: {
+                                            sampleRate,
+                                            leadInSeconds: renderLeadIn,
+                                            stepSeconds: sixteenth,
+                                            stepsPerLoop,
+                                            loopCount,
+                                            bpm: state.playback.bpm,
+                                        },
+                                        events,
+                                    },
+                                );
+                            }
+
                             return {
                                 peak,
                                 peakDb: toDb(peak),
@@ -1249,6 +1340,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                     stems: MIX_REPORT_STEMS,
                     seeds,
                     writeWav: Boolean(writeWav),
+                    writeEvents: Boolean(writeEvents),
                     loops: loopCount,
                     calibratePack: calibratePack || null,
                     cohesionBand: cohesion ? COHESION_SAMPLE_BAND : null,
@@ -1260,6 +1352,7 @@ async function renderSceneReports({ scenes, seeds, writeWav, loops, calibratePac
                 calibration: evaluated.calibration,
                 cohesion: evaluated.cohesion,
                 writtenWavPaths,
+                writtenEventPaths,
             };
         } finally {
             await browser.close();
@@ -1297,14 +1390,16 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         });
     }
 
-    const { sceneRuns, calibration, cohesion, writtenWavPaths } = await renderSceneReports({
-        scenes,
-        seeds,
-        writeWav: cliOptions.writeWav,
-        loops: cliOptions.loops,
-        calibratePack: cliOptions.calibratePack,
-        cohesion: cliOptions.cohesion,
-    });
+    const { sceneRuns, calibration, cohesion, writtenWavPaths, writtenEventPaths } =
+        await renderSceneReports({
+            scenes,
+            seeds,
+            writeWav: cliOptions.writeWav,
+            writeEvents: cliOptions.writeEvents,
+            loops: cliOptions.loops,
+            calibratePack: cliOptions.calibratePack,
+            cohesion: cliOptions.cohesion,
+        });
 
     // Cohesion mode: the deliverable is the band-level synth-vs-sample block,
     // not the per-stem report. Print it and return (#687).
@@ -1350,6 +1445,10 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
 
     if (writtenWavPaths && writtenWavPaths.length > 0) {
         log.write(`\nWrote ${writtenWavPaths.length} WAV files to ${cliOptions.writeWav}\n`);
+    }
+
+    if (writtenEventPaths && writtenEventPaths.length > 0) {
+        log.write(`Wrote ${writtenEventPaths.length} event files to ${cliOptions.writeEvents}\n`);
     }
 
     return report;
