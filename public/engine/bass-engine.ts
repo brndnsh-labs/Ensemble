@@ -1,5 +1,5 @@
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
-import { getFrequency, getMidi } from '../utils.js';
+import { chordHasPerfectFifth, getFrequency, getMidi } from '../utils.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
@@ -580,10 +580,14 @@ export function getBassNote(
     //   - occurrence 2 vs occurrence 3 → different target beats (variation per repeat)
     //   - different sectionIds at same occurrence → different patterns (Verse-2 ≠ Chorus-2)
     //
-    // #1271 — lifted out of `withImperfectSymmetry` so the pump path below gates on the
-    // identical beat. The two paths differ only in WHAT they displace (one note vs the
-    // beat's whole anchor); if they ever disagreed on WHICH beat, a pump style would
-    // shift on a beat the generic contract says it shouldn't.
+    // #1271 lifted this out of `withImperfectSymmetry` so the pump path could gate on the
+    // identical beat. #1276 gave the pump its OWN selection (`isPumpTargetBeat`) and this is
+    // now the generic path's alone — deliberately, not by drift. The #1271 concern was the
+    // two branches INSIDE `withImperfectSymmetry` disagreeing about which beat they act on,
+    // and those two are mutually exclusive at runtime (`isPumpAnchorStyle` short-circuits
+    // before the generic path ever runs), so there is nothing left for them to disagree
+    // about. Don't "restore" the sharing: the pump needs a phrase-INVARIANT target and the
+    // generic path needs a phrase-varying one, for the musical reasons stated at each.
     const isSymmetryTargetBeat = (): boolean => {
         const BEATS_PER_PHRASE = PHRASE_BARS * ts.beats;
         const targetSeed = scrambleHash(
@@ -599,6 +603,10 @@ export function getBassNote(
     // V2 / V3 / V4 / V5 each pick independently. An earlier draft used `occurrence % 2`
     // parity, but that collapses to two values (V4 ≡ V2 in direction); reviewer P1-3.
     // The hash is XOR'd with a third constant so it doesn't correlate with `targetSeed`.
+    //
+    // The hash-seeded branch is reachable only from the generic (non-pump) caller. A pump
+    // measures headroom on the PAIR, and those two tests are mutually exclusive — see
+    // `pumpVariation`, which gets its per-repeat independence from a menu draw instead.
     const symmetryDirection = (canGoUp: boolean, canGoDown: boolean): number => {
         if (canGoUp && canGoDown) {
             const dirSeed = scrambleHash(
@@ -615,45 +623,211 @@ export function getBassNote(
         return 0; // No headroom either direction.
     };
 
-    // #1271 — the pump's displacement, as a single delta applied to every note in the
-    // target beat. Headroom is measured on the PAIR (anchor and its octave), not on the
-    // individual note, which is what keeps the shifted beat a real pump: `absMax - 12`
-    // for the same reason `pumpAnchorFor` uses it. Absolute bounds rather than the
-    // generic path's comfort range (28-51) — at intensity 0.9 the disco anchor is 36 and
-    // 36 - 12 = 24 sits below comfortMin, so a comfort-range test would find no headroom
-    // in either direction and silently make the gesture a no-op for the whole genre. The
-    // sub-basement octave is idiomatic here, not out-of-character: it is the disco
-    // octave-down thump.
+    // #1276 — the pump's repeat-pass variation, as a weighted draw over a VOCABULARY of
+    // gestures rather than a register shift. #1271 made the shift move the whole PAIR
+    // (anchor and its octave), which kept
+    // the pump intact, but a pair displacement can only ever express one thing — and for
+    // one pitch class it cannot express anything at all:
     //
-    // Absolute bounds here, NOT the comfort range the anchor itself lives in. A one-beat
-    // excursion outside comfort is the gesture — the sub-basement thump, or the octave-up
-    // beat — and it is categorically different from parking every upbeat up there. Test it
-    // against comfort instead and there is no headroom in either direction for any anchor,
-    // so the whole gesture silently dies for the genre.
+    // - The direction was ALWAYS forced. `canGoUp` needs anchor ≤ 33 and `canGoDown` needs
+    //   anchor ≥ 35: mutually exclusive, so `symmetryDirection`'s hash-seeded branch was
+    //   structurally unreachable from here and every repeat of a section shifted the same
+    //   way. V5 moved exactly like V2; the only per-repeat variation disco got was *which*
+    //   beat moved.
+    // - Bb (anchor 34) fails BOTH tests: 34 + 24 = 58 > absMax and 34 - 12 = 22 < absMin.
+    //   A pair displacement needs a 36-semitone window inside a 34-semitone slot, so 34 was
+    //   provably the one anchor that could never vary — and since the anchor no longer
+    //   moves with intensity, it failed at every intensity, forever. Bb is a core
+    //   disco/horn key, not an exotic corner.
     //
-    // Two properties worth stating rather than rediscovering:
+    // Both dissolve once the variation stops being ONLY a register shift and gains outcomes
+    // that need no headroom. The vocabulary is three gestures:
     //
-    // - The direction is ALWAYS forced for a pump; `symmetryDirection`'s hash-seeded
-    //   branch is unreachable from here. `canGoUp` needs anchor ≤ 33 and `canGoDown`
-    //   needs anchor ≥ 35, which are mutually exclusive. So the per-repeat variation
-    //   disco gets is *which beat* drops, never which direction — V5 shifts the same way
-    //   as V2. Don't read that helper's "V2/V3/V4/V5 each pick independently" comment as
-    //   describing this caller.
-    // - The dead spot is ALWAYS Bb (anchor 34), not a rotating one-in-twelve: 34 fails
-    //   both tests, and since the anchor no longer moves with intensity it fails them at
-    //   every intensity, forever. The gesture needs a 36-semitone window inside a
-    //   34-semitone slot, so 34 is provably the one anchor that can never shift. Bb is a core
-    //   disco/horn key, so this is not an exotic corner. Degrading to no variation is the
-    //   right *shape* of failure (it can't produce a broken pump), but the better fix is a
-    //   non-octave one — dropping the beat entirely, which is core disco vocabulary and
-    //   needs no headroom at all. Tracked as a follow-up; don't "fix" it by relaxing the up
-    //   test to `absMax`, which puts the shifted beat's own upbeat over the ceiling and
-    //   hands it back to the fold this story exists to disarm.
-    const pumpSymmetryDelta = (): number => {
-        if (!isSymmetryTargetBeat()) {
-            return 0;
+    //   drop   — the target beat is silent: the downbeat, the "and", and any gallop 16ths
+    //            between them. A bassist leaving a beat empty is core disco/funk
+    //            vocabulary — it is what makes the next downbeat land — and it needs no
+    //            headroom, so it reads identically on Bb and on C. It is a hole, not a
+    //            dropout: disco's kick is 4-on-the-floor on both drum paths, so the kit
+    //            still marks the spot — see the KNOWN LIMIT note at the `drop`
+    //            short-circuit in `getBassNote` for the one meter where that is only
+    //            approximately true.
+    //   fifth  — the beat keeps its low root and the lift above it becomes the 5th instead
+    //            of the octave. `baseRoot` is in [28, 39] because `pumpAnchorFor`'s window
+    //            is exactly an octave, so `baseRoot + 7` is in [35, 46] — inside the
+    //            comfort range for every pitch class. No headroom test, no fold, no clamp.
+    //   octave — #1271's pair displacement, unchanged, including its use of the ABSOLUTE
+    //            bounds rather than the comfort range the anchor itself lives in. The
+    //            disco anchor on a C root is 36 at EVERY intensity (`pumpAnchorFor` is a
+    //            pure function of pitch class — #1271's P0 fix took `bandIntensity` out of
+    //            it), and 36 - 12 = 24 sits below comfortMin, so a comfort-range test
+    //            would find no headroom in either direction and silently kill the gesture
+    //            for the whole genre. A one-beat excursion outside comfort IS the gesture —
+    //            the disco octave-down thump — and is categorically different from parking
+    //            every upbeat down there. Don't "fix" the up test by relaxing it to
+    //            `absMax`: that puts the shifted beat's own upbeat over the ceiling and
+    //            hands it back to the fold `PUMP_ANCHOR_STYLES` exists to disarm.
+    //
+    // Invariants this establishes, worth stating rather than rediscovering:
+    //
+    // - On an ordinary (perfect-fifth) chord EVERY anchor, Bb included, has at least two
+    //   outcomes available, so V2/V3/V4/V5 differ in KIND, not merely in which beat is
+    //   affected. `'none'` is only reachable when a target beat is simultaneously an
+    //   arrival, out of octave headroom, AND under an altered-fifth chord.
+    // - The draw is over a CONSTANT vocabulary and the ladder below resolves what isn't
+    //   available, so a gesture's share never changes with local headroom.
+    // - No variation of any kind ever touches a bar's One — that is structural, owned by
+    //   `isPumpTargetBeat`'s candidate set rather than by a per-gesture veto. `drop`
+    //   additionally never silences a section entrance or a chord entry, and `fifth` never
+    //   sounds over a chord whose fifth is altered.
+    type PumpVariation = 'none' | 'drop' | 'octave' | 'fifth';
+
+    const pumpOctaveDelta = (): number =>
+        symmetryDirection(baseRoot + 12 + 12 <= absMax, baseRoot - 12 >= absMin);
+
+    // why: the pump gets its OWN target beat, seeded on (sectionIdHash, sectionOccurrence)
+    // and deliberately NOT on `phraseIndex` — the opposite of `isSymmetryTargetBeat`.
+    //
+    // A beat-long rest is real disco vocabulary, but on every record where it works the hole
+    // is part of the RIFF: it recurs at the same phrase-relative position bar after bar, so
+    // the ear learns it and hears the next downbeat land into an expected shape. One hole per
+    // 4 bars at a *different* spot each time is scatter, and against a texture whose identity
+    // is relentless eighth-note motion it reads as the bassist losing the thread rather than
+    // as phrasing. Dropping `phraseIndex` makes every phrase of Verse 2 vary the same beat;
+    // Verse 3 picks a different one, so PLACEMENT is what distinguishes the repeats and the
+    // per-phrase menu draw (which keeps `phraseIndex`) is what keeps the occurrence alive.
+    //
+    // why: the target beat is NEVER a bar's One. Variation lives off the One — in
+    // four-on-the-floor that beat is where kick, bass and comp lock, so it is the beat the
+    // whole arrangement is measured against and the wrong place to re-voice, displace OR
+    // remove the bass. Same argument `withOctaveJump` makes about the adjacent gesture
+    // (it excludes pump styles outright because a pump already leaps the octave twice per
+    // beat, so displacing its anchor removes an accent rather than adding one), applied to
+    // PLACEMENT instead of to style.
+    //
+    // Stated once here rather than as a veto downstream. The target is stable for a whole
+    // occurrence, so a downstream "not on a One" veto and a selection that can land on one
+    // collide catastrophically: every draw of the vetoed gesture in that occurrence degrades
+    // through the ladder and the entire repeat pass loses it. Selecting only from the
+    // non-One beats keeps all three outcomes legal at every beat this can produce.
+    const isPumpTargetBeat = (): boolean => {
+        const BEATS_PER_BAR = ts.beats;
+        // A one-beat bar has no non-One beat, so the gesture simply doesn't fire there.
+        if (BEATS_PER_BAR < 2) {
+            return false;
         }
-        return symmetryDirection(baseRoot + 12 + 12 <= absMax, baseRoot - 12 >= absMin);
+        const OFFBEATS_PER_BAR = BEATS_PER_BAR - 1; // beats 2..N of each bar
+        const CANDIDATES = PHRASE_BARS * OFFBEATS_PER_BAR;
+        const targetSeed = scrambleHash((sectionIdHash ^ (sectionOccurrence * 0x9e3779b1)) | 0);
+        // No `Math.min` ceiling guard: `scrambleHash` is mulberry32 and returns [0, 1), so
+        // `pick` is in [0, CANDIDATES). Same reason the menu draw below carries none.
+        const pick = Math.floor(targetSeed * CANDIDATES);
+        const bar = Math.floor(pick / OFFBEATS_PER_BAR);
+        const beatInBar = (pick % OFFBEATS_PER_BAR) + 1; // 1..N-1, never 0
+        const targetBeatInPhrase = bar * BEATS_PER_BAR + beatInBar;
+        return barInPhrase * BEATS_PER_BAR + intBeat === targetBeatInPhrase;
+    };
+
+    const pumpVariation = (): PumpVariation => {
+        // The same gates `withImperfectSymmetry` applies. Both callers — that wrapper and
+        // the drop short-circuit in getBassNote — ask this one function rather than
+        // re-listing the conditions, so they can never disagree about whether the gesture
+        // is live.
+        if (!isPumpAnchorStyle || !isRepeatPass || isSoloistBusyEarly || intensity < 0.25) {
+            return 'none';
+        }
+        if (!isPumpTargetBeat()) {
+            return 'none';
+        }
+
+        // --- Availability, evaluated at BEAT level ---
+        // A drop silences the whole beat, so its legality is a property of the beat, not of
+        // whichever sub-step is being generated. Deciding it per-step would sound the One
+        // and then silence its "and" — a half-gesture nobody plays. `subBeatStep` backs the
+        // current step up to the beat's first step for each test.
+        const subBeatStep = stepInMeasure % ts.stepsPerBeat;
+
+        // "Never silence a bar's One" is NOT a term here. It is guaranteed one level up by
+        // `isPumpTargetBeat`, which selects only from the non-One beats — see the argument
+        // there. A second veto at this level would be unreachable (and therefore untestable)
+        // machinery enforcing a rule the selection already makes structural; worse, before
+        // that selection change it was actively harmful, because the target beat is stable
+        // for a whole occurrence and any occurrence whose target landed on a One lost every
+        // drop it drew. The two terms below survive because they depend on the CHART, not on
+        // beat position: a chord entry or a section start can land mid-bar, on a beat the
+        // selection is free to pick.
+        //
+        // why: a section entrance, kept as its own term even though it usually implies a
+        // downbeat — a section can begin mid-bar, and a bass that fails to come in on its
+        // own entrance reads as a dropout at the loudest possible moment.
+        const sectionStartStep = context?.sectionStart;
+        const beatStartWrapped = wrappedStepForSectionStart - subBeatStep;
+        const beatOwnsSectionStart =
+            typeof sectionStartStep === 'number' &&
+            sectionStartStep >= beatStartWrapped &&
+            sectionStartStep < beatStartWrapped + ts.stepsPerBeat;
+        // why: a chord entry. Nothing above this point in getBassNote emits for a pump
+        // style, so a drop on the first beat of a new chord means NOBODY in the bass lane
+        // states the new root — the harmony changes underneath a hole.
+        const beatOwnsChordEntry = stepInChord - subBeatStep <= 0;
+        // Deliberately ONE-SIDED: there is no symmetric "beat before a change" window,
+        // because a hole on the LAST beat before a chord change or a section boundary is
+        // musically good — it's the breath into the new harmony. Only the arrival is
+        // protected.
+        const canDrop = !beatOwnsSectionStart && !beatOwnsChordEntry;
+        // why: a natural 5 over a chord whose fifth is ♭5/♯5 grinds a semitone against the
+        // comper on an accented upbeat. See `chordHasPerfectFifth` for why the answer is
+        // "pick another gesture" rather than "play the altered fifth down there instead".
+        const canFifth = chordHasPerfectFifth(chord?.quality);
+        const canOctave = pumpOctaveDelta() !== 0;
+
+        // why: NOT a flat 1/3 split — the three gestures are not equals. `fifth` is the
+        // mildest and most idiomatic (the pulse and the low root both survive; only the
+        // lift is re-voiced), so it carries the gesture most of the time. `drop` is a
+        // statement and wants to stay an event. `octave` is the most register-disruptive,
+        // so it is the rarest. A uniform split is the "50/50 for funk" anti-pattern in
+        // three-item clothing.
+        //
+        // Drawn over the CONSTANT vocabulary — never over a menu re-sized by local
+        // headroom. Re-dividing the seed range when `octave` is unavailable would silently
+        // hand its 20% to whichever gesture inherited the range, which is how Bb ended up
+        // with ~50% more holes than every other key. `scrambleHash` is mulberry32 and
+        // returns [0, 1), so the three bands below are exhaustive with no dead corner
+        // guard needed.
+        const menuSeed = scrambleHash(
+            (sectionIdHash ^ (sectionOccurrence * 0x7feb352d) ^ (phraseIndex * 0x846ca68b)) | 0,
+        );
+        const drawn: Exclude<PumpVariation, 'none'> =
+            menuSeed < 0.5 ? 'fifth' : menuSeed < 0.8 ? 'drop' : 'octave';
+
+        // --- Resolution ladder ---
+        // why: three separate reasons ("altered fifth", "no octave headroom", "chord entry
+        // or section start") all produce the same shape of problem — this outcome isn't
+        // available here — so they get one terminating resolution rather than three ad-hoc
+        // fallbacks. Each ladder is ordered by musical NEARNESS to the drawn gesture: a
+        // fifth is the near substitute for an octave (the beat still sounds, only the lift
+        // is re-voiced), so the two non-drop ladders swap into each other first. A drop is
+        // categorically different — it removes the beat instead of re-voicing it — so it is
+        // last in both non-drop ladders, and conversely a drop that can't happen falls to
+        // the mildest sounding gesture rather than to the loudest.
+        const LADDER: Record<Exclude<PumpVariation, 'none'>, Exclude<PumpVariation, 'none'>[]> = {
+            drop: ['drop', 'fifth', 'octave'],
+            fifth: ['fifth', 'octave', 'drop'],
+            octave: ['octave', 'fifth', 'drop'],
+        };
+        const available: Record<Exclude<PumpVariation, 'none'>, boolean> = {
+            drop: canDrop,
+            fifth: canFifth,
+            octave: canOctave,
+        };
+        for (const candidate of LADDER[drawn]) {
+            if (available[candidate]) {
+                return candidate;
+            }
+        }
+        // Nothing is available (e.g. an altered-fifth chord entering on a Bb anchor, which
+        // rules out `fifth` by quality, `drop` by arrival and `octave` by headroom at once).
+        // The phrase plays the Statement's shape on that beat — correct, just unvaried.
+        return 'none';
     };
 
     const withImperfectSymmetry = (note: number): number => {
@@ -684,8 +858,29 @@ export function getBassNote(
         // the fix, against 60 at occurrence 1). Shifting every note in the beat by one
         // delta keeps the pump intact and reads as the octave-down thump a disco player
         // actually does — the gesture commits for the beat rather than jolting one note.
+        //
+        // #1276 — the delta is now one of three outcomes chosen by `pumpVariation`.
         if (isPumpAnchorStyle) {
-            return note + pumpSymmetryDelta();
+            const variation = pumpVariation();
+            if (variation === 'octave') {
+                return note + pumpOctaveDelta();
+            }
+            if (variation === 'fifth') {
+                // why: only the pump's UPPER note becomes the 5th. The low root on the beat
+                // is the floor of the groove — moving it would change the gesture's anchor,
+                // not its voicing — so notes already at `baseRoot` are left alone. The
+                // interval shrinks from an octave to a fifth for one beat, which reads as
+                // the bassist voicing the lift differently, not as a register jolt.
+                //
+                // Safe to emit a natural 5 unconditionally here: `pumpVariation` only
+                // returns 'fifth' when `chordHasPerfectFifth` passed, and the ladder routes
+                // every altered-fifth chord to another gesture.
+                return note === baseRoot + 12 ? baseRoot + 7 : note;
+            }
+            // 'drop' is handled by the short-circuit near the top of getBassNote — by the
+            // time a note reaches result() its beat has already been silenced, so there is
+            // nothing here to displace. 'none' is the ordinary no-op.
+            return note;
         }
         if (!isBeatStartEarly) {
             return note;
@@ -697,7 +892,7 @@ export function getBassNote(
         // displacement in the bass's idiomatic neck range — the extreme attic /
         // sub-basement would sound out-of-character for a walking or melodic line even
         // when in-range. (The pump path above deliberately uses the absolute bounds; see
-        // `pumpSymmetryDelta`.)
+        // `pumpVariation`.)
         return note + symmetryDirection(note + 12 <= 51, note - 12 >= 28);
     };
 
@@ -892,8 +1087,9 @@ export function getBassNote(
         // `getBassNoteStyle` runs. Grep `isStraightStyle` before assuming a style's
         // downbeat comes from its own branch.
         //
-        // Disco's phrase-level register variation is not lost: Imperfect Symmetry still
-        // fires, and (per `pumpSymmetryDelta`) moves the whole pair so the pump survives.
+        // Disco's phrase-level variation is not lost: Imperfect Symmetry still fires, and
+        // (per `pumpVariation`) either moves the whole pair, voices the lift as a 5th, or
+        // drops the beat outright — so the pump survives whichever outcome it picks.
         if (isPumpAnchorStyle) {
             return note;
         }
@@ -997,6 +1193,44 @@ export function getBassNote(
         // why: subsequent steps in the final bar emit nothing. This is the
         // "ring out" half of the gesture — the tonic from beat 1 sustains; the
         // rock/funk 8th-note pattern doesn't undercut it with offbeat root hits.
+        return null;
+    }
+
+    // --- #1276: the dropped beat (Imperfect Symmetry's `drop` variation) ---
+    // why: a `drop` silences its whole target beat — the downbeat, the "and", and any
+    // gallop 16ths between them. That has to happen here rather than inside `result()`,
+    // because `result()` returns a note dict that three call sites mutate in place
+    // (`res.timingOffset += …` on the funk slap ghost and both reggae paths); making it
+    // nullable would push a null guard onto every one of them for a gesture only
+    // `PUMP_ANCHOR_STYLES` can ever fire.
+    //
+    // Placement is load-bearing in both directions:
+    //   - AFTER the Final-Bar Resolution Cascade above, which bypasses `result()` to hold
+    //     a sustained tonic through the form's last bar. An outro downbeat must never be
+    //     silenced by a phrasing gesture — the same reason #1271's review (P1-1) kept
+    //     Imperfect Symmetry off that cascade entirely.
+    //   - BEFORE every remaining emission path (the `isStraightStyle` downbeat claim, the
+    //     reggae fill, `getBassNoteStyle`'s disco branch, and the generic fallbacks), so a
+    //     single gate covers every route a disco note can leave this function by. Verified
+    //     by reading: nothing above this point emits for a pump style.
+    //
+    // One gate silences the whole beat because `isPumpTargetBeat` compares against
+    // `barInPhrase * ts.beats + intBeat`, and `intBeat` is
+    // `floor(stepInMeasure / stepsPerBeat)` — constant across every sub-step of a beat. The
+    // two `canDrop` terms inside `pumpVariation` are beat-quantized for the same reason.
+    //
+    // KNOWN LIMIT, compound meter. The "the kit still marks the spot" argument rests on
+    // disco's kick being strict 4-on-the-floor, and in 4/4 it is on both drum paths. The
+    // groove strategy's Kick lane (`grooves/disco.ts`) is `shouldPlay = isBeatStart` and
+    // THEN `if (shouldPlay && !compoundKickAllowed(context)) shouldPlay = false` — a no-op
+    // in 4/4, but in 6/8 it trims the kick to the two dotted-quarter pulses per bar while
+    // this gesture's target beat still ranges over all six beats. So in compound meter a
+    // dropped beat CAN land where the kick was trimmed, and there the hole is unmarked.
+    // Deliberately not vetoed here: disco-in-6/8 is already an unusual reinterpretation
+    // (see that lane's own comment), the bass gesture is not what makes it unusual, and a
+    // meter-specific veto in the bass would encode a drum-lane detail in the wrong engine.
+    // Characterized rather than asserted in `disco-bass-critique.test.ts`.
+    if (pumpVariation() === 'drop') {
         return null;
     }
 

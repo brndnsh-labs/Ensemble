@@ -136,6 +136,49 @@ export function getMidi(freq: number): number | null {
 }
 
 /**
+ * Chord-quality families whose triad has NO perfect fifth.
+ *
+ * Hoisted to module level so `getChordMidiNotes` (which picks a scale-degree table per
+ * family) and `chordHasPerfectFifth` (which asks the narrower "is scale degree 5 natural"
+ * question) read the SAME membership. Two local copies of the same list is how one of them
+ * silently acquires a quality the other doesn't know about.
+ *
+ * Spellings are the union of what `getChordDetails` (`engine/chords-engine.ts`) normalizes
+ * to (`dim`, `halfdim`, `aug`) and the longer forms that reach us from imported/hand-built
+ * chord objects (`diminished`, `m7b5`, `half-diminished`, `augmented`, `+`).
+ */
+const DIMINISHED_QUALITIES = ['dim', 'dim7', 'diminished', 'halfdim', 'm7b5', 'half-diminished'];
+const AUGMENTED_QUALITIES = ['augmented', 'aug', '+'];
+
+/**
+ * Does this chord quality contain a natural (perfect) fifth?
+ *
+ * why: any generator that wants to voice a bare "root + 5th" — the disco pump's `fifth`
+ * variation in `bass-engine.ts` is the first — must not emit a natural 5 over a chord whose
+ * fifth is flatted or sharped. On a `dim7`/`m7b5`/`aug`/`7alt` the comper is stating ♭5 or
+ * ♯5 and a natural 5 in the bass grinds a semitone against it on an accented upbeat.
+ *
+ * NOTE for the bass in particular: "just play the altered fifth instead" is the wrong repair.
+ * The bass sits at MIDI 34-46 under a pump, and down there a ♭5/♯5 fights the root it is
+ * sounding against — the bass is the harmonic floor, so its job on those chords is to state
+ * the root, not to color the alteration. That color belongs to the comper's register. So the
+ * right answer for a quality without a perfect fifth is "pick a different gesture", which is
+ * why this is a boolean predicate rather than a fifth-interval lookup.
+ *
+ * `false` for the diminished family, the augmented family (including `augmaj7`, which is
+ * `maj7#5` normalized and so would slip a literal `#5` substring test), and any quality
+ * spelled with `alt` / `b5` / `#5`. `true` otherwise — including `7b9`/`7#9`/`7#11`/`7b13`
+ * and the sus qualities, all of which keep a natural fifth.
+ */
+export function chordHasPerfectFifth(quality: string | undefined | null): boolean {
+    const q = (quality || 'major').toLowerCase();
+    if (DIMINISHED_QUALITIES.includes(q) || AUGMENTED_QUALITIES.includes(q)) {
+        return false;
+    }
+    return !(q.includes('alt') || q.includes('b5') || q.includes('#5') || q.includes('aug'));
+}
+
+/**
  * Calculates MIDI notes for specific scale degrees (Full 10-note scale)
  * based on a given chord object.
  */
@@ -151,14 +194,7 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
         quality === 'm9' ||
         quality === 'm11' ||
         quality === 'm13';
-    const isDiminishedFamily = [
-        'dim',
-        'dim7',
-        'diminished',
-        'halfdim',
-        'm7b5',
-        'half-diminished',
-    ].includes(quality);
+    const isDiminishedFamily = DIMINISHED_QUALITIES.includes(quality);
     const isDominantFamily =
         quality === 'dominant' ||
         quality === '7' ||
@@ -176,7 +212,7 @@ export function getChordMidiNotes(chordObj: any, baseOctave = 4): number[] {
     } else if (isDiminishedFamily) {
         safeIntervals = [0, 3, 6, 10, 13];
         colorIntervals = [1, 5, 8, 12, 15];
-    } else if (quality === 'augmented' || quality === 'aug' || quality === '+') {
+    } else if (AUGMENTED_QUALITIES.includes(quality)) {
         safeIntervals = [0, 4, 8, 10, 14];
         colorIntervals = [2, 6, 9, 12, 16];
     } else if (isDominantFamily) {
