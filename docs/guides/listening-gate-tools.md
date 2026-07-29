@@ -329,6 +329,81 @@ broadband distortion the manifest never claimed — which is exactly the kind of
 undocumented difference that quietly invalidates an A/B. The verdict above is the one
 measured against the corrected transform.
 
+## `npm run --silent mix:ab -- --refs=A..B`
+
+Renders the same scene/seed at two git refs and **subtracts the audio**. "Did this
+change alter anything besides X, and where" stops being a listening task and becomes
+a measurement. Exits nonzero above threshold, so it is a `git bisect run` predicate.
+
+```bash
+npm run --silent mix:ab -- --scene=funk-pocket --refs=main..HEAD
+npm run --silent mix:ab -- --scene=funk-pocket --refs=main..HEAD --stems=bass
+npm run --silent mix:ab -- --identity=HEAD --scene=funk-pocket   # measure the noise floor
+git bisect start bad good && git bisect run npm run --silent mix:ab -- --scene=funk-pocket --refs=HEAD~1..HEAD
+```
+
+Per stem it reports total residual RMS, **residual per bar** (so the change is
+addressable — "bass, bar 3"), the note-level event delta, and writes the residual
+itself as a WAV so `mix:spectro --from=<dir>` renders a difference spectrogram.
+
+### The floor is measured, not zero — do not "fix" this
+
+**The renderer is not bit-reproducible.** Two renders of the same ref, same seed,
+same bundle differ. Measured across three renders of `funk-pocket` / `MIX_AUDIT`:
+
+| stem | residual RMS | max abs diff |
+| :- | -: | -: |
+| full | **−99.0 dBFS** | 2 LSB |
+| full+solo | −99.2 | 2 |
+| bass | −100.5 | 2 |
+| drums | −102.9 | 2 |
+| harmony | −105.0 | 1 |
+| chords | −107.3 | 1 |
+| soloist (silent) | −Inf (byte-identical) | 0 |
+
+Only the **silent** stem is bit-identical, and that is the tell: the nondeterminism
+scales with signal, which is float summation-order variation in Chromium's
+`OfflineAudioContext` — not anything structural or musical. It is inaudible and not
+fixable from this repo.
+
+So the default threshold is **−90 dBFS**, about 9 dB above the worst observed floor,
+and a difference below it is reported as *indistinguishable from render noise* rather
+than attributed to the change under test. The original design said the identity check
+must "null to silence" and the tool must refuse to compare until it does — which, since
+that never holds, would have deadlocked the tool permanently. The floor preserves that
+rule's intent (never report noise as signal) in a form that is achievable.
+
+### Validated against a known change
+
+A bar-localized positive control (bass muted across bars 3–4, on a throwaway commit)
+produced exactly the localization the tool exists to provide:
+
+```
+bass       residual  -34.6 dBFS   ABOVE THRESHOLD by 55.4 dB
+           loudest: bar 3 -25.1, bar 4 -69.3, bar 6 -98.8, bar 1 -99.4, ... (rest at the floor)
+           events: 0 added, 11 removed  ·  bar 3 beat 1 — bass midi 45 in A, absent in B
+drums / chords / harmony / soloist        at or below threshold
+3 of 7 stem(s) above -90.0 dBFS: bass, full+solo, full   → exit 1
+```
+
+Right stems, right bars, right notes, nonzero exit. Note `bar 4` sitting well above
+the floor at −69.3 dB is correct physics, not leakage — it is the release tail of the
+notes that were still ringing when the mute began.
+
+### The event delta needs both refs to carry event dumps
+
+`--write-events` landed in `795baf1b`. Comparing two older refs still works for the
+null test — the residual is exact — but the per-bar breakdown and the event delta both
+print `NOT VERIFIABLE`, because the bar grid comes from the dump. Rendering an old ref
+through the *current* harness is deliberately **not** done: it would measure the harness
+change along with the engine change, which is a different experiment.
+
+Each ref is rendered by checking it out **in the main repo** (a worktree has no
+`node_modules` — see the npx-probe trap in the global guide) and running that ref's own
+harness. `tmp/` is gitignored, which is what lets the rendered output survive the
+checkout. The tool refuses a dirty tree, never stashes, and restores the original ref
+in a `finally`.
+
 ## Share modal → Download .wav
 
 In addition to the CLI tools above, the in-app **Share & Export** modal
