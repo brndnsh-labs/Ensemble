@@ -122,7 +122,25 @@ function playBassNoteNew(
     if (!playback.audio || !playback.audioGraph) {
         return;
     }
-    // Every input is caller-supplied — guard them all. A non-finite
+    // `muted` carries TWO meanings across the codebase and only one of them is a
+    // number. The bass writes a numeric palm-mute amount 0..1 (`bass-engine.ts`
+    // `@param muted`; the funk slap chuck emits `1`), while the chords lanes emit
+    // a boolean `muted: true` sentinel for CC-only notes (`accompaniment.ts`).
+    // `NoteEntry` still types the field `boolean`, so a boolean reaching here is
+    // a live possibility — and `Number.isFinite(true) === false`, which would
+    // trip the guard below and drop the note in total silence with no error.
+    // Normalize instead: a boolean means fully muted / open, and any out-of-range
+    // number clamps rather than driving `vol` negative through the `1 - m * 0.85`
+    // below (anything above ~1.176 does, which is the same silent drop by a
+    // different route). Both routes were confirmed reachable by mutation test —
+    // neither is reachable from today's producers, which all emit 0 or 1.
+    const mute =
+        typeof muteAmount === 'boolean'
+            ? muteAmount
+                ? 1
+                : 0
+            : Math.max(0, Math.min(1, muteAmount));
+    // Every other input is caller-supplied — guard them all. A non-finite
     // `bendStartInterval` would otherwise poison `startFreq` and the pitch
     // ramp anchor, silently dropping the voice.
     if (
@@ -130,7 +148,7 @@ function playBassNoteNew(
         !Number.isFinite(time) ||
         !Number.isFinite(duration) ||
         !Number.isFinite(velocity) ||
-        !Number.isFinite(muteAmount) ||
+        !Number.isFinite(mute) ||
         !Number.isFinite(bendStartInterval)
     ) {
         return;
@@ -155,7 +173,7 @@ function playBassNoteNew(
             cutoffRange: [0.4, 1.5],
         });
 
-        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - muteAmount * 0.85);
+        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - mute * 0.85);
         if (vol < 0.005) {
             return;
         }
@@ -181,7 +199,7 @@ function playBassNoteNew(
         // Base (fully-open) cutoff tracks pitch; `cutoffMult` scales it down on
         // soft notes, a palm-mute (`muteAmount`) rolls it down further.
         const midi = 12 * Math.log2(freq / 440) + 69;
-        const baseCutoff = (450 + midi * 18) * (1 - muteAmount * 0.5);
+        const baseCutoff = (450 + midi * 18) * (1 - mute * 0.5);
         // Pluck-settle motion: a real plucked string is brightest at the
         // attack and mellows as the pluck energy decays. The saw lowpass opens
         // ~1.3–1.7× above its velocity-scaled target (a harder pluck swings
@@ -282,7 +300,7 @@ function playBassNoteNew(
         const amp = audio.createGain();
         amp.gain.setValueAtTime(0, startTime);
         amp.gain.setTargetAtTime(vol, startTime, 0.006);
-        const releaseTime = Math.max(0.06, duration * (1 - muteAmount) + 0.02 * muteAmount);
+        const releaseTime = Math.max(0.06, duration * (1 - mute) + 0.02 * mute);
         amp.gain.setTargetAtTime(vol * 0.45, startTime + 0.04, 0.12);
         amp.gain.setTargetAtTime(0, startTime + releaseTime, 0.08);
         shaper.connect(amp);

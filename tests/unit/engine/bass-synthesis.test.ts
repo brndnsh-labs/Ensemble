@@ -280,6 +280,45 @@ describe('Reworked Synth Bass Voice', () => {
         expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.005);
     });
+
+    // `muted` means two different things in this codebase: a NUMERIC palm-mute
+    // amount 0..1 on the bass (the funk slap chuck emits 1) and a BOOLEAN
+    // CC-only sentinel on the chords lanes. `NoteEntry` types it `boolean`, so
+    // either can reach this voice, and before normalization either non-numeric
+    // or out-of-range value dropped the note in total silence with no error —
+    // `Number.isFinite(true)` is false, and `1 - m * 0.85` goes negative above
+    // ~1.176, tripping the `vol < 0.005` bail. Both were confirmed reachable by
+    // mutation test against a live render (0 oscillators started, 0 errors).
+    describe('mute normalization — an odd `muted` must not silence the note', () => {
+        // 3 oscillators === the voice actually built; 0 === the silent drop.
+        const oscillators = () => playback.audio.createOscillator.mock.calls.length;
+
+        it('treats a boolean `true` as fully muted rather than dropping the note', () => {
+            playBassNote(getState(), 41.2, 10, 1.0, 1.0, true as unknown as number);
+            expect(oscillators()).toBe(3);
+        });
+
+        it('treats a boolean `false` as open rather than dropping the note', () => {
+            playBassNote(getState(), 41.2, 10, 1.0, 1.0, false as unknown as number);
+            expect(oscillators()).toBe(3);
+        });
+
+        // Bracketed around the point where `1 - m * 0.85` reaches zero (m = 1/0.85
+        // ≈ 1.176): just inside it was always fine, just outside was the silent
+        // drop. Asserting only a far-out value would pass on a partial fix.
+        it('clamps an out-of-range mute instead of driving the gain negative', () => {
+            playBassNote(getState(), 41.2, 10, 1.0, 1.0, 1.17);
+            expect(oscillators()).toBe(3);
+            vi.clearAllMocks();
+            playBassNote(getState(), 41.2, 10, 1.0, 1.0, 1.18);
+            expect(oscillators()).toBe(3);
+        });
+
+        it('still builds the voice at the numeric mute the funk chuck emits', () => {
+            playBassNote(getState(), 41.2, 10, 1.0, 1.0, 1);
+            expect(oscillators()).toBe(3);
+        });
+    });
 });
 
 // RETIRED (asserted the deleted `current` voice's DSP, with no analog in the

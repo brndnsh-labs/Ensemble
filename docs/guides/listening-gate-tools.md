@@ -153,10 +153,26 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   rejected: noise-based percussion legitimately reaches a delta/peak ratio of ~1.36
   against a real click's ~1.96, too narrow to separate without proper bandwidth
   estimation.
-- **A repeated same-pitch note inside the previous note's ring produces no new
-  attack**, so it reports as MISSED. On funk bass that accounts for the whole gap
-  between its ~82% rate and the kit's 100%. Whether that is legato or a dropped
-  note is a musical judgment, not a tool bug — tracked in #1284.
+- **A deliberately quiet note under a louder tail reports as MISSED.** This is the
+  big one, and it produced a wrong bug report before it was understood. On funk bass
+  the whole gap between its ~82% rate and the kit's 100% is the **slap "chuck"**
+  (`bass-styles.ts`): a dead note that emits `muted: 1`, so it plays at
+  `vol × 0.15` — exactly −16.5 dB — with a halved cutoff, landing 144 ms after a note
+  still ringing 17–28 dB above it. It is 27% of that lane's notes. **The note sounds;
+  presence detection cannot see it.** `mix:verify` measures a band-energy *rise*
+  across the onset, and a note 17 dB below the ongoing tail does not produce one.
+  Confirmed by instrumenting the render: 161 scheduled notes → 161 voices built and
+  started, zero early returns.
+
+  Two traps this exposed, both worth knowing before trusting a MISSED report:
+  **(1)** the bass visualizer payload omits velocity, so the tool cannot tell an
+  intentionally-quiet note from a failed one — it has no way to expect −16.5 dB.
+  **(2)** Do not try to rescue this by band-splitting for the attack transient.
+  `playPercussiveStrike`'s centre frequency is `Math.max(200, …)` and pins to the
+  200 Hz floor for a low-E bass note, so a split above that measures a band the
+  transient is not in — and the transient carries the same ×0.15 mute anyway, so it
+  is not level-independent either. That reasoning produced a confident, wrong
+  "the voice never executes" conclusion (see #1284).
 - **Pitch confirmation is monophonic AND high-register only.** Inside a chord a
   neighbor's partials land on a note's probe bins, so `chords`/`harmony` decline it.
   Separately, an 80 ms Goertzel resolves ~12.5 Hz while a semitone at MIDI 45 spans
