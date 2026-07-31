@@ -1,6 +1,6 @@
 import { deepSignal } from 'deepsignal';
 import type { Action, GlobalContext, GrooveState, Mutable } from '../types.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, isSwingSub } from '../types.js';
 
 export type { GrooveState };
 
@@ -145,7 +145,13 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
             g.swing = action.payload;
             return true;
         case ACTIONS.SET_SWING_SUB:
-            g.swingSub = action.payload;
+            // #1264 — payload arrives untyped (a DOM `<Select>` value, or the e2e
+            // bridge). An unrecognized grid is IGNORED rather than defaulted: silently
+            // resetting a user's 16th-note feel to 8th on a bad payload changes the
+            // groove's idiom, which is a worse failure than the write not landing.
+            if (isSwingSub(action.payload)) {
+                g.swingSub = action.payload;
+            }
             return true;
         case ACTIONS.SET_HUMANIZE:
             g.humanize = action.payload;
@@ -203,7 +209,7 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
                 if (action.payload.swing !== undefined) {
                     g.swing = action.payload.swing;
                 }
-                if (action.payload.sub !== undefined) {
+                if (isSwingSub(action.payload.sub)) {
                     g.swingSub = action.payload.sub;
                 }
             }

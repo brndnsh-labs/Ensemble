@@ -8,7 +8,7 @@ import type {
     Mutable,
     SoloistState,
 } from '../types.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, isChordDensity } from '../types.js';
 
 export type { BassState, ChordState, HarmonyState, SoloistState };
 
@@ -440,7 +440,11 @@ export function instrumentReducer(action: Action): boolean {
             }
             return true;
         case ACTIONS.SET_DENSITY:
-            c.density = action.payload;
+            // #1264 — see the SET_SWING_SUB note in `groove.ts`: untyped payload,
+            // unrecognized value ignored rather than defaulted.
+            if (isChordDensity(action.payload)) {
+                c.density = action.payload;
+            }
             return true;
         case ACTIONS.SET_VOLUME:
             // grooveReducer owns the groove lane for this action (#1182).
@@ -502,7 +506,7 @@ export function instrumentReducer(action: Action): boolean {
             }
             return true;
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (action.payload.density) {
+            if (isChordDensity(action.payload.density)) {
                 c.density = action.payload.density;
             }
             return true;

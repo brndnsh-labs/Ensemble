@@ -10,8 +10,20 @@ import { hydrateVoice } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { escapeHTML, stripDangerousChars } from '../sanitize.js';
 import { dispatch, getState, storage } from '../state.js';
-import type { InstrumentVoice, Mutable, Palette, ThemeMode } from '../types.js';
-import { ACTIONS } from '../types.js';
+import type {
+    BassState,
+    ChordState,
+    GrooveState,
+    HarmonyState,
+    InstrumentVoice,
+    Mutable,
+    Palette,
+    SharedBandPayload,
+    SoloistState,
+    SwingSub,
+    ThemeMode,
+} from '../types.js';
+import { ACTIONS, isChordDensity, isSwingSub } from '../types.js';
 import { normalizeKey } from '../utils.js';
 import { INSTRUMENT_REVERB_DEFAULTS, MIXER_SETTINGS_VERSION } from './instruments.js';
 import { saveCurrentState } from './persistence.js';
@@ -56,7 +68,10 @@ function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
 }
 
 /**
- * The swing-subdivision keyspace, and the one authority that normalizes into it.
+ * The one authority that normalizes an untrusted value into the swing-subdivision
+ * keyspace. (#1264 moved the keyspace itself to `types.ts` as `SwingSub` /
+ * `isSwingSub`; this function stays here because its FALLBACK — '8th' — is a
+ * hydration policy, not a property of the type.)
  *
  * why (#1257): `swingSub` is a **string** ('8th' | '16th') — the swing-base `<select>`
  * in `InstrumentSettings.tsx` only ever dispatches those two, and the branching
@@ -76,13 +91,8 @@ function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
  * opened a share link stayed stuck at 8th-note swing on every subsequent boot, with
  * no share URL involved. Fixing only the share reader would leave them there.
  */
-const SWING_SUBS: ReadonlySet<string> = new Set(['8th', '16th']);
-
-/** Chord voicing-density keyspace — see the `density` reader below (#1257). */
-const DENSITIES: ReadonlySet<string> = new Set(['thin', 'standard', 'rich']);
-
-export function normalizeSwingSub(value: unknown): string {
-    return typeof value === 'string' && SWING_SUBS.has(value) ? value : '8th';
+export function normalizeSwingSub(value: unknown): SwingSub {
+    return isSwingSub(value) ? value : '8th';
 }
 
 const VALID_PALETTES = new Set<Palette>([
@@ -126,7 +136,16 @@ function migrateTheme(savedState: any): { palette: Palette; mode: ThemeMode } {
     return LEGACY_THEME_MAP[savedState?.theme] ?? { palette: 'after-hours', mode: 'auto' };
 }
 
-function decompressBandSettings(str: string): any {
+/**
+ * #1264 — returns `SharedBandPayload | null`, not `any`. The parse itself is still
+ * unchecked at runtime (it is `JSON.parse` on untrusted input), so this is an
+ * ASSERTION about the wire format, not a validation of it — every field below is
+ * still guarded before it reaches a slice. What the type buys is the other
+ * direction: the writer in `export/sharing.ts` is annotated with the same interface,
+ * so a reader that validates against a keyspace the writer never emits is now a
+ * compile error rather than a bug that ships and survives for months (#1257).
+ */
+function decompressBandSettings(str: string): SharedBandPayload | null {
     try {
         // Bound untrusted `bnd` share-URL input before decode/parse to prevent
         // memory exhaustion — mirrors the 100KB cap in decompressSections (utils.ts).
@@ -346,7 +365,7 @@ function hydrateSavedState(): void {
                 // — so that population stays pinned to standard voicing forever. Also
                 // stops a pre-#1257 save with no `density` key from overwriting the
                 // slice's 'standard' default with `undefined`.
-                density: DENSITIES.has(savedState.chords.density)
+                density: isChordDensity(savedState.chords.density)
                     ? savedState.chords.density
                     : 'standard',
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.chords.volume, 0, 1, 1.0),
@@ -642,19 +661,23 @@ export function loadFromUrl(): void {
             const hasMixerVersion =
                 Number(band.mv || band.mixerVersion || 0) === MIXER_SETTINGS_VERSION;
             if (band.s) {
+                // #1264 — bound to a local: TS drops the `if (band.s)` narrowing inside the
+                // `.some()` callback below, and reaching for a `!` there would defeat the
+                // very check this type was added to enable.
+                const bs = band.s;
                 Object.assign(soloist, {
-                    enabled: !!band.s.e,
-                    style: SOLOIST_STYLES.some((s) => s.id === band.s.s) ? band.s.s : soloist.style,
-                    preset: normalizeSoloistPreset(band.s.p, soloist.preset),
-                    octave: clamp(band.s.o, 0, 127, 72),
-                    volume: hasMixerVersion ? clamp(band.s.v, 0, 1, 1.0) : 1.0,
+                    enabled: !!bs.e,
+                    style: SOLOIST_STYLES.some((s) => s.id === bs.s) ? bs.s : soloist.style,
+                    preset: normalizeSoloistPreset(bs.p, soloist.preset),
+                    octave: clamp(bs.o, 0, 127, 72),
+                    volume: hasMixerVersion ? clamp(bs.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
-                        ? clamp(band.s.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist)
+                        ? clamp(bs.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.soloist)
                         : INSTRUMENT_REVERB_DEFAULTS.soloist,
-                    mode: resolveSoloistMode(band.s.m || soloist.mode),
+                    mode: resolveSoloistMode(bs.m || soloist.mode),
                     // #856 — older share URLs have no `am`; default to Auto.
-                    autoMode: band.s.am === undefined ? true : !!band.s.am,
-                });
+                    autoMode: bs.am === undefined ? true : !!bs.am,
+                } satisfies Partial<SoloistState>);
                 // why (#1258): sanitize + cap, matching the top-level `?seed=` sibling
                 // below. This route previously accepted any string up to the payload's
                 // ~100KB ceiling, and that value is then persisted, re-shared, and fed
@@ -662,23 +685,24 @@ export function loadFromUrl(): void {
                 // hashing-cost and data-hygiene problem carried forward indefinitely.
                 // (Not XSS: Preact escapes it at render.) Two readers of the same field
                 // disagreeing on its bounds is the actual defect.
-                if (typeof band.s.sd === 'string') {
-                    const safeSeed = stripDangerousChars(band.s.sd).slice(0, 64);
+                if (typeof bs.sd === 'string') {
+                    const safeSeed = stripDangerousChars(bs.sd).slice(0, 64);
                     if (safeSeed) {
                         Object.assign(arranger, { seed: safeSeed });
                     }
                 }
             }
             if (band.b) {
+                const bb = band.b; // #1264 — see the `bs` note above
                 Object.assign(bass, {
-                    enabled: !!band.b.e,
-                    style: BASS_STYLES.some((s) => s.id === band.b.s) ? band.b.s : bass.style,
-                    octave: clamp(band.b.o, 0, 127, 36),
-                    volume: hasMixerVersion ? clamp(band.b.v, 0, 1, 1.0) : 1.0,
+                    enabled: !!bb.e,
+                    style: BASS_STYLES.some((s) => s.id === bb.s) ? bb.s : bass.style,
+                    octave: clamp(bb.o, 0, 127, 36),
+                    volume: hasMixerVersion ? clamp(bb.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
-                        ? clamp(band.b.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.bass)
+                        ? clamp(bb.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.bass)
                         : INSTRUMENT_REVERB_DEFAULTS.bass,
-                });
+                } satisfies Partial<BassState>);
             }
             if (band.c) {
                 Object.assign(chords, {
@@ -705,20 +729,21 @@ export function loadFromUrl(): void {
                     // rewriting density from intensity — that runs via
                     // `updateAutoConductor`, which early-returns unless a ramp is actually
                     // in flight, and a share URL sets `int=` directly.
-                    density: DENSITIES.has(band.c.d) ? band.c.d : 'standard',
-                });
+                    density: isChordDensity(band.c.d) ? band.c.d : 'standard',
+                } satisfies Partial<ChordState>);
             }
             if (band.h) {
+                const bh = band.h; // #1264 — see the `bs` note above
                 Object.assign(harmony, {
-                    enabled: !!band.h.e,
-                    style: HARMONY_STYLES.some((s) => s.id === band.h.s) ? band.h.s : harmony.style,
-                    octave: clamp(band.h.o, 0, 127, 60),
-                    volume: hasMixerVersion ? clamp(band.h.v, 0, 1, 1.0) : 1.0,
+                    enabled: !!bh.e,
+                    style: HARMONY_STYLES.some((s) => s.id === bh.s) ? bh.s : harmony.style,
+                    octave: clamp(bh.o, 0, 127, 60),
+                    volume: hasMixerVersion ? clamp(bh.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
-                        ? clamp(band.h.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.harmony)
+                        ? clamp(bh.r, 0, 1, INSTRUMENT_REVERB_DEFAULTS.harmony)
                         : INSTRUMENT_REVERB_DEFAULTS.harmony,
-                    complexity: clamp(band.h.c, 0, 1, 0.5),
-                });
+                    complexity: clamp(bh.c, 0, 1, 0.5),
+                } satisfies Partial<HarmonyState>);
             }
             if (band.g) {
                 Object.assign(groove, {
@@ -730,7 +755,7 @@ export function loadFromUrl(): void {
                     swing: clamp(band.g.sw, 0, 100, 0),
                     swingSub: normalizeSwingSub(band.g.ss),
                     humanize: clamp(band.g.hu, 0, 100, 20),
-                });
+                } satisfies Partial<GrooveState>);
             }
         }
     }

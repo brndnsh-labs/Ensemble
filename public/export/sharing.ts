@@ -1,6 +1,7 @@
 import { MIXER_SETTINGS_VERSION } from '../state/instruments.js';
 import { compressSections, encodeBase64Unicode } from '../state/share-codec.js';
 import { getState } from '../state.js';
+import type { SharedBandPayload } from '../types.js';
 import { showToast } from '../ui.js';
 
 export interface ShareOptions {
@@ -20,7 +21,11 @@ export interface ShareOptions {
 function compressBandSettings(options: ShareOptions = {}): string {
     const { arranger, soloist, bass, chords, harmony, groove } = getState();
 
-    const band = {
+    // #1264 — annotated, not inferred. This is the half that makes `SharedBandPayload`
+    // load-bearing rather than decorative: typing only the READER would describe what
+    // the reader hopes for, and a writer drifting to a different keyspace would still
+    // compile. With the writer pinned too, the two sides cannot disagree silently.
+    const band: SharedBandPayload = {
         mv: MIXER_SETTINGS_VERSION,
         s: {
             e: (options.includeSolo !== undefined ? options.includeSolo : soloist.enabled) ? 1 : 0,

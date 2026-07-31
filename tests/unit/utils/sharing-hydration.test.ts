@@ -664,3 +664,73 @@ describe('untrusted URL input hardening (#1258)', () => {
         expect(arranger.seed).toBe('blue-note-42');
     });
 });
+
+describe('bnd payload keyspace guards (#1264)', () => {
+    // #1264 typed the `?bnd=` wire format (`SharedBandPayload`) so writer/reader
+    // keyspace drift is a compile error. The types are a SECOND line, not a
+    // replacement — the payload is still untrusted input that a forged or
+    // hand-edited link can put anything into, and `tsc` is not present at runtime.
+    // These cover the runtime half: an out-of-keyspace value must be REJECTED, and
+    // rejection must leave the slice's existing value alone rather than resetting it.
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubGlobal('navigator', {
+            clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+        });
+        arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
+    });
+
+    const loadBnd = (payload) => {
+        const bnd = encodeBase64Unicode(JSON.stringify(payload));
+        vi.stubGlobal('location', new URL(`http://localhost/?bnd=${encodeURIComponent(bnd)}`));
+        loadFromUrl();
+    };
+
+    it('rejects the pre-#1257 numeric swingSub a forged link could still carry', () => {
+        groove.swingSub = '16th';
+        // The exact shape the broken reader used to WRITE, now arriving as input.
+        loadBnd({ mv: MIXER_SETTINGS_VERSION, g: { e: 1, ss: 8 } });
+
+        expect(groove.swingSub).toBe('8th'); // normalizeSwingSub's documented fallback
+        expect(typeof groove.swingSub).toBe('string');
+    });
+
+    it('round-trips a valid 16th-note grid through the typed payload', () => {
+        groove.swingSub = '8th';
+        loadBnd({ mv: MIXER_SETTINGS_VERSION, g: { e: 1, ss: '16th' } });
+
+        expect(groove.swingSub).toBe('16th');
+    });
+
+    it('rejects a numeric chords.density and falls back to standard', () => {
+        chords.density = 'rich';
+        // 0.5 is what the pre-#1257 numeric `clamp` landed on every share link.
+        loadBnd({ mv: MIXER_SETTINGS_VERSION, c: { e: 1, d: 0.5 } });
+
+        expect(chords.density).toBe('standard');
+    });
+
+    it('round-trips a valid rich voicing through the typed payload', () => {
+        chords.density = 'standard';
+        loadBnd({ mv: MIXER_SETTINGS_VERSION, c: { e: 1, d: 'rich' } });
+
+        expect(chords.density).toBe('rich');
+    });
+
+    it('rejects an out-of-keyspace string rather than storing it verbatim', () => {
+        // The failure mode a bare `typeof x === 'string'` check would miss: a
+        // plausible-looking value that no consumer branches on, which would leave
+        // both `=== 'rich'` and `=== 'thin'` false and silently read as standard
+        // WITHOUT the slice ever holding a legal value.
+        chords.density = 'thin';
+        groove.swingSub = '16th';
+        loadBnd({
+            mv: MIXER_SETTINGS_VERSION,
+            c: { e: 1, d: 'constructor' },
+            g: { e: 1, ss: '32nd' },
+        });
+
+        expect(chords.density).toBe('standard');
+        expect(groove.swingSub).toBe('8th');
+    });
+});

@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../song/form-analysis.js';
 import { saveCurrentState } from '../state/persistence.js';
-import type { EnsembleState } from '../types.js';
+import type { ChordDensity, EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
@@ -114,7 +114,11 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     const complexity = playback.complexity; // 0.0 - 1.0
 
     // --- 1. Master Dynamics ---
-    let targetDensity = 'standard';
+    // #1264 — annotated so a new tier added here is a compile error at the SOURCE
+    // rather than a value the `UPDATE_CONDUCTOR_DECISION` reducer's guard silently
+    // drops on the floor. Inferred, this was `string`, and the reducer was the only
+    // thing standing between it and the slice.
+    let targetDensity: ChordDensity = 'standard';
     if (intensity < 0.4) {
         targetDensity = 'thin';
     } else if (intensity > 0.85) {

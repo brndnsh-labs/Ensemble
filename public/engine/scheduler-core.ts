@@ -11,7 +11,7 @@ import {
     buildSoloistSyncPayload,
 } from '../state.js';
 import type { ArrangerState, EnsembleState, GlobalContext, Mutable } from '../types.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, isSwingSub } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
     getMidi,
@@ -455,7 +455,11 @@ function applyPendingGenre(state: EnsembleState): void {
     if (payload.swing !== undefined) {
         (groove as Mutable<typeof groove>).swing = payload.swing; // @direct-mutation
     }
-    if (payload.sub !== undefined) {
+    // #1264 — `payload` is `any`, and an `any` assigned through a `Mutable<>` cast
+    // type-checks against the narrowed `SwingSub` field without complaint. So this
+    // site is invisible to the union and needs the runtime guard to be protected;
+    // it is exactly the writer a type-only fix would have left open.
+    if (isSwingSub(payload.sub)) {
         (groove as Mutable<typeof groove>).swingSub = payload.sub; // @direct-mutation
     }
     if (payload.genreName) {

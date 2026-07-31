@@ -8,6 +8,115 @@
  */
 
 /**
+ * Swing subdivision — which note value the swing ratio is applied to. This is the
+ * FEEL of the swing, not its amount (see `docs/guides/` on the swing system): an
+ * 8th-note grid and a 16th-note grid at the same `swing` percentage are different
+ * idioms, not different intensities of one.
+ *
+ * Declared as a union rather than `string` (#1264) because it is written by the
+ * share-URL writer and read back by an untrusted-input validator; when both sides
+ * were `string`, a reader validating against a keyspace the writer never emits was
+ * invisible to `tsc`. That is exactly the bug #1257 fixed by hand — the reader
+ * checked `[4, 8, 16].includes(...)` against a writer emitting `'8th' | '16th'`, so
+ * every share link landed the number `8` and the 16th-note grid was dead for months.
+ */
+export type SwingSub = '8th' | '16th';
+
+/**
+ * Runtime keyspace for {@link SwingSub} — the single source the guard below derives
+ * from. Deliberately NOT exported: no caller outside this module needs to enumerate
+ * the keyspace today, and exporting it on spec just gives `knip` a dead export to
+ * flag. Widen to an export when something actually consumes the list.
+ */
+const SWING_SUBS: readonly SwingSub[] = ['8th', '16th'];
+
+/**
+ * Narrows an untrusted value to {@link SwingSub}. Reducers and the `@direct-mutation`
+ * genre-apply path both need this: their payloads arrive as `any` (from `dispatch`,
+ * a DOM `<Select>` value, or the e2e bridge), and an `any` assigned through a
+ * `Mutable<>` cast type-checks against a narrowed field without complaint — so the
+ * union alone does NOT protect those writers. The guard is what makes it real.
+ */
+export function isSwingSub(value: unknown): value is SwingSub {
+    // Derived from SWING_SUBS rather than re-listing the literals: a guard that
+    // hardcodes its own copy is the same "two declarations nothing forces to agree"
+    // shape this issue exists to remove. The widening cast is safe (readonly
+    // SwingSub[] -> readonly string[]) and is what lets `includes` take an unknown.
+    return typeof value === 'string' && (SWING_SUBS as readonly string[]).includes(value);
+}
+
+/**
+ * Chord voicing density. Consumers in `chords-styles.ts` branch on the literal
+ * (`density === 'rich'` / `=== 'thin'`), so this is a keyspace, not a scale.
+ *
+ * Union rather than `string` for the same reason as `SwingSub` (#1264): the share
+ * reader ran this through a numeric `clamp`, which did `parseFloat('rich') → NaN`
+ * and substituted `0.5`, silently collapsing every shared rich/thin voicing to
+ * standard. Typing the field makes that class of mismatch a compile error.
+ */
+export type ChordDensity = 'thin' | 'standard' | 'rich';
+
+/** Runtime keyspace for {@link ChordDensity}. See {@link SWING_SUBS} on why it is local. */
+const CHORD_DENSITIES: readonly ChordDensity[] = ['thin', 'standard', 'rich'];
+
+/** Narrows an untrusted value to {@link ChordDensity}. See {@link isSwingSub}. */
+export function isChordDensity(value: unknown): value is ChordDensity {
+    return typeof value === 'string' && (CHORD_DENSITIES as readonly string[]).includes(value);
+}
+
+/**
+ * The `?bnd=` share-URL wire payload — the base64'd JSON `compressBandSettings`
+ * (`export/sharing.ts`) emits and `decompressBandSettings` (`state/state-hydration.ts`)
+ * reads back. Keys are deliberately terse; the URL carries them on every share link.
+ *
+ * WHY THIS EXISTS (#1264). `decompressBandSettings` used to return `any`, so every
+ * `band.*` read was untyped and `Object.assign(slice, {...})` accepted it even where
+ * the slice field was a narrowed union. Writer/reader keyspace drift was therefore
+ * invisible to `tsc`, and the only way to find it was by hand, one field at a time —
+ * which is how all three known instances were found:
+ *
+ *   - `g.ss` — writer emitted `'8th' | '16th'`, reader validated `[4, 8, 16].includes(...)`
+ *   - `c.d`  — writer emitted `'thin' | 'standard' | 'rich'`, reader ran a numeric `clamp`
+ *   - `c.s`  — reader validated against the picker list, rejecting the genre-routed `'arp'`
+ *
+ * All three shipped and survived for months (#1257 fixed the instances; this types the
+ * cause). BOTH sides are annotated with this interface, which is the point: a writer
+ * that starts emitting a different keyspace fails to compile against the reader's
+ * expectation, instead of silently landing a default on every recipient's session.
+ *
+ * This does NOT replace runtime validation — the payload is untrusted input and every
+ * reader still guards. It removes the *silent* case, where a guard checks a keyspace
+ * the writer never produces and `tsc` says nothing.
+ */
+export interface SharedBandPayload {
+    /** Mixer-settings schema version; volumes/reverbs are ignored unless it matches. */
+    mv?: number;
+    /** Legacy alias for `mv` accepted by the reader. */
+    mixerVersion?: number;
+    /** Soloist lane (plus the arranger seed, which rides along here). */
+    s?: {
+        e?: 0 | 1;
+        s?: string;
+        p?: string;
+        o?: number;
+        v?: number;
+        r?: number;
+        m?: string;
+        am?: 0 | 1;
+        /** Arranger seed — sanitized and length-capped on read. */
+        sd?: string;
+    };
+    /** Bass lane. */
+    b?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number };
+    /** Chords lane. `d` is a keyspace, not a 0..1 scale — see {@link ChordDensity}. */
+    c?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number; d?: ChordDensity };
+    /** Harmony lane. */
+    h?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number; c?: number };
+    /** Groove lane. `ss` is a subdivision keyspace — see {@link SwingSub}. */
+    g?: { e?: 0 | 1; v?: number; r?: number; sw?: number; ss?: SwingSub; hu?: number };
+}
+
+/**
  * One component of a chord display string (root + suffix, with optional slash bass).
  */
 export interface ChordNamePart {
@@ -237,7 +346,7 @@ export interface GrooveState {
     /** Swing percentage (0-100). */
     readonly swing: number;
     /** Swing subdivision ('8th' or '16th'). */
-    readonly swingSub: string;
+    readonly swingSub: SwingSub;
     /** Name of the last loaded drum preset. */
     readonly lastDrumPreset: string;
     /** Thematic seed for deterministic generation. */
@@ -310,7 +419,7 @@ export interface ChordState {
     /** Base MIDI octave for voicing. */
     readonly octave: number;
     /** Voicing density ('thin', 'standard', 'rich'). */
-    readonly density: string;
+    readonly density: ChordDensity;
     /** Index of the currently playing chord (UI). */
     readonly lastActiveChordIndex: number | null;
     /** Index of the last scheduled chord (Internal). */
