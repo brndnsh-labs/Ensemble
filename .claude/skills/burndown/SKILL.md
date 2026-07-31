@@ -1,96 +1,101 @@
 ---
 name: burndown
-description: Autonomously work through the SAFE, self-contained backlog — issues labelled `burndown` (human-vetted) first, then clean findings + hygiene (knip dead-code, jscpd de-dup, /dep-update, bounded type-tightening) — one item at a time via /cycle with auto-merge, stopping at any judgment call or when the safe set is dry. The "fire it and let it grind" companion to /cycle. Plan-first: curates + presents the safe queue before working. Excludes anything destructive / state-or-worker-contract-design / Track-synth / by-ear / audio-path-perf.
+description: Autonomously grind through the SAFE, self-contained subset of the Ensemble backlog — pre-filters out anything touching DOCTRINE §5's always-brake surfaces (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) or posing an open decision, then loops `/cycle #<n>` over the rest, plus standing hygiene (`/dep-update`, a bounded dead-code sweep) when the issue queue is thin. A judgment call parks that item and the loop moves on; the run itself stops at 5 shipped items, a red gate, or a dry queue. Plan-first. Never touches prod. Usage `/burndown`.
 ---
+<!-- cycle:rendered template=skills/burndown.md.tmpl hash=525c25bf541a — managed by the-cycle; edit the template, not this file -->
 
 # /burndown — grind the safe backlog autonomously
 
-Goal: tick off the safe, no-judgment work without Brandon in the loop, so a session runs
-unattended-ish and he reviews the merged results when back. The autonomous engine on top of `/cycle`.
+Goal: tick off the safe, no-judgment-call work without Brandon babysitting each one, so a
+session runs mostly unattended and the merged results get reviewed after. The curating layer on top
+of `/cycle`, not a replacement for its safety logic.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The **safe set**
-this skill lives or dies by *is* §5's autonomous safe set (the negation of the always-brake list) —
-`/burndown` only ever touches work outside the brakes. Also leans on §2 Labels (the `burndown` tag),
-§6 Merge guard (auto-merge = the poll-then-merge guard, never `--auto`), §3 (re-verify agent claims).
-**When in doubt, exclude and surface — never include.**
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The safe set
+this skill lives or dies by *is* §5's always-brake list. Also leans on §1 (Status/ranking), §2
+(Labels), §6 (Merge guard — already enforced *inside* `/cycle` → `/done`; don't re-implement it
+here), §7 (tracker mechanics). **When in doubt, exclude and surface — never include.**
 
-## The `burndown` label — the fast path (and the /unblock handoff)
+## How this differs from `/cycle next --until-blocked`
 
-A **`burndown`**-labelled issue is **vetted safe for autonomous execution** (§2) — typically by
-`/unblock` when a decision turns an item into safe hands-off work, by `/scout`, or by Brandon. Pick
-these first, in issue-number order. **But the safe filter still backstops it** — if a labelled item
-turns sensitive mid-cycle, stop and hand it back (strong signal, not a blank check).
+`/cycle next --until-blocked` already runs hands-off and already stops at a judgment call — most of
+the safety machinery lives there, not here. The gap it leaves: it picks by **strict rank** and
+**stops the whole chain** the moment the top-ranked item turns out to need a judgment call, even if
+three safer issues sit right behind it. `/burndown` pre-vets the queue so a known-risky issue
+doesn't block a session's throughput — it's skipped (and surfaced in the report), not a stopping
+point.
 
-## The safe filter (what /burndown MAY pick — label or not)
+Use `/cycle next --until-blocked` when you want the *next* thing in strict priority order
+regardless of risk; use `/burndown` when you want to clear as much *safe* work as possible in one
+unattended pass.
 
-Qualifies ONLY if **all** hold:
-- **Not a §5 always-brake class** (`/done` wouldn't auto-merge it anyway) — not a destructive data op
-  (persisted sessions / share-URL schema / preset data / state migration), not a state-or-worker
-  contract change needing a design call.
-- **Not Track `synth` and not by-ear musical** — their DoD is a human listen (`Needs-ear`), which an
-  unattended run can't satisfy.
-- **Not audio-path perf / floor-risky** (§5) — NOT `scheduler-core.ts`, the `synth-*.ts` voices, or
-  the worker hot paths; those need a by-ear / weak-device check the gates lack.
-- **Well-specified + self-contained** — clear acceptance, small (S/M), single area, no open design
-  question.
-- **Gate/CI-verifiable** (§4) — provable by the gates (a passing critique test for a musical change, a
-  measured KB delta for bundle), **not by ear or a device**.
+## The safe filter (what /burndown MAY queue)
 
-If an item *almost* qualifies but has one catch, it's **out** — leave it for a human `/cycle`.
+Qualifies only if **all** hold — read the issue body; don't just pattern-match the labels:
+
+- **Status `ready`** — pickable, not already in flight.
+- **Doesn't pose an open decision.** An issue framed "decide one of: A / B" is a human `/cycle`
+  candidate regardless of how small the eventual diff is — a decision is a judgment call by
+  construction.
+- **Doesn't touch a §5 always-brake surface** (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)). Labels are a first-pass signal,
+  **not the filter**: a clean dependency CVE bump under a `security` label can be perfectly safe,
+  and an unlabelled issue can still be risky. **Read the body and the touched area before
+  deciding.**
+- **Well-specified and bounded** — clear acceptance, single area, no "TBD" scope.
+- **Gate-verifiable** (§4) — not something whose correctness needs a live or manual glance.
+
+If an item *almost* qualifies but has one catch, it's **out** — leave it for a human `/cycle #<n>`.
 
 ## What's in scope
 
-1. **`burndown`-labelled issues** (fast path).
-2. **Other clean backlog/finding issues** that pass the safe filter (most are Track `bundle` or
-   mechanical hygiene; a `musical` story qualifies only if its critique test is the whole DoD).
-3. **Hygiene** (standing safe work, even with no clean issue):
-   - **`knip` dead-code sweep** — `npm run knip`; remove genuinely dead exports/files.
-   - **`jscpd` de-dup** — `npx jscpd`; collapse genuine copy-paste in non-engine code.
-   - **`/dep-update`** — npm update + validate + lockfile commit.
-   - **Bounded type-tightening** — a named, single-file `any`/`as` cleanup that doesn't change
-     behavior (NOT an engine change that could move a critique test). **Verify the gap first.**
+1. **Safe-filtered pickable issues** (above), ordered by §1's ranking within the filtered set.
+2. **Standing hygiene**, when the filtered queue is thin or dry:
+   - **`/dep-update`** — run its workflow inline.
+   - **A bounded dead-code / type-safety sweep** — mirrors `/scout`'s hygiene lens. **Verify the
+     gap is real first** (read the code, don't assume); keep each sweep single-area and small.
+     Skip if nothing concrete turns up — don't invent a change.
 
 ## Workflow
 
-1. **Build the safe queue.** `burndown`-labelled first; then other open issues through the safe filter
-   (§7 read + fields); then hygiene candidates — **verifying each has *real* work** (knip flags
-   something, jscpd finds a real clone, deps actually update). Order: quickest first.
-2. **Present the curated queue** (plan-first): the ordered list, each with one line of *why it's safe*,
-   plus the stop conditions. The only checkpoint — then it works unattended (or under a standing go).
-3. **Work each item:**
-   - **Issue:** ensure Ready (set fields), `/cycle #<n>` → auto-merge (safe by construction) → sync
-     main.
-   - **Hygiene:** branch, gates green (the full §4 suite — critique test if anything engine-adjacent
-     slipped in), `/done`-style PR (`Closes` any tracking issue) → auto-merge.
-   - **Re-verify gates yourself** (§3) — never trust a spawned "green."
-4. **Stop — and report — when ANY of:**
-   - A **judgment call surfaces inside a cycle** → stop, leave that PR for Brandon; continue the rest
-     only if still clearly clean.
-   - **Gates or CI red** and not a trivial retry.
-   - The **safe queue is dry**.
-   - **5 items shipped** this run → check in (runaway guard).
+1. **Build the safe queue.** Pull the open set (§7); partition to pickable; apply the safe filter
+   to each; order the survivors by §1 rank. Note (but don't queue) anything excluded, with a
+   one-line reason.
+2. **Present the curated queue** (plan-first): the ordered list, one line each on *why it's safe*,
+   the excluded set + why, and the hygiene fallback if the queue's thin. This is the only
+   checkpoint — then it runs unattended.
+3. **Work each item: `/cycle #<n>`** (run its workflow inline — don't re-derive it). `/cycle`'s own
+   judgment-call detection is the real backstop. If a pre-vetted item still trips one mid-cycle,
+   that's the filter being wrong on this one, not a bug in the loop — **stop that item** (leave its
+   PR open, per `/cycle`'s own behavior) **and continue to the next queued item**.
+4. **When the issue queue is dry, run the hygiene fallback.** Re-verify gates yourself after each —
+   never trust a spawned "green" (§3).
+5. **Stop — and report — when ANY of:**
+   - **5 items shipped** this run (issues + hygiene combined) → check in (runaway guard).
+   - **Gates or CI red**, and not a trivial retry.
+   - **The safe queue AND the hygiene fallback are both dry.**
    - Interrupt.
-5. **Report:** what shipped (issue/PR links), what was skipped + why, what's left, anything needing
-   Brandon.
+6. **Report:** what shipped (issue/PR links), what was excluded and why (so Brandon can
+   `/cycle #<n>` those himself), and anything left running or blocked.
 
 ## Safety
 
-- **The filter is conservative by design.** Excluding a safe-ish item costs throughput; including an
-  unsafe one costs trust. Exclude when unsure — even a `burndown`-labelled item if the diff turns
-  sensitive mid-cycle.
-- Auto-merge only, only for filter-passing items with green CI, via §6's guard — **never bypass it
-  with a direct merge**.
-- **Merges auto-deploy to prod (CD, §6).** A green auto-merge ships to `ensemble.brndn.zip` via
-  the CI `deploy` job — including overnight `/burndown` merges (Brandon's standing call
-  2026-07-14). So the safe-set filter *is* the prod-ship gate: only §5-safe, gate-verifiable items
-  merge, so only those ship. `scripts/deploy.sh prod` stays the manual break-glass path, not the loop's job.
-- Honor the 5-item check-in and the >30-min-per-cycle guard from `/cycle`.
+- **The filter is conservative by design.** Excluding a safe-ish item costs a bit of throughput;
+  including an unsafe one costs trust in the whole queue. **Exclude when unsure.**
+- **Auto-merge is entirely `/cycle`/`/done`'s job** (§6) — `/burndown` never merges directly.
+- **Prod deploy is never part of `/burndown`** — always Brandon's explicit `/deploy-prod`.
+- Honor `/cycle`'s own >30-min-per-cycle guard.
 
 ## Edge cases
 
-- **Nothing safe to do:** say so — the backlog is all blocked / sensitive / needs-design / by-ear.
-  Don't manufacture busywork; suggest `/unblock` (clears decisions → safe Ready work) or `/scout`
-  (refills the `burndown` pile).
-- **A hygiene task has no real work:** skip it, don't invent a change.
-- **An item looked safe but the diff grew / got sensitive (or could move a critique test):** treat as
-  a judgment call — stop, hand it back.
+- **Nothing safe to do:** say so plainly — the backlog is all blocked, sensitive, or design-shaped.
+  Point at `/scout` to refill the queue, or suggest a human `/cycle #<n>` on the judgment-call
+  pile. **Don't manufacture busywork.**
+- **A hygiene pass has no real work:** skip it, say so, don't invent a change.
+- **An item looked safe but the diff turned sensitive mid-cycle:** that's `/cycle`'s own brake
+  doing its job — treat it as informative for next run's filter, not as a failure.
+
+## How it fits the pipeline
+
+- **`/scout`** = code → candidate issues (feeds this queue).
+- **`/burndown`** = grind the safe subset of that queue, unattended, plus hygiene backfill.
+- **`/cycle #<n>`** = the human-in-the-loop path for anything `/burndown` excludes, and the engine
+  `/burndown` calls under the hood.

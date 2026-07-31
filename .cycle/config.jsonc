@@ -1,0 +1,103 @@
+// the-cycle bindings for this repo.
+// Everything repo-specific lives here; the skills in .claude/skills are rendered
+// from shared templates and should not be hand-edited (`cycle check` will tell you
+// if they have been). Re-render with `cycle update` after changing this file.
+{
+  "repo": {
+    "name": "Ensemble",
+    "slug": "brandon/Ensemble",
+    "human": "Brandon"
+  },
+  "profile": "full",
+  "backend": "forgejo",
+  "tracker": {
+    "description": "the **Forgejo repo's issues** (`brandon/Ensemble` on `https://git.brndn.zip`, LAN/WG-only)",
+    "project": null,
+    "owner": "brandon",
+    "api": "https://git.brndn.zip/api/v1",
+    // Track is the load-bearing routing dimension here — it picks the DoD, reviewer,
+    // and merge behavior (see overlays/doctrine-routing.md).
+    "fields": { "Track": "track", "Review lens": "lens" },
+    "statuses": [
+      {
+        "name": "ready",
+        "meaning": "scoped + pickable",
+        "action": "`/next` ranks & picks; `/implement`/`/cycle` build"
+      },
+      {
+        "name": "in-progress",
+        "meaning": "being built",
+        "action": "don't re-pick"
+      },
+      {
+        "name": "needs-decision",
+        "meaning": "blocked on a Brandon call",
+        "action": "`/unblock` surfaces; **don't build**"
+      },
+      {
+        "name": "needs-ear",
+        "meaning": "blocked on Brandon's ear (a listen pass or synth A/B audition)",
+        "action": "`/unblock` tees up; **don't build past the gate**"
+      },
+      {
+        "name": "blocked",
+        "meaning": "blocked on a dependency",
+        "action": "skip; name the blocker"
+      },
+      {
+        "name": "(closed issue)",
+        "meaning": "done — no `status/*` on a closed issue",
+        "action": "done"
+      },
+      {
+        "name": "(no Status)",
+        "meaning": "+ `backlog`/`finding`: the idea pile, not a scheduled story",
+        "action": "triage/scope to ready first; don't pick"
+      }
+    ],
+    // "in-review" is retired (ensemble-adoption, matching songsiknow's D2): nothing
+    // downstream reads it once review stops touching Status, and its only action
+    // ("don't re-pick") is already covered by in-progress. An open PR is the
+    // "built, awaiting merge" signal.
+    "status": {
+      "pickable": "ready",
+      "active": "in-progress",
+      "done": "(closed)"
+    },
+    "ranking": "milestone (a real numbered epic > a \"candidate epic\" / no milestone), then Size (S < M < L), then issue number. Model is *not* a ranking factor",
+    "milestones": []
+  },
+  "routing": {
+    "model": "`sonnet` | `opus` via the `model/*` label (default opus). **Model never gates autonomy** (§5) — it only picks the executor's model.",
+    "executor_default": "orchestrator-inline"
+  },
+  "gates": {
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
+    "test": "npm test",
+    "commands": [
+      "npm run typecheck     # tsc over public/**/*.{ts,tsx}",
+      "npm run lint          # Biome lint + format check",
+      "npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)",
+      "npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)",
+      "npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)"
+    ]
+  },
+  "brakes": [
+    "Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)",
+    "destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)",
+    "the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)"
+  ],
+  "branch": {
+    // main is server-protected (confirmed 2026-07-17 — a plain local commit on main was
+    // twice rejected by Forgejo's pre-receive hook). No minor-edits-direct carve-out.
+    "minor_edits_direct": false
+  },
+  "commit": {
+    "coauthor": "Claude Opus 5 <noreply@anthropic.com>"
+  },
+  "deploy": {
+    "test": "./scripts/deploy.sh test",
+    "prod": "./scripts/deploy.sh prod"
+  }
+}

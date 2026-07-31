@@ -1,0 +1,29 @@
+{
+    "upstream": "1b2623b",
+    "files": {
+        ".claude/skills/DOCTRINE.md": "0b84dcdac9cd",
+        ".claude/skills/cycle/SKILL.md": "8dd430556d9d",
+        ".claude/skills/implement/SKILL.md": "02a34d331396",
+        ".claude/skills/review/SKILL.md": "8bad0e66a060",
+        ".claude/skills/patch/SKILL.md": "113afe1ec8a4",
+        ".claude/skills/done/SKILL.md": "ed4d8c454662",
+        ".claude/skills/next/SKILL.md": "4756e888faa5",
+        ".claude/skills/intake/SKILL.md": "d63c93ef7de4",
+        ".claude/skills/scout/SKILL.md": "2061dbee43f6",
+        ".claude/skills/burndown/SKILL.md": "525c25bf541a",
+        ".claude/skills/dep-update/SKILL.md": "461a7c9551b0",
+        ".claude/skills/deploy-test/SKILL.md": "9f3ed83dfdc7",
+        ".claude/skills/deploy-prod/SKILL.md": "b6ff78a53e97",
+        ".claude/skills/unblock/SKILL.md": "2113c959aa25",
+        ".claude/skills/wrap-up/SKILL.md": "c7a38b83dbb4",
+        ".claude/skills/pre-compact/SKILL.md": "1cac080453a7",
+        ".claude/skills/nightly/SKILL.md": "24a54105bfd7",
+        ".claude/skills/fan-out/SKILL.md": "e5eb3afc62de",
+        ".claude/skills/cover/SKILL.md": "a606e6e19dcb",
+        ".claude/skills/flake/SKILL.md": "083be1268a44",
+        "scripts/forgejo.mjs": "efc48067f46b",
+        "scripts/forgejo-merge.mjs": "cf4dd53e8a43",
+        "scripts/forgejo-project.mjs": "3763ffdfb726",
+        "scripts/ci-logs.mjs": "6a3d576ae89e"
+    }
+}

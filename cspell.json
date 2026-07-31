@@ -409,7 +409,11 @@
         "worktree",
         "worker-utils",
         "workstream",
-        "Wurli"
+        "Wurli",
+        "emptively",
+        "licence",
+        "unasserted",
+        "unreviewable"
     ],
-    "ignorePaths": ["node_modules", "dist", "coverage", ".git"]
+    "ignorePaths": ["node_modules", "dist", "coverage", ".git", "scripts/*.mjs"]
 }

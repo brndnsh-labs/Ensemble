@@ -1,117 +1,86 @@
 ---
 name: wrap-up
-description: Wind down an Ensemble work session — sweep what happened, triage status-vs-lesson, share an honest first-person read of the session, write the memories worth keeping (restraint-first), and leave a clean handoff for next session. The session-end bookend to /next. Writes the clear-cut lesson memories itself and flags only the borderline ones; reports what it saved. Use at the end of a working session, when the user asks to "wrap up / wind down / document for future selves," or before a long break.
+description: Wind down a Ensemble session — sweep what happened, triage each notable thing as status vs lesson vs idea, give an honest read on how the session went, and write only the memories that genuinely earn their place. Governed by restraint: saving zero memories is a common and correct outcome. Never pushes, merges, or deploys. Usage `/wrap-up`.
 ---
+<!-- cycle:rendered template=skills/wrap-up.md.tmpl hash=c7a38b83dbb4 — managed by the-cycle; edit the template, not this file -->
 
-# /wrap-up — wind down a session
+# /wrap-up — end the session cleanly
 
-Goal: close a session deliberately. Capture the **lessons** worth keeping, confirm the **status** is
-already recorded where it belongs (the board / commits), and leave next-session-me a clean handoff.
-The bookend to `/next`.
+Goal: leave the next session (which remembers nothing) better off, without burying it in noise.
+
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.**
 
 ## The governing rule: restraint
 
-**Most of this skill's value is in what it DOESN'T save.** A wind-down that manufactures artifacts
-every time produces memory bloat. **Saving zero memories is a common, correct outcome.** Treat "I
-saved 0" and "I saved 2" as equally good; the win is *accuracy*, not volume. If you feel obligated to
-write something, that's the smell — stop and re-check the gate.
+**Most of this skill's value is in what it does NOT save.** The memory index loads wholesale every
+session, so every line is a tax paid forever. **Saving zero memories is a common, correct
+outcome** — say so plainly rather than manufacturing an insight to look thorough.
 
 ## Workflow
 
-1. **Sweep the session.** Gather, don't act:
-   - `git log --oneline @{u}..HEAD` (unpushed) and the diff/log since the session began — what
-     shipped/changed.
-   - Working tree: anything uncommitted? Anything merged-but-undeployed (on `main`, not on test/prod
-     via `scripts/deploy.sh test` / `scripts/deploy.sh prod`)?
-   - Anything **blocked on Brandon** on the board (Status `Needs-ear` / `Needs-decision`), and any
-     open `finding` issues (review debt — should trend to empty).
-   - Did a story or **epic (milestone)** close? (If an epic completed, fold in `/cycle`'s
-     epic-boundary retrospective prompt.)
+### 1. Sweep
 
-2. **Triage every notable thing: status, lesson, or idea.**
-   | Kind | Definition | Home |
-   |---|---|---|
-   | **Status** | *What got done* this session | the **board** (issues closed → Shipped via `/done`), commit messages — **verify it's there; do not duplicate into memory** |
-   | **Lesson** | *What we learned about how to work*, or a **non-obvious project fact** | memory (see the gate) |
-   | **Idea** | New scope/feature surfaced, not a flaw | a `backlog` issue (`/intake`), not memory |
+`git status`, `git log` for the session, the working tree, and any findings raised but not
+actioned. What actually happened?
 
-   Status is almost always *already captured* by `/done` (the closed issue) + commits — your job is to
-   **confirm**, not re-record. Only lessons and ideas produce new writing; ideas go to the board.
+### 2. Triage every notable thing into exactly one of three
 
-3. **My read — the orchestrator's own take.** Before the memory pass, say the part the restraint gate
-   would otherwise drop: an honest, first-person read of the session — **deliberately *not* filtered
-   by the memory gate**, because its home is *this conversation*, not a file:
-   - what went well or badly, and what *surprised* you;
-   - risks or loose threads you're carrying into next session that aren't yet a finding/blocked item;
-   - a strategic hunch, or a recommendation or two — **including disagreement with how we worked.**
+| Kind | What it is | Where it goes |
+| --- | --- | --- |
+| **Status** | where the work stands right now | the tracker — an issue, a PR, a comment |
+| **Lesson** | something durable we learned about how to work, or about this repo | memory, if it clears the gate below |
+| **Idea** | something we might do later | an issue via `/intake` — **not** memory |
 
-   **Same honesty discipline, pointed the other way:** restraint governs *persistence* (don't write
-   bloat), **not candor**. Say something real, or "nothing notable this time." Never soften a genuine
-   concern to seem agreeable — a wind-down is the moment to voice it.
+Most items are status or ideas. Only lessons are memory candidates.
 
-4. **Memory pass — write AND retire (restraint-first).** Two symmetric halves: write the lessons
-   worth keeping, then retire the ones whose job is done. For each *lesson* candidate, apply the
-   write gate — it must be **all three**:
-   - **Durable** — useful in a *future* session, not just this conversation.
-   - **Non-obvious** — a future-you wouldn't re-derive it for free.
-   - **Not already recorded** — not in code, git history, CLAUDE.md, the board, or an existing memory.
+### 3. My read
 
-   Fails any one → **drop it.** If it passes:
-   - **Search existing memories first** (`memory/` + `MEMORY.md`). Prefer **updating** the memory that
-     already covers the area over a near-duplicate.
-   - Write/update the memory file with correct frontmatter (`type: user | feedback | project |
-     reference`; for feedback/project add **Why:** + **How to apply:**; link related with `[[name]]`).
-   - Keep `MEMORY.md` honest: one-line pointer for a new memory, or update the existing line.
+**An honest first-person take on how the session went — deliberately exempt from the memory gate.**
 
-   **Autonomy: write the clear ones, flag the borderline.** Clearly passes all three → just write it.
-   Genuinely unsure (borderline durable/obvious, or might duplicate) → **don't write silently;
-   surface it** and let Brandon call it. Always **report what you saved/updated**.
+Say what you actually think: what went well, what was awkward, where the approach was wrong, where
+you disagree with how the session was run or with a decision that got made. This is the one place
+that isn't filtered for durability, so use it. A wrap-up that only ever reports smooth sailing
+isn't being read carefully.
 
-   **Then the retire half.** `MEMORY.md` loads *wholesale* every session (no ranked retrieval) → the
-   index is per-session **retrieval budget, not storage**; a stale line is taxed every session, and a
-   write-gate without a retire-gate is the ADD-only bloat trap. After writing:
-   - **Epic/milestone closed this session?** Once its reusable rules are in `docs/guides/` or the
-     code, its `project_*` status memory's job is done — move the file to `../archived-memory/` and
-     drop its `MEMORY.md` line. Retire only the "epic shipped" record; keep the per-incident
-     `feedback_*` lessons. Live `project_*` facts (pending epics, infra, product gaps) stay.
-   - **`MEMORY.md` near its limit (> ~22 KB)?** Archive any completed-status logs, and merge only
-     *true* same-lesson-different-trigger duplicates — don't over-merge distinct lessons (a precise
-     index hook beats the bytes). Re-verify links resolve + no orphans after.
-   - Full rationale + mechanics: [[feedback-memory-lifecycle-retire-gate]].
+### 4. Memory pass — the write gate
 
-5. **Loose-ends handoff.** A short, scannable report:
-   - **Unpushed / undeployed:** N commits ahead of origin; anything on `main` not yet on test/prod.
-     (Surface — do NOT push or deploy as part of wrap-up; Brandon's calls.)
-   - **Blocked on Brandon:** open `Needs-ear` / `Needs-decision` items, by issue #.
-   - **Open `finding` issues:** review debt (target: empty).
-   - **Where we are + next pickup:** one line of state + what `/next` would surface.
+A lesson is written **only if all three hold**:
 
-## Output shape
+1. **Durable** — it'll still be true in a month. Not "the build is currently broken."
+2. **Non-obvious** — a competent reader wouldn't infer it from the code, the docs, or git history.
+3. **Not already recorded** — check the index first; update the existing note instead of adding
+   a near-duplicate.
+
+Write the clear ones without asking. Flag the borderline ones and let Brandon call it.
+
+**And the retire gate — symmetric, and just as important.** When an epic ships and its rules land
+in docs or code, **archive its status memory** and drop the index line. Keep the per-incident
+lessons; retire the "this is in progress" records. An index that only grows is an index that stops
+being read.
+
+### 5. Loose ends
+
+What's unfinished, what's blocked and on whom, and the single most useful next move.
+
+## Output
 
 ```
-## Session wind-down
-**Shipped:** <issue #s / one-line>      **State:** <where the project is, one line>
-**My read:** <honest first-person take — what surprised you, a risk you're carrying, a recommendation; or "nothing notable this time">
-**Saved to memory:** <files written/updated, or "nothing — already covered">
-**Retired/merged:** <archived status logs + merged duplicates, or "none"> · index <N entries / KB>
-**Flagged for your call:** <borderline memory candidates, or none>
-**Loose ends:** unpushed <N> · undeployed <…> · blocked-on-you <#…> · open findings <#…>
-**Next:** <what /next would pick>
+## Session wrap-up
+
+**Shipped:** <issues/PRs, or "nothing — <what happened instead>">
+**Status:** <where things stand>
+
+**My read:** <the honest take — including disagreement>
+
+**Memory:** <written: N · updated: N · retired: N · or "nothing earned a write this session">
+**Loose ends:** <unfinished / blocked on whom>
+**Next:** <the one most useful move>
 ```
-
-## What this skill is NOT
-
-- **Not `/done`** — it doesn't commit/ship story work (that's already happened). It reflects.
-- **Not a deploy/push step** — it *surfaces* unpushed/undeployed work; never performs it.
-- **Not a status logger** — story status lives on the board via `/done`; don't re-record "what
-  shipped" into memory.
-- **Not obligated to produce output** — "nothing new to save, here's the handoff" is a complete run.
 
 ## Safety
 
-- Read-and-propose for anything outside memory. **Never push, merge, or deploy** as part of
-  wind-down — surface them as loose ends.
-- Don't let `MEMORY.md` grow with low-value lines; a swelling index is the bloat smell — the retire
-  half of step 4 is the cure (archive to `../archived-memory/`, drop the line). Archiving preserves
-  the file; it never deletes knowledge, just removes it from the always-loaded set.
-- When unsure whether something clears the memory gate, it probably doesn't — flag it instead.
+- **Never push, merge, or deploy as part of winding down.** A wrap-up that ships something is a
+  wrap-up that shipped something unreviewed.
+- Don't restructure docs or "tidy" code here — note it as an idea and let it go through the
+  pipeline.
+- Don't write a memory to feel productive. Zero is fine.

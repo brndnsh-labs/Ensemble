@@ -1,179 +1,118 @@
 ---
 name: flake
-description: Diagnose and fix a flaky test, then record it in docs/FLAKY_TESTS.md. Takes a test path (or reads the last failure from conversation context), runs it in isolation N times to measure an empirical fail-rate, classifies the root cause against the three known classes (unseeded-statistical, ordering-dependent, e2e-timing), applies the canonical fix for that class, and appends a registry entry. Use when a test failed once and you suspect nondeterminism, or after a pre-commit/CI hook trips on a test that passes on retry. Plan-first.
+description: Diagnose one flaky Ensemble test. Runs it in isolation N times to measure an empirical fail rate, but decides on VARIANCE not pass-count — byte-identical output across runs means it isn't a flake at all. Classifies against four causes, applies the canonical fix for that class, and registers it. Never seeds or skips to hide a real bug. One flake per invocation. Usage `/flake <test>`.
 ---
+<!-- cycle:rendered template=skills/flake.md.tmpl hash=083be1268a44 — managed by the-cycle; edit the template, not this file -->
 
-# /flake — diagnose, fix, and record a flaky test
+# /flake — diagnose one flaky test
 
-Goal: turn "this test failed once and I don't know why" into a root-caused,
-fixed, and documented flake. Ensemble is flake-prone by design (random
-generative engines + statistical critique bounds + a live dev server for e2e),
-so flakes recur — this skill makes diagnosis repeatable instead of re-derived.
+Goal: find out *why* a test is unreliable, and fix that — rather than making the symptom go away.
 
-The tracker is [`docs/FLAKY_TESTS.md`](../../../docs/FLAKY_TESTS.md). Read its
-"flake classes" table first — it's the classifier this skill applies.
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §4
+(Gates), §5 (a flake that's actually a real bug is a judgment call).
 
-## When to use
+## The load-bearing insight: variance decides, not pass count
 
-- A test failed in a pre-commit hook (`vitest related`) or CI but passes on retry.
-- A critique test failed once and you suspect an unlucky `Math.random` roll.
-- A Playwright spec timed out under parallel workers.
-- NOT for a test that fails *deterministically* — that's a real bug or a stale
-  expectation, fix it directly (or via `/patch`), don't route it through here.
+The instinct is to run the test 20 times and read the pass rate. **That's the secondary signal.**
 
-## Inputs
+The decisive one is **variance in the test's own observed values across runs.** Log what the test
+actually computes on each run, then compare:
 
-- `$ARGUMENTS` is the test path (e.g. `tests/standards/rock-bass-critique.test.ts`),
-  optionally with a `-t "test name"` filter.
-- If no argument: read the most-recent test failure from conversation context
-  (the failing file + assertion). If none is in context, ask the user for the
-  failing test path — don't guess.
+- **Values differ across runs** → genuinely non-deterministic. Now classify it (below).
+- **Values are byte-identical across runs, but the test still failed somewhere** → **it is not a
+  flake.** The input is stable, so the failure came from outside the test's own logic — ordering,
+  shared state, a resource, the environment, or a real intermittent bug in the code. **Say so and
+  stop**; a "fix" aimed at nondeterminism will do nothing here except hide the trail.
+
+That second case is the one that gets misdiagnosed, and the cost is high: the test gets seeded or
+retried, looks fixed, and the real intermittent bug stays in the product.
+
+**Anti-heuristic warning.** Grepping for `Math.random` / a missing seeded helper **over-counts
+badly** — plenty of tests reference randomness and are perfectly stable, and plenty of unstable
+tests contain none. Measure; don't pattern-match.
+
+## The four classes
+
+| Class | Tell | Canonical fix |
+| --- | --- | --- |
+| **Unseeded statistical** | values differ every run; failures cluster near a threshold | seed the generator **at the test boundary**, or assert a range wide enough to be true rather than a point that's usually true |
+| **Ordering-dependent** | passes alone, fails in suite (or vice-versa) | find the shared state — a module-level cache, a global, a leaked handle — and isolate it. Don't just reorder the file. |
+| **Timing / async** | fails under load or in CI, passes locally | wait on the actual condition, never on a duration. A raised timeout is a deferral, not a fix. |
+| **Slow but legitimate** | never actually fails; trips a timeout | it isn't flaky. Raise the budget, or split the test, and say which. |
 
 ## Workflow
 
-Plan-first: present the diagnosis plan (which test, how many repeats, what
-you'll measure) before running anything long.
+1. **Run it in isolation, N times** (start at ~20), capturing the values it computes, not just
+   pass/fail.
+2. **Read the variance first.** No variance → the "not a flake" exit above.
+3. **Measure the empirical fail rate** as the secondary signal, and note it — a 1-in-50 flake and a
+   1-in-3 flake justify very different responses.
+4. **Classify** against the table. **Confirm the class before fixing** — the fixes are mutually
+   wrong, and applying the seeding fix to an ordering problem hides it perfectly.
+5. **Apply that class's canonical fix.**
+6. **Re-run N times to confirm**, then run the full suite (§4) — an isolation fix that breaks a
+   neighbor is common.
+7. **Register it** — comment the record on the issue you filed for this flake (§7):
+   test, class, fix, and the measured before/after rate. If it was fixed without an issue, file
+   one closed rather than inventing a new home for the record — one durable, searchable place is
+   what turns "this feels flaky lately" into evidence next time.
 
-1. **Reproduce + measure fail-rate.** Run the test *in isolation* N times and
-   count failures. Start with N=10; bump to 20-30 if it's clean but you have
-   strong evidence it flakes (rare flakes need many runs to surface).
+## Safety — the rules that keep this from causing harm
 
-   ```bash
-   # unit / critique (vitest)
-   for i in $(seq 1 10); do
-     npx vitest run <path> 2>&1 \
-       | grep -E "Tests .*(passed|failed)|AssertionError|expected .* to be" \
-       | sed "s/^/[run $i] /"
-   done
+- **Never seed to hide a real bug.** If the test only passes with one seed, the code is wrong for
+  the other seeds and you have found a bug, not a flake. Surface it (§5).
+- **Never `.skip` as the fix.** A skipped test is a deleted test that still shows up in the count.
+  Skipping to unblock a release is a decision for Brandon, taken explicitly and with a
+  filed issue — not a diagnosis.
+- **Never raise a timeout to make timing flakiness go away.** Wait on the condition.
+- **One flake per invocation.** Batching diagnoses is how the wrong fix gets applied to the wrong
+  class.
 
-   # e2e (playwright)
-   for i in $(seq 1 5); do npx playwright test <path> 2>&1 | tail -3; done
-   ```
+## Edge cases
 
-   **The decisive signal is variance, not a clean pass-count.** A test that
-   passes 10/10 can still be a latent flake sitting one unlucky roll from a
-   bound. For a critique test, capture the *logged statistical values* across
-   runs (the report lines — ghost %, jump counts, ratios) — vitest hides
-   `console.log` on pass, so use `--reporter=verbose`:
+- **It won't reproduce in N runs:** report the measured rate (possibly zero) and stop. Don't fix
+  what you can't observe.
+- **The fix is in the product code, not the test:** that's a real bug — file it and route it
+  through `/cycle`.
+- **Several tests share one root cause:** fix the cause once; note the others in the registry entry
+  rather than opening four of them.
 
-   ```bash
-   for i in $(seq 1 8); do
-     npx vitest run <path> --reporter=verbose 2>&1 \
-       | grep -iE "<the metric labels the test logs>" | sed "s/^/[run $i] /"
-   done
-   ```
+**No separate registry file** — a fixed flake is recorded by commenting on the issue
+you filed for it (or filing one closed if there wasn't one), same as any other finding.
+The tracker is the durable record.
 
-   - **Values byte-identical across runs → the path is already deterministic
-     (seeded `scrambleHash`/`sectionSeed`). NOT A FLAKE — stop here.** Do not
-     seed it: a deterministic test gains nothing and the change falsely brands
-     it as formerly-flaky. Report "not a flake" (step 3) and exit. This is the
-     common case — the `Math.random`-grep / `installSeededRandom`-absence
-     heuristic over-counts badly, because the *engines* were migrated to seeded
-     hashing, so most "unseeded" tests never actually roll a die on their path.
-   - **Values vary but all passed → latent flake.** Measure how close the
-     varying value gets to its bound. Near the edge → proceed to fix. Wide
-     margin → note it in the tracker as `🟡` (watch) but a fix is optional.
-   - **Values vary and some failed → active flake.** Proceed to classify + fix.
+**Repro:**
+```bash
+# unit / critique (vitest) — capture the LOGGED VALUES, not just pass/fail
+for i in $(seq 1 10); do
+  npx vitest run <path> --reporter=verbose 2>&1 \
+    | grep -iE "Tests .*(passed|failed)|AssertionError|<the metric labels the test logs>" \
+    | sed "s/^/[run $i] /"
+done
+# e2e (playwright)
+for i in $(seq 1 5); do npx playwright test <path> 2>&1 | tail -3; done
+# ordering-dependence check — run inside the full multi-file batch too
+npx vitest run tests/standards/
+```
 
-   Also run it **inside a multi-file batch** to test for ordering-dependence:
-   `npx vitest run tests/standards/` (or `vitest related` against the file it
-   shares an engine with). A flake that only appears in the batch is
-   ordering-dependent, not statistical.
+**The decisive signal is variance in the LOGGED values, not pass count** — a test that
+passes 10/10 can still be a latent flake one unlucky roll from its bound. Byte-identical
+values across runs = deterministic on that path (seeded `scrambleHash`/`sectionSeed`) =
+**not a flake**, stop there; don't seed it. The `Math.random`-grep / `installSeededRandom`-
+absence heuristic over-counts badly — the engines were migrated to seeded hashing, so
+variance across runs is the only reliable tell.
 
-2. **Classify** against the classes in `docs/FLAKY_TESTS.md`:
-
-   | Observation | Class |
-   |---|---|
-   | Logged values **vary** across standalone runs; the failing assertion is a statistical bound | **unseeded-statistical** (the engine rolls raw `Math.random` on this path) |
-   | Logged values **identical** standalone, fails only in a multi-file run | **ordering-dependent** (a prior file leaked a spy / global signal / stale mock) |
-   | Playwright hydration-wait timeout, or whole-run import crash | **e2e-timing** |
-   | **No failed assertion** — vitest reports "test timed out", and the test's own duration is already a large fraction of `testTimeout` when idle | **slow-legitimate** (real work crowding the limit; raise the timeout at the tightest scope — never globally, never by shrinking the sample) |
-
-   The variance check in step 1 already did the disambiguation: a test whose
-   values are identical standalone is deterministic on its path, so a failure
-   that only appears in-batch must be an *external* perturbation (an ordering
-   leak), not the engine. Don't classify on the `Math.random`-grep or the
-   absence of `installSeededRandom` — both over-count, because the engines were
-   migrated to seeded hashing. Variance across runs is the only reliable tell.
-
-3. **Present the verdict.** If the step-1 variance check showed identical
-   values (deterministic), this is the **not-a-flake exit** — report and stop,
-   no fix, no tracker entry:
-
-   ```
-   ## Not a flake
-
-   **Test:** `<path>`
-   **Evidence:** logged values byte-identical across <N> runs (<the values>) — deterministic on the tested path (seeded scrambleHash/sectionSeed).
-   **Verdict:** no fix. The unseeded-test heuristic over-counted; the engine path never rolls a die.
-   ```
-
-   Otherwise present the fix plan:
-
-   ```
-   ## Flake diagnosis
-
-   **Test:** `<path>` — "<failing assertion>"
-   **Fail-rate:** <X>/<N> standalone, <Y>/<M> in-batch
-   **Class:** <unseeded-statistical | ordering-dependent | e2e-timing>
-   **Evidence:** <the varying numbers + the Math.random / ordering finding>
-
-   **Fix:** <canonical fix for the class — see table below>
-   **Validation:** re-run <path> <N>x to confirm determinism + comfortable margin
-
-   Apply the fix?
-   ```
-
-4. **Apply the canonical fix** for the class:
-
-   | Class | Fix |
-   |---|---|
-   | unseeded-statistical | Add `import { installSeededRandom } from '<rel>/utils/seeded-random.js';` and call `installSeededRandom();` at the top of the `describe`. Remove any redundant `beforeEach(() => vi.restoreAllMocks())` (the helper does it in before+after). Then **verify the seeded draw lands with comfortable margin** — read the report numbers; if the default seed sits right at the bound, `reseed()` to a representative passing value and say so in a `// why:` comment. Never pick a seed that hides a genuinely out-of-range distribution — that converts a flake into a masked bug. |
-   | ordering-dependent | Find the leaking file (the one that ran before and left a spy / mock / signal dirty). Add the missing `afterEach(() => vi.restoreAllMocks())` or convert it to `installSeededRandom` (restores both sides). Confirm by re-running the batch. |
-   | e2e-timing | Timeout → ensure the spec uses the `gotoHydrated` helper and the `globalSetup` warm-up is intact (do not introduce `vite preview`). Import crash → default-import `@playwright/test` only. |
-
-   Add a `// why:` comment at the fix site explaining the flake (per CLAUDE.md
-   "Musical intent" / comment discipline), citing `docs/FLAKY_TESTS.md`.
-
-5. **Validate the fix.** Re-run the test 5x standalone — all must pass — and
-   confirm the seeded draw has margin (not a borderline pass). For
-   ordering-dependent, re-run the batch that exposed it.
-
-6. **Record it.** Append an entry to `docs/FLAKY_TESTS.md` under "Registry"
-   matching the existing heading format
-   (`### <status-emoji> <path> — "<assertion>"`), all five fields filled
-   (class, symptom, root cause, fix, last seen). Status `🟢 fixed` once the
-   patch is in and validation is green.
-
-7. **Report.**
-
-   ```
-   ## Flake fixed
-
-   **Test:** `<path>`
-   **Class:** <class> | **Was:** <X>/<N> fail-rate → **Now:** 5/5 pass, margin <m>
-   **Fix:** <one-line>
-   **Tracker:** entry added to docs/FLAKY_TESTS.md
-
-   ## Next:
-   - `/done` to commit (test + tracker together)
-   ```
-
-## Chain references
-
-- Often triggered by a `/done` or `/cycle` pre-commit hook failure that passes on retry.
-- Hands off to `/done` to commit the fix + tracker entry together.
-- If diagnosis reveals the failure is *deterministic* (a real regression, not a flake), stop and route to `/patch` or `/implement` instead.
-
-## Safety rules
-
-- **Never seed to hide a bug.** Seeding makes a test deterministic; if the
-  deterministic draw is genuinely out of the intended musical range, that's a
-  real regression — surface it, don't pick a luckier seed.
-- **Don't `.skip` a flake as the "fix."** Quarantine (`🟡`) is a last resort
-  for a flake you can't yet root-cause, and it must get a tracker entry with a
-  follow-up. The default is to actually fix it.
-- **Confirm the class before fixing.** A misclassified ordering-leak "fixed" by
-  seeding the wrong file will keep flaking. Run the in-batch repro.
-- **One flake per invocation.** If the repro surfaces a second unrelated flake,
-  record it as `🔴 open` in the tracker and finish the one you came for.
+**Fixes:**
+- **unseeded-statistical** → `import { installSeededRandom } from '<rel>/utils/seeded-random.js';`
+  (path from repo root: `tests/utils/seeded-random.ts`), call `installSeededRandom()` at
+  the top of the `describe`. Remove a redundant `beforeEach(() => vi.restoreAllMocks())`
+  (the helper does it in before+after). Verify the seeded draw lands with comfortable
+  margin — a default seed sitting right at the bound needs `reseed()` to a representative
+  passing value, noted in a `// why:` comment. Never pick a seed that masks a genuinely
+  out-of-range distribution.
+- **ordering-dependent** → find the leaking file (ran earlier, left a spy/mock/signal
+  dirty); add the missing `afterEach(() => vi.restoreAllMocks())` or convert to
+  `installSeededRandom` (restores both sides). Confirm by re-running the batch.
+- **e2e-timing** → timeout: ensure the spec uses the `gotoHydrated` helper and the
+  `globalSetup` warm-up is intact (don't introduce `vite preview`). Import crash:
+  default-import `@playwright/test` only.

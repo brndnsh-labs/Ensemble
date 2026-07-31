@@ -1,108 +1,101 @@
 ---
 name: nightly
-description: The manually-kicked overnight loop — run before signing off. Consumes the vetted safe backlog (/burndown), and when it runs dry, generates tomorrow's candidates by running ONE /scout lens (rotates by day so a11y · security · perf · hygiene · context all cycle weekly, weighted toward the fuel-rich ones). Establishes the standing "overnight go" so the run proceeds unattended through its safe set, deploys what shipped to test, and leaves a clean morning report with a smoke-test checklist. Consume + find + ship-to-test in one invocation. Usage `/nightly` (rotates the scout lens) or `/nightly <a11y|security|perf|hygiene|context>` (pins it).
+description: The unattended overnight composition for Ensemble — timestamp, grind the safe queue via /burndown, then when it's dry run ONE /scout lens by day-of-week rotation, deploy what merged to test, and leave a morning report with a smoke-test checklist derived from the night's diff. Runs under a standing go. Usage `/nightly`.
 ---
+<!-- cycle:rendered template=skills/nightly.md.tmpl hash=24a54105bfd7 — managed by the-cycle; edit the template, not this file -->
 
-# /nightly — consume the safe queue, then scout for tomorrow's
+# /nightly — the unattended overnight run
 
-Goal: one verb Brandon fires before signing off that puts the loop to productive work overnight —
-**grind everything already vetted-safe, then discover candidates for next time** — and hands him a
-clean morning summary. Not scheduled; **manually invoked**. It composes the two halves of the
-autonomous loop and declares the standing go that lets them run without a per-step nod.
+Goal: convert idle hours into merged safe work plus a refilled queue, and leave behind a report
+Brandon can act on over coffee.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This is the
-unattended path, so §5 (always-brake set / autonomous safe set) and §6 (the poll-then-merge guard,
-never `--auto`) are load-bearing — the standing go below removes the *checkpoint pauses*, not those
-*guardrails*.
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill
+composes `/burndown` and `/scout`; it adds no new autonomy of its own. Every §5 brake still applies
+exactly as written.
 
-## What it does, in order
+## The standing go
 
-0. **Start the clock.** Before anything, capture a start timestamp — `date +%s` (and note the human
-   time) — so the morning report can state how long the run took. A model can't estimate elapsed time
-   after the fact.
+The overnight run has a **standing go**: it removes the *checkpoint pauses* that exist so
+Brandon can redirect in real time. Nobody is there, so those pauses would just stall the run
+until morning.
 
-1. **Consume — `/burndown`.** Grind the safe set: `burndown`-labelled issues first, then other
-   filter-passing issues, then standing hygiene. Auto-merge on green CI, all of `/burndown`'s safety
-   rules intact. For an unattended run, **relax the 5-item check-in into a checkpoint *note*** — keep
-   shipping safe items and record each in the running report rather than pausing — but every *other*
-   stop condition (judgment call, gates/CI red, queue dry) still halts that item and logs it.
-   - **`verify-on-device` items ARE in the safe set** (§2/§5): build + auto-merge them like any safe
-     story — but **track each** so step 3 can put it on the device-verify checklist (its correctness
-     is knowable from code; CI green ≠ eyeballed). A true `needs-ear` item (can't tell it's *correct*
-     without hearing it — any Track `synth` or by-ear musical work) stays excluded.
+**It does not remove a single guardrail.** Every §5 always-brake surface still stops the work and
+parks it for morning. The distinction matters: a pause exists for convenience; a brake exists
+because the change needs a human. Only the first one is lifted.
 
-2. **Find — one `/scout` lens.** When `/burndown` reports the safe queue **dry** (or it was dry to
-   begin with), run a single `/scout` pass to refill the candidate pipeline:
-   - **Lens by rotation:** default picks by day so all five cycle weekly, **weighted toward the
-     fuel-rich lenses** — `hygiene` (Mon/Fri), `context` (Tue/Sat), `a11y` (Wed), `perf` (Thu),
-     `security` (Sun). Hygiene and context repeat (most auto-grind fuel); security runs once weekly
-     (`npm audit` doesn't change daily). A passed arg pins it. *(Update this table if a lens changes.)*
-   - Scout's budget (top ~3–5), dedup, and conservative `burndown`-tagging all apply. The standing go
-     lets scout file its slate without the interactive checkpoint.
-   - **The feedback loop:** the dead-safe items scout files tonight (hygiene, off-path perf [Track
-     bundle], deterministic a11y `+verify-on-device`, factual-sync context, CVE bumps) become
-     `burndown` fuel the *next* `/nightly`; the `Needs-decision`-shaped finds become fuel one
-     `/unblock` later. Discovery and consumption compound over nights.
+## Workflow
 
-3. **Ship to test + build the eyeball list.** If the run **merged anything**, deploy what shipped so
-   Brandon can see it over coffee — run the **`/deploy-test`** skill (the single source of truth for
-   the staging push: `scripts/deploy.sh test` + the live-asset-hash confirm against
-   `git rev-parse --short HEAD`). Then assemble a **smoke-test checklist from the night's
-   diff**, grouped the way a human checks:
-   - **Lead with the highest-value / riskiest *visible* change** — the one thing most worth a look.
-   - **New visible features/fixes**, one line each: what to do + where to click + the issue #.
-   - **A one-line sanity sweep** (app loads, a chart plays through, no red console errors).
-   - **List the shipped items with NO UI surface** (dead-code / dep bumps / comments / type-tightening)
-     as "nothing to check," so Brandon doesn't hunt for an invisible change. **Only user-visible
-     surfaces get a checkbox.**
-   - **A dedicated "Verify on your phone/device" block** for every `verify-on-device` item merged
-     tonight — kept *separate* from the desktop smoke sweep. One entry each: **what changed**, **what
-     should now be true**, **what to confirm it *didn't* break** (the adjacent surface — e.g. for a
-     `safe-area-inset` change, check the top of the chart didn't slide under the status bar), and **the
-     one-line revert** (`git revert <sha>`). These landed on `main` on CI-green trust — the checklist
-     is how Brandon closes the loop, so make the revert frictionless.
-   **Nothing merged** (dry queue, or all halted for review) → **skip the deploy** and say so. Prod is
-   never part of this — promoting to prod is Brandon's awake, gated call (`scripts/deploy.sh prod`).
+0. **Timestamp first.** Capture `date +%s` before anything runs. A model cannot estimate elapsed
+   time after the fact, and "how long did this take" is the first thing worth knowing in the
+   morning.
 
-4. **Report.** One morning-ready summary, in order: **lead with the run duration** (`date +%s` again
-   minus the step-0 start, human-readable — "ran 4h 12m, 23:40 → 03:52"); then what `/burndown`
-   **shipped** (issue/PR links); the **test-deploy SHA + the step-3 smoke-test checklist**; what
-   `/scout` **filed** (links + Status / whether `burndown`); and what **stopped and why** (judgment
-   calls → "`/unblock` next sitting") plus what's now grind-ready. Brandon reads *one thing* over
-   coffee and knows the state.
+1. **`/burndown`** — grind the safe queue (run its workflow inline).
 
-## The standing overnight "go"
+2. **When the queue is dry, run ONE `/scout` lens** by day-of-week rotation. One lens, not all —
+   depth beats breadth when nobody's watching, and a full sweep every night floods the queue.
 
-Invoking `/nightly` **is** the authorization for the run's safe set — `/burndown` auto-merges and
-`/scout` files without per-step confirmation, because Brandon explicitly started the unattended loop.
-This does **not** widen the safe filter: **§5's always-brake classes still stop and surface**, exactly
-as in an attended `/burndown`. The standing go removes the *checkpoint pauses*, not the *guardrails*.
+   | Day | Lens |
+   | --- | --- |
+   | Mon | hygiene |
+   | Tue | context |
+   | Wed | a11y |
+   | Thu | performance |
+   | Fri | hygiene |
+   | Sat | context |
+   | Sun | security |
 
-## Guardrails (inherited — the unattended path leans on them hardest)
+   Weighted toward the lenses that reliably produce fuel. Anything filed lands in tomorrow's
+   `/burndown` queue.
 
-- **The safe filter (§5) is unchanged and conservative.** Excluding a safe-ish item costs throughput;
-  including an unsafe one costs trust — exclude when unsure.
-- **Auto-merge = §6's poll-then-merge guard only, never `--auto`** (no server-side
-  required checks here, so `--auto` can land before gates finish).
-- **Prod is never touched.** The standard finish deploys to **test** (step 3); `/nightly` never runs
-  `deploy.sh prod`. Promoting to prod is always Brandon's explicit, awake decision.
-- **Scout finds, never fixes.** Step 2 only files issues; never branches/merges speculative work.
-- **Re-verify gates yourself** — never trust a spawned "green."
-- **Honor every hard stop:** judgment call, red CI, dry queue, or interrupt. A clean halt with a good
-  report beats grinding past a real signal.
+3. **Deploy what merged** to test, so the morning checklist is checkable.
+
+4. **Write the morning report.**
+
+## The morning report
+
+Lead with **run duration** (from step 0), then what shipped.
+
+The smoke-test checklist is the part that earns its keep, so build it properly:
+
+- **Derive it from the night's diff and each shipped issue's `Acceptance:` line.** Derive; don't
+  invent. A generic "check the app still works" teaches the reader to skim past it.
+- **Only user-visible surfaces get a checkbox.** A refactor that shipped correctly and changed
+  nothing observable gets a line in "what shipped," not a checkbox.
+- **Each item names three things:** what changed · what should now be true · what to confirm
+  didn't break nearby.
+- **Group by how it would actually get checked** — everything at the desk together, everything on a phone
+  together. Don't force six device switches.
+- **Give each item its one-line revert.** If something's wrong at 7am, the fix should be one
+  command, not an investigation.
+
+```
+## Overnight run — <date>   (<duration>)
+
+**Shipped:** <issue → PR, one line each>
+**Filed:** <what /scout found, which lens>
+**Parked for you:** <anything that hit a §5 brake, and why>
+**Deployed to test:** <revision>
+
+### Check at your desk
+- [ ] <what changed> → <what should be true> · <what to confirm didn't break>
+      revert: `git revert <sha>`
+
+### Check on your phone
+- [ ] …
+
+**Blocked / needs you:** <or "nothing">
+```
+
+## Safety
+
+- **Never deploys to prod.** That's `/deploy-prod`, and it requires an explicit human go that
+  cannot exist at 3am.
+- **Never lifts a §5 brake.** Parked work stays parked.
+- Honors `/burndown`'s stop conditions unchanged — including the 5-item guard.
 
 ## Edge cases
 
-- **Safe queue dry AND scout finds nothing** (clean on tonight's lens) → a legitimate quiet night.
-  Report "nothing safe to grind, clean on `<lens>`" and stop — don't widen the filter to stay busy.
-- **`/burndown` stops early on a judgment call** → still run the `/scout` step (discovery is
-  independent and safe), then report both the halted item and the scouted slate.
-- **Pinned lens** (`/nightly perf`) → skip rotation, run that lens; everything else identical.
-
-## How it fits the pipeline
-
-- **`/nightly`** = the unattended composition: `/burndown` (consume) + `/scout` (discover) +
-  deploy-test (ship) + report-with-checklist.
-- **`/burndown`** / **`/scout`** = its two halves, also runnable standalone.
-- **`/unblock`** / **`/intake`** = where Brandon picks up what `/nightly` surfaces and files.
-- **`/wrap-up`** = the *session-end* bookend (lessons → memory); `/nightly` is the *sign-off* one.
+- **Nothing safe in the queue and the scout lens comes up clean:** that's a good night. Report it
+  in two lines; don't manufacture work to fill the report.
+- **A cycle fails mid-run:** stop that item, park it, continue with the next. Report both.
+- **The run is interrupted:** the report is still owed — write it from whatever completed.

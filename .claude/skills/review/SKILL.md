@@ -1,81 +1,75 @@
 ---
 name: review
-description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers by Track + what changed — music-theory-reviewer for engine/critique-test changes, synth-graph-reviewer for audio-graph changes, state-discipline-reviewer for state/coordination, worker-contract-reviewer for worker-mirrored state, bundle-hygiene-reviewer for shrink diffs, plus an inline correctness pass and a Sonnet orthogonal angle. Plan-first — presents the reviewer plan before spawning. Use after /implement or /fan-out, before /done.
+description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within in-progress. Use after /implement, before /done.
 ---
+<!-- cycle:rendered template=skills/review.md.tmpl hash=8bad0e66a060 — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
 Goal: pick the right reviewers for what changed, run them, present consolidated findings.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is the
-detailed expansion of §3 (Track → Reviewers) and routes on §5's sensitive-diff classes (destructive
-data ops / state-or-worker-contract design calls / by-ear). §7 covers the `forgejo-project.mjs status`
-write.
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is
+the detailed expansion of §3 (Reviewers) and routes on §5's always-brake surfaces. The routing
+table below is review's own, more-specific version of §3. **Review does not change Status** — the
+story stays `in-progress` through review and patch.
 
 ## Workflow
 
-1. **Survey the diff.** `git status` + `git diff --stat`. Empty diff → say so and stop. If an issue #
-   is in context (from `/implement` or `/cycle`), mark it **In review** —
-   `node scripts/forgejo-project.mjs status <n> "In review"` (best-effort; skip for a standalone review).
-2. **Route reviewers** (rows are additive — union them, run each once):
+1. **Survey the diff.** `git status` + `git diff --stat`. If the diff is empty, say so and stop.
+2. **Route reviewers.** Rows are **additive** — union the reviewers and run each once.
 
    | If the diff touches... | Run |
    | :- | :- |
-   | `public/engine/**` (generative engines), `public/data/**`, or `tests/standards/**` | **`music-theory-reviewer`** (musical correctness, weight placement, idiom — Track musical) |
-   | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph wiring | **`synth-graph-reviewer`** (Web Audio graph hygiene — Track synth) |
-   | `public/state/*.ts`, `public/state/state-effects.ts`, components that dispatch, OR `coordination-engine.ts` | **`state-discipline-reviewer`** (direct-mutation / dispatch discipline / `@direct-mutation` abuse) |
-   | worker-mirrored slices (`arranger/chords/bass/soloist/harmony/groove/playback`), `logic-worker.ts`, `worker-client.ts`, OR `getSyncState`/`syncWorker`/`WORKER_MSG.*` changes | **`worker-contract-reviewer`** (half-synced fields) |
-   | A bundle-shrink / dead-code diff (Track bundle) | **`bundle-hygiene-reviewer`** (no behavior change, real shrink, tree-shake-safe) |
-   | **Test-only diff** — *every* changed file is a test | the **test-quality lens** (below) — *not* the bug-hunt inline pass, which returns `(none)` on tests. For a `tests/standards/` critique test, route to the `critique-test-author` agent's lens (the 5 smells); otherwise `/code-review`'s test angle. **+** the **Sonnet angle**. |
-   | Any non-trivial code change | the orchestrator's **inline correctness pass** (logic, edges, error paths, contracts — the same angles `/code-review` covers). Flag if the diff is large/risky enough that a human `/code-review` is worth it. |
-   | Destructive data op (persisted sessions / share-URL schema / preset data / state migration) | review is **mandatory** — never ship unreviewed. Surface to Brandon for a human `/code-review`. |
-   | **Built by Opus** (orchestrator-inline, or an opus-tagged spawn) | a **Sonnet second-perspective** pass (see below) |
-   | Docs only (`docs/`, `*.md`, `.claude/skills/**`) and no code | None — report "docs-only, skipping review." |
+   | Any non-trivial code change | the **inline correctness pass** — the orchestrator reviews the diff itself, across the angles a heavyweight reviewer would cover (logic, edges, error paths, contracts, invariants). Match depth to risk. Tests **alongside** prod code stay supporting cast — review the behavior change; the prod diff is the subject. |
+   | **Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
+   | **destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
+   | **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
+   | A **test-only** diff | the **test-quality lens** (below) — the tests *are* the deliverable. |
+   | A meaty diff built by the default model | optionally a **second-model angle** (below). |
+   | Docs only (`*.md`) and no code | None — report "docs-only, skipping review." |
+
+   **`/code-review` is human-triggered, not a loop step.** The heavyweight multi-angle cloud review
+   exists, but only Brandon can invoke it — no skill can run it, and a routing table that
+   names it as the baseline just teaches the loop to skip that row. The loop's baseline is the
+   inline pass + the second-model angle; when a diff is large or risky enough to deserve the
+   heavyweight pass, *say so* in the findings ("worth a human `/code-review`") and leave the call
+   to Brandon.
 
    ### Second-model angle (cheap, orthogonal)
 
-   A reviewer with a **different model than the implementer** shares fewer blind spots. So **prefer the
-   reviewer model ≠ the implementer model.** This matters most when the orchestrator (Opus) built the
-   code inline and would otherwise also review it (Opus grading its own homework). Concretely: an
-   Opus-built diff → spawn a **Sonnet** general-purpose reviewer alongside the domain agents. Prompt it
-   for correctness bugs *and* "anything that feels off"; don't over-constrain. Cheap — run it freely.
+   A reviewer with a **different model than the implementer** shares fewer blind spots — a
+   different prior catches what same-model review lets slide. Spawn a reviewer on the other tier
+   for a meaty diff, alongside the inline pass. Prompt it for correctness bugs *and* anything that
+   "feels off" — the different weighting is the point, so don't over-constrain it. It's cheap; run
+   it freely on a substantial diff.
 
-   ### Test-quality lens (for test-only diffs)
+   ### Test-quality lens
 
-   When the deliverable **is** the tests, review the tests *as the subject* against the module under
-   test (a critique test → the 5 smells in `docs/guides/musical-engine-patterns.md` § Methodology: tautology, sub-baseline threshold,
-   mislabel, log-vs-assert mismatch, harness-silencing):
-   - **Coverage gaps** — which branches / gated paths of the target are unexercised?
-   - **Intent vs implementation** — do the asserts pin the *contract*, or just codify today's output
-     (freezing a bug in)? Suspect the asserted value is itself a bug → **flag it, don't bless it.**
-   - **Tautological / vacuous asserts**, over-mocking that tests the mock not the unit.
-   - **Statistical-range discipline** — a critique test must use ranges, not a rigid binary snapshot
-     (CLAUDE.md). A critique test reduced to a rigid binary snapshot is a finding.
+   When the tests *are* the deliverable, review them as the subject, not as supporting cast:
+   - **Coverage gaps** — which behaviors of the unit under test are still unasserted?
+   - **Intent vs implementation** — does the test assert the *contract*, or merely restate what the
+     code currently does? The second kind passes forever and catches nothing.
+   - **Vacuous asserts** — assertions that cannot fail (a tautology, a threshold below the
+     no-op baseline, an assert on a value the test itself just set).
+   - **Brittle verbatim** — snapshots and exact-string matches that will break on an unrelated
+     change and teach everyone to re-bless them without reading.
+   - If a test appears to **codify a bug** — the behavior is wrong but the test enshrines it —
+     **flag it as a finding**; never bless it because it passes.
 
-3. **Present the plan:**
+3. **Present the plan** (a status update, not a gate — §5):
 
    ```
    ## Review plan
-   **Diff:** <N files, +<n>/-<m>>   **Track:** <musical|synth|bundle>
+   **Diff:** <N files, +<n>/-<m>>
    **Files:** <key files + scope>
-   **Reviewers:** <inline pass | music-theory | synth-graph | state-discipline | worker-contract | bundle-hygiene | Sonnet angle — list those firing> — <why each>
-   Run them?
+   **Reviewers:** <those firing> — <why each>
    ```
 
-4. **On confirmation, run them.**
-   - **Inline correctness pass** — orchestrator reviews the diff itself (logic, edges, error paths,
-     contracts, the invariants). Match depth to risk.
-   - **Domain agent(s)** — spawn the routed reviewers in parallel (single message, multiple `Agent`
-     calls, `run_in_background: false`), each with the issue # + focus + the specific invariants.
-   - **Test-quality lens** — for a test-only diff, per above.
-   - **Sonnet angle** — for an Opus-built diff, a `model: sonnet` general-purpose reviewer.
-   - **Human `/code-review` (optional):** large/risky diff → surface it; *Brandon* triggers it.
-5. **Present consolidated findings,** each with severity (P0/P1/P2) + `file:line` + verbatim quote:
+4. **Run them immediately** in the same turn — no "Run them?" wait.
+5. **Present consolidated findings,** each with severity (P0/P1/P2) + `file:line` + a **verbatim
+   quote** of the offending line, then a recommendation:
 
    ```
-   ## Review findings (<N> reviewers)
-   ### <reviewer> (<count>)
-   - P0: <verbatim> | <file:line>
    ### Recommendation
    - ✅ Clean → /done
    - ⚠️ Mechanical findings → /patch, then /done
@@ -85,12 +79,18 @@ write.
 
 6. **Suggest the next step** from the recommendation.
 
+## Safety
+
+- **A finding is a hypothesis with a citation, not a fact.** Before reporting one, read the cited
+  line — grep the *assignment*, not just a textual match. Roughly one in three "X exists at line N"
+  claims is a misread, and a confidently wrong finding costs more than a missed one.
+- **Empty findings is a valid clean result; *missing* findings is a failure.** If a reviewer times
+  out or errors, report that — never fabricate "clean" from an absent answer.
+
 ## Edge cases
 
-- **Empty diff:** report; suggest `/next`. Don't spawn.
-- **Diff mixes story work + unrelated drift:** flag the drift; ask whether to revert before reviewing.
-- **A reviewer returns nothing:** empty findings is a valid clean result; *missing* findings
-  (timeout/error) is a failure — report it, don't fabricate "clean."
-- **Finding contradicts a memory note:** the memory wins unless Brandon overrides; surface prominently.
-- **Track `synth` diff:** `synth-graph-reviewer` judges graph hygiene, **not** whether it sounds good —
-  that's the A/B audition (Needs-ear), a separate human gate before `/done` can merge.
+- **Empty diff:** report; suggest `/next`. Don't run reviewers.
+- **Diff mixes story work + unrelated drift:** flag the drift; ask whether to revert before
+  reviewing.
+- **Finding contradicts a memory note** (an architecture rule, an invariant): the memory wins
+  unless Brandon overrides; surface it prominently rather than silently dropping either one.

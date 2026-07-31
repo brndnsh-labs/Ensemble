@@ -1,79 +1,73 @@
 ---
 name: next
-description: Pick up the next Ensemble work story from the Forgejo tracker (issues + labels). Finds the highest-priority Ready issue (surfacing but not picking Needs-ear / Needs-decision ones blocked on Brandon), the in-flight work, the backlog/idea pile, and raw `inbox` captures. Lays out enough to choose /implement (one issue) vs /cycle (full loop). Plan-first — read-only, no spawn/edit. Use at session start or whenever deciding what to pick up.
+description: Pick up the next Ensemble work story. Finds the highest-priority pickable issue, the in-flight work, and the finding pile, and lays out enough to choose /implement (one issue) vs /cycle (full loop). Add `--board` for the whole-queue orientation view instead of a single pick. Plan-first — read-only, no spawn, no edit. Use at session start or whenever deciding what to pick up.
 ---
+<!-- cycle:rendered template=skills/next.md.tmpl hash=4756e888faa5 — managed by the-cycle; edit the template, not this file -->
 
-# /next — surface the next work story (Forgejo-backed)
+# /next — surface the next work story
 
-Goal: tell Brandon what to work on next, with enough context to choose `/implement #<n>` vs
-`/cycle #<n>`.
+Goal: say what to work on next, with enough context to choose `/implement #<n>` vs `/cycle #<n>`.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is
-all §1 (Tracker & readiness — the Status model, the ranking, the idea-pile rule) + §2 (Labels) + §3
-(Track label + routing labels) + §7 (Forgejo REST mechanics, incl. the "Forgejo unreachable → stop, don't read the
-frozen markdown as current" rule). Don't restate them; apply them.
+all §1 (Tracker & readiness — the Status model, the ranking), §2 (Labels) and §7 (tracker
+mechanics, including the "unreachable → stop" rule). Don't restate them; apply them.
+
+## Forms
+
+- **`/next`** — the single best pick, with enough context to start. The default.
+- **`/next --board`** — orientation instead of a pick: the whole queue tallied by Status and
+  milestone, what's in flight, what's blocked on Brandon, and the idea pile. Readable in 20
+  seconds. **This is not a planner, a reviewer, or a writer** — it reports, then stops.
 
 ## Data sources (§7)
 
-- **The open issues** — `node scripts/forgejo.mjs list --open`. A JSON array; each issue: `number`,
-  `title`, `url`, `body`, `state`, `milestone`, and `labels[]`. The `status`/`track`/`size`/`model`/
-  `agent`/`lens` routing is read off `labels[]` by namespace prefix (§3, e.g.
-  `labels.find(l => l.startsWith('status/'))?.slice('status/'.length)`) — absent when that namespace
-  has no label.
-- **Open-only in one call** — `--open` filters to open issues natively (each issue carries its
-  `state`), so there's no separate open set to fetch and **intersect on `number`**; the single call
-  already excludes closed issues and surfaces every open issue (esp. `inbox` captures).
-- **Forgejo unreachable:** say so and **stop** (§7) — do not fall back to the frozen `docs/audit/`
-  or `docs/synth-audit/` markdown as if current.
+- **The open set** — `node scripts/forgejo.mjs list --open`
+- **Unreachable → stop** (§7). Say so plainly; never guess tracker state or fall back to a cached
+  list.
 
 ## Workflow
 
-1. **Pull the open issues** — one `node scripts/forgejo.mjs list --open` call (state + labels +
-   milestone come back together).
-2. **Partition by Status** (§1): Ready (pickable) · Needs-decision/Needs-ear (blocked on Brandon —
-   surface, don't pick) · Blocked (skip, name the blocker) · In progress/In review (note, don't
-   re-pick) · closed (ignore) · no-Status + `backlog`/`finding` (the idea pile — count +
-   sample, don't pick).
-3. **Rank the Ready issues** by the §1 rule: milestone (real numbered epic > candidate/none), then
-   Size (S<M<L), then issue number. (Model is *not* a ranking factor.)
-4. **Read the top pick's body** (already in the issue's `body`) — Why / Touches / Acceptance.
-5. **Check the capture inbox** — `node scripts/forgejo.mjs list --open --label inbox`.
+1. **Pull the open set**.
+2. **Partition by Status** (§1): pickable · in flight (note, don't re-pick) · done/closed (ignore) ·
+   the `finding` pile (review debt — count and sample, don't pick) · **unrouted** (no Status at all).
+   Unrouted is not an empty bucket: §10 has `/intake` and `/scout` file without routing on purpose,
+   so everything they file lands here. Never silently drop it — count it, and surface the top
+   candidates under **Untriaged** so it can be promoted.
+3. **Rank the pickable issues** by the §1 rule: milestone (a real numbered epic > a "candidate epic" / no milestone), then Size (S < M < L), then issue number. Model is *not* a ranking factor.
+4. **Read the top pick's body** — Why / Touches / Acceptance.
+5. **Check it hasn't already shipped** (§1) — an umbrella issue's slices often land under
+   sibling-numbered PRs that never reference its number. If the body describes behavior that looks
+   familiar, trace it in live code before recommending it.
 6. **Present** (below).
-7. **Stop.** Read-only — no spawn, no edit, no Status/issue changes.
+7. **Stop.** Read-only — no spawn, no edit, no Status or issue changes.
 
 ## Presentation
 
 ```
-## Next: #<n> — <title>   ( <milestone> · Track: <musical|synth|bundle> )
+## Next: #<n> — <title>   ( <milestone> )
 
-**Status:** Ready   **Model:** <sonnet|opus>   **Size:** <S|M|L>
-**Agent:** <per §3>   **Review lens:** <per §3>
+**Status:** ready   **Executor:** orchestrator-inline (default, §3)
+**Reviewer:** inline pass<, + /security-review if the diff touches an always-brake surface (§3)>
 
 **Why / Touches / Acceptance:** <from the issue body>
 
 **Suggested next:**
 - `/implement #<n>` — ship it (plan-first)
-- `/cycle #<n>` — full loop (implement → review → patch → done → PR → CI-gated merge / Track-gated)
+- `/cycle #<n>` — full loop (implement → review → patch → done → PR → CI-gated merge)
 
-**Blocked on you (not picked):**
-- #<x> — Needs-decision: <what>   ·   #<y> — Needs-ear: <what>
-
-**In flight:** #<…> (In progress / In review), if any.
-
-**📥 Inbox (raw captures to triage):** #<n> <title> — `/intake` to shape, or close.
-
-**Backlog / findings (idea pile — not scheduled):** N issues (`finding`=review debt M; `backlog`=
-ideas K). By track/epic: … . Of these, J carry a `needs-ear`/`needs-decision` caveat.
+**In flight:** #<…>, if any.
+**Findings (review debt — not scheduled):** N issues.
 ```
+
+With `--board`, replace the single pick with: tallies by Status and milestone, what closed
+recently (`node scripts/forgejo.mjs list --state closed --limit 20` — the open set won't tell you), anything blocked on
+Brandon, the untriaged pile, and `git status` in-flight work — then a one-line
+**Suggested entry point**.
 
 ## Edge cases
 
-- **No Ready issues, only Needs-ear/Needs-decision:** say so plainly — the queue is blocked on
-  Brandon (his ear / a call), not on more building. List blockers + the backlog count. Suggest
-  `/unblock`.
-- **Candidate-epic milestones with only backlog (no Ready):** name them as **future epics not yet
-  scheduled** (N backlog issues each); to start one, a backlog issue gets scoped + Status `Ready`.
-- **All issues closed:** congratulate; suggest synthesizing the next epic (promote a cluster
-  into a milestone with `Ready` stories) or a `/scout` sweep to refill the pile.
-- **A raw `inbox` capture (untriaged):** surface it; note it should be shaped during triage
-  (`/intake`) — the issue existing is already enough (there's no board to add it to).
+- **No pickable issues:** say so plainly — the queue is drained. List anything in flight (a merge
+  may be pending, §6) and the `finding` count. Suggest scoping the next epic, or a `/scout` sweep.
+- **All issues shipped/closed:** say so; suggest scoping the next milestone's stories.
+- **A pickable issue that's really a design call:** `/next` still surfaces it (it *is* pickable),
+  but flag in the body read that it lands on a §5 always-brake surface — `/cycle` will pause there.

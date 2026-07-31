@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// cycle:rendered template=shim.mjs.tmpl hash=efc48067f46b — managed by the-cycle; edit the template, not this file
+// cycle:rendered template=shim.mjs.tmpl hash=6a3d576ae89e — managed by the-cycle; edit the template, not this file
 //
-// forgejo.mjs — shim → the-cycle's canonical helpers/forgejo.mjs.
+// ci-logs.mjs — shim → the-cycle's canonical helpers/ci-logs.sh.
 //
 // A REAL FILE, not a symlink, on purpose: a committed symlink dangles in an isolated
 // CI checkout (the runner clones one repo, no siblings), which breaks any gate that
@@ -15,7 +15,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
-const HELPER = join('helpers', 'forgejo.mjs');
+const HELPER = join('helpers', 'ci-logs.sh');
 
 /**
  * Locate the-cycle, most explicit first: an env override, then wherever the `cycle`
@@ -43,7 +43,7 @@ function cycleHome() {
 const home = cycleHome();
 if (!home) {
     console.error(
-        `forgejo.mjs: cannot find the-cycle (no ${HELPER} on any candidate path).\n` +
+        `ci-logs.mjs: cannot find the-cycle (no ${HELPER} on any candidate path).\n` +
             '  Clone it and run install.sh, or set CYCLE_HOME=/path/to/the-cycle.',
     );
     process.exit(1);

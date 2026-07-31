@@ -1,64 +1,89 @@
 ---
 name: fan-out
-description: Implement 3-5 Ensemble work stories in parallel. Loads each issue's context from the tracker, verifies file-disjointness (no two stories edit the same file), determines the right agent + model per story, sets each Status → In progress, and presents a batch plan before spawning. Plan-first — does not spawn until confirmed. Use for disjoint batches; do NOT use for stories that share a hot file (coordination-engine.ts, tick-logic.ts). Usage `/fan-out #<n1> #<n2> #<n3>...`.
+description: Implement 3–5 independent Ensemble issues in parallel on one shared branch. Verifies the stories are file-disjoint FIRST — any overlap is a hard stop — then spawns one agent per story, waits for all, and re-verifies the gates on the combined tree. For mechanical work that repeats a pattern; not for anything needing judgment. Usage `/fan-out #<a> #<b> #<c>`.
 ---
+<!-- cycle:rendered template=skills/fan-out.md.tmpl hash=e5eb3afc62de — managed by the-cycle; edit the template, not this file -->
 
-# /fan-out #<n…> — parallel implementation batch
+# /fan-out — build several independent stories at once
 
-Goal: take a curated list of disjoint issues, spawn implementer agents in parallel, await all, then
-suggest `/review`.
+Goal: collapse the wall-clock cost of N mechanical stories that genuinely don't touch each other.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §1
-(pickability), §3 (Track → executor + model + reviewer; re-verify agent claims), §4 Gates, §9 Branch
-policy, §7 (the **batch** rule for the Status writes). The procedure below is just the ordering.
+**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §3
+(executor choice, re-verify agent claims), §4 (Gates), §5 (nothing here overrides a brake), §9
+(branch policy).
+
+## The disjointness gate — the whole reason this skill is safe
+
+**Build the set of files each story will touch. If any two sets intersect, STOP.**
+
+This is not a heuristic to weigh against throughput; it's the precondition. Two agents editing the
+same file produce a tree where both "succeeded" and the result is neither change — and the failure
+surfaces later, somewhere else, as a mystery.
+
+- Derive each set from the issue's `Touches:` line **and** a quick trace of what the change
+  actually implies. `Touches:` is a claim, not a manifest.
+- **Shared/index files are the usual collision** — a route index, a barrel export, a schema, a
+  registry, a docs map. If two stories both need one, they are not disjoint.
+- Overlap → drop the *fewest* stories needed to make the rest disjoint, and say which and why.
+  Don't silently proceed with a smaller set.
+
+## What fan-out is for
+
+**Mechanical work that repeats a pattern across independent files.** The same rename in six
+modules. The same missing guard in four handlers.
+
+**Not for:** anything needing judgment, anything on a §5 always-brake surface, anything where the
+right answer for story B depends on how story A turned out. If you're tempted to fan out
+non-mechanical work, run `/burndown` instead — serial, and it stops properly.
 
 ## Workflow
 
-1. **Parse the issue refs.** `#<n>` each. Require at least 2; warn over 5 (diminishing returns +
-   context pressure + a large post-batch review diff).
-2. **Load each issue's context** (§7 read + `forgejo.mjs issue view`): Why/Touches/Acceptance, Track, Agent,
-   Model, Size, Review lens, files-touched (from Touches). Confirm each is **pickable** (§1).
-3. **Verify file-disjointness.**
-   - Build the set of files-touched per story. Any file in two stories' sets is a conflict — **do not
-     proceed**; present it and suggest which to drop.
-   - `coordination-engine.ts`, `tick-logic.ts`, `scheduler-core.ts`, and the worker sync files are
-     particularly likely to collide — stories sharing them must run sequentially, not fanned out.
-4. **Pick agent + model per story** (§3) — from the Agent/Model fields, sanity-checked against Track +
-   Touches. Different models in one batch is fine.
-5. **Set each Status → In progress** in **one batch call** (§7):
-   `node scripts/forgejo-project.mjs batch /tmp/fanout-status.json` (one `{issue,field:"Status",value:"In
-   progress"}` per story) — never a loop of single writes.
-6. **Branch** (§9) — a shared batch branch is fine for a disjoint set (`git checkout -b <batch-slug>`).
-7. **Present the batch plan:**
+1. **Parse the issue refs** (3–5; more than 5 is a queue, not a batch).
+2. **Read each issue** and build its file set.
+3. **Run the disjointness gate.** Overlap → drop or stop.
+4. **Present the batch plan:**
 
    ```
-   ## Plan: fan-out batch (<N> stories)
-   | Issue | Track | Agent | Model | Files | DoD |
-   | :- | :- | :- | :- | :- | :- |
-   | #12 | musical | musical-engine-implementer | sonnet | bass-engine.ts | jazz-bass-critique |
-   | #15 | bundle  | claude | sonnet | viz-overlay.tsx | KB delta |
-   **File-disjointness:** ✅ verified   **Branch:** <batch-slug>
-   **Reviewers (after):** <union per §3 / the combined diff>
-   Spawn all <N> in parallel? Or adjust?
+   ## Fan-out plan
+   | # | Title | Files it owns | Why it's mechanical |
+   |---|---|---|---|
+   **Branch:** <shared batch branch>
+   **Disjointness:** verified — no two stories share a file
+   **Dropped:** <story + which file it collided on>, if any
    ```
 
-8. **On confirmation, spawn all in parallel** — single message, multiple `Agent` calls,
-   `run_in_background: false`. Each prompt = `/implement`'s spawn shape (cite issue #, acceptance,
-   Track DoD, file ownership "edit ONLY <files>, report Blocked if you need others", ask for `## Result`).
-9. **As each reports, capture its `## Result`.** Don't summarize until all are in.
-10. **Independently re-verify** (§3) — re-run the §4 gates + each story's Track DoD **yourself** on the
-    combined tree; an agent's "green" is a claim.
-11. **Present the batch report:** ✅/⚠️ per story (with the re-verified gate status), combined diff
-    stat, and any Blocked ones. Roll a Blocked story's Status back to `Ready` (§7) so the tracker doesn't
-    strand it In-progress.
-12. **Suggest `/review`** on the combined diff.
+5. **One batched Status write** (§7), then **branch once** — all stories land on one shared branch
+   (§9). Separate branches would defeat the point.
+6. **Spawn all agents in a single message** so they actually run in parallel. Each prompt names:
+   the issue number and its acceptance, **the exact files it owns and that it must touch no
+   others**, the §4 gates, and a `## Result` block to return.
+7. **Wait for all of them.**
+8. **Re-verify the gates yourself on the combined tree** (§3) — this is non-negotiable and it is
+   *not* the same as each agent's green. Individually-correct changes can combine into a broken
+   tree, and that's exactly what this step catches:
+   ```
+   npm run typecheck     # tsc over public/**/*.{ts,tsx}
+   npm run lint          # Biome lint + format check
+   npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
+   npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
+   npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
+   ```
+9. **Confirm the writes actually landed.** A subagent reporting "completed" is evidence of intent,
+   not of a successful write. Check the files changed — by modification time or content, not by
+   trusting the report.
+10. **Roll back any blocked story's Status** so nothing is stranded, and report per-story.
+
+## Safety
+
+- **The disjointness gate is not negotiable.**
+- **Never fan out judgment-shaped work.** Parallel agents multiply a bad call by N.
+- **One reviewer pass over the combined diff**, not N independent ones — the interactions are the
+  risk, and only a combined review sees them.
 
 ## Edge cases
 
-- **Two stories edit the same file:** drop one; run it sequentially after via `/implement`.
-- **A story is opus, bundled with sonnet ones:** fine — spawn it on opus alongside.
-- **One agent finishes much faster:** wait. Don't review partial state.
-- **An agent reports Blocked:** keep the others running; report the blocker; roll its Status back to
-  Ready. Don't kill siblings.
-- **Mixed Tracks in one batch:** fine if files are disjoint — the post-batch `/review` unions the
-  Track-appropriate reviewers; a synth story in the batch still hits its listening gate at `/done`.
+- **An agent returns Blocked:** roll that story back, keep the others, report it.
+- **An agent edited a file it didn't own:** treat the batch as suspect. Review the whole combined
+  diff carefully before going further — the disjointness guarantee is gone.
+- **Gates red on the combined tree but green individually:** that's the interaction this skill
+  exists to catch. Bisect by reverting one story at a time; don't patch blindly.

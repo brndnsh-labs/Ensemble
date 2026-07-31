@@ -1,154 +1,138 @@
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=0b84dcdac9cd — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
 "see DOCTRINE §X" means *this* file. **If this isn't already in your context, read it once** —
 within a session the read amortizes across every pipeline skill you run.
 
-Reconcile here, not in the skills: when a rule changes, edit this file, not the dozen skills
-that used to restate it. The skills hold only their *unique* procedure.
+Reconcile here, not in the skills: when a rule changes, edit this file, not the skills that
+restate it. The skills hold only their *unique* procedure.
 
 ---
 
 ## §1 Tracker & readiness
 
-The tracker is the **Forgejo repo's issues** (`brandon/Ensemble` on
-<https://git.brndn.zip> — LAN/WG-only). A **story = an issue**: its **body** holds Why /
-Touches / Acceptance; its **labels** hold routing (§3). The `docs/audit/` and
-`docs/synth-audit/` trees are a **frozen archive** of the markdown-tracked cycles — *not* the
-live tracker; never read them as current. **Milestones = epics** (native Forgejo milestones).
+The tracker is the **Forgejo repo's issues** (`brandon/Ensemble` on `https://git.brndn.zip`, LAN/WG-only). A **story = an issue**: its **body** holds
+Why / Touches / Acceptance; its **labels** hold routing (§3). **Milestones = epics.**
 
 **Labels are the source of truth**; any board/project *view* is eyes-only — no skill writes it.
-**The `status/*` label is for *scheduled* work** (an issue scoped into an epic). Backlog ideas
-stay status-less.
 
-| `status/*` | Meaning | Pipeline action |
+| Status | Meaning | Pipeline action |
 | --- | --- | --- |
 | **ready** | scoped + pickable | `/next` ranks & picks; `/implement`/`/cycle` build |
 | **in-progress** | being built | don't re-pick |
-| **in-review** | built, under review / PR open | don't re-pick |
 | **needs-decision** | blocked on a Brandon call | `/unblock` surfaces; **don't build** |
-| **needs-ear** | blocked on Brandon's ear (listen pass / A/B audition) | `/unblock` tees up; **don't build past the gate** |
+| **needs-ear** | blocked on Brandon's ear (a listen pass or synth A/B audition) | `/unblock` tees up; **don't build past the gate** |
 | **blocked** | blocked on a dependency | skip; name the blocker |
-| **(no status/\*)** + `backlog`/`finding` | the idea pile, not a scheduled story | triage/scope to ready first; don't pick |
+| **(closed issue)** | done — no `status/*` on a closed issue | done |
+| **(no Status)** | + `backlog`/`finding`: the idea pile, not a scheduled story | triage/scope to ready first; don't pick |
 
-**Ranking ready** (`/next`): milestone (a real numbered epic > a "candidate epic" / no
-milestone), then `size/*` (s < m < l), then issue number. `model/*` is *not* a ranking factor.
+**Ranking pickable work** (`/next`): milestone (a real numbered epic > a "candidate epic" / no milestone), then Size (S < M < L), then issue number. Model is *not* a ranking factor.
 
-**A closed issue is "done" — there is no "Shipped" state.** `Closes #<n>` on merge closes the
-issue, and closed *is* the source-of-truth done (DOCTRINE dropped the old "Shipped" board field —
-Forgejo has no closed→field automation, and a closed issue already says it). The pipeline doesn't
-mark done; it just lets the close speak. Clear any lingering `status/*` on close if you like, but
-nothing downstream reads it once the issue is closed.
+**A closed issue is "done."** There is no `status/shipped`; `issue close` is the terminal step, and the merge guard drops any lingering `status/*` label as it closes — a closed issue never keeps one. Pass `--open` when picking work. The pipeline doesn't argue with the
+close; it lets the close speak.
 
 **A stale-*open* issue may already be shipped.** An umbrella/parent issue's slices often ship
-under sibling-numbered PRs that never reference the umbrella's own number — `git log
---grep=#<n>` finds nothing even though the work is done. Before building a Ready-looking issue,
-trace whether the described *behavior* already exists in live code (`git log -S"<symbol>"`, read
-the actual function) — don't trust issue-number absence in history as proof no work has happened.
+under sibling-numbered PRs that never reference the umbrella's own number — `git log --grep=#<n>`
+finds nothing even though the work is done. Before building a pickable-looking issue, trace
+whether the described *behavior* already exists in live code (`git log -S"<symbol>"`, read the
+actual function) — don't trust issue-number absence in history as proof no work has happened.
+
+The `docs/audit/` and `docs/synth-audit/` trees are a **frozen archive** of the old
+markdown-tracked cycles — not the live tracker. Never read them as current; if Forgejo
+is unreachable, stop, don't fall back to them.
 
 ## §2 Labels
 
 - **`finding`** — review debt, diff-coupled; **should trend to empty**. A cycle must not *grow*
-  this set as a side effect — only genuinely new ideas become `backlog`.
-- **`backlog`** — new ideas (the pipeline). May *also* carry a `needs-ear`/`needs-decision`
-  **caveat label** = "needs Brandon's input even to schedule" (a hint, not a blocked story).
+  this set as a side effect — escalate only with Brandon's nod (§5).
+- **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so their origin stays
+  visible later. Additive only; doesn't change routing.
+
+**An issue carved from a review's out-of-scope observation arrives unrouted by design** — no
+routing values set. Don't treat that as under-specification: routing is decided by the *picking*
+skill at `/cycle` time, from what the diff actually touches, not at filing time.
+
+- **`backlog`** — new ideas. May also carry a `needs-ear`/`needs-decision` **caveat
+  label** = "needs Brandon's input even to schedule" (a hint, not a blocked story).
 - **`inbox`** — raw capture, not yet triaged.
-- **`burndown`** — vetted **safe for autonomous execution** (§5 safe set); `/burndown`'s fast-path
-  fuel. A strong signal, not a blank check — the safe filter still backstops it.
-- **`verify-on-device`** — deterministic + safe to build *and* auto-merge unattended, but the
-  deliverable's last residual is a **real-device visual glance** (e.g. a mobile safe-area / viewport
-  / touch-target fix that CI's headless run can't eyeball). **Not** `needs-ear`: the change's
-  *correctness* is knowable from code; only its *side-effects* need an eyeball. `/nightly` runs these
-  and lands each on the morning device-verify checklist. Pairs with `burndown` (it's in the safe set).
-- **`verify-by-ear`** — the **musical analogue of `verify-on-device`** (§5): a musical-correctness
-  change whose idiom *is* captured by a critique test, so it builds + auto-merges on green, but its
-  last residual is a **listen pass** to confirm it feels right. Ships with a 🎧 listen checklist
-  (genre/setting to load, what changed, old-vs-new to hear). **Not** `needs-ear` (which is reserved for
-  genuinely-subjective work where no critique test can assert the idiom). Pairs with `burndown`.
-- **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock` can surface last
-  night's finds freshest-first.
-- **`area:*`** — surface tags inferring the executor when `agent/*` is unset: `area:soloist`,
-  `area:bass`, `area:drums`, `area:chords`, `area:harmony`, `area:groove`, `area:synth`,
-  `area:state`, `area:worker`, `area:ui`, `area:infra`.
-- **A `finding`/`backlog` issue carved from a review's out-of-scope observation arrives unrouted
-  by design** — only `area:*` + `finding`/`backlog`, no `track/*`/`model/*`/`size/*`/`agent/*`/
-  `lens/*`. Don't treat that as a blocker or under-specification: infer Track from what the diff
-  actually ends up touching once traced, and set routing yourself (`forgejo-project.mjs`) before
-  branching.
-- **Routing namespaces** — `status/*`, `track/*`, `model/*`, `size/*`, `agent/*`, `lens/*` are
-  **single-select label groups** that carry the routing formerly held by Project fields (§3). Each
-  namespace holds at most one label per issue; **set them via `scripts/forgejo-project.mjs`, never
-  by hand** — it enforces the one-per-namespace rule and preserves the workflow labels above.
-  `track/*` (musical|synth|bundle|ui) is the load-bearing one (§3).
+- **`burndown`** — vetted safe for autonomous execution (the safe set); `/burndown`'s
+  fast-path fuel. A strong signal, not a blank check — the safe filter still backstops it.
+- **`verify-on-device`** — deterministic + safe to build and auto-merge unattended, but
+  the deliverable's last residual is a real-device visual glance (e.g. a mobile
+  safe-area/viewport/touch-target fix headless CI can't eyeball). Not `needs-ear` — the
+  change's *correctness* is knowable from code; only its side-effects need an eyeball.
+  `/nightly` lands these on the morning device-verify checklist. Pairs with `burndown`.
+- **`verify-by-ear`** — the musical analogue: a musical-correctness change whose idiom
+  *is* captured by a critique test, so it builds + auto-merges on green, but its last
+  residual is a listen pass (ships with a 🎧 checklist: genre/setting to load, what
+  changed, old-vs-new to hear). Not `needs-ear` (reserved for genuinely-subjective work
+  no critique test can assert). Pairs with `burndown`.
+- **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock`
+  surfaces last night's finds freshest-first.
+- **`area:*`** — surface tags inferring the executor when `agent/*` is unset:
+  `area:soloist`, `area:bass`, `area:drums`, `area:chords`, `area:harmony`,
+  `area:groove`, `area:synth`, `area:state`, `area:worker`, `area:ui`, `area:infra`.
 
-## §3 Routing labels
+## §3 Routing
 
-**Routing namespaces** (single-select label groups, written via `scripts/forgejo-project.mjs
-set-field <n> "<Field>" "<Value>"` — the Field name maps to the namespace: Track→`track/*`,
-Model→`model/*`, Size→`size/*`, Agent→`agent/*`, "Review lens"→`lens/*`, Status→`status/*`):
-- **Track** (`track/*`) — `musical` | `synth` | `bundle` | `ui`. **The load-bearing routing
-  namespace** — it picks the Definition of Done and the reviewer set (below). The tracks differ
-  on their DoD:
-  - **musical** → gated by a **critique test** in `tests/standards/` (statistical ranges, an
-    automated oracle). Most musical stories are fully auto-mergeable on green; when the change is
-    audible, ship it `verify-by-ear` (auto-merge on green + a 🎧 listen checklist — §5). Only
-    genuinely-subjective feel (no test can assert the idiom) is a `Needs-ear` hard stop.
-  - **synth** → gated by a **human listen on the deployed test build**: `/done` builds the PR, then
-    deploys the branch to test (`scripts/deploy.sh test` — no merge needed first) and runs a
-    Works/Something's-off/Haven't-checked check-in right there; there is no automated oracle. A synth
-    story is **`Needs-ear`** at the merge gate (§5) — a **"Works"** verdict at that check-in merges
-    immediately (the verdict *is* the approval); otherwise it stays parked. **Never auto-merge
-    unheard.**
-  - **bundle** → gated by a **measurable KB delta** (`npm run build` / size check) **and**
-    behavior-preservation (full suite green). Auto-mergeable on green.
-  - **ui** → UI/UX surface work (`public/components/**`, non-engine `public/**`) with no new
-    generative behavior, synth voice, or bundle-shrink claim. Gated by **e2e smoke +
-    `npm run typecheck`** green; reviewer is `state-discipline` when it touches state, else
-    `/code-review`. Auto-mergeable on green (same safe posture as `bundle`). When a `ui` change
-    routes audible voices (e.g. a sound-source picker), pair it with `verify-by-ear` for a 🎧 pass —
-    but routing already-approved voices is **not** a `synth` Needs-ear hard stop.
-- **Model** (`model/*`) — `sonnet` | `opus` (default **opus** — standing call: spawn agents on
-  opus). **Model does not gate autonomy** (§5) — it only picks the executor's model.
-- **Size** (`size/*`) — `s` | `m` | `l`.
-- **Agent** (`agent/*`) — the executor (below).
-- **Review lens** (`lens/*`) — `music-theory` | `synth-graph` | `state-discipline` |
-  `worker-contract` | `bundle-hygiene` | `code-review` | `both`.
+- **Model:** `sonnet` | `opus` via the `model/*` label (default opus). **Model never gates autonomy** (§5) — it only picks the executor's model.
+- **Executor:** **`orchestrator-inline` by default** — the main thread builds directly,
+  keeping accumulated context. **Spawn parallel agents only for
+  independent mechanical work** (the same change across several files); keep shared-file edits
+  (indexes, schema) and the validation gates on the main thread.
+- **Reviewer** (`/review` routes by the diff):
+  - The **inline correctness pass** — any non-trivial diff. The orchestrator reviews the diff
+    itself (logic, edges, error paths, contracts, invariants). The heavyweight `/code-review` is
+    **human-triggered** — the loop cannot invoke it; offer it on a large or risky diff and leave
+    the call to Brandon.
+  - **`/security-review`** — **additionally**, whenever the diff touches Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field).
+  - A **second-model angle** (a Sonnet pass over an opus diff, or vice-versa) is a cheap way to
+    catch same-prior blind spots on a meaty diff.
 
-**Executors** (the `agent/*` label, sanity-checked against what the issue touches):
-- **`musical-engine-implementer`** — generative engine behavior: bass, drums, soloist,
-  harmonies, chords, accompaniment, coordination, conductor, arranger (`public/engine/**`,
-  `public/state/**` engine slices). Follows the repo's musical patterns (final-stage multiplier,
-  deterministic phrasing, register slotting, coordination-context discipline).
-- **`critique-test-author`** — when the deliverable **is** a new/tightened critique test in
-  `tests/standards/` (NOT a one-line threshold bump an engine implementer can do inline).
-- **`synth-implementer`** — audio-DSP / synthesis voices (`public/engine/synth-*.ts`,
-  `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph wiring).
-- **`orchestrator-inline`** — the main thread builds directly. **Default for opus / small / taste
-  stories** and finicky-infra / deep-internals (state-slice schema, worker sync contract,
-  hydration) where a cold agent re-derives brittle detail and ships latent bugs. The
-  orchestrator's existing context is the defense.
-- **`claude`** — general UI (`public/components/**`), non-engine `public/**`, mechanical work.
+**Track** (`track/*`) is the load-bearing routing namespace — it picks the Definition
+of Done and the reviewer set:
 
-**Reviewers** (`/review` routes by Track + the diff):
-- **`music-theory-reviewer`** — any generative-engine or `tests/standards/` change (Track musical).
-- **`synth-graph-reviewer`** — any `synth-*.ts` / audio-graph change (Track synth).
-- **`state-discipline-reviewer`** — state slices, new actions, `coordination-engine.ts`, anywhere
-  a `signal.x = y` might bypass `dispatch`.
-- **`worker-contract-reviewer`** — state read by the logic worker (`getSyncState()` / `syncWorker()`,
-  worker-mirrored slices, new `WORKER_MSG.*`).
-- **`bundle-hygiene-reviewer`** — any bundle-shrink / dead-code diff (Track bundle).
-- **`/code-review`** — correctness pass on any non-trivial diff.
-- **test-quality lens** — a **test-only** diff reviews the *tests as the subject* (use
-  `critique-test-author` for critique tests; `/code-review` otherwise): coverage gaps,
-  intent-vs-implementation, vacuous/brittle asserts.
-- **Sonnet angle** — opus-reviews-sonnet (or vice-versa) catches same-prior blind spots.
+| Track | DoD | Reviewer | Merge |
+| --- | --- | --- | --- |
+| **musical** | a critique test in `tests/standards/` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `Needs-ear` hard stop |
+| **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `Needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
+| **bundle** | a measured KB delta (`npm run build`/size check) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
+| **ui** | e2e smoke + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
+
+**Executors** (`agent/*`, sanity-checked against what the issue touches):
+- `musical-engine-implementer` — generative engine behavior (`public/engine/**`,
+  `public/state/**` engine slices); follows the repo's musical patterns (final-stage
+  multiplier, deterministic phrasing, register slotting, coordination-context discipline).
+- `critique-test-author` — when the deliverable **is** a new/tightened critique test
+  (not a one-line threshold bump an engine implementer can do inline).
+- `synth-implementer` — audio-DSP/synthesis voices (`synth-*.ts`, `initAudio()`,
+  `reverb.ts`, `synth-utils.ts`, scheduler audio-graph wiring).
+- `orchestrator-inline` — default for opus/small/taste stories and finicky infra
+  (state-slice schema, worker sync contract, hydration) where a cold agent re-derives
+  brittle detail and ships latent bugs.
+- `claude` — general UI, non-engine `public/**`, mechanical work.
+
+**Reviewers**, additive (union what fires):
+`music-theory-reviewer` (engine/`tests/standards/`, Track musical) ·
+`synth-graph-reviewer` (`synth-*.ts`/audio-graph, Track synth) ·
+`state-discipline-reviewer` (state slices, new actions, `coordination-engine.ts`, any
+`signal.x = y` that might bypass `dispatch`) ·
+`worker-contract-reviewer` (state read by the logic worker — `getSyncState()`/
+`syncWorker()`, worker-mirrored slices, new `WORKER_MSG.*`) ·
+`bundle-hygiene-reviewer` (Track bundle) ·
+`/code-review` (correctness pass, any non-trivial diff) ·
+a **test-quality lens** for test-only diffs (coverage gaps, intent-vs-implementation,
+vacuous/brittle asserts — `critique-test-author`'s lens for a critique test, `/code-review`
+otherwise) · a **Sonnet second-perspective** pass when the implementer was Opus.
 
 **Re-verify agent claims:** a spawned agent's "gates green / tests pass" is a *claim*. Re-run the
-gates **yourself** — a spawned "green" has failed in a clean shell before.
+gates **yourself** before trusting it — a spawned "all green" has failed in a clean shell before.
 
 ## §4 Gates
 
 Local, before handing to `/review` or `/done` (never proceed over a red gate):
+
 ```
 npm run typecheck     # tsc over public/**/*.{ts,tsx}
 npm run lint          # Biome lint + format check
@@ -156,237 +140,234 @@ npm test              # mutation check + Biome + docs lint + Vitest (node/happy-
 npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
 npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)
 ```
-`npm test`, `npm run test:browser`, and `npm run test:e2e` are three separate
-runners (node · browser-audio · e2e); `npm run ci` covers only the first (the
-`checks` job has no browser). The e2e CI job runs the other two.
-`npm run validate` (typecheck + knip + jscpd + format + npm test) is the full sweep — run it
-before a `/done` that touches more than one file. **CI** runs `npm test` and a parallel
-`npm run test:e2e` job (both must be green to merge).
 
-**Track-specific DoD on top of the gates (§3):**
-- **musical** → run the matching **critique test** (`npx vitest run tests/standards/<…>-critique.test.ts`)
-  and read its "Critique Report" for balance. A new musical bias without a passing critique test
-  is not done.
-- **synth** → the **human listen on the deployed test build** is the gate — `/done` deploys the
-  branch at the gate itself so the listen happens on the real build, not a local harness; it's a
-  **human listening stop**, not an automated check (→ `Needs-ear`, §5).
-- **bundle** → a **measured KB delta** from the size check **and** the full suite green
-  (behavior-preserving).
+`npm test`, `npm run test:browser`, `npm run test:e2e` are three separate runners
+(node · browser-audio · e2e); `npm run ci` covers only the first. `npm run validate`
+(typecheck + knip + jscpd + format + `npm test`) is the full sweep — run it before a
+`/done` that touches more than one file. CI runs `npm test` + `npm run test:e2e` in
+parallel; both must be green to merge.
+
+**Track-specific DoD on top of the gates:**
+- **musical** → run the matching critique test
+  (`npx vitest run tests/standards/<…>-critique.test.ts`) and read its Critique Report
+  for balance. A new musical bias without a passing critique test is not done.
+- **synth** → the human listen on the deployed test build IS the gate — `/done` deploys
+  the branch at the gate itself, not a local harness.
+- **bundle** → a measured KB delta **and** the full suite green.
 
 **Repo-specific gotchas the gates enforce:**
-- A **new `public/engine/*.ts` file** must be registered in **`AI_MAP.md`** or the pre-commit
+- A new `public/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
   docs-lint hook blocks the commit — add the row during `/done` staging.
 - `// @direct-mutation` is only sanctioned in the three categories in `CLAUDE.md`
-  (real-time hot paths, init-only, pre-mount). Everywhere else routes through `dispatch` —
-  `state-discipline-reviewer` enforces it.
+  (real-time hot paths, init-only, pre-mount). Everywhere else routes through
+  `dispatch` — `state-discipline-reviewer` enforces it.
 
 ## §5 Judgment calls & autonomy
 
-**Default: full-auto + merge-to-`main` for self-contained, gate-verifiable, non-destructive
-stories of *any* tier (sonnet OR opus).** Run the whole chain unattended; Brandon reviews the
-result. **Tier does not gate autonomy** — it only picks the executor's model. What gates a pause
-is a **judgment call**. **Auto-merge now means auto-deploy** — `main` is continuously deployed to
-prod (§6), so an auto-merged PR ships to `ensemble.brndn.zip` within minutes; the pre-merge
-`Needs-ear` stop below is what keeps un-auditioned work from shipping.
+**Default: run the whole chain unattended** for self-contained, gate-verifiable, non-destructive
+stories; Brandon reviews the *result*. **Tier does not gate autonomy** — it only picks the
+executor's model. What gates a pause is a **judgment call**.
 
 **Stop and surface — the always-brake set:**
-- **Track `synth`** and **genuinely-subjective** musical work (timbre / feel with **no idiom a
-  critique test can assert**): the A/B audition / listen pass is a **`Needs-ear`** human stop.
-  Build + open the PR, but **leave it for Brandon's ear + merge** — never auto-merge unheard.
-  This is **not** the same as musical work whose idiom *is* theory-specifiable + critique-testable —
-  that is `verify-by-ear`, see below.
-- A diff is a **destructive data op** (drops/rewrites persisted sessions, share-URL schema,
-  preset data, or a state-slice migration that breaks saved state) — Brandon wants to *see* these
-  even if the cycle could proceed; offer a human `/code-review`.
-- A diff trips the **state/worker contract** in a way that needs a design call (a
-  `@direct-mutation` outside the sanctioned categories, a half-synced worker field) — surface it.
-- A story is **`Needs-decision`** — can't proceed without his input.
+- **Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)** — Brandon wants to *see* these even when the cycle could proceed.
+- **destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)** — Brandon wants to *see* these even when the cycle could proceed.
+- **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** — Brandon wants to *see* these even when the cycle could proceed.
 - A review finding needs a **design decision**, is **P0**, or **contradicts a memory note**.
 - An **implementation choice is genuinely ambiguous** with no obvious default — surface options +
   a recommendation, don't guess.
 - **Gates/CI red**, an agent returned **Blocked**, or a spawned "green" that doesn't reproduce.
 
-When the work is well-specified, run it — opus included. When in doubt about a *decision*,
-surface it. **Findings get actioned, not parked:** `/patch` fix-now is the default
-(P0/P1/bounded-P2); too-big = *escalate* to a `finding` issue with Brandon's nod, never a silent
-defer. An implementer's own "out of scope, defer to follow-up" tag does **not** override this —
-if the deferred item would falsify the story's stated `Acceptance:` criterion, it's in scope
-regardless of the tag; run `/review` anyway rather than `/done` on the implementer's word alone.
+When the work is well-specified, run it. When in doubt about a *decision*, surface it.
 
-**Lifting a `Needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise is not
-sign-off.** "Everything's sounding great" is encouragement, not a merge instruction for a specific
-parked PR; ask directly ("merge both / one / hold") before merging. The `/cycle #<n> approved`
-path is the canonical signal. Build + deploy-to-test is autonomous; the merge of a by-ear story
-never is.
+**Findings get actioned, not parked:** `/patch` fix-now is the default (P0/P1/bounded-P2); too-big
+= *escalate* to a `finding` issue with Brandon's nod, never a silent defer. An implementer's
+own "out of scope, defer to follow-up" tag does **not** override this — if the deferred item would
+falsify the story's stated `Acceptance:` criterion, it's in scope regardless of the tag.
 
-**`verify-by-ear` — musical correctness is not a work-blocker.** Most "by-ear" musical work is
-*not* subjective: its idiom is a music-theory **fact** (rock harmony = harmonized 3rds/6ths; ska
-soloist favors the offbeats; blues b3 landing-tone rate sits in an idiomatic band). When the claim
-is expressible as a **critique test that asserts the idiom** (not merely "a weight moved"), it is
-gate-verifiable: implement with a music-theory/correctness lens → critique test + `music-theory-reviewer`
-→ **auto-merge on green** (Brandon's standing call 2026-06-19), deploy to test, and attach a **🎧 listen
-checklist** (tag `verify-by-ear`): genre/setting to load, what changed, old-vs-new to hear. The test
-is the correctness gate; Brandon's ear is *confirmation* — a follow-up tweak if it feels off, never a
-rollback (musical diffs are reversible). **The hard guardrail (no programmer's math):** if you cannot
-write a test that captures the musical claim, that is the signal the change isn't understood well
-enough to ship unheard — **stop and surface.** Mirrors `verify-on-device`: correctness knowable from
-code/test, only a real-world sensory glance remains. (Track `synth` and genuinely-subjective feel
-stay the `Needs-ear` hard stop above — no oracle exists for "does it *sound* good.")
+**Plans are status updates, not confirmation gates.** Every pipeline skill presents its plan
+(`## Plan` / `## Cycle plan` / `## Review plan` / `## Patch plan`) before acting — that's for
+visibility, so Brandon can see and redirect. It is **not** a "Proceed?" prompt to wait on.
+Present the plan, then continue in the same turn unless the plan *itself* surfaces a judgment call
+from this section. This applies whether a skill is driven by `/cycle` or invoked directly.
 
-**The autonomous safe set (`/burndown` / `/nightly`).** The unattended grinders operate on the
-**negation of the always-brake set**: an item is `burndown`-safe only if it is *none* of the classes
-above AND is well-specified, S/M, single-area, and **gate/CI-verifiable** (provable by §4, not by ear
-or a device). `verify-on-device` is the one bright-line exception — build + auto-merge it, but it must
-land on `/nightly`'s morning device-verify checklist (correctness is knowable from code; only a
-real-device visual glance remains). **`verify-by-ear`** is the musical sibling: theory-provable
-musical correctness **is** in the autonomous set — its critique test is the §4 gate, it merges on
-green, and only a confirming listen remains. Track `synth` and **genuinely-subjective** musical work
-(no critique-test oracle for the idiom) are **never** `burndown`-safe (their DoD is a human listen →
-`Needs-ear`). When unsure, **exclude and surface** — a mis-graded autonomous merge costs trust; a
-skipped-safe item only costs throughput.
+**The autonomous safe set (`/burndown`).** The unattended grinders operate on the **negation of the
+always-brake set**: an item is safe only if it is *none* of the classes above AND is
+well-specified, small-to-medium, single-area, and **gate-verifiable** (provable by §4). When
+unsure, **exclude and surface** — a mis-graded autonomous merge costs trust; a skipped-safe item
+only costs throughput.
+
+**`verify-on-device` and `verify-by-ear` are a third state between "auto-merge" and
+"hard stop."** Both cover work whose *correctness* is knowable from code/test, where
+only a real-world sensory glance remains — build + auto-merge it, then attach a
+lightweight residual check instead of gating the merge on it:
+- `verify-on-device` — a real-device visual glance (mobile safe-area/viewport/touch
+  target); lands on `/nightly`'s morning device-verify checklist.
+- `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
+  test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new). The
+  test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
+  feels off, never a rollback (musical diffs are reversible).
+
+**The hard guardrail: if you cannot write a test that captures the musical claim, that
+is the signal the change isn't understood well enough to ship unheard — stop and
+surface.** Track `synth` and genuinely-subjective feel (no oracle for "does it sound
+good") stay the `Needs-ear` hard stop — never auto-merge those unheard.
+
+**Lifting a `Needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise
+is not sign-off.** "Everything's sounding great" is encouragement, not a merge
+instruction for a specific parked PR; ask directly before merging. `/cycle #<n> approved`
+is the canonical signal.
+
+**Auto-merge now means auto-deploy** (§6 is CD) — an auto-merged PR ships to prod within
+minutes. The pre-merge `Needs-ear` stop is what keeps un-auditioned work from shipping,
+not a separate deploy gate.
 
 ## §6 Merge guard
 
 The pipeline pushes + opens PRs. **Auto-merge SAFE stories** (none of §5's always-brake classes,
-AND green CI); **a judgment-call story's PR is left open for Brandon's manual merge** (Status stays
-In review, or Needs-ear for synth; report "ready for your merge: <url>" + why).
+AND green CI); **a judgment-call story's PR is left open for Brandon's manual merge** —
+report "ready for your merge: <url>" + *why* it's gated.
 
-Forgejo Actions has **no server-side auto-merge-on-green**, so — exactly as on GitHub — the
-**poll-then-merge guard IS the enforcement**. One script owns it, run in the **background** (the
-poll takes minutes; a foreground `sleep` is harness-blocked):
+There is **no server-side auto-merge-on-green** here, so the **poll-then-merge guard IS the
+enforcement**. Never use a fire-and-forget auto-merge flag — with nothing to wait on it merges
+immediately. Run the guard in the **background** (the poll takes minutes; a foreground `sleep` is
+harness-blocked):
+
 ```bash
-# Waits for CI to REGISTER + FINISH on the PR's head sha, then merges (squash + delete branch)
-# ONLY if the combined commit-status is `success`; on failure it prints each failing check's run
-# URL, plus the TAIL OF THAT JOB'S LOG, and exits non-zero. Add --dry-run to poll + decide
-# without merging.
-node scripts/forgejo-merge.mjs <pr> &
+node scripts/forgejo-merge.mjs "<pr>" --closes "<n>" &
 ```
-The gate is the verified `GET /commits/{sha}/status` endpoint (combined `state` + per-job
-`statuses[]` — the `gh statusCheckRollup` replacement).
 
-**Reading a red gate (2026-07-24).** This Forgejo build (15.0.3~gitea-1.22.0) exposes **no
-job-log API** — every documented `/actions/.../logs` route 404s even with a valid token. Logs
-come from **`ci-logs`** (a global command from `~/code/dotfiles`, wrapping `fj-ex`, which scrapes
-the web UI with a session cookie). Repo is inferred from the current checkout's `origin`:
-```bash
-ci-logs --failed        # the most recent FAILED run — "what broke"
-ci-logs <run> <job>     # one job of one run (indices come straight off the target_url
-                        #   the merge guard prints: /…/actions/runs/<run>/jobs/<job>)
-ci-logs --list          # recent runs + status
-```
-The merge guard prints the failing tail automatically, so a red gate is usually self-explaining
-without running anything. **A red CI is now diagnosable, so "retry and see" is no longer an
-acceptable first move** — read the log, then decide transient-vs-real (§5 still makes an
-unexplained red a hard stop). Setup is one-time: `cargo install forgejo-cli-ex` then
-`fj-ex auth login --host git.brndn.zip --username brandon` (TOTP, not a security key); if the
-session cookie expires the guard degrades to printing the URL alone and says so. After a safe merge, `Closes #<n>` already
-closed the issue = done (§1 — no Shipped field to set). Just **sync local main** (`git checkout main
-&& git fetch origin && git reset --hard origin/main`) and prune the branch.
+**Always pass `--closes`** — the issue number(s) already in hand, or **`none`** when the merge should close nothing (a multi-phase PR: "Phase 2a of #539"). The guard's body-regex scan is only a fallback for an ad-hoc merge with no `--closes`, and it fires on any `Closes #n` token in prose — even "will close #539 later" (bit on a real PR). Editing the body after launch doesn't help; the guard snapshots it at registration.
 
-**Deploy (static-file app) — CD: `main` IS live.** Ensemble ships as **static files on nginx
-behind Caddy** — `vite build` → `rsync --delete dist/` to `/var/www/html/` on the box. No app
-server, no DB, no migrations, no restart; nginx serves the new files the instant rsync finishes.
-**One script — `scripts/deploy.sh <test|prod>`** — owns the mechanics for both.
+**Reading a red gate.** Logs come from `node scripts/ci-logs.mjs "<run>"`.
+The most recent *failing* run is `node scripts/ci-logs.mjs --failed` — it scans
+back through the run list. A red CI is diagnosable, so **"retry and see" is not
+an acceptable first move** — read the log, then decide transient-vs-real. §5 still makes an
+unexplained red a hard stop.
 
-**Prod is continuous (2026-07-14).** A push to `main` only happens via a green PR merge (`main`
-is branch-protected — no direct push, required CI contexts `CI / checks` + `CI / e2e-tests`), so
-the CI **`deploy`** job (`.forgejo/workflows/ci.yml`) ships every merge to `ensemble.brndn.zip`
-automatically: it runs `deploy.sh prod` after `checks` + `e2e-tests` pass on the merged commit,
-over a **dedicated CI deploy key** (Forgejo secret `DEPLOY_SSH_KEY`, scoped — not the laptop's
-key). **A merge to `main` IS a prod deploy** — including unattended overnight `/burndown` /
-`/nightly` merges (Brandon's standing call 2026-07-14). Nothing un-auditioned reaches prod
-because the §5 **`Needs-ear`** gate is a *pre-merge* stop: by-ear/synth work never auto-merges,
-so it never auto-ships.
+After a safe merge: **sync local main** (`git checkout main && git fetch origin && git reset --hard
+origin/main`) and prune the branch.
 
-- **`/deploy-prod`** (`scripts/deploy.sh prod` → `ensemble.brndn.zip`) is now the **manual
-  break-glass** path — a laptop redeploy when CI itself is down, or to force a known-good build.
-  It still **refuses a dirty tree**. **Rollback = roll forward:** `git revert` → PR → green → the
-  CI deploy job redeploys (a manual `workflow_dispatch` on `main` also redeploys, no new commit).
-- **`/deploy-test`** (`scripts/deploy.sh test` → `ensembletest.brndn.zip`) — the **pre-merge
-  audition** box: deploy a *branch* here to hear/preview it before merging (esp. `Needs-ear`
-  work). Low ceremony, private box; the script confirms the live asset hash matches the build.
+**The harness's own auto-mode classifier can independently deny the background merge command**, even
+on a safe story with everything above satisfied. That's an environment-level permission gate, not a
+pipeline judgment call, and no skill text can route around it. If it fires: report the open,
+CI-pending PR and ask Brandon for a one-turn approval to re-run the merge (or to
+merge it himself). Don't treat the denial as a §5 pause, and don't retry with `--no-verify` or
+other workarounds.
 
-**The live site is the source of truth for what's deployed — there is no stored deploy ref**
-(the old `refs/deploys/*` refs were retired: their best-effort push silently drifted, faking
-the deploy history). `vite.config.ts` (`computeBuildRev`) bakes the rev into every asset
-filename, so the running `index.html` names the exact build. `scripts/deploy.sh` reads that
-live rev itself — curling it **before** to print the real delta (`git log <live-sha>..HEAD`,
-accurate regardless of who deployed last or from where) and **after** to verify the right
-bundle landed. To check the pending set by hand: curl the origin's `index.<rev>.js`, strip any
-dirty `-<sig>` suffix, and `git log <rev>..HEAD`.
+**Static-file app, CD: `main` IS live.** `vite build` → `rsync --delete dist/` to
+`/var/www/html/` on the box — no app server, no DB, no migrations, no restart; nginx
+serves the new files the instant rsync finishes. `scripts/deploy.sh <test|prod>` owns
+the mechanics for both.
 
-## §7 Tracker mechanics (Forgejo REST)
+**Prod is continuous.** A push to `main` only happens via a green PR merge (branch-
+protected, required CI contexts `CI / checks` + `CI / e2e-tests`), so the CI `deploy`
+job ships every merge to `ensemble.brndn.zip` automatically — including unattended
+overnight `/burndown`/`/nightly` merges. `/deploy-prod` is now the manual break-glass
+path (CI down, or forcing a known-good build), not the normal route.
 
-The tracker is Forgejo issues + labels over REST (`https://git.brndn.zip/api/v1`, token at
-`~/.config/forgejo/token`). **No `tea` CLI, no `gh`** — two thin scripts wrap the surface:
+**Environments:**
+- **test** (`ensembletest.brndn.zip`) — the pre-merge audition box; deploy a branch here
+  to hear/preview before merging, especially `Needs-ear` work. Low ceremony, private.
+- **prod** (`ensemble.brndn.zip`) — the public origin; CD on merge, or the gated manual
+  `/deploy-prod` break-glass path.
 
-- **Read the tracker:** `node scripts/forgejo.mjs list [--open] [--label <l>] [--milestone <m>]`
-  → issues as JSON (`number`, `title`, `body`, `url`, `state`, `labels[]`, `milestone`). The
-  `status/track/size/model/agent/lens` routing is read straight off `labels[]` (filter by the
-  namespace prefix). No pagination footgun like the old board's 30-item default — the script pages
-  to completion. A closed issue is done (§1); pass `--open` to a picking skill.
-- **Write a routing label:** `node scripts/forgejo-project.mjs status <n> "<Status>"` or
-  `set-field <n> "<Field>" "<Value>"` (e.g. `set-field 12 Track synth`) — enforces one-per-namespace.
-- **Bulk writes:** **always** `node scripts/forgejo-project.mjs batch <file.json>` (array of
-  `{issue, field, value}`) — it groups by issue and does one GET + one PUT per issue. Cheaper and
-  atomic; never loop single-op writes.
-- **Issue/PR ops:** `node scripts/forgejo.mjs issue create|comment|close|edit ...` and
-  `pr create ...` (see the script's `--help`). `Closes #<n>` in a PR body auto-closes on merge, same
-  as GitHub. **No `reopen` verb** — `issue edit` has no `--state` flag either; to reopen, PATCH the
-  API directly: `curl -X PATCH .../issues/<n> -d '{"state":"open"}'` with the same auth the script
-  uses (`~/.config/forgejo/token`).
-- **Verify a body actually landed before trusting `Closes #<n>` to fire:** both `--body B` and
-  `--body-file <path>` work (the parser normalizes `--body-file` → `@<path>`), but an unexpected
-  empty body is a sign a flag got silently dropped upstream, not that Forgejo's auto-close is
-  broken — check with `pr view <n>` / `issue view <n>` (both include `body`) before assuming the
-  service, not the tooling, is at fault. `forgejo-merge.mjs` also closes referenced issues itself
-  after a successful merge (parses the same `Closes/Fixes/Resolves` keywords) as defense-in-depth,
-  independent of Forgejo's native close.
-- **Forgejo unreachable:** both scripts **exit 3** and say so — a skill must **stop**, not fall back
-  to the frozen markdown or a cached list as current.
+**Verification is free, and it's the whole trick:** `vite.config.ts`'s `computeBuildRev`
+bakes the revision into every asset filename (`index.<REV>.js`), so the live `index.html`
+names the exact build. There is **no stored deploy ref** — the running site is the only
+source of truth; `scripts/deploy.sh` curls it before (to print the real delta) and after
+(to verify the right bundle landed).
+
+**Rollback = roll forward:** no DB, no migration, so `git revert` → PR → green → the CI
+deploy job redeploys (or a manual `workflow_dispatch` on `main`, no new commit).
+
+## §7 Tracker mechanics
+
+Routing values are label namespaces. Read one by finding the label with the prefix and stripping it: `labels.find(l => l.startsWith('status/'))?.slice('status/'.length)`. `forgejo-project.mjs` enforces one label per namespace and preserves workflow labels (`bug`, `area:*`, `finding`, `scout`).
+
+- **Read the tracker:** `node scripts/forgejo.mjs list --open`
+- **Read one issue:** `node scripts/forgejo.mjs issue view "<n>"`
+- **Write a routing value:** `node scripts/forgejo-project.mjs status "<n>" "<Status>"` (or `node scripts/forgejo-project.mjs set-field "<n>" "<Field>" "<Value>"`)
+- **Bulk writes:** **always** `node scripts/forgejo-project.mjs batch "<file.json>"` — an array of `{issue, field, value}`,
+  grouped into one read + one write per issue. Never loop single-op writes.
+- **Issue/PR ops:** `node scripts/forgejo.mjs issue create --title "<title>" --body "<body>" --label "<label>"` · `node scripts/forgejo.mjs issue comment "<n>" "<text>"` ·
+  `node scripts/forgejo.mjs issue close "<n>"` · `node scripts/forgejo.mjs pr create --head "<branch>" --base main --title "<title>" --body "<body>"`
+
+**Unreachable → STOP.** All three scripts exit **3** and print `unreachable` on a connection failure. Stop and say so — never fall back to a cached list or a frozen markdown tracker.
+
+- **No `reopen` verb** — `issue edit` has no `--state` flag. To reopen: PATCH the API
+  directly (`curl -X PATCH .../issues/<n> -d '{"state":"open"}'`, same token auth).
+- **Verify a body actually landed before trusting `Closes #<n>` to fire** — an
+  unexpected empty body means a flag got silently dropped upstream, not that Forgejo's
+  auto-close is broken. Check with `pr view`/`issue view` (both include `body`) before
+  assuming the service is at fault. `forgejo-merge.mjs` also closes referenced issues
+  itself after a successful merge, independent of Forgejo's native close.
+- **No job-log API on this Forgejo build** — every documented `/actions/.../logs` route
+  404s even with a valid token. Logs come from `ci-logs` (wraps `fj-ex`, scrapes the web
+  UI with a session cookie); `ci-logs --failed` / `ci-logs <run> <job>` / `ci-logs --list`.
 
 ## §8 Commit & PR conventions
 
-- **Conventional Commit** (`feat(soloist)` / `fix(ts)` / `chore(deps)` / `refactor(mobile)` /
-  `docs` / `test`), scoped to the area; body lists the story. Ends with:
+- **Conventional Commit** (`feat(scope)` / `fix` / `docs` / `chore` / `test`), scoped to the area;
+  body names the story. Ends with:
   ```
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
   ```
 - **`git add <explicit paths>` — never `-A` / `.`**. Never `--no-verify`; never amend; never
   **force**-push.
-- **PR:** `node scripts/forgejo.mjs pr create --base main --head <branch>` (after `git push`), a
-  rich "what shipped + which findings were actioned" narrative as the body, **with `Closes #<n>`**,
-  title = the Conventional-Commit subject. The `Closes/Fixes/Resolves #N` keyword fires **anywhere**
-  in the body regardless of surrounding prose — writing `Closes #844 is NOT set` still closes #844.
-  When carving one item out of a multi-item umbrella issue, never put that close-keyword token next
-  to the umbrella's number at all, not even to deny it — reference it as "part of #844" instead.
-  PR bodies end with:
+- **PR:** base `main`, a "what shipped + which findings were actioned" narrative as the body,
+  **with `Closes #<n>`** (closing the issue is the done-signal), title = the Conventional-Commit
+  subject. PR bodies end with:
   ```
   🤖 Generated with [Claude Code](https://claude.com/claude-code)
   ```
-- Post a one-line issue comment linking the PR (`forgejo.mjs issue comment <n> ...`); the narrative
-  lives in the PR body.
+- The `Closes/Fixes/Resolves #N` keyword fires **anywhere** in the body regardless of surrounding
+  prose — writing "`Closes #844` is NOT set" still closes #844. When carving one item out of a
+  multi-item umbrella issue, never put that token next to the umbrella's number at all, not even to
+  deny it — write "part of #844" instead.
+- Post a one-line issue comment linking the PR; the narrative lives in the PR body.
 
 ## §9 Branch policy
 
-- **Everything → a feature branch + PR, no exceptions.** `main` is branch-protected against
-  *all* direct pushes (not just story work) — confirmed 2026-07-17 when a plain local commit on
-  `main` (a `chore(deps)` dependency bump, then a `docs(skills)` follow-up) was rejected at push
-  time by Forgejo's pre-receive hook (`Not allowed to push to protected branch main`) both times.
-  There is no minor-edit carve-out: `.claude/skills/*`, `scripts/forgejo*.mjs`, ops notes, and
-  `docs/*` all need their own branch + PR the same as issue work, even though most will auto-merge
-  immediately (§6 — gate-verified, non-destructive). Never build on `main`; `/implement` branches
+- **Issue work → a feature branch + PR**, always. Never build on `main`; `/implement` branches
   (`git checkout -b <short-slug>`), reusing an epic branch if one exists.
+- **No minor-edit carve-out.** `main` is protected against *all* direct pushes — skills, scripts,
+  ops notes and docs each need their own branch + PR, even though most auto-merge immediately (§6).
 - **Branch off freshly-fetched `origin/main`, not local `main`.** A squash-merge PR is based
   against `origin/main` HEAD, not your local HEAD — if local `main` carries commits never pushed to
   origin, cutting a branch off it silently folds those unpushed commits into your feature's squash
   commit (content survives, but loses its own commit identity). `git checkout main && git fetch
   origin && git reset --hard origin/main` before branching avoids it; the tell after the fact is
   `git pull --ff-only` refusing to fast-forward with local-ahead commits that aren't yours.
-- **Local branches don't clean up on their own.** `forgejo-merge.mjs` deletes the *remote* branch
-  on a successful merge but never the local one — 68 stale local branches had silently piled up
-  across sessions before a first cleanup (2026-07-18). Periodically: `git fetch --prune origin`
-  (refreshes stale tracking state — a branch showing a live remote may just be a stale local
-  cache), confirm zero open PRs, then bulk `git branch -D` everything but `main`/the current branch
-  (`-D` because a squash-merged branch is never a literal ancestor, so plain `-d` refuses every
-  one) — safe since the commits stay recoverable via reflog if that assumption is ever wrong.
+- **Local branches don't clean up on their own.** The merge guard deletes the *remote* branch but
+  never the local one, and they pile up silently across sessions. Periodically: `git fetch --prune
+  origin`, confirm zero open PRs, then bulk `git branch -D` everything but `main` and the current
+  branch (`-D` because a squash-merged branch is never a literal ancestor, so plain `-d` refuses
+  every one) — safe, since the commits stay recoverable via reflog.
+
+## §10 Filing an issue
+
+Shared by `/scout` (machine-found) and `/intake` (human-described). Both *find or interview, then
+file* — neither fixes, branches, or merges.
+
+1. **Dedup first.** Search open issues before filing. A near-duplicate gets a comment on the
+   existing issue, not a new one.
+2. **The bar is *actionable*.** An issue nobody could pick up and start is noise. If it can't be
+   stated as Why / Touches / Acceptance, it isn't ready to file — keep interviewing, or don't file.
+3. **Shape it so the smallest human input unlocks it.** Prefer a pre-drafted fix with a
+   yes/no decision over an open-ended question. A finding that arrives with the diff already
+   written costs Brandon one glance; the same finding as a paragraph costs a work session.
+4. **Body format:**
+   ```
+   **Why:** <the problem, and what's wrong today — with file:line evidence>
+   **Touches:** <files / surfaces>
+   **Fix (drafted):** <the concrete change — a diff, or the exact edit>
+   **Acceptance:** <the observable condition that means it's done>
+   ```
+   The **Fix** line is mandatory for a machine-found finding (`/scout` read the code; the draft
+   is the point) and best-effort for a human-described idea (`/intake` interviews toward it but
+   files without it when the idea is scope, not a defect).
+5. **Classify, don't over-classify.** Set what you know; leave routing to the picking skill (§2).
+6. **Budget.** Filing zero is a success. A sweep that files 20 low-grade issues has made the queue
+   worse, not better. Cap a focused pass at **3–5** findings; a multi-lens sweep caps *per lens* and
+   stays in single digits overall. Rank by (impact × how-actionable) and file only the top ones —
+   mention the rest in the report without filing.
