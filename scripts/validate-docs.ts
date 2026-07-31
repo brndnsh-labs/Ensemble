@@ -9,6 +9,61 @@ import path from 'node:path';
  * and that all core modules are mapped in AI_MAP.md.
  */
 
+// The dir-scoped agent docs (#1153) and the pipeline skill tree. These are
+// auto-loaded the moment an agent works in the matching directory, so a rotted
+// path here misleads at exactly the point it is most trusted — and until #1303
+// none of them were scanned at all. That gap cost a real pointer: the
+// impulse-response bisection harness moved to `tests/browser/` in #1097 while
+// `public/engine/CLAUDE.md` kept sending readers to `tests/e2e/`.
+//
+// Both sets are DISCOVERED, not listed. A hand-maintained list is the exact
+// failure this gate just suffered — `DOCS_TO_SCAN` was never extended when
+// #1153 added the dir-scoped docs, and nobody noticed for months. Enumerating
+// them here would only move that staleness one file over.
+const AGENT_DOC_ROOTS = ['public', 'tests'];
+const SKILLS_ROOT = '.claude/skills';
+
+/** Every dir-scoped `CLAUDE.md` under the source tree, at any depth. */
+function discoverNestedAgentDocs() {
+    const found = [];
+    const walk = (dir) => {
+        if (!fs.existsSync(dir)) {
+            return;
+        }
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+                walk(full);
+            } else if (entry.name === 'CLAUDE.md') {
+                found.push(full);
+            }
+        }
+    };
+    for (const root of AGENT_DOC_ROOTS) {
+        walk(root);
+    }
+    return found;
+}
+
+/** DOCTRINE plus every `.claude/skills/<name>/SKILL.md` — a new skill is scanned the day it lands. */
+function discoverSkillDocs() {
+    if (!fs.existsSync(SKILLS_ROOT)) {
+        return [];
+    }
+    const docs = fs
+        .readdirSync(SKILLS_ROOT, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => `${SKILLS_ROOT}/${entry.name}/SKILL.md`);
+    // Loose shared docs beside the skill dirs (DOCTRINE, migration notes).
+    docs.push(
+        ...fs
+            .readdirSync(SKILLS_ROOT, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+            .map((entry) => `${SKILLS_ROOT}/${entry.name}`),
+    );
+    return docs.filter((docPath) => fs.existsSync(docPath));
+}
+
 const DOCS_TO_SCAN = [
     'README.md',
     'AI_MAP.md',
@@ -23,6 +78,8 @@ const DOCS_TO_SCAN = [
     'docs/guides/REFERENCE_TUNING.md',
     'docs/guides/PERFORMANCE_GUIDELINES.md',
     'tests/README.md',
+    ...discoverNestedAgentDocs(),
+    ...discoverSkillDocs(),
 ];
 
 // Phase 2 (unmapped-shadow-file detection) only scans what's listed here, so a
@@ -68,6 +125,7 @@ const VALID_BARE_LINKS = new Set([
 ]);
 
 const VALID_LINK_PREFIXES = [
+    '.claude/', // the agent-doc tree: DOCTRINE, skills, agent definitions
     '.github/',
     '.vscode/',
     'docs/',
@@ -166,6 +224,76 @@ function resolveDocLink(rawPath) {
     return rawPath.trim().split('#')[0].split('?')[0].replace(/\/$/, '');
 }
 
+/**
+ * Is this backtick span a path this gate should check at all?
+ *
+ * The repo-root prefix allowlist is the primary test, and it stays the ONLY test
+ * for root-level docs — widening it there would start checking incidental spans
+ * like `dist/assets/index.js`. The dir-scoped agent docs (#1153) additionally
+ * cite paths relative to their OWN directory (`state/history.ts` in
+ * `public/CLAUDE.md`, `../coordination-engine.ts` in the grooves one), so for
+ * those a second, self-limiting test applies: an explicit `./`/`../`, or a first
+ * segment that is a real subdirectory of the doc. A span that matches neither
+ * isn't treated as a path — that's a skip, not a pass.
+ *
+ * @param {string} cleanPath
+ * @param {string} docDir  the doc's own directory, '.' for a root-level doc
+ * @returns {boolean}
+ */
+function isCheckablePath(cleanPath, docDir) {
+    // An absolute path is a MACHINE path, never a repo path — the deploy target
+    // (`/var/www/html/`), a scratch file (`/tmp/…`). Nothing here can resolve it
+    // and nothing should try.
+    if (cleanPath.startsWith('/')) {
+        return false;
+    }
+    if (!cleanPath.includes('/')) {
+        return VALID_BARE_LINKS.has(cleanPath);
+    }
+    if (VALID_LINK_PREFIXES.some((prefix) => cleanPath.startsWith(prefix))) {
+        return true;
+    }
+    if (!allowsDocRelativeLinks(docDir)) {
+        return false;
+    }
+    if (cleanPath.startsWith('./') || cleanPath.startsWith('../')) {
+        return true;
+    }
+    const firstSegment = cleanPath.split('/')[0];
+    const candidate = path.join(docDir, firstSegment);
+    return fs.existsSync(candidate) && fs.statSync(candidate).isDirectory();
+}
+
+/**
+ * Doc-relative resolution is for docs that live INSIDE the source tree and
+ * describe their siblings — `public/**`, `tests/`. The pipeline skill tree
+ * cites every repo path root-relative (`scripts/forgejo.mjs`,
+ * `tests/standards/…`), and its only relative spans point outside the repo
+ * entirely (the `../archived-memory/` memory tree in `/wrap-up`). Reading those
+ * as repo-relative invents a broken link out of correct prose, so `.claude/**`
+ * gets root-relative checking only — which still catches the rot that actually
+ * threatens it.
+ *
+ * @param {string} docDir
+ * @returns {boolean}
+ */
+function allowsDocRelativeLinks(docDir) {
+    return docDir !== '.' && !docDir.startsWith('.claude');
+}
+
+/**
+ * A cited path counts as resolved if it exists repo-relative OR relative to the
+ * citing doc. Both readings are legitimate and both appear in the tree, so
+ * demanding one spelling would red the gate on correct docs.
+ *
+ * @param {string} cleanPath
+ * @param {string} docDir
+ * @returns {boolean}
+ */
+function docLinkExists(cleanPath, docDir) {
+    return fs.existsSync(cleanPath) || fs.existsSync(path.resolve(docDir, cleanPath));
+}
+
 function validatePlaywrightProjectDocs() {
     let hasError = false;
     const projects = extractPlaywrightProjects(readText('playwright.config.ts'));
@@ -247,6 +375,7 @@ function validateDocs() {
         }
 
         const content = readText(doc);
+        const docDir = path.dirname(doc);
 
         const pathRegex = /`([^`]+\.[a-z0-9]+)`|`([^`]+\/)`/g;
         let match = pathRegex.exec(content);
@@ -259,9 +388,11 @@ function validateDocs() {
                 !cleanPath ||
                 cleanPath.startsWith('http') ||
                 cleanPath.startsWith('{{') ||
-                (!cleanPath.includes('/') && !VALID_BARE_LINKS.has(cleanPath)) ||
-                (cleanPath.includes('/') &&
-                    !VALID_LINK_PREFIXES.some((prefix) => cleanPath.startsWith(prefix)))
+                // A glob is a deliberate reference to a FAMILY of files
+                // (`synth-*.ts`, `tests/standards/*-critique.test.ts`) — real, and
+                // not resolvable by `existsSync`. Skipping is the correct read.
+                cleanPath.includes('*') ||
+                !isCheckablePath(cleanPath, docDir)
             ) {
                 match = pathRegex.exec(content);
                 continue;
@@ -273,7 +404,7 @@ function validateDocs() {
             }
             checkedInDoc.add(cleanPath);
 
-            if (!fs.existsSync(cleanPath)) {
+            if (!docLinkExists(cleanPath, docDir)) {
                 console.error(`❌ [${doc}] Broken link: \`${rawPath}\` does not exist on disk.`);
                 hasError = true;
             }
