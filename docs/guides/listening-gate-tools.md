@@ -173,6 +173,37 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   transient is not in — and the transient carries the same ×0.15 mute anyway, so it
   is not level-independent either. That reasoning produced a confident, wrong
   "the voice never executes" conclusion (see #1284).
+
+  **Quantified 2026-07-31, when #1284 was re-opened and re-investigated on the same
+  wrong premise a second time.** If you are here because the funk bass lane reports
+  ~80%, stop and read this instead of instrumenting the voice again:
+
+  | | count |
+  |---|---|
+  | MISSED notes carrying `muted: 1` | **16 / 16** |
+  | MISSED notes carrying `muted: 0` | **0 / 16** |
+  | MATCHED notes carrying `muted: 0` | 61 / 65 |
+
+  The lane emits exactly two values — 61 × `0`, 20 × `1`. **The control group is the
+  proof, not the correlation:** the four remaining `muted: 1` notes (steps 13, 31, 45,
+  77) *did* match, at +24.6 to +31.6 dB. Their only distinguishing property is a
+  **263–464 ms** gap after the previous note ended, versus 29–174 ms for all sixteen
+  missed ones. A chuck landing in silence is detected loudly; the same chuck landing
+  under a decaying note is not. There is nothing to mask it, so it reads.
+
+  Mutation test on `MUTE_ATTENUATION` (which feeds *only* `vol` — cutoff and
+  `releaseTime` read the raw amount, so voice construction was byte-identical across
+  all three renders and level was the sole variable): at `0` (chuck at full level) the
+  lane goes **65 → 77 matched**; at `1.0` (`vol → 0`, tripping the `vol < 0.005` bail,
+  i.e. a genuinely silent chuck) it drops to **61**, all 20 muted notes missing. A gain
+  constant cannot resurrect 12 of 16 notes if the voice never retriggered.
+
+  **The residual ceiling, worth knowing before you chase the last four.** Steps 1, 17,
+  33 and 65 stay undetectable *even at full gain* (0.58–1.38 dB, under the 2 dB
+  threshold). They land ~29 ms after a full-velocity **same-pitch** note, so they are
+  not a *rise* over what they replace at any level. That is a limit of rise-based
+  presence detection, not a defect in anything it is measuring — a lane whose idiom is
+  the repeated sixteenth has a floor on what this method can verify.
 - **Pitch confirmation is monophonic AND high-register only.** Inside a chord a
   neighbor's partials land on a note's probe bins, so `chords`/`harmony` decline it.
   Separately, an 80 ms Goertzel resolves ~12.5 Hz while a semitone at MIDI 45 spans
