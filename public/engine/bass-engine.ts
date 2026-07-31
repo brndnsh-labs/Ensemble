@@ -1374,6 +1374,9 @@ export function getBassNote(
             isSameAsPrev,
             clampAndNormalize: clampAndNormalizeMidi,
             normalizeToRange,
+            // #1292 — the pump's say in the EMISSION, not just in the post-hoc `revoice`.
+            // A drawn `fifth` re-voices a lift, so there has to be a lift for it to act on.
+            pumpForcesLift: pump.forcesLift(),
         },
         ts,
         stepsPerMeasure,

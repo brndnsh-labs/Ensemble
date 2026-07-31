@@ -22,6 +22,13 @@ import { scrambleHash } from './hash-utils.js';
  * downbeat root, the upbeat octave roll and the gallop 16ths are still `bass-styles.ts`'s
  * disco branch, because those are ordinary style-lane note choices. This module owns the
  * ANCHOR and the repeat-pass VARIATION — the two things the generic engine got wrong.
+ *
+ * ONE exception to that boundary, and it is a narrow one: `forcesLift` (#1292). The pump
+ * does not choose the pump's notes, but it holds a veto-proof override on the upbeat lift,
+ * because the variation it owns is defined as a RE-VOICING and a re-voicing needs something
+ * to act on. Without it a drawn `fifth` was silently annulled whenever `bass-styles.ts`'s
+ * `octaveProb` roll declined — 45% of the time at the gesture's own intensity floor. If you
+ * are here debugging a missing lift, `forcesLift` is the other half of `revoice`.
  */
 
 // #1271 — styles whose register is a FIXED STRUCTURAL ANCHOR, not a drifting hand
@@ -136,6 +143,17 @@ export interface BassPump {
     anchorFor(midi: number): number | null;
     /** The repeat-pass outcome for the step this context describes. */
     variation(): PumpVariation;
+    /**
+     * True when this step must sound the beat's LIFT because a `fifth` has been drawn for
+     * it. `revoice` can only re-voice a lift that was actually emitted, and `bass-styles.ts`
+     * emits one on a `Math.random() < octaveProb` coin flip — so without this, a drawn
+     * `fifth` produced nothing at all whenever that roll declined, on a rate that got worse
+     * as intensity fell (45% of draws silent at the gesture's own 0.25 floor, versus 6% at
+     * the 0.9 every repeat-pass test used to run at). A bassist who decides to voice the
+     * lift as a 5th plays it; the roll is a density knob and has no opinion about that.
+     * See #1292.
+     */
+    forcesLift(): boolean;
     /** Apply the repeat-pass outcome to one note of the target beat. Identity outside the
      *  `fifth` outcome — `drop` silences its whole beat upstream, so nothing that reaches
      *  here needs re-voicing. */
@@ -436,6 +454,16 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
         return canFifth ? 'fifth' : 'none';
     };
 
+    // The beat's lift sits on its own "and" — the same sub-step `bass-styles.ts` calls
+    // `isOffbeatAnd`, derived the same way (`% stepsPerBeat` against `floor(stepsPerBeat/2)`)
+    // so the two cannot drift apart on a compound meter. Deliberately NOT the gallop 16ths:
+    // those are a density flourish that may or may not be present, and forcing one would
+    // add a note rather than re-voice the one the gesture is about.
+    const isLiftStep = (): boolean =>
+        ctx.stepInMeasure % ctx.stepsPerBeat === Math.floor(ctx.stepsPerBeat / 2);
+
+    const forcesLift = (): boolean => variation() === 'fifth' && isLiftStep();
+
     const revoice = (note: number, baseRoot: number): number => {
         if (variation() !== 'fifth') {
             // 'drop' is handled by the short-circuit near the top of `getBassNote` — by the
@@ -443,6 +471,13 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
             // nothing here to re-voice. 'none' is the ordinary no-op.
             return note;
         }
+        // #1292 — this rewrite is only half the gesture, and the other half is `forcesLift`.
+        // `revoice` can only act on a lift that was actually emitted, and `bass-styles.ts`
+        // emits one on an `octaveProb` coin flip; when that roll declined, the drawn `fifth`
+        // silently produced nothing and the target beat came out byte-identical to the
+        // Statement. `forcesLift` makes the lift unconditional on this beat so there is
+        // always something here to re-voice. Neither half is sufficient alone.
+        //
         // why: only notes an OCTAVE ABOVE THE ANCHOR become the 5th. The low root is the
         // floor of the groove — moving it would change the gesture's anchor, not its
         // voicing — so notes already at `baseRoot` are left alone. The interval shrinks from
@@ -452,8 +487,11 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
         // That is USUALLY the beat's "and" alone, but not always, and the extra case is
         // wanted rather than tolerated: at high complexity the gallop puts 16ths on the 'e'
         // and the 'a', and `bass-styles.ts` gives those `baseRoot + 12` about 30% of the
-        // time. They are re-voiced too, so the whole beat's lift is one consistent 5th
-        // rather than a 5th on the "and" against octaves either side of it.
+        // time. They are re-voiced too, so NO OCTAVE SURVIVES on that beat — which is the
+        // property that matters. (Not "the whole beat becomes one consistent 5th": the other
+        // 70% of gallop 16ths roll `baseRoot` and stay root ghosts, so the beat typically
+        // reads root-ghost → fifth-lift → root-ghost. That is an ordinary root-fifth figure
+        // and entirely coherent; what would not be is a 5th sounding against an octave.)
         //
         // `baseRoot` is in [28, 39], so `baseRoot + 7` is in [35, 46] — no headroom test, no
         // fold, no clamp, and never outside the comfort range in any key.
@@ -464,5 +502,5 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
         return note === baseRoot + 12 ? baseRoot + 7 : note;
     };
 
-    return { isAnchorStyle, anchorFor, variation, revoice };
+    return { isAnchorStyle, anchorFor, variation, forcesLift, revoice };
 }

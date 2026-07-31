@@ -468,6 +468,8 @@ export function getBassNoteStyle(
         isSameAsPrev: (midi: number) => boolean;
         clampAndNormalize: (midi: number) => number;
         normalizeToRange: (midi: number) => number;
+        /** `BassPump.forcesLift()` — see the disco `isOffbeatAnd` branch. */
+        pumpForcesLift: boolean;
     },
     ts: { stepsPerBeat: number; beats: number },
     stepsPerMeasure: number,
@@ -503,7 +505,8 @@ export function getBassNoteStyle(
     kickInst: { steps: number[] } | null,
     barsUntilSectionChange?: number,
 ) {
-    const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange } = context;
+    const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange, pumpForcesLift } =
+        context;
 
     // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
     if (style === 'country') {
@@ -1146,7 +1149,18 @@ export function getBassNoteStyle(
 
     // --- DISCO STYLE (Dynamic Octaves / Pulse) ---
     if (style === 'disco') {
-        const stepInBeat = step % ts.stepsPerBeat;
+        // MEASURE-relative, not raw-step-relative — matching the `isBeatStart` this branch
+        // is handed (`bass-engine.ts` derives it as `stepInMeasure % stepsPerBeat === 0`),
+        // the pump's `isLiftStep`, and the bossa/neo pickers above. `step % stepsPerBeat`
+        // agrees with this on every chart whose bar length is a multiple of the beat grid,
+        // which is all of them EXCEPT 7/8 (14 steps): a per-section `measureMap`
+        // (`chords-engine.ts`) puts every measure after an odd number of 7/8 bars at
+        // `start ≡ 2 (mod 4)`, and the two frames then disagree by two steps for the rest of
+        // the chart. That made the beat-start arm and the "and" arm fire on the SAME step
+        // (beat-start winning), and left the pump's forced lift landing on a step this
+        // branch does not treat as the "and" at all — a silent no-op, #1292 in a new
+        // costume. One frame for the whole branch removes the class.
+        const stepInBeat = stepInMeasure % ts.stepsPerBeat;
         const isOffbeatAnd = stepInBeat === Math.floor(ts.stepsPerBeat / 2);
 
         // 1. Downbeats (1, 2, 3, 4) -> Solid Root
@@ -1158,7 +1172,21 @@ export function getBassNoteStyle(
         if (isOffbeatAnd) {
             // Probability of octave increases with intensity
             const octaveProb = 0.4 + intensity * 0.6;
-            if (Math.random() < octaveProb) {
+            // #1292 — the roll is a DENSITY knob: how often the pump lifts at all. It is not
+            // entitled to veto a repeat-pass gesture that has already been decided. When the
+            // pump has drawn a `fifth` for this beat, the lift sounds unconditionally and
+            // `revoice` (via `withImperfectSymmetry` in `bass-engine.ts`) turns it into the
+            // 5th; the alternative was a seeded musical decision losing to a bare
+            // `Math.random()` it has no visibility into, silently 45% of the time at the
+            // gesture's own 0.25 intensity floor.
+            //
+            // The roll is evaluated UNCONDITIONALLY rather than short-circuited past, so the
+            // global `Math.random()` stream advances identically whether or not the override
+            // fires — otherwise every downstream draw in the tick would shift on exactly the
+            // beats the gesture is live, which is a far harder regression to attribute than
+            // the one being fixed.
+            const rollLifts = Math.random() < octaveProb;
+            if (pumpForcesLift || rollLifts) {
                 const note = baseRoot + 12;
                 // #1271 — the pump is UPWARD by definition: low root on the beat, octave
                 // as the lift above it. This used to fold an overflowing octave DOWN

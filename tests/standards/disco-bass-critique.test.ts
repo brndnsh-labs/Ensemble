@@ -296,15 +296,16 @@ describe('Disco Bassist Critique', () => {
      * run carries the same pitch, so modal and minimum agree; modal is kept because it is
      * the reading that stays correct if a future gesture displaces a beat downward.
      *
-     * KNOWN UNDER-COUNT, deliberately not repaired: `fifth` is detected as a beat → "and"
-     * delta of +7, so it is invisible on the ~6-10% of target beats where the `octaveProb`
-     * roll declines and the beat plays root → root with no upper note at all. Those phrases
-     * classify as `'none'`. That is harmless for every assertion here (each one is either a
-     * ceiling on fifths or a difference between two sequences, and an under-count can only
-     * make both harder to pass) — but it does mean the PRINTED distribution under-reports
-     * `fifth` by that margin. Don't read the report as evidence the draw is uniform, or as
-     * a measurement of the 0.7/0.3 weighting; it is a floor on the fifth's share, not an
-     * estimate of it.
+     * The `fifth` detector is EXACT as of #1292. It reads a beat → "and" delta of +7, and
+     * the pump now forces the lift it re-voices, so every drawn `fifth` renders — at every
+     * intensity above the 0.25 gate, in every key.
+     *
+     * This docblock previously recorded a KNOWN UNDER-COUNT here (a fifth was invisible on
+     * the ~6-10% of target beats where the `octaveProb` roll declined, classifying those
+     * phrases as `'none'`). That was real, but it was a BUG in the engine rather than a
+     * limitation of the classifier, and #1292 removed it. Consequence worth knowing: the
+     * printed distribution is now a genuine estimate of the 0.7/0.3 draw weighting rather
+     * than a floor on the fifth's share, so it is legitimate to calibrate against it.
      */
     const summarizeVariations = (performance, numBars, timeSignature = '4/4') => {
         const ts = TIME_SIGNATURES[timeSignature];
@@ -800,6 +801,97 @@ describe('Disco Bassist Critique', () => {
         expect(restatement.kinds.length).toBeGreaterThanOrEqual(1);
     });
 
+    // #1292 — the repeat pass must sound the SAME at ballad intensity as at full tilt.
+    //
+    // Every other repeat-pass test in this file runs at `bandIntensity` 0.9, and that is
+    // exactly what hid this: `bass-styles.ts` only emits the lift a drawn `fifth` re-voices
+    // on a `Math.random() < 0.4 + intensity * 0.6` roll, which succeeds 94% of the time at
+    // 0.9 — a rounding error — but only 55% at the gesture's own 0.25 floor. A seeded
+    // musical decision was being vetoed by a bare `Math.random()` in another file that it
+    // has no visibility into, and the veto rate scaled with quietness.
+    //
+    // That is the inverse of what `withImperfectSymmetry`'s own comment says the floor is
+    // FOR: "ballad-style verses (~0.30) are exactly where the mechanical-loop feel is most
+    // exposed, so this is where Imperfect Symmetry earns its keep." The mechanism was
+    // weakest precisely where its stated purpose is strongest.
+    //
+    // The assertion is EQUALITY, not a rate floor, and that is the whole strength of it.
+    // Nothing in the gesture reads intensity above the 0.25 gate: the menu seed is
+    // (sectionIdHash, sectionOccurrence, phraseIndex), the target beat is phrase-invariant,
+    // and `canFifth`/`canDrop` are properties of the CHORD. So the variation an occurrence
+    // draws is provably identical at 0.30 and at 0.9, and the rendered result must be too.
+    // A rate floor would have to be calibrated and could be satisfied by the wrong beats;
+    // set equality cannot. Pre-fix this reddens on the fifths at essentially every root —
+    // the roll declines ~42% of the time at 0.30 versus ~6% at 0.9, so the two sets diverge.
+    it.each(PITCH_CLASSES)(
+        'sounds the identical repeat-pass gesture at ballad and full intensity on a %s root (#1292)',
+        (name, rootMidi) => {
+            const BARS = 32;
+            const ballad = { playback: { bandIntensity: 0.3, complexity: 0.5, bpm: 124 } };
+            const loud = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
+
+            for (let occ = 2; occ <= 5; occ++) {
+                const opts = { stepCoordination: { sectionOccurrence: occ } };
+                const quiet = summarizeVariations(
+                    simulatePerformance(BARS, ballad, rootMidi, opts),
+                    BARS,
+                );
+                const full = summarizeVariations(
+                    simulatePerformance(BARS, loud, rootMidi, opts),
+                    BARS,
+                );
+
+                console.log(
+                    `[Disco Critique] ${name} V${occ}: ballad fifths [${quiet.fifths.join(', ')}] ` +
+                        `drops [${quiet.dropped.join(', ')}] | full fifths ` +
+                        `[${full.fifths.join(', ')}] drops [${full.dropped.join(', ')}]`,
+                );
+
+                // The gesture is intensity-invariant above the gate, in both directions.
+                expect(quiet.fifths).toEqual(full.fifths);
+                expect(quiet.dropped).toEqual(full.dropped);
+            }
+        },
+    );
+
+    // The companion to the equality test above: equality alone would also be satisfied by
+    // BOTH intensities rendering zero fifths. Pin that the gesture is actually present at
+    // ballad intensity, which is the thing #1292 was about.
+    it('renders a drawn fifth at ballad intensity, on every root (#1292)', () => {
+        const BARS = 32;
+        const settings = { playback: { bandIntensity: 0.3, complexity: 0.5, bpm: 124 } };
+        const rootsWithNoFifth = [];
+
+        for (const [name, rootMidi] of PITCH_CLASSES) {
+            let seen = 0;
+            for (let occ = 2; occ <= 5; occ++) {
+                seen += summarizeVariations(
+                    simulatePerformance(BARS, settings, rootMidi, {
+                        stepCoordination: { sectionOccurrence: occ },
+                    }),
+                    BARS,
+                ).fifths.length;
+            }
+            if (seen === 0) {
+                rootsWithNoFifth.push(name);
+            }
+        }
+
+        console.log(
+            `[Disco Critique] ballad-intensity fifth coverage: ` +
+                `${PITCH_CLASSES.length - rootsWithNoFifth.length}/${PITCH_CLASSES.length} roots`,
+        );
+
+        // The menu seed includes `phraseIndex`, so a 32-bar run draws once per 4-bar phrase
+        // — 8 draws per occurrence, 32 across V2-V5. `fifth` carries 0.7 of a two-item menu,
+        // so a root drawing none at all is `0.3 ** 32` ≈ 2e-17. (Stated precisely because
+        // the next person calibrating a threshold here will trust it: the intuitive
+        // "0.3 ** 4 ≈ 0.8%" reading treats it as one draw per occurrence, which is wrong by
+        // ~15 orders of magnitude.) It is not chance in any case, since the draw is seeded —
+        // any root listed here means the gesture is being vetoed, not that it was unlucky.
+        expect(rootsWithNoFifth).toEqual([]);
+    });
+
     // #1276 acceptance 2 — at least two distinguishable outcomes across repeats, so V4 ≠ V2
     // in KIND and not merely in which beat is affected.
     //
@@ -824,19 +916,23 @@ describe('Disco Bassist Critique', () => {
     // from the other eleven (`{drop|fifth}` against `{drop|fifth|octave}`).
     //
     // What is asserted HERE is the DROP POSITIONS: the twelve roots must drop the identical
-    // beats. Not the phrase-kind sequence, and the distinction is load-bearing rather than a
-    // matter of taste — `fifth` is detected as a rendered +7, so at this test's intensity it
-    // is invisible whenever the `octaveProb` roll declines on the target beat, and which
-    // beats lose their "and" is a property of this file's ONE shared seeded stream in call
-    // order, not of the engine. The sequence therefore genuinely differs per root here (the
-    // `?` entries in the report below), and asserting it would be asserting the harness. A
-    // dropped beat has no such dependence: it never reaches `bass-styles.ts`'s disco branch
-    // at all, so its detection is exact.
+    // beats. Not the phrase-kind sequence — the sequence genuinely differs per root here (the
+    // `?` entries in the report below), because the gallop's own `Math.random()` draws shift
+    // this file's ONE shared seeded stream by root, and asserting it would be asserting the
+    // harness rather than the engine. A dropped beat has no such dependence: it never
+    // reaches `bass-styles.ts`'s disco branch at all, so its detection is exact.
+    //
+    // #1292 UPDATE — this note used to also say the `fifth` detector was inexact at this
+    // intensity, because a drawn `fifth` was invisible whenever the `octaveProb` roll
+    // declined on the target beat. That was true, and it was a BUG rather than a property of
+    // the test: the pump now forces the lift it re-voices, so a drawn `fifth` renders at
+    // every intensity above the 0.25 gate. The detector is exact everywhere, which is what
+    // the new ballad-vs-full equality sweep above relies on.
     //
     // The other half — that the twelve roots run the identical VOCABULARY, in the identical
     // places, which is the claim that actually distinguishes post-#1291 Bb from pre-#1291 Bb
-    // — needs the fifth detector to be exact, so it lives in its own test below at an
-    // intensity where it is.
+    // — lives in its own test below. It no longer NEEDS its high intensity to make the
+    // detector exact; it keeps it because that is the setting it was calibrated at.
     it('gives every root at least two variation kinds across repeats (#1276, #1291)', () => {
         const BARS = 32;
         const PHRASES = BARS / 4;
@@ -863,11 +959,15 @@ describe('Disco Bassist Critique', () => {
         // declined so the beat played root → root with no upper note to read a +7 off. Printed
         // as `n` it made the visible V4/V5 divergence between roots read as engine
         // key-dependence, when it is the harness's shared stream position.
+        // `?` means a phrase whose variation rendered as neither gesture. Before #1292 that
+        // was routine — a drawn `fifth` whose octave roll declined — and it is now genuinely
+        // exceptional: the only remaining route is a chord the `fifth` may not sound over
+        // (altered fifth or slash bass) on a phrase that also drew an unavailable `drop`.
+        // A `?` appearing on the plain triads this sweep uses would be a real defect.
         const glyph = (kind) => (kind === 'none' ? '?' : kind[0]);
         console.log(
             `[Disco Critique] Variation kinds over occurrences 2-5 ` +
-                `(phrase sequence, d=drop f=fifth ?=undetected, usually a fifth whose ` +
-                `octave roll declined):\n  ` +
+                `(phrase sequence, d=drop f=fifth ?=neither gesture rendered):\n  ` +
                 rows
                     .map(
                         (row) =>
@@ -894,20 +994,25 @@ describe('Disco Bassist Critique', () => {
         // level up: `kinds` below is now key-invariant too, where #1276 left Bb with a
         // two-item menu against everyone else's three.
         //
-        // Asserted on the drop POSITIONS rather than on the phrase-kind sequence, and that
-        // choice is load-bearing. `fifth` is detected as a rendered +7, so it is invisible
-        // whenever the `octaveProb` roll declines on the target beat — and this file installs
-        // ONE seeded `Math.random` stream per test, shared by all 48 runs below in call
-        // order, so which beats lose their "and" genuinely does differ per root here. That is
-        // a property of the harness, not of the engine. A dropped beat has no such
-        // dependence: it never reaches `bass-styles.ts`'s disco branch at all, so its
-        // detection is exact.
-        const dropSignature = (row) => row.perOcc.map((o) => o.v.dropped.join(',')).join(' | ');
-        const reference = dropSignature(rows[0]);
+        // #1292 STRENGTHENED — this used to assert only the drop POSITIONS, because a
+        // `fifth` was invisible whenever the `octaveProb` roll declined on the target beat,
+        // which made the rendered fifth positions a property of this file's ONE shared
+        // seeded `Math.random` stream in call order rather than of the engine. That is no
+        // longer true: the pump forces the lift it re-voices, so every drawn `fifth` renders
+        // at every intensity above the gate. The full phrase-kind SEQUENCE is now an exact,
+        // root-invariant transcript, so assert that instead.
+        //
+        // This is the strictly stronger form and it is what the key-invariance claim
+        // actually means. The drop-only version would pass an engine that silently gave one
+        // pitch class no fifth at all — which is precisely the pre-#1291 Bb defect this test
+        // exists to keep out. Asserting both gestures closes that hole.
+        const kindSignature = (row) =>
+            row.perOcc.map((o) => `V${o.occ}:${o.v.phraseKinds.map(glyph).join('')}`).join(' | ');
+        const reference = kindSignature(rows[0]);
         for (const row of rows.slice(1)) {
             expect(
-                dropSignature(row),
-                `${row.name} drops different beats from ${rows[0].name}`,
+                kindSignature(row),
+                `${row.name} plays a different variation sequence from ${rows[0].name}`,
             ).toEqual(reference);
         }
 
