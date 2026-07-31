@@ -64,6 +64,7 @@ import {
     startMidiTransport,
     stopMidiTransport,
 } from './midi-scheduler.js';
+import { isSilentSentinel, muteGain } from './mute-contract.js';
 import {
     initPlatformHacks,
     startPlatformAudioAndWakeLock,
@@ -760,7 +761,9 @@ function scheduleDrumsFromBuffer(state: EnsembleState, step: number, time: numbe
 /**
  * Schedules bass notes from the worker buffer.
  */
-function scheduleBass(
+// Exported for the same reason `scheduleChordVisuals`/`scheduleHarmonies` are: it
+// owns a decision (which bass notes reach MIDI out) worth asserting directly.
+export function scheduleBass(
     state: EnsembleState,
     chordData: ChordAtStep,
     step: number,
@@ -826,9 +829,23 @@ function scheduleBass(
                     muted,
                     bendStartInterval || 0,
                 );
-                if (!muted) {
+                // `muted` on the bass lane is a NUMERIC palm-mute amount, not the
+                // boolean CC-only sentinel the chords lanes emit (`mute-contract.ts`).
+                // A palm-muted note — the funk slap chuck, a muted chromatic pickup —
+                // is a note a bassist genuinely plays, so it goes out over MIDI
+                // attenuated rather than dropped, at the same 0.15 the audio voice and
+                // the `.mid` export already give it. Testing `!muted` instead sent 0%
+                // of them (27% of a funk lane's notes) to MIDI out while they sounded
+                // normally in audio (#1288). Only the boolean sentinel is a non-note.
+                if (!isSilentSentinel(muted)) {
                     // Bass is strictly monophonic, so we force Mono mode to kill previous notes
-                    dispatchMidiBass(state, midiNum, finalVel, adjustedTime, duration);
+                    dispatchMidiBass(
+                        state,
+                        midiNum,
+                        finalVel * muteGain(muted),
+                        adjustedTime,
+                        duration,
+                    );
                 }
             }
         });

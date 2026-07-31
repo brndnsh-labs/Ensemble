@@ -19,6 +19,7 @@ import {
     writeInt32,
     writeString,
 } from './midi-utils.js';
+import { muteGain } from './mute-contract.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
@@ -441,8 +442,22 @@ export class ExportProcessor {
                     finalVel = noteVel * intensityGain;
                 }
 
-                if (res.muted) {
-                    finalVel *= moduleName === 'bass' ? 0.15 : 0.3;
+                // The bass's `muted` is a numeric palm-mute amount and the other
+                // lanes' is a boolean ghost/CC sentinel (`mute-contract.ts`), so they
+                // scale differently: `muteGain` reads the amount (and is exactly the
+                // 0.15 this used to hard-code at a full mute, so today's producers —
+                // which only ever emit 0 or 1 — export byte-identically), while a
+                // ghosted comp voice keeps its flat 0.3.
+                //
+                // Known asymmetry, unreachable today: a boolean `true` on the BASS lane
+                // would be attenuated here but dropped outright by the live path's
+                // `isSilentSentinel` gate. Bass only ever writes numbers, so neither
+                // branch fires; the live gate is itself defensive. Not resolved with an
+                // early return here because that would also skip this note's CC events.
+                if (moduleName === 'bass') {
+                    finalVel *= muteGain(res.muted);
+                } else if (res.muted) {
+                    finalVel *= 0.3;
                 }
 
                 // Apply global humanization to velocity

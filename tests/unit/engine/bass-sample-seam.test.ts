@@ -86,6 +86,35 @@ describe('bass sample seam (#697)', () => {
         expect(mocks.playSampledNote.mock.calls[0][5].velocity).toBeCloseTo(0.24, 5);
     });
 
+    // #1288: this seam read the mute amount with a bare `Number.isFinite` test while
+    // the synth voice 90 lines away normalized it. The two therefore disagreed on
+    // every non-numeric input — a sample pack played a chuck at FULL volume where the
+    // synth played it at 0.15. Both now route through `mute-contract.ts`.
+    it('attenuates a BOOLEAN mute instead of playing it wide open', () => {
+        mocks.resolveInstrumentSource.mockReturnValue({ kind: 'sample', packId: 'upright-bass' });
+        mocks.getPackZones.mockReturnValue([zone45]);
+        mocks.pickZone.mockReturnValue(zone45);
+
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, true as never, 0);
+
+        // Same 0.24 the numeric `1` produces — not 1.6, which is what
+        // `Number.isFinite(true) === false → mute = 0` used to yield.
+        expect(mocks.playSampledNote.mock.calls[0][5].velocity).toBeCloseTo(0.24, 5);
+    });
+
+    it('clamps an over-range mute rather than driving the velocity negative', () => {
+        mocks.resolveInstrumentSource.mockReturnValue({ kind: 'sample', packId: 'upright-bass' });
+        mocks.getPackZones.mockReturnValue([zone45]);
+        mocks.pickZone.mockReturnValue(zone45);
+
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 2, 0);
+
+        // Previously `1 - 2*0.85 = -0.7` → a NEGATIVE velocity into playSampledNote.
+        const { velocity } = mocks.playSampledNote.mock.calls[0][5];
+        expect(velocity).toBeGreaterThan(0);
+        expect(velocity).toBeCloseTo(0.24, 5);
+    });
+
     it('falls back to synth (no sample) when the pack has no loaded zones', () => {
         mocks.resolveInstrumentSource.mockReturnValue({ kind: 'sample', packId: 'upright-bass' });
         mocks.getPackZones.mockReturnValue(null); // not loaded yet

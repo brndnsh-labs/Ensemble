@@ -38,7 +38,15 @@ export interface NoteResult {
     isLegato?: boolean;
     dry?: boolean;
     ccEvents?: any;
-    muted?: boolean;
+    /**
+     * Two meanings, one field — see `mute-contract.ts`, which owns the disambiguation.
+     * The bass writes a NUMERIC palm-mute amount 0..1 (a real note that sounds quietly);
+     * the chords lanes write a BOOLEAN sentinel (`true` = ghost or CC-only carrier).
+     * Typing this `boolean` alone is what let a bare `!muted` read as "is this audible"
+     * and silently drop every palm-muted bass note from MIDI out (#1288). Never test it
+     * with `!muted`.
+     */
+    muted?: number | boolean;
 }
 
 export interface GenerateNotesOptions {

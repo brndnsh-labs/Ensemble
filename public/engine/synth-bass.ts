@@ -2,6 +2,7 @@ import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { MUTE_ATTENUATION, muteGain, normalizeMuteAmount } from './mute-contract.js';
 import { playSampledNote } from './sample-voice.js';
 import {
     playPercussiveStrike,
@@ -65,13 +66,17 @@ function playSampledBass(
         return false;
     }
     const { audio, dest, zone, targetMidi } = resolved;
-    // Mirror the synth voice's mute attenuation so palm-muted notes sit back
-    // (the synth path does `* (1 - muteAmount * 0.85)`). Finite-guard both inputs
-    // locally — same "guard them all" discipline as playBassNoteNew — rather than
-    // leaning on playSampledNote's downstream clamp.
+    // Mirror the synth voice's mute attenuation so palm-muted notes sit back, via
+    // the shared contract (`mute-contract.ts`) rather than a second hand-rolled
+    // copy of it: this branch previously read the amount with a bare
+    // `Number.isFinite` test, which sent a boolean to `0` and played a chuck at
+    // FULL volume on a sample pack while the synth voice 90 lines below played the
+    // identical note at 0.15. It also clamped only the low end, so an amount above
+    // ~1.176 drove the velocity negative. Finite-guard `velocity` locally — same
+    // "guard them all" discipline as playBassNoteNew — rather than leaning on
+    // playSampledNote's downstream clamp.
     const vel = Number.isFinite(velocity) ? velocity : 0.5;
-    const mute = Number.isFinite(muteAmount) ? Math.max(0, muteAmount) : 0;
-    const v = vel * (1 - mute * 0.85);
+    const v = vel * muteGain(muteAmount);
     // Pass the pack-calibrated velocity STRAIGHT to playSampledNote (which bounds
     // the envelope peak at MAX_SAMPLE_PEAK). No `Math.min(1, …)` here: that clamp
     // silently defeats gain calibration above unity (#660 strings lesson).
@@ -122,24 +127,16 @@ function playBassNoteNew(
     if (!playback.audio || !playback.audioGraph) {
         return;
     }
-    // `muted` carries TWO meanings across the codebase and only one of them is a
-    // number. The bass writes a numeric palm-mute amount 0..1 (`bass-engine.ts`
-    // `@param muted`; the funk slap chuck emits `1`), while the chords lanes emit
-    // a boolean `muted: true` sentinel for CC-only notes (`accompaniment.ts`).
-    // `NoteEntry` still types the field `boolean`, so a boolean reaching here is
-    // a live possibility — and `Number.isFinite(true) === false`, which would
-    // trip the guard below and drop the note in total silence with no error.
-    // Normalize instead: a boolean means fully muted / open, and any out-of-range
-    // number clamps rather than driving `vol` negative through the `1 - m * 0.85`
-    // below (anything above ~1.176 does, which is the same silent drop by a
-    // different route). Both routes were confirmed reachable by mutation test —
-    // neither is reachable from today's producers, which all emit 0 or 1.
-    const mute =
-        typeof muteAmount === 'boolean'
-            ? muteAmount
-                ? 1
-                : 0
-            : Math.max(0, Math.min(1, muteAmount));
+    // `muted` carries TWO meanings and only one of them is a number — see
+    // `mute-contract.ts`, which owns the disambiguation for every consumer.
+    // Normalizing here matters because a boolean can legitimately reach this
+    // param (`NoteResult.muted` in `tick-logic.ts` allows both forms), and
+    // `Number.isFinite(true) === false` would trip the guard below
+    // and drop the note in total silence with no error. A non-finite *number*
+    // deliberately survives normalization so that guard still fires on it. Both
+    // routes were confirmed reachable by mutation test — neither is reachable
+    // from today's producers, which all emit 0 or 1.
+    const mute = normalizeMuteAmount(muteAmount);
     // Every other input is caller-supplied — guard them all. A non-finite
     // `bendStartInterval` would otherwise poison `startFreq` and the pitch
     // ramp anchor, silently dropping the voice.
@@ -173,7 +170,7 @@ function playBassNoteNew(
             cutoffRange: [0.4, 1.5],
         });
 
-        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - mute * 0.85);
+        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - mute * MUTE_ATTENUATION);
         if (vol < 0.005) {
             return;
         }
