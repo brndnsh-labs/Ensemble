@@ -35,6 +35,25 @@ export function writeInt16(val: number): number[] {
 }
 
 /**
+ * Maps a soloist entry-bend's `bendStartInterval` (semitones the note starts
+ * away from its target — +1 = start above, glide down) to a 14-bit MIDI
+ * pitch-wheel value. #1322: this exact formula used to be copy-pasted at
+ * three independent sites (live MIDI-out's `dispatchMidiSoloist`, and the
+ * `.mid` exporter's note + resolution-buffer emission) — #963 had to fix a
+ * sign inversion at all three by hand. One shared function makes that class
+ * of divergence structurally impossible instead of relying on three copies
+ * staying in sync. Positive = wheel UP everywhere in this codebase, matching
+ * `synth-soloist.ts`'s `startFreq = freq * 2**(bendStartInterval/12)` and
+ * `emitBendGesture`'s waypoint polyline.
+ */
+export function entryBendToPitchWheel(bendStartInterval: number): number {
+    if (!bendStartInterval) {
+        return 0;
+    }
+    return Math.round((bendStartInterval / 2) * 8192);
+}
+
+/**
  * Maps an internal velocity (0.0 to ~1.5) to a MIDI velocity (0-127).
  * Uses a compression curve to ensure high-intensity accents don't just slam into 127.
  */

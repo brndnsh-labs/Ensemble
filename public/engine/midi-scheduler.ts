@@ -7,7 +7,7 @@ import {
 } from '../controllers/midi-controller.js';
 import type { EnsembleState, StepInfo } from '../types.js';
 import { getMidi } from '../utils.js';
-import { normalizeMidiVelocity } from './midi-utils.js';
+import { entryBendToPitchWheel, normalizeMidiVelocity } from './midi-utils.js';
 
 export function stopMidiTransport(_state: EnsembleState, time: number): void {
     panic(true);
@@ -57,17 +57,10 @@ export function dispatchMidiSoloist(
     isMono: boolean,
 ): void {
     const { midi } = state;
-    // Support Pitch Bend for MIDI scoops
-    let bend = 0;
-    if (bendStartInterval !== 0) {
-        // Map semitones to 14-bit value (-8192 to 8191), standard 2-semitone range.
-        // Positive = wheel UP, matching emitBendGesture and the synth/sampled voices
-        // (synth-soloist startFreq = freq * 2**(bendStartInterval/12): +1 starts
-        // ABOVE). bendStartInterval is where the note STARTS relative to its target,
-        // so +1 ("start above, glide down") = wheel up at onset. #963 fixed the sign
-        // (was negated → every entry-bend played the wrong way on MIDI-out).
-        bend = Math.round((bendStartInterval / 2) * 8192);
-    }
+    // #1322: shared with the .mid exporter's two bend-emission sites via
+    // entryBendToPitchWheel (midi-utils.ts) — see its doc comment for the
+    // sign convention and the #963 divergence this extraction now prevents.
+    const bend = entryBendToPitchWheel(bendStartInterval);
 
     sendMIDINote(
         midi.soloistChannel,

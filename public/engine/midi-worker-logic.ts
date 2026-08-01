@@ -13,13 +13,14 @@ import {
 import { calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
+    entryBendToPitchWheel,
     MidiTrack,
     normalizeMidiVelocity,
     writeInt16,
     writeInt32,
     writeString,
 } from './midi-utils.js';
-import { muteGain } from './mute-contract.js';
+import { isSilentSentinel, muteGain } from './mute-contract.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
@@ -455,12 +456,25 @@ export class ExportProcessor {
                 const noteVel = res.velocity ?? 0;
                 let finalVel = noteVel * polyphonyComp;
 
-                // Match live engine dynamic scaling
+                // #1322: verified against the live paths while auditing this seam —
+                // read both notes below before changing either branch's numbers.
                 if (moduleName === 'bass') {
-                    // Match synth-bass square-root compression curve
+                    // Same sqrt SHAPE as synth-bass.ts's `playBassNoteNew` voice
+                    // builder, but NOT byte-identical: the live voice clamps
+                    // velocity to [0,1] before the sqrt (`Math.sqrt(Math.max(0,
+                    // Math.min(1, velocity)))`), this doesn't. Only diverges outside
+                    // that range (an accent/humanize spike >1, or a negative input —
+                    // unclamped, `Math.sqrt` of a negative velocity is NaN). Left
+                    // unchanged here: matching it is a numeric behavior change to
+                    // exported velocity, out of scope for a behavior-preserving
+                    // refactor — filed as #1325.
                     finalVel = Math.sqrt(noteVel);
                 } else if (moduleName === 'soloist') {
-                    // Match synth-soloist band intensity swell
+                    // NOT a live match despite the old comment's claim: live's
+                    // soloist velocity (scheduler-core.ts, `vel = baseVel *
+                    // polyphonyComp`) has no bandIntensity factor at all — this
+                    // swell exists ONLY in the exported .mid. Left unchanged here
+                    // (same reason as bass, above) — filed as #1325.
                     const intensity = this.state.playback.bandIntensity ?? 0.5;
                     const intensityGain = 0.5 + intensity * 0.9;
                     finalVel = noteVel * intensityGain;
@@ -478,9 +492,16 @@ export class ExportProcessor {
                 // `isSilentSentinel` gate. Bass only ever writes numbers, so neither
                 // branch fires; the live gate is itself defensive. Not resolved with an
                 // early return here because that would also skip this note's CC events.
+                //
+                // #1322: read through isSilentSentinel rather than bare truthiness —
+                // for today's boolean-only chords/harmony producers this is a no-op
+                // (a boolean `true` is already the only truthy value they emit), but
+                // it stops being coincidental if a future producer emits a numeric
+                // partial value here. The 0.3 flat attenuation itself is #1299's open
+                // question (does a ghost sound at all?) and is deliberately UNCHANGED.
                 if (moduleName === 'bass') {
                     finalVel *= muteGain(res.muted);
-                } else if (res.muted) {
+                } else if (isSilentSentinel(res.muted)) {
                     finalVel *= 0.3;
                 }
 
@@ -499,14 +520,13 @@ export class ExportProcessor {
                 }
 
                 if (res.bendStartInterval) {
-                    // Positive = wheel UP, matching emitBendGesture (line ~281) and the
-                    // synth/sampled voices; bendStartInterval is where the note STARTS
-                    // relative to its target (+1 = start above → wheel up at onset).
-                    // #963 fixed the sign (was negated → entry-bends exported reversed).
+                    // #1322: shared with live MIDI-out (dispatchMidiSoloist) and the
+                    // resolution-buffer emission below via entryBendToPitchWheel
+                    // (midi-utils.ts) — see its doc comment for the sign convention.
                     track.pitchBend(
                         notePulse,
                         channel,
-                        Math.round((res.bendStartInterval / 2) * 8192),
+                        entryBendToPitchWheel(res.bendStartInterval),
                     );
                     track.noteOn(notePulse, channel, finalMidi, midiVel);
                 } else {
@@ -889,13 +909,8 @@ export class ExportProcessor {
                 const finalMidi = Math.max(0, Math.min(127, n.midi + octaveShift * 12));
 
                 if (n.module === 'soloist' && n.bendStartInterval) {
-                    // Positive = wheel UP (see the sibling site above + emitBendGesture);
-                    // #963 fixed the sign. bendStartInterval +1 = start above → wheel up.
-                    track.pitchBend(
-                        notePulse,
-                        channel,
-                        Math.round((n.bendStartInterval / 2) * 8192),
-                    );
+                    // #1322: shared via entryBendToPitchWheel — see its doc comment.
+                    track.pitchBend(notePulse, channel, entryBendToPitchWheel(n.bendStartInterval));
                 }
 
                 track.noteOn(notePulse, channel, finalMidi, n.midiVelocity || 90);

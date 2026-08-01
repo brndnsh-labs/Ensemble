@@ -1053,8 +1053,12 @@ export function shouldReleasePriorVoicing(
 /**
  * Schedules chord notes from the worker buffer.
  * Handles sustain pedal events (MIDI CC 64).
+ *
+ * Exported for `tests/unit/engine/midi-interpretation-parity.test.ts` — the
+ * #1322 live-vs-export existence-parity tests, matching the precedent of
+ * `scheduleBass`/`scheduleHarmonies` already being exported for the same reason.
  */
-function scheduleChords(
+export function scheduleChords(
     state: EnsembleState,
     chordData: ChordAtStep,
     step: number,
@@ -1099,10 +1103,15 @@ function scheduleChords(
         // step → seconds via the canonical step duration so chord-comp note
         // lengths match their `durationSteps` count.
         const stepSecChords = secondsPerStepFor(playback.bpm);
-        // Count how many non-muted notes are in this step for volume normalization
+        // Count how many non-muted notes are in this step for volume normalization.
+        // #1299/#1322: read through isSilentSentinel, not bare truthiness — this
+        // lane only ever writes a boolean today (true = non-note), so the count is
+        // unchanged, but it must move together with the dispatch gate and the
+        // strum-rank loop below (the paired-site trap: changing one without the
+        // others desyncs the voice count from the notes actually played).
         let numVoices = 0;
         for (let i = 0; i < notes.length; i++) {
-            if (!notes[i].muted && notes[i].freq) {
+            if (!isSilentSentinel(notes[i].muted) && notes[i].freq) {
                 numVoices++;
             }
         }
@@ -1118,7 +1127,7 @@ function scheduleChords(
         const strummedVoice = isStrummedChordVoice(state.chords.voice);
         const playable: number[] = [];
         for (let i = 0; i < notes.length; i++) {
-            if (!notes[i].muted && notes[i].freq) {
+            if (!isSilentSentinel(notes[i].muted) && notes[i].freq) {
                 playable.push(i);
             }
         }
@@ -1147,7 +1156,7 @@ function scheduleChords(
                 }
             }
 
-            if (!muted && freq) {
+            if (!isSilentSentinel(muted) && freq) {
                 // synth-audit Epic 2 S7 — fail-fast NaN guards. `velocity`
                 // comes straight from the worker note and `duration` from
                 // `durationSteps`; a non-finite value silently poisons a gain
