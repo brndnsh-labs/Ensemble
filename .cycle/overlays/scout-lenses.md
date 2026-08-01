@@ -38,7 +38,7 @@ dropout. **The split that decides everything — which side of the audio path is
 - **Real-time audio path** (`scheduler-core.ts`, the `synth-*.ts` voices, the logic/visualizer
   workers, `tick-logic`) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
-  `synth-implementer` / `musical-engine-implementer` + the matching reviewer, Model `opus`, leave off
+  `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, Model `opus`, leave off
   `burndown` (often `needs-ear`).
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `Track: bundle`, Review lens `bundle-hygiene`. Drop an unused dep, lazy-load a

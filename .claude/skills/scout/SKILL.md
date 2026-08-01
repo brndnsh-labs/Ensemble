@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=2061dbee43f6 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=3737ff6a1cc8 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -79,7 +79,7 @@ dropout. **The split that decides everything — which side of the audio path is
 - **Real-time audio path** (`scheduler-core.ts`, the `synth-*.ts` voices, the logic/visualizer
   workers, `tick-logic`) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
-  `synth-implementer` / `musical-engine-implementer` + the matching reviewer, Model `opus`, leave off
+  `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, Model `opus`, leave off
   `burndown` (often `needs-ear`).
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `Track: bundle`, Review lens `bundle-hygiene`. Drop an unused dep, lazy-load a

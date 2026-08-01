@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=0b84dcdac9cd — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=f897f99ae859 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -106,11 +106,10 @@ of Done and the reviewer set:
   multiplier, deterministic phrasing, register slotting, coordination-context discipline).
 - `critique-test-author` — when the deliverable **is** a new/tightened critique test
   (not a one-line threshold bump an engine implementer can do inline).
-- `synth-implementer` — audio-DSP/synthesis voices (`synth-*.ts`, `initAudio()`,
-  `reverb.ts`, `synth-utils.ts`, scheduler audio-graph wiring).
-- `orchestrator-inline` — default for opus/small/taste stories and finicky infra
-  (state-slice schema, worker sync contract, hydration) where a cold agent re-derives
-  brittle detail and ships latent bugs.
+- `orchestrator-inline` — default for opus/small/taste stories, for audio-DSP/synthesis
+  voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph
+  wiring), and for finicky infra (state-slice schema, worker sync contract, hydration) —
+  anywhere a cold agent re-derives brittle detail and ships latent bugs.
 - `claude` — general UI, non-engine `public/**`, mechanical work.
 
 **Reviewers**, additive (union what fires):
