@@ -211,6 +211,18 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
     // Because the window is exactly an octave there is no nearest-candidate choice left
     // to make, and therefore no tie to break — the earlier draft's lean-to-the-lower-octave
     // rule is subsumed by the window itself.
+    //
+    // #1275 asked whether the anchor could instead resolve from the PREVIOUS chord's
+    // anchor, to shrink an occasional large root-to-root leap (e.g. D→Eb→E: 38→39→28,
+    // an 11-semitone drop) — i.e. real inter-chord voice leading, not just the
+    // within-chord stability this already provides. It cannot, for the same reason
+    // there's no tie to break above: a 12-integer window is a complete residue class
+    // mod 12, so every pitch class has exactly ONE legal anchor already. There is no
+    // second candidate for "nearest to the previous anchor" to choose between — verified
+    // by hand against #1275's own D→Eb→E example, where the only alternative to 28
+    // (E's sole legal anchor) is ~40, whose partner (52) is outside comfort range and
+    // folds straight back to 28. The fix would require widening the window, which is
+    // exactly the tradeoff rejected two paragraphs up. Closed as already-optimal.
     const anchorFor = (midi: number): number | null => {
         if (!isAnchorStyle) {
             return null;
