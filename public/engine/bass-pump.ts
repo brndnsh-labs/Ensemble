@@ -23,12 +23,14 @@ import { scrambleHash } from './hash-utils.js';
  * disco branch, because those are ordinary style-lane note choices. This module owns the
  * ANCHOR and the repeat-pass VARIATION — the two things the generic engine got wrong.
  *
- * ONE exception to that boundary, and it is a narrow one: `forcesLift` (#1292). The pump
- * does not choose the pump's notes, but it holds a veto-proof override on the upbeat lift,
- * because the variation it owns is defined as a RE-VOICING and a re-voicing needs something
- * to act on. Without it a drawn `fifth` was silently annulled whenever `bass-styles.ts`'s
- * `octaveProb` roll declined — 45% of the time at the gesture's own intensity floor. If you
- * are here debugging a missing lift, `forcesLift` is the other half of `revoice`.
+ * ONE exception to that boundary, and it is a narrow one: `forcesLift` (#1292, extended to
+ * `half-drop` in #1293). The pump does not choose the pump's notes, but it holds a
+ * veto-proof override on the upbeat lift, because both variations it owns that keep the
+ * lift sounding — a RE-VOICING (`fifth`) and a partial SILENCING (`half-drop`) — need that
+ * lift to actually be there. Without it a drawn `fifth`/`half-drop` was silently annulled
+ * whenever `bass-styles.ts`'s `octaveProb` roll declined — 45% of the time at the gesture's
+ * own intensity floor. If you are here debugging a missing lift, `forcesLift` is the other
+ * half of `revoice`.
  */
 
 // #1271 — styles whose register is a FIXED STRUCTURAL ANCHOR, not a drifting hand
@@ -66,9 +68,10 @@ const pitchClass = (midi: number): number => ((midi % 12) + 12) % 12;
  *
  * `'none'` — the beat plays the Statement's shape, unvaried.
  * `'drop'` — the whole beat is silent.
+ * `'half-drop'` — the downbeat root is silent; the "and" lift still sounds, unchanged.
  * `'fifth'` — the beat keeps its low root and the lift above it is re-voiced as a 5th.
  */
-export type PumpVariation = 'none' | 'drop' | 'fifth';
+export type PumpVariation = 'none' | 'drop' | 'half-drop' | 'fifth';
 
 /**
  * Everything the pump reads, assembled once per `getBassNote` call.
@@ -143,15 +146,25 @@ export interface BassPump {
     anchorFor(midi: number): number | null;
     /** The repeat-pass outcome for the step this context describes. */
     variation(): PumpVariation;
+    /** True on the beat's own "and" — the sub-step the lift sits on. Read by `bass-engine.ts`
+     *  to spare exactly that one sub-step when `variation()` is `'half-drop'`; every other
+     *  sub-step of the beat silences the same way `'drop'` silences the whole thing. */
+    isLiftStep(): boolean;
     /**
-     * True when this step must sound the beat's LIFT because a `fifth` has been drawn for
-     * it. `revoice` can only re-voice a lift that was actually emitted, and `bass-styles.ts`
-     * emits one on a `Math.random() < octaveProb` coin flip — so without this, a drawn
-     * `fifth` produced nothing at all whenever that roll declined, on a rate that got worse
-     * as intensity fell (45% of draws silent at the gesture's own 0.25 floor, versus 6% at
-     * the 0.9 every repeat-pass test used to run at). A bassist who decides to voice the
-     * lift as a 5th plays it; the roll is a density knob and has no opinion about that.
-     * See #1292.
+     * True when this step must sound the beat's LIFT because a `fifth` OR a `half-drop` has
+     * been drawn for it. `revoice` can only re-voice a lift that was actually emitted, and
+     * `bass-styles.ts` emits one on a `Math.random() < octaveProb` coin flip — so without
+     * this, a drawn `fifth` produced nothing at all whenever that roll declined, on a rate
+     * that got worse as intensity fell (45% of draws silent at the gesture's own 0.25 floor,
+     * versus 6% at the 0.9 every repeat-pass test used to run at). A bassist who decides to
+     * voice the lift as a 5th plays it; the roll is a density knob and has no opinion about
+     * that. See #1292.
+     *
+     * `half-drop` (#1293) needs the identical force for a different reason: its entire
+     * identity is "the root is silent, the lift is not" — if the roll declined on its one
+     * surviving note, the beat would render byte-identical to a full `drop` despite being
+     * drawn and classified as something else. The same 45%-silent-at-the-floor rate that
+     * broke `fifth` would break `half-drop` the same way, on the same beats.
      */
     forcesLift(): boolean;
     /** Apply the repeat-pass outcome to one note of the target beat. Identity outside the
@@ -285,35 +298,51 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
     // the [28, 51] comfort range: on the target beat the lift is either voiced as a fifth or
     // the beat is silent.
     //
-    // The vocabulary is two gestures:
+    // The vocabulary is three gestures:
     //
-    //   drop   — the target beat is silent: the downbeat, the "and", and any gallop 16ths
-    //            between them. A bassist leaving a beat empty is core disco/funk
-    //            vocabulary — it is what makes the next downbeat land — and it needs no
-    //            headroom, so it reads identically on Bb and on C. It is a hole, not a
-    //            dropout: disco's kick is 4-on-the-floor on both drum paths, so the kit
-    //            still marks the spot — see the KNOWN LIMIT note at the `drop`
-    //            short-circuit in `getBassNote` for the one meter where that is only
-    //            approximately true.
-    //   fifth  — the beat keeps its low root and the lift above it becomes the 5th instead
-    //            of the octave. `baseRoot` is in [28, 39] because the anchor window above is
-    //            exactly an octave, so `baseRoot + 7` is in [35, 46] — inside the comfort
-    //            range for every pitch class. No headroom test, no fold, no clamp. It is the
-    //            one gesture here that reads the CHORD rather than just the root, and it has
-    //            two conditions, not one — see `canFifth`.
+    //   drop      — the target beat is silent: the downbeat, the "and", and any gallop 16ths
+    //               between them. A bassist leaving a beat empty is core disco/funk
+    //               vocabulary — it is what makes the next downbeat land — and it needs no
+    //               headroom, so it reads identically on Bb and on C. It is a hole, not a
+    //               dropout: disco's kick is 4-on-the-floor on both drum paths, so the kit
+    //               still marks the spot — see the KNOWN LIMIT note at the `drop`
+    //               short-circuit in `getBassNote` for the one meter where that is only
+    //               approximately true.
+    //   half-drop — #1293. Silence the beat's downbeat root; keep the "and" lift. Arguably
+    //               the single most idiomatic disco/funk repeat-pass move of the three —
+    //               leave the One of the beat, let the upbeat pop, and the line leans
+    //               forward into the next downbeat instead of dropping out of it entirely.
+    //               Reuses `drop`'s machinery (the same beat-quantized legality, `canDrop`)
+    //               restricted to a single sub-step rather than the whole beat: every
+    //               sub-step except the lift (`isLiftStep`) silences the way a full `drop`
+    //               silences all of them. Like `drop`, it needs no headroom and no chord
+    //               data — it removes a note rather than placing one — so it reads
+    //               identically in every key. Unlike `fifth`, the note that does sound is
+    //               unmodified (still `baseRoot + 12`, via `revoice`'s no-op path): the
+    //               gesture is entirely about what goes silent, not about re-voicing what
+    //               remains.
+    //   fifth     — the beat keeps its low root and the lift above it becomes the 5th instead
+    //               of the octave. `baseRoot` is in [28, 39] because the anchor window above
+    //               is exactly an octave, so `baseRoot + 7` is in [35, 46] — inside the
+    //               comfort range for every pitch class. No headroom test, no fold, no clamp.
+    //               It is the one gesture here that reads the CHORD rather than just the
+    //               root, and it has two conditions, not one — see `canFifth`.
     //
     // Invariants this establishes, worth stating rather than rediscovering:
     //
-    // - Neither gesture depends on headroom, so both are available in every key on an
+    // - No gesture depends on headroom, so all three are available in every key on an
     //   ordinary root-position perfect-fifth chord — V2/V3/V4/V5 differ in KIND, not merely
     //   in which beat is affected, on all twelve roots equally. `'none'` is reachable only
     //   through the CHART, never through the key: a chord the `fifth` may not sound over
-    //   (altered fifth, or a slash bass), plus — for a drawn `drop` — an arrival.
+    //   (altered fifth, or a slash bass), plus — for a drawn `drop` or `half-drop` — an
+    //   arrival.
     // - The draw is over a CONSTANT vocabulary, so a gesture's share never changes with
     //   local availability or with the chord root.
     // - No variation of any kind ever touches a bar's One — that is structural, owned by
-    //   `isTargetBeat`'s candidate set rather than by a per-gesture veto. `drop`
-    //   additionally never silences a section entrance or a chord entry, and `fifth` never
+    //   `isTargetBeat`'s candidate set rather than by a per-gesture veto. `drop` and
+    //   `half-drop` additionally never silence a section entrance or a chord entry (they
+    //   share the identical `canDrop` legality — see the resolution below for why an
+    //   illegal `half-drop` falls to `fifth` rather than to `drop`), and `fifth` never
     //   sounds over a chord whose fifth is altered or whose bass is not the root.
     const variation = (): PumpVariation => {
         // The same gates the generic Imperfect Symmetry wrapper applies. Both callers in
@@ -340,6 +369,17 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
         // alone, so `beatOwnsChordEntry` would have to become a stricter test, not a looser
         // one. `subBeatStep` backs the current step up to the beat's first step for each
         // test below.
+        //
+        // #1293 review — that mirror gesture is now `half-drop`, and it reuses `canDrop`
+        // BELOW unchanged rather than tightening it further. That satisfies this note's
+        // requirement rather than contradicting it: "identical to `drop`'s guard" is the
+        // strictest member of "at least as strict, never looser" — it is not a per-step
+        // reading (still beat-quantized, still keyed off `beatOwnsChordEntry`), and it still
+        // refuses a chord entry outright rather than accepting a late, octave-up "and" as an
+        // answer to it. If the listening gate this story stops at judges that a `half-drop`
+        // is acceptable ON a chord entry specifically — because the "and" states the new
+        // root, just delayed and an octave high — loosen `canDrop` for `half-drop` alone at
+        // that point; don't infer it from this comment.
         const subBeatStep = ctx.stepInMeasure % ctx.stepsPerBeat;
 
         // "Never silence a bar's One" is NOT a term here. It is guaranteed one level up by
@@ -397,27 +437,31 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
             pitchClass(ctx.chordBassMidi) === pitchClass(ctx.chordRootMidi);
         const canFifth = bassIsChordRoot && chordHasPerfectFifth(ctx.chordQuality);
 
-        // why: 0.7 fifth / 0.3 drop — NOT a 50/50 split, because the two gestures are not
-        // equals. `fifth` is the mildest and most idiomatic (the pulse and the low root both
-        // survive; only the lift is re-voiced), so it carries the gesture most of the time.
-        // `drop` is a statement and wants to stay an event. A uniform split is the "50/50
-        // for funk" anti-pattern in two-item clothing.
+        // why: 0.5 fifth / 0.3 half-drop / 0.2 drop — NOT a uniform three-way split, because
+        // the three gestures are not equals. `fifth` is the mildest and most idiomatic (the
+        // pulse and the low root both survive; only the lift is re-voiced), so it still
+        // carries the gesture most of the time, same as it did as the two-item menu's
+        // majority share.
         //
-        // #1291 — `drop` HOLDS the 0.3 it had when `octave` still existed, and `fifth` takes
-        // the entire retired 0.2. Deliberate, not incidental. Musically, 0.3 is the hole
-        // density that was auditioned and approved, and the hole is the one outcome here a
-        // listener registers as an EVENT — inheriting the retired weight would have taken it
-        // to 0.5 and changed what the repeat pass sounds like, which removing a third gesture
-        // does not authorize. Structurally, `fifth` is the near substitute for the octave
-        // (the beat still sounds, still off its own low root; only the lift's interval
-        // changed) and `drop` is the far one, so if a retired band has to land somewhere it
-        // belongs on the nearer gesture.
+        // #1293 — adding `half-drop` takes its 0.3 out of `fifth`'s former 0.7 and leaves
+        // `drop`'s share untouched at a REDUCED 0.2, not the 0.3 it held as the two-item
+        // menu's minority. That is deliberate, not an oversight: `drop`'s 0.3 was a density
+        // that was auditioned and approved as the two-item menu's ONE silence outcome, and
+        // `half-drop` is also a silence (of the root) — so leaving `drop` at 0.3 on top of a
+        // new 0.3 `half-drop` would have doubled the beat's rate of "something in this beat
+        // goes quiet" from the audited 30% to 60%, which is not what this story asked for.
+        // `half-drop` is pitched at the SAME density `drop` used to carry alone, and `drop`
+        // itself steps back to make room, staying the rarest of the three — the full-beat
+        // silence is the most drastic gesture and should stay the one a listener registers
+        // as an EVENT, per the reasoning `drop`'s original share was chosen under. This first
+        // split is a starting estimate, not a re-audition of the whole vocabulary — it is
+        // what the listening gate this story stops at (§5) exists to confirm or correct.
         //
         // Drawn over the CONSTANT vocabulary — never over a menu re-sized by local
         // availability. Re-dividing the seed range when an outcome is unavailable would
         // silently hand its band to whichever gesture inherited the range, which is how Bb
         // ended up with ~50% more holes than every other key. `scrambleHash` is mulberry32
-        // and returns [0, 1), so the two bands below are exhaustive with no dead corner
+        // and returns [0, 1), so the three bands below are exhaustive with no dead corner
         // guard needed.
         const menuSeed = scrambleHash(
             (ctx.sectionIdHash ^
@@ -425,50 +469,65 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
                 (ctx.phraseIndex * 0x846ca68b)) |
                 0,
         );
-        const drawn: Exclude<PumpVariation, 'none'> = menuSeed < 0.7 ? 'fifth' : 'drop';
+        const drawn: Exclude<PumpVariation, 'none'> =
+            menuSeed < 0.5 ? 'fifth' : menuSeed < 0.8 ? 'half-drop' : 'drop';
 
         // --- Resolution ---
         // why: several separate reasons ("altered fifth", "slash bass", "chord entry or
         // section start") produce the same shape of problem — this outcome isn't available
         // here — so they get one resolution rather than an ad-hoc per-reason fallback.
         // #1276's three-rung ladder ordered its fallbacks by musical NEARNESS to the drawn
-        // gesture; with a two-item menu there is exactly one alternative, so the ordering
-        // rule has nothing left to decide and the machinery collapses to the two lines
-        // below.
+        // gesture; #1293 restores a real ladder rather than the two-item menu's collapsed
+        // pair, but the ordering principle is the same one #1276 established.
         //
-        // why: those two lines are NOT symmetric, and the asymmetry is the whole rule. An
-        // unavailable `drop` falls to `fifth` — both are variations, and the beat should
-        // still vary. An unavailable `fifth` falls to `none`, NEVER to `drop`.
+        // why: `drop` and `half-drop` share the IDENTICAL legality (`canDrop` — both are a
+        // property of the same beat-level arrival guard, since `half-drop` is `drop`'s
+        // machinery with a sub-step restriction, not a separate legality question). So a
+        // `canDrop` failure takes BOTH silencing gestures out at once — there is nothing
+        // "nearer" to fall to between them, and falling from one straight to the other would
+        // be falling from an illegal outcome to an equally illegal one. Both therefore fall
+        // to `fifth` — still a variation, so the beat still varies — and only if `fifth` is
+        // ALSO unavailable does the beat give up and play the Statement's shape.
         //
         // Never manufacture a hole out of a re-voicing that couldn't happen. `canDrop` is a
-        // property of one BEAT (an arrival), so routing `drop` → `fifth` costs at most that
-        // beat. `canFifth` is a property of the CHORD, so it holds for as long as that chord
-        // sounds: routing `fifth` → `drop` would take the hole density from its auditioned
-        // 0.3 to a flat 1.0 for an entire slash-chord or altered-fifth passage — every
-        // target beat in it a hole, which is a worse defect than the mis-voiced fifth the
-        // guard above exists to prevent. On those chords the pump plays the Statement's
-        // shape instead: less variation, not more silence.
-        if (drawn === 'drop') {
-            return canDrop ? 'drop' : canFifth ? 'fifth' : 'none';
+        // property of one BEAT (an arrival), so routing a silencing gesture to `fifth` costs
+        // at most that beat. `canFifth` is a property of the CHORD, so it holds for as long
+        // as that chord sounds: routing `fifth` → a silencing gesture would take the hole
+        // density from its auditioned band to a flat 1.0 for an entire slash-chord or
+        // altered-fifth passage — every target beat in it a hole, which is a worse defect
+        // than the mis-voiced fifth the guard above exists to prevent. On those chords the
+        // pump plays the Statement's shape instead: less variation, not more silence.
+        if (drawn === 'fifth') {
+            return canFifth ? 'fifth' : 'none';
         }
-        return canFifth ? 'fifth' : 'none';
+        if (!canDrop) {
+            return canFifth ? 'fifth' : 'none';
+        }
+        return drawn;
     };
 
     // The beat's lift sits on its own "and" — the same sub-step `bass-styles.ts` calls
     // `isOffbeatAnd`, derived the same way (`% stepsPerBeat` against `floor(stepsPerBeat/2)`)
     // so the two cannot drift apart on a compound meter. Deliberately NOT the gallop 16ths:
     // those are a density flourish that may or may not be present, and forcing one would
-    // add a note rather than re-voice the one the gesture is about.
+    // add a note rather than re-voice the one the gesture is about. `half-drop` reads this
+    // same distinction the other way: the gallop 16ths are exactly the sub-steps it silences
+    // along with the downbeat, since only the lift itself is spared (#1293).
     const isLiftStep = (): boolean =>
         ctx.stepInMeasure % ctx.stepsPerBeat === Math.floor(ctx.stepsPerBeat / 2);
 
-    const forcesLift = (): boolean => variation() === 'fifth' && isLiftStep();
+    const forcesLift = (): boolean => {
+        const v = variation();
+        return (v === 'fifth' || v === 'half-drop') && isLiftStep();
+    };
 
     const revoice = (note: number, baseRoot: number): number => {
         if (variation() !== 'fifth') {
-            // 'drop' is handled by the short-circuit near the top of `getBassNote` — by the
-            // time a note reaches `result()` its beat has already been silenced, so there is
-            // nothing here to re-voice. 'none' is the ordinary no-op.
+            // 'drop' and 'half-drop' are both handled by the short-circuits near the top of
+            // `getBassNote` — by the time a note reaches `result()` its silenced sub-steps are
+            // already gone, and the one note `half-drop` spares is deliberately NOT re-voiced
+            // here (its whole identity is "unmodified lift"; only `fifth` rewrites the lift's
+            // interval). 'none' is the ordinary no-op.
             return note;
         }
         // #1292 — this rewrite is only half the gesture, and the other half is `forcesLift`.
@@ -502,5 +561,5 @@ export function createBassPump(ctx: BassPumpContext): BassPump {
         return note === baseRoot + 12 ? baseRoot + 7 : note;
     };
 
-    return { isAnchorStyle, anchorFor, variation, forcesLift, revoice };
+    return { isAnchorStyle, anchorFor, variation, isLiftStep, forcesLift, revoice };
 }

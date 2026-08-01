@@ -278,34 +278,43 @@ describe('Disco Bassist Critique', () => {
      * every kind is detected by an artifact that is STRUCTURALLY IMPOSSIBLE at
      * occurrence 1, which is also what makes the classifier non-vacuous:
      *
-     *   drop   — a beat start with no note at all. At occurrence 1 disco emits on every
-     *            single beat start without exception: `checkBassActiveStyle` returns true
-     *            unconditionally for the style, and the disco branch's `isBeatStart` arm
-     *            always fires.
-     *   fifth  — a beat → "and" delta of exactly +7. The pump's only other legal moves are
-     *            0 (the `octaveProb` roll declining) and +12.
+     *   drop      — a beat start with NO note at all, and no "and" either — the whole beat
+     *               is silent. At occurrence 1 disco emits on every single beat start
+     *               without exception: `checkBassActiveStyle` returns true unconditionally
+     *               for the style, and the disco branch's `isBeatStart` arm always fires.
+     *   half-drop — #1293. A beat start with no note, but an "and" IS present. `drop` and
+     *               `half-drop` share the identical downbeat signature (no note at the
+     *               beat), so they can only be told apart by what the "and" does: silent
+     *               under `drop`, sounding under `half-drop`. Structurally impossible at
+     *               occurrence 1 for the same reason `drop` is — nothing silences a
+     *               downbeat outside the repeat-pass gesture.
+     *   fifth     — a beat → "and" delta of exactly +7. The pump's only other legal moves
+     *               are 0 (the `octaveProb` roll declining) and +12.
      *
-     * #1291 removed the third kind. `octave` was detected as a beat-start pitch away from
-     * the anchor; with the pair displacement retired, no repeat pass ever moves a beat's
-     * pitch, so that detector could only ever report zero. It is deleted rather than kept
-     * as a permanently-zero row — the claim it used to make ("the anchor never moves") is
-     * now asserted directly as `distinctBeatMidis === 1` on the repeat pass, and as the
-     * flat 28-51 register bound.
+     * #1291 removed the third kind (`octave`). `octave` was detected as a beat-start pitch
+     * away from the anchor; with the pair displacement retired, no repeat pass ever moves a
+     * beat's pitch, so that detector could only ever report zero. It was deleted rather than
+     * kept as a permanently-zero row — the claim it used to make ("the anchor never moves")
+     * is now asserted directly as `distinctBeatMidis === 1` on the repeat pass, and as the
+     * flat 28-51 register bound. #1293 adds `half-drop` back as a genuine third kind, but it
+     * is detected from the performance exactly like `drop` and `fifth` are — an artifact, not
+     * a re-derivation of the engine's own menu draw.
      *
      * The anchor is the MODAL beat-start pitch. Since #1291 every beat of a single-chord
      * run carries the same pitch, so modal and minimum agree; modal is kept because it is
      * the reading that stays correct if a future gesture displaces a beat downward.
      *
-     * The `fifth` detector is EXACT as of #1292. It reads a beat → "and" delta of +7, and
-     * the pump now forces the lift it re-voices, so every drawn `fifth` renders — at every
+     * The `fifth` and `half-drop` detectors are both EXACT as of #1292/#1293. Both read off
+     * a forced lift (`forcesLift` covers both — see `bass-pump.ts`), so neither is invisible
+     * to an `octaveProb` roll declining; every drawn instance of either renders, at every
      * intensity above the 0.25 gate, in every key.
      *
      * This docblock previously recorded a KNOWN UNDER-COUNT here (a fifth was invisible on
      * the ~6-10% of target beats where the `octaveProb` roll declined, classifying those
      * phrases as `'none'`). That was real, but it was a BUG in the engine rather than a
      * limitation of the classifier, and #1292 removed it. Consequence worth knowing: the
-     * printed distribution is now a genuine estimate of the 0.7/0.3 draw weighting rather
-     * than a floor on the fifth's share, so it is legitimate to calibrate against it.
+     * printed distribution is now a genuine estimate of the draw weighting rather than a
+     * floor on any one gesture's share, so it is legitimate to calibrate against it.
      */
     const summarizeVariations = (performance, numBars, timeSignature = '4/4') => {
         const ts = TIME_SIGNATURES[timeSignature];
@@ -325,16 +334,26 @@ describe('Disco Bassist Critique', () => {
         const kinds = new Set();
         const kindAtBeat = new Map();
         const dropped = [];
+        const halfDropped = [];
         const fifths = [];
         for (let b = 0; b < totalBeats; b++) {
             const beat = byStep.get(b * stepsPerBeat);
-            if (!beat) {
+            const and = byStep.get(b * stepsPerBeat + stepsPerBeat / 2);
+            if (!beat && !and) {
                 kinds.add('drop');
                 kindAtBeat.set(b, 'drop');
                 dropped.push(b);
                 continue;
             }
-            const and = byStep.get(b * stepsPerBeat + stepsPerBeat / 2);
+            // #1293 — same missing-downbeat signature as `drop`, distinguished only by the
+            // "and" actually sounding. Checked before the `fifth` delta test below because
+            // `beat` is undefined here and a delta needs both notes.
+            if (!beat && and) {
+                kinds.add('half-drop');
+                kindAtBeat.set(b, 'half-drop');
+                halfDropped.push(b);
+                continue;
+            }
             if (and && and.note.midi - beat.note.midi === 7) {
                 kinds.add('fifth');
                 kindAtBeat.set(b, 'fifth');
@@ -367,6 +386,7 @@ describe('Disco Bassist Critique', () => {
                 (a, b) => a - b,
             ),
             dropped,
+            halfDropped,
             fifths,
             pitches: [...new Set(performance.map((p) => p.note.midi))].sort((a, b) => a - b),
         };
@@ -723,36 +743,32 @@ describe('Disco Bassist Critique', () => {
         // target beat, so that bound holds for any implementation, including a menu
         // degenerated to always-`fifth`.
         //
-        // Both ends are derived, not guessed. RE-DERIVED for #1291's two-item menu: the
-        // fifth's weight went 0.5 → 0.7 when `octave` retired and handed it the whole
-        // remaining band, so the centre moves 16 → 22.4 phrases. Observed 23 (32 phrases
-        // split 23 fifth / 7 drop / 2 undetected against an expected 22.4 / 9.6).
+        // Both ends are derived, not guessed. RE-DERIVED for #1293's three-item menu: `fifth`
+        // steps back down to its original 0.5 share (from #1291's 0.7, which handed it the
+        // whole band `octave` vacated), so the centre moves 22.4 → 16 phrases. Observed 18
+        // (32 phrases split 18 fifth / 8 half-drop / 6 drop against an expected 16 / 9.6 /
+        // 6.4 — see the run's own log line above).
         //
-        // A menu degenerated to always-`fifth` MEASURES 30 here — verified by temporarily
-        // forcing the draw — so `< 29` catches it; a fifth that never fires reads 0, so
-        // `> 14` catches that. Binomial sd at n=32, p=0.7 is 2.6, so the ends sit ~3.4σ and
-        // ~2.3σ off the observed value; the value is deterministic, so that width is there
-        // to tolerate a re-weighting, not sampling noise.
+        // Binomial sd at n=32, p=0.5 is 2.83. Floor 8 sits ~3.5σ below the observed value —
+        // comfortably above the near-zero a vetoed/dead `fifth` would read, and a menu
+        // degenerated to always-`fifth` structurally measures at most 32 (every phrase forced
+        // to render, per `forcesLift`), so ceiling 25 sits clearly below that while still
+        // ~2.5σ above the observed value: enough headroom to tolerate a future re-weighting
+        // without re-deriving these bounds, not enough to pass a genuinely broken menu.
         //
-        // #1291 review — be honest about the top end specifically. 30 is 32 phrases less the
-        // two whose `octaveProb` roll declined on the target beat, and that 2 is a property
-        // of the PINNED STREAM, not of the engine: the structural value is 32, and the
-        // detector's under-count is binomial (n=32, p=0.94 → ~1.9 expected, sd ~1.3). Under
-        // a different stream a degenerate menu could measure 28 and slip under this bound.
-        // So `< 29` is a real second reading of the failure, not a margin with structure
-        // behind it — read "one phrase to spare" as luck, and don't lean on it.
-        //
-        // The reliable catcher for the degenerate menu is `kinds.length >= 2` above: an
-        // always-`fifth` menu produces no hole AT ALL, so the classifier reads one kind
-        // regardless of the stream. Verified by the same mutation, which reddens 14 tests in
-        // this file.
-        expect(repeat.fifthLifts).toBeGreaterThan(14);
-        expect(repeat.fifthLifts).toBeLessThan(29);
+        // The reliable catcher for a degenerate menu either way is `kinds.length >= 2` above:
+        // an always-`fifth` menu produces neither a hole nor a half-drop, so the classifier
+        // reads exactly one kind regardless of the stream — this band is the second reading,
+        // not the only one.
+        expect(repeat.fifthLifts).toBeGreaterThan(8);
+        expect(repeat.fifthLifts).toBeLessThan(25);
 
         // Rate holds through the variation — the varied beats are not paying for it. Read
         // on `liftRate` (octave OR fifth) rather than `score`, because a fifth beat is a
         // lift that happens not to be an octave: scoring it as a miss would assert that
-        // the new gesture must be rare, which is not the musical claim.
+        // the new gesture must be rare, which is not the musical claim. `half-drop`'s one
+        // surviving note is an unmodified octave lift (never re-voiced), so it already reads
+        // as an ordinary `octaveLifts` hit and needs no separate accounting here.
         expect(repeat.liftRate).toBeGreaterThan(0.9);
         // ...but the octave-only rate needs its own floor, or switching this guard to
         // `liftRate` would leave the pump proper unguarded: a `fifth` leaking past the one
@@ -760,10 +776,12 @@ describe('Disco Bassist Critique', () => {
         //
         // The floor is set from the gesture's structural worst case, not from the observed
         // number. The variation touches 32 of 512 pairs, so even if EVERY target beat were
-        // a fifth the rate could only fall from pass 1's 91.6% to ~85.4% (the always-`fifth`
-        // mutation measured 88.3%). Observed here: 89.9% — 1pt below the pre-#1291 90.9%,
-        // which is the fifth's larger share showing up exactly where it should. 0.84 sits
-        // below that structural bound and far above anything that would mean the pump broke.
+        // a fifth the rate could only fall from pass 1's 91.6% to ~85.4%. Observed here: 91.4%
+        // — within noise of pass 1's 91.6%, because `half-drop`'s forced lift still reads as
+        // an ordinary octave and `drop`'s share (which WOULD cost `score`, since a dropped
+        // beat vanishes from `checks` entirely) shrank from 0.3 to 0.2 under the new menu.
+        // 0.84 sits below that structural worst case and far above anything that would mean
+        // the pump broke.
         expect(repeat.score).toBeGreaterThan(0.84);
     });
 
@@ -843,13 +861,19 @@ describe('Disco Bassist Critique', () => {
 
                 console.log(
                     `[Disco Critique] ${name} V${occ}: ballad fifths [${quiet.fifths.join(', ')}] ` +
-                        `drops [${quiet.dropped.join(', ')}] | full fifths ` +
-                        `[${full.fifths.join(', ')}] drops [${full.dropped.join(', ')}]`,
+                        `drops [${quiet.dropped.join(', ')}] half-drops ` +
+                        `[${quiet.halfDropped.join(', ')}] | full fifths [${full.fifths.join(', ')}] ` +
+                        `drops [${full.dropped.join(', ')}] half-drops [${full.halfDropped.join(', ')}]`,
                 );
 
                 // The gesture is intensity-invariant above the gate, in both directions.
+                // #1293 — `half-drop` reads the identical gate as `fifth` (`forcesLift`), so
+                // it needs the identical equality check: without it, the same 45%-silent-at-
+                // the-floor bug #1292 fixed for `fifth` would apply to `half-drop`'s one
+                // surviving note too.
                 expect(quiet.fifths).toEqual(full.fifths);
                 expect(quiet.dropped).toEqual(full.dropped);
+                expect(quiet.halfDropped).toEqual(full.halfDropped);
             }
         },
     );
@@ -883,13 +907,52 @@ describe('Disco Bassist Critique', () => {
         );
 
         // The menu seed includes `phraseIndex`, so a 32-bar run draws once per 4-bar phrase
-        // — 8 draws per occurrence, 32 across V2-V5. `fifth` carries 0.7 of a two-item menu,
-        // so a root drawing none at all is `0.3 ** 32` ≈ 2e-17. (Stated precisely because
-        // the next person calibrating a threshold here will trust it: the intuitive
-        // "0.3 ** 4 ≈ 0.8%" reading treats it as one draw per occurrence, which is wrong by
-        // ~15 orders of magnitude.) It is not chance in any case, since the draw is seeded —
-        // any root listed here means the gesture is being vetoed, not that it was unlucky.
+        // — 8 draws per occurrence, 32 across V2-V5. `fifth` carries 0.5 of the #1293
+        // three-item menu, so a root drawing none at all is `0.5 ** 32` ≈ 2.3e-10. (Stated
+        // precisely because the next person calibrating a threshold here will trust it: the
+        // intuitive "0.5 ** 4 ≈ 6%" reading treats it as one draw per occurrence, which is
+        // wrong by ~9 orders of magnitude.) It is not chance in any case, since the draw is
+        // seeded — any root listed here means the gesture is being vetoed, not that it was
+        // unlucky.
         expect(rootsWithNoFifth).toEqual([]);
+    });
+
+    // #1293 — the same non-vacuity companion, for `half-drop`. `forcesLift` covers it
+    // identically to `fifth` (both need the "and" to actually render rather than lose it to
+    // the `octaveProb` roll declining), so it needs the identical ballad-intensity proof: a
+    // root that silently never draws — or never renders — `half-drop` at low intensity would
+    // pass the equality test above (both readings would agree at zero) while the gesture is
+    // effectively dead in exactly the register the story cites (#1292's "ballad-style verses
+    // are where Imperfect Symmetry earns its keep" applies to this gesture too).
+    it('renders a drawn half-drop at ballad intensity, on every root (#1293)', () => {
+        const BARS = 32;
+        const settings = { playback: { bandIntensity: 0.3, complexity: 0.5, bpm: 124 } };
+        const rootsWithNoHalfDrop = [];
+
+        for (const [name, rootMidi] of PITCH_CLASSES) {
+            let seen = 0;
+            for (let occ = 2; occ <= 5; occ++) {
+                seen += summarizeVariations(
+                    simulatePerformance(BARS, settings, rootMidi, {
+                        stepCoordination: { sectionOccurrence: occ },
+                    }),
+                    BARS,
+                ).halfDropped.length;
+            }
+            if (seen === 0) {
+                rootsWithNoHalfDrop.push(name);
+            }
+        }
+
+        console.log(
+            `[Disco Critique] ballad-intensity half-drop coverage: ` +
+                `${PITCH_CLASSES.length - rootsWithNoHalfDrop.length}/${PITCH_CLASSES.length} roots`,
+        );
+
+        // `half-drop` carries 0.3 of the menu, so a root drawing none at all across 32 draws
+        // is `0.7 ** 32` ≈ 1.1e-5 — not chance, since the draw is seeded, but stated so a
+        // future re-weighting doesn't mistake a real veto for an unlucky sweep.
+        expect(rootsWithNoHalfDrop).toEqual([]);
     });
 
     // #1276 acceptance 2 — at least two distinguishable outcomes across repeats, so V4 ≠ V2
@@ -933,6 +996,12 @@ describe('Disco Bassist Critique', () => {
     // places, which is the claim that actually distinguishes post-#1291 Bb from pre-#1291 Bb
     // — lives in its own test below. It no longer NEEDS its high intensity to make the
     // detector exact; it keeps it because that is the setting it was calibrated at.
+    //
+    // #1293 UPDATE — the menu is now three items (`drop` / `half-drop` / `fifth`), all
+    // headroom-free and none of them chord-quality-dependent except `fifth`'s own guard, so
+    // the key-invariance argument above extends unchanged: nothing new here can see the
+    // chord root either. `forcesLift` covers `half-drop` the same way it covers `fifth`, so
+    // its detector is exact at this intensity too — see `summarizeVariations`.
     it('gives every root at least two variation kinds across repeats (#1276, #1291)', () => {
         const BARS = 32;
         const PHRASES = BARS / 4;
@@ -967,7 +1036,7 @@ describe('Disco Bassist Critique', () => {
         const glyph = (kind) => (kind === 'none' ? '?' : kind[0]);
         console.log(
             `[Disco Critique] Variation kinds over occurrences 2-5 ` +
-                `(phrase sequence, d=drop f=fifth ?=neither gesture rendered):\n  ` +
+                `(phrase sequence, d=drop h=half-drop f=fifth ?=neither gesture rendered):\n  ` +
                 rows
                     .map(
                         (row) =>
@@ -1017,11 +1086,11 @@ describe('Disco Bassist Critique', () => {
         }
 
         for (const row of rows) {
-            // intent: two outcomes is the minimum that makes "V4 ≠ V2" a statement about
-            // the gesture rather than about its placement. Since #1291 the menu has exactly
-            // two members, so this now says every root uses ALL of it — including Bb, whose
-            // menu #1276 left one item short.
-            expect(row.kinds.length).toBeGreaterThanOrEqual(2);
+            // intent: using the whole vocabulary is the minimum that makes "V4 ≠ V2" a
+            // statement about the gesture rather than about its placement. #1293 widens the
+            // menu to three members (`drop` / `half-drop` / `fifth`), so this now says every
+            // root uses ALL of it — including Bb, whose menu #1276 once left one item short.
+            expect(row.kinds.length).toBeGreaterThanOrEqual(3);
 
             // ...and the actual "V4 ≠ V2" claim: each occurrence's per-phrase kind sequence
             // differs from every other occurrence's. This is what a byte-identical repeat
@@ -1114,7 +1183,7 @@ describe('Disco Bassist Critique', () => {
 
         console.log(
             `[Disco Critique] Variation vocabulary at saturated octaveProb ` +
-                `(d=drop f=fifth n=none):\n  ` +
+                `(d=drop h=half-drop f=fifth n=none):\n  ` +
                 rows.map((row) => `${row.name}: ${row.sequence}`).join('\n  '),
         );
 
@@ -1122,9 +1191,11 @@ describe('Disco Bassist Critique', () => {
         // classifies as `none`, so the detector missed nothing and the sequences below are
         // complete transcripts rather than partial ones.
         expect(rows.filter((row) => row.sequence.includes('n')).map((row) => row.name)).toEqual([]);
-        // ...and non-vacuity: the transcript has to contain BOTH gestures, or "identical
-        // across roots" would be satisfied by an engine that never varies at all.
+        // ...and non-vacuity: the transcript has to contain ALL THREE gestures (#1293 adds
+        // `half-drop`), or "identical across roots" would be satisfied by an engine that
+        // never varies at all, or that varies but never actually reaches the new gesture.
         expect(rows[0].sequence).toMatch(/d/);
+        expect(rows[0].sequence).toMatch(/h/);
         expect(rows[0].sequence).toMatch(/f/);
 
         // The claim. Every root plays the same gesture in the same phrase of the same
@@ -1298,18 +1369,24 @@ describe('Disco Bassist Critique', () => {
                     ),
                     BARS,
                 );
-                // The occurrence's target beat. Both artifacts are ROOT-INDEPENDENT — a
-                // silent beat and a +7 lift are readable under a progression, where every
-                // chord has its own anchor and any pitch-vs-anchor comparison would not be.
-                // (#1276 had a third, `shifted`, which had to be excluded here for exactly
-                // that reason; #1291 retired the gesture it detected.)
+                // The occurrence's target beat. All three artifacts are ROOT-INDEPENDENT — a
+                // silent beat, a half-silent beat and a +7 lift are readable under a
+                // progression, where every chord has its own anchor and any pitch-vs-anchor
+                // comparison would not be. (#1276 had a third, `shifted`, which had to be
+                // excluded here for exactly that reason; #1291 retired the gesture it
+                // detected. #1293 adds `halfDropped` — omitting it would occasionally read a
+                // phrase that drew `half-drop` as producing no artifact at all.)
                 const targets = [
-                    ...new Set([...v.dropped, ...v.fifths].map((b) => b % PHRASE_BEATS)),
+                    ...new Set(
+                        [...v.dropped, ...v.halfDropped, ...v.fifths].map((b) => b % PHRASE_BEATS),
+                    ),
                 ];
                 rows.push({
                     occ,
                     target: targets.length === 1 ? targets[0] : null,
-                    drops: v.dropped.length,
+                    // Both silencing gestures share `canDrop`'s legality (#1293), so a
+                    // chord-entry/section-start guard must hold for either.
+                    drops: v.dropped.length + v.halfDropped.length,
                 });
             }
             return rows;
@@ -1330,7 +1407,11 @@ describe('Disco Bassist Critique', () => {
                 }),
                 BARS,
             );
-            const targets = [...new Set([...v.dropped, ...v.fifths].map((b) => b % PHRASE_BEATS))];
+            const targets = [
+                ...new Set(
+                    [...v.dropped, ...v.halfDropped, ...v.fifths].map((b) => b % PHRASE_BEATS),
+                ),
+            ];
             selectionTargets.push({ occ, target: targets.length === 1 ? targets[0] : null });
         }
         const onBarOne = selectionTargets.filter(
@@ -1397,14 +1478,15 @@ describe('Disco Bassist Critique', () => {
         // occurrence 96 came up with zero drops and reddened a claim that is true.
         const GUARDED_BARS = 128;
         const ENTRANCE_STEP = 4; // beat 1 of bar 0 — a section beginning mid-bar
-        // why: 500, widened from #1276's 200 in #1291. The coincidence this test needs is
-        // unchanged in RATE (target beat = beat 1 of bar 0, 1 in 12, AND phrase 0 drawing
-        // `drop`, still weighted 0.3 → ~2% of occurrences), but retiring `octave` moved the
-        // drop's seed band from [0.5, 0.8) to [0.7, 1.0), so a different — and here smaller —
-        // set of occurrences qualifies. 200 happened to yield 3 before and 1 after, which is
-        // sampling luck on a ~4-expected count either way, not a behavior change. 500 puts
-        // the expectation near 10 so the non-vacuity floor below is cleared by margin
-        // rather than by draw.
+        // why: 500, widened from #1276's 200 in #1291. The coincidence this test needs was
+        // unchanged in RATE across #1291 (target beat = beat 1 of bar 0, 1 in 12, AND phrase
+        // 0 drawing `drop`, weighted 0.3 → ~2% of occurrences). #1293 changes the rate again:
+        // `half-drop` ALSO silences the downbeat (this check reads `unguarded.some(p => p.step
+        // === ENTRANCE_STEP)`, which is blind to which silencing gesture fired), so the
+        // relevant probability is now the COMBINED silencing share, 0.2 `drop` + 0.3
+        // `half-drop` = 0.5 → ~4.2% of occurrences, roughly doubling the expected count.
+        // Measured 18 of 499 here, against ~20.8 expected — within noise. 500 keeps the
+        // non-vacuity floor below cleared by margin rather than by draw.
         const OCCURRENCES = 500;
         const settings = { playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 } };
         const wouldDropEntrance = [];
@@ -1439,11 +1521,18 @@ describe('Disco Bassist Critique', () => {
                 `occurrence ${occ} silenced the mid-bar section entrance`,
             ).toBe(true);
             // ...and the guard is surgical: it protects that ONE beat, it does not disarm
-            // the gesture for the whole occurrence. Later phrases still drop their target
-            // beat, because only phrase 0's target beat owns the section start.
+            // the gesture for the whole occurrence. Later phrases still silence their target
+            // beat, because only phrase 0's target beat owns the section start. Checked as
+            // `dropped + halfDropped` combined (#1293) — the guard is the same `canDrop` for
+            // both gestures, so either can carry this claim, and pinning `dropped` alone
+            // would fail this test at any seed/weighting where phrase 0's own occurrence
+            // happens to draw only `half-drop` on its later, unguarded phrases.
             const v = summarizeVariations(guarded, GUARDED_BARS);
             expect(v.kinds.length, `occurrence ${occ}`).toBeGreaterThanOrEqual(1);
-            expect(v.dropped.length, `occurrence ${occ} lost every drop`).toBeGreaterThan(0);
+            expect(
+                v.dropped.length + v.halfDropped.length,
+                `occurrence ${occ} lost every silencing gesture`,
+            ).toBeGreaterThan(0);
         }
     });
 
@@ -1479,6 +1568,7 @@ describe('Disco Bassist Critique', () => {
         let fifthLifts = 0;
         let varied = 0;
         let drops = 0;
+        let halfDrops = 0;
         const illegalDeltas = [];
         for (let occ = 2; occ <= 6; occ++) {
             const perf = simulatePerformance(
@@ -1491,14 +1581,18 @@ describe('Disco Bassist Critique', () => {
             const r = scoreOctaveAlternation(perf);
             const v = summarizeVariations(perf, BARS);
             fifthLifts += r.fifthLifts;
-            varied += v.dropped.length + v.fifths.length;
+            // #1293 — `half-drop` doesn't read chord data any more than `drop` does, so it
+            // varies the beat regardless of quality too.
+            varied += v.dropped.length + v.halfDropped.length + v.fifths.length;
             drops += v.dropped.length;
+            halfDrops += v.halfDropped.length;
             illegalDeltas.push(...r.illegalDeltas);
         }
         console.log(
             `[Disco Critique] Quality ${quality} over occurrences 2-6: ${fifthLifts} fifth ` +
-                `lift(s), ${drops} dropped of ${TARGET_BEATS} target beat(s), ${varied} ` +
-                `varied beat(s), ${illegalDeltas.length} illegal delta(s)`,
+                `lift(s), ${drops} dropped + ${halfDrops} half-dropped of ${TARGET_BEATS} ` +
+                `target beat(s), ${varied} varied beat(s), ${illegalDeltas.length} illegal ` +
+                `delta(s)`,
         );
 
         if (hasFifth) {
@@ -1514,15 +1608,20 @@ describe('Disco Bassist Critique', () => {
         }
         // #1291 review — the density guard, and the reason the sentence above changed.
         // `canFifth` is a property of the CHORD, so on an altered-fifth chart it is false
-        // for every target beat of the whole passage: routing a drawn `fifth` to `drop`
-        // made EVERY target beat a hole (measured: all 40 of them, a 1.0 hole density
-        // against the 0.3 that was auditioned), which is a worse defect than the mis-voiced
-        // fifth the guard exists to prevent. Bounded rather than pinned: the 0.3 weight
-        // predicts 12 of 40 and every quality here measures 13 (the drop decision reads no
-        // chord data at all, so it is identical in all six rows), while the regression
-        // reads the full 40. 20 sits clear of both.
+        // for every target beat of the whole passage: routing a drawn `fifth` to a silencing
+        // gesture would make EVERY target beat at least partly silent (a worse defect than
+        // the mis-voiced fifth the guard exists to prevent), which the resolution in
+        // `bass-pump.ts` avoids by falling straight to `none` instead. Bounded rather than
+        // pinned: `drop`'s 0.2 weight predicts 8 of 40 and every quality here measures 9 (the
+        // drop decision reads no chord data at all, so it is identical in all six rows),
+        // while a `fifth` → `drop` regression would read the full 40.
         expect(drops).toBeLessThan(20);
-        expect(drops).toBeGreaterThan(4);
+        expect(drops).toBeGreaterThan(2);
+        // #1293 — the identical guard for `half-drop`, which shares `drop`'s chord-blind
+        // legality: its 0.3 weight predicts 12 of 40, and a `fifth` → `half-drop` regression
+        // would read the full 40 the same way a `fifth` → `drop` one would.
+        expect(halfDrops).toBeLessThan(28);
+        expect(halfDrops).toBeGreaterThan(4);
         // The rest of the pump's vocabulary is unchanged in every quality.
         expect(illegalDeltas).toEqual([]);
     });
@@ -1563,6 +1662,7 @@ describe('Disco Bassist Critique', () => {
             let fifthLifts = 0;
             const illegalDeltas = [];
             const dropped = [];
+            const halfDropped = [];
             const pitches = new Set();
             for (let occ = 2; occ <= 6; occ++) {
                 const perf = simulatePerformance(
@@ -1577,11 +1677,18 @@ describe('Disco Bassist Critique', () => {
                 fifthLifts += r.fifthLifts;
                 illegalDeltas.push(...r.illegalDeltas);
                 dropped.push(`V${occ}:${v.dropped.join(',')}`);
+                halfDropped.push(`V${occ}:${v.halfDropped.join(',')}`);
                 for (const midi of v.pitches) {
                     pitches.add(midi);
                 }
             }
-            return { fifthLifts, illegalDeltas, dropped: dropped.join(' | '), pitches };
+            return {
+                fifthLifts,
+                illegalDeltas,
+                dropped: dropped.join(' | '),
+                halfDropped: halfDropped.join(' | '),
+                pitches,
+            };
         };
         // Order matters only for the report: `dropped` is stream-independent (a dropped beat
         // never reaches `bass-styles.ts` and consumes no `Math.random` draw), and the two
@@ -1606,20 +1713,25 @@ describe('Disco Bassist Critique', () => {
         expect(rootPosition.illegalDeltas).toEqual([]);
 
         // #1291 review, finding 2 — the density regression guard, and the reason a drawn
-        // `fifth` resolves to `none` rather than to `drop`. `canFifth` is false for the
-        // whole slash-chord passage, so routing it to `drop` would make EVERY target beat a
-        // hole for as long as that chord sounds — the 0.3 hole density becomes 1.0 and the
-        // section turns into a string of gaps, a worse defect than the one being fixed.
+        // `fifth` resolves to `none` rather than to a silencing gesture. `canFifth` is false
+        // for the whole slash-chord passage, so routing it to `drop`/`half-drop` would make
+        // EVERY target beat at least partly silent for as long as that chord sounds — the
+        // #1293 menu's combined 0.5 silencing share (0.2 `drop` + 0.3 `half-drop`) would
+        // become a flat 1.0, a worse defect than the mis-voiced fifth being fixed.
         //
         // Asserted as EQUALITY against the root-position control rather than as a band,
-        // because the drop decision reads no chord data at all: same target beat, same menu
-        // draw, same `canDrop`. So the two runs must drop the identical beats, and a
-        // `fifth` → `drop` routing reddens this with a readable diff rather than a
-        // threshold argument.
+        // because neither silencing gesture reads chord data at all: same target beat, same
+        // menu draw, same `canDrop`. So the two runs must silence the identical beats the
+        // identical way, and a `fifth` → `drop`/`half-drop` routing reddens this with a
+        // readable diff rather than a threshold argument.
         expect(
             slash.dropped,
             `${name} drops different beats from its root-position control`,
         ).toEqual(rootPosition.dropped);
+        expect(
+            slash.halfDropped,
+            `${name} half-drops different beats from its root-position control`,
+        ).toEqual(rootPosition.halfDropped);
     });
 
     // #1276 (P1 review) — the hole has to be part of the RIFF, not scatter.

@@ -985,6 +985,17 @@ export function getBassNote(
         return null;
     }
 
+    // #1293 — `half-drop`: the same gate, restricted to a single sub-step. Every sub-step of
+    // the target beat EXCEPT the lift silences the way a full `drop` silences all of them;
+    // the lift itself (`pump.isLiftStep()`) is spared and falls through to the ordinary
+    // emission path below, where `forcesLift` guarantees it actually sounds and `revoice`
+    // leaves it unmodified — this gesture is entirely about what goes silent, not about
+    // re-voicing what remains. Same placement reasoning as the `drop` gate above: after the
+    // Final-Bar cascade, before every remaining emission path.
+    if (pump.variation() === 'half-drop' && !pump.isLiftStep()) {
+        return null;
+    }
+
     // --- Intro/Outro layering mute (epic-form-arrangement S5) ---
     // why: form-arranger.md P1 #4 — during the first `INTRO_MUTES.bass` bars of
     // an Intro section, AND during the last `OUTRO_MUTES.bass` bars of an Outro
