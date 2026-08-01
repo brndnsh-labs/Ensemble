@@ -152,6 +152,134 @@ describe('Funk Bass Critique', () => {
         };
     };
 
+    /**
+     * #1312 — the sibling gesture to `scoreOctavePops`: the high-complexity 16th-note
+     * "a" pop (`stepInBeat === 3`, gated on `playback.complexity > 0.7`, the
+     * "Syncopated Pushes & Gallops" section of the funk `popProb` ladder in
+     * `bass-styles.ts`). Structurally invisible to `scoreOctavePops`, which only ever
+     * samples `stepInBeat === stepsPerBeat / 2` (the "and") — nothing in this suite
+     * previously exercised the "a" at all.
+     *
+     * `stepInBeat === 3` is shared by THREE competing branches (the high-complexity
+     * pop itself, the dead-note "chuck" ghost, and the melodic hammer-on), so unlike
+     * `scoreOctavePops` this can't isolate the pop by step index alone — pairing every
+     * note at that step against the previous one measured the ghost/hammer-on notes
+     * too and produced a false "drifts to +2" reading (#1312 investigation). Isolate
+     * by OUTPUT SHAPE instead of replicating the internal `scrambleHash` gate (which
+     * would silently stop matching if the seed formula in bass-styles.ts ever
+     * changes): the pop is the only one of the three that is both unmuted (the chuck
+     * always sets `muted: 1`) and lands exactly on the chord root's pitch class (the
+     * hammer-on always lands a 2nd above it).
+     *
+     * MEASURED (#1312, 128-bar sweep, intensity 0.9, complexity 0.8): 233 qualifying
+     * pops, 0 inversions, 0 illegal (non {0, +12}) deltas — the vocabulary is clean;
+     * this gesture's headroom fallback (`note > absMax ? baseRoot : note`) genuinely
+     * cannot invert, exactly as the issue predicted. But only 30/233 (12.9%) actually
+     * LIFT the octave — 203/233 (87.1%) land as an inert UNISON. `baseRoot` here is an
+     * independent `normalizeToRange` resolution gravitating toward `safeCenterMidi`
+     * (~42-48 at this intensity), which frequently sits AT the pitch the pop would
+     * need to rise FROM, so `baseRoot + 12` clears `absMax` (57) and folds back to a
+     * no-op. KNOWN GAP, NOT fixed by this story: simulating #1295's anchor-to-
+     * `prevMidi` fix against these same recordings reproduces an IDENTICAL 30/203
+     * split — the defect is a register-HEADROOM problem (nothing upstream reserves
+     * room for this pop's lift, unlike bass-engine.ts's `safeBaseRoot` fold that
+     * reserves room for the downbeat -> "and"-pop relationship), not an
+     * anchor-computation one, so reusing #1295's fix shape verbatim is a no-op here.
+     * A real fix needs a headroom-reservation companion for whatever fires
+     * immediately before the "a" (three different possible predecessors), which is a
+     * design decision beyond this story's scope — tracked as a follow-up, not
+     * papered over here. This test guards the vocabulary/direction health that IS
+     * true today (never inverts, never drifts to an illegal interval), per
+     * feedback_dod_test_skip_smell the lift-rate itself is reported for visibility
+     * only and not gated — asserting today's ~13% lift rate as a target would
+     * calcify the known gap instead of flagging it for the follow-up fix.
+     */
+    const scoreAPop = (performance, tsConfig) => {
+        const spb = tsConfig.stepsPerBeat;
+        let checks = 0;
+        let octaveUp = 0;
+        let unison = 0;
+        let inversions = 0;
+        let firedAtStep = 0;
+        const illegalDeltas = [];
+
+        performance.forEach((p, idx) => {
+            if (p.stepInMeasure % spb !== 3) {
+                return;
+            }
+            firedAtStep++;
+            const rootPc = ((p.chord.rootMidi % 12) + 12) % 12;
+            const midiPc = ((p.note.midi % 12) + 12) % 12;
+            const isChuckGhost = p.note.muted === 1;
+            const isAPop = !isChuckGhost && midiPc === rootPc;
+            if (!isAPop) {
+                return;
+            }
+            const prevEntry = performance[idx - 1];
+            if (!prevEntry) {
+                return;
+            }
+            checks++;
+            const prevMidi = prevEntry.note.midi;
+            const anchorBase = Math.floor(prevMidi / 12) * 12;
+            const anchorRoot = [anchorBase - 12, anchorBase, anchorBase + 12]
+                .map((o) => o + rootPc)
+                .reduce((best, c) =>
+                    Math.abs(c - prevMidi) < Math.abs(best - prevMidi) ? c : best,
+                );
+            const delta = p.note.midi - anchorRoot;
+            if (delta === 12) {
+                octaveUp++;
+            } else if (delta === 0) {
+                unison++;
+            } else if (delta < 0) {
+                inversions++;
+            }
+            if (delta !== 12 && delta !== 0 && delta !== -12) {
+                illegalDeltas.push(`step${p.step}:${prevMidi}->${p.note.midi}`);
+            }
+        });
+
+        return {
+            checks,
+            octaveUp,
+            unison,
+            inversions,
+            illegalDeltas,
+            firedAtStep,
+            liftRate: octaveUp / (checks || 1),
+            inversionRate: inversions / (checks || 1),
+        };
+    };
+
+    it('funk "a" 16th high-complexity pop: vocabulary/direction guard (#1312)', () => {
+        const performance = simulatePerformance(128, {
+            playback: { bandIntensity: 0.9, bpm: 110, complexity: 0.8 },
+        });
+        const r = scoreAPop(performance, TIME_SIGNATURES['4/4']);
+
+        console.log(
+            '\n--- FUNK "A" POP CRITIQUE REPORT (#1312) ---\n' +
+                `[A-Pop Vocabulary]      ${r.illegalDeltas.length} illegal deltas (Target: 0)\n` +
+                `[A-Pop Direction]       ${(r.inversionRate * 100).toFixed(1)}% inverted (Target: 0%)\n` +
+                `[A-Pop Lift Direction]  ${(r.liftRate * 100).toFixed(1)}% up an octave, ${r.unison} unison ` +
+                `(${r.octaveUp}/${r.checks} pairs) — KNOWN GAP #1312, reported only, not gated\n` +
+                '------------------------------------\n',
+        );
+
+        // Non-vacuous: confirm the high-complexity branch actually fired enough
+        // times in this sweep for the vocabulary guard below to mean something.
+        expect(r.checks).toBeGreaterThan(50); // measured 233/128 bars
+
+        // Vocabulary/direction health — this IS true today and is the regression
+        // guard: no illegal interval, never inverted. This is what would have
+        // caught the #1295-class bug (inconsistent/inverted interval) had it
+        // existed here; it doesn't, but the lift-rate gap above is real and
+        // deliberately left unasserted (see block comment above).
+        expect(r.illegalDeltas).toEqual([]);
+        expect(r.inversionRate).toBe(0);
+    });
+
     it('should pass an authenticity critique for a 128-bar Funk performance', () => {
         const totalMeasures = 128;
         const performance = simulatePerformance(totalMeasures);
