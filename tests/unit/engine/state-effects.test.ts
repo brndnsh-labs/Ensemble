@@ -1,8 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyThemeToDom, setBpm } from '../../../public/controllers/app-controller.js';
+import { setBpm } from '../../../public/controllers/app-controller.js';
 import { loadDrumPreset } from '../../../public/controllers/instrument-controller.js';
-import { initMIDI } from '../../../public/controllers/midi-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import {
     initAudio,
@@ -27,7 +26,6 @@ vi.mock('../../../public/engine/chords-engine.js', () => ({
 }));
 vi.mock('../../../public/controllers/app-controller.js', () => ({
     setBpm: vi.fn(),
-    applyThemeToDom: vi.fn(),
 }));
 vi.mock('../../../public/controllers/instrument-controller.js', () => ({
     loadDrumPreset: vi.fn(),
@@ -38,9 +36,6 @@ vi.mock('../../../public/engine/engine.js', () => ({
     syncBusReverbSend: vi.fn(),
     syncBusVolume: vi.fn(),
 }));
-vi.mock('../../../public/controllers/midi-controller.js', () => ({
-    initMIDI: vi.fn(),
-}));
 
 describe('State Effects Handler', () => {
     let stateMap;
@@ -50,7 +45,6 @@ describe('State Effects Handler', () => {
         vi.clearAllMocks();
         stateMap = {
             playback: { isPlaying: false, toasts: [], theme: 'dark' },
-            midi: { enabled: false },
         };
         dispatch = vi.fn();
     });
@@ -172,15 +166,6 @@ describe('State Effects Handler', () => {
     it('should call initAudio on INIT_AUDIO action', () => {
         handleEffects(ACTIONS.INIT_AUDIO, {}, stateMap, { dispatch });
         expect(initAudio).toHaveBeenCalledWith(stateMap);
-    });
-
-    it('should apply theme and init MIDI on HYDRATE', () => {
-        stateMap.playback.palette = 'midnight';
-        stateMap.playback.mode = 'light';
-        stateMap.midi.enabled = true;
-        handleEffects('HYDRATE', {}, stateMap, { dispatch });
-        expect(applyThemeToDom).toHaveBeenCalledWith('midnight', 'light');
-        expect(initMIDI).toHaveBeenCalled();
     });
 
     it('should set toast expiration on SHOW_TOAST', () => {

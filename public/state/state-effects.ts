@@ -1,6 +1,5 @@
-import { applyThemeToDom, setBpm } from '../controllers/app-controller.js';
+import { setBpm } from '../controllers/app-controller.js';
 import { loadDrumPreset } from '../controllers/instrument-controller.js';
-import { initMIDI } from '../controllers/midi-controller.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 import { validateProgression } from '../engine/chords-engine.js';
@@ -199,6 +198,8 @@ export function handleEffects(
     context: HandleEffectsContext,
 ): void {
     const { dispatch } = context;
+    // No HYDRATE case: this subscriber isn't attached until after boot hydration
+    // already dispatched it, so boot-time effects (theme, etc.) run directly from main.ts.
     switch (action) {
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // Epic 6 — selecting a `pack:<id>` voice lazily loads that pack's
@@ -374,13 +375,6 @@ export function handleEffects(
             // on every audio-up path — so a persisted pack is ready whether audio
             // came up here or via the play path's direct initAudio() call.
             initAudio(stateMap);
-            break;
-        }
-        case 'HYDRATE': {
-            applyThemeToDom(stateMap.playback.palette, stateMap.playback.mode);
-            if (stateMap.midi.enabled) {
-                initMIDI();
-            }
             break;
         }
     }

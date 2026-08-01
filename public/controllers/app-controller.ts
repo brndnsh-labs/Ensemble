@@ -13,9 +13,9 @@ export function resolveMode(mode: ThemeMode): 'light' | 'dark' {
 }
 
 /** Write the resolved palette + light/dark mode to `<html>`. Single source of
- *  truth shared by the pre-mount paint (main.ts), the HYDRATE effect, and the
- *  reactive App-level effect (which also wires the prefers-color-scheme
- *  listener while mode === 'auto'). */
+ *  truth shared by the pre-mount paint (main.ts) and the reactive App-level
+ *  effect (which also wires the prefers-color-scheme listener while
+ *  mode === 'auto'). */
 export function applyThemeToDom(palette: Palette, mode: ThemeMode): void {
     const resolved = resolveMode(mode);
     const root = document.documentElement;

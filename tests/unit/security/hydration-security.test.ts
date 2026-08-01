@@ -718,9 +718,9 @@ describe('Security: Hydration & Storage Resilience', () => {
 
             // Nothing observes HYDRATE at this point in boot — `subscribe()`'s only
             // call site (main.ts) attaches long after hydrateState() runs, so the
-            // listener list is empty and state-effects' `case 'HYDRATE'` never fires
-            // here. The guard is against a successor moving that subscribe earlier
-            // and finding the action silently absent on the recovery path.
+            // listener list is empty here. The guard is against a successor moving
+            // that subscribe earlier and finding the action silently absent on the
+            // recovery path.
             expect(stateModule.dispatch).toHaveBeenCalledWith(ACTIONS.HYDRATE);
 
             consoleError.mockRestore();
