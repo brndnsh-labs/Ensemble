@@ -1236,8 +1236,31 @@ export function getBassNote(
         (isStraightStyle || style === 'funk') &&
         groove.genreFeel !== 'Reggae'
     ) {
+        // why: #1295 — this is the site that actually emits funk's "The One": it
+        // intercepts stepInChord === 0 ahead of getBassNoteStyle, so that function's
+        // own (redundant) isOne arm never runs for funk. A funk downbeat is played
+        // KNOWING a slap-pop follows on the "and" 60-100% of the time
+        // (bass-styles.ts's funk popProb branch) — a real player leaves headroom for
+        // that octave-up snap by choosing the lower hand position rather than
+        // stranding the pop against the register ceiling. `normalizeToRange`'s own
+        // register drift (not `withOctaveJump`'s deliberate rare structural jump —
+        // see below) is what pushes the downbeat there: measured #1295: 93/128
+        // downbeats resolve to MIDI 48 at bandIntensity 0.9, against absMax 57.
+        // Fold BEFORE `withOctaveJump`, not its output: an earlier version folded
+        // `withOctaveJump`'s result, which silently cancelled every Imperfect
+        // Symmetry structural jump for funk (measured: collapsed 128/128 downbeats
+        // to a single fixed pitch on a 128-bar sweep — a real musical regression,
+        // caught in review). `withOctaveJump` already has its own headroom-aware
+        // direction logic (`canGoUp`/`canGoDown`, ceiling 55) and is rare (~2-10% of
+        // structural points), so it's left free to fire and occasionally still land
+        // a downbeat too high for the pop to lift off of — on those rare bars the
+        // pop's own existing `note > absMax ? slappedRoot : note` fallback holds a
+        // unison, which is a far smaller musical cost than flattening every
+        // downbeat's register for the whole performance.
+        const safeBaseRoot = style === 'funk' && baseRoot > absMax - 12 ? baseRoot - 12 : baseRoot;
+        const slapNote = withOctaveJump(safeBaseRoot);
         return result(
-            getFrequency(withOctaveJump(baseRoot)),
+            getFrequency(slapNote),
             null,
             style === 'funk' ? 1.25 : 1.0 + intensity * 0.25,
         );

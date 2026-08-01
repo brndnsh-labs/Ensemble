@@ -158,11 +158,13 @@ describe('Funk Bass Critique', () => {
 
         let ghostNotes = 0;
         let downbeatHits = 0;
+        const downbeatMidiValues = new Set();
 
         performance.forEach((p) => {
             const midi = p.note.midi;
             if (p.stepInMeasure === 0) {
                 downbeatHits++;
+                downbeatMidiValues.add(midi);
                 expect(midi % 12).toBe(p.chord.rootMidi % 12);
             }
             if (p.note.muted) {
@@ -190,6 +192,15 @@ describe('Funk Bass Critique', () => {
 
         // The One: deterministic root on every bar downbeat (per bass-engine.ts:439, 509)
         expect(downbeatRatio).toBe(1.0); // intent: the downbeat is deterministically the chord root — an engine guarantee, not a measured tendency
+
+        // #1295 regression guard: the downbeat's OCTAVE must still vary across a long
+        // performance. An earlier version of the #1295 fix folded `withOctaveJump`'s
+        // output (rather than its input) to reserve pop headroom, which silently
+        // cancelled every Imperfect Symmetry structural jump for funk — measured
+        // 128/128 downbeats collapsing onto one fixed pitch, caught only by review,
+        // not by this file. Register-class (pitch class) is checked above; this
+        // checks the register itself hasn't gone rigid.
+        expect(downbeatMidiValues.size).toBeGreaterThan(1); // measured 2 (MIDI 36 x122, 48 x6)
         // Ghost density: engine fires chuckProb = 0.2 + intensity*0.4 = 0.56 on 16th offbeats.
         // #1277 — re-measured. This path is fully seeded (`scrambleHash`), so there is one
         // exact figure rather than a range: 24.76% (311/1256 notes). The previous
@@ -216,27 +227,31 @@ describe('Funk Bass Critique', () => {
         expect(r.illegalDeltas).toEqual([]);
 
         // ---------------------------------------------------------------------------
-        // DIRECTION — these two bounds are a REGRESSION RATCHET, not the musical target.
+        // DIRECTION — the real musical targets (#1295), not a regression ratchet.
         //
-        // The corrected metric exposes a live engine defect (filed separately as #1295):
-        // at intensity 0.9 the pop lands an octave BELOW its own
-        // slapped root on 135 of 196 paired beats — 68.9% of the gesture plays upside
-        // down. The musical target is liftRate ~1.0 and inversionRate 0. The cause is the
-        // same one #1271 removed for disco: `normalizeToRange` re-resolves `baseRoot` per
-        // step against a `prevMidi`-weighted reference, so a high downbeat drags the next
-        // resolution down an octave and `baseRoot + 12` lands under the note it should
-        // rise above. Funk is deliberately NOT in `PUMP_ANCHOR_STYLES` (its line is
-        // genuinely melodic — hammer-ons, fifths, chromatic approaches — so a fixed anchor
-        // is the wrong medicine); the fix is its own design call, which is why this file
-        // reports the defect rather than tuning a floor to hide it.
-        //
-        // The bounds are set just outside today's measured split so the file cannot drift
-        // further in either direction while the engine question is open: a rise in
-        // inversions reds immediately, and so does a collapse in genuine lifts. Both move
-        // the correct way when the anchor is fixed (liftRate -> 1, inversionRate -> 0), so
-        // neither has to be relaxed to land that fix.
-        expect(r.inversionRate).toBeLessThan(0.75); // measured 0.689 — TARGET IS 0
-        expect(r.liftRate).toBeGreaterThan(0.25); // measured 0.311 — TARGET IS ~1.0
+        // #1295 fixed the anchor: the pop now resolves off the beat's own ACTUAL
+        // slapped root (nearest occurrence of the chord root's pitch class around
+        // `prevMidi`, immune to an intervening chuck/hammer-on) plus 12, instead of a
+        // fresh independent `normalizeToRange` resolution — one resolution, not two.
+        // The companion half of the fix is in `bass-engine.ts`: the funk downbeat
+        // itself (the `stepInChord === 0` early return that actually emits it, ahead
+        // of `getBassNoteStyle`) now folds `baseRoot` down an octave BEFORE
+        // `withOctaveJump` runs, when `normalizeToRange`'s own register drift
+        // wouldn't leave the pop room to lift under `absMax` — a real player picks
+        // the lower hand position on beat 1 knowing the pop follows. Folding
+        // `withOctaveJump`'s own OUTPUT instead of its input was tried first and
+        // rejected in review: it silently cancelled every Imperfect Symmetry
+        // structural jump for funk (measured: 128/128 downbeats collapsed to one
+        // fixed pitch on a 128-bar sweep). Folding the input instead leaves
+        // `withOctaveJump`'s own headroom-aware direction logic free to fire — on
+        // the rare bar (~5% here) where it still lands the downbeat too high, the
+        // pop's own `note > absMax ? slappedRoot : note` fallback holds a unison
+        // rather than an inversion. Net: a 128-bar sweep went from 68.9% inverted /
+        // 31.1% lifted to 0% inverted / 98.0% lifted (192/196), with genuine
+        // downbeat register variety preserved (measured 122×MIDI36, 6×MIDI48) and
+        // zero illegal deltas.
+        expect(r.inversionRate).toBe(0); // measured 0/196 — acceptance #1: never inverted
+        expect(r.liftRate).toBeGreaterThan(0.9); // measured 192/196 (98.0%)
     });
 
     it('should suppress octave pops at low intensity', () => {
@@ -266,16 +281,45 @@ describe('Funk Bass Critique', () => {
                 `(low unisons=${low.unisons}, low pops fired=${low.pops})`,
         );
 
-        // High intensity fires the ladder: 16 genuine octave lifts over 32 bars (of 52
-        // paired beats — the rest are the inversions the sweep above ratchets).
-        expect(high.octavePops).toBeGreaterThan(10); // measured 16 over 32 bars
-        // Low intensity suppresses it entirely: measured 0 lifts over 32 bars, with all
-        // 13 paired beats landing a unison instead. The suppression is real — below
-        // ~0.4 the rock/funk no-kick branch returns null on most non-downbeats — but note
-        // it is a suppression of the LIFT, not of the pop: the ladder still emits 29 pops,
-        // they just never leave the root. That distinction is the thing the absolute
-        // metric could not express, and it is the low-intensity face of the same anchor
-        // defect the sweep above documents.
+        // High intensity: essentially every paired beat lifts post-#1295 — measured
+        // 52/52 over 32 bars in this run, 0 inversions (the sweep above's
+        // inversionRate === 0 holds here too).
+        expect(high.octavePops).toBeGreaterThan(10); // measured 52 over 32 bars
+        // Low intensity suppression is now almost entirely a DENSITY effect, not a
+        // direction one: below ~0.4 the rock/funk no-kick branch (bass-engine.ts,
+        // `intensity < 0.4 && !isDownbeat`) returns null on most non-downbeats via a
+        // deliberately unseeded `Math.random()` (#1083 — per-loop variety is the
+        // point there), so this branch's exact counts vary run-to-run (typically
+        // single digits for both `checks` and `octavePops`). Of the few pops that do
+        // fire, #1295 means most still lift correctly rather than collapsing to a
+        // unison the way the pre-#1295 anchor bug did at this register. The ratio
+        // bound below holds with wide margin across runs because the density drop
+        // alone is enough to clear it — it is no longer evidence of a direction defect.
         expect(low.octavePops).toBeLessThanOrEqual(high.octavePops / 3);
+    });
+
+    it('lifts at moderate intensity instead of collapsing to unisons (#1295 acceptance #2)', () => {
+        // Pre-#1295, moderate intensity (0.4-0.6) was the WORST band, not a middle
+        // ground: the register geometry at that band made the double-resolution bug
+        // land almost every pop back on the downbeat's own pitch — measured 2/166
+        // genuine lifts at intensity 0.5 in the original report, a near-total
+        // collapse the high/low-intensity comparison above can't see (it only
+        // samples the endpoints). This is the dedicated regression guard for that
+        // middle band.
+        const ts44 = TIME_SIGNATURES['4/4'];
+        for (const bandIntensity of [0.4, 0.5, 0.6]) {
+            const perf = simulatePerformance(64, {
+                playback: { bandIntensity, bpm: 110, complexity: 0.5 },
+            });
+            const r = scoreOctavePops(perf, ts44);
+            console.log(
+                `[Funk Moderate-Intensity Lift] intensity=${bandIntensity} ` +
+                    `lift=${r.octavePops}/${r.checks} unisons=${r.unisons} inversions=${r.inversions}`,
+            );
+            expect(r.inversionRate).toBe(0);
+            // Measured 100% lift at all three sampled points post-#1295; headroom
+            // below that guards against a false pass from a near-empty sample.
+            expect(r.liftRate).toBeGreaterThan(0.8);
+        }
     });
 });

@@ -1051,9 +1051,33 @@ export function getBassNoteStyle(
             ((step * 0x9e3779b1) ^ ((playback.currentLoopCount | 0) * 0x85ebca77)) | 0;
 
         // 1. "The One" (and Beat 3) - Primary Slaps
+        // why: `isOne` (stepInChord === 0) never actually reaches this arm for funk —
+        // bass-engine.ts's shared straight-style early return (`stepInChord === 0 &&
+        // (isStraightStyle || style === 'funk')`, ahead of this function's call site)
+        // intercepts it first every time. Only `isSecondarySlap` (Beat 3) is live here;
+        // `isOne`'s headroom fold below lives in bass-engine.ts instead, at the site
+        // that actually emits it. Left both conditions in the guard rather than pruning
+        // `isOne` — that's a pre-existing dead-code seam unrelated to #1295, flagged
+        // out of scope rather than fixed here.
         if (isOne || isSecondarySlap) {
             const slapVel = 1.2 + intensity * 0.2;
-            return result(getFrequency(withOctaveJump(baseRoot)), 0.9, slapVel);
+            // why: #1295 — a slap-bass downbeat is played KNOWING the pop is coming right
+            // after it on the "and" (popProb is 60-100%): a real player leaves headroom
+            // for that octave-up snap by choosing the lower hand position, not by
+            // stranding the pop against the register ceiling. `normalizeToRange`'s own
+            // register drift (measured #1295: 93/128 downbeats resolve to MIDI 48 at
+            // bandIntensity 0.9, against `absMax` 57) has no notion of "a pop follows
+            // this note," so fold BEFORE `withOctaveJump`, not its output — folding the
+            // jump's own result would silently cancel Imperfect Symmetry's occasional
+            // deliberate structural octave displacement (caught in review: an earlier
+            // version of this fold did exactly that and collapsed every downbeat in a
+            // 128-bar sweep to one fixed pitch). `withOctaveJump` keeps its own
+            // headroom-aware direction logic and stays free to fire; on the rare bar
+            // where it still lands too high for the pop to lift off of, the pop's own
+            // `note > absMax ? slappedRoot : note` fallback holds a unison instead.
+            const safeBaseRoot = baseRoot > absMax - 12 ? baseRoot - 12 : baseRoot;
+            const slapNote = withOctaveJump(safeBaseRoot);
+            return result(getFrequency(slapNote), 0.9, slapVel);
         }
 
         // 2. The "And" (8th notes) - Aggressive Pops
@@ -1067,10 +1091,39 @@ export function getBassNoteStyle(
             // slapped root, giving the signature bright snap. Source: bass.md P2 #17.
             const popProb = 0.6 + intensity * 0.4;
             if (scrambleHash((slapSeedBase + 1) | 0) < popProb) {
-                const note = baseRoot + 12;
+                // why: #1295 — anchor the pop on the BEAT'S OWN SLAPPED ROOT instead of a
+                // fresh `baseRoot` resolution. `baseRoot` here would be an INDEPENDENT
+                // re-run of `normalizeToRange`, whose neck-drift-prevention weights the
+                // octave toward `prevMidi` — so a high downbeat dragged the *next*
+                // resolution down an octave and `baseRoot + 12` landed BELOW the note it
+                // was supposed to rise above 69% of the time (measured #1295). Defining
+                // the gesture by its INTERVAL off the root that actually sounded — one
+                // resolution, not two independent ones — fixes both the inversion and the
+                // low-intensity unison collapse in the same move (DECISION 2026-07-31).
+                //
+                // `prevMidi` is the engine's last-emitted note, which is usually the
+                // downbeat itself, but an intervening chuck/hammer-on on the "e" 16th
+                // (the odd-step branches below) can leave it a semitone or two off the
+                // root's pitch class. Snap to the nearest occurrence of the CHORD ROOT's
+                // pitch class around `prevMidi` (not a bare `+12`) so a stray hammer-on
+                // can't leak into the pop's pitch class — this is "the beat's own slapped
+                // root," not "whatever note happened to play last."
+                const anchor = prevMidi ?? baseRoot;
+                const rootPc = ((chord.rootMidi % 12) + 12) % 12;
+                const anchorBase = Math.floor(anchor / 12) * 12;
+                const slappedRoot = [anchorBase - 12, anchorBase, anchorBase + 12]
+                    .map((o) => o + rootPc)
+                    .reduce((best, c) =>
+                        Math.abs(c - anchor) < Math.abs(best - anchor) ? c : best,
+                    );
+                const note = slappedRoot + 12;
                 // Pop velocity: triggers bright, snappy tone
                 const popVel = 1.25 + intensity * 0.2;
-                return result(getFrequency(clampAndNormalize(note)), 0.3, popVel);
+                // Headroom fallback: never fold back down into an inversion — if the lift
+                // would clear the ceiling, hold the unison instead (same non-inverting
+                // shape as the disco pump's upbeat lift and the "a" 16th pop below).
+                const finalNote = note > absMax ? slappedRoot : note;
+                return result(getFrequency(finalNote), 0.3, popVel);
             }
         }
 
