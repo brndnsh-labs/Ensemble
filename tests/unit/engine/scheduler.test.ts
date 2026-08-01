@@ -490,6 +490,269 @@ describe('Scheduler Core System', () => {
         });
     });
 
+    // #1323: the visualizer used to own a private `DRUM_VIS_PITCHES` map with
+    // the same `|| 36` Kick fallback #1321 removed from live MIDI-out. It was
+    // missing the percussion lanes, the space-form Toms, and the suffix-first
+    // Agogo/Cowbell variants — so 8 of the 13 drum lanes, plus most of the
+    // soundNames the groove strategies emit, drew on top of the Kick. The
+    // visualizer now reads the one completed `DRUM_MAP`.
+    describe('Drum visualizer note mapping (#1323)', () => {
+        // The GM note each emitted soundName must draw at, spelled out
+        // literally rather than read back out of DRUM_MAP — a re-read would
+        // pass for any map, including the broken one.
+        const GM_NOTES: Record<string, number> = {
+            Kick: 36,
+            Snare: 38,
+            Sidestick: 37,
+            Brush: 37,
+            HiHat: 42,
+            HiHatQuarter: 42,
+            HiHatHalf: 46,
+            HiHatPedal: 44,
+            Open: 46,
+            Ride: 51,
+            Crash: 49,
+            China: 52,
+            Cowbell: 56,
+            CowbellHigh: 56,
+            CowbellLow: 56,
+            AgogoHigh: 67,
+            AgogoLow: 68,
+            Clave: 75,
+            Conga: 63,
+            Bongo: 60,
+            Perc: 67,
+            Shaker: 70,
+            Guiro: 74,
+            'High Tom': 50,
+            'Mid Tom': 47,
+            'Low Tom': 43,
+        };
+
+        // The eight lanes that fell through the old `DRUM_VIS_PITCHES` map to
+        // its `|| 36` Kick fallback. A groove strategy can rewrite the Kick/
+        // Snare/HiHat/Open lanes' soundName from context, but never these.
+        //
+        // `Shaker` is deliberately NOT here: the old map already had
+        // `Shaker: 70`, so a Shaker row would stay green against the broken
+        // map and guard `DRUM_MAP`'s value rather than this fix. It rides the
+        // full-kit sweep below instead.
+        const PREVIOUSLY_KICK_LANES: Array<[string, number]> = [
+            ['Clave', 75],
+            ['Conga', 63],
+            ['Bongo', 60],
+            ['Perc', 67],
+            ['Guiro', 74],
+            ['High Tom', 50],
+            ['Mid Tom', 47],
+            ['Low Tom', 43],
+        ];
+
+        // The previously-Kick soundNames the groove strategies emit that no
+        // lane is named after — the other half of the bug. Each needs its own
+        // genre/intensity fixture to reach through a lane sweep (`China` is
+        // Metal's accentCymbal, the Agogo/Cowbell variants are Latin/Disco,
+        // `Sidestick` needs bandIntensity < 0.4), so they're driven through
+        // the buffer path instead, which takes `n.name` verbatim.
+        const PREVIOUSLY_KICK_SOUNDS: Array<[string, number]> = [
+            ['Sidestick', 37],
+            ['Brush', 37],
+            ['China', 52],
+            ['CowbellHigh', 56],
+            ['CowbellLow', 56],
+            ['AgogoHigh', 67],
+            ['AgogoLow', 68],
+            ['HiHatPedal', 44],
+        ];
+
+        // The full default kit, in `groove.instruments` order.
+        const ALL_LANES = [
+            'Kick',
+            'Snare',
+            'HiHat',
+            'Open',
+            'Shaker',
+            ...PREVIOUSLY_KICK_LANES.map(([lane]) => lane),
+        ];
+
+        /**
+         * Arm the given drum lanes on every step and drive a full bar through
+         * the live `scheduleGlobalEvent` path, returning what actually SOUNDED
+         * (`playDrumSound`'s soundName, in emission order) alongside what was
+         * drawn (the queued visualizer notes' midi, same order — both come off
+         * the same `drumHits.forEach`).
+         *
+         * Two deliberate shapes here. Pairing sounded-with-drawn, rather than
+         * asserting lane → hard-coded note, keeps the test honest when a groove
+         * strategy rewrites a lane's soundName from context (`bandIntensity <
+         * 0.4` swaps Snare for Sidestick, entropy syncopation reclaims Open as
+         * HiHat, ...) — and exercising those rewrites is the point, since they
+         * emit names no lane is called. Sweeping a whole bar with every step
+         * armed is because a strategy freely suppresses individual steps (Rock
+         * mutes a snare on the downbeat and won't place an open hat with no
+         * HiHat lane present), so a single-step probe measures the strategy
+         * rather than the mapping.
+         */
+        function playKit(lanes: string[]) {
+            playback.drawQueue.length = 0;
+            Engine.playDrumSound.mockClear();
+            groove.instruments = lanes.map((name) => ({ name, steps: new Array(16).fill(2) }));
+            for (let step = 0; step < 16; step++) {
+                scheduleGlobalEvent(getState(), step, 10.0 + step * 0.1);
+            }
+            return {
+                sounded: Engine.playDrumSound.mock.calls.map((call) => call[1]),
+                drawn: playback.drawQueue
+                    .filter((e) => e.type === 'note' && e.track === 'drums')
+                    .map((e) => e.midi),
+            };
+        }
+
+        beforeEach(() => {
+            vizState.enabled = true;
+            // Isolate the drum lane under test: the melodic lanes queue their
+            // own visualizer events onto the same drawQueue.
+            bass.enabled = false;
+            soloist.enabled = false;
+            chords.enabled = false;
+            harmony.enabled = false;
+            // The groove strategies read these and the outer beforeEach doesn't
+            // reset them — pin both so lane→soundName resolution is stable
+            // regardless of test order.
+            playback.bandIntensity = 0.5;
+            groove.genreFeel = 'Rock';
+        });
+
+        it('draws every hit of a full kit bar as the instrument that actually sounded', () => {
+            const { sounded, drawn } = playKit(ALL_LANES);
+
+            expect(sounded.length, 'the kit sounded nothing').toBeGreaterThan(0);
+            expect(drawn, 'the kit drew a different number of notes than it sounded').toHaveLength(
+                sounded.length,
+            );
+            sounded.forEach((soundName, i) => {
+                expect(
+                    GM_NOTES[soundName],
+                    `"${soundName}" sounded but isn't in this test's GM table`,
+                ).toBeTypeOf('number');
+                expect(
+                    drawn[i],
+                    `"${soundName}" should visualize as GM ${GM_NOTES[soundName]}`,
+                ).toBe(GM_NOTES[soundName]);
+            });
+
+            // Proof the sweep reaches the strategy-rewritten names (Sidestick,
+            // Crash, Ride, ...) and not just the identity lane→soundName path —
+            // otherwise the pairing above would only ever cover 13 names.
+            const laneNames = new Set(ALL_LANES);
+            expect(
+                sounded.some((name) => !laneNames.has(name)),
+                'the sweep never exercised a strategy-rewritten soundName',
+            ).toBe(true);
+        });
+
+        it.each(PREVIOUSLY_KICK_LANES)(
+            'draws the %s lane at GM %i instead of the old Kick fallback',
+            (laneName, expectedNote) => {
+                const { sounded, drawn } = playKit([laneName]);
+
+                // These lanes are never soundName-rewritten, so the hard
+                // lane→note assertion is safe and is the direct #1323
+                // regression statement.
+                expect(sounded.length, `${laneName} sounded nothing`).toBeGreaterThan(0);
+                expect(new Set(sounded)).toEqual(new Set([laneName]));
+                expect(
+                    new Set(drawn),
+                    `${laneName} drew a note other than GM ${expectedNote}`,
+                ).toEqual(new Set([expectedNote]));
+                expect(
+                    drawn,
+                    `${laneName} drew a different number of notes than it sounded`,
+                ).toHaveLength(sounded.length);
+                expect(expectedNote, `${laneName} still draws at the Kick position`).not.toBe(36);
+            },
+        );
+
+        it('skips the event for a name with no DRUM_MAP entry instead of drawing a Kick', () => {
+            const { sounded, drawn } = playKit(['TotallyMadeUpPercussion']);
+
+            // A missing dot is a smaller error than a confidently wrong one —
+            // the same rule `sendMIDIDrum` adopted in #1321. Asserting
+            // `sounded` too proves the hit still reached the audio path and
+            // only the visualizer skipped it.
+            expect(sounded.length, 'the made-up lane never sounded').toBeGreaterThan(0);
+            expect(new Set(sounded)).toEqual(new Set(['TotallyMadeUpPercussion']));
+            expect(drawn).toHaveLength(0);
+        });
+
+        /**
+         * Drive the OTHER changed call site: `scheduleDrumsFromBuffer`,
+         * reached only through the song-ending resolution
+         * (`triggerResolution` → 50ms → `scheduleResolution`). It reads the
+         * worker's notes verbatim off `groove.buffer` with no groove strategy
+         * in between, which is what makes it the one seam that can exercise an
+         * arbitrary soundName deterministically.
+         *
+         * Note the honest scope: `groove.buffer`'s only production writer is
+         * `generateResolutionNotes` (`engine/resolution.ts`), which emits just
+         * Kick/Snare/Crash — all three mapped identically by the old map, so
+         * this call site's fix is inert *today*. It's tested anyway because
+         * the point of #1323 is that both sites resolve a name the same way;
+         * a future resolution voice would otherwise re-open the bug here only.
+         */
+        function playResolutionBuffer(names: string[]) {
+            const state = getState();
+            state.playback.isPlaying = true;
+            state.playback.isEndingPending = true;
+            state.playback.step = state.arranger.totalSteps;
+            state.playback.scheduleAheadTime = 0.2;
+            state.playback.nextNoteTime = 10.0;
+            state.playback.audio.currentTime = 10.0;
+
+            scheduler(getState());
+            expect(state.playback.resolutionTriggered, 'resolution never triggered').toBe(true);
+
+            // `triggerResolution` clears the buffers first, then the worker's
+            // resolution notes arrive via the worker-client callback — so seed
+            // AFTER the trigger, matching production ordering.
+            playback.drawQueue.length = 0;
+            Engine.playDrumSound.mockClear();
+            groove.buffer.set(
+                state.playback.step,
+                names.map((name) => ({ name, velocity: 0.8, timingOffset: 0 })),
+            );
+
+            vi.advanceTimersByTime(60);
+
+            return {
+                sounded: Engine.playDrumSound.mock.calls.map((call) => call[1]),
+                drawn: playback.drawQueue
+                    .filter((e) => e.type === 'note' && e.track === 'drums')
+                    .map((e) => e.midi),
+            };
+        }
+
+        it('draws the strategy-emitted soundNames at their own GM note on the resolution path', () => {
+            const { sounded, drawn } = playResolutionBuffer(
+                PREVIOUSLY_KICK_SOUNDS.map(([name]) => name),
+            );
+
+            expect(sounded).toEqual(PREVIOUSLY_KICK_SOUNDS.map(([name]) => name));
+            expect(drawn).toEqual(PREVIOUSLY_KICK_SOUNDS.map(([, note]) => note));
+            // Every one of these hit the old map's `|| 36` Kick fallback.
+            expect(drawn).not.toContain(36);
+        });
+
+        it('skips an unmapped name on the resolution path too', () => {
+            const { sounded, drawn } = playResolutionBuffer(['Kick', 'NotARealDrum', 'Snare']);
+
+            expect(sounded).toEqual(['Kick', 'NotARealDrum', 'Snare']);
+            // Only the unmapped one drops out — and it does not shift the
+            // others onto the wrong row.
+            expect(drawn).toEqual([36, 38]);
+        });
+    });
+
     describe('Visual Scheduling', () => {
         it('should not push chord events while visualizer is disabled', () => {
             const chordData = {

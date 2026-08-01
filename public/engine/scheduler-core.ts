@@ -53,6 +53,7 @@ import {
 } from './engine.js';
 import { calculateStepDuration } from './groove-engine.js';
 import { stringHash31 } from './hash-utils.js';
+import { DRUM_MAP } from './midi-constants.js';
 import {
     dispatchMidiAutomation,
     dispatchMidiBass,
@@ -131,26 +132,50 @@ function getChordMidiNotes(chord: { freqs: number[] }): number[] {
     return cached;
 }
 
-const DRUM_VIS_PITCHES: Record<string, number> = {
-    Kick: 36,
-    Snare: 38,
-    HiHat: 42,
-    ClosedHat: 42,
-    HiHatQuarter: 42,
-    HiHatHalf: 46,
-    HiHatPedal: 44,
-    Open: 46,
-    OpenHat: 46,
-    Ride: 51,
-    Crash: 49,
-    TomHi: 50,
-    TomMid: 47,
-    TomLow: 45,
-    Rimshot: 37,
-    Clap: 39,
-    Shaker: 70,
-    Cowbell: 56,
-};
+/**
+ * The visualizer's drum-lane pitch for a hit's `soundName`.
+ *
+ * #1323: this used to be `DRUM_VIS_PITCHES` — a third, independent
+ * drum-name→GM-note map alongside `DRUM_MAP`, carrying the same
+ * `[name] || 36` Kick fallback #1321 removed from live MIDI-out. It was
+ * missing most of what the drum engine actually emits (8 of the 13 drum
+ * lanes, including the space-form Toms, plus `Sidestick`, `Brush`, `China`
+ * and the suffix-first Agogo/Cowbell variants), so those hits all drew at the
+ * Kick position; it also carried keys no producer ever emits (`TomHi`/
+ * `TomMid`/`TomLow`/`ClosedHat`/`OpenHat`/`Rimshot`). There is no
+ * visualizer-specific reason for a divergent mapping — display, live MIDI-out
+ * and `.mid` export all want "which GM voice is this?" — so it now reads the
+ * one map #1321 completed.
+ *
+ * Returns `undefined` for an unmapped name so the caller skips the event
+ * instead of drawing the wrong instrument, matching `sendMIDIDrum`'s #1321
+ * rule: a missing dot is a smaller error than a confidently wrong one. Every
+ * name the engine emits today resolves, so that branch is unreachable — but
+ * note the guard in `tests/unit/app/midi-controller.test.ts` asserts
+ * `KNOWN_SOUND_NAMES` ∪ space-form Toms ⊆ `DRUM_MAP`, which is a *registry*
+ * subset check, not an emission trace. A groove writing a name absent from
+ * both would only surface as `maybeWarnUnknownSound`'s runtime console warn.
+ *
+ * Why the drums lane isn't widened to fit GM percussion: the lane renders
+ * midi 35–59 (`VISUALIZER_TRACKS.drums`), so hand percussion above that
+ * (`Bongo` 60, `Conga` 63, `Perc`/`AgogoHigh` 67, `Shaker` 70, `Guiro` 74,
+ * `Clave` 75) clamps to the top row and shares it. That's deliberate: GM's
+ * percussion key map is frequency-ordered only up to ~59 — kick 36 → snare 38
+ * → toms 43/47/50 → cymbals 49–52 genuinely ascends, which is why the lane's
+ * vertical axis reads as "low kit → high kit". Above 59 the ordering is
+ * arbitrary (Hi Bongo 60 is the highest-pitched drum in the Latin set, Low
+ * Conga 64 the lowest), so raising `midiMax` would draw a low conga above a
+ * crash — trading a legible frequency axis for a GM-index one. What does
+ * hold: rows 53–59 carry no emitted kit voice (the highest is `Cowbell` 56),
+ * so the clamped percussion piles into empty space rather than masquerading
+ * as a ride or a crash.
+ */
+function drumVisualizerMidi(soundName: string): number | undefined {
+    // The `| undefined` return annotation, not a cast, is what tells callers
+    // the lookup can miss — `DRUM_MAP` is already `Record<string, number>` and
+    // the repo doesn't set `noUncheckedIndexedAccess`.
+    return DRUM_MAP[soundName];
+}
 
 // Initialize platform-specific hacks (iOS Audio, WakeLock state)
 initPlatformHacks();
@@ -710,14 +735,16 @@ function scheduleDrums(
         playDrumSound(state, hit.soundName, playTime, velocity);
 
         if (vizState.enabled) {
-            const midiNum = DRUM_VIS_PITCHES[hit.soundName] || 36;
-            queueVisualizerNoteEvent(playback, {
-                track: 'drums',
-                midi: midiNum,
-                time: playTime,
-                velocity,
-                duration: 0.1,
-            });
+            const midiNum = drumVisualizerMidi(hit.soundName);
+            if (midiNum !== undefined) {
+                queueVisualizerNoteEvent(playback, {
+                    track: 'drums',
+                    midi: midiNum,
+                    time: playTime,
+                    velocity,
+                    duration: 0.1,
+                });
+            }
         }
 
         dispatchMidiDrum(state, hit.soundName, playTime, velocity);
@@ -743,14 +770,17 @@ function scheduleDrumsFromBuffer(state: EnsembleState, step: number, time: numbe
             playDrumSound(state, name, playTime, velocity * conductorVel);
 
             if (vizState.enabled) {
-                const midiNum = DRUM_VIS_PITCHES[name] || 36;
-                queueVisualizerNoteEvent(playback, {
-                    track: 'drums',
-                    midi: midiNum,
-                    time: playTime,
-                    velocity: velocity * conductorVel,
-                    duration: 0.1,
-                });
+                // #1323: same skip-don't-guess rule as the live path above.
+                const midiNum = drumVisualizerMidi(name);
+                if (midiNum !== undefined) {
+                    queueVisualizerNoteEvent(playback, {
+                        track: 'drums',
+                        midi: midiNum,
+                        time: playTime,
+                        velocity: velocity * conductorVel,
+                        duration: 0.1,
+                    });
+                }
             }
 
             dispatchMidiDrum(state, name, playTime, velocity * conductorVel);
