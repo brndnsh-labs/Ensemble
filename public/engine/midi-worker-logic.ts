@@ -28,6 +28,30 @@ import { getChordAtStep } from './worker-utils.js';
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 const PPQ = 480;
 
+/**
+ * Resolves a drum hit's GM note for `.mid` export: `soundName` first, falling
+ * back to the hit's static drum-lane name (`instName`) when the hit didn't
+ * override it (e.g. a plain kick/snare/hat step with no per-hit soundName).
+ * #1321: DRUM_MAP now has a direct key for every name the drum engine
+ * actually emits, so this is an exact lookup — no fuzzy matching needed, and
+ * no case where an unmapped `soundName` silently falls back to the WRONG
+ * lane's note (China on the Open lane used to export as Open Hi-Hat 46; a
+ * disco Cowbell on the Perc lane used to export as Perc 67). Exported so it
+ * can be pinned directly — see `tests/unit/app/midi-controller.test.ts`.
+ */
+export function resolveExportDrumMidi(
+    soundName: string | undefined,
+    instName: string,
+    octaveOffset: number,
+): number | undefined {
+    let midi = DRUM_MAP[soundName as string] || DRUM_MAP[instName];
+    if (midi) {
+        midi += octaveOffset * 12;
+        midi = Math.max(0, Math.min(127, midi));
+    }
+    return midi;
+}
+
 export interface ExportOptions {
     includedTracks?: string[];
     targetDuration?: number;
@@ -725,66 +749,11 @@ export class ExportProcessor {
                 const soundName = hit.soundName as any;
                 const instName = (hit.inst as any).name;
                 const name = soundName || instName;
-                let midi = DRUM_MAP[soundName] || DRUM_MAP[instName];
-
-                if (midi) {
-                    midi += (this.state.midi.drumsOctave || 0) * 12;
-                    midi = Math.max(0, Math.min(127, midi));
-                }
-
-                // Fuzzy matching for unmapped dynamic names
-                if (!midi) {
-                    if (name.includes('Tom')) {
-                        if (name.includes('High')) {
-                            midi = DRUM_MAP['High Tom'];
-                        } else if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Tom'];
-                        } else {
-                            midi = DRUM_MAP['Mid Tom'];
-                        }
-                    } else if (name.includes('Agogo')) {
-                        if (name.includes('Low')) {
-                            midi = DRUM_MAP['Low Agogo'];
-                        } else {
-                            midi = DRUM_MAP['High Agogo'];
-                        }
-                    } else if (name.includes('Bongo')) {
-                        // why: S8(d) — DRUM_MAP keys are suffix-first
-                        // (`Bongo<Variant>`), matching Agogo/Cowbell.
-                        if (name.includes('Low')) {
-                            midi = DRUM_MAP.BongoLow;
-                        } else {
-                            midi = DRUM_MAP.BongoHigh;
-                        }
-                    } else if (name.includes('Conga')) {
-                        // why: S8(d) — DRUM_MAP keys are suffix-first
-                        // (`Conga<Variant>`), matching Agogo/Cowbell.
-                        if (name.includes('Low')) {
-                            midi = DRUM_MAP.CongaLow;
-                        } else if (name.includes('Open')) {
-                            midi = DRUM_MAP.CongaOpen;
-                        } else if (name.includes('Mute')) {
-                            midi = DRUM_MAP.CongaMute;
-                        } else if (name.includes('Slap')) {
-                            midi = DRUM_MAP.CongaSlap;
-                        } else {
-                            midi = DRUM_MAP.CongaHigh;
-                        }
-                    } else if (name.includes('Cowbell')) {
-                        // why: live drum engine (playDrumSoundCurrent's Cowbell block) emits
-                        // 'CowbellHigh'/'CowbellLow' for the disco octave-cowbell
-                        // motif (Epic 7 S2). Without this branch the variants
-                        // would fall through and silently drop from MIDI export
-                        // while still rendering in audio. GM has only one cowbell
-                        // note (56), so high/low both map to it — the per-voice
-                        // pitch shift is a synth-side effect, not a MIDI feature.
-                        midi = DRUM_MAP.Cowbell;
-                    } else if (name.includes('Brush')) {
-                        // why: any 'Brush'-named variant routes to the bare
-                        // Brush mapping (Side Stick 37) — see midi-constants.ts.
-                        midi = DRUM_MAP.Brush;
-                    }
-                }
+                const midi = resolveExportDrumMidi(
+                    soundName,
+                    instName,
+                    this.state.midi.drumsOctave || 0,
+                );
 
                 if (midi) {
                     const durS =

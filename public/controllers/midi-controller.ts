@@ -485,7 +485,15 @@ export function sendMIDIDrum(
     octaveOffset = 0,
 ): void {
     const { midi } = getState();
-    const note = ((DRUM_MAP as Record<string, number>)[instrumentName] || 36) + octaveOffset * 12;
+    const gmNote = (DRUM_MAP as Record<string, number>)[instrumentName];
+    // #1321: an unmapped name used to fall back to Kick (36) — playing the
+    // wrong instrument is worse than not sounding one, and DRUM_MAP is now
+    // complete against every name the drum engine actually emits, so this is
+    // a genuine "can't happen today" guard, not an active fallback.
+    if (gmNote === undefined) {
+        return;
+    }
+    const note = gmNote + octaveOffset * 12;
     const vel = normalizeMidiVelocity(velocity, midi.velocitySensitivity);
     // Drums are usually short triggers, so we'll send a note off shortly after
     sendMIDINote(midi.drumsChannel, note, vel, time, 0.05);

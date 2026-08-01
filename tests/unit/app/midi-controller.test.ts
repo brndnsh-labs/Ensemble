@@ -9,6 +9,9 @@ import {
     sendMIDINote,
     sendMIDIPitchBend,
 } from '../../../public/controllers/midi-controller.js';
+import { DRUM_MAP } from '../../../public/engine/midi-constants.js';
+import { resolveExportDrumMidi } from '../../../public/engine/midi-worker-logic.js';
+import { KNOWN_SOUND_NAMES } from '../../../public/engine/synth-drums.js';
 import { getState } from '../../../public/state.js';
 
 const { playback, midi } = getState();
@@ -213,6 +216,106 @@ describe('MIDI Controller System', () => {
 
             expect(status).toBe(0x99); // Channel 10 Note On
             expect(note).toBe(36); // Kick
+        });
+
+        // #1321: sendMIDIDrum used a bare `DRUM_MAP[name] || 36` lookup, so any
+        // name missing from DRUM_MAP silently played as Kick. CowbellHigh/
+        // CowbellLow, AgogoHigh, and China (Metal's accent-cymbal splash) were
+        // all real, currently-emitted names with no entry.
+        it('maps the suffix-variant and China names that used to fall through to Kick', () => {
+            midi.drumsChannel = 10;
+            const cases: Array<[string, number]> = [
+                ['CowbellHigh', 56],
+                ['CowbellLow', 56],
+                ['AgogoHigh', 67],
+                ['AgogoLow', 68],
+                ['China', 52],
+            ];
+
+            for (const [name, expectedNote] of cases) {
+                sendMIDIDrum(name, 1000, 0.8);
+                const lastCall = mockOutput.send.mock.calls.at(-1);
+                expect(lastCall[0][1], `${name} should resolve to GM ${expectedNote}`).toBe(
+                    expectedNote,
+                );
+                // None of these should be the Kick fallback (36) they used to hit.
+                expect(lastCall[0][1]).not.toBe(36);
+            }
+        });
+
+        // #1321 acceptance: a genuinely unmapped name must be SKIPPED, not
+        // played as the wrong instrument (Kick) — a dropped note is a smaller
+        // error than an audibly wrong one.
+        it('sends nothing for a name with no DRUM_MAP entry, instead of falling back to Kick', () => {
+            midi.drumsChannel = 10;
+            sendMIDIDrum('TotallyMadeUpPercussion', 1000, 0.8);
+
+            expect(mockOutput.send).not.toHaveBeenCalled();
+        });
+
+        // #1321 acceptance #1, made into a regression guard: every name the
+        // drum engine can actually emit (synth-drums.ts's KNOWN_SOUND_NAMES,
+        // plus the space-form Tom names it deliberately excludes as redundant)
+        // must resolve to a real GM note — never silently miss and fall
+        // through to a fallback on either the live or export path.
+        it('resolves every reachable drum sound name to a defined GM note', () => {
+            const reachableNames = [...KNOWN_SOUND_NAMES, 'High Tom', 'Mid Tom', 'Low Tom'];
+
+            for (const name of reachableNames) {
+                expect(
+                    (DRUM_MAP as Record<string, number>)[name],
+                    `"${name}" is emitted at runtime but missing from DRUM_MAP`,
+                ).toBeTypeOf('number');
+            }
+        });
+
+        // #1321 acceptance #2: live MIDI-out (sendMIDIDrum) and the .mid
+        // exporter's real resolution function (resolveExportDrumMidi, in
+        // midi-worker-logic.ts) must agree on the GM note for every name they
+        // both see a plain soundName-only lookup for. This drives the
+        // exporter's ACTUAL resolution logic, not a re-read of DRUM_MAP, so a
+        // future divergence in either function's fallback/octave/clamp
+        // behavior would redden this rather than pass trivially.
+        it('agrees with the .mid exporter on the GM note for every reachable name', () => {
+            midi.drumsChannel = 10;
+            const reachableNames = [...KNOWN_SOUND_NAMES, 'High Tom', 'Mid Tom', 'Low Tom'];
+
+            for (const name of reachableNames) {
+                sendMIDIDrum(name, 1000, 0.8);
+                const liveNote = mockOutput.send.mock.calls.at(-1)[0][1];
+                // instName irrelevant here — soundName resolves directly for
+                // every reachable name, so the lane-name fallback never fires.
+                const exportNote = resolveExportDrumMidi(name, 'Kick', 0);
+                expect(liveNote, `"${name}" diverges between live MIDI-out and export`).toBe(
+                    exportNote,
+                );
+            }
+        });
+
+        // #1321: before this fix, an unmapped soundName made the .mid exporter
+        // fall back to `DRUM_MAP[instName]` — the hit's static DRUM LANE name —
+        // not silence and not the intended sound. A Metal China splash (fires
+        // on the Open lane) exported as Open Hi-Hat (46); a Disco cowbell
+        // (fires on the Perc lane) exported as Perc (67); a Latin agogô bell
+        // (fires on the Snare lane, see grooves/latin.ts) exported as Snare
+        // (38). Pin that all three now resolve to their real GM note, using
+        // the actual (soundName, laneName) pairs those grooves emit.
+        it('resolves the real drum-lane pairings that used to export as the wrong lane instead of dropping', () => {
+            const cases: Array<[string, string, number]> = [
+                ['China', 'Open', 52],
+                ['CowbellHigh', 'Perc', 56],
+                ['CowbellLow', 'Perc', 56],
+                ['AgogoHigh', 'Snare', 67],
+            ];
+
+            for (const [soundName, laneName, expectedNote] of cases) {
+                const note = resolveExportDrumMidi(soundName, laneName, 0);
+                expect(
+                    note,
+                    `${soundName} on the ${laneName} lane should export as ${expectedNote}, not the lane's own note`,
+                ).toBe(expectedNote);
+                expect(note).not.toBe(resolveExportDrumMidi(undefined, laneName, 0));
+            }
         });
 
         it('should send explicit Note Offs for all active notes when panic() is called', () => {

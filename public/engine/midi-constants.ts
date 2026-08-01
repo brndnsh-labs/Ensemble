@@ -45,4 +45,24 @@ export const DRUM_MAP: Record<string, number> = {
     CongaOpen: 63,
     CongaMute: 62,
     CongaSlap: 63,
+    // why: #1321 — `DISPATCHER_FAMILIES` (synth-drums.ts) emits Agogo/Cowbell
+    // variants suffix-first (`AgogoHigh`, `CowbellLow`, ...), the same
+    // convention as the Conga/Bongo keys above, but this map only had the
+    // legacy space-form Agogo keys and no variant Cowbell keys at all — so a
+    // bare `DRUM_MAP[name]` lookup (used by live MIDI-out) missed both and
+    // fell through to its Kick fallback. GM has only one cowbell note (56),
+    // so both variants land on it, matching the `.mid` exporter's now-removed
+    // fuzzy-match comment.
+    AgogoHigh: 67,
+    AgogoLow: 68,
+    CowbellHigh: 56,
+    CowbellLow: 56,
+    // why: #1321 — Metal's accent-cymbal splash (`grooves/metal.ts`) emits
+    // 'China' and this map had no entry at all. Live MIDI-out (soundName-only
+    // lookup) fell all the way through to the Kick fallback; the `.mid`
+    // exporter (soundName-or-lane-name lookup) fell back to the China hit's
+    // Open-lane note instead — wrong instrument on both paths, just
+    // differently wrong. 52 is General MIDI's "Chinese Cymbal" — the
+    // standard percussion-key-map note for this voice.
+    China: 52,
 };
