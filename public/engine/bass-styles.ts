@@ -492,7 +492,11 @@ export function getBassNoteStyle(
     intensity: number,
     velocity: number,
     isSoloistBusy: boolean,
-    beatsInChord: number,
+    // why: #1256 — no longer read by this function (the only call site was the
+    // now-deleted dead chromatic-approach block); kept as a positional
+    // parameter since bass-engine.ts's call site passes it positionally and
+    // still uses its own copy of `beatsInChord` upstream.
+    _beatsInChord: number,
     result: (
         freq: number,
         dur?: number | null,
@@ -505,8 +509,11 @@ export function getBassNoteStyle(
     kickInst: { steps: number[] } | null,
     barsUntilSectionChange?: number,
 ) {
-    const { withOctaveJump, isSameAsPrev, clampAndNormalize, normalizeToRange, pumpForcesLift } =
-        context;
+    // why: #1256 — `isSameAsPrev` is no longer read here; the only call site was
+    // the now-deleted dead chromatic-approach block. Left off the destructure
+    // rather than underscore-prefixed since object destructuring can simply
+    // omit an unused property.
+    const { withOctaveJump, clampAndNormalize, normalizeToRange, pumpForcesLift } = context;
 
     // --- COUNTRY STYLE (Two-Step + Quarter-Note Root-Fifth + Walk-Up) ---
     if (style === 'country') {
@@ -1682,80 +1689,15 @@ export function getBassNoteStyle(
             }
         }
 
-        // For intermediate beats, return undefined to let the Generic Fallback and Approach Logic
-        // handle scale tone picking with proper voice-leading and soloist awareness.
+        // For intermediate beats, return undefined — the generic scale-tone
+        // fallback AND the chromatic-approach logic both live in bass-engine.ts
+        // (right after its `getBassNoteStyle` call site, gated on
+        // `styleResult !== undefined`), not in this file. #1256: this function
+        // used to carry its own near-identical copy of that chromatic-approach
+        // block here, but every style branch in this file returns before ever
+        // reaching it (confirmed exhaustively across all 13 bass styles), so it
+        // was always dead code — deleted rather than kept "in sync" by hand.
         return undefined;
-    }
-
-    // Chromatic Approach Logic — universal across genres; Jazz/Blues retain higher probability
-    const isLastBeatOfMeasure = intBeat === ts.beats - 1;
-    const isEndOfChord = intBeat === beatsInChord - 1;
-    const isLastEighth = _stepInfo?.mStep === ts.beats * ts.stepsPerBeat - 2;
-    const isApproachPoint =
-        (isBeatStart && (isLastBeatOfMeasure || isEndOfChord)) || isEighthSkip || isLastEighth;
-
-    // Use a slightly more aggressive chromatic probability for the critique to ensure it triggers
-    if (isApproachPoint && isChordChangeApproach(nextChord, chord)) {
-        const nextTarget =
-            nextChord.bassMidi !== null && nextChord.bassMidi !== undefined
-                ? nextChord.bassMidi
-                : nextChord.rootMidi;
-        const targetRoot = normalizeToRange(nextTarget);
-        const pullTension =
-            (soloist.session.tension || 0) + intensity * 0.3 + playback.complexity * 0.2;
-        let chromaticProb = (isSoloistBusy ? 0.4 : 0.6) + pullTension * 0.3;
-
-        // Force very high probability for Jazz/Blues at high levels
-        if (intensity > 0.75 && (groove.genreFeel === 'Jazz' || groove.genreFeel === 'Blues')) {
-            // why: jazz/blues idiomatic — chromatic leading tones are the primary
-            // approach vocabulary at high intensity; raise to near-certain.
-            chromaticProb = 0.95;
-        } else if (groove.genreFeel !== 'Jazz' && groove.genreFeel !== 'Blues') {
-            // why: rock/funk/pop/country/soul/gospel all use chromatic approaches but
-            // less frequently than jazz/blues — half the base probability preserves the
-            // idiom without over-jazzing non-jazz genres (bass.md P1 #4).
-            chromaticProb *= 0.5;
-        }
-
-        if (Math.random() < chromaticProb) {
-            const choices = [
-                { midi: targetRoot - 5, weight: 0.5 },
-                { midi: targetRoot - 1, weight: 1.0 },
-                { midi: targetRoot + 1, weight: 1.0 },
-            ];
-            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-            let totalWeight = 0;
-            for (let i = 0; i < choices.length; i++) {
-                totalWeight += choices[i].weight;
-            }
-            let r = Math.random() * totalWeight;
-            let approach = targetRoot - 1;
-            for (const c of choices) {
-                r -= c.weight;
-                if (r <= 0) {
-                    approach = c.midi;
-                    break;
-                }
-            }
-            // why: approach notes must sit within ±5 semitones of their target;
-            // withOctaveJump would add ±12, turning a smooth half-step approach into
-            // a dissonant octave leap — contradicts voice-leading intent (bass.md P0 #2).
-            // Octave displacement is reserved for downbeat root statements only.
-            approach = clampAndNormalize(approach);
-            const bend = approachBend(groove.genreFeel, approach, targetRoot, isSoloistBusy);
-            return result(getFrequency(approach), 1, velocity, 0, bend);
-        } else {
-            const candidates = [targetRoot - 5, targetRoot + 7, targetRoot + 5, targetRoot - 7];
-            const valid = candidates.filter(
-                (n) => n >= absMin && n <= absMax && !isSameAsPrev(n) && n % 12 !== baseRoot % 12,
-            );
-            const approach =
-                valid.length > 0 ? valid[Math.floor(Math.random() * valid.length)] : targetRoot - 5;
-            // why: candidates already filtered to absMin–absMax (bass register 23–57);
-            // withOctaveJump would displace the perfect-fourth approach (−5) by ±12,
-            // producing a leap instead of a smooth landing. Reserve for downbeat roots.
-            return result(getFrequency(approach), null, velocity);
-        }
     }
 
     return undefined;
