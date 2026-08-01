@@ -68,7 +68,7 @@
     "milestones": []
   },
   "routing": {
-    "model": "`sonnet` | `opus` via the `model/*` label (default opus). **Model never gates autonomy** (§5) — it only picks the executor's model.",
+    "model": "`sonnet` | `opus` via the `model/*` label (default opus when untagged). Tag `sonnet` for well-specified, gate-verifiable stories — including musical work, where the critique tests + the `Needs-ear` stop gate the result regardless of executor; reserve `opus` for design-call / open-investigation stories (which usually carry `Needs-decision` anyway). **Model never gates autonomy** (§5) — it only picks the executor's model.",
     "executor_default": "orchestrator-inline"
   },
   "gates": {

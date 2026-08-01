@@ -38,14 +38,16 @@ dropout. **The split that decides everything — which side of the audio path is
 - **Real-time audio path** (`scheduler-core.ts`, the `synth-*.ts` voices, the logic/visualizer
   workers, `tick-logic`) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
-  `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, Model `opus`, leave off
-  `burndown` (often `needs-ear`).
+  `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, leave off
+  `burndown` (often `needs-ear`). Model per the §3 routing rule: `sonnet` when the acceptance is
+  critique-test-verifiable, `opus` only when the finding is itself a design call.
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `Track: bundle`, Review lens `bundle-hygiene`. Drop an unused dep, lazy-load a
   route/overlay, code-split a heavy component, memoize a *verified*-hot render. `npm run build` /
   the size check **is** the proof and it never touches the audio floor. Pure ones (drop a dep) →
   `burndown`; tradeoff ones (a lazy-load adds a loading state) → `Needs-decision`-with-fix.
-- **Classify:** audio-path → Track `synth`/`musical`, Model `opus`, caveat or `Needs-ear`. Off-path →
+- **Classify:** audio-path → Track `synth`/`musical`, Model per the §3 routing rule (`sonnet` if
+  gate-verifiable, `opus` for design calls), caveat or `Needs-ear`. Off-path →
   Track `bundle`, Model `sonnet`, `Ready` + `burndown` (or `Needs-decision`-with-fix for tradeoffs).
 
 ### `hygiene` — type-safety, dead code, duplication, drift (the most `burndown`-able lens)

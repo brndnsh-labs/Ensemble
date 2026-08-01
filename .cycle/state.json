@@ -1,7 +1,7 @@
 {
   "upstream": "fc6aafc",
   "files": {
-    ".claude/skills/DOCTRINE.md": "f897f99ae859",
+    ".claude/skills/DOCTRINE.md": "d2c909820811",
     ".claude/skills/cycle/SKILL.md": "8dd430556d9d",
     ".claude/skills/implement/SKILL.md": "02a34d331396",
     ".claude/skills/review/SKILL.md": "8bad0e66a060",
@@ -9,7 +9,7 @@
     ".claude/skills/done/SKILL.md": "ed4d8c454662",
     ".claude/skills/next/SKILL.md": "4756e888faa5",
     ".claude/skills/intake/SKILL.md": "d63c93ef7de4",
-    ".claude/skills/scout/SKILL.md": "3737ff6a1cc8",
+    ".claude/skills/scout/SKILL.md": "d994478f2050",
     ".claude/skills/burndown/SKILL.md": "525c25bf541a",
     ".claude/skills/dep-update/SKILL.md": "461a7c9551b0",
     ".claude/skills/deploy-test/SKILL.md": "9f3ed83dfdc7",

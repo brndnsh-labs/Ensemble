@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=f897f99ae859 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=d2c909820811 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -76,7 +76,7 @@ skill at `/cycle` time, from what the diff actually touches, not at filing time.
 
 ## §3 Routing
 
-- **Model:** `sonnet` | `opus` via the `model/*` label (default opus). **Model never gates autonomy** (§5) — it only picks the executor's model.
+- **Model:** `sonnet` | `opus` via the `model/*` label (default opus when untagged). Tag `sonnet` for well-specified, gate-verifiable stories — including musical work, where the critique tests + the `Needs-ear` stop gate the result regardless of executor; reserve `opus` for design-call / open-investigation stories (which usually carry `Needs-decision` anyway). **Model never gates autonomy** (§5) — it only picks the executor's model.
 - **Executor:** **`orchestrator-inline` by default** — the main thread builds directly,
   keeping accumulated context. **Spawn parallel agents only for
   independent mechanical work** (the same change across several files); keep shared-file edits
