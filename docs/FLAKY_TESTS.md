@@ -127,6 +127,100 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix:** default import only — `import pkg from '@playwright/test'; const { chromium } = pkg;` (globalSetup, 2026-05-29).
 - **Last seen:** 2026-05-29 (fixed).
 
+## Tail-margin sweep (#1262) — full `tests/standards/` enumeration
+
+The disco/rock/hip-hop/bass-chord-change entries above ended on a shared
+observation: the suite plausibly holds **dozens** of unseeded critique gates
+with ~1-in-500 tail margins, making "some pair reds out together" nearer
+1-in-300 runs than naive independence would suggest. #1262 is the enumeration
+that turns that hypothesis into a ranked list, per its own sizing note
+("the enumeration is cheap and is the part worth doing first").
+
+**Method.** `tests/standards/*.test.ts` has 157 files; 8 already call
+`installSeededRandom()` (out of scope, already fixed) and 149 don't. Of
+those, 133 contain a `toBeGreaterThan`/`toBeLessThan`/`toBeCloseTo`-shaped
+assertion. Rather than measure all 133 blind, the search was narrowed by
+tracing **which engines still contain a live (non-comment, non-audio,
+non-test-fixture) `Math.random()` call reachable from a critique test** —
+because a critique test's statistical assertion can only be unseeded-flaky
+if the engine path it drives actually rolls unseeded dice. `grep -rn
+"Math\.random(" public/engine/ public/engine/grooves/` and a symbol-by-symbol
+trace of every hit found the surface is now **narrow**: prior epics (#790,
+#792, #841, #1083, #1256, #1271, #1277, #1295, #1300, the
+deterministic-phrasing epic, Epic 12 S4) have already migrated the large
+majority of per-step decision points to `scrambleHash`/seeded draws. What's
+left:
+
+| Engine | Live `Math.random()` sites | Reachable from a critique-tested statistical assertion? |
+|---|---|---|
+| `synth-drums/chords/harmonies/soloist/utils.ts`, `scheduler-core.ts`, `engine.ts` | Real-time audio-graph jitter, DSP buffers | No — `tests/standards/` never touches audio synthesis; covered by `tests/browser/` instead |
+| `public/engine/grooves/utils.ts` (`roll`/`humanizeDraw`/`placementSkew`) | Legacy fallback, gated on `context.rollBaseSeed === undefined` | No — `rollBaseSeed` is computed **internally** by `applyGrooveOverrides` (`groove-engine.ts:506`) from `(sectionId, barIndex, loopStep, inst.name)`, not supplied by the caller. Every one of the ~40 drum critique tests that calls `applyGrooveOverrides` (confirmed by grep: zero files set `rollBaseSeed` directly, because none need to) gets the seeded path automatically. The legacy fallback is dead from `tests/standards/`'s perspective. |
+| `public/engine/comping-cells.ts`, `accompaniment.ts`, `groove-engine.ts`, `grooves/latin.ts`, `grooves/jazz.ts`, `hash-utils.ts`, `bass-pump.ts`, `conductor.ts` | 0 live — every hit in these files is a `why:`-comment documenting a **past** migration off `Math.random()` | N/A |
+| `public/engine/chords-engine.ts` (`mutateProgression`, 4 sites) | Live, but only reachable from a "surprise me" progression-randomizer UI feature (`InlineEditor.tsx`, re-exported by `arranger-controller.ts`) | No — grepped every `tests/standards/*.test.ts` import of `chords-engine.js`; all 36 importers use `validateProgression`/`getBestInversion`, none call `mutateProgression`. Dead from the critique suite. |
+| `public/engine/resolution.ts` (`getStagger`, timing jitter ±15ms) | Live, drives final-cadence note stagger | No — the two cadence critique files (`final-bar-cadence.test.ts`, `ending-cadence-tonic-critique.test.ts`) assert pitch/duration/register, never raw `timingOffset`; the latter's own comment explicitly notes this ("a timing stagger, never a pitch — so these are pinned" on pitch only). |
+| `public/engine/midi-worker-logic.ts` (velocity humanize jitter) | Live, MIDI-export-only | No critique test asserts a velocity range on MIDI-export output. |
+| `public/engine/bass-styles.ts`, `bass-engine.ts` | Live — the one genuinely exercised surface (see below) | **Yes, on 4 genre bass styles** — measured below |
+
+**The bass-engine surface, measured.** Six genre bass styles (Acoustic,
+Metal, Ska-Punk, Jazz, Blues, Funk) still route pitch decisions through raw
+`Math.random()` in specific branches (`bass-styles.ts`'s acoustic/metal/
+walking-ska/quarter-beat-3 branches; `bass-engine.ts`'s blues walk-up,
+quiet-rock/funk-offbeat ghost, and generic chromatic-approach fallback —
+the last one only reachable by Jazz, since `country`/`neo`/`dub`/`rock`/
+`disco`/`hiphop` all return a defined result on every style-function call
+and never fall through to it). Reggae/Country/Neo-Soul were traced and
+found to have **zero** statistical-assertion exposure (Reggae's only raw
+draw is a ±5% velocity jitter that no test asserts a range on; Country and
+Neo-Soul's pitch pickers are 100% `scrambleHash`-seeded already). For the
+remaining five files, each candidate assertion was measured over
+150-1000 isolated `getBassNote`/`getStepInfo` trials (a throwaway vitest
+harness, not `test:loop`, since the metric needed is a per-trial numeric
+draw, not a pass/fail count) and the tail probability derived from the
+measured mean/sd against the file's actual threshold:
+
+| File | Assertion | Measured mean / sd (n) | Threshold | Margin | Verdict |
+|---|---|---|---|---|---|
+| `acoustic-bass-critique.test.ts` | 4 assertions, all `toBe(1.0)`/exact counts | N/A — invariant | N/A | ∞ | **Not at risk.** Every random branch (5th-vs-octave pitch choice) still lands on a pitch-class the assertion accepts regardless of the draw — the test is invariant under the engine's own randomness, not merely lucky. |
+| `metal-bass-critique.test.ts` | `gallopCount > 10` | 21.0 / 2.00 (n=200) | 10 | 5.5σ | **Not at risk.** The file's own stale comment ("observed 14-22 across 10 runs") undersold the margin from an n=10 sample; n=200 shows min=15. |
+| `metal-bass-critique.test.ts` | `hitDensity > 0.72` | 0.805 / 0.0148 (n=200) | 0.72 | 5.7σ | **Not at risk** (comment also stale, same n=10 cause). |
+| `metal-bass-critique.test.ts` | density-scaling `ratio > 1.6` | 1.996 / 0.063 (n=200) | 1.6 | 6.3σ | **Not at risk.** |
+| `ska-punk-bass-critique.test.ts` | `rootRatio < 0.7` | 0.358 / 0.033 (n=200) | 0.7 | 10.4σ | **Not at risk.** |
+| `jazz-bass-critique.test.ts` | `chromaticApproachRate > 0.5` | 0.749 / 0.051 (n=100, 128-bar sweep each) | 0.5 | ~4.9σ | **Not at risk**, but flagged: at Jazz/high-intensity the engine's designed rate is ≈0.76-0.95×0.8, so a floor of 0.5 also has real regression headroom (an engine drop to ~0.55 would still pass) — a candidate for a future **band re-derivation** story (out of this story's scope per its acceptance item 3), not urgent. |
+| `funk-bass-critique.test.ts` | low-intensity `octavePops ≤ high/3` | low: 7.98 / 2.39, high: 52 (deterministic) (n=300, 32-bar sweep) | high/3 ≈ 17.3 | 3.9σ | **Not at risk.** An initial measurement pass found an apparent ~1.5% fail rate that would have crossed this story's action threshold — traced to a bug in the throwaway harness (it fed a raw MIDI number where the engine expects a frequency in Hz for `prevFreq`, degenerating the simulated line). Re-measured with the harness corrected to mirror the real test's `getFrequency(lastMidi)` conversion; margin is comfortable. Recorded here as a cautionary note on measurement methodology, not as an engine or test finding. |
+| `blues-bassist-critique.test.ts` | all assertions | N/A — invariant | N/A | ∞ | **Not at risk.** The one raw-`Math.random()`-exposed branch (walk-up variation, `intensity > 0.7`) only changes which scale tone a downbeat plays; every assertion in the file checks either duration, count, or the *following* upbeat's pitch mirroring `prevMidi` (which holds regardless of which scale tone the downbeat drew) — none samples downbeat pitch class at `intensity > 0.7`. |
+| `reggae-bass-critique.test.ts`, `country-bass-critique.test.ts`, `neo-soul-bass-critique.test.ts` | all assertions | N/A | N/A | N/A | **Not at risk** (engine paths are deterministic/`scrambleHash`-seeded or the only random draw is velocity jitter with no assertion on it — see table above). |
+
+**Result: nothing crosses the ~1-in-500 action threshold this pass.**
+Every measured margin is ≥3.9σ (funk, the tightest), most are 5-10σ+,
+corresponding to tail probabilities from ~1e-5 down to <1e-15 — several
+orders of magnitude inside the safety bar the disco/hip-hop/bass-approach
+fixes sat just outside of. Nothing was seeded (seeding a file with no real
+flake risk would only cost sensitivity for no reliability gain — see
+`feedback_weight_tuning_multiplier_placement`'s sibling caution on paying a
+determinism cost without a matching benefit). Nothing is deferred as
+"ambiguous/contentious to seed" either, since nothing reached the decision
+point of picking a representative seed. The one soft finding —
+`jazz-bass-critique.test.ts`'s `chromaticApproachRate > 0.5` floor being
+loose relative to the engine's designed ≈0.76 mean — is flagged for a
+possible future band-tightening story, per this story's acceptance item 3,
+not actioned here.
+
+**Why this differs from the disco/hip-hop/bass-approach precedents.** Those
+three were found *reactively*, from an actual CI red — i.e. they were
+already known to be near a tail. This sweep is *proactive*: it traces the
+engine surface first and only measures where a live unseeded
+`Math.random()` genuinely reaches a statistical assertion. The proactive
+trace turned up a much narrower surface than "dozens of unseeded gates"
+might suggest, because the intervening epics (#790, #792, #1083, #1256,
+#1271, #1277, #1295, #1300, Epic 12 S4) had already migrated most of the
+suite's random draws to `scrambleHash` for unrelated musical reasons
+(deterministic looped playback), and seeding-for-flake-safety came along as
+a free side effect. The remaining raw-`Math.random()` sites are deliberate
+per-loop-variety choices (bass.md `#1083`'s "Raw Math.random here … is
+deliberate: per-loop variety on this ornament is wanted") whose consuming
+assertions, when actually traced to a metric, turn out to have been
+authored with real headroom already.
+
 ## Adding an entry
 
 When you hit a flake, run `/flake <test-path>` — it measures the fail-rate,
