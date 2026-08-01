@@ -1831,4 +1831,83 @@ describe('Disco Bassist Critique', () => {
         expect(highGallops).toBeGreaterThan(50);
         expect(lowGallops).toBe(0);
     });
+
+    /**
+     * #1300 — the upbeat lift roll (and the gallop's two draws) used raw `Math.random()`,
+     * so the SAME bar re-scattered a different lift pattern every time it played: a
+     * different scatter bar-to-bar under one static chord, and a different scatter again
+     * on a later loop. The line never locked to a figure. Fixed by seeding on
+     * `stepInMeasure` alone — deliberately NOT mixed with `currentLoopCount` the way
+     * `checkBassActiveStyle`'s density gate is (that shape is for a gate that WANTS
+     * loop-to-loop variety; here it would just make the re-scatter reproducible instead
+     * of removing it) — so the SAME beat position gets the SAME decision every bar and
+     * every loop.
+     */
+    describe('locks the upbeat lift to a figure across bars and loops (#1300)', () => {
+        const extractBarLiftPattern = (performance, stepsPerBar) => {
+            const byStep = new Map(performance.map((p) => [p.step, p]));
+            const bars = new Map();
+            performance.forEach((p) => {
+                if (!p.info.isBeatStart) {
+                    return;
+                }
+                const bar = Math.floor(p.step / stepsPerBar);
+                const and = byStep.get(p.step + 2);
+                const lifted = and ? and.note.midi - p.note.midi : null;
+                if (!bars.has(bar)) {
+                    bars.set(bar, []);
+                }
+                bars.get(bar).push(lifted);
+            });
+            return [...bars.values()].map((b) => b.join(','));
+        };
+
+        it('the SAME bar plays the SAME lift pattern on every occurrence within one pass (today it does not)', () => {
+            // 16 bars, one static chord held throughout — every bar is "the same bar"
+            // musically, so a locked figure means every row is identical.
+            const performance = simulatePerformance(16, {
+                playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 124 },
+            });
+            const patterns = extractBarLiftPattern(performance, 16);
+            expect(patterns.length).toBeGreaterThan(10);
+            const first = patterns[0];
+            expect(patterns.every((p) => p === first)).toBe(true);
+        });
+
+        it('the SAME beat position resolves identically regardless of playback.currentLoopCount', () => {
+            // Same-position determinism, not a claim about a loop-replay mechanism: the
+            // disco note picker doesn't read `currentLoopCount` at all (unlike
+            // `checkBassActiveStyle`'s density gate), so this locks in that the lift
+            // roll stays a pure function of beat position — it must NOT regress into
+            // reading `currentLoopCount` and re-acquiring loop-to-loop drift.
+            const loop0 = simulatePerformance(4, {
+                playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 124, currentLoopCount: 0 },
+            });
+            const loop5 = simulatePerformance(4, {
+                playback: { bandIntensity: 0.5, complexity: 0.5, bpm: 124, currentLoopCount: 5 },
+            });
+            expect(extractBarLiftPattern(loop0, 16)).toEqual(extractBarLiftPattern(loop5, 16));
+        });
+
+        it('is reproducible — an identical setup re-run gives identical output', () => {
+            const setup = { playback: { bandIntensity: 0.5, complexity: 0.6, bpm: 124 } };
+            const run1 = simulatePerformance(8, setup);
+            const run2 = simulatePerformance(8, setup);
+            expect(run1.map((p) => p.note.midi)).toEqual(run2.map((p) => p.note.midi));
+        });
+
+        it('bandIntensity still moves the lift DENSITY — a determinism change, not a density change', () => {
+            const low = scoreOctaveAlternation(
+                simulatePerformance(16, {
+                    playback: { bandIntensity: 0.3, complexity: 0.5, bpm: 124 },
+                }),
+            );
+            const high = scoreOctaveAlternation(
+                simulatePerformance(16, {
+                    playback: { bandIntensity: 0.9, complexity: 0.5, bpm: 124 },
+                }),
+            );
+            expect(high.liftRate).toBeGreaterThan(low.liftRate);
+        });
+    });
 });

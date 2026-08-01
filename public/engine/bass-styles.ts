@@ -1163,6 +1163,27 @@ export function getBassNoteStyle(
         const stepInBeat = stepInMeasure % ts.stepsPerBeat;
         const isOffbeatAnd = stepInBeat === Math.floor(ts.stepsPerBeat / 2);
 
+        // why: #1300 — the lift roll and the gallop's two draws below used raw
+        // `Math.random()`, so the SAME bar re-scattered a different lift pattern
+        // every time it played, on every loop — the line never locked to a figure.
+        // A disco bassist picks a figure (octaves throughout / back-half-only /
+        // straight eighths) and holds it, varying only at a phrase boundary — not
+        // per-eighth-note. Seeded on `stepInMeasure` — already the loop-relative,
+        // bar-wrapped position (`bass-engine.ts` derives it from `stepInfo.mStep`
+        // before this function ever sees it, per CLAUDE.md's rule that a seed
+        // derived from `step` must be measure-relative, not the raw monotonic
+        // counter) — deliberately NOT mixed with `currentLoopCount` the
+        // way `checkBassActiveStyle`'s density gate is: that shape is right for a
+        // gate that WANTS loop-to-loop variety (Imperfect Symmetry), but it's the
+        // wrong shape here — XOR-ing in the loop would keep the exact scatter this
+        // issue is fixing, just make it reproducible-per-loop instead of literally
+        // random. `stepInMeasure`-only gives the SAME bar the SAME lift pattern on
+        // every loop, which is the actual musical target. `scrambleHash` is
+        // stateless (unlike `Math.random()`'s shared stream), so these draws no
+        // longer need to be evaluated unconditionally to protect downstream draw
+        // order.
+        const discoSeedBase = (stepInMeasure * 0x9e3779b1) | 0;
+
         // 1. Downbeats (1, 2, 3, 4) -> Solid Root
         if (isBeatStart) {
             return result(getFrequency(baseRoot), 0.9, 1.25);
@@ -1179,13 +1200,7 @@ export function getBassNoteStyle(
             // 5th; the alternative was a seeded musical decision losing to a bare
             // `Math.random()` it has no visibility into, silently 45% of the time at the
             // gesture's own 0.25 intensity floor.
-            //
-            // The roll is evaluated UNCONDITIONALLY rather than short-circuited past, so the
-            // global `Math.random()` stream advances identically whether or not the override
-            // fires — otherwise every downstream draw in the tick would shift on exactly the
-            // beats the gesture is live, which is a far harder regression to attribute than
-            // the one being fixed.
-            const rollLifts = Math.random() < octaveProb;
+            const rollLifts = scrambleHash((discoSeedBase + 1) | 0) < octaveProb;
             if (pumpForcesLift || rollLifts) {
                 const note = baseRoot + 12;
                 // #1271 — the pump is UPWARD by definition: low root on the beat, octave
@@ -1219,9 +1234,12 @@ export function getBassNoteStyle(
         if (stepInBeat % 2 !== 0) {
             // Only at higher complexity and intensity
             const gallopProb = intensity ** 2 * 0.4 + playback.complexity * 0.3;
-            if (Math.random() < gallopProb - 0.1) {
+            // #1300 — seeded on `discoSeedBase` alongside the upbeat lift so the gallop's
+            // density and note choice also lock to a figure loop-to-loop instead of
+            // re-rolling on every pass (same rationale as the lift roll above).
+            if (scrambleHash((discoSeedBase + 2) | 0) < gallopProb - 0.1) {
                 // Usually repeat the root or octave ghosted
-                const note = Math.random() < 0.7 ? baseRoot : baseRoot + 12;
+                const note = scrambleHash((discoSeedBase + 3) | 0) < 0.7 ? baseRoot : baseRoot + 12;
                 // Unreachable for a pump style, for the same reason as the fold above:
                 // `baseRoot` is pinned to [28, 39], so `note` is at most 51 and `absMax` is
                 // 57. Kept as a non-inverting fallback rather than deleted, on the same
