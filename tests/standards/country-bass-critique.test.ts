@@ -296,8 +296,16 @@ describe('Country Bassist Critique', () => {
             `[Country Critique] Velocity scaling: low=${lowVel.toFixed(2)} high=${highVel.toFixed(2)}`,
         );
 
-        // Expected: 0.95 + 0.3*0.3 = 1.04 vs 0.95 + 0.95*0.3 = 1.235 — both clamped
-        // by the velocity ceiling at 1.25 (bass-engine.ts:361).
-        expect(highVel).toBeGreaterThan(lowVel * 1.1); // measured: engine delivers low=0.88, high=1.25 (~1.42x); floor 1.1x leaves ~0.32x headroom
+        // Expected: pluckVel 0.95 + 0.3*0.3 = 1.04 vs 0.95 + 0.95*0.3 = 1.235,
+        // each then times the intensity/envelope terms. #1331 moved the engine's
+        // emission clamp from the AUTHORING ceiling (1.25) to the DOMAIN ceiling
+        // (`BASS_VELOCITY_DOMAIN_MAX` = 1.5), so the high-intensity mean rose
+        // 1.25 -> 1.50: at 0.95 intensity country's quarter-tier notes were
+        // previously all sitting on the old rail. They now sit on the new one —
+        // the residual triple-stacked intensity multiplication is #1336, not this
+        // test's business. This assertion measures ENGINE velocity; the rendered
+        // dynamics (what a listener hears through `bassVelocityToAmplitude`) are
+        // asserted in `funk-bass-critique.test.ts`.
+        expect(highVel).toBeGreaterThan(lowVel * 1.1); // measured: engine delivers low=0.88, high=1.50 (~1.70x); floor 1.1x leaves ~0.6x headroom
     });
 });

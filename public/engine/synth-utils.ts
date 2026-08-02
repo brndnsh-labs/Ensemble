@@ -484,7 +484,39 @@ export interface VelocityTimbreOptions {
      * waveshaper / pre-gain. Default `[0, 1]`.
      */
     readonly driveRange?: readonly [number, number];
+    /**
+     * Top of the CALLER's velocity domain. Default `1` — velocities above unity
+     * clamp and the timbre pins. Every OTHER current caller (drums, chords,
+     * soloist) omits this option, so they keep that default; whether pinning is
+     * actually the musically-right shape for them is untested — #1331 only
+     * argued the case for bass, where it demonstrably wasn't. Note this default
+     * doesn't mean those voices only ever SEE `[0, 1]`: `scheduler-core.ts`
+     * multiplies `conductorVelocity` (up to 1.15) onto every lane's velocity
+     * before the voice renders it, bass included, so an accent can already
+     * arrive above unity and pin today regardless of this option.
+     *
+     * A voice whose engine emits above unity passes its real ceiling here (#1331:
+     * the bass, `[0, 1.5]`). Velocities in `(1, maxVelocity]` then keep opening
+     * the filter and pushing the drive along a compressed extension instead of
+     * pinning — because the timbre axis pinning *before* the level axis is what
+     * makes an accent read as pumping rather than as digging in. Values ≤ 1 are
+     * ignored (the default clamp applies), so this is opt-in and byte-identical
+     * for every existing caller.
+     */
+    readonly maxVelocity?: number;
 }
+
+/**
+ * How far past nominal-full-brightness a velocity at the top of an extended
+ * domain opens the voice (#1331).
+ *
+ * why 0.2: enough that an accent is audibly *brighter*, not just louder — the
+ * whole point of moving the timbre axis with the level axis. Kept small because
+ * consumers square this term (`synth-bass.ts`'s `brightness²` saturation drive,
+ * which would go 1.44× hotter into the soft-clipper at +20% and buzz outright at
+ * the +50% a naive linear extension would give).
+ */
+const TIMBRE_OVERSHOOT_AT_CEILING = 0.2;
 
 /** The timbre controls derived from one note's velocity. */
 export interface VelocityTimbre {
@@ -497,10 +529,14 @@ export interface VelocityTimbre {
 }
 
 /**
- * Map a note's velocity to timbre controls. `velocity` is clamped to 0..1,
- * shaped through `options.curve`, then mapped linearly into the cutoff and
- * drive ranges. Pure and deterministic — no allocation beyond the small
- * returned object, safe to call per note.
+ * Map a note's velocity to timbre controls. `velocity` is clamped to
+ * `0..options.maxVelocity` (default 1), shaped through `options.curve`, then
+ * mapped linearly into the cutoff and drive ranges. Pure and deterministic — no
+ * allocation beyond the small returned object, safe to call per note.
+ *
+ * `brightness` is `0..1` on the default domain; on an extended domain it runs to
+ * `1 + TIMBRE_OVERSHOOT_AT_CEILING`, so a `cutoffRange`/`driveRange` top can be
+ * exceeded by that much on the hardest notes — intentional headroom, not a bug.
  */
 export function velocityTimbre(
     velocity: number,
@@ -512,8 +548,19 @@ export function velocityTimbre(
     const curve = Number.isFinite(rawCurve) && rawCurve > 0 ? rawCurve : 1.5;
     const [cutLo, cutHi] = options.cutoffRange ?? [0.5, 1.5];
     const [driveLo, driveHi] = options.driveRange ?? [0, 1];
-    const v = Number.isFinite(velocity) ? Math.min(1, Math.max(0, velocity)) : 0;
-    const brightness = curve === 1 ? v : v ** curve;
+    const rawMax = options.maxVelocity ?? 1;
+    const maxV = Number.isFinite(rawMax) && rawMax > 1 ? rawMax : 1;
+    const v = Number.isFinite(velocity) ? Math.min(maxV, Math.max(0, velocity)) : 0;
+    // Below unity the curve is unchanged for every caller; above it (extended
+    // domains only) brightness tracks LINEARLY to the overshoot, rather than
+    // continuing the convex curve — `v ** 1.6` at v=1.5 would be 1.93, nearly
+    // doubling a squared drive term.
+    const brightness =
+        v <= 1
+            ? curve === 1
+                ? v
+                : v ** curve
+            : 1 + ((v - 1) / (maxV - 1)) * TIMBRE_OVERSHOOT_AT_CEILING;
     return {
         brightness,
         cutoffMult: cutLo + brightness * (cutHi - cutLo),

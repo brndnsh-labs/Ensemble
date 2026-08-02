@@ -10,6 +10,7 @@ import {
     resolveSampledZone,
     velocityTimbre,
 } from './synth-utils.js';
+import { BASS_VELOCITY_DOMAIN_MAX, bassVelocityToAmplitude } from './velocity-shaping.js';
 
 export function killBassNote(state: EnsembleState): void {
     const { playback, bass } = state;
@@ -163,14 +164,29 @@ function playBassNoteNew(
 
         // The whole point of the New voice: velocity → timbre, not just level.
         // Convex curve (1.6) keeps soft notes round and dark; hard notes bloom.
-        // `timbre.brightness` (curve-shaped velocity, 0..1) drives the lowpass
+        // `timbre.brightness` (curve-shaped velocity, 0..1.2) drives the lowpass
         // cutoff, the saturation pre-gain, and the impact transient below.
+        // #1331: the engine's velocity domain is [0, 1.5], so this reads the real
+        // ceiling instead of pinning at unity. Below 1.0 the mapping is unchanged;
+        // above it the filter/drive keep opening, because a level accent whose
+        // timbre is already pinned reads as pumping, not as digging in. The
+        // reference is the EMISSION domain (1.5), not the higher post-conductor
+        // value the level axis sees — a note the band-swell pushes past 1.5 is
+        // already at full brightness; only its level should keep climbing.
         const timbre = velocityTimbre(velocity, {
             curve: 1.6,
             cutoffRange: [0.4, 1.5],
+            maxVelocity: BASS_VELOCITY_DOMAIN_MAX,
         });
 
-        const vol = Math.sqrt(Math.max(0, Math.min(1, velocity))) * (1 - mute * MUTE_ATTENUATION);
+        // #1331: was `sqrt(min(1, velocity))` — the unity clamp erased the top
+        // third of the engine's domain, so at chorus intensity every note in the
+        // bar rendered at exactly the same amplitude. `bassVelocityToAmplitude`
+        // keeps the sqrt below unity (the mix seat is unchanged) and compresses
+        // the accent band above it. Shared with `tests/standards/` so rendered
+        // dynamics — not engine-side `note.velocity` — are what the critiques
+        // assert on.
+        const vol = bassVelocityToAmplitude(velocity) * (1 - mute * MUTE_ATTENUATION);
         if (vol < 0.005) {
             return;
         }
@@ -281,7 +297,19 @@ function playBassNoteNew(
         // genuine hard dig-in (≳0.8 velocity) blooms toward the ~2.6× ceiling.
         // Tuned down from a near-linear `1 + drive*2.5` after the S1 listening
         // gate flagged the New voice as too aggressive on soft/medium notes.
-        const driveAmount = timbre.brightness * timbre.brightness;
+        //
+        // #1331: `timbre.brightness` can now reach 1.2 (the extended domain),
+        // but the drive term specifically is clamped back to the pre-#1331
+        // brightness ceiling (1.0) here — the 2.6× pre-gain above is a value
+        // that same S1 gate explicitly tuned DOWN to for sounding too
+        // aggressive, and #1331's job is to widen level/timbre tracking at the
+        // top of the domain, not to silently re-open a prior by-ear decision.
+        // The filter cutoff (`lpTarget`/`lpStart` above) and the saw grit gain
+        // (`sawGain` below) still read the full extended brightness — "digs in"
+        // reads through opening the filter and grit, not through more
+        // saturation, so this cap costs nothing musically while it protects
+        // the gated ceiling. Revisit only alongside a fresh listen.
+        const driveAmount = Math.min(1, timbre.brightness) * Math.min(1, timbre.brightness);
         const driveGain = audio.createGain();
         driveGain.gain.setValueAtTime(1 + driveAmount * 1.6, startTime);
         const shaper = audio.createWaveShaper();

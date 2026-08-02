@@ -465,15 +465,16 @@ export class ExportProcessor {
                     // #1325 INVESTIGATED AND DECLINED to add live's `[0,1]` clamp here.
                     // The obvious-looking fix propagates a truncation:
                     //
-                    // `getBassNote` emits accents up to `Math.min(1.25, …)`, and at
-                    // ordinary intensities MOST notes are already above 1.0 (measured:
-                    // Rock @0.6 = 100% of notes, Jazz @0.6 = 84%). Clamping collapses
-                    // the whole exported bass lane to one velocity — Rock and Jazz
-                    // @0.6 both go from 3-4 distinct MIDI velocities to exactly 1, so
-                    // a DAW shows a flat horizontal line and the only surviving
-                    // variation is the post-clamp humanize jitter. `bassEnvelope`'s
-                    // metric accent (lean into the strong beat, release after) is
-                    // precisely what gets truncated away.
+                    // At the time, `getBassNote` emitted accents up to
+                    // `Math.min(1.25, …)`, and at ordinary intensities MOST notes
+                    // were already above 1.0 (measured: Rock @0.6 = 100% of notes,
+                    // Jazz @0.6 = 84%). Clamping would have collapsed the whole
+                    // exported bass lane to one velocity — Rock and Jazz @0.6 both
+                    // go from 3-4 distinct MIDI velocities to exactly 1, so a DAW
+                    // shows a flat horizontal line and the only surviving variation
+                    // is the post-clamp humanize jitter. `bassEnvelope`'s metric
+                    // accent (lean into the strong beat, release after) is precisely
+                    // what gets truncated away.
                     //
                     // "Match live" is also ill-defined for bass: live has TWO
                     // answers. The synth voice clamps and sqrt-compresses
@@ -483,11 +484,15 @@ export class ExportProcessor {
                     // calibration above unity (#660 strings lesson)"). The unclamped
                     // export is closer to the sampled voice than a clamped one would be.
                     //
-                    // The real defect is upstream — three producers disagree about the
-                    // bass ceiling (engine emits [0,1.25], `normalizeMidiVelocity`
-                    // documents 1.5, only the synth voice says 1.0), which also leaves
-                    // LIVE synth bass dynamically dead above intensity ≈0.6. Filed
-                    // separately; fixing the domain is the fix, not propagating the clamp.
+                    // #1331 resolved this from the other end: rather than teaching the
+                    // exporter live's old truncation, live dropped it. The bass
+                    // velocity DOMAIN is now `[0, 1.5]` on every path — engine
+                    // emission (`bass-engine.ts`), the synth voice
+                    // (`bassVelocityToAmplitude` in `velocity-shaping.ts`), and this
+                    // export's `normalizeMidiVelocity`, which already assumed 1.5.
+                    // The rest of this reasoning (why NOT to clamp here) stands —
+                    // export still passes velocity through unclamped, same as sampled
+                    // live now effectively does past its own [0,1.5] domain.
                     //
                     // Deliberately drops `polyphonyComp`: the live bass lane is
                     // strictly monophonic (`scheduleBass` applies no polyphony

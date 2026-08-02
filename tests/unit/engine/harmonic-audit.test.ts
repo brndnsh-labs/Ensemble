@@ -94,9 +94,25 @@ describe('Harmonic Audit: Global Preset/Genre Compatibility', () => {
                                 stepInChord,
                             );
                             if (bassNote) {
-                                // Velocity Check
+                                // Velocity Check. #1331 widened the bass EMISSION
+                                // domain to `BASS_VELOCITY_DOMAIN_MAX` (1.5, was
+                                // 1.25), and `conductorVelocity` — a band-wide swell
+                                // gain applied downstream in `scheduler-core.ts`, not
+                                // part of the note's own domain — multiplies on top of
+                                // it, peaking at 0.7 + 1.0*0.45 = 1.15. So the honest
+                                // ceiling for this product is 1.5 * 1.15 = 1.725; the
+                                // guard keeps a little slack above it and stays what it
+                                // has always been: a "nothing insane escaped" tripwire,
+                                // not a mix-level claim. The bass VOICE law
+                                // (`bassVelocityToAmplitude`) deliberately does NOT
+                                // clamp at 1.5 — humanize (`velocityMult`, up to 1.1)
+                                // multiplies in after this check, so the real input the
+                                // voice can see peaks near 1.5*1.15*1.1 ≈ 1.9, bounded
+                                // defensively at `BASS_VOICE_INPUT_MAX` (2.0). Re-clamping
+                                // the voice's law at 1.5 would reproduce this issue's
+                                // original bug one layer down.
                                 const finalVel = bassNote.velocity * playback.conductorVelocity;
-                                if (finalVel > 1.5) {
+                                if (finalVel > 1.8) {
                                     errors.push(
                                         `[${genre} @ ${intensity}] Bass Vel Overload: ${finalVel.toFixed(2)} at step ${step}`,
                                     );

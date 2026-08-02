@@ -357,8 +357,12 @@ describe.each([
         expect(strongR.length).toBeGreaterThan(10);
         expect(releaseR.length).toBeGreaterThan(4);
 
-        // Unsaturated: the bass clamps at 1.25; ON = OFF × 1.05 must stay under it or the
-        // ratio understates the envelope. intent: below clamp ; measured 1.05 ; floor 1.19.
+        // Unsaturated: the bass clamps at `BASS_VELOCITY_DOMAIN_MAX` (1.5 since
+        // #1331, 1.25 before it); ON = OFF × 1.05 must stay under that or the ratio
+        // understates the envelope. The 1.19 floor is kept as-is rather than
+        // relaxed to the new ceiling — it was measured against the ENGINE's output
+        // here (1.05), not derived from the clamp, so it stays a tight guard.
+        // intent: below clamp ; measured 1.05 ; floor 1.19.
         expect(maxOff).toBeLessThan(1.19);
 
         // The envelope lifts strong beats and dips the release notes — a contour that is

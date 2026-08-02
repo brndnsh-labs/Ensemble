@@ -4,6 +4,7 @@ import { createBassPump } from './bass-pump.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
 import { getScaleForChord } from './theory-scales.js';
+import { BASS_AUTHORING_CEILING, BASS_VELOCITY_DOMAIN_MAX } from './velocity-shaping.js';
 
 // #1005: the bass's band-relative micro-timing = the single per-genre band pocket
 // (getBandPocket), the same lean bass+comp+harmony+soloist all add relative to the
@@ -755,7 +756,16 @@ export function getBassNote(
                 }
             }
         }
-        const finalVel = Math.min(1.25, velocityParam * velocity * intensityFactor * bassEnvelope);
+        // why: clamp to the DOMAIN ceiling (1.5), not the authoring ceiling (1.25)
+        // — #1331. The product below stacks four terms (style token × odd-beat
+        // accent × intensity × metric envelope); clamping it at the loudest value a
+        // style is allowed to *author* meant the accent hit the rail at i≈0.70 and
+        // the base note at i≈0.93, so a chorus played every note in the bar at one
+        // identical velocity. See `BASS_VELOCITY_DOMAIN_MAX` for the split.
+        const finalVel = Math.min(
+            BASS_VELOCITY_DOMAIN_MAX,
+            velocityParam * velocity * intensityFactor * bassEnvelope,
+        );
         const isLongStyle = ['acoustic'].includes(style);
         const maxSafeDuration =
             style === 'quarter'
@@ -904,8 +914,8 @@ export function getBassNote(
     //
     // Musical intent: "land hard on the tonic, no variation theatre on the
     // way out." Velocity 1.1 — clear accent above the default 1.0 — signals
-    // arrival without overshooting the 1.25 cap. Muted=0 (open) so the note
-    // sustains cleanly.
+    // arrival without reaching the 1.25 authoring ceiling. Muted=0 (open) so the
+    // note sustains cleanly.
     //
     // Source: docs/audit/form-arranger.md P1 #6;
     //         docs/audit/epic-form-arrangement.md S4.
@@ -913,7 +923,10 @@ export function getBassNote(
     if (isFinalMeasureBass) {
         if (isDownbeat) {
             const intensityFactor = 0.6 + intensity * 0.7;
-            const finalVel = Math.min(1.25, 1.1 * velocity * intensityFactor);
+            // why: same domain-vs-authoring split as `result()` above (#1331) —
+            // the cadence's 1.1 token times the accent and intensity terms must
+            // stay free to swell instead of railing at the authoring ceiling.
+            const finalVel = Math.min(BASS_VELOCITY_DOMAIN_MAX, 1.1 * velocity * intensityFactor);
             let timingOffset = getBandPocket(groove.genreFeel, chord?.sectionLabel ?? null);
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
                 // #1005: see the main timing block — residual retuned against the 25ms
@@ -1262,7 +1275,7 @@ export function getBassNote(
         return result(
             getFrequency(slapNote),
             null,
-            style === 'funk' ? 1.25 : 1.0 + intensity * 0.25,
+            style === 'funk' ? BASS_AUTHORING_CEILING : 1.0 + intensity * 0.25,
         );
     }
 
