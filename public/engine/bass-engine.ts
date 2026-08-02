@@ -1282,7 +1282,33 @@ export function getBassNote(
         return result(
             getFrequency(slapNote),
             null,
-            style === 'funk' ? BASS_AUTHORING_CEILING : 1.0 + intensity * 0.25,
+            // #1334: was a flat 1.25 (BASS_AUTHORING_CEILING) — funk was the
+            // only branch here with no intensity term, so the downbeat slap
+            // didn't respond to the band's dynamic build at all. `1.25 +
+            // intensity*0.2` matches `popVel`'s exact slope/base (`bass-
+            // styles.ts`) and sits 0.05 above the beat-3 "secondary slap"'s
+            // `slapVel` (`1.2 + intensity*0.2`, same gesture class per that
+            // file's own "The One (and Beat 3) - Primary Slaps" grouping) —
+            // preserving The One as the loudest of the two rather than making
+            // them identical.
+            //
+            // Measured effect: the downbeat gets measurably louder through
+            // the verse->chorus build (i≈0.4-0.7, +0.2 to +0.5dB over the old
+            // flat value there).
+            //
+            // What this does NOT fix, verified, not assumed: (1) at i≥0.7 this
+            // term and `popVel` both saturate `BASS_VELOCITY_DOMAIN_MAX` and
+            // render identically regardless of either one's own slope — a
+            // structural ceiling (#1336's un-stacked-intensity territory), not
+            // a tuning problem. (2) Below that ceiling, funk is NOT one of
+            // `EVEN_ACCENT_BASS_STYLES` (#1335 deliberately left it accented),
+            // so the pop (an odd `intBeat`) still carries the +15% backbeat
+            // accent The One (even `intBeat`) doesn't — measured: the pop is
+            // actually LOUDER than The One from i≈0.1 to i≈0.65, despite this
+            // fix. The One is not "the loudest thing in the bar" the issue
+            // pictured; that needs a funk-specific accent profile (1&3 over
+            // 2&4), a design call beyond this story's scope — filed as #1342.
+            style === 'funk' ? BASS_AUTHORING_CEILING + intensity * 0.2 : 1.0 + intensity * 0.25,
         );
     }
 

@@ -2,7 +2,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
-import { bassVelocityToAmplitude } from '../../public/engine/velocity-shaping.js';
+import {
+    BASS_VELOCITY_DOMAIN_MAX,
+    bassVelocityToAmplitude,
+} from '../../public/engine/velocity-shaping.js';
 import { getState } from '../../public/state.js';
 import { getFrequency, getStepInfo } from '../../public/utils.js';
 
@@ -610,5 +613,110 @@ describe('Funk Bass Critique', () => {
         }
         // intent: the swell is audible, not a rounding artifact ; measured +6.10 dB ; floor 5.0.
         expect(dB(ramp[9] / ramp[0])).toBeGreaterThanOrEqual(5.0);
+    });
+
+    // --- #1334: funk downbeat slap responds to intensity -------------------
+    //
+    // "The One" (the bar downbeat) had a FLAT velocityParam (`BASS_AUTHORING_
+    // CEILING`, no intensity term) while its own sibling gesture — the
+    // secondary slap on beat 3 — already scaled with intensity via
+    // `bass-styles.ts`'s `slapVel`. The fix gives it the same slope as
+    // `popVel` (`BASS_AUTHORING_CEILING + intensity*0.2`), sitting 0.05 above
+    // the secondary slap so The One stays the louder of the two.
+    //
+    // NOTE ON SCOPE (re-derived from the issue, and corrected again during
+    // review — read this before touching the assertions below):
+    //
+    // The issue's acceptance criterion asked for the downbeat to show +3 to
+    // +5dB of RENDERED separation over "the rest of the bar," WIDENING from
+    // verse (i=0.3) to chorus (i=0.9). Measured directly against the actual
+    // full rest-of-bar population (every other full note in the bar, not
+    // just the pop): separation is real at low intensity (~2.1-2.5dB) but
+    // NARROWS toward chorus (~1.3dB) — i.e. acceptance 1's primary clause
+    // (sep(0.9) >= sep(0.3)) is NOT met, and this fix does not meaningfully
+    // change that (pre-fix ~2.14dB->1.31dB, post-fix ~2.17dB->1.31dB). Two
+    // separate, verified reasons, neither fixable by retuning this one
+    // literal:
+    //   1. At i>=0.7, this term and `popVel` both saturate
+    //      `BASS_VELOCITY_DOMAIN_MAX` and render IDENTICALLY regardless of
+    //      either one's own slope — a structural ceiling (#1336's territory).
+    //   2. Below that ceiling, funk is not in `EVEN_ACCENT_BASS_STYLES`
+    //      (#1335 deliberately left it accented), so the pop (odd `intBeat`)
+    //      still carries the +15% backbeat accent The One (even `intBeat`)
+    //      doesn't — measured: the pop is actually LOUDER than The One from
+    //      i~0.1 to i~0.65. A funk-specific accent profile (1&3 over 2&4) is
+    //      a design call beyond this story — filed as #1342.
+    //
+    // What IS real, testable, and asserted below: this fix makes the
+    // downbeat measurably louder through the verse->chorus BUILD (i=0.4-0.7,
+    // before the ceiling saturates everything), where pre-fix it was making
+    // no independent contribution at all. That is a genuine, if modest,
+    // improvement — it is NOT "The One is now the loudest thing in the bar,"
+    // which the issue pictured and which is not achievable in this story's
+    // scope.
+    const meanOf = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1);
+    const theOneAmplitude = (bandIntensity) => {
+        const perf = simulatePerformance(32, {
+            playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+        });
+        const gain = conductorGain(bandIntensity);
+        const theOne = perf
+            .filter((p) => p.stepInMeasure === 0)
+            .map((p) => bassVelocityToAmplitude(p.note.velocity * gain));
+        return { mean: meanOf(theOne), n: theOne.length };
+    };
+
+    it('funk downbeat slap gets louder through the verse->chorus build (#1334)', () => {
+        const buildIntensities = [0.4, 0.5, 0.6, 0.7];
+        const results = buildIntensities.map((bi) => ({ bi, ...theOneAmplitude(bi) }));
+
+        console.log(
+            [
+                '',
+                '--- #1334 FUNK "THE ONE" BUILD AMPLITUDE ---',
+                ...results.map((r) => `[i=${r.bi}]  n=${r.n}  amplitude=${r.mean.toFixed(4)}`),
+                '-------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        for (const r of results) {
+            expect(r.n).toBeGreaterThan(20);
+        }
+        // intent: strictly increasing through the build — the downbeat must
+        // keep climbing as the band lifts, not plateau. This alone doesn't
+        // distinguish the fix from pre-fix behavior (intensityFactor/
+        // bassEnvelope already gave every note SOME growth) — the mutation
+        // check below does that.
+        for (let i = 1; i < results.length; i++) {
+            expect(results[i].mean).toBeGreaterThan(results[i - 1].mean);
+        }
+        // intent: the mutation check — reconstructs what the OLD flat-1.25
+        // velocityParam would have rendered to at each build intensity, via
+        // the same closed-form chain the engine itself uses
+        // (velocityParam * accent(1.0, downbeat is always even intBeat) *
+        // intensityFactor(0.6+i*0.7) * bassEnvelope(1.05, the downbeat is
+        // always a strong beat) * conductorGain, domain-clamped, then
+        // bassVelocityToAmplitude). Verified this closed form matches the
+        // real simulation's measured amplitude to 4 decimal places at every
+        // build intensity — confirms the downbeat's ONLY per-note inputs here
+        // are velocityParam and intensity, so this is a faithful reconstruction,
+        // not an approximation. Pre-fix, velocityParam contributed nothing
+        // beyond the shared intensityFactor/bassEnvelope terms every OTHER
+        // note also gets; measured post-fix gain is +0.2 to +0.4dB across the
+        // build (i=0.4-0.7) — small but real, and this proves it's the fix's
+        // doing, not simulation noise.
+        const oldAmplitudeAt = (bandIntensity) => {
+            const intensityFactor = 0.6 + bandIntensity * 0.7;
+            const bassEnvelope = 1.05;
+            const gain = conductorGain(bandIntensity);
+            const oldRaw = Math.min(
+                BASS_VELOCITY_DOMAIN_MAX,
+                1.25 * intensityFactor * bassEnvelope,
+            );
+            return bassVelocityToAmplitude(oldRaw * gain);
+        };
+        for (const r of results) {
+            expect(r.mean).toBeGreaterThan(oldAmplitudeAt(r.bi));
+        }
     });
 });
