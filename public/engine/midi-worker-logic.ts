@@ -24,6 +24,7 @@ import { isSilentSentinel, muteGain } from './mute-contract.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
+import { soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep } from './worker-utils.js';
 
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
@@ -456,28 +457,62 @@ export class ExportProcessor {
                 const noteVel = res.velocity ?? 0;
                 let finalVel = noteVel * polyphonyComp;
 
-                // #1322: verified against the live paths while auditing this seam —
-                // read both notes below before changing either branch's numbers.
+                // #1322 audited these two branches against the live paths and found
+                // both "matches live" comments false. #1325 resolved the SOLOIST half
+                // (one shared curve in `velocity-shaping.ts` — change it there, never
+                // here) and deliberately did NOT resolve the bass half; see below.
                 if (moduleName === 'bass') {
-                    // Same sqrt SHAPE as synth-bass.ts's `playBassNoteNew` voice
-                    // builder, but NOT byte-identical: the live voice clamps
-                    // velocity to [0,1] before the sqrt (`Math.sqrt(Math.max(0,
-                    // Math.min(1, velocity)))`), this doesn't. Only diverges outside
-                    // that range (an accent/humanize spike >1, or a negative input —
-                    // unclamped, `Math.sqrt` of a negative velocity is NaN). Left
-                    // unchanged here: matching it is a numeric behavior change to
-                    // exported velocity, out of scope for a behavior-preserving
-                    // refactor — filed as #1325.
+                    // #1325 INVESTIGATED AND DECLINED to add live's `[0,1]` clamp here.
+                    // The obvious-looking fix propagates a truncation:
+                    //
+                    // `getBassNote` emits accents up to `Math.min(1.25, …)`, and at
+                    // ordinary intensities MOST notes are already above 1.0 (measured:
+                    // Rock @0.6 = 100% of notes, Jazz @0.6 = 84%). Clamping collapses
+                    // the whole exported bass lane to one velocity — Rock and Jazz
+                    // @0.6 both go from 3-4 distinct MIDI velocities to exactly 1, so
+                    // a DAW shows a flat horizontal line and the only surviving
+                    // variation is the post-clamp humanize jitter. `bassEnvelope`'s
+                    // metric accent (lean into the strong beat, release after) is
+                    // precisely what gets truncated away.
+                    //
+                    // "Match live" is also ill-defined for bass: live has TWO
+                    // answers. The synth voice clamps and sqrt-compresses
+                    // (`playBassNoteNew`), while the SAMPLED voice passes velocity
+                    // through raw and unclamped on purpose (`playBassNoteSampled` —
+                    // "No `Math.min(1, …)` here: that clamp silently defeats gain
+                    // calibration above unity (#660 strings lesson)"). The unclamped
+                    // export is closer to the sampled voice than a clamped one would be.
+                    //
+                    // The real defect is upstream — three producers disagree about the
+                    // bass ceiling (engine emits [0,1.25], `normalizeMidiVelocity`
+                    // documents 1.5, only the synth voice says 1.0), which also leaves
+                    // LIVE synth bass dynamically dead above intensity ≈0.6. Filed
+                    // separately; fixing the domain is the fix, not propagating the clamp.
+                    //
+                    // Deliberately drops `polyphonyComp`: the live bass lane is
+                    // strictly monophonic (`scheduleBass` applies no polyphony
+                    // compensation either), so there is nothing to compensate for.
                     finalVel = Math.sqrt(noteVel);
                 } else if (moduleName === 'soloist') {
-                    // NOT a live match despite the old comment's claim: live's
-                    // soloist velocity (scheduler-core.ts, `vel = baseVel *
-                    // polyphonyComp`) has no bandIntensity factor at all — this
-                    // swell exists ONLY in the exported .mid. Left unchanged here
-                    // (same reason as bass, above) — filed as #1325.
-                    const intensity = this.state.playback.bandIntensity ?? 0.5;
-                    const intensityGain = 0.5 + intensity * 0.9;
-                    finalVel = noteVel * intensityGain;
+                    // #1325: live playback now applies this same swell
+                    // (`scheduleSoloist` in scheduler-core.ts), which it previously
+                    // expressed only in timbre and generated weight, never in
+                    // playback level. The export was judged right and live changed.
+                    //
+                    // The shared formula does NOT make the two land on the same
+                    // number: live also multiplies by `conductorVelocity`
+                    // (`0.7 + bandIntensity * 0.45`), which this path never reads
+                    // despite it being synced to the worker. See `scheduleSoloist`.
+                    //
+                    // KNOWN, UNRESOLVED divergence, deliberately left as-is: this
+                    // rebuilds from `noteVel`, so it drops the `polyphonyComp` the
+                    // live path DOES apply to the soloist — a ~1.41x gap on a double
+                    // stop. Normalizing it needs the mono-mode filtering and
+                    // freq-presence voice counting reconciled too (live counts only
+                    // notes with a `freq`, after mono-mode drops all but the first),
+                    // which is a wider question than this branch. Filed separately —
+                    // don't "fix" it here by swapping in `finalVel`.
+                    finalVel = noteVel * soloistIntensityGain(this.state.playback.bandIntensity);
                 }
 
                 // The bass's `muted` is a numeric palm-mute amount and the other

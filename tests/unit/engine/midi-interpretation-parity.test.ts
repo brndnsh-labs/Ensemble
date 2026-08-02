@@ -14,10 +14,17 @@
  *   Bass (mute-contract-routed on both live and export) is expected to
  *   AGREE. Chords ghost notes are a KNOWN, DELIBERATE divergence pending
  *   #1299's decision — pinned here as an exclusion, not silently normalized.
+ *
+ * #1325 adds the VELOCITY-CURVE dimension: the soloist's band-intensity swell
+ * (which the export applied and live didn't, until live gained it) and the
+ * bass's clamped sqrt compression (which live applied and the export didn't).
+ * Both are now single shared functions in `velocity-shaping.ts`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { entryBendToPitchWheel } from '../../../public/engine/midi-utils.js';
 import { isSilentSentinel } from '../../../public/engine/mute-contract.js';
+import { soloistIntensityGain } from '../../../public/engine/velocity-shaping.js';
+import { makeSoloistMock } from '../../utils/mock-soloist.js';
 
 vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
@@ -44,11 +51,16 @@ vi.mock('../../../public/engine/midi-scheduler.js', () => ({
     stopMidiTransport: vi.fn(),
 }));
 
-const { scheduleBass, scheduleChords } = await import('../../../public/engine/scheduler-core.js');
-const { dispatchMidiBass, dispatchMidiChordNote } = await import(
+const { scheduleBass, scheduleChords, scheduleSoloist } = await import(
+    '../../../public/engine/scheduler-core.js'
+);
+const { dispatchMidiBass, dispatchMidiChordNote, dispatchMidiSoloist } = await import(
     '../../../public/engine/midi-scheduler.js'
 );
-const { playNote } = await import('../../../public/engine/engine.js');
+const { playNote, playSoloNote } = await import('../../../public/engine/engine.js');
+const { applyConductor } = await import('../../../public/engine/conductor.js');
+const { ExportProcessor } = await import('../../../public/engine/midi-worker-logic.js');
+const { MidiTrack } = await import('../../../public/engine/midi-utils.js');
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -101,6 +113,240 @@ describe('#1322 — note-existence parity: bass mute', () => {
         scheduleBass(makeBassState([bassNote({ muted: true })]), CHORD_DATA, 0, 0);
         expect(dispatchMidiBass).not.toHaveBeenCalled();
         expect(isSilentSentinel(true)).toBe(true);
+    });
+});
+
+describe('#1325 — soloist band-intensity swell: live playback now applies the export curve', () => {
+    const CHORD_DATA = { chord: {} };
+
+    function makeSoloistState(bandIntensity: number | undefined, conductorVelocity: number) {
+        return {
+            soloist: {
+                mode: 'mono',
+                audio: {
+                    buffer: new Map([
+                        [
+                            0,
+                            [
+                                {
+                                    freq: 440,
+                                    midi: 69,
+                                    durationSteps: 1,
+                                    velocity: 1.0,
+                                    timingOffset: 0,
+                                },
+                            ],
+                        ],
+                    ]),
+                    lastPlayedFreq: 0,
+                    lastNoteEnd: -999,
+                },
+            },
+            playback: { bpm: 120, conductorVelocity, bandIntensity },
+            vizState: { enabled: false },
+        } as never;
+    }
+
+    /**
+     * The `conductorVelocity` the REAL auto-conductor produces at this intensity.
+     * Driven through `applyConductor` rather than re-typing its `0.7 + I * 0.45`
+     * — re-typing the formula is the exact duplication this whole story exists
+     * to stop, and it would rot the moment the conductor is retuned.
+     */
+    function conductorVelocityFor(bandIntensity: number): number {
+        let captured = Number.NaN;
+        applyConductor(
+            {
+                playback: { bandIntensity, complexity: 0.5, songMode: false },
+                groove: { genreFeel: 'Rock' },
+            } as never,
+            ((_action: unknown, payload: { velocity?: number }) => {
+                if (typeof payload?.velocity === 'number') {
+                    captured = payload.velocity;
+                }
+            }) as never,
+        );
+        expect(Number.isFinite(captured)).toBe(true);
+        return captured;
+    }
+
+    /**
+     * The velocity the live audio voice is actually asked to play.
+     *
+     * `conductorVelocity` defaults to whatever the real conductor emits at this
+     * intensity, because production ALWAYS co-varies the two — a fixture that
+     * freezes it at 1.0 while sweeping `bandIntensity` pins a combination the
+     * conductor only produces at I≈0.667, and would stay green straight through
+     * a regression in the composite curve.
+     */
+    function liveSoloistVelocity(
+        bandIntensity: number | undefined,
+        conductorVelocity = conductorVelocityFor(bandIntensity ?? 0.5),
+    ): number {
+        vi.clearAllMocks();
+        scheduleSoloist(
+            makeSoloistState(bandIntensity, conductorVelocity),
+            CHORD_DATA as never,
+            0,
+            0,
+        );
+        expect(playSoloNote).toHaveBeenCalledTimes(1);
+        // playSoloNote(state, freq, time, duration, vel, ...)
+        return vi.mocked(playSoloNote).mock.calls[0][4] as number;
+    }
+
+    it('the SHARED CURVE brackets both ends: intensity 0 → 0.5x, intensity 1 → 1.4x (conductor held neutral)', () => {
+        // Bracketed at the ends rather than sampled mid-band, so a curve that
+        // merely trends the right way can't pass — these are the exact values
+        // the exporter has always written. `conductorVelocity` is pinned to 1.0
+        // here to isolate THIS factor; see the composite test below for the
+        // number a listener actually hears.
+        expect(liveSoloistVelocity(0, 1.0)).toBeCloseTo(0.5, 10);
+        expect(liveSoloistVelocity(1, 1.0)).toBeCloseTo(1.4, 10);
+    });
+
+    it('is the SAME formula the .mid exporter applies — one shared function, not two copies (conductor held neutral)', () => {
+        // The exporter's soloist branch is `noteVel * soloistIntensityGain(...)`
+        // (midi-worker-logic.ts `_writeNotesToTrack`). With noteVel 1.0, a single
+        // voice and a neutral conductor, live lands on exactly that number.
+        for (const intensity of [0, 0.25, 0.35, 0.5, 0.75, 1]) {
+            expect(liveSoloistVelocity(intensity, 1.0)).toBeCloseTo(
+                soloistIntensityGain(intensity),
+                10,
+            );
+        }
+    });
+
+    it('the LIVE COMPOSITE is quadratic and wider than the export — 0.35x at rest-floor, 1.61x at climax', () => {
+        // The number a listener actually hears. `conductorVelocity` is itself
+        // `0.7 + I * 0.45`, so the live curve is (0.7 + 0.45I)(0.5 + 0.9I) —
+        // NOT the export's 0.5..1.4. Pinning it here means a future change to
+        // either curve has to come here and restate the composite deliberately,
+        // rather than silently doubling the lead's dynamic range again.
+        expect(liveSoloistVelocity(0)).toBeCloseTo(0.7 * 0.5, 10); // 0.350
+        expect(liveSoloistVelocity(1)).toBeCloseTo(1.15 * 1.4, 10); // 1.610
+        // Production's at-rest seat is bandIntensity 0.35, not 0.5.
+        expect(liveSoloistVelocity(0.35)).toBeCloseTo(0.8575 * 0.815, 10); // ~0.699
+    });
+
+    it('KNOWN DIVERGENCE: live is strictly louder than the export above I≈0.667 and quieter below — the shared formula does not equalize them', () => {
+        // Pinned as an exclusion, not a bug, matching how #1299's ghost-note
+        // divergence is recorded above. The exporter never reads
+        // `conductorVelocity` even though it IS synced to the worker.
+        const exportVel = (i: number) => 1.0 * soloistIntensityGain(i);
+        expect(liveSoloistVelocity(0)).toBeLessThan(exportVel(0));
+        expect(liveSoloistVelocity(1)).toBeGreaterThan(exportVel(1));
+        // They cross where conductorVelocity passes through unity.
+        expect(liveSoloistVelocity(2 / 3)).toBeCloseTo(exportVel(2 / 3), 6);
+    });
+
+    it('varies monotonically with bandIntensity — the swell is audible, not a constant', () => {
+        // The regression this pins: before #1325 live carried the arc only in
+        // timbre and generated weight, never in playback level.
+        const swept = [0, 0.35, 0.7, 1].map((i) => liveSoloistVelocity(i));
+        for (let i = 1; i < swept.length; i++) {
+            expect(swept[i]).toBeGreaterThan(swept[i - 1]);
+        }
+    });
+
+    it('an absent bandIntensity falls back to the neutral 0.5 → 0.95x, never ducking the lead to silence', () => {
+        expect(liveSoloistVelocity(undefined, 1.0)).toBeCloseTo(0.95, 10);
+    });
+
+    it('a non-finite bandIntensity cannot fan a NaN into MIDI-out (normalizeMidiVelocity would pass it through as a data byte)', () => {
+        expect(liveSoloistVelocity(Number.NaN, 1.0)).toBeCloseTo(0.95, 10);
+    });
+
+    it('the swell reaches live MIDI-out too, so an external synth hears the same dynamics', () => {
+        vi.clearAllMocks();
+        scheduleSoloist(makeSoloistState(1, 1.0), CHORD_DATA as never, 0, 0);
+        // dispatchMidiSoloist(state, midi, vel, time, duration, bend, isMono)
+        expect(vi.mocked(dispatchMidiSoloist).mock.calls[0][2]).toBeCloseTo(1.4, 10);
+    });
+});
+
+describe('#1325 — the EXPORTER actually calls the shared curves (not just the helper in isolation)', () => {
+    function exportState(bandIntensity: number) {
+        return {
+            playback: { bpm: 120, bandIntensity, complexity: 0.5, intent: {} },
+            arranger: {
+                totalSteps: 32,
+                timeSignature: '4/4',
+                stepMap: [],
+                progression: ['C'],
+                key: 'C',
+                isMinor: false,
+            },
+            chords: { enabled: true, style: 'Standard', volume: 0.5, octave: 0 },
+            bass: { enabled: true, style: 'Standard', volume: 0.5, octave: 0 },
+            soloist: makeSoloistMock({ enabled: true, style: 'Standard', lastMidi: 60, octave: 0 }),
+            harmony: { enabled: true, style: 'Standard', volume: 0.5, octave: 0, complexity: 0.5 },
+            groove: { enabled: true, volume: 0.5, instruments: [], humanize: 0 },
+            midi: {
+                chordsChannel: 1,
+                bassChannel: 2,
+                soloistChannel: 3,
+                harmonyChannel: 4,
+                drumsChannel: 10,
+                latency: 0,
+                velocitySensitivity: 1.0,
+            },
+        };
+    }
+
+    /** The MIDI velocity byte the exporter writes for a single note on `moduleName`. */
+    function exportedVelocityByte(
+        moduleName: string,
+        noteVel: number,
+        bandIntensity = 0.5,
+    ): number {
+        const processor = new ExportProcessor(
+            exportState(bandIntensity) as never,
+            {
+                includedTracks: [moduleName],
+            } as never,
+        );
+        const track = new MidiTrack();
+        processor._writeNotesToTrack(
+            track,
+            0,
+            [{ midi: 60, velocity: noteVel, durationSteps: 1, timingOffset: 0 }] as never,
+            0,
+            moduleName,
+            {} as never,
+            0,
+        );
+        const noteOn = track.events.find((e) => (e.data[0] & 0xf0) === 0x90);
+        return (noteOn as { data: number[] }).data[2];
+    }
+
+    it("BASS: #1325 DECLINED live's [0,1] clamp here — accents above 1.0 must stay distinguishable in the exported .mid", () => {
+        // Pinned as a DECISION, not an oversight. `getBassNote` emits up to
+        // `Math.min(1.25, …)` and at ordinary intensities most notes are already
+        // above 1.0, so clamping collapses the exported bass lane to a single
+        // velocity (measured: Rock and Jazz @0.6 both go 3-4 distinct values → 1).
+        // If someone "restores parity" by adding the clamp, this goes red.
+        expect(exportedVelocityByte('bass', 1.25)).toBeGreaterThan(
+            exportedVelocityByte('bass', 1.0),
+        );
+    });
+
+    it('BASS: the metric accent structure survives export — distinct velocities across the engine’s real [0,1.25] range', () => {
+        // The property the clamp destroyed: `bassEnvelope`'s lean-into-the-strong-beat
+        // shaping has to reach the .mid as distinct velocities, or a DAW shows a
+        // flat line and the line reads sequenced rather than played.
+        const spread = [0.85, 1.0, 1.1, 1.25].map((v) => exportedVelocityByte('bass', v));
+        expect(new Set(spread).size).toBeGreaterThan(2);
+    });
+
+    it('SOLOIST: the exported swell tracks the same shared curve live now applies', () => {
+        // Ordered low→high across the intensity range, i.e. the exporter is
+        // reading `bandIntensity` through `soloistIntensityGain` as before.
+        const low = exportedVelocityByte('soloist', 0.7, 0);
+        const mid = exportedVelocityByte('soloist', 0.7, 0.5);
+        const high = exportedVelocityByte('soloist', 0.7, 1);
+        expect(low).toBeLessThan(mid);
+        expect(mid).toBeLessThan(high);
     });
 });
 

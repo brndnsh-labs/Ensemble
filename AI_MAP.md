@@ -115,6 +115,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
 | `public/engine/mute-contract.ts` | Import-free leaf owning what a note's `muted` field means — the bass's numeric palm-mute amount vs the chords lanes' boolean ghost/CC sentinel. Read the field through here, never with `!muted`. | `isMuteSentinel`, `normalizeMuteAmount`, `muteGain` |
+| `public/engine/velocity-shaping.ts` | Import-free leaf owning the soloist's band-intensity velocity swell, shared by live playback and the `.mid` export. Change the curve here, never at a call site. | `soloistIntensityGain` |
 
 ## Live vs Worker Responsibilities
 

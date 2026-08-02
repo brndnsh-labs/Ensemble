@@ -79,6 +79,7 @@ import {
 } from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
+import { soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
 type Dispatch = (action: any, payload?: any) => void;
@@ -885,8 +886,12 @@ export function scheduleBass(
 /**
  * Schedules soloist (melody) notes from the worker buffer.
  * Handles monophonic/polyphonic modes, bends, and MIDI output.
+ *
+ * Exported for the same reason `scheduleBass`/`scheduleChords` are: the
+ * live-vs-export parity gate (`tests/unit/engine/midi-interpretation-parity.test.ts`)
+ * has to drive the real live path, not a re-derivation of it.
  */
-function scheduleSoloist(
+export function scheduleSoloist(
     state: EnsembleState,
     chordData: ChordAtStep,
     step: number,
@@ -938,7 +943,24 @@ function scheduleSoloist(
                 // step → seconds via the canonical step duration.
                 const duration = (durationSteps || 4) * soloistStepSec;
                 const baseVel = (velocity || 1.0) * (playback.conductorVelocity || 1.0);
-                const vel = baseVel * polyphonyComp;
+                // #1325: the band-intensity swell, applied as a FINAL-STAGE
+                // multiplier after the accent/conductor/polyphony factors (the
+                // weight-tuning rule in CLAUDE.md — folded into `baseVel` it
+                // would wash out against them). The `.mid` exporter has always
+                // written this swell and playback level never carried it: live
+                // held the arc in TIMBRE (`soloistBrightnessDrive` opens the
+                // lead's filter as the band lifts) and in the generated weight
+                // (`bandVel` in soloist-phrase-first.ts), but not in level.
+                //
+                // NOT full parity, and knowingly so. `conductorVelocity` in
+                // `baseVel` above is itself `0.7 + bandIntensity * 0.45`, so the
+                // live curve is quadratic (0.35x–1.61x) while the export applies
+                // only this linear factor (0.50x–1.40x) — the exporter never
+                // reads `conductorVelocity` even though it IS synced. The shared
+                // formula stops the CURVE from drifting; it does not make the two
+                // paths land on the same number. Reconciling the two competing
+                // intensity→velocity curves is an open decision, filed separately.
+                const vel = baseVel * polyphonyComp * soloistIntensityGain(playback.bandIntensity);
                 const finalTime = playTime + offsetS;
 
                 // Legato detection (epic-3-soloist S1): a note that begins
