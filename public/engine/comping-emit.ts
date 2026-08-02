@@ -136,12 +136,17 @@ const ALTERED_DOMINANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11'
 // why: genres whose comp SUSTAINS (a held/strummed chord that wants to ring and
 // breathe), as opposed to the percussive-identity lanes (Funk clav chucks,
 // Reggae/Ska skank, Hip-Hop stabs) whose rhythmic restatement IS the genre. Only
-// the sustained set gets the per-hit economy below. The percussive lanes are
-// excluded two ways: Funk/Reggae/Ska/Neo-Soul/Country/Metal early-return in
-// getAccompanimentNotes before ever reaching the economy; Hip-Hop falls through
-// to the shared smart lane but is left out of this set. Either way they keep
-// their feel untouched. Rock/Disco deliberately excluded for now (Disco/Ska are
-// stabs; Rock is a follow-up once the mechanism is auditioned on Jazz/Blues).
+// the sustained set gets the per-hit economy below. How the percussive lanes are
+// excluded differs, and #1216 corrected this comment because the distinction
+// matters: Funk/Reggae/Neo-Soul early-return in getAccompanimentNotes on their
+// FEEL, so they never reach the economy at all; Country/Metal early-return too,
+// but keyed on their default CHORD STYLE ('strum-country'/'power-metal') — move a
+// country chart off that style and it lands in the shared lane, where this set is
+// the only thing keeping it out. Ska and Hip-Hop have NO early-return lane
+// (contrary to what this comment claimed before) and reach the shared smart lane,
+// so for them this set is the sole exclusion. Rock/Disco deliberately excluded
+// for now (Disco/Ska are stabs; Rock is a follow-up once the mechanism is
+// auditioned on Jazz/Blues).
 // Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
 export const SUSTAINED_COMP_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Acoustic']);
 

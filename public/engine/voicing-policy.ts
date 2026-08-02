@@ -16,6 +16,22 @@ export const BASS_SPACE_FEELS = new Set([
     //      and synth-bass line rather than doubling roots. Joins the other
     //      rootless-voicing idioms.
     'Hip Hop',
+    // why: #1216 — the riddim is bass-led: the bass line is reggae's melodic
+    //      subject, not its floor, and both comping lanes sit deliberately above
+    //      it (the backbeat skank on the chords channel, the organ bubble on the
+    //      harmony channel). Doubling roots down there is the mud this set
+    //      exists to prevent. Same class as the entries above; it was an
+    //      omission rather than a decision — the set had never been pinned.
+    //      Audible consequence: minor skanks now voice rootless and pick up a b7
+    //      (Am -> Am7, per getRootlessVoicing); plain major skanks are unchanged
+    //      because shouldUseRootlessVoicing only fires on minor/dominant/maj7.
+    //      Two knock-ons, both already accepted for the six feels above: in
+    //      practice mode `shouldPreferGroundedPracticeVoicing` now re-admits the
+    //      root on identity-losing qualities (halfdim/dim/alt) for Reggae, and
+    //      the soloist's voicing-derived `chordMask` treats the root as a
+    //      non-chord-tone on 7th-family chords — see engine/CLAUDE.md #6; bend
+    //      and slide targets already derive from `quality`, not the mask.
+    'Reggae',
 ]);
 const PRACTICE_GROUNDING_QUALITIES = new Set([
     'halfdim',

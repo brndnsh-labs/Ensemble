@@ -85,6 +85,16 @@ export const GENRE_INTENSITY_FLOORS: Record<string, number> = {
     // the old 'Ska-Punk' key (the preset name) never matched, so the floor was dead
     // and the upbeat-crack could fall below the velocity threshold. Epic 2 S1.
     Ska: 0.4,
+    // why: #1216 — the one-drop skank is identity-defining for reggae in exactly
+    // the way ska's upbeat is, and for the same mechanical reason: the genre's
+    // pulse lives in an OFFBEAT chop whose audibility is velocity-dependent, so
+    // parking bandIntensity near the macro-arc's 0.1 floor makes the riddim read
+    // as absence rather than as restraint. Matched to Ska's 0.4 rather than
+    // Jazz/Bossa's 0.3 — brush ride and sidestick comping stay legible at any
+    // dynamic (that's their idiom), an offbeat crack does not. Note this does NOT
+    // cost reggae its cross-stick identity: the strategy picks Sidestick over
+    // Snare below intensity 0.7 (grooves/reggae.ts), well above this floor.
+    Reggae: 0.4,
 };
 
 /**

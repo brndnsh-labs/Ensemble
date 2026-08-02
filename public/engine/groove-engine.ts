@@ -92,10 +92,17 @@ export const strategies: Record<string, any> = Object.fromEntries(
 //     ticking 16ths; reviewer-flagged borderline case but the cadence-
 //     intensity correlation tips it into the set)
 //
-// For sparser-hat genres (Jazz/Bossa/Acoustic/Country/Blues/Reggae) the
-// original universal suppression remains correct — the hat wasn't part of the
-// spine to begin with, so silencing it on the final bar reads as the intended
-// "let the swell breathe" gesture.
+// For the OUT genres (Jazz/Bossa/Acoustic/Country/Blues/Reggae) the original
+// universal suppression remains correct — but #1216 corrected the reason, which
+// used to read "the hat wasn't part of the spine to begin with." That is only
+// true of Jazz (whose closed hat is a HiHatPedal chirp on 2 and 4, its real time
+// living on the ride). Bossa, Country, Blues, Acoustic and Reggae all tick a
+// continuous hat in their own strategy files. The operative test is not hat
+// DENSITY but whether the closed hat is the listener's time reference AT
+// CADENCE ARRIVAL: in these genres the final bar hands time to the swell/ride,
+// so silencing the hat reads as the intended "let the swell breathe" gesture.
+// (Distinct from the 'sparse'/'shimmer' split in grooves/utils.ts, which budgets
+// compound-meter hat density and deliberately groups differently.)
 // Exported for tests/standards/genre-feel-canon-guard.test.ts (#1208) only.
 export const HAT_SPINE_GENRES = new Set([
     'Disco',
