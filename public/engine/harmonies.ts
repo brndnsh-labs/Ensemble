@@ -1269,7 +1269,16 @@ export function getHarmonyNotes(
     };
 
     const config: StyleConfig = {
-        ...(STYLE_CONFIGS[activeStyle] || STYLE_CONFIGS.smart),
+        // #1266 — `Object.hasOwn`, not the `||` truthiness lookup: `activeStyle`
+        // derives from the persisted `harmony.style`, and on this plain literal
+        // `STYLE_CONFIGS['constructor']` returns the `Object` constructor, which is
+        // truthy and would spread `density`/`velocity`/`octaveOffset` in as
+        // `undefined`. Guarded at the read rather than null-prototyping the
+        // declaration because this is the table's ONE consumer (and it is a
+        // function-local literal) — the single-read-site half of the rule in CLAUDE.md.
+        ...(activeStyle && Object.hasOwn(STYLE_CONFIGS, activeStyle)
+            ? STYLE_CONFIGS[activeStyle]
+            : STYLE_CONFIGS.smart),
         activeStyle,
     };
     if (style === 'smart') {

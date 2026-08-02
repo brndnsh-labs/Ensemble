@@ -1,3 +1,4 @@
+import { SONG_SEED_MAX_LENGTH } from '../sanitize.js';
 import { dispatch } from '../state.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -78,6 +79,11 @@ export function SongSeedControl() {
                             placeholder={randomizeSeed ? 'Random each play' : 'Set a seed'}
                             class="seed-input"
                             aria-label="Song seed"
+                            // #1266 — the reducer bounds the seed regardless; this
+                            // stops the field from *showing* text it will silently
+                            // truncate, which is what let a >64-char typed seed reach
+                            // the share writer and desync sender from recipient.
+                            maxLength={SONG_SEED_MAX_LENGTH}
                             disabled={randomizeSeed}
                             onInput={(e) => updateSeed((e.target as HTMLInputElement).value)}
                         />

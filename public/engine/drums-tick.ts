@@ -389,7 +389,14 @@ export function runDrumTick(
     // Pre-calculate Drum Hits for Coordination
     const drumStep = step % (groove.measures * stepsPerBar);
     const sectionId = chordData?.chord?.sectionId || null;
-    const seedIdx = groove.sectionSeedMap && sectionId ? groove.sectionSeedMap[sectionId] || 0 : 0;
+    // #1266 — type-checked, not `|| 0`: see the matching note in `groove-engine.ts`.
+    // This map is plain/prototype-bearing on the worker (`toRaw` rebuilds it), so a
+    // section id of 'constructor' would otherwise index the `Object` constructor
+    // here — truthy, so it defeats the `|| 0` and lands as the
+    // `groove.variations[seedIdx]` key.
+    const rawSectionSeed = sectionId ? groove.sectionSeedMap?.[sectionId] : undefined;
+    const seedIdx =
+        typeof rawSectionSeed === 'number' && Number.isFinite(rawSectionSeed) ? rawSectionSeed : 0;
 
     // --- Calculate Turnaround State ---
     const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);

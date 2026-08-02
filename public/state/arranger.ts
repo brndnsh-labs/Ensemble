@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal';
+import { normalizeSongSeed } from '../sanitize.js';
 import type { Action, ArrangerState, Mutable, Section } from '../types.js';
 import { ACTIONS } from '../types.js';
 
@@ -31,7 +32,13 @@ export function arrangerReducer(action: Action): boolean {
     switch (action.type) {
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'arranger') {
-                (arranger as Record<string, unknown>)[action.payload.param] = action.payload.value;
+                const { param, value } = action.payload;
+                // #1266 — `seed` is bounded on the way IN, on every write path, so the
+                // slice can only ever hold a value all three readers agree on. This
+                // generic back door has no `seed` caller today; it is normalized anyway
+                // because "the reducer is the bound" is only true if it has no hole.
+                (arranger as Record<string, unknown>)[param] =
+                    param === 'seed' ? normalizeSongSeed(value) : value;
                 return true;
             }
             break;
@@ -95,7 +102,10 @@ export function arrangerReducer(action: Action): boolean {
             a.isMinor = !!action.payload;
             return true;
         case ACTIONS.SET_SONG_SEED:
-            a.seed = action.payload;
+            // #1266 — the single bound on the seed keyspace, applied at the write
+            // side. See `normalizeSongSeed` in sanitize.ts for why one write-side
+            // bound replaced three disagreeing read-side ones.
+            a.seed = normalizeSongSeed(action.payload);
             return true;
         case ACTIONS.SET_SEED_RANDOMIZE:
             a.randomizeSeed = !!action.payload;

@@ -1,14 +1,14 @@
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
 import {
-    BASS_STYLES,
-    HARMONY_STYLES,
+    isKnownBassStyle,
     isKnownChordStyle,
-    SOLOIST_STYLES,
+    isKnownHarmonyStyle,
+    isKnownSoloistStyle,
 } from '../data/instrument-styles.js';
 import { GENRE_FEELS, resolveGenre } from '../data/smart-genres.js';
 import { hydrateVoice } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import { escapeHTML, stripDangerousChars } from '../sanitize.js';
+import { escapeHTML, normalizeSongSeed, stripDangerousChars } from '../sanitize.js';
 import { dispatch, getState, storage } from '../state.js';
 import type {
     BassState,
@@ -93,6 +93,100 @@ function normalizeSoloistPreset(preset: any, fallback = 'trumpet'): string {
  */
 export function normalizeSwingSub(value: unknown): SwingSub {
     return isSwingSub(value) ? value : '8th';
+}
+
+/**
+ * Sanitize a free-text persisted display string (#1266).
+ *
+ * `arranger.lastChordPreset` is the case this exists for. It deliberately gets a
+ * *sanitizer*, not an allowlist: user-saved progressions put arbitrary names in
+ * this field (see `saveProgression` in arranger-controller.ts), so validating it
+ * against the built-in preset table would discard a real user's own preset name.
+ * What it needs instead is the same treatment as any other untrusted display
+ * string — a type check, a length cap, and the dangerous-character strip — since
+ * it is rendered in `PresetLibrary` and pre-fills the `prompt()` in
+ * `saveProgression`.
+ */
+function sanitizeDisplayString(value: unknown, fallback: string, maxLen = 100): string {
+    if (typeof value !== 'string') {
+        return fallback;
+    }
+    const safe = stripDangerousChars(value).slice(0, maxLen);
+    return safe || fallback;
+}
+
+/**
+ * Is `id` usable as a section id — and therefore as a `sectionSeedMap` KEY (#1266)?
+ *
+ * Rejects the `Object.prototype` member names. A section id is what indexes
+ * `groove.sectionSeedMap`, so an id of `'constructor'` makes `map[sectionId]`
+ * return an inherited function instead of a seed on any prototype-bearing copy of
+ * that map — and *every* live copy is prototype-bearing: `grooveReducer` re-creates
+ * the map as a plain `{}` on `SET_SONG_SEED` / `RESET_STATE`, and `toRaw` in
+ * `worker-client.ts` copies every synced object into a fresh `{}` before
+ * `postMessage`. Rejecting the KEY at the source is therefore the only guard that
+ * actually reaches every reader; null-prototyping the map does not survive either
+ * hop. `Object.getOwnPropertyNames(Object.prototype)` rather than a hand-listed
+ * `['__proto__', 'constructor', …]` so the set can't drift.
+ *
+ * Safe to reject outright rather than repair: every legitimate id is minted by
+ * `generateId()`, and `decompressSections` mints fresh ones on the share path.
+ */
+const PROTOTYPE_MEMBER_NAMES: ReadonlySet<string> = new Set(
+    Object.getOwnPropertyNames(Object.prototype),
+);
+
+function isSafeSectionId(id: unknown): id is string {
+    return typeof id === 'string' && !!id && !PROTOTYPE_MEMBER_NAMES.has(id);
+}
+
+/**
+ * Shape-validate the persisted `groove.sectionSeedMap` (#1266).
+ *
+ * This was the one place the persist reader assigned an untrusted **object**
+ * wholesale (`savedState.groove.sectionSeedMap || {}`), and it is not an inert
+ * one: it is `Record<string, number>`, it crosses to the logic worker via
+ * `getSyncState()`, and `drums-tick.ts` used to read it as
+ * `groove.sectionSeedMap[sectionId] || 0` — a plain-literal truthiness lookup, so
+ * on a prototype-bearing object a section id of `'constructor'` yielded the
+ * `Object` constructor *as a seed index*, and any non-numeric value flowed into
+ * the drum-motif index arithmetic as `NaN`. (That read is type-checked as of this
+ * change; the shape validation here is the other half.)
+ *
+ * Deliberately NOT null-prototyped, though that is the reflex the rest of this
+ * file would suggest. It would be theatre here: this map's prototype is rebuilt as
+ * a plain object twice over before any consumer sees it — `grooveReducer` assigns a
+ * fresh `{}` on `SET_SONG_SEED` (which `state-effects.ts` fires on the FIRST
+ * `TOGGLE_PLAY`, because `randomizeSeed` defaults true) and on `RESET_STATE`, and
+ * `toRaw` in `worker-client.ts` copies every synced object into a plain `{}` before
+ * `postMessage`. A null prototype would also silently drop the field out of
+ * deepsignal's reactive graph, since its proxy predicate is
+ * `SUPPORTED.has(value.constructor)` and a null-prototype object has no
+ * `.constructor`.
+ *
+ * What actually holds, at three layers: the KEYS are rejected at the source
+ * (`isSafeSectionId` above, so no section id can name a prototype member), the
+ * VALUES are filtered here to finite numbers, and each of the four engine reads
+ * type-checks what it gets back (`groove-engine.ts`, `drums-tick.ts`, and both
+ * reads in `conductor.ts`). That combination reaches the worker; a prototype guard
+ * on this object cannot.
+ *
+ * The 1000-entry cap mirrors `validateSections`' 500-section cap with headroom:
+ * this map is keyed by section id, so it cannot legitimately outgrow the chart by
+ * much. It bounds the SYNCED SNAPSHOT, not the parse — `JSON.parse` has already
+ * materialized the whole payload by the time we get here.
+ */
+function validateSectionSeedMap(saved: unknown): Record<string, number> {
+    const out: Record<string, number> = {};
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+        return out;
+    }
+    for (const [id, seed] of Object.entries(saved).slice(0, 1000)) {
+        if (isSafeSectionId(id) && typeof seed === 'number' && Number.isFinite(seed)) {
+            out[id] = seed;
+        }
+    }
+    return out;
 }
 
 const VALID_PALETTES = new Set<Palette>([
@@ -208,7 +302,16 @@ function validateSections(sections: any[]): any[] {
             // carries one, silently collapsing their independent groove seeds into one.
             // `decompressSections` always mints fresh ids, so only the persist path
             // could supply a caller-controlled id — but it's a one-word fix.
-            id: typeof s.id === 'string' && s.id ? s.id : generateId(),
+            //
+            // #1266 adds the prototype-shape rejection. Section ids are the KEYS of
+            // `sectionSeedMap`, so an id of 'constructor' turns `map[sectionId]` into
+            // the `Object` constructor on any prototype-bearing copy of that map — and
+            // hydration's null-prototype hardening cannot help there, because
+            // `structuredClone` does not preserve a null prototype and the two hottest
+            // readers (`groove-engine.ts`, `drums-tick.ts`) run on the WORKER's cloned
+            // mirror. Rejecting the id at the source closes it on both threads at once.
+            // Safe to reject outright: every legitimate id comes from `generateId()`.
+            id: isSafeSectionId(s.id) ? s.id : generateId(),
             label: safeLabel,
             value: safeValue,
             key: safeKey,
@@ -293,12 +396,16 @@ function hydrateSavedState(): void {
             sections: validatedSections,
             key: validatedKey,
             timeSignature: validatedTS,
-            isMinor: savedState.isMinor || false,
+            isMinor: !!savedState.isMinor,
             notation: validatedNotation,
-            lastChordPreset: savedState.lastChordPreset || 'Pop (Standard)',
+            lastChordPreset: sanitizeDisplayString(savedState.lastChordPreset, 'Pop (Standard)'),
+            // #1266 — the third reader of `arranger.seed`, now on the same bound as
+            // the other two. `normalizeSongSeed` also subsumes the old
+            // `typeof === 'string'` tests, so the `||` chain still means "prefer the
+            // top-level seed, fall back to the pre-#791 nested one."
             seed:
-                (typeof savedState.seed === 'string' && savedState.seed) ||
-                (typeof savedState.soloist?.seed === 'string' && savedState.soloist.seed) ||
+                normalizeSongSeed(savedState.seed) ||
+                normalizeSongSeed(savedState.soloist?.seed) ||
                 '',
             randomizeSeed:
                 typeof savedState.randomizeSeed === 'boolean' ? savedState.randomizeSeed : true,
@@ -318,17 +425,15 @@ function hydrateSavedState(): void {
             // #1259 (saved on every write, silently dropped on every load), and the next
             // person diffing writer against reader will land on exactly these two lines.
             autoIntensity: true,
-            practiceMode: savedState.practiceMode !== undefined ? savedState.practiceMode : true,
+            practiceMode: savedState.practiceMode !== undefined ? !!savedState.practiceMode : true,
             metronome: false,
-            visualFlash: savedState.visualFlash !== undefined ? savedState.visualFlash : false,
-            qualityColors: savedState.qualityColors !== undefined ? savedState.qualityColors : true,
-            countIn: savedState.countIn !== undefined ? savedState.countIn : true,
+            visualFlash: !!savedState.visualFlash,
+            qualityColors:
+                savedState.qualityColors !== undefined ? !!savedState.qualityColors : true,
+            countIn: savedState.countIn !== undefined ? !!savedState.countIn : true,
             sessionTimer: clamp(savedState.sessionTimer, 0, 60, 5),
             songMode: savedState.songMode !== undefined ? !!savedState.songMode : true,
-            applyPresetSettings:
-                savedState.applyPresetSettings !== undefined
-                    ? savedState.applyPresetSettings
-                    : false,
+            applyPresetSettings: !!savedState.applyPresetSettings,
             masterVolume: clamp(savedState.masterVolume, 0, 1, 0.4),
         });
 
@@ -341,22 +446,28 @@ function hydrateSavedState(): void {
         (vizState as Mutable<typeof vizState>).enabled = !!savedState.vizEnabled; // @direct-mutation
 
         if (savedState.chords) {
+            // #787: Acoustic's chord-style default changed 'pad' → 'arp' (the
+            // fingerpick lane). A session saved under the old default would
+            // otherwise reload as a static block pad with no arpeggio, so
+            // upgrade that one stale default. A deliberately-chosen 'pad' on
+            // any other genre is preserved.
+            const migratedChordStyle =
+                savedState.groove?.genreFeel === 'Acoustic' && savedState.chords.style === 'pad'
+                    ? 'arp'
+                    : savedState.chords.style;
             Object.assign(chords, {
-                enabled: savedState.chords.enabled !== undefined ? savedState.chords.enabled : true,
+                enabled:
+                    savedState.chords.enabled !== undefined ? !!savedState.chords.enabled : true,
                 voice: hydrateVoice(savedState.chords.voice),
                 autoSound: hydrateAutoSound(
                     savedState.chords.autoSound,
                     hydrateVoice(savedState.chords.voice),
                 ),
-                // #787: Acoustic's chord-style default changed 'pad' → 'arp' (the
-                // fingerpick lane). A session saved under the old default would
-                // otherwise reload as a static block pad with no arpeggio, so
-                // upgrade that one stale default. A deliberately-chosen 'pad' on
-                // any other genre is preserved.
-                style:
-                    savedState.groove?.genreFeel === 'Acoustic' && savedState.chords.style === 'pad'
-                        ? 'arp'
-                        : savedState.chords.style || 'smart',
+                // #1266 — validated against the same predicate the share reader uses.
+                // The #787 migration runs FIRST so its 'pad' → 'arp' rewrite is what
+                // gets validated (both are known styles, so the order is a statement of
+                // intent rather than a behavior difference).
+                style: isKnownChordStyle(migratedChordStyle) ? migratedChordStyle : 'smart',
                 instrument: 'Piano',
                 octave: clamp(savedState.chords.octave, 0, 127, 48),
                 // Normalized, same reasoning as `swingSub` below (#1257/#1258): every
@@ -376,13 +487,18 @@ function hydrateSavedState(): void {
         }
         if (savedState.bass) {
             Object.assign(bass, {
-                enabled: savedState.bass.enabled !== undefined ? savedState.bass.enabled : true,
+                enabled: savedState.bass.enabled !== undefined ? !!savedState.bass.enabled : true,
                 voice: hydrateVoice(savedState.bass.voice),
                 autoSound: hydrateAutoSound(
                     savedState.bass.autoSound,
                     hydrateVoice(savedState.bass.voice),
                 ),
-                style: savedState.bass.style || 'smart',
+                // #1266 — same predicate as the share reader. A retired style key
+                // (e.g. the #628 'whole' drone) now falls back to the genre-routed
+                // 'smart' default here as well as on the share path, which is what the
+                // BASS_STYLES comment has claimed hydration did since #628; the guard
+                // it names was only ever on the share reader.
+                style: isKnownBassStyle(savedState.bass.style) ? savedState.bass.style : 'smart',
                 octave: clamp(savedState.bass.octave, 0, 127, 36),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.bass.volume, 0, 1, 1.0),
                 reverb: shouldResetMixer
@@ -393,13 +509,20 @@ function hydrateSavedState(): void {
         if (savedState.soloist) {
             Object.assign(soloist, {
                 enabled:
-                    savedState.soloist.enabled !== undefined ? savedState.soloist.enabled : false,
+                    savedState.soloist.enabled !== undefined ? !!savedState.soloist.enabled : false,
                 voice: hydrateVoice(savedState.soloist.voice),
                 autoSound: hydrateAutoSound(
                     savedState.soloist.autoSound,
                     hydrateVoice(savedState.soloist.voice),
                 ),
-                style: savedState.soloist.style || 'smart',
+                // #1266 — the sharpest of the unguarded persist fields: a raw value
+                // here reaches `STYLE_CONFIG[style] || STYLE_CONFIG.scalar` in
+                // soloist-seeder.ts and synth-soloist.ts. (That table is now
+                // null-prototype too — belt and braces, since the seeder's copy runs on
+                // the worker's mirror of this slice.)
+                style: isKnownSoloistStyle(savedState.soloist.style)
+                    ? savedState.soloist.style
+                    : 'smart',
                 preset: normalizeSoloistPreset(savedState.soloist.preset, 'trumpet'),
                 octave:
                     savedState.soloist.octave === 77 ||
@@ -433,13 +556,17 @@ function hydrateSavedState(): void {
         if (savedState.harmony) {
             Object.assign(harmony, {
                 enabled:
-                    savedState.harmony.enabled !== undefined ? savedState.harmony.enabled : false,
+                    savedState.harmony.enabled !== undefined ? !!savedState.harmony.enabled : false,
                 voice: hydrateVoice(savedState.harmony.voice),
                 autoSound: hydrateAutoSound(
                     savedState.harmony.autoSound,
                     hydrateVoice(savedState.harmony.voice),
                 ),
-                style: savedState.harmony.style || 'smart',
+                // #1266 — same predicate as the share reader; feeds the
+                // `STYLE_CONFIGS[activeStyle]` lookup in harmonies.ts.
+                style: isKnownHarmonyStyle(savedState.harmony.style)
+                    ? savedState.harmony.style
+                    : 'smart',
                 octave: clamp(savedState.harmony.octave, 0, 127, 60),
                 volume: shouldResetMixer ? 1.0 : clamp(savedState.harmony.volume, 0, 1, 1.0),
                 reverb: shouldResetMixer
@@ -449,8 +576,27 @@ function hydrateSavedState(): void {
             });
         }
         if (savedState.groove) {
+            // #1266 — genreFeel and lastSmartGenre resolved as ONE pair, matching the
+            // share reader's `?genre=` path (which lands both halves off a single
+            // `resolveGenre` call). Derived independently, they could disagree: a
+            // payload carrying only `lastSmartGenre: 'Jazz'` used to yield feel 'Rock'
+            // + name 'Jazz', so the picker read Jazz while every feel-keyed engine
+            // table played Rock. `resolveGenre` normalizes either keyspace, so
+            // whichever half survived the payload reconstructs the other.
+            const savedGenre =
+                resolveGenre(
+                    typeof savedState.groove.genreFeel === 'string'
+                        ? savedState.groove.genreFeel
+                        : null,
+                ) ??
+                resolveGenre(
+                    typeof savedState.groove.lastSmartGenre === 'string'
+                        ? savedState.groove.lastSmartGenre
+                        : null,
+                );
             Object.assign(groove, {
-                enabled: savedState.groove.enabled !== undefined ? savedState.groove.enabled : true,
+                enabled:
+                    savedState.groove.enabled !== undefined ? !!savedState.groove.enabled : true,
                 voice: hydrateVoice(savedState.groove.voice),
                 autoSound: hydrateAutoSound(
                     savedState.groove.autoSound,
@@ -472,16 +618,21 @@ function hydrateSavedState(): void {
                 // the reader in Visualizer is now inlined as always-on. Both stale keys are
                 // simply ignored here rather than migrated: an unread extra key in a
                 // persisted payload is harmless, and the next save drops it.
-                lastDrumPreset: savedState.groove.lastDrumPreset || 'Basic Rock',
+                // Not allowlisted against DRUM_PRESETS on purpose: `loadDrumPreset`
+                // already guards its own lookup with `Object.hasOwn` (#1244) and is the
+                // field's only consumer beyond display, so the single-read-site half of
+                // the prototype-guard rule applies. Sanitized as a display string.
+                lastDrumPreset: sanitizeDisplayString(
+                    savedState.groove.lastDrumPreset,
+                    'Basic Rock',
+                ),
+                // Both halves come from the one `savedGenre` resolution above, so they
+                // can no longer disagree. `GENRE_FEELS.includes` is kept as the outer
+                // gate for the feel because that list is the engine-facing keyspace.
                 genreFeel:
-                    savedState.groove.genreFeel && GENRE_FEELS.includes(savedState.groove.genreFeel)
-                        ? savedState.groove.genreFeel
-                        : 'Rock',
-                lastSmartGenre:
-                    savedState.groove.lastSmartGenre ||
-                    resolveGenre(savedState.groove.genreFeel)?.name ||
-                    'Rock',
-                sectionSeedMap: savedState.groove.sectionSeedMap || {},
+                    savedGenre && GENRE_FEELS.includes(savedGenre.feel) ? savedGenre.feel : 'Rock',
+                lastSmartGenre: savedGenre?.name || 'Rock',
+                sectionSeedMap: validateSectionSeedMap(savedState.groove.sectionSeedMap),
                 currentMeasure: 0,
             });
 
@@ -661,13 +812,16 @@ export function loadFromUrl(): void {
             const hasMixerVersion =
                 Number(band.mv || band.mixerVersion || 0) === MIXER_SETTINGS_VERSION;
             if (band.s) {
-                // #1264 — bound to a local: TS drops the `if (band.s)` narrowing inside the
-                // `.some()` callback below, and reaching for a `!` there would defeat the
-                // very check this type was added to enable.
+                // #1264 — bound to a local so TS keeps the `if (band.s)` narrowing in the
+                // expressions below rather than needing a `!` that would defeat the very
+                // check this type was added to enable.
                 const bs = band.s;
                 Object.assign(soloist, {
                     enabled: !!bs.e,
-                    style: SOLOIST_STYLES.some((s) => s.id === bs.s) ? bs.s : soloist.style,
+                    // #1266 — the shared predicate, not an inline list scan. The persist
+                    // reader now asks the identical question; duplicating the guard is
+                    // how the two readers drifted apart in the first place.
+                    style: isKnownSoloistStyle(bs.s) ? bs.s : soloist.style,
                     preset: normalizeSoloistPreset(bs.p, soloist.preset),
                     octave: clamp(bs.o, 0, 127, 72),
                     volume: hasMixerVersion ? clamp(bs.v, 0, 1, 1.0) : 1.0,
@@ -685,18 +839,22 @@ export function loadFromUrl(): void {
                 // hashing-cost and data-hygiene problem carried forward indefinitely.
                 // (Not XSS: Preact escapes it at render.) Two readers of the same field
                 // disagreeing on its bounds is the actual defect.
-                if (typeof bs.sd === 'string') {
-                    const safeSeed = stripDangerousChars(bs.sd).slice(0, 64);
-                    if (safeSeed) {
-                        Object.assign(arranger, { seed: safeSeed });
-                    }
+                // #1266 — one authority (`normalizeSongSeed`), shared with `?seed=`
+                // below, the persist reader, and the `SET_SONG_SEED` reducer that bounds
+                // the write side. The inline `stripDangerousChars(...).slice(0, 64)`
+                // this replaces was #1258's fix for *this* reader disagreeing with
+                // `?seed=`; the persist reader and the seed input were the two that
+                // stayed out of step.
+                const safeSeed = normalizeSongSeed(bs.sd);
+                if (safeSeed) {
+                    Object.assign(arranger, { seed: safeSeed });
                 }
             }
             if (band.b) {
                 const bb = band.b; // #1264 — see the `bs` note above
                 Object.assign(bass, {
                     enabled: !!bb.e,
-                    style: BASS_STYLES.some((s) => s.id === bb.s) ? bb.s : bass.style,
+                    style: isKnownBassStyle(bb.s) ? bb.s : bass.style, // #1266 — shared predicate
                     octave: clamp(bb.o, 0, 127, 36),
                     volume: hasMixerVersion ? clamp(bb.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
@@ -736,7 +894,7 @@ export function loadFromUrl(): void {
                 const bh = band.h; // #1264 — see the `bs` note above
                 Object.assign(harmony, {
                     enabled: !!bh.e,
-                    style: HARMONY_STYLES.some((s) => s.id === bh.s) ? bh.s : harmony.style,
+                    style: isKnownHarmonyStyle(bh.s) ? bh.s : harmony.style, // #1266 — shared predicate
                     octave: clamp(bh.o, 0, 127, 60),
                     volume: hasMixerVersion ? clamp(bh.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
@@ -765,7 +923,7 @@ export function loadFromUrl(): void {
     // without having to round-trip through the full base64 `bnd` payload.
     const seedParam = params.get('seed');
     if (seedParam) {
-        const safe = stripDangerousChars(seedParam).slice(0, 64);
+        const safe = normalizeSongSeed(seedParam);
         if (safe) {
             (arranger as Mutable<typeof arranger>).seed = safe; // @direct-mutation
         }

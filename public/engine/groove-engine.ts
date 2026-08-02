@@ -486,7 +486,15 @@ export function applyGrooveOverrides(
     const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], step);
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
-    if (sectionSeed === undefined) {
+    // #1266 — `typeof !== 'number'`, not `=== undefined`. `sectionSeedMap` is always a
+    // plain, prototype-bearing object by the time it reaches here (`toRaw` in
+    // `worker-client.ts` rebuilds every synced object as a fresh `{}` before
+    // `postMessage`, and `grooveReducer` re-creates it as `{}` on SET_SONG_SEED), so a
+    // section id of 'constructor' returns the `Object` constructor — not `undefined`,
+    // and it would sail into `getPhraseSeed` as a function where a number is required.
+    // Hydration rejects such ids at the source; this is the second line of defense,
+    // and it matches the two reads in `conductor.ts` and the one in `drums-tick.ts`.
+    if (typeof sectionSeed !== 'number' || !Number.isFinite(sectionSeed)) {
         // #791: derive the SAME per-section marker the conductor writes into
         // sectionSeedMap — from (sectionId, songSeed) — so the seeded and
         // fallback paths agree (no mid-section groove swap as the lagged

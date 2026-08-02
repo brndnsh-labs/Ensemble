@@ -856,4 +856,227 @@ describe('Security: Hydration & Storage Resilience', () => {
             expect(stateModule.getState().vizState.enabled).toBe(false);
         });
     });
+
+    // The standing invariant this issue exists to restore: `loadFromUrl` validated
+    // essentially every enum-ish string while `hydrateSavedState` passed several
+    // straight through. That asymmetry is what made `swingSub` (#1257) and
+    // `chords.density` (#1258) each need a SECOND, retrofitted persist-side fix
+    // after their share-side one. Both readers now call the same predicate.
+    describe('the persist reader validates what the share reader validates (#1266)', () => {
+        const validSection = { id: '1', label: 'A', value: 'I' };
+
+        const hydrateWith = (payload: Record<string, unknown>) => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [validSection], ...payload }),
+            );
+            hydrateState();
+            return stateModule.getState();
+        };
+
+        // Reject direction, per lane. The prototype keys are the sharp case (a raw
+        // `soloist.style` of 'constructor' reaches `STYLE_CONFIG[style] || …`), the
+        // ordinary garbage strings are the common one (a rolled-back save carrying a
+        // style key that no longer exists).
+        it.each([
+            ['chords', 'chords', 'style', 'smart'],
+            ['bass', 'bass', 'style', 'smart'],
+            ['soloist', 'soloist', 'style', 'smart'],
+            ['harmony', 'harmony', 'style', 'smart'],
+        ])('rejects an out-of-keyspace %s style', (_label, slice, field, fallback) => {
+            for (const bad of ['constructor', '__proto__', 'toString', 'no-such-style', 42, {}]) {
+                const state = hydrateWith({ [slice]: { [field]: bad } });
+                expect(state[slice][field]).toBe(fallback);
+            }
+        });
+
+        // Accept direction — a validating reader that rejects everything is not a fix.
+        it.each([
+            ['chords', 'chords', 'jazz'],
+            // 'arp' is genre-routed, not in the CHORD_STYLES picker: the #1257 trap.
+            ['chords', 'chords', 'arp'],
+            ['bass', 'bass', 'walking-ska'],
+            ['soloist', 'soloist', 'bird'],
+            ['harmony', 'harmony', 'organ'],
+        ])('still restores a legitimate %s style (%s)', (_label, slice, good) => {
+            const state = hydrateWith({ [slice]: { style: good } });
+            expect(state[slice].style).toBe(good);
+        });
+
+        // #787's Acoustic 'pad' → 'arp' upgrade has to survive being wrapped in the
+        // new guard — it runs first, and 'arp' must then pass validation.
+        it('keeps the #787 Acoustic pad→arp migration', () => {
+            const state = hydrateWith({
+                groove: { genreFeel: 'Acoustic' },
+                chords: { style: 'pad' },
+            });
+            expect(state.chords.style).toBe('arp');
+        });
+
+        it('normalizes lastSmartGenre through resolveGenre', () => {
+            expect(
+                hydrateWith({ groove: { lastSmartGenre: 'constructor' } }).groove.lastSmartGenre,
+            ).toBe('Rock');
+            expect(
+                hydrateWith({ groove: { lastSmartGenre: 'Nonsense' } }).groove.lastSmartGenre,
+            ).toBe('Rock');
+            // Accept direction, plus the feel→name normalization resolveGenre buys:
+            // a payload that stored the FEEL in the canon-name field self-corrects.
+            expect(
+                hydrateWith({ groove: { lastSmartGenre: 'Neo-Soul' } }).groove.lastSmartGenre,
+            ).toBe('Neo-Soul');
+            expect(hydrateWith({ groove: { lastSmartGenre: 'Ska' } }).groove.lastSmartGenre).toBe(
+                'Ska-Punk',
+            );
+        });
+
+        // The one place the persist reader assigned an untrusted OBJECT wholesale.
+        // It crosses to the logic worker and `drums-tick.ts` reads it as
+        // `sectionSeedMap[sectionId] || 0`, so a prototype-bearing map turns a
+        // section id of 'constructor' into the Object constructor as a seed index.
+        describe('groove.sectionSeedMap is shape-validated', () => {
+            it('drops prototype-shaped KEYS rather than relying on the map prototype', () => {
+                // The map itself is a plain object on purpose (a null prototype survives
+                // neither grooveReducer nor the worker hop — see groove-seeds.test.ts).
+                // The guard is that no prototype-named key can get IN.
+                const map = hydrateWith({
+                    groove: {
+                        sectionSeedMap: { s1: 3, constructor: 9, toString: 4, __proto__: 5 },
+                    },
+                }).groove.sectionSeedMap;
+
+                expect(map.s1).toBe(3);
+                for (const key of ['constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+                    expect(Object.hasOwn(map, key)).toBe(false);
+                }
+            });
+
+            it('drops non-numeric and non-finite seed values', () => {
+                const map = hydrateWith({
+                    groove: {
+                        sectionSeedMap: {
+                            good: 7,
+                            zero: 0,
+                            str: '5',
+                            obj: { a: 1 },
+                            nul: null,
+                            nan: 'NaN',
+                        },
+                    },
+                }).groove.sectionSeedMap;
+                expect(map.good).toBe(7);
+                // 0 is a legitimate seed index, so it must survive the filter.
+                expect(map.zero).toBe(0);
+                expect(map.str).toBeUndefined();
+                expect(map.obj).toBeUndefined();
+                expect(map.nul).toBeUndefined();
+                expect(map.nan).toBeUndefined();
+            });
+
+            it.each([
+                ['a string', 'not-a-map'],
+                ['an array', [1, 2, 3]],
+                ['a number', 7],
+                ['null', null],
+            ])('returns an empty map for %s', (_label, bad) => {
+                const map = hydrateWith({ groove: { sectionSeedMap: bad } }).groove.sectionSeedMap;
+                expect(Object.keys(map)).toEqual([]);
+            });
+        });
+
+        it('sanitizes the free-text lastChordPreset without allowlisting it', () => {
+            // A sanitizer, not an allowlist: user-saved progressions put arbitrary
+            // names here, so a real user's own preset name must survive.
+            expect(
+                hydrateWith({ lastChordPreset: "Brandon's Tune #4" }).arranger.lastChordPreset,
+            ).toBe("Brandon's Tune #4");
+            expect(
+                hydrateWith({ lastChordPreset: '<b>Bad "Quote"</b>' }).arranger.lastChordPreset,
+            ).toBe('bBad Quote/b');
+            expect(
+                hydrateWith({ lastChordPreset: 'z'.repeat(500) }).arranger.lastChordPreset.length,
+            ).toBe(100);
+            expect(hydrateWith({ lastChordPreset: { evil: 1 } }).arranger.lastChordPreset).toBe(
+                'Pop (Standard)',
+            );
+        });
+
+        // A section id is what KEYS sectionSeedMap, so a prototype-named id is the
+        // actual vector — reject it at the source and every reader is covered at once.
+        it.each(['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty'])(
+            'mints a fresh id for a prototype-shaped persisted section id (%s)',
+            (badId) => {
+                const state = hydrateWith({
+                    sections: [{ id: badId, label: 'A', value: 'I' }],
+                });
+                expect(state.arranger.sections[0].id).not.toBe(badId);
+                expect(typeof state.arranger.sections[0].id).toBe('string');
+            },
+        );
+
+        // The share reader coerces every `enabled` with `!!`; the persist reader passed
+        // them raw, so a forged object landed in a boolean-typed field, crossed to the
+        // worker, and was written straight back by persistence.ts. Same shape as the
+        // #1259 vizEnabled fix two blocks up.
+        it.each(['chords', 'bass', 'soloist', 'harmony', 'groove'])(
+            'coerces %s.enabled to a real boolean',
+            (slice) => {
+                const truthy = hydrateWith({ [slice]: { enabled: { on: true } } })[slice].enabled;
+                expect(truthy).toBe(true);
+                expect(typeof truthy).toBe('boolean');
+
+                const falsy = hydrateWith({ [slice]: { enabled: 0 } })[slice].enabled;
+                expect(falsy).toBe(false);
+                expect(typeof falsy).toBe('boolean');
+            },
+        );
+
+        it("keeps each lane's missing-key default (the accept direction)", () => {
+            const state = hydrateWith({
+                chords: {},
+                bass: {},
+                soloist: {},
+                harmony: {},
+                groove: {},
+            });
+            expect(state.chords.enabled).toBe(true);
+            expect(state.bass.enabled).toBe(true);
+            expect(state.groove.enabled).toBe(true);
+            expect(state.soloist.enabled).toBe(false);
+            expect(state.harmony.enabled).toBe(false);
+        });
+
+        // genreFeel and lastSmartGenre are one resolution, matching the share reader.
+        it('resolves genreFeel and lastSmartGenre as a matched pair', () => {
+            // Only the canon NAME survived the payload — the feel must follow it,
+            // not silently fall back to Rock while the picker reads Jazz.
+            const fromName = hydrateWith({ groove: { lastSmartGenre: 'Jazz' } }).groove;
+            expect(fromName.lastSmartGenre).toBe('Jazz');
+            expect(fromName.genreFeel).toBe('Jazz');
+
+            // Only the FEEL survived — the name must follow it, including the two
+            // genres whose feel and name differ.
+            const fromFeel = hydrateWith({ groove: { genreFeel: 'Ska' } }).groove;
+            expect(fromFeel.genreFeel).toBe('Ska');
+            expect(fromFeel.lastSmartGenre).toBe('Ska-Punk');
+
+            // Garbage in both halves lands on the Rock default, coherently.
+            const junk = hydrateWith({
+                groove: { genreFeel: 'constructor', lastSmartGenre: 'x' },
+            }).groove;
+            expect(junk.genreFeel).toBe('Rock');
+            expect(junk.lastSmartGenre).toBe('Rock');
+        });
+
+        it('bounds a persisted seed on the same rule as the other two readers', () => {
+            expect(hydrateWith({ seed: 'a'.repeat(500) }).arranger.seed.length).toBe(64);
+            expect(hydrateWith({ seed: 'blue-note-42' }).arranger.seed).toBe('blue-note-42');
+            expect(hydrateWith({ seed: '<script>' }).arranger.seed).toBe('script');
+            expect(hydrateWith({ seed: { evil: 1 } }).arranger.seed).toBe('');
+            // The pre-#791 nested fallback still works, and is bounded too.
+            expect(hydrateWith({ soloist: { seed: 'b'.repeat(500) } }).arranger.seed.length).toBe(
+                64,
+            );
+        });
+    });
 });

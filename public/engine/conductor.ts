@@ -653,8 +653,15 @@ export function checkSectionTransition(
 
                 // --- 3. THE DRUM SEED (section memory) ---
                 if (nextSection) {
-                    // Re-evaluate the drum seed only if it hasn't been set for this section
-                    if (groove.sectionSeedMap?.[nextSection.id] === undefined) {
+                    // Re-evaluate the drum seed only if it hasn't been set for this section.
+                    // #1266 — `typeof !== 'number'`, matching the sibling read below and the
+                    // two in groove-engine/drums-tick. `=== undefined` is not enough on a
+                    // prototype-bearing map (which is every live copy — see
+                    // `validateSectionSeedMap`): a section id of 'constructor' returns an
+                    // inherited function, so this skipped the memo write while groove-engine
+                    // derived a real seed — the mid-section groove swap the #791 note below
+                    // says this memo exists to prevent.
+                    if (typeof groove.sectionSeedMap?.[nextSection.id] !== 'number') {
                         // #791: derive the section's groove marker from (sectionId,
                         // songSeed) instead of Math.random(). The groove-engine
                         // fallback derives the SAME value, so this write is now a

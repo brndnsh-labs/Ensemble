@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkSectionTransition } from '../../../public/engine/conductor.js';
 import { deriveSectionSeed } from '../../../public/engine/hash-utils.js';
+import { grooveReducer, groove as realGrooveSlice } from '../../../public/state/groove.js';
 import { dispatch, getState } from '../../../public/state.js';
+import { ACTIONS } from '../../../public/types.js';
 
 // Mock state
 const { mockState } = vi.hoisted(() => ({
@@ -114,5 +116,43 @@ describe('Groove Engine - Multi-Seed Memory', () => {
         expect(mockState.groove.sectionSeedMap.s2).not.toBe(firstRun);
 
         mockState.arranger.seed = undefined;
+    });
+});
+
+// #1266 — the load-bearing runtime facts behind the section-id guard, pinned here
+// because both are easy to forget and invisible in code review. The reflex fix for a
+// `TABLE[untrusted]` hole is to null-prototype the table; on a STATE SLICE field that
+// does not work, for two independent reasons, so the guard has to reject the KEY at
+// the reader instead.
+describe('a null prototype cannot protect a synced slice field (#1266)', () => {
+    it('grooveReducer re-creates sectionSeedMap as a plain object on SET_SONG_SEED', () => {
+        // This fires on the FIRST TOGGLE_PLAY (state-effects.ts) whenever
+        // `arranger.randomizeSeed` is true — which is the default. So a hardened map
+        // installed at hydration is plain again before a single bar plays.
+        // The REAL groove slice — this file mocks `public/state.js`, but grooveReducer
+        // closes over the actual deepSignal from `public/state/groove.js`.
+        realGrooveSlice.sectionSeedMap = Object.create(null);
+        expect(Object.getPrototypeOf(realGrooveSlice.sectionSeedMap)).toBeNull();
+
+        grooveReducer({ type: ACTIONS.SET_SONG_SEED, payload: 'A1B2C3' });
+
+        expect(Object.getPrototypeOf(realGrooveSlice.sectionSeedMap)).toBe(Object.prototype);
+    });
+
+    it('the structured-clone/toRaw hop rebuilds Object.prototype', () => {
+        const hardened: Record<string, number> = Object.create(null);
+        hardened.s1 = 0.5;
+        expect(hardened.constructor).toBeUndefined();
+
+        // `toRaw` (worker-client.ts) copies into a fresh `{}` before postMessage;
+        // structuredClone would rebuild the prototype too. Either way the worker's
+        // mirror — where groove-engine and drums-tick read — is prototype-bearing.
+        const asTheWorkerSeesIt = structuredClone(hardened);
+
+        expect(asTheWorkerSeesIt.s1).toBe(0.5);
+        expect(Object.getPrototypeOf(asTheWorkerSeesIt)).toBe(Object.prototype);
+        // The consequence: a section id naming a prototype member reads as a hit,
+        // and it is truthy, so it defeats the `|| fallback` at every consumer.
+        expect(asTheWorkerSeesIt.constructor || 0).not.toBe(0);
     });
 });

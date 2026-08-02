@@ -99,3 +99,40 @@ const KNOWN_CHORD_STYLES: ReadonlySet<string> = new Set([
 export function isKnownChordStyle(id: unknown): boolean {
     return typeof id === 'string' && KNOWN_CHORD_STYLES.has(id);
 }
+
+const KNOWN_BASS_STYLES: ReadonlySet<string> = new Set(BASS_STYLES.map((s) => s.id));
+const KNOWN_SOLOIST_STYLES: ReadonlySet<string> = new Set(SOLOIST_STYLES.map((s) => s.id));
+const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s) => s.id));
+
+/*
+ * The bass/soloist/harmony siblings of `isKnownChordStyle`, added by #1266.
+ *
+ * why they exist rather than an inline `BASS_STYLES.some(s => s.id === x)`: the
+ * share reader (`loadFromUrl`) validated these three inline while the persist
+ * reader (`hydrateSavedState`) passed the saved value straight through, and the
+ * two readers then drifted independently — the exact failure mode that made
+ * `swingSub` (#1257) and `chords.density` (#1258) each need a *second*,
+ * retrofitted persist-side fix after their share-side one. One exported
+ * predicate per lane means "what values may this field hold" is answered in one
+ * place and both readers ask the same question.
+ *
+ * Unlike chords, none of these three unions in a genre-routed value. Within
+ * `public/`, `SET_STYLE` is only ever dispatched for `module: 'chords'`, and the
+ * genre tables route bass and soloist at *read* time (`resolveMappedStyle` /
+ * `resolveSoloistStyle`) without ever writing the resolved key back to the slice.
+ * (`scripts/ensemble-analysis-utils.ts` does drive all four lanes, but only with
+ * values already in these lists — checked, not assumed.) So the picker list
+ * genuinely is the whole keyspace here — see `isKnownChordStyle` above for why
+ * that is emphatically NOT true of chords.
+ */
+export function isKnownBassStyle(id: unknown): boolean {
+    return typeof id === 'string' && KNOWN_BASS_STYLES.has(id);
+}
+
+export function isKnownSoloistStyle(id: unknown): boolean {
+    return typeof id === 'string' && KNOWN_SOLOIST_STYLES.has(id);
+}
+
+export function isKnownHarmonyStyle(id: unknown): boolean {
+    return typeof id === 'string' && KNOWN_HARMONY_STYLES.has(id);
+}

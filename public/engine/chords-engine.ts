@@ -551,8 +551,16 @@ export function mutateProgression(progressionStr: string): {
         '6-': ['1', '3-', '4'],
     };
 
-    // If we have a known substitution, use it
-    const choices = substitutions[original] || [];
+    // If we have a known substitution, use it.
+    // #1266 — `Object.hasOwn`, not `|| []`. `original` is a `|`-delimited token off
+    // `arranger.sections[].value`, which is untrusted (a persisted chart, or `?prog=`)
+    // and is only stripped/capped, never allowlisted. On this plain literal the
+    // arity-1 inherited members ('constructor', 'hasOwnProperty', 'isPrototypeOf',
+    // 'propertyIsEnumerable') return a FUNCTION: truthy, so it defeated the `|| []`,
+    // and `Function.length === 1` then defeated the `length > 0` guard — so
+    // `choices[0]` was `undefined` and the literal token "undefined" got written back
+    // into the chart and persisted.
+    const choices = Object.hasOwn(substitutions, original) ? substitutions[original] : [];
     if (choices.length > 0) {
         mutatedParts[idx] = choices[Math.floor(Math.random() * choices.length)];
     } else {

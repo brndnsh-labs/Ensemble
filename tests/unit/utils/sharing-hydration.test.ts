@@ -3,7 +3,7 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getState } from '../../../public/state.js';
+import { dispatch, getState } from '../../../public/state.js';
 
 const { arranger, playback, groove, chords, bass, soloist, harmony } = getState();
 
@@ -18,6 +18,7 @@ import { generateShareUrl, shareProgression } from '../../../public/export/shari
 import { MIXER_SETTINGS_VERSION } from '../../../public/state/instruments.js';
 import { encodeBase64Unicode } from '../../../public/state/share-codec.js';
 import { loadFromUrl, normalizeSwingSub } from '../../../public/state/state-hydration.js';
+import { ACTIONS } from '../../../public/types.js';
 
 vi.mock('../../../public/ui.js', () => ({
     ui: {
@@ -732,5 +733,65 @@ describe('bnd payload keyspace guards (#1264)', () => {
 
         expect(chords.density).toBe('standard');
         expect(groove.swingSub).toBe('8th');
+    });
+});
+
+describe('song seed: one bound, at the write side (#1266)', () => {
+    // Before this, the seed had three readers on two bounds. #1258 aligned
+    // `bnd.s.sd` with `?seed=` (both cap at 64) but the persist reader was a third,
+    // unbounded reader and `SongSeedControl` had no length cap — so a >64-char seed
+    // was reachable BY TYPING, survived locally, and was emitted whole by the share
+    // writer, while the recipient's reader truncated it. The seed is the PRNG input
+    // for the whole session, so sender and recipient then heard different soloist
+    // lines off the "same" seed. Bounding at the write side is what makes them agree.
+    beforeEach(() => {
+        vi.clearAllMocks();
+        arranger.sections = [{ id: '1', label: 'Intro', value: 'I' }];
+        arranger.seed = '';
+        vi.stubGlobal('navigator', {
+            clipboard: { writeText: vi.fn().mockImplementation(() => Promise.resolve()) },
+        });
+        vi.stubGlobal('location', new URL('http://localhost'));
+    });
+
+    it('a >64-char typed seed round-trips identically for sender and recipient', () => {
+        // The "typed" path: the seed input dispatches SET_SONG_SEED per keystroke.
+        dispatch(ACTIONS.SET_SONG_SEED, 'x'.repeat(200));
+
+        const senderSeed = arranger.seed;
+        expect(senderSeed.length).toBe(64);
+
+        // Sender shares. The writer emits whatever the slice holds — which is now
+        // already bounded, so there is nothing left for a reader to truncate.
+        const shareUrl = generateShareUrl();
+
+        // Recipient opens the link on a fresh session.
+        arranger.seed = '';
+        vi.stubGlobal('location', new URL(shareUrl));
+        loadFromUrl();
+
+        expect(arranger.seed).toBe(senderSeed);
+    });
+
+    it('normalizes at the reducer, not only at the readers', () => {
+        dispatch(ACTIONS.SET_SONG_SEED, `<script>${'y'.repeat(100)}`);
+        expect(arranger.seed.length).toBe(64);
+        expect(arranger.seed.startsWith('script')).toBe(true);
+
+        // Non-strings coerce to the empty seed rather than into the PRNG.
+        dispatch(ACTIONS.SET_SONG_SEED, { evil: 1 });
+        expect(arranger.seed).toBe('');
+    });
+
+    it('leaves an ordinary seed untouched (the accept direction)', () => {
+        dispatch(ACTIONS.SET_SONG_SEED, 'A1B2C3');
+        expect(arranger.seed).toBe('A1B2C3');
+
+        const shareUrl = generateShareUrl();
+        arranger.seed = '';
+        vi.stubGlobal('location', new URL(shareUrl));
+        loadFromUrl();
+
+        expect(arranger.seed).toBe('A1B2C3');
     });
 });

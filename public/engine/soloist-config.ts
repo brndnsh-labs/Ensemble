@@ -398,6 +398,21 @@ const STYLE_OVERRIDES: Record<string, Partial<StyleConfig>> = {
     },
 };
 
+/**
+ * Null-prototype, per #1266 and the prototype-guard rule in CLAUDE.md: this table
+ * has several `STYLE_CONFIG[style] || STYLE_CONFIG.scalar` consumers
+ * (`soloist-seeder.ts` ×2, `synth-soloist.ts`), and `style` is a *persisted*
+ * value. On a plain literal, `STYLE_CONFIG['constructor']` returns the `Object`
+ * constructor — a truthy hit that sails past the `||` and is then read as a style
+ * config, so `styleConfig.seedTriplets` is `undefined` and every numeric knob
+ * (`syncopationLikelihood`, `chromaticism`, …) silently falls to its `|| default`.
+ * With many fallback-style consumers, hardening the declaration once beats an
+ * `Object.hasOwn` at each of them.
+ *
+ * (The persist reader now validates `soloist.style` against `SOLOIST_STYLES`
+ * too — but this table is read on the *worker's* mirror of the slice, so it
+ * keeps its own guard rather than trusting a main-thread reader two hops away.)
+ */
 export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERRIDES).reduce(
     (acc: Record<string, StyleConfig>, key) => {
         const styleOverride = (STYLE_OVERRIDES as Record<string, any>)[key];
@@ -411,7 +426,7 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
         };
         return acc;
     },
-    {} as Record<string, StyleConfig>,
+    Object.create(null) as Record<string, StyleConfig>,
 );
 
 /**
