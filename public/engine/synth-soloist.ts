@@ -147,7 +147,16 @@ function playSampledSolo(
         return false;
     }
     const { audio, dest, zone, targetMidi } = resolved;
-    const velocity = Math.min(1, (Number.isFinite(vol) ? vol : 0.5) * gainForPack(packId));
+    // #1332: was `Math.min(1, …)` — every soloist-lane pack has `gainForPack > 1`
+    // (nylon 5, e-guitar-driven 3.4, sax 3, e-guitar-clean 3), so that clamp
+    // saturated at vol ≈ 1/gainForPack, well inside the practical velocity
+    // range, and #1325's intensity swell (or any
+    // other velocity factor) got silently clipped away above it. Pass the
+    // pack-calibrated velocity straight to `playSampledNote`, which bounds the
+    // envelope peak at `MAX_SAMPLE_PEAK` — same fix the sampled BASS path
+    // already applied for the identical reason (`synth-bass.ts`, #660: "that
+    // clamp silently defeats gain calibration above unity").
+    const velocity = (Number.isFinite(vol) ? vol : 0.5) * gainForPack(packId);
 
     // Guitar legato slur — the hammer-on / pull-off (#855). A horn re-articulates
     // every note; a guitarist slurs a connected run: pick the first note, then
