@@ -375,3 +375,203 @@ describe('Generic walking fallback target-awareness (bass.md P1 #10)', () => {
         expect(gap).toBeGreaterThanOrEqual(0.5);
     });
 });
+
+// ---------------------------------------------------------------------------
+// #1335: even-idiom bass styles are not genre-neutrally accented
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs `getBassNote` over a static vamp (one chord, no chord changes — isolates
+ * the odd-beat accent from chord-change/approach confounders) and returns every
+ * active note's velocity tagged with its beat parity.
+ */
+const simulateVelocityByParity = (
+    style: string,
+    genreFeel: string,
+    numBars: number,
+    bandIntensity = 0.7,
+) => {
+    const chord = { rootMidi: 48, quality: 'maj7', beats: 4, intervals: [0, 4, 7, 11] };
+    const mockState = {
+        playback: { bandIntensity, complexity: 0.6, bpm: 120 },
+        groove: { genreFeel, lastDrumPreset: genreFeel, instruments: [] },
+        arranger: { timeSignature: '4/4', totalSteps: numBars * 16 },
+        soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+    };
+    getState.mockReturnValue(mockState);
+
+    const tsConfig = TIME_SIGNATURES['4/4'];
+    const samples: { step: number; intBeat: number; velocity: number }[] = [];
+    let prevFreq = 0;
+    for (let step = 0; step < numBars * 16; step++) {
+        const stepInMeasure = step % 16;
+        const info = getStepInfo(step, tsConfig, [], TIME_SIGNATURES);
+        const active = isBassActive(getState(), style, step, stepInMeasure, info, {});
+        if (!active) {
+            continue;
+        }
+        const note = getBassNote(
+            getState(),
+            chord,
+            chord,
+            info.beatIndex,
+            prevFreq,
+            chord.rootMidi,
+            style,
+            0,
+            step,
+            stepInMeasure,
+            {},
+            info,
+        );
+        if (note && !note.muted) {
+            samples.push({
+                step,
+                intBeat: Math.floor(stepInMeasure / 4),
+                velocity: note.velocity,
+            });
+            prevFreq = note.freq;
+        }
+    }
+    return samples;
+};
+
+const meanBy = (samples: { velocity: number }[]) =>
+    samples.reduce((acc, s) => acc + s.velocity, 0) / (samples.length || 1);
+
+describe('#1335 — the generic odd-beat velocity accent respects style idiom', () => {
+    it('jazz walking (quarter) removes the genre-neutral backbeat accent', () => {
+        // Jazz walking emits exactly one note per beat (intBeat 0/1/2/3 —
+        // there are no pickup-eighth samples for this style). Beat 0 (the bar
+        // downbeat) is EXCLUDED from this comparison on purpose: it carries a
+        // separate, pre-existing +intensity*0.25 accent from
+        // `bass-engine.ts`'s `isStraightStyle` branch (`stepInChord === 0`),
+        // unrelated to the odd-beat accent this story removes — filed
+        // separately (see #1335's PR). Mixing it in would let that unrelated
+        // bug's contamination mask or invert this test's actual signal (a
+        // real risk verified during review: a naive odd/even mean split
+        // reported "ratio 0.89" — looked like an improvement — while the
+        // dominant beat-0 downbeat imbalance persisted `un`measured).
+        //
+        // Beat 2 (the bar midpoint) is the correct reference: it's the OTHER
+        // strong beat (same `#1006` envelope boost as beat 0, but immune to
+        // `isStraightStyle` since `stepInChord` isn't 0 there), so a fair
+        // beat1+beat3 (backbeat, odd) vs beat2 (even, non-downbeat-strong)
+        // comparison isolates just the accent this fix removes.
+        const samples = simulateVelocityByParity('quarter', 'Jazz', 32);
+        const backbeat = samples.filter((s) => s.intBeat === 1 || s.intBeat === 3);
+        const midpoint = samples.filter((s) => s.intBeat === 2);
+        const backbeatMean = meanBy(backbeat);
+        const midpointMean = meanBy(midpoint);
+        const ratio = backbeatMean / midpointMean;
+
+        console.log(
+            [
+                '',
+                '--- #1335 JAZZ WALKING BACKBEAT VS BAR-MIDPOINT (beat 0 excluded) ---',
+                `[backbeat 2&4]   n=${backbeat.length}  mean=${backbeatMean.toFixed(4)}`,
+                `[bar-midpoint]   n=${midpoint.length}  mean=${midpointMean.toFixed(4)}`,
+                `[ratio]          ${ratio.toFixed(4)} (measured pre-fix: ~1.09; the ~5%`,
+                '                 #1006 envelope boost on the midpoint alone would give ~0.95)',
+                '-------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        expect(backbeat.length).toBeGreaterThan(50);
+        expect(midpoint.length).toBeGreaterThan(20);
+        // why: pre-fix the backbeat carried the old ×1.15 accent ON TOP of its
+        // own position-based envelope, so it measurably OUTWEIGHED the
+        // midpoint's legitimate +5% strong-beat boost (measured ratio ~1.09,
+        // backbeat louder than the midpoint it should sit under). Post-fix the
+        // midpoint's own envelope boost dominates instead (measured ~0.95,
+        // backbeat quieter). Floor/ceiling straddle 1.0 with real headroom on
+        // both sides of the measured pre/post values.
+        expect(ratio).toBeGreaterThan(0.85);
+        expect(ratio).toBeLessThan(1.02);
+        // why: mutation check baked into the assertion — reconstructs what the
+        // OLD code's ratio would have been (backbeat × the removed 1.15
+        // accent) and confirms it would have failed the ceiling above, so this
+        // test is a real regression guard, not a vacuous one.
+        expect((backbeatMean * 1.15) / midpointMean).toBeGreaterThan(1.02);
+    });
+
+    it('blues keeps its odd-beat accent unchanged (negative control)', () => {
+        // Blues is NOT in `EVEN_ACCENT_BASS_STYLES` — its own early-return
+        // branch (`bass-engine.ts:1208`) still calls the same shared
+        // `result()` closure every other style does, so it still carries the
+        // odd-beat accent (per-style literals multiply INTO the shared
+        // `velocity`, they don't replace it — see the gate's own doc comment).
+        // Chosen over funk as the negative control because funk mixes several
+        // overlapping velocity mechanisms (an `isStraightStyle`-adjacent
+        // downbeat special-case, its own slap/pop literals) that dilute the
+        // accent's signature to near-zero; blues' single early-return branch
+        // gives a cleaner, still-realistic measurement.
+        const samples = simulateVelocityByParity('blues', 'Blues', 32);
+        const odd = samples.filter((s) => s.intBeat % 2 === 1);
+        const even = samples.filter((s) => s.intBeat % 2 === 0);
+        const oddMean = meanBy(odd);
+        const evenMean = meanBy(even);
+        const ratio = oddMean / evenMean;
+
+        console.log(
+            [
+                '',
+                '--- #1335 BLUES VELOCITY PARITY (negative control) ---',
+                `[odd-beat]   n=${odd.length}  mean=${oddMean.toFixed(4)}`,
+                `[even-beat]  n=${even.length}  mean=${evenMean.toFixed(4)}`,
+                `[ratio]      ${ratio.toFixed(4)} (blues is NOT in EVEN_ACCENT_BASS_STYLES —`,
+                '             must still show the accented signature)',
+                '-------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        expect(odd.length).toBeGreaterThan(20);
+        expect(even.length).toBeGreaterThan(20);
+        // why: positive control for the test methodology itself — if this ever
+        // drops near 1.0, either the generic accent broke or the gate leaked
+        // into a style it shouldn't touch.
+        expect(ratio).toBeGreaterThan(1.1);
+    });
+
+    it('bossa downbeat anchors render louder than the anticipation upbeats (idiom hierarchy)', () => {
+        // Bossa's own literals author the "1/3" downbeat anchors LOUDER
+        // (`1.1 + intensity*0.1`) than the "& of 2/4" anticipation upbeats
+        // (`1.0 + intensity*0.15`) — but both are built via the SAME shared
+        // `result()` closure `getBassNote` passes into `getBassNoteStyle`,
+        // which still multiplies by the generic odd-beat `velocity`. Pre-fix,
+        // the anticipation upbeats (odd `intBeat`) picked up the spurious
+        // ×1.15 while the downbeat anchors (even `intBeat`) did not —
+        // inverting the intended hierarchy (verified: the accented upbeat
+        // product exceeds the downbeat's at every intensity from 0 to 1). This
+        // asserts the CORRECT ordering is restored.
+        const bandIntensity = 0.7;
+        const samples = simulateVelocityByParity('bossa', 'Bossa', 16, bandIntensity);
+        const downbeatSamples = samples.filter((s) => [0, 8].includes(s.step % 16));
+        const offbeatSamples = samples.filter((s) => [6, 14].includes(s.step % 16));
+        const downbeatMean = meanBy(downbeatSamples);
+        const offbeatMean = meanBy(offbeatSamples);
+
+        console.log(
+            [
+                '',
+                '--- #1335 BOSSA DOWNBEAT/ANTICIPATION HIERARCHY ---',
+                `[downbeat 0/8]   n=${downbeatSamples.length}  mean=${downbeatMean.toFixed(4)}`,
+                `[offbeat 6/14]   n=${offbeatSamples.length}  mean=${offbeatMean.toFixed(4)}`,
+                `[pre-fix offbeat mean would have been]  ${(offbeatMean * 1.15).toFixed(4)} (inverted: > downbeat)`,
+                '-------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        expect(downbeatSamples.length).toBeGreaterThan(10);
+        expect(offbeatSamples.length).toBeGreaterThan(10);
+        // why: bossa authors its downbeat anchor louder than its anticipation
+        // upbeat by design; the pre-fix accent inverted this (offbeat×1.15
+        // exceeded downbeat at every intensity). Post-fix the authored
+        // ordering must hold.
+        expect(downbeatMean).toBeGreaterThan(offbeatMean);
+        // why: confirms the OLD (buggy) product really would have inverted the
+        // ordering — a mutation check baked into the assertion itself, so this
+        // test would have failed before the fix rather than passing vacuously.
+        expect(offbeatMean * 1.15).toBeGreaterThan(downbeatMean);
+    });
+});

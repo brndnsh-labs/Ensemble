@@ -38,6 +38,7 @@ import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import {
     approachBend,
     checkBassActiveStyle,
+    EVEN_ACCENT_BASS_STYLES,
     getBassNoteStyle,
     isChordChangeApproach,
 } from './bass-styles.js';
@@ -451,7 +452,13 @@ export function getBassNote(
 
     const scale = getScaleForChord(state, chord, nextChord, style);
     const beatsInChord = Math.round(chord.beats);
-    const velocity = intBeat % 2 === 1 ? 1.15 : 1.0;
+    // #1335: was a genre-neutral `intBeat % 2 === 1 ? 1.15 : 1.0` for every
+    // style. A walking jazz line's drive comes from note-length consistency
+    // and the quarter pulse, not level accents; a bossa's own downbeat/
+    // anticipation hierarchy (bass-styles.ts) was getting inverted by this
+    // same accent multiplying through the shared `result()` closure — see
+    // `EVEN_ACCENT_BASS_STYLES` for the full reasoning on both.
+    const velocity = EVEN_ACCENT_BASS_STYLES.has(style) ? 1.0 : intBeat % 2 === 1 ? 1.15 : 1.0;
 
     // --- Imperfect Symmetry: per-phrase octave displacement on repeat passes ---
     // why: epic-form-arrangement S2 — when a section repeats (Verse 2 vs Verse 1),

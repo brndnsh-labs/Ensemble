@@ -9,6 +9,49 @@ type ChordChangeShape = {
 };
 
 /**
+ * #1335: bass styles whose idiom is deliberately EVEN — `bass-engine.ts`'s
+ * generic odd-beat velocity accent (`intBeat % 2 === 1 ? 1.15 : 1.0`) would
+ * misrepresent these idioms if it reached them, so it's suppressed to flat
+ * 1.0 for these style ids. Absence (any other, or a future style) means
+ * "accented," the historical default — never silent.
+ *
+ * The gate is applied once, at `bass-engine.ts`'s `const velocity`
+ * definition — so it covers every consumer of that shared value: the
+ * `result()` closure's `velocityParam * velocity * intensityFactor *
+ * bassEnvelope` product (used by every `getBassNoteStyle` branch, including
+ * `quarter`'s own — search `style === 'quarter'` inside that function, it
+ * DOES have dedicated handling, contrary to an earlier draft of this
+ * comment), the two return sites in `bass-engine.ts` that bypass `result()`
+ * entirely, and the generic candidate-picking fallback quarter also reaches
+ * for most positions. One gate site, not a per-branch patch.
+ *
+ * 'quarter' (jazz walking): a walking line's drive comes from note-length
+ * consistency and the quarter pulse, not level accents — a systematic
+ * backbeat accent is a rock/backbeat trait, off-idiom here.
+ *
+ * 'bossa': `getBassNoteStyle`'s bossa branch (below) never reaches the
+ * OUTER generic candidate-picking code in `bass-engine.ts` (its one
+ * `return null;`, for a step outside its four foundation positions, is dead
+ * in production — `checkBassActiveStyle`'s bossa gate only ever calls
+ * `getBassNote` on exactly those same four positions: 0/6/8/14 in 4/4, the
+ * pulse-start/pickup slots in compound). BUT every one of those foundation
+ * notes is built by calling `result(...)` — the SAME `result` closure
+ * `getBassNote` defines and passes down as a context argument, which still
+ * multiplies `velocityParam * velocity * intensityFactor * bassEnvelope` —
+ * so the shared `velocity` (this gate) DOES reach every bossa note, just
+ * through that shared closure rather than the generic fallback. Verified
+ * empirically: pre-fix, the "& of 2/4" anticipation notes (odd `intBeat`,
+ * authored quieter at `1.0 + intensity*0.15`) picked up the spurious ×1.15
+ * accent while the "1/3" downbeat anchors (even `intBeat`, authored louder
+ * at `1.1 + intensity*0.1`) did not — inverting bossa's intended
+ * downbeat-anchor-over-anticipation hierarchy at every intensity where the
+ * pair isn't railed at `BASS_VELOCITY_DOMAIN_MAX` (both saturate and read
+ * equal above roughly intensity 0.88 — #1331's clamp, not this gate's
+ * business). This gate restores the ordering below that ceiling.
+ */
+export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
+
+/**
  * Type-guard returning true only when nextChord represents an actual chord
  * change vs the current chord — i.e. the bass target on the next bar is
  * different from now.
