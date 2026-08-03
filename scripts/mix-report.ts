@@ -20,6 +20,7 @@ import {
     formatRenderedMixReport,
     MIX_REPORT_STEMS,
     parseEnsembleAuditInput,
+    parseExternalScenes,
     resolveMixReportCliOptions,
     selectMixReportScenes,
 } from './mix-report-utils.js';
@@ -1374,8 +1375,16 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
     const cliOptions = resolveMixReportCliOptions(argv);
     const machineReadable = cliOptions.json || cliOptions.jsonl;
     const log = machineReadable ? process.stderr : process.stdout;
+    if (cliOptions.scenesFrom && (cliOptions.sceneIds.length > 0 || cliOptions.focusFrom)) {
+        throw new Error('--scenes-from is mutually exclusive with --scene/--scenes/--focus-from');
+    }
     const focusInput = await loadFocusInput(cliOptions.focusFrom, cliOptions.focusLimit);
-    const scenes = resolveScenes(cliOptions, focusInput);
+    const scenes = cliOptions.scenesFrom
+        ? parseExternalScenes(
+              await readFile(path.resolve(REPO_ROOT, cliOptions.scenesFrom), 'utf8'),
+              cliOptions.scenesFrom,
+          )
+        : resolveScenes(cliOptions, focusInput);
     const { seeds, source } = resolveSeeds(cliOptions, focusInput);
 
     if (!cliOptions.noBuild) {

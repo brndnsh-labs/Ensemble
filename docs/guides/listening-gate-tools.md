@@ -35,6 +35,31 @@ RMS in dB (`loopDb` column) and an `arc` classification: `flat` (under
 old default render of a single loop was silently testing only the
 "Loop 0" head behavior — this surfaces the rest of the architecture.
 
+### `--scenes-from=<file.json>` — render externally supplied scenes
+
+Renders a JSON array of scene objects (shaped like the `DEFAULT_MIX_REPORT_SCENES`
+entries in `scripts/mix-report-utils.ts`) instead of the built-in catalog.
+Required per scene: `id`, `genreFeel`, `bpm`, `key`, and a non-empty `sections`
+array whose entries carry a `value` progression string (`'A7 | D7 | …'`).
+`label` defaults to the id, `intensity`/`complexity` to 0.7/0.6,
+`drumPreset` to `Basic Rock`, `timeSignature` to `4/4`; `findingThresholds`
+falls back to the genre-agnostic defaults. Unknown fields pass through
+untouched, so an external spec's own metadata rides along. Mutually exclusive
+with `--scene`/`--scenes`/`--focus-from`.
+
+This is the fixture-factory entry point for the songsiknow analysis harness
+(#1349): combined with `--write-wav` + `--write-events` it renders per-stem
+audio whose musical truth (the event stream + the scene spec) is known by
+construction. Note the render is *musically* deterministic per seed — the
+events JSON is byte-identical across runs — but WAVs can differ by ±2 LSB of
+int16 (OfflineAudioContext float jitter), so fixture consumers should
+render-once-and-freeze rather than re-render and expect byte equality.
+
+```bash
+npm run mix:report -- --scenes-from=/path/to/scenes.json \
+  --write-wav=tmp/fixtures --write-events=tmp/fixtures --seeds=FIXTURE_1
+```
+
 ## `npm run --silent mix:diff -- before.json after.json`
 
 Compares two `mix:report --json` outputs and surfaces stems whose

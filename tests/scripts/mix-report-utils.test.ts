@@ -7,6 +7,7 @@ import {
     formatCohesionReport,
     formatRenderedMixReport,
     parseEnsembleAuditInput,
+    parseExternalScenes,
     resolveMixReportCliOptions,
     selectMixReportScenes,
     summarizeRenderedFindings,
@@ -80,6 +81,95 @@ describe('mix report utilities', () => {
         expect(() => selectMixReportScenes(DEFAULT_MIX_REPORT_SCENES, ['missing-scene'])).toThrow(
             'Unknown mix report scene: missing-scene',
         );
+
+        expect(defaults.scenesFrom).toBeNull();
+        const external = resolveMixReportCliOptions(['--scenes-from=fixtures/scenes.json']);
+        expect(external.scenesFrom).toBe('fixtures/scenes.json');
+    });
+
+    it('parses external scenes with defaults applied and metadata passed through', () => {
+        const scenes = parseExternalScenes(
+            JSON.stringify([
+                {
+                    id: 'blues-a-shuffle',
+                    genreFeel: 'Blues',
+                    drumPreset: 'Blues Shuffle',
+                    bpm: 120,
+                    key: 'A',
+                    timeSignature: '4/4',
+                    seedNote: 'fixture metadata rides along',
+                    sections: [
+                        {
+                            value: 'A7 | D7 | A7 | A7 | D7 | D7 | A7 | A7 | E7 | D7 | A7 | E7',
+                        },
+                    ],
+                },
+            ]),
+            'scenes.json',
+        );
+
+        expect(scenes).toHaveLength(1);
+        const scene = scenes[0];
+        expect(scene.label).toBe('blues-a-shuffle');
+        expect(scene.intensity).toBe(0.7);
+        expect(scene.complexity).toBe(0.6);
+        expect(scene.timeSignature).toBe('4/4');
+        expect(scene.seedNote).toBe('fixture metadata rides along');
+        expect(scene.sections[0].id).toBe('blues-a-shuffle-s0');
+        expect(scene.sections[0].value).toContain('A7 | D7');
+
+        const explicit = parseExternalScenes(
+            JSON.stringify([
+                {
+                    id: 'x',
+                    label: 'Custom Label',
+                    genreFeel: 'Rock',
+                    bpm: 100,
+                    key: 'C',
+                    intensity: 0.9,
+                    sections: [{ id: 'keep-me', value: 'C | G' }],
+                },
+            ]),
+        );
+        expect(explicit[0].label).toBe('Custom Label');
+        expect(explicit[0].intensity).toBe(0.9);
+        expect(explicit[0].sections[0].id).toBe('keep-me');
+    });
+
+    it('rejects malformed external scene files with located errors', () => {
+        expect(() => parseExternalScenes('not json', 'bad.json')).toThrow('bad.json: not valid');
+        expect(() => parseExternalScenes('{}', 'bad.json')).toThrow(
+            'expected a non-empty JSON array',
+        );
+        expect(() => parseExternalScenes('[]', 'bad.json')).toThrow(
+            'expected a non-empty JSON array',
+        );
+        expect(() =>
+            parseExternalScenes(JSON.stringify([{ genreFeel: 'Blues', bpm: 120 }]), 'bad.json'),
+        ).toThrow('scene[0] needs a non-empty string "id"');
+        expect(() =>
+            parseExternalScenes(
+                JSON.stringify([{ id: 's', genreFeel: 'Blues', key: 'A', sections: [] }]),
+            ),
+        ).toThrow('positive numeric "bpm"');
+        expect(() =>
+            parseExternalScenes(
+                JSON.stringify([{ id: 's', genreFeel: 'Blues', bpm: 90, key: 'A', sections: [] }]),
+            ),
+        ).toThrow('non-empty "sections" array');
+        expect(() =>
+            parseExternalScenes(
+                JSON.stringify([
+                    {
+                        id: 's',
+                        genreFeel: 'Blues',
+                        bpm: 90,
+                        key: 'A',
+                        sections: [{ value: '   ' }],
+                    },
+                ]),
+            ),
+        ).toThrow('section[0] needs a non-empty string "value"');
     });
 
     it('parses symbolic focus input from JSON and JSONL payloads', () => {

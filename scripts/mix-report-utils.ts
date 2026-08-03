@@ -364,6 +364,11 @@ export function resolveMixReportCliOptions(argv = []) {
         jsonl: readBooleanOption(options, 'jsonl', false),
         pretty: readBooleanOption(options, 'pretty', false),
         focusFrom: readStringOption(options, 'focus-from', '') || null,
+        // `--scenes-from=<file.json>` → render externally supplied scenes (a JSON
+        // array of scene objects) instead of the built-in catalog. The fixture
+        // path songsiknow's analysis harness renders known-truth audio through
+        // (#1349). Mutually exclusive with `--scene`/`--scenes`/`--focus-from`.
+        scenesFrom: readStringOption(options, 'scenes-from', '') || null,
         focusLimit: Math.max(1, Math.floor(readNumberOption(options, 'focus-limit', 3))),
         noBuild: readBooleanOption(options, 'no-build', false),
         writeWav: readStringOption(options, 'write-wav', '') || null,
@@ -569,6 +574,77 @@ export function selectMixReportScenes(scenes, requestedIds = []) {
     });
 
     return selected;
+}
+
+/**
+ * Parse a `--scenes-from` file: a JSON array of scene objects shaped like the
+ * `DEFAULT_MIX_REPORT_SCENES` entries. Validates only what the renderer would
+ * otherwise fail on silently (a scene with no progression renders zero-length
+ * audio; a missing bpm schedules NaN note times) and passes every other field
+ * through untouched, so external specs can carry their own metadata (a truth
+ * compiler's fields ride along unmolested). `findingThresholds` stays optional —
+ * `summarizeRenderedFindings` already falls back to the genre-agnostic defaults.
+ */
+export function parseExternalScenes(text, sourcePath = 'scenes file') {
+    let parsed = null;
+    try {
+        parsed = JSON.parse(String(text || ''));
+    } catch (error) {
+        throw new Error(`${sourcePath}: not valid JSON (${error.message})`);
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error(`${sourcePath}: expected a non-empty JSON array of scene objects`);
+    }
+
+    return parsed.map((scene, index) => {
+        const where = `${sourcePath}: scene[${index}]`;
+        if (!scene || typeof scene !== 'object' || Array.isArray(scene)) {
+            throw new Error(`${where} is not an object`);
+        }
+        const id = typeof scene.id === 'string' ? scene.id.trim() : '';
+        if (!id) {
+            throw new Error(`${where} needs a non-empty string "id"`);
+        }
+        if (!Number.isFinite(scene.bpm) || scene.bpm <= 0) {
+            throw new Error(`${where} ("${id}") needs a positive numeric "bpm"`);
+        }
+        if (typeof scene.key !== 'string' || !scene.key.trim()) {
+            throw new Error(`${where} ("${id}") needs a non-empty string "key"`);
+        }
+        if (typeof scene.genreFeel !== 'string' || !scene.genreFeel.trim()) {
+            throw new Error(`${where} ("${id}") needs a non-empty string "genreFeel"`);
+        }
+        if (!Array.isArray(scene.sections) || scene.sections.length === 0) {
+            throw new Error(`${where} ("${id}") needs a non-empty "sections" array`);
+        }
+        const sections = scene.sections.map((section, sectionIndex) => {
+            if (
+                !section ||
+                typeof section !== 'object' ||
+                typeof section.value !== 'string' ||
+                !section.value.trim()
+            ) {
+                throw new Error(
+                    `${where} ("${id}") section[${sectionIndex}] needs a non-empty string ` +
+                        '"value" (the "|"-separated progression)',
+                );
+            }
+            return {
+                id: `${id}-s${sectionIndex}`,
+                label: `${id} section ${sectionIndex}`,
+                ...section,
+            };
+        });
+
+        return {
+            label: id,
+            intensity: 0.7,
+            complexity: 0.6,
+            ...scene,
+            id,
+            sections,
+        };
+    });
 }
 
 export function parseEnsembleAuditInput(text, options = {}) {
