@@ -575,3 +575,60 @@ describe('#1335 — the generic odd-beat velocity accent respects style idiom', 
         expect(offbeatMean * 1.15).toBeGreaterThan(downbeatMean);
     });
 });
+
+// ---------------------------------------------------------------------------
+// #1340: jazz walking's downbeat no longer inherits the isStraightStyle
+// dynamics accent (rock/disco/neo's `1.0 + intensity*0.25`) — it was masked
+// by #1335's backbeat-accent fix, not caused by it.
+// ---------------------------------------------------------------------------
+describe('#1340 — jazz walking downbeat drops the borrowed isStraightStyle accent', () => {
+    it('the four beat positions read materially more even than the pre-fix ~1.27 spread', () => {
+        // Pre-fix (measured in #1340's filing, 32-bar sim, bandIntensity 0.7):
+        // beat 0/1/2/3 means read 1.275 / 1.018 / 1.115 / 1.098 — a ~25%
+        // max/min spread (beat 0 the clear outlier). The fix drops the extra
+        // `1.0 + intensity*0.25` velocityParam on beat 0's downbeat-slap
+        // return (bass-engine.ts's `isStraightStyle` branch) for 'quarter'
+        // specifically, so beat 0 falls back to velocityParam=1.0 — the same
+        // default every other quarter-note beat in the bar already gets.
+        const bandIntensity = 0.7;
+        const samples = simulateVelocityByParity('quarter', 'Jazz', 32, bandIntensity);
+        const byBeat = [0, 1, 2, 3].map((b) => {
+            const beatSamples = samples.filter((s) => s.intBeat === b);
+            return { beat: b, n: beatSamples.length, mean: meanBy(beatSamples) };
+        });
+        const means = byBeat.map((b) => b.mean);
+        const maxMean = Math.max(...means);
+        const minMean = Math.min(...means);
+        const spread = maxMean / minMean;
+
+        console.log(
+            [
+                '',
+                '--- #1340 JAZZ WALKING PER-BEAT VELOCITY (all 4 beats) ---',
+                ...byBeat.map((b) => `[beat ${b.beat}]  n=${b.n}  mean=${b.mean.toFixed(4)}`),
+                `[max/min spread]  ${spread.toFixed(4)} (pre-fix measured: ~1.27)`,
+                '-----------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        for (const b of byBeat) {
+            expect(b.n).toBeGreaterThan(15);
+        }
+        // why: pre-fix spread measured ~1.27 (beat 0 the outlier, carrying the
+        // borrowed rock/disco/neo downbeat accent on top of the shared
+        // genre-neutral bassEnvelope swell every strong beat already gets).
+        // 1.15 leaves real headroom above the fix's actual result while still
+        // catching a full regression back to the old accent.
+        expect(spread).toBeLessThan(1.15);
+        // why: mutation check — reconstructs what beat 0 would read with the
+        // OLD extra `1.0 + intensity*0.25` velocityParam re-applied (a simple
+        // ratio against the new flat 1.0, since velocityParam is the sole
+        // factor this fix changed — every other term in `result()`'s product
+        // is identical), confirming the reconstructed spread would have
+        // failed the ceiling above (not a vacuous assertion).
+        const beat0Mean = byBeat[0].mean;
+        const otherMin = Math.min(...byBeat.slice(1).map((b) => b.mean));
+        const oldBeat0Mean = beat0Mean * (1.0 + bandIntensity * 0.25);
+        expect(oldBeat0Mean / otherMin).toBeGreaterThan(1.15);
+    });
+});

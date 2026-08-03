@@ -1308,7 +1308,30 @@ export function getBassNote(
             // fix. The One is not "the loudest thing in the bar" the issue
             // pictured; that needs a funk-specific accent profile (1&3 over
             // 2&4), a design call beyond this story's scope — filed as #1342.
-            style === 'funk' ? BASS_AUTHORING_CEILING + intensity * 0.2 : 1.0 + intensity * 0.25,
+            //
+            // #1340: 'quarter' (jazz walking) gets flat 1.0 here, not the
+            // `1.0 + intensity*0.25` rock/disco/neo share. `isStraightStyle`
+            // is reused above purely to decide which styles emit their
+            // downbeat through THIS branch (a rhythmic/entry-gate question);
+            // this velocity literal is a separate, dynamics-only decision,
+            // and jazz walking's drive is note-length + the quarter pulse,
+            // not a downbeat accent — same reasoning #1335 already applied to
+            // the generic backbeat accent (`EVEN_ACCENT_BASS_STYLES`). Every
+            // OTHER quarter-note step in the bar already reaches `result()`
+            // (via `getBassNoteStyle`, downstream of this early-return) at
+            // 1.0 or an intentionally SOFTER literal (path/pickup notes are
+            // `velocity * 0.9`/`0.85` in `bass-styles.ts`) — never a boosted
+            // one — so 1.0 here just makes the downbeat consistent with the
+            // rest of the walking line, not louder than any of it. It
+            // still gets the genre-neutral +5% strong-beat swell from
+            // `bassEnvelope` (`#1006`, `isStrongBeatB` above), same as every
+            // other style's downbeat. rock/disco/neo are unchanged pending a
+            // by-ear call on whether they want this too (out of scope here).
+            style === 'funk'
+                ? BASS_AUTHORING_CEILING + intensity * 0.2
+                : style === 'quarter'
+                  ? 1.0
+                  : 1.0 + intensity * 0.25,
         );
     }
 
