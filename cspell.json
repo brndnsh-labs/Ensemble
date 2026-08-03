@@ -413,7 +413,10 @@
         "emptively",
         "licence",
         "unasserted",
-        "unreviewable"
+        "unreviewable",
+        "pointerdown",
+        "touchend",
+        "focusout"
     ],
     "ignorePaths": ["node_modules", "dist", "coverage", ".git", "scripts/*.mjs"]
 }
