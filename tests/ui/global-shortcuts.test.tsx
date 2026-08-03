@@ -4,7 +4,6 @@
  */
 
 import { render } from 'preact';
-import React from 'preact/compat';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalShortcuts } from '../../public/components/GlobalShortcuts.jsx';
 import { ACTIONS } from '../../public/types.js';

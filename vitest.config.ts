@@ -1,5 +1,5 @@
 import preact from '@preact/preset-vite';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [preact()],
@@ -24,17 +24,6 @@ export default defineConfig({
                 'public/App.tsx',
             ],
         },
-        exclude: [
-            '**/node_modules/**',
-            '**/dist/**',
-            '**/test-dist/**',
-            '**/cypress/**',
-            '**/.{idea,git,cache,output,temp}/**',
-            '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,playwright}.config.*',
-            'tests/e2e/**',
-            'tests/browser/**',
-            'tests/bench/**',
-            undefined,
-        ],
+        exclude: [...configDefaults.exclude, 'tests/e2e/**', 'tests/browser/**', 'tests/bench/**'],
     },
 });

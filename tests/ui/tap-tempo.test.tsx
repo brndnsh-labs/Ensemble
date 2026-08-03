@@ -4,7 +4,6 @@
  */
 
 import { render } from 'preact';
-import React from 'preact/compat';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Transport } from '../../public/components/Transport.jsx';
 import { dispatch, getState } from '../../public/state.js';

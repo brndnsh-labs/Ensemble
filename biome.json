@@ -15,7 +15,6 @@
         "formatter": {
             "quoteStyle": "single"
         },
-        "jsxRuntime": "reactClassic",
         "globals": [
             "__APP_VERSION__",
             "__BUILD_REV__",
@@ -55,9 +54,7 @@
             "WaveShaperNode",
             "DynamicsCompressorNode",
             "GainNode",
-            "OscillatorNode",
-            "h",
-            "Fragment"
+            "OscillatorNode"
         ]
     },
     "linter": {

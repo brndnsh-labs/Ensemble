@@ -8,6 +8,7 @@
         "jsxImportSource": "preact",
         "noEmit": true,
         "strict": true,
+        "erasableSyntaxOnly": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
         "paths": {
