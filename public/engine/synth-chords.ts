@@ -213,7 +213,13 @@ function playSampledChord(
     // synth voice. The lift is catalog-owned (`gainForPack`, #656) — calibrated
     // against the synth baseline via `mix-report --calibrate-pack` and paired with
     // the SYNTH_CHORD_LEVEL trim. The bus limiter catches peaks on dense chords.
-    const velocity = Math.min(1, (vol / Math.sqrt(numVoices)) * gainForPack(packId));
+    // #1338: was `Math.min(1, …)` — the chords lane carries the catalog's
+    // highest-gain packs (grand piano 8, hammond 6.6, clavinet/rhodes 4.5,
+    // e-guitar-rhythm 4.2), and the `/sqrt(numVoices)` divisor pushed the
+    // saturation point even lower (a 4-note grand voicing clipped past
+    // vol ≈ 0.25). Same trap as #1332 (soloist) and #660 (bass); defer to
+    // playSampledNote's MAX_SAMPLE_PEAK envelope ceiling instead.
+    const velocity = (vol / Math.sqrt(numVoices)) * gainForPack(packId);
     // Return the voice handle so the scheduler can release this voicing when the
     // harmony changes (#691) — sustained packs hold flat and would otherwise ring
     // into the next chord.
