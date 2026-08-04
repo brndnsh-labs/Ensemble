@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+    ATTENUATED_LEVEL_SCALE,
     CLICK_DISCONTINUITY,
     detectOnsets,
+    effectiveLevel,
     formatVerificationTable,
     groupSimultaneous,
     isPitchResolvable,
@@ -521,5 +523,208 @@ describe('audio-verify — output discipline', () => {
         for (const verdict of ['sounds good', 'sounds right', 'all good', 'looks good', 'passed']) {
             expect(table).not.toContain(verdict);
         }
+    });
+});
+
+describe('audio-verify — effective level & intended attenuation (#1351)', () => {
+    // Eight audible attacks whose FINAL scalar (renderVelocity) varies while the
+    // authored velocity is deliberately flat — only the audit field can explain
+    // the rendered dynamics.
+    function buildRenderVelocityEvents(): ScheduledEvent[] {
+        const renderVelocities = [1.0, 0.45, 0.85, 0.5, 0.95, 0.4, 0.75, 0.6];
+        return renderVelocities.map((renderVelocity, index) => ({
+            track: 'bass',
+            time: META.leadInSeconds + index * 2 * META.stepSeconds,
+            midi: 45,
+            duration: 0.2,
+            renderVelocity,
+        }));
+    }
+
+    it('effectiveLevel prefers renderVelocity over velocity and applies levelScale', () => {
+        expect(effectiveLevel({ track: 'bass', time: 0, midi: 45 })).toBeNull();
+        expect(effectiveLevel({ track: 'bass', time: 0, midi: 45, velocity: 0.8 })).toBe(0.8);
+        expect(
+            effectiveLevel({
+                track: 'bass',
+                time: 0,
+                midi: 45,
+                velocity: 0.8,
+                renderVelocity: 0.6,
+            }),
+        ).toBe(0.6);
+        expect(
+            effectiveLevel({
+                track: 'bass',
+                time: 0,
+                midi: 45,
+                renderVelocity: 0.8,
+                levelScale: 0.15,
+            }),
+        ).toBeCloseTo(0.12, 10);
+    });
+
+    it('velocityPeakR: no level at all is NOT VERIFIABLE; renderVelocity alone makes it real', () => {
+        // Mutation 6b, both directions: omit the final velocity → the metric must
+        // refuse; carry it → the metric must exist and track the render.
+        const bare = buildRenderVelocityEvents().map(({ renderVelocity, ...event }) => event);
+        const bareResult = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples: renderEvents(bare, {
+                amplitudes: buildRenderVelocityEvents().map((e) => e.renderVelocity as number),
+            }),
+            events: bare,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(bareResult.velocityPeakR).toBeNull();
+        expect(bareResult.notVerifiable.velocityPeakR).toMatch(
+            /neither velocity nor renderVelocity/,
+        );
+
+        const carried = buildRenderVelocityEvents();
+        const carriedResult = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples: renderEvents(carried, {
+                amplitudes: carried.map((e) => e.renderVelocity as number),
+            }),
+            events: carried,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(carriedResult.velocityPeakR ?? 0).toBeGreaterThan(0.9);
+    });
+
+    it('a silent palm-muted attack lands in quietAttenuated and leaves the match-rate denominator', () => {
+        const events = buildRenderVelocityEvents();
+        // Two extra attacks the render omits entirely: both carry a healthy
+        // renderVelocity, but only the palm-muted one is *marked* attenuated.
+        const muted: ScheduledEvent = {
+            track: 'bass',
+            time: META.leadInSeconds + 9 * META.stepSeconds,
+            midi: 45,
+            renderVelocity: 0.8,
+            levelScale: 0.15,
+        };
+        const all = [...events, muted];
+        const result = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples: renderEvents(events, {
+                amplitudes: events.map((e) => e.renderVelocity as number),
+            }),
+            events: all,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.quietAttenuated).toHaveLength(1);
+        expect(result.quietAttenuated[0].step).toBe(9);
+        expect(result.missed).toHaveLength(0);
+        // 8 audible of (9 groups − 1 intended-quiet) — the chuck is not a failure.
+        expect(result.matchRate).toBeCloseTo(1.0, 10);
+        expect(formatVerificationTable([result], META)).toContain('QUIET (intended, unverifiable)');
+    });
+
+    it('an unattenuated dropped note still reads MISSED — the quiet bucket cannot hide real drops', () => {
+        // Mutation 6c, over-reach direction: if the attenuation exemption were any
+        // looser, a genuinely dropped open note would vanish into the quiet bucket.
+        const events = buildRenderVelocityEvents();
+        const dropped: ScheduledEvent = {
+            track: 'bass',
+            time: META.leadInSeconds + 9 * META.stepSeconds,
+            midi: 45,
+            renderVelocity: 0.8,
+        };
+        const result = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples: renderEvents(events, {
+                amplitudes: events.map((e) => e.renderVelocity as number),
+            }),
+            events: [...events, dropped],
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.quietAttenuated).toHaveLength(0);
+        expect(result.missed).toHaveLength(1);
+        expect(result.matchRate).toBeCloseTo(8 / 9, 10);
+    });
+
+    it('ATTENUATED_LEVEL_SCALE brackets: at the threshold is attenuated, just above is not', () => {
+        const at = groupSimultaneous(
+            [
+                {
+                    track: 'bass',
+                    time: 1.0,
+                    midi: 45,
+                    renderVelocity: 0.8,
+                    levelScale: ATTENUATED_LEVEL_SCALE,
+                },
+            ],
+            META,
+        );
+        const above = groupSimultaneous(
+            [
+                {
+                    track: 'bass',
+                    time: 1.0,
+                    midi: 45,
+                    renderVelocity: 0.8,
+                    levelScale: ATTENUATED_LEVEL_SCALE + 0.01,
+                },
+            ],
+            META,
+        );
+        expect(at[0].attenuated).toBe(true);
+        expect(above[0].attenuated).toBe(false);
+    });
+
+    it('a cluster is intended-quiet only when every leveled member is', () => {
+        const groups = groupSimultaneous(
+            [
+                { track: 'bass', time: 1.0, midi: 45, renderVelocity: 0.8, levelScale: 0.15 },
+                { track: 'bass', time: 1.001, midi: 57, renderVelocity: 0.8 },
+            ],
+            META,
+        );
+        expect(groups).toHaveLength(1);
+        expect(groups[0].attenuated).toBe(false);
+    });
+
+    it('attacks rows carry per-attack rendered evidence for every scheduled group', () => {
+        const events = buildRenderVelocityEvents();
+        const result = verifyStem({
+            stemId: 'bass',
+            tracks: ['bass'],
+            samples: renderEvents(events, {
+                amplitudes: events.map((e) => e.renderVelocity as number),
+            }),
+            events,
+            meta: META,
+            pitched: true,
+            singleLane: true,
+            outputLatencyMs: 0,
+        });
+        expect(result.attacks).toHaveLength(result.expectedAttacks);
+        for (const row of result.attacks) {
+            expect(Number.isFinite(row.riseDb)).toBe(true);
+            expect(Number.isFinite(row.peak)).toBe(true);
+            expect(row.level).not.toBeNull();
+        }
+        // The louder scheduled attack must show the larger rendered peak — the
+        // grouped-position relationship a story asserts against (#1351 accept. 4).
+        const loudest = result.attacks.reduce((a, b) => ((a.level ?? 0) > (b.level ?? 0) ? a : b));
+        const quietest = result.attacks.reduce((a, b) => ((a.level ?? 1) < (b.level ?? 1) ? a : b));
+        expect(loudest.peak).toBeGreaterThan(quietest.peak);
     });
 });

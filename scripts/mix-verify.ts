@@ -38,13 +38,142 @@ import {
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 
+/**
+ * One generated note as the engine *intended* it — snapshotted from the lane
+ * buffers before the scheduler consumes them (#1351). `time` is grid time
+ * (lead-in + absoluteStep · step), pre-humanization by construction.
+ */
+export interface IntentEvent {
+    track: string;
+    /** Loop-relative step (the buffer key). */
+    step: number;
+    /** loopIndex · stepsPerLoop + step — the render-absolute position. */
+    absoluteStep: number;
+    time: number;
+    midi: number;
+    durationSteps?: number;
+    /** Authored velocity, before conductor/humanization. */
+    velocity?: number;
+    /** The lane's mute payload verbatim: boolean sentinel or numeric palm-mute. */
+    muted?: number | boolean;
+}
+
 interface EventDump {
     scene: string;
     stem: string;
     seed: string;
     tracks: string[];
     meta: RenderMeta;
+    /** Compatibility alias for `dispatchEvents` — older dumps carry only this. */
     events: Array<ScheduledEvent & { velocity: number | null }>;
+    /** Post-humanization scheduler tap, with the #1351 audit fields. */
+    dispatchEvents?: Array<ScheduledEvent & { velocity: number | null }>;
+    /** Pre-consumption note-buffer snapshot; absent on dumps from older renders. */
+    intentEvents?: IntentEvent[];
+}
+
+/** The intent → dispatch reconciliation for one stem (#1351). */
+export interface IntentParity {
+    verifiable: boolean;
+    reason?: string;
+    intentCount: number;
+    matchedCount: number;
+    /** Intents no dispatch accounted for — each one is a note the scheduler dropped. */
+    missing: IntentEvent[];
+    /** How many of `missing` are boolean-sentinel ghosts (the #1299 class). */
+    missingSentinelMuted: number;
+    /** Dispatches with no matching intent — informational, not a parity failure. */
+    extraDispatches: number;
+}
+
+/**
+ * Exact existence parity: every pitched intent must surface as a dispatch with the
+ * same track + midi in the same step bin (±1 bin absorbs humanization/swing, which
+ * are bounded well under a step). CC-only carriers (`midi: 0`) are deliberately
+ * excluded — they are not notes, and counting them would fabricate parity failures
+ * on every sustain-pedal step. Drums never enter the pitched lane buffers, so a
+ * drums-only stem reports NOT VERIFIABLE rather than fabricated intent.
+ */
+export function verifyIntentParity(
+    intents: IntentEvent[],
+    dispatches: ScheduledEvent[],
+    meta: RenderMeta,
+    tracks: string[],
+): IntentParity {
+    const pitchedTracks = tracks.filter((track) => track !== 'drums');
+    if (pitchedTracks.length === 0) {
+        return {
+            verifiable: false,
+            reason: 'drums never enter the pitched note buffers — no intent stream exists',
+            intentCount: 0,
+            matchedCount: 0,
+            missing: [],
+            missingSentinelMuted: 0,
+            extraDispatches: 0,
+        };
+    }
+
+    const binOf = (time: number): number =>
+        Math.round((time - meta.leadInSeconds) / meta.stepSeconds);
+    const keyOf = (track: string, bin: number, midi: number): string => `${track}:${bin}:${midi}`;
+
+    const pool = new Map<string, number>();
+    let poolSize = 0;
+    for (const event of dispatches) {
+        if (!pitchedTracks.includes(event.track) || !(event.midi > 0)) {
+            continue;
+        }
+        const key = keyOf(event.track, binOf(event.time), event.midi);
+        pool.set(key, (pool.get(key) ?? 0) + 1);
+        poolSize++;
+    }
+
+    const considered = intents.filter(
+        (intent) => pitchedTracks.includes(intent.track) && intent.midi > 0,
+    );
+    // Two passes, exact bin first: a single greedy pass let an intent whose exact
+    // bin was empty (a sentinel ghost, typically) STEAL a neighboring bin's
+    // dispatch through the ±1 fallback before that bin's own intent claimed it —
+    // measured on funk-pocket/chords as 54 false missing/matched pairs. The
+    // fallback only runs for intents nothing exact-matched.
+    const takeFrom = (intent: IntentEvent, bins: number[]): boolean => {
+        for (const bin of bins) {
+            const key = keyOf(intent.track, bin, intent.midi);
+            const count = pool.get(key) ?? 0;
+            if (count > 0) {
+                pool.set(key, count - 1);
+                poolSize--;
+                return true;
+            }
+        }
+        return false;
+    };
+    const missing: IntentEvent[] = [];
+    let matchedCount = 0;
+    const fuzzyQueue: IntentEvent[] = [];
+    for (const intent of considered) {
+        if (takeFrom(intent, [intent.absoluteStep])) {
+            matchedCount++;
+        } else {
+            fuzzyQueue.push(intent);
+        }
+    }
+    for (const intent of fuzzyQueue) {
+        if (takeFrom(intent, [intent.absoluteStep - 1, intent.absoluteStep + 1])) {
+            matchedCount++;
+        } else {
+            missing.push(intent);
+        }
+    }
+
+    return {
+        verifiable: true,
+        intentCount: considered.length,
+        matchedCount,
+        missing,
+        missingSentinelMuted: missing.filter((intent) => intent.muted === true).length,
+        extraDispatches: poolSize,
+    };
 }
 
 export interface MixVerifyOptions {
@@ -54,6 +183,10 @@ export interface MixVerifyOptions {
     seed: string | null;
     keep: string | null;
     noBuild: boolean;
+    /** Print the full structured results as JSON instead of the text table (#1351). */
+    json: boolean;
+    /** Forwarded to mix:report — render externally supplied scenes (#1349). */
+    scenesFrom: string | null;
 }
 
 export function parseMixVerifyArgs(argv: string[]): MixVerifyOptions {
@@ -64,10 +197,16 @@ export function parseMixVerifyArgs(argv: string[]): MixVerifyOptions {
         seed: null,
         keep: null,
         noBuild: false,
+        json: false,
+        scenesFrom: null,
     };
     for (const arg of argv) {
         if (arg === '--no-build') {
             options.noBuild = true;
+        } else if (arg === '--json') {
+            options.json = true;
+        } else if (arg.startsWith('--scenes-from=')) {
+            options.scenesFrom = arg.slice('--scenes-from='.length);
         } else if (arg.startsWith('--scene=')) {
             options.scene = arg.slice('--scene='.length);
         } else if (arg.startsWith('--stems=')) {
@@ -165,6 +304,9 @@ function runMixReport(outDir: string, options: MixVerifyOptions): void {
     if (options.scene) {
         args.push(`--scene=${options.scene}`);
     }
+    if (options.scenesFrom) {
+        args.push(`--scenes-from=${options.scenesFrom}`);
+    }
     if (options.seed) {
         args.push(`--seed=${options.seed}`);
     }
@@ -190,13 +332,47 @@ function runMixReport(outDir: string, options: MixVerifyOptions): void {
 
 /** Dump events → the analysis module's shape (its optionals are `undefined`, not `null`). */
 function toScheduledEvents(dump: EventDump): ScheduledEvent[] {
-    return dump.events.map((event) => ({
+    return (dump.dispatchEvents ?? dump.events).map((event) => ({
         track: event.track,
         time: event.time,
         midi: event.midi,
         duration: event.duration ?? undefined,
         velocity: event.velocity ?? undefined,
+        renderVelocity: event.renderVelocity ?? undefined,
+        levelScale: event.levelScale ?? undefined,
     }));
+}
+
+function verifyDumpParity(dump: EventDump): IntentParity {
+    if (!dump.intentEvents) {
+        return {
+            verifiable: false,
+            reason: 'event dump predates intent capture — re-render with current mix:report',
+            intentCount: 0,
+            matchedCount: 0,
+            missing: [],
+            missingSentinelMuted: 0,
+            extraDispatches: 0,
+        };
+    }
+    return verifyIntentParity(dump.intentEvents, toScheduledEvents(dump), dump.meta, dump.tracks);
+}
+
+function formatParityLine(stemId: string, parity: IntentParity): string {
+    if (!parity.verifiable) {
+        return `${stemId.padEnd(14)} NOT VERIFIABLE — ${parity.reason}`;
+    }
+    const ghosts =
+        parity.missingSentinelMuted > 0
+            ? ` (${parity.missingSentinelMuted} sentinel-muted ghost${parity.missingSentinelMuted === 1 ? '' : 's'})`
+            : '';
+    const extras = parity.extraDispatches > 0 ? `  extra ${parity.extraDispatches}` : '';
+    const verdict =
+        parity.missing.length === 0 ? 'exact' : `MISSING ${parity.missing.length}${ghosts}`;
+    return (
+        `${stemId.padEnd(14)} intents ${String(parity.intentCount).padStart(4)}  ` +
+        `matched ${String(parity.matchedCount).padStart(4)}  ${verdict}${extras}`
+    );
 }
 
 export function verifyDump(
@@ -284,6 +460,30 @@ async function main(argv: string[]): Promise<void> {
         const results: StemVerification[] = shown.map(({ dump, samples }) =>
             verifyDump(dump, samples, sharedLatencyMs),
         );
+        const parities: IntentParity[] = shown.map(({ dump }) => verifyDumpParity(dump));
+
+        if (options.json) {
+            // The machine-readable path (#1351): everything the table shows, plus
+            // the per-attack evidence rows, so a story can group musical positions
+            // and assert rendered relationships without scraping text.
+            process.stdout.write(
+                `${JSON.stringify(
+                    {
+                        scenes: [...new Set(shown.map(({ dump }) => dump.scene))],
+                        stems: results.map((result, index) => ({
+                            ...result,
+                            intentParity: parities[index],
+                        })),
+                    },
+                    null,
+                    2,
+                )}\n`,
+            );
+            if (options.keep) {
+                process.stderr.write(`Render artifacts kept in ${outDir}\n`);
+            }
+            return;
+        }
 
         // Scene geometry differs per scene, so a bare multi-scene run would print
         // every row under one scene's bpm/step size. Rows are scene-qualified; the
@@ -300,6 +500,16 @@ async function main(argv: string[]): Promise<void> {
             );
         } else {
             process.stdout.write(`${formatVerificationTable(results, meta)}\n`);
+        }
+
+        // Stage 1 of the two-stage claim (#1351): did every generated note reach
+        // dispatch at all? Printed after the rendered-audio table because a parity
+        // failure explains the table (a note missing here can't have sounded).
+        process.stdout.write('\nintent → dispatch (existence parity, pre-render):\n');
+        for (const [index, { dump }] of shown.entries()) {
+            process.stdout.write(
+                `${formatParityLine(`${dump.scene}/${dump.stem}`, parities[index])}\n`,
+            );
         }
         if (options.keep) {
             process.stdout.write(`Render artifacts kept in ${outDir}\n`);

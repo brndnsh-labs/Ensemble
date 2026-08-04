@@ -23,9 +23,41 @@ export interface ScheduledEvent {
     time: number;
     midi: number;
     duration?: number;
-    /** Absent on lanes whose visualizer payload omits it (bass/soloist/harmony today). */
+    /** Absent on lanes whose visualizer payload omits it (drums/chords carry it today). */
     velocity?: number;
+    /**
+     * The exact final scalar the voice received — post-conductor, post-humanization
+     * (#1351). Preferred over `velocity` when present: it is the level the render
+     * was actually asked to produce.
+     */
+    renderVelocity?: number;
+    /** Post-articulation linear attenuation (palm-mute gain etc.), default 1 (#1351). */
+    levelScale?: number;
 }
+
+/**
+ * The level the render was asked to produce for one event: the most-final velocity
+ * available, times any articulation attenuation. Null when the lane's payload
+ * carries no velocity at all — the caller must report the gap, not invent a value.
+ */
+export function effectiveLevel(event: ScheduledEvent): number | null {
+    const base = typeof event.renderVelocity === 'number' ? event.renderVelocity : event.velocity;
+    if (typeof base !== 'number') {
+        return null;
+    }
+    return base * (typeof event.levelScale === 'number' ? event.levelScale : 1);
+}
+
+/**
+ * `levelScale` at or below this marks a *deliberately* attenuated articulation. An
+ * attack this quiet that shows no energy rise is reported as intended-quiet, not as
+ * a dropped note — the #1342-review false-negative trap this constant exists to
+ * close. Deliberately tight: the full palm-mute floor is 0.15 (`MUTE_ATTENUATION`
+ * in `mute-contract.ts`), and 0.2 covers it with margin while a half-muted note
+ * (`levelScale 0.5`) — normally clearly audible — still reads MISSED when dropped.
+ * Widening this widens the class of genuinely dropped notes that can hide.
+ */
+export const ATTENUATED_LEVEL_SCALE = 0.2;
 
 /** Render geometry, needed to map seconds back to musical step indices. */
 export interface RenderMeta {
@@ -56,7 +88,30 @@ export interface AttackGroup {
     midis: number[];
     /** Max velocity across the group's events, or null if no event carried one. */
     velocity: number | null;
+    /**
+     * Max *effective* level across the group ({@link effectiveLevel}), or null when
+     * no event carried any velocity. Equals `velocity` on lanes without the #1351
+     * audit fields, so pre-existing dumps read unchanged.
+     */
+    level: number | null;
+    /**
+     * True when every leveled event in the group is deliberately attenuated
+     * (`levelScale ≤ ATTENUATED_LEVEL_SCALE`) — an intended-quiet attack.
+     */
+    attenuated: boolean;
     eventCount: number;
+}
+
+/** One row of per-attack rendered evidence — the JSON a story asserts against (#1351). */
+export interface AttackRow {
+    step: number;
+    time: number;
+    midis: number[];
+    level: number | null;
+    attenuated: boolean;
+    present: boolean;
+    riseDb: number;
+    peak: number;
 }
 
 export interface StemVerification {
@@ -69,6 +124,15 @@ export interface StemVerification {
     /** null when nothing was scheduled — distinct from 0, which means all dropped. */
     matchRate: number | null;
     missed: AttackGroup[];
+    /**
+     * Attacks with no measurable rise whose events are all deliberately attenuated
+     * (`levelScale ≤ ATTENUATED_LEVEL_SCALE`) — intended-quiet, excluded from
+     * `matchRate`'s denominator and reported separately so a palm-muted chuck is
+     * never miscounted as a dropped note (#1351).
+     */
+    quietAttenuated: AttackGroup[];
+    /** Per-attack rendered evidence, one row per scheduled attack group (#1351). */
+    attacks: AttackRow[];
     unscheduled: DetectedOnset[];
     /** Constant graph latency removed before per-note timing is reported. */
     outputLatencyMs: number | null;
@@ -396,12 +460,23 @@ export function groupSimultaneous(
     const sorted = [...events].sort((a, b) => a.time - b.time);
     const groups: AttackGroup[] = [];
     for (const event of sorted) {
+        const level = effectiveLevel(event);
+        const attenuated =
+            level !== null &&
+            typeof event.levelScale === 'number' &&
+            event.levelScale <= ATTENUATED_LEVEL_SCALE;
         const last = groups[groups.length - 1];
         if (last && (event.time - last.time) * 1000 <= epsilonMs) {
             last.midis.push(event.midi);
             last.eventCount++;
             if (typeof event.velocity === 'number') {
                 last.velocity = Math.max(last.velocity ?? 0, event.velocity);
+            }
+            if (level !== null) {
+                last.level = Math.max(last.level ?? 0, level);
+                // A cluster is intended-quiet only if EVERY leveled member is —
+                // one open note beside a chuck means the attack should be heard.
+                last.attenuated = last.attenuated && attenuated;
             }
             continue;
         }
@@ -410,6 +485,8 @@ export function groupSimultaneous(
             step: Math.round((event.time - meta.leadInSeconds) / meta.stepSeconds),
             midis: [event.midi],
             velocity: typeof event.velocity === 'number' ? event.velocity : null,
+            level,
+            attenuated,
             eventCount: 1,
         });
     }
@@ -702,10 +779,24 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
     // contest against neighboring hits (see `measureAttackEvidence`).
     const present: AttackGroup[] = [];
     const missed: AttackGroup[] = [];
+    const quietAttenuated: AttackGroup[] = [];
+    const attacks: AttackRow[] = [];
     const deviations: number[] = [];
     for (const group of groups) {
         const expected = group.time + latencySec;
-        if (measureAttackEvidence(bands, meta.sampleRate, expected).riseDb >= PRESENCE_RISE_DB) {
+        const evidence = measureAttackEvidence(bands, meta.sampleRate, expected);
+        const sounded = evidence.riseDb >= PRESENCE_RISE_DB;
+        attacks.push({
+            step: group.step,
+            time: group.time,
+            midis: group.midis,
+            level: group.level,
+            attenuated: group.attenuated,
+            present: sounded,
+            riseDb: evidence.riseDb,
+            peak: measureAttackPeak(samples, meta.sampleRate, expected),
+        });
+        if (sounded) {
             present.push(group);
             const actual = refineOnsetTime(
                 samples,
@@ -715,6 +806,11 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
                 toleranceMs,
             );
             deviations.push((actual - expected) * 1000);
+        } else if (group.attenuated) {
+            // No rise, but every event was deliberately attenuated (palm-mute
+            // class) — an intended-quiet attack, not a dropped note. Reported in
+            // its own bucket so the presence claim stays honest both ways.
+            quietAttenuated.push(group);
         } else {
             missed.push(group);
         }
@@ -740,14 +836,14 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         // per-band probe. Restricting to single-event attacks was tried and is
         // worse — a funk kit stacks hits on nearly every step, so it deletes the
         // metric entirely rather than narrowing it.
-        const withVelocity = present.filter((group) => group.velocity !== null);
-        if (withVelocity.length < 3) {
+        const withLevel = present.filter((group) => group.level !== null);
+        if (withLevel.length < 3) {
             notVerifiable.velocityPeakR =
-                "fewer than 3 sounded attacks carry velocity (this lane's visualizer payload omits it)";
+                "fewer than 3 sounded attacks carry a level (this lane's payload has neither velocity nor renderVelocity)";
         } else {
             velocityPeakR = pearson(
-                withVelocity.map((group) => group.velocity as number),
-                withVelocity.map((group) =>
+                withLevel.map((group) => group.level as number),
+                withLevel.map((group) =>
                     measureAttackPeak(samples, meta.sampleRate, group.time + latencySec),
                 ),
             );
@@ -828,8 +924,16 @@ export function verifyStem(input: VerifyStemInput): StemVerification {
         // null, not 0, when nothing was scheduled: "0.0%" for an empty lane is
         // visually identical to "every note was dropped", which is the opposite
         // conclusion. Also null for mixed stems, where it is not attributable.
-        matchRate: groups.length > 0 && input.singleLane ? present.length / groups.length : null,
+        // Intended-quiet attacks leave the denominator: an inaudible palm-mute
+        // chuck is not a presence failure, and counting it as one is exactly the
+        // false negative #1351 exists to remove.
+        matchRate:
+            groups.length - quietAttenuated.length > 0 && input.singleLane
+                ? present.length / (groups.length - quietAttenuated.length)
+                : null,
         missed,
+        quietAttenuated,
+        attacks,
         unscheduled,
         outputLatencyMs,
         medianOffsetMs: median(deviations),
@@ -860,7 +964,11 @@ function describeGroup(group: AttackGroup, pitched: boolean): string {
     const name = pitched ? `midi ${first}` : (DRUM_LABELS[first] ?? `midi ${first}`);
     const extra = group.eventCount > 1 ? ` +${group.eventCount - 1}` : '';
     const velocity = group.velocity === null ? '' : `,v${group.velocity.toFixed(2)}`;
-    return `step ${group.step} (${name}${extra}${velocity})`;
+    const level =
+        group.level === null || group.level === group.velocity
+            ? ''
+            : `,lvl${group.level.toFixed(2)}`;
+    return `step ${group.step} (${name}${extra}${velocity}${level})`;
 }
 
 /**
@@ -911,6 +1019,20 @@ export function formatVerificationTable(
                     ? `, +${result.missed.length - missedLimit} more`
                     : '';
             lines.push(`${' '.repeat(11)}MISSED ${shown}${more}`);
+        }
+
+        if (result.quietAttenuated.length > 0) {
+            const shown = result.quietAttenuated
+                .slice(0, missedLimit)
+                .map((group) => describeGroup(group, pitched))
+                .join(', ');
+            const more =
+                result.quietAttenuated.length > missedLimit
+                    ? `, +${result.quietAttenuated.length - missedLimit} more`
+                    : '';
+            // Not counted in the match rate either way: intended-quiet, no rise
+            // measurable — printed so the exclusion is visible, never silent.
+            lines.push(`${' '.repeat(11)}QUIET (intended, unverifiable) ${shown}${more}`);
         }
 
         if (result.unscheduled.length > 0) {

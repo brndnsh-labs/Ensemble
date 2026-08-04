@@ -25,6 +25,17 @@ export interface VisualizerNoteEvent {
     midi: number;
     duration?: number;
     velocity?: number;
+    /**
+     * Audit-only (#1351): the exact final scalar handed to the voice — post-conductor,
+     * post-humanization. `velocity` stays the UI-facing value; verification tooling
+     * (`mix:verify`) reads this one. The visualizer never renders it.
+     */
+    renderVelocity?: number;
+    /**
+     * Audit-only (#1351): post-articulation linear attenuation (`muteGain`), default 1.
+     * Lets the verifier tell an intended-quiet attack from a failed one.
+     */
+    levelScale?: number;
     noteName?: string;
     octave?: number;
     noteType?: string;
@@ -184,6 +195,8 @@ export function createVisualizerNoteEvent(payload: {
     midi: number;
     duration?: number;
     velocity?: number;
+    renderVelocity?: number;
+    levelScale?: number;
     noteName?: string;
     octave?: number;
     noteType?: string;
@@ -208,6 +221,12 @@ export function createVisualizerNoteEvent(payload: {
     }
     if (typeof payload.velocity === 'number') {
         event.velocity = payload.velocity;
+    }
+    if (typeof payload.renderVelocity === 'number') {
+        event.renderVelocity = payload.renderVelocity;
+    }
+    if (typeof payload.levelScale === 'number') {
+        event.levelScale = payload.levelScale;
     }
     if (payload.noteName) {
         event.noteName = payload.noteName;

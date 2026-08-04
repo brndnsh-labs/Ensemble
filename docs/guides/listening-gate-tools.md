@@ -138,6 +138,7 @@ can read directly: it answers audible-fact questions in text, without an ear.
 npm run --silent mix:verify -- --scene=funk-pocket
 npm run --silent mix:verify -- --scene=jazz-ride --stems=bass,drums --loops=2   # --stems filters the REPORT, not the render
 npm run --silent mix:verify -- --scene=rock-backbeat --keep=tmp/ears   # keep WAVs + events
+npm run --silent mix:verify -- --scenes-from=scripts/scenes/funk-bass-ladder.json --stems=bass --loops=1 --json
 ```
 
 It drives one `mix:report --write-wav --write-events` render, then runs the pure
@@ -151,6 +152,30 @@ checks in `scripts/audio-verify.ts` over each stem:
 | median deviation | per-note timing against the grid after latency removal (pocket as a number, not a feel) |
 | vel→peak r | whether the loudest hit of each attack reaches the output at the level its velocity asked for |
 | pitch confirmed | harmonic energy at the expected f0 vs its semitone neighbors (monophonic, resolvable pitches only) |
+| intent → dispatch | existence parity between the generated note buffers and the scheduler's dispatch tap (see below) |
+| QUIET (intended) | attacks whose events are all deliberately attenuated (`levelScale ≤ 0.2` — the 0.15 palm-mute floor plus margin, kept tight so a half-muted dropped note still reads MISSED) and show no rise — excluded from the match-rate denominator, printed so the exclusion is never silent |
+
+**The two-stage claim (#1351).** The table above proves *dispatch → PCM*; the
+`intent → dispatch` block proves the stage before it: every pitched note the
+engine *generated* (snapshotted from the lane buffers before the scheduler
+consumes them) must surface at a dispatch site with the same track + midi in the
+same step bin (±1 bin absorbs humanization/swing). This is what catches the class
+where audio dispatch and the visualizer tap sit behind the *same* gate, so a
+dropped note vanishes from both and the old single-stage check read clean — the
+#1299 boolean chord ghost is the type specimen, and its ghosts print as
+`sentinel-muted` in the missing list until #1299 makes them audible. CC-only
+carriers (`midi: 0`) are deliberately not notes; drums never enter the buffers,
+so a drums stem prints `NOT VERIFIABLE` here rather than fabricated intent.
+
+**`--json`** prints the full structured results instead of the table: per stem,
+everything above plus `intentParity` and a per-attack `attacks` array
+(`step`/`time`/`midis`/`level`/`attenuated`/`present`/`riseDb`/`peak`) — so a
+story can group musical positions and assert rendered relationships (intensity
+ladders, The-One-vs-pop salience) without scraping text.
+`scripts/scenes/funk-bass-ladder.json` is the standing fixture for exactly that:
+a 3-rung intensity ladder × {synth, `pack:upright-bass`} funk-bass scene set
+(external scenes can pin lane voices via a `voices` array — event capture stays
+on, unlike the `--calibrate-pack` voice-override path).
 
 **Scope limit, stated deliberately.** The events and the audio come from the same
 code path, so `mix:verify` cannot catch a bad *musical decision* — only a decision
@@ -190,8 +215,13 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   started, zero early returns.
 
   Two traps this exposed, both worth knowing before trusting a MISSED report:
-  **(1)** the bass visualizer payload omits velocity, so the tool cannot tell an
-  intentionally-quiet note from a failed one — it has no way to expect −16.5 dB.
+  **(1)** ~~the bass visualizer payload omits velocity, so the tool cannot tell an
+  intentionally-quiet note from a failed one — it has no way to expect −16.5 dB.~~
+  **Closed 2026-08-03 (#1351):** bass/soloist/harmony dispatch events now carry
+  `renderVelocity` (the exact post-conductor scalar the voice received) and bass
+  carries `levelScale` (the numeric `muteGain`), so the chuck class above now
+  prints under `QUIET (intended, unverifiable)` instead of MISSED, leaves the
+  match-rate denominator, and `vel→peak r` is computable on the bass lane.
   **(2)** Do not try to rescue this by band-splitting for the attack transient.
   `playPercussiveStrike`'s centre frequency is `Math.max(200, …)` and pins to the
   200 Hz floor for a low-E bass note, so a split above that measures a band the
@@ -254,14 +284,18 @@ diffs two renders. (Enabling `--write-events` perturbs the output by ~7e-5 dB,
 an order of magnitude *inside* that floor, which is how it was confirmed to be a
 passive tap rather than something that changes the render.)
 
-Implementation note worth knowing before extending it: the event stream is
+Implementation note worth knowing before extending it: the **dispatch** stream is
 captured by switching the visualizer event queue **on** in the render clone
 (`--write-events`), not by reading the note buffers. The buffers hold
 pre-humanization times and contain no drums at all (drums are generated live in
 `scheduleGlobalEvent`); `queueVisualizerNoteEvent` fires at every lane's real
 schedule site with the actual play time, which is what a ±25 ms match needs.
-Velocity is only on the payload for lanes that pass it today (drums, chords) —
-the others report NOT VERIFIABLE rather than assuming a value.
+Since #1351 the sidecar *also* snapshots those buffers as `intentEvents` (grid
+time, authored velocity, mute payload) right before each loop's consumption —
+the two streams are what `intent → dispatch` reconciles, and `events` remains a
+compatibility alias for `dispatchEvents`. UI-facing `velocity` stays exactly as
+it was (drums, chords); the audit fields ride alongside and cost nothing when
+event capture is off (they sit inside the existing `vizState.enabled` gates).
 
 ## `npm run --silent mix:spectro -- --scene=<id>`
 

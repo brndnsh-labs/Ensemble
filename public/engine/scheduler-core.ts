@@ -849,6 +849,11 @@ export function scheduleBass(
                         time: adjustedTime,
                         chordNotes,
                         duration,
+                        // #1351 audit tap: the exact scalar `playBassNote` receives,
+                        // plus the palm-mute attenuation it applies — so `mix:verify`
+                        // can prove rendered dynamics instead of NOT VERIFIABLE.
+                        renderVelocity: finalVel,
+                        levelScale: muteGain(muted),
                     });
                 }
                 playBassNote(
@@ -1024,6 +1029,8 @@ export function scheduleSoloist(
                         chordNotes,
                         duration,
                         noteType,
+                        // #1351 audit tap: the exact scalar the soloist voice receives.
+                        renderVelocity: vel,
                     });
                 }
                 (soloist.audio as Mutable<typeof soloist.audio>).lastNoteEnd = finalTime + duration; // @direct-mutation
@@ -1375,6 +1382,8 @@ export function scheduleHarmonies(
                         midi: m,
                         time: playTime,
                         duration,
+                        // #1351 audit tap: the exact scalar `playHarmonyNote` receives.
+                        renderVelocity: finalVel,
                     });
                 }
             }

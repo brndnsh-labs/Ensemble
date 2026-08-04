@@ -572,6 +572,33 @@ async function renderSceneReports({
                         }
                         state.groove.snareMask = snareMask;
 
+                        // #1351: a scene may pin lane voices ('synth' | 'pack:<id>')
+                        // so an external fixture (--scenes-from) can exercise the
+                        // sampled path with event capture ON — the voiceOverride
+                        // path below deliberately disables capture (filename
+                        // collision), which made pack voices unverifiable.
+                        if (Array.isArray(scene.voices)) {
+                            // Allowlist the module key — `--scenes-from` input is
+                            // external, and `state['constructor']` is a truthy hit
+                            // (the #1266 TABLE[untrusted] rule).
+                            const VOICE_MODULES = [
+                                'bass',
+                                'chords',
+                                'harmony',
+                                'soloist',
+                                'groove',
+                            ];
+                            for (const entry of scene.voices) {
+                                if (
+                                    entry?.voice &&
+                                    VOICE_MODULES.includes(entry.module) &&
+                                    state[entry.module]
+                                ) {
+                                    state[entry.module].voice = entry.voice;
+                                }
+                            }
+                        }
+
                         // Pack-calibration A/B: force the target lane onto a
                         // specific voice ('synth' baseline vs 'pack:<id>') so the
                         // two renders differ only in the voice under test. The
@@ -670,6 +697,69 @@ async function renderSceneReports({
                             }
                         }
                         return combined;
+                    }
+
+                    // #1351 intent tap: snapshot the pitched lane buffers BEFORE the
+                    // scheduler consumes them (scheduleGlobalEvent deletes each step's
+                    // entry as it dispatches). This is the engine's generated truth —
+                    // the stream `mix:verify` reconciles dispatch against. Freq-less
+                    // and midi-0 entries are CC-only carriers, not notes; a pitched
+                    // boolean-muted ghost (#1299) IS captured, deliberately. Drums
+                    // never enter these buffers (includeDrums stays false here).
+                    function collectIntentEvents(
+                        state,
+                        stem,
+                        loopIndex,
+                        stepsPerLoop,
+                        leadInSeconds,
+                        stepSeconds,
+                    ) {
+                        const lanes = [
+                            ['bass', state.bass.buffer],
+                            ['chords', state.chords.buffer],
+                            ['harmony', state.harmony.buffer],
+                            ['soloist', state.soloist.audio.buffer],
+                        ];
+                        const out = [];
+                        for (const [track, buffer] of lanes) {
+                            if (!stem.enabled[track] || !(buffer instanceof Map)) {
+                                continue;
+                            }
+                            for (const [step, notes] of buffer.entries()) {
+                                if (step < 0 || step >= stepsPerLoop || !Array.isArray(notes)) {
+                                    continue;
+                                }
+                                for (const note of notes) {
+                                    const freq = note?.freq;
+                                    if (!(freq > 0)) {
+                                        continue;
+                                    }
+                                    const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+                                    if (!(midi > 0)) {
+                                        continue;
+                                    }
+                                    const absoluteStep = loopIndex * stepsPerLoop + step;
+                                    const entry = {
+                                        track,
+                                        step,
+                                        absoluteStep,
+                                        time: leadInSeconds + absoluteStep * stepSeconds,
+                                        midi,
+                                    };
+                                    if (typeof note.durationSteps === 'number') {
+                                        entry.durationSteps = note.durationSteps;
+                                    }
+                                    if (typeof note.velocity === 'number') {
+                                        entry.velocity = note.velocity;
+                                    }
+                                    if (note.muted !== undefined) {
+                                        entry.muted = note.muted;
+                                    }
+                                    out.push(entry);
+                                }
+                            }
+                        }
+                        return out;
                     }
 
                     function toMono(audioBuffer) {
@@ -1023,6 +1113,31 @@ async function renderSceneReports({
                     async function renderStem(scene, stem, seedLabel, voiceOverride) {
                         await loadDrumPreset(scene.drumPreset || 'Basic Rock');
                         const state = createSceneState(scene, stem, voiceOverride);
+                        // Preload any pack a scene-pinned voice needs (same
+                        // module-global cache idiom as the cohesion render).
+                        for (const module of ['bass', 'chords', 'harmony', 'soloist', 'groove']) {
+                            const voice = state[module]?.voice;
+                            if (typeof voice === 'string' && voice.startsWith('pack:')) {
+                                const packId = voice.slice(5);
+                                const loadCtx = new OfflineAudioContext(1, sampleRate, sampleRate);
+                                await ensemble.ensurePackLoaded(loadCtx, packId);
+                                // `ensurePackLoaded` swallows failure (correct for the
+                                // live app's graceful synth fallback, wrong for an
+                                // audit tool): a typo'd id would silently render the
+                                // synth voice and stamp evidence over the wrong claim.
+                                // A pitched pack proves it loaded via built zones;
+                                // percussion packs (#662) build none, so only pitched
+                                // lanes can be asserted.
+                                if (module !== 'groove') {
+                                    const zones = ensemble.getPackZones(packId);
+                                    if (!zones || zones.length === 0) {
+                                        throw new Error(
+                                            `scene "${scene.id}": pack "${packId}" for ${module} did not load — refusing to render the synth fallback as pack evidence`,
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         const sixteenth = 60 / state.playback.bpm / 4;
                         const renderLeadIn = 0.25;
                         const stepsPerLoop = state.arranger.totalSteps;
@@ -1055,6 +1170,8 @@ async function renderSceneReports({
                                   )
                                 : null;
 
+                            const intentEvents = [];
+
                             for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
                                 // Drive the soloist's chorus-evolution machinery
                                 // (Loop 0 head → Loop 1 themed → Loop 2+ exploratory)
@@ -1077,6 +1194,21 @@ async function renderSceneReports({
                                     // rate, fatigue decay, common-tone reward) actually
                                     // express in the generated notes for this loop.
                                     fillBuffers(state);
+                                }
+                                // Same gate as the sidecar write below: intent capture
+                                // is part of event capture, so the default render path
+                                // allocates nothing new (#1351 acceptance 7).
+                                if (writeEvents && !voiceOverride) {
+                                    intentEvents.push(
+                                        ...collectIntentEvents(
+                                            state,
+                                            stem,
+                                            loopIndex,
+                                            stepsPerLoop,
+                                            renderLeadIn,
+                                            sixteenth,
+                                        ),
+                                    );
                                 }
                                 for (let step = 0; step < stepsPerLoop; step++) {
                                     const absoluteStep = loopIndex * stepsPerLoop + step;
@@ -1122,7 +1254,7 @@ async function renderSceneReports({
                                 const enabledTracks = Object.keys(stem.enabled).filter(
                                     (track) => stem.enabled[track],
                                 );
-                                const events = (state.playback.drawQueue || [])
+                                const dispatchEvents = (state.playback.drawQueue || [])
                                     .filter(
                                         (event) =>
                                             event &&
@@ -1140,6 +1272,16 @@ async function renderSceneReports({
                                         velocity:
                                             typeof event.velocity === 'number'
                                                 ? event.velocity
+                                                : null,
+                                        // #1351 audit fields: the exact scalar the voice
+                                        // received, and any articulation attenuation.
+                                        renderVelocity:
+                                            typeof event.renderVelocity === 'number'
+                                                ? event.renderVelocity
+                                                : null,
+                                        levelScale:
+                                            typeof event.levelScale === 'number'
+                                                ? event.levelScale
                                                 : null,
                                     }))
                                     .sort((a, b) => a.time - b.time);
@@ -1159,7 +1301,13 @@ async function renderSceneReports({
                                             loopCount,
                                             bpm: state.playback.bpm,
                                         },
-                                        events,
+                                        // `events` stays as a compatibility alias for
+                                        // `dispatchEvents` during migration (#1351).
+                                        events: dispatchEvents,
+                                        dispatchEvents,
+                                        intentEvents: intentEvents
+                                            .slice()
+                                            .sort((a, b) => a.time - b.time || a.midi - b.midi),
                                     },
                                 );
                             }
