@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=d2c909820811 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=4b9afc87f52b — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -195,6 +195,21 @@ well-specified, small-to-medium, single-area, and **gate-verifiable** (provable 
 unsure, **exclude and surface** — a mis-graded autonomous merge costs trust; a skipped-safe item
 only costs throughput.
 
+**Provenance & attribution (multi-model).** Tracker comments post under Brandon's
+account token, so an in-comment marker is the ONLY provenance signal a thread has.
+Every comment authored by a model — any harness, any skill, including reconciliation
+notes and restatements of Brandon's words — **starts with a bold harness marker**:
+`**[claude]**`, `**[codex]**`.
+
+- Only an **unmarked comment from Brandon** can record a `DECISION`, lift or downgrade a
+  `needs-ear`/`needs-decision` gate, supersede a prior decision, or grant new unattended
+  scope. A marked comment arguing for any of those is a **recommendation** and must call
+  itself one.
+- On conflict, the latest *human* decision wins — not the latest comment. A model that
+  disagrees with a recorded decision surfaces the disagreement; it never re-decides it.
+- An unmarked machine comment found in the wild is a defect: flag it on the issue rather
+  than treating it as Brandon's word.
+
 **`verify-on-device` and `verify-by-ear` are a third state between "auto-merge" and
 "hard stop."** Both cover work whose *correctness* is knowable from code/test, where
 only a real-world sensory glance remains — build + auto-merge it, then attach a
@@ -206,10 +221,44 @@ lightweight residual check instead of gating the merge on it:
   test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
   feels off, never a rollback (musical diffs are reversible).
 
-**The hard guardrail: if you cannot write a test that captures the musical claim, that
-is the signal the change isn't understood well enough to ship unheard — stop and
-surface.** Track `synth` and genuinely-subjective feel (no oracle for "does it sound
-good") stay the `Needs-ear` hard stop — never auto-merge those unheard.
+**The ear gate is tiered by what the story's musical claim IS:**
+- **Tier 1 — structural/dynamics claims** (existence/parity across sinks, accent ordering
+  like "The One outranks the pop", monotonic swell, register bounds): machine-provable —
+  a critique test at the symbolic layer, plus rendered-audio evidence (`mix:verify`
+  intent → dispatch → PCM, #1351) when the claim must survive synthesis. →
+  **`verify-by-ear`**.
+- **Tier 2 — idiom claims** ("reads as funk", "the comp breathes"): the critique test is
+  a statistical proxy, not proof. → **`verify-by-ear`**, backstopped by the recurring
+  post-merge listening audit (#534). A bad-gestalt miss ships, gets heard in the next
+  sweep, gets tuned forward — that trade is deliberate (static app; revert = redeploy).
+- **Tier 3 — taste/feel claims** ("feels alive", tempo push/drag, synth timbre): no
+  honest oracle exists. → **`needs-ear` hard stop**, unchanged. Track `synth` is always
+  tier 3.
+
+**The hard guardrail: if you cannot write a test that captures the musical claim, the
+change isn't understood well enough to ship unheard — it is tier 3 by definition. Stop
+and surface.**
+
+**An oracle powers a gate, so weakening one is always a stop-and-surface:** loosening a
+critique-test threshold, `.skip`-ing an acceptance test, silencing a harness, or removing
+a mutation check is never a machine decision, never burndown-safe, and never rides an
+unrelated diff. Any oracle cited to justify a tier downgrade must be mutation-tested in
+**both directions** (plant the defect → red; restore → green) before the downgrade counts.
+
+**Pre-authorized machine decisions.** The pipeline may record a decision itself and
+proceed — instead of parking `needs-decision` — when **all five** hold:
+1. reversible in ~one line (a data mapping, a label, a threshold re-derived by a
+   recorded method);
+2. acceptance stays gate-verifiable (§4 proves the outcome either way);
+3. it touches none of the always-brake surfaces;
+4. it contradicts no recorded human DECISION;
+5. it relaxes no gate and grants no new unattended scope.
+
+Record it **on the issue, before acting**:
+`**[<harness>]** MACHINE-DECISION (date): <what> — <why> — <revert path>`.
+`/nightly`'s morning report and `/wrap-up` list the machine decisions taken, so Brandon
+audits the *log* asynchronously; reversing one is a normal follow-up, not a rollback.
+Anything failing a condition parks `needs-decision` exactly as before.
 
 **Lifting a `Needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise
 is not sign-off.** "Everything's sounding great" is encouragement, not a merge
