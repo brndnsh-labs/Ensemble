@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=4b9afc87f52b — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=8b7d95c372fe — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -201,10 +201,14 @@ Every comment authored by a model — any harness, any skill, including reconcil
 notes and restatements of Brandon's words — **starts with a bold harness marker**:
 `**[claude]**`, `**[codex]**`.
 
-- Only an **unmarked comment from Brandon** can record a `DECISION`, lift or downgrade a
+- Only **Brandon's own word** can record a `DECISION`, lift or downgrade a
   `needs-ear`/`needs-decision` gate, supersede a prior decision, or grant new unattended
-  scope. A marked comment arguing for any of those is a **recommendation** and must call
-  itself one.
+  scope. That word arrives two ways: an **unmarked comment he writes himself**, or an
+  **interactive in-session answer** (an `AskUserQuestion` selection, a typed reply) — in
+  the latter case the recording comment is marked by its author and MUST quote his
+  answer verbatim, so the thread can distinguish "he chose this" from "the model
+  concluded this." A marked comment arguing for any of those *without* a quoted answer
+  is a **recommendation** and must call itself one.
 - On conflict, the latest *human* decision wins — not the latest comment. A model that
   disagrees with a recorded decision surfaces the disagreement; it never re-decides it.
 - An unmarked machine comment found in the wild is a defect: flag it on the issue rather
