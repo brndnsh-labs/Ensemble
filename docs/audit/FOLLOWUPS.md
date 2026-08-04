@@ -1,7 +1,8 @@
 # Follow-ups & Deferred Work
 
-> **⛔ FROZEN ARCHIVE (2026-06-18).** Follow-ups are now `finding`/`backlog` issues on the **Forgejo
-> tracker** (`brandon/Ensemble`; GitHub is a push-mirror backup only), not appended here. The by-ear cluster (§E + the "left-as-is by decision" items) was migrated to a
+> **⛔ FROZEN ARCHIVE (2026-06-18).** Follow-ups are now `finding`/`backlog` issues on the **GitHub
+> tracker** (`brndnsh-labs/Ensemble`, public; Forgejo `git.brndn.zip` is now a read-only pull mirror),
+> not appended here. The by-ear cluster (§E + the "left-as-is by decision" items) was migrated to a
 > single umbrella backlog issue (Track `musical`, `needs-ear`); the ~3 mechanical items were already
 > shipped or are documented limits. Kept for historical context; do **not** treat as the live backlog.
 
