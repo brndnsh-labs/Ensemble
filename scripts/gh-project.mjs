@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// cycle:rendered template=shim.mjs.tmpl hash=6a3d576ae89e — managed by the-cycle; edit the template, not this file
+// cycle:rendered template=shim.mjs.tmpl hash=1aafc111d0a6 — managed by the-cycle; edit the template, not this file
 //
-// ci-logs.mjs — shim → the-cycle's canonical helpers/ci-logs.sh.
+// gh-project.mjs — shim → the-cycle's canonical helpers/gh-project.mjs.
 //
 // A REAL FILE, not a symlink, on purpose: a committed symlink dangles in an isolated
 // CI checkout (the runner clones one repo, no siblings), which breaks any gate that
@@ -15,7 +15,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
-const HELPER = join('helpers', 'ci-logs.sh');
+const HELPER = join('helpers', 'gh-project.mjs');
 
 /**
  * Locate the-cycle, most explicit first: an env override, then wherever the `cycle`
@@ -43,7 +43,7 @@ function cycleHome() {
 const home = cycleHome();
 if (!home) {
     console.error(
-        `ci-logs.mjs: cannot find the-cycle (no ${HELPER} on any candidate path).\n` +
+        `gh-project.mjs: cannot find the-cycle (no ${HELPER} on any candidate path).\n` +
             '  Clone it and run install.sh, or set CYCLE_HOME=/path/to/the-cycle.',
     );
     process.exit(1);
@@ -58,8 +58,9 @@ const result = spawnSync(argv[0], [...argv.slice(1), ...process.argv.slice(2)], 
     env: {
         // Bindings from .cycle/config.jsonc, baked in at render time. An explicitly
         // exported value still wins — these are defaults, not overrides.
-        FORGEJO_REPO: "brandon/Ensemble",
-        FORGEJO_API: "https://git.brndn.zip/api/v1",
+        GH_OWNER: "brndnsh-labs",
+        GH_PROJECT: "1",
+        GH_REPO: "brndnsh-labs/Ensemble",
         ...process.env,
     },
 });

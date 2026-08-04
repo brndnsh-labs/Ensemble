@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=e40b6f90f89b — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=babc8d910b78 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -11,7 +11,7 @@ incident — and land it in the same tracker every other skill already reads. Ev
 skill *consumes* the queue (`/next` picks, `/cycle` builds); `/scout` *generates* candidates from
 the code.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Scout files
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** Scout files
 issues, so the filing mechanics are **§10** — dedup, the actionable bar, the body format, the
 budget. Don't restate them; apply them. Also leans on §1 (Status), §2 (the `scout` provenance
 stamp), §5 (a finding that touches an always-brake surface still gets filed, just clearly flagged),

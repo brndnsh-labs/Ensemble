@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=bdbdecbefa55 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=a5e2b017095a — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -388,7 +388,7 @@ Routing values are Project fields on the board item, not labels. `gh project ite
   **with `Closes #<n>`** (closing the issue is the done-signal), title = the Conventional-Commit
   subject. PR bodies end with:
   ```
-  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+  🤖 Generated with [Codex CLI](https://developers.openai.com/codex/cli)
   ```
 - The `Closes/Fixes/Resolves #N` keyword fires **anywhere** in the body regardless of surrounding
   prose — writing "`Closes #844` is NOT set" still closes #844. When carving one item out of a

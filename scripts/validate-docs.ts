@@ -267,7 +267,7 @@ function isCheckablePath(cleanPath, docDir) {
 /**
  * Doc-relative resolution is for docs that live INSIDE the source tree and
  * describe their siblings — `public/**`, `tests/`. The pipeline skill tree
- * cites every repo path root-relative (`scripts/forgejo.mjs`,
+ * cites every repo path root-relative (`scripts/gh-project.mjs`,
  * `tests/standards/…`), and its only relative spans point outside the repo
  * entirely (the `../archived-memory/` memory tree in `/wrap-up`). Reading those
  * as repo-relative invents a broken link out of correct prose, so `.claude/**`

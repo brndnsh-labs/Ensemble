@@ -1,0 +1,220 @@
+# CI + continuous deployment. Moved here from `.forgejo/workflows/` at the
+# 2026-08-04 GitHub flip.
+#
+# RUNNER: `ubuntu-latest`, NOT the org's self-hosted runner on ghrunner01. That is
+# deliberate and not negotiable while this repo is public — the org runner group
+# refuses public repos, and for good reason: a fork PR carries its own workflow YAML,
+# so a self-hosted LAN box would execute an outside contributor's code. Being
+# open-source means inviting exactly that traffic. Do not "fix" a queued job by
+# switching to `[self-hosted, ensemble]`; it will queue forever.
+#
+# BRANCH PROTECTION: because this repo is public, a Free org CAN protect its branches
+# server-side (it cannot for a private repo — that's why every other repo in this fleet
+# relies on a client-side merge guard). `main` requires the `checks` and `e2e-tests`
+# contexts, so the `needs:` edge below is a second belt, not the only one.
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Supersede in-flight PR runs when a branch is pushed again; never cancel a run on
+# main, because a cancelled run on main is a half-finished deploy.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # The full non-browser gate. `npm run ci` is the single source of truth for
+  # what "green" means — typecheck, depcheck, knip, mutation/lint/docs checks,
+  # unit tests, production build, and bundle-size budgets — so `npm run ci`
+  # locally predicts this job exactly. Keep this job's checks == that script;
+  # don't add gate steps here that aren't in the script (or vice versa).
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the full gate (npm run ci)
+        run: npm run ci
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Gate first (fast, cheap) before spending a runner slot on the browser suite.
+    needs: checks
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      # `--with-deps` IS needed here, unlike on the old self-hosted runner where the
+      # host libraries were installed once by hand. A GitHub-hosted runner is a fresh
+      # VM every run, and the suite includes a Mobile Safari project — that's real
+      # webkit, whose system libraries are NOT preinstalled on ubuntu-latest.
+      # The browser binaries cache; the apt-installed libraries cannot, so a cache hit
+      # still has to re-run `install-deps`.
+      - name: Install Playwright browsers + system deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+
+      - name: Install Playwright system deps (browsers came from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
+
+      # The offline-audio guards (reverb tail decays, harmony click-free) run in
+      # Vitest browser mode against the same Chromium installed above — they need
+      # a real `OfflineAudioContext`, which the node-mode `npm test` (happy-dom)
+      # can't provide. Kept here (not in the `checks` job / `npm run ci`) because
+      # only this job installs a browser. Fast (~2s); runs before the e2e suite
+      # so an audio-graph regression fails early.
+      - name: Run browser-mode audio guards
+        run: npm run test:browser
+
+      # `npm run test:e2e` builds the production bundle (VITE_E2E_BRIDGE=1) and
+      # serves it via `vite preview` (see playwright.config.ts webServer) — the
+      # suite exercises the real shipped artifact, not the dev server.
+      - name: Run Playwright tests
+        run: npm run test:e2e
+
+      # @v3 was a Forgejo-only pin (that build's artifact API rejected @v4+ with
+      # GHESNotSupportedError). On github.com @v3 is dead — retired 2025-01 — so this
+      # is @v7 now.
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Continuous deployment: main IS live. A push to main only happens via a green PR
+  # merge, so reaching this job means the full gate already passed on this exact
+  # commit — deploy it. `workflow_dispatch` on main is a manual break-glass redeploy
+  # (no new commit).
+  #
+  # NETWORK: prod is a LAN box (192.168.1.239) with nothing exposed to the internet,
+  # so a GitHub-hosted runner cannot reach it directly. It joins the tailnet as an
+  # ephemeral, tag:ci node instead — see homelab-maintenance `tailscale/README.md`.
+  # The tailnet policy grants tag:ci exactly one thing: SSH to .239. If these
+  # credentials leaked, that is the entire blast radius, and behind that port is a
+  # scoped account whose only power is writing /var/www/html.
+  #
+  # Fork PRs cannot reach any of this: secrets are withheld from fork-PR runs, and
+  # this job doesn't run on `pull_request` at all.
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [checks, e2e-tests]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    timeout-minutes: 10
+    # Serialize deploys across ALL runs. On the old self-hosted setup this came free
+    # from having exactly one runner; hosted runners really do run in parallel, so it
+    # has to be stated. Never cancel-in-progress — an interrupted rsync is a
+    # half-deployed site.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          use-cache: 'true'
+
+      # Set explicitly rather than through the action's extra-args input, because
+      # these two are load-bearing and worth being able to see:
+      #   --accept-routes   Linux is the ONE platform where Tailscale does not accept
+      #                     subnet routes by default. Without this the runner joins
+      #                     the tailnet successfully and then cannot reach the LAN at
+      #                     all — a confusing failure that looks like a firewall.
+      #   --accept-dns=false  Keeps the runner on GitHub's resolver. Otherwise it
+      #                     inherits pi-hole through the subnet router, which makes
+      #                     npm installs depend on the LAN's DNS and makes deploy.sh's
+      #                     post-deploy check resolve ensemble.brndn.zip split-horizon
+      #                     instead of over the public path a real visitor takes.
+      - name: Accept subnet routes, keep GitHub's DNS
+        run: sudo tailscale set --accept-routes --accept-dns=false
+
+      # Fail here with a clear message rather than 10 minutes later as an opaque
+      # rsync timeout, if the tailnet path or the policy grant is wrong.
+      - name: Verify the deploy target is reachable
+        env:
+          PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+        run: |
+          tailscale status --peers=false
+          timeout 20 bash -c "until </dev/tcp/$PROD_DEPLOY_HOST/22; do sleep 1; done" \
+            || { echo "::error::Cannot reach $PROD_DEPLOY_HOST:22 over the tailnet — check the tag:ci grant in the tailnet policy."; exit 1; }
+
+      # Materialize the `ensemble-admin` ssh alias that deploy.sh targets, from
+      # the dedicated CI deploy key (a scoped keypair — not the laptop's key).
+      # Secrets go through env, never interpolated into the command line.
+      - name: Configure deploy SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          PROD_DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ci_deploy_key
+          chmod 600 ~/.ssh/ci_deploy_key
+          {
+            echo "Host ensemble-admin"
+            echo "  HostName $PROD_DEPLOY_HOST"
+            echo "  User $DEPLOY_SSH_USER"
+            echo "  IdentityFile ~/.ssh/ci_deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } >> ~/.ssh/config
+
+      # deploy.sh builds --mode production, rsyncs to prod, and self-verifies the
+      # live REV == built REV (its exit-1-on-mismatch is our post-deploy check).
+      - name: Deploy to prod
+        run: ./scripts/deploy.sh prod

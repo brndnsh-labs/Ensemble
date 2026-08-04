@@ -2,13 +2,13 @@
 name: next
 description: Pick up the next Ensemble work story. Finds the highest-priority pickable issue, the in-flight work, and the finding pile, and lays out enough to choose /implement (one issue) vs /cycle (full loop). Add `--board` for the whole-queue orientation view instead of a single pick. Plan-first — read-only, no spawn, no edit. Use at session start or whenever deciding what to pick up.
 ---
-<!-- cycle:rendered template=skills/next.md.tmpl hash=fa1b0161cb54 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/next.md.tmpl hash=b013923912ab — managed by the-cycle; edit the template, not this file -->
 
 # /next — surface the next work story
 
 Goal: say what to work on next, with enough context to choose `/implement #<n>` vs `/cycle #<n>`.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill is
 all §1 (Tracker & readiness — the Status model, the ranking), §2 (Labels) and §7 (tracker
 mechanics, including the "unreachable → stop" rule). Don't restate them; apply them.
 

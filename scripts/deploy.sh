@@ -6,7 +6,7 @@
 #
 #   ./scripts/deploy.sh <test|prod> [--dry-run] [--quiet]
 #
-# Prod is continuously deployed: the CI `deploy` job (.forgejo/workflows/ci.yml)
+# Prod is continuously deployed: the CI `deploy` job (.github/workflows/ci.yml)
 # runs `deploy.sh prod` on every merge to main. This script is also the manual
 # path for both environments; the *ceremony* lives in the SKILLS, not here:
 #   /deploy-test  — low ceremony, pre-merge audition box (the private staging box).

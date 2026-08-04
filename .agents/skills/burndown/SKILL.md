@@ -2,7 +2,7 @@
 name: burndown
 description: Autonomously grind through the SAFE, self-contained subset of the Ensemble backlog — pre-filters out anything touching DOCTRINE §5's always-brake surfaces (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) or posing an open decision, then loops `/cycle #<n>` over the rest, plus standing hygiene (`/dep-update`, a bounded dead-code sweep) when the issue queue is thin. A judgment call parks that item and the loop moves on; the run itself stops at 5 shipped items, a red gate, or a dry queue. Plan-first. Never touches prod. Usage `/burndown`.
 ---
-<!-- cycle:rendered template=skills/burndown.md.tmpl hash=af45d9548906 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/burndown.md.tmpl hash=8ab529d277ec — managed by the-cycle; edit the template, not this file -->
 
 # /burndown — grind the safe backlog autonomously
 
@@ -10,7 +10,7 @@ Goal: tick off the safe, no-judgment-call work without Brandon babysitting each 
 session runs mostly unattended and the merged results get reviewed after. The curating layer on top
 of `/cycle`, not a replacement for its safety logic.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The safe set
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** The safe set
 this skill lives or dies by *is* §5's always-brake list. Also leans on §1 (Status/ranking), §2
 (Labels), §6 (Merge guard — already enforced *inside* `/cycle` → `/done`; don't re-implement it
 here), §7 (tracker mechanics). **When in doubt, exclude and surface — never include.**

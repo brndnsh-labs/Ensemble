@@ -2,13 +2,13 @@
 name: implement
 description: Implement a single Ensemble work story from its issue. Reads the spec from the issue body (Why / Touches / Acceptance), picks the executor (orchestrator-inline by default; a parallel agent only for independent mechanical work across several files), sets Status → In progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
 ---
-<!-- cycle:rendered template=skills/implement.md.tmpl hash=3d0ce713fb69 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/implement.md.tmpl hash=cddd6f64c8e9 — managed by the-cycle; edit the template, not this file -->
 
 # /implement #<n> — ship a single story
 
 Goal: load one issue's context, present a plan, build, report.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill
 leans on §1 Tracker & readiness (pickability), §3 Routing (executor choice; re-verify agent
 claims), §4 Gates, §9 Branch policy. The procedure below is just the ordering.
 

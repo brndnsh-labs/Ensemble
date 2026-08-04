@@ -2,7 +2,7 @@
 name: done
 description: Ship a Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) merge it via the background poll-then-merge guard; a judgment-call story's PR is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n>`. Use after /review (+ /patch) pass clean.
 ---
-<!-- cycle:rendered template=skills/done.md.tmpl hash=276d86c5a30c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/done.md.tmpl hash=8703d9ceadde — managed by the-cycle; edit the template, not this file -->
 
 # /done #<n> — ship a story
 
@@ -10,7 +10,7 @@ Goal: commit the reviewed work, push, open a PR that closes the issue, and land 
 a safe story (CI-gated, via the background guard) or leaving a judgment-call PR for
 Brandon.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill
 leans on §4 Gates, §5 Judgment calls (the safe-vs-brake split), §6 Merge guard, §7 Tracker
 mechanics, §8 Commit & PR conventions, §9 Branch policy. The procedure below is just the ordering.
 

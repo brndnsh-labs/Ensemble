@@ -2,13 +2,13 @@
 name: review
 description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within In progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=e976495093db — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=62828afdb03f — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
 Goal: pick the right reviewers for what changed, run them, present consolidated findings.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill is
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill is
 the detailed expansion of §3 (Reviewers) and routes on §5's always-brake surfaces. The routing
 table below is review's own, more-specific version of §3. **Review does not change Status** — the
 story stays `In progress` through review and patch.

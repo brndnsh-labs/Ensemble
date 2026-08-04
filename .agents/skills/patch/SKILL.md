@@ -2,13 +2,13 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=f1d2ef2e2f97 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=625d18478712 — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
 Goal: close the review→done seam — sort `/review`'s findings and apply inline fixes.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The triage
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** The triage
 below applies §5 (findings get actioned not parked — the `finding` issue set trends to empty) and
 §2 (the `finding` label); the re-run gates are §4. **Patch does not change Status** — the story
 stays in progress.

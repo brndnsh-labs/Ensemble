@@ -1,14 +1,14 @@
 ---
 name: unblock
-description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via `AskUserQuestion`, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
+description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via `ask_user_question`, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=d97134d2a4da — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=c3244dfcbe76 — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
 Goal: turn a scattered pile of "waiting on Brandon" into one short sitting.
 
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** Leans on §1
+**Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** Leans on §1
 (Status), §2 (Labels), §5 (what counts as a judgment call in the first place), §7 (the batch-write
 rule).
 
@@ -49,7 +49,7 @@ both and presents desk first, then hands-on.
    **A recommendation is mandatory on every item.** "What do you want to do?" hands the work back;
    the point of this skill is to hand back only the *decision*.
 
-6. **Ask.** Via `AskUserQuestion` — one question per item, **recommended
+6. **Ask.** Via `ask_user_question` — one question per item, **recommended
    option first and labelled `(Recommended)`**, max 4 per call.
    - **desk** verdicts: the actual options, recommendation first.
    - **hands-on** verdicts: **Works** / **Doesn't work** / **Not now**.
