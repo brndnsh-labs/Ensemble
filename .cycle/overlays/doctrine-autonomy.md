@@ -39,7 +39,7 @@ lightweight residual check instead of gating the merge on it:
   post-merge listening audit (#534). A bad-gestalt miss ships, gets heard in the next
   sweep, gets tuned forward — that trade is deliberate (static app; revert = redeploy).
 - **Tier 3 — taste/feel claims** ("feels alive", tempo push/drag, synth timbre): no
-  honest oracle exists. → **`needs-ear` hard stop**, unchanged. Track `synth` is always
+  honest oracle exists. → **`needs-ear` hard stop**, unchanged. `track:synth` is always
   tier 3.
 
 **The hard guardrail: if you cannot write a test that captures the musical claim, the
@@ -67,11 +67,11 @@ Record it **on the issue, before acting**:
 audits the *log* asynchronously; reversing one is a normal follow-up, not a rollback.
 Anything failing a condition parks `needs-decision` exactly as before.
 
-**Lifting a `Needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise
+**Lifting a `status:needs-ear` stop requires an EXPLICIT per-PR go-ahead — warm general praise
 is not sign-off.** "Everything's sounding great" is encouragement, not a merge
 instruction for a specific parked PR; ask directly before merging. `/cycle #<n> approved`
 is the canonical signal.
 
 **Auto-merge now means auto-deploy** (§6 is CD) — an auto-merged PR ships to prod within
-minutes. The pre-merge `Needs-ear` stop is what keeps un-auditioned work from shipping,
+minutes. The pre-merge `status:needs-ear` stop is what keeps un-auditioned work from shipping,
 not a separate deploy gate.

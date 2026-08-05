@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=4125c99dfcbf — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=a3bb29c4964b — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -112,7 +112,7 @@ from a reviewer without parsing actual findings — empty findings is valid, *mi
 
 ## Track-awareness (the fold-in)
 
-Read the issue's **Track** field; it sets the loop's tail:
+Read the issue's `track:*` label; it sets the loop's tail:
 - **musical** → DoD is the **critique test** (run it, read the Critique Report); reviewer
   `music-theory-reviewer` (+ state/worker if those changed). Safe → auto-merge on green.
 - **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
@@ -120,8 +120,7 @@ Read the issue's **Track** field; it sets the loop's tail:
   to the gate. `/done` builds + opens the PR, then **deploys the branch to test** (`scripts/deploy.sh
   test`, no merge needed first) and hands Brandon the checklist + a Works/Something's-off/Haven't-
   checked verdict prompt right there — **that's the audition**, not a separate local harness step.
-  "Works" merges immediately (the verdict *is* the approval); "Haven't checked" parks it (Status
-  `Needs-ear`) — re-invoke `/cycle #<n> approved` once he's listened. The merge itself still always
+  "Works" merges immediately (the verdict *is* the approval); "Haven't checked" parks it (`status:needs-ear`) — re-invoke `/cycle #<n> approved` once he's listened. The merge itself still always
   waits on his ear; nothing here auto-merges unheard.
 - **bundle** → DoD is a **measured KB delta** (`npm run build` / size check) **and** the full suite
   green (behavior-preserving); reviewer `bundle-hygiene-reviewer`. Safe → auto-merge on green.

@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=e40b6f90f89b — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=82206773b695 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -50,12 +50,12 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
 - **Class 1 — deterministic (the burndown subset):** an unambiguously-right native fix — a missing
   `aria-label` on an icon button, `<span role="button">`→`<button>`, a missing `type="button"`, a
   hand-rolled Enter/Space handler a native element gives free. → **`burndown` + `verify-on-device`**,
-  Review lens `code-review`, Status `Ready`.
+  `lens:code-review`, `status:ready`.
 - **Class 2 — subjective (the unblock subset):** contrast ratios, focus *feel*, motion, arguable
-  tab-order. **Don't park as `Needs-ear`** — file as **`Needs-decision` with the concrete fix
+  tab-order. **Don't park as `status:needs-ear`** — file as **`status:needs-decision` with the concrete fix
   attached** ("text is 3.8:1, AA wants 4.5:1, here's the darker token — apply?").
-- **Classify:** Track `bundle`? No — `area:ui`, `finding`/`enhancement`, Review lens `code-review`;
-  Class 1 → `Ready` + `burndown` + `verify-on-device`; Class 2 → `Needs-decision` fix-pre-drafted.
+- **Classify:** `track:bundle`? No — `area:ui`, `finding`/`enhancement`, `lens:code-review`;
+  Class 1 → `status:ready` + `burndown` + `verify-on-device`; Class 2 → `status:needs-decision` fix-pre-drafted.
 
 ### `security` — hardening (the *least* burndown-able lens; deliberately small here)
 This is a client-only PWA: no auth, no payments, no server. The real surface is **untrusted input**
@@ -69,9 +69,9 @@ This is a client-only PWA: no auth, no payments, no server. The real surface is 
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
   **code-level input-parsing change** is a judgment call — file it, route to a human `/cycle` with a
   `/security-review`, **never `burndown`-tag it** (a wrong hardening change is worse than the gap).
-- **Classify:** CVE bump → `burndown`. Input-hardening code → `Needs-decision` with the fix
-  pre-drafted ("approve adding shape validation to the share-URL reader?") → on clear, `Ready`,
-  Review lens `code-review` + "needs `/security-review`", **off `burndown`**.
+- **Classify:** CVE bump → `burndown`. Input-hardening code → `status:needs-decision` with the fix
+  pre-drafted ("approve adding shape validation to the share-URL reader?") → on clear, `status:ready`,
+  `lens:code-review` + "needs `/security-review`", **off `burndown`**.
 
 ### `perf` — performance, *floor-aware*
 Speedups must keep playback glitch-free on weak hardware — a synthetic bench can't hear an audio
@@ -83,13 +83,13 @@ dropout. **The split that decides everything — which side of the audio path is
   `burndown` (often `needs-ear`). Model per the §3 routing rule: `sonnet` when the acceptance is
   critique-test-verifiable, `opus` only when the finding is itself a design call.
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
-  Track** — file it `Track: bundle`, Review lens `bundle-hygiene`. Drop an unused dep, lazy-load a
+  Track** — file it `track:bundle`, `lens:bundle-hygiene`. Drop an unused dep, lazy-load a
   route/overlay, code-split a heavy component, memoize a *verified*-hot render. `npm run build` /
   the size check **is** the proof and it never touches the audio floor. Pure ones (drop a dep) →
-  `burndown`; tradeoff ones (a lazy-load adds a loading state) → `Needs-decision`-with-fix.
-- **Classify:** audio-path → Track `synth`/`musical`, Model per the §3 routing rule (`sonnet` if
-  gate-verifiable, `opus` for design calls), caveat or `Needs-ear`. Off-path →
-  Track `bundle`, Model `sonnet`, `Ready` + `burndown` (or `Needs-decision`-with-fix for tradeoffs).
+  `burndown`; tradeoff ones (a lazy-load adds a loading state) → `status:needs-decision`-with-fix.
+- **Classify:** audio-path → `track:synth`/`musical`, Model per the §3 routing rule (`sonnet` if
+  gate-verifiable, `opus` for design calls), caveat or `status:needs-ear`. Off-path →
+  `track:bundle`, Model `sonnet`, `status:ready` + `burndown` (or `status:needs-decision`-with-fix for tradeoffs).
 
 ### `hygiene` — type-safety, dead code, duplication, drift (the most `burndown`-able lens)
 The mechanical-wins lens — where overnight discovery most feeds same-week auto-grind.
@@ -101,9 +101,9 @@ The mechanical-wins lens — where overnight discovery most feeds same-week auto
   `worker-client.ts`" not "remove all `any`". An unbounded sweep isn't `burndown`-safe. **Engine
   hygiene that changes generative behavior is NOT hygiene** — if a "cleanup" could shift a critique
   test, it's a `musical` Track story, not a `burndown` nit.
-- **Classify:** `area:*`, `finding`, Model `sonnet`, Size `S`, Status `Ready` **+ `burndown`** for the
+- **Classify:** `area:*`, `finding`, Model `sonnet`, Size `S`, `status:ready` **+ `burndown`** for the
   genuinely build-verifiable ones (a bounded `any`-tighten, a knip dead-code removal, a jscpd
-  de-dup); the judgment-tail ("is this export dead or kept API?") → `Needs-decision`-with-fix. Track
+  de-dup); the judgment-tail ("is this export dead or kept API?") → `status:needs-decision`-with-fix. Track
   `bundle` for dead-code removal; otherwise leave Track unset / `musical` if it's engine-adjacent.
 
 ### `context` — does the map match the territory (the project-unique lens)
@@ -123,10 +123,10 @@ cost. Two faces of one failure: **doc↔code drift** and **undocumented load-bea
   generative engines (`public/engine/**`).
 - **The split:** **factual sync** (a renamed-file reference, a missing AI_MAP row, a missing
   musical-intent comment) → `burndown` (build/lint-verifiable or doc-only + directionally
-  unambiguous). **Interpretive drift** ("is the *doc* wrong or the *code*?") → `Needs-decision`
+  unambiguous). **Interpretive drift** ("is the *doc* wrong or the *code*?") → `status:needs-decision`
   with the likely correction pre-drafted.
 - **Classify:** `area:infra` (or the owning area), `finding`, Model `sonnet`, Size `S`; factual-sync →
-  `Ready` + `burndown`; interpretive → `Needs-decision`-with-fix. Review lens `code-review`.
+  `status:ready` + `burndown`; interpretive → `status:needs-decision`-with-fix. `lens:code-review`.
 
 ## The budget — quality over flood (load-bearing)
 
@@ -174,11 +174,9 @@ call — file it with the options sketched and flag it as needing a decision, no
 6. **Present the slate** — each finding with its lens, `file:line`, the drafted issue body
    **including its drafted fix**, and whether it lands on a §5 brake. **This is the checkpoint**;
    nothing is written before it.
-7. **File** (§7): `gh issue create --title "<title>" --body "<body>" --label "scout"`, then set
-   Status for **all of them in one batch** — never a loop:
-   ```
-   node scripts/gh-project.mjs batch "<file.json>"
-   ```
+7. **File** (§7): `gh issue create --title "<title>" --body "<body>" --label "scout"` per finding, then apply any
+   routing this repo's lens table calls for — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "<status:label>"` per issue.
+   A plain loop is correct here; these are REST calls, and there is nothing to batch around.
    Tracker unreachable → say so and stop; don't pretend it filed.
 8. **Report.** What was filed (links, labels, which ones flag a §5 brake for later), what was found
    but not filed (dups, below-the-cut, "clean on this lens"), and point at `/next`.

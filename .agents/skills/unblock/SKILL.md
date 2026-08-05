@@ -2,7 +2,7 @@
 name: unblock
 description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via `ask_user_question`, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=c3244dfcbe76 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=cb2be19ab272 — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
@@ -56,7 +56,9 @@ both and presents desk first, then hands-on.
      **"Not now" is a first-class answer, not a failure** — declining to go test something is a
      legitimate outcome, and making it feel like a punt is how a queue becomes a guilt pile.
 7. **Read-only until they answer.** Nothing is written during gathering or asking.
-8. **Apply all answers in one batched write** (§7): `node scripts/gh-project.mjs batch "<file.json>"` — never a loop.
+8. **Apply the answers** (§7) — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "<status:label>"` per issue, in a plain
+   loop. Apply them together, after all the answers are in, so a half-answered session never
+   leaves the queue half-moved.
    - **Works** → unblock it: merge via §6's guard, or close it.
    - **Doesn't work** → capture the description **verbatim** as a `finding`. Their raw words are the
      evidence; don't paraphrase them into your own diagnosis.
@@ -64,15 +66,15 @@ both and presents desk first, then hands-on.
 9. **Report** what moved, what stayed, and what's still owed.
 
 Here, the lanes map onto the Status vocabulary directly:
-- **desk** = Status `Needs-decision`, or a backlog issue carrying a `needs-decision`
+- **desk** = `status:needs-decision`, or a backlog issue carrying a `needs-decision`
   caveat label (status-less idea, needs input before it can even be scheduled).
-- **hands-on** = Status `Needs-ear`, or a backlog issue carrying a `needs-ear` caveat
+- **hands-on** = `status:needs-ear`, or a backlog issue carrying a `needs-ear` caveat
   label — but see below, it does not get the generic Works / Doesn't work / Not now menu.
 
-**`Needs-ear` is not verified through this menu at all.** A synth A/B or a musical
+**`status:needs-ear` is not verified through this menu at all.** A synth A/B or a musical
 listen pass can't be resolved from a menu, and the audition itself already happens
 elsewhere — at `/cycle`'s merge gate (Track-awareness) or `/done`'s deploy-to-test
-check-in, once the PR is built and live. `/unblock`'s job for a `Needs-ear` item is just
+check-in, once the PR is built and live. `/unblock`'s job for a `status:needs-ear` item is just
 to **surface it as a named note** ("still waiting on your ear for #<n>"), never to
 present a verdict menu or attempt to verify it live itself.
 

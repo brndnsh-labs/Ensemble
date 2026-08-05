@@ -2,7 +2,7 @@
 name: burndown
 description: Autonomously grind through the SAFE, self-contained subset of the Ensemble backlog — pre-filters out anything touching DOCTRINE §5's always-brake surfaces (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) or posing an open decision, then loops `/cycle #<n>` over the rest, plus standing hygiene (`/dep-update`, a bounded dead-code sweep) when the issue queue is thin. A judgment call parks that item and the loop moves on; the run itself stops at 5 shipped items, a red gate, or a dry queue. Plan-first. Never touches prod. Usage `/burndown`.
 ---
-<!-- cycle:rendered template=skills/burndown.md.tmpl hash=8ab529d277ec — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/burndown.md.tmpl hash=b74a51eff5d8 — managed by the-cycle; edit the template, not this file -->
 
 # /burndown — grind the safe backlog autonomously
 
@@ -32,7 +32,7 @@ unattended pass.
 
 Qualifies only if **all** hold — read the issue body; don't just pattern-match the labels:
 
-- **Status `Ready`** — pickable, not already in flight.
+- **Labelled `status:ready`** — pickable, not already in flight.
 - **Doesn't pose an open decision.** An issue framed "decide one of: A / B" is a human `/cycle`
   candidate regardless of how small the eventual diff is — a decision is a judgment call by
   construction.

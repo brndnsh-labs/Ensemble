@@ -16,56 +16,43 @@
   // update`/`cycle check` actually manage it instead of letting it rot.)
   "harnesses": ["claude", "codex"],
   "tracker": {
-    "description": "the **GitHub repo's issues** (`brndnsh-labs/Ensemble`, public), routed on org project #1",
-    "project": 1,
-    "owner": "brndnsh-labs",
-    // On the board, routing that CHANGES during the loop lives in real Projects v2
-    // fields: Status, Track and "Review lens". Track is the load-bearing routing
-    // dimension here — it picks the DoD, reviewer, and merge behavior (see
-    // overlays/doctrine-routing.md). Static attributes stay plain labels — `size/*`,
-    // `model/*`, `agent/*` and `area:*` are read straight off `gh issue list --json
-    // labels` and never need a field write, so they did not earn a board column.
-    // (Under the Forgejo backend all of these were label namespaces.)
-    "fields": { "Track": "track", "Review lens": "lens" },
-    // These names must match the board's option names EXACTLY — helpers compare with
-    // `o.name === value`, so a casing slip ("needs ear", "Needs-ear") fails to route
-    // with no error at all. The lowercase-kebab names below were recased at the
-    // 2026-08-04 flip for exactly that reason.
+    "description": "the **GitHub repo's issues** (`brndnsh-labs/Ensemble`, public), routed by `status:*` labels",
+    // Routing lives in `status:*` labels on the issue. Each name below is a real label
+    // that must exist in the repo — `gh` fails loudly on one that doesn't, which is the
+    // point: the Projects v2 board this replaced misrouted silently. Every write clears
+    // the whole set before adding one, so the states stay mutually exclusive. No label =
+    // the untriaged pile (DOCTRINE §1 renders that row itself; don't add a "(none)"
+    // entry here or it becomes a real label).
     "statuses": [
       {
-        "name": "Ready",
+        "name": "status:ready",
         "meaning": "scoped + pickable",
         "action": "`/next` ranks & picks; `/implement`/`/cycle` build"
       },
       {
-        "name": "In progress",
+        "name": "status:in-progress",
         "meaning": "being built",
         "action": "don't re-pick"
       },
       {
-        "name": "Needs decision",
-        "meaning": "blocked on a Brandon call",
-        "action": "`/unblock` surfaces; **don't build**"
+        "name": "status:in-review",
+        "meaning": "built, under review / PR open",
+        "action": "don't re-pick"
       },
       {
-        "name": "Needs ear",
-        "meaning": "blocked on Brandon's ear (a listen pass or synth A/B audition)",
-        "action": "`/unblock` tees up; **don't build past the gate**"
+        "name": "status:needs-decision",
+        "meaning": "blocked on a human call",
+        "action": "surface it; **don't build**"
       },
       {
-        "name": "Blocked",
+        "name": "status:needs-ear",
+        "meaning": "needs a by-ear listening pass before it can ship",
+        "action": "surface it; **don\u2019t** call it done on tests alone"
+      },
+      {
+        "name": "status:blocked",
         "meaning": "blocked on a dependency",
         "action": "skip; name the blocker"
-      },
-      {
-        "name": "(closed issue)",
-        "meaning": "done — a closed issue is the real done-signal, whatever Status says",
-        "action": "done"
-      },
-      {
-        "name": "(no Status)",
-        "meaning": "+ `backlog`/`finding`: the idea pile, not a scheduled story. Note an issue can be open and NOT on the board at all — `gh project item-list` carries no open/closed state, so intersect it with `gh issue list --state open`",
-        "action": "triage/scope to Ready first; don't pick"
       }
     ],
     // "in-review" is retired (ensemble-adoption, matching songsiknow's D2): nothing
@@ -73,9 +60,9 @@
     // ("don't re-pick") is already covered by in-progress. An open PR is the
     // "built, awaiting merge" signal.
     "status": {
-      "pickable": "Ready",
-      "active": "In progress",
-      "done": "(closed)"
+      "pickable": "status:ready",
+      "active": "status:in-progress",
+      "done": "status:in-review"
     },
     "ranking": "milestone (a real numbered epic > a \"candidate epic\" / no milestone), then Size (S < M < L, read off the `size/*` **label** — Size is not a board field), then issue number. Model is *not* a ranking factor",
     "milestones": []
