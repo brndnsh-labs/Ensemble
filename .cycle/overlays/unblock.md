@@ -1,13 +1,13 @@
 Here, the lanes map onto the Status vocabulary directly:
-- **desk** = Status `Needs-decision`, or a backlog issue carrying a `needs-decision`
+- **desk** = `status:needs-decision`, or a backlog issue carrying a `needs-decision`
   caveat label (status-less idea, needs input before it can even be scheduled).
-- **hands-on** = Status `Needs-ear`, or a backlog issue carrying a `needs-ear` caveat
+- **hands-on** = `status:needs-ear`, or a backlog issue carrying a `needs-ear` caveat
   label — but see below, it does not get the generic Works / Doesn't work / Not now menu.
 
-**`Needs-ear` is not verified through this menu at all.** A synth A/B or a musical
+**`status:needs-ear` is not verified through this menu at all.** A synth A/B or a musical
 listen pass can't be resolved from a menu, and the audition itself already happens
 elsewhere — at `/cycle`'s merge gate (Track-awareness) or `/done`'s deploy-to-test
-check-in, once the PR is built and live. `/unblock`'s job for a `Needs-ear` item is just
+check-in, once the PR is built and live. `/unblock`'s job for a `status:needs-ear` item is just
 to **surface it as a named note** ("still waiting on your ear for #<n>"), never to
 present a verdict menu or attempt to verify it live itself.
 

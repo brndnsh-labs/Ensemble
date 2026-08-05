@@ -1,8 +1,8 @@
 ---
 name: review
-description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within In progress. Use after /implement, before /done.
+description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=62828afdb03f — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=aaaab23ac765 — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -11,7 +11,7 @@ Goal: pick the right reviewers for what changed, run them, present consolidated 
 **Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill is
 the detailed expansion of §3 (Reviewers) and routes on §5's always-brake surfaces. The routing
 table below is review's own, more-specific version of §3. **Review does not change Status** — the
-story stays `In progress` through review and patch.
+story stays `status:in-progress` through review and patch.
 
 ## Workflow
 
@@ -45,7 +45,7 @@ story stays `In progress` through review and patch.
    | If the diff touches... | Run | It is responsible for |
    | :- | :- | :- |
    | Generative engines — `public/engine/{bass-engine,soloist-*,accompaniment,chords-engine,harmonies,arc,fills}.ts`, `public/engine/grooves/**`, `coordination-engine.ts` — or `tests/standards/**` | **`music-theory-reviewer`** | Whether the musical intent is actually *expressed* by the code. Catches "programmer's math": statistically clean, musically wrong. |
-   | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the audio-graph wiring in `scheduler-core.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `Needs-ear` gate. |
+   | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the audio-graph wiring in `scheduler-core.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
    | `public/state/**`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the four sanctioned categories in CLAUDE.md; non-atomic dispatch chains; reactivity lost in a `useEnsembleState` selector. |
    | `worker-client.ts`, `logic-worker.ts`, `getSyncState()`/`syncWorker()`, `WORKER_SYNC_MANIFEST`, a worker-mirrored slice (`arranger`, `chords`, `bass`, `soloist`, `harmony`, `groove`, `playback`), or a new `WORKER_MSG.*` | **`worker-contract-reviewer`** | The half-update: a field that exists on the main thread but never crosses; that rides the initial snapshot but has no delta case; or that the worker silently drops. |
    | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — `npm run build:size` owns the numbers. |

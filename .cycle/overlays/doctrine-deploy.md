@@ -11,7 +11,7 @@ path (CI down, or forcing a known-good build), not the normal route.
 
 **Environments:**
 - **test** (`ensembletest.brndn.zip`) — the pre-merge audition box; deploy a branch here
-  to hear/preview before merging, especially `Needs-ear` work. Low ceremony, private.
+  to hear/preview before merging, especially `status:needs-ear` work. Low ceremony, private.
 - **prod** (`ensemble.brndn.zip`) — the public origin; CD on merge, or the gated manual
   `/deploy-prod` break-glass path.
 

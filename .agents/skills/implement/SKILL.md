@@ -1,8 +1,8 @@
 ---
 name: implement
-description: Implement a single Ensemble work story from its issue. Reads the spec from the issue body (Why / Touches / Acceptance), picks the executor (orchestrator-inline by default; a parallel agent only for independent mechanical work across several files), sets Status → In progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
+description: Implement a single Ensemble work story from its issue. Reads the spec from the issue body (Why / Touches / Acceptance), picks the executor (orchestrator-inline by default; a parallel agent only for independent mechanical work across several files), moves it to status:in-progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
 ---
-<!-- cycle:rendered template=skills/implement.md.tmpl hash=cddd6f64c8e9 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/implement.md.tmpl hash=5c90d720b3b1 — managed by the-cycle; edit the template, not this file -->
 
 # /implement #<n> — ship a single story
 
@@ -19,15 +19,15 @@ claims), §4 Gates, §9 Branch policy. The procedure below is just the ordering.
    - `gh issue view "<n>" --json number,title,state,url,labels,milestone,body` — Why / Touches / Acceptance (body), labels (§2), epic (milestone).
    - Its current Status (§1).
    - The relevant docs + `CLAUDE.md`.
-3. **Check it's pickable** (§1). `Ready` → pick. `In progress` →
-   likely mid-flight; confirm before re-building. No Status → warn it's untriaged; proceed only if
+3. **Check it's pickable** (§1). `status:ready` → pick. `status:in-progress` →
+   likely mid-flight; confirm before re-building. No status label → warn it's untriaged; proceed only if
    genuinely scoped (the write below promotes it).
 4. **Pick the executor** (§3) — **`orchestrator-inline` by default**: the main thread
    builds, keeping accumulated context (right for small diffs, and for the surfaces where a cold
    agent re-derives brittle detail and ships latent bugs). **Spawn a parallel agent only for
    independent mechanical work** (the same change across several files); keep shared-file edits
    (indexes, schema) and the §4 gates on the main thread.
-5. **Set Status → In progress:** `node scripts/gh-project.mjs status "<n>" "In progress"`
+5. **Mark it `status:in-progress`:** `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:in-progress"`
 6. **Branch check** (§9) — if on `main`, branch first (`git checkout -b <short-slug>`); reuse an
    epic branch if one exists. Never build on `main`.
 7. **Present the plan** (a status update, not a gate — §5):
@@ -35,7 +35,7 @@ claims), §4 Gates, §9 Branch policy. The procedure below is just the ordering.
    ```
    ## Plan: #<n> — <title>
 
-   **Issue:** #<n>  ( <milestone> )   **Status:** In progress
+   **Issue:** #<n>  ( <milestone> )   **Status:** status:in-progress
    **Executor:** orchestrator-inline | parallel agent   **Branch:** <branch>
    **Files I expect to touch:** <from Touches in the body>
    **Acceptance gates:** §4
@@ -73,8 +73,8 @@ claims), §4 Gates, §9 Branch policy. The procedure below is just the ordering.
 - **Agent returns Blocked:** present the blocker; don't auto-retry. Common causes: the spec no
   longer matches the code (refresh the issue body), or the acceptance criterion can't be measured.
 - **Gates red:** report; don't hand off to `/review` against a broken build.
-- **Build abandoned** (not handed to `/review`): roll Status back to `Ready`
-  (`node scripts/gh-project.mjs status "<n>" "Ready"`) so nothing is stranded mid-flight.
+- **Build abandoned** (not handed to `/review`): roll the label back to `status:ready`
+  (`gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`) so nothing is stranded mid-flight.
 
 Before building, read: the `CLAUDE.md` section matching the story's Track/area (always
 § Musical Logic & Generative Standards for a musical story; § Coordination if context
