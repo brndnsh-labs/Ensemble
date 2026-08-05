@@ -2,7 +2,7 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=625d18478712 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=3f7396fb1f6e — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
@@ -67,5 +67,5 @@ stays in progress.
 - **Cited line has moved** (the diff was edited since `/review`): re-Read, relocate by content
   match, and note the drift.
 - **A finding contradicts a project memory note:** this is a §5 always-brake — **escalate, don't
-  resolve it here.** The memory usually wins, but "usually" is not a licence to drop a finding
+  resolve it here.** The memory usually wins, but "usually" is not a license to drop a finding
   silently: surface both, say which you'd keep and why, and let Brandon call it.
