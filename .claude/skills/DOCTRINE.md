@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=2b4cd3bfed40 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=49c57c8404e1 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -29,8 +29,9 @@ nothing to be on or off. Status is one `status:*` label on the issue itself.
 | *(none)* | the idea pile — filed but not scheduled | triage/scope it first; don't pick |
 
 Exactly one `status:*` label at a time: every write clears the whole set before adding one, so
-the states can't overlap. **No label is a real state**, not a gap — `/intake` and `/scout` file
-without routing on purpose (§10), and that unrouted pile is where triage starts.
+the states can't overlap. **No label is a real state**, not a gap — it's every issue still waiting
+on a §10.5 certainty call (a review-carved observation, §2; a finding the filer couldn't
+confidently route), and that untriaged pile is where triage starts.
 
 **Ranking pickable work** (`/next`): milestone (a real numbered epic > a "candidate epic" / no milestone), then Size (S < M < L, read off the `size/*` **label** — Size is not a board field), then issue number. Model is *not* a ranking factor.
 
@@ -292,7 +293,7 @@ immediately. Run the guard in the **background** (the poll takes minutes; a fore
 harness-blocked):
 
 ```bash
-(until gh pr checks "<pr>" >/dev/null 2>&1; do sleep 5; done; gh pr checks "<pr>" --watch --fail-fast && gh pr merge "<pr>" --squash --delete-branch) &
+(until gh pr checks "<pr>" >/dev/null 2>&1; do sleep 30; done; gh pr checks "<pr>" --watch --interval 30 --fail-fast && gh pr merge "<pr>" --squash --delete-branch) &
 ```
 
 Closing rides on the PR body's `Closes #<n>` keyword — GitHub fires it anywhere in the body
@@ -438,8 +439,11 @@ that isn't in the §1 table.
 Shared by `/scout` (machine-found) and `/intake` (human-described). Both *find or interview, then
 file* — neither fixes, branches, or merges.
 
-1. **Dedup first.** Search open issues before filing. A near-duplicate gets a comment on the
-   existing issue, not a new one.
+1. **Dedup first — and a rejection has memory.** Search open issues before filing; a
+   near-duplicate gets a comment on the existing issue, not a new one. Then check recently
+   *closed* issues too: a twin that was closed without shipping is a decision already made, and
+   re-filing it because the code it cites still exists is how a recurring sweep turns the queue
+   into a nag. Mention the match in the report; don't re-file it.
 2. **The bar is *actionable*.** An issue nobody could pick up and start is noise. If it can't be
    stated as Why / Touches / Acceptance, it isn't ready to file — keep interviewing, or don't file.
 3. **Shape it so the smallest human input unlocks it.** Prefer a pre-drafted fix with a
@@ -455,7 +459,19 @@ file* — neither fixes, branches, or merges.
    The **Fix** line is mandatory for a machine-found finding (`/scout` read the code; the draft
    is the point) and best-effort for a human-described idea (`/intake` interviews toward it but
    files without it when the idea is scope, not a defect).
-5. **Classify, don't over-classify.** Set what you know; leave routing to the picking skill (§2).
+5. **Classify by kind, route by certainty.** Kind labels (`bug`, `area:*`, §2's stamps) record
+   what you know — set them freely. The `status:*` label is a **certainty call**, made at filing
+   time, with three outcomes:
+   - **Deterministic** — the fix would be the same no matter who wrote it, and §4's gates can
+     prove it → `status:ready`. That is real scheduling: an unattended grinder may
+     build it (§5), so the bar is "this exact diff should ship," not "something here should change."
+   - **Interpretive** — a judgment call anywhere in it, however small → `status:needs-decision`,
+     **with the fix pre-drafted** (rule 3) so the decision costs one glance, not a work session.
+   - **Unsure → no status label.** It lands in the untriaged pile (§1) for a human look — the
+     filing-time twin of §5's "when unsure, exclude and surface."
+
+   A finding that touches a §5 brake surface is **never** deterministic, however certain the fix
+   looks — certainty and safety are different axes, and pickable requires both.
 6. **Budget.** Filing zero is a success. A sweep that files 20 low-grade issues has made the queue
    worse, not better. Cap a focused pass at **3–5** findings; a multi-lens sweep caps *per lens* and
    stays in single digits overall. Rank by (impact × how-actionable) and file only the top ones —

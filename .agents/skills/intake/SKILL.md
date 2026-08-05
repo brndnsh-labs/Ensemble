@@ -2,7 +2,7 @@
 name: intake
 description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon ONE question at a time until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=28f7f651c026 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=208c757ce107 — managed by the-cycle; edit the template, not this file -->
 
 # /intake — turn an idea into an actionable issue
 
@@ -62,10 +62,12 @@ options, recommendation first) — never to fire several at once.
    seen it.
 
 5. **File it** (§7): `gh issue create --title "<title>" --body "<body>" --label "<label>"` — the label is a §2 workflow
-   label describing *what kind of work it is* (`bug` and the `area:*` set), never a routing value:
-   §10.5 leaves routing to the picking skill. No fitting label is fine; file it bare, then mark it
-   pickable: `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`. There is nothing to add it
-   *to* — an open issue is already in the queue; the status label is the only write.
+   label describing *what kind of work it is* (`bug` and the `area:*` set); no fitting label is
+   fine. Then route it by §10.5's certainty call — which the interview already made: an idea that
+   reached the actionable bar is pickable, `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`;
+   one that's really a decision (step 3) gets `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:needs-decision"`
+   instead. There is nothing to add it *to* — an open issue is already in the queue; the status
+   label is the only write.
 
 6. **Report** the issue number and URL, and suggest `/cycle #<n>` if it's ready to build now.
 
@@ -79,7 +81,8 @@ show the set together, then file with a **single batched field write** (§7).
 - **Actionable, or don't file** (§10). If the interview stalls short of that bar, say so and stop —
   a placeholder issue is debt, not capture.
 - **Read-only until Brandon confirms the draft.** No issue is created mid-interview.
-- **Don't over-classify** (§10) — set what you know; routing is the picking skill's job.
+- **Route honestly** (§10.5) — pickable only when the interview genuinely reached actionable; a
+  decision-shaped idea files as `status:needs-decision`, never as pickable-with-caveats.
 - **Don't fix anything.** `/intake` files; `/cycle` builds. Even a one-line fix goes through the
   pipeline.
 

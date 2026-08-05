@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=82206773b695 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=186c1aa3dad7 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -161,7 +161,8 @@ it. Every filed issue includes:
 
 A finding you can't draft a fix for usually isn't actionable enough to file — put it in the
 report as an observation instead. The one exception: a genuine defect whose fix needs a design
-call — file it with the options sketched and flag it as needing a decision, not as pickable.
+call — file it with the options sketched and route it `status:needs-decision` (§10.5),
+never pickable.
 
 ## Workflow
 
@@ -169,15 +170,19 @@ call — file it with the options sketched and flag it as needing a decision, no
 2. **Sweep, read-only.** Fan out across the lenses; each returns candidate findings with
    `file:line` citations.
 3. **Verify each candidate against the real file.** Drop anything that doesn't survive.
-4. **Dedup against open issues** (§10.1) — search before filing.
+4. **Dedup** (§10.1) — open *and* recently-closed issues. A closed-unfixed twin is a rejection
+   with memory: report it, don't re-file it.
 5. **Rank and cut to budget.**
 6. **Present the slate** — each finding with its lens, `file:line`, the drafted issue body
-   **including its drafted fix**, and whether it lands on a §5 brake. **This is the checkpoint**;
-   nothing is written before it.
-7. **File** (§7): `gh issue create --title "<title>" --body "<body>" --label "scout"` per finding, then apply any
-   routing this repo's lens table calls for — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "<status:label>"` per issue.
-   A plain loop is correct here; these are REST calls, and there is nothing to batch around.
-   Tracker unreachable → say so and stop; don't pretend it filed.
+   **including its drafted fix**, its §10.5 certainty call with one line of why, and whether it
+   lands on a §5 brake. This is a §5 plan — shown for visibility, then acted on in the same turn;
+   an unattended run's standing go folds it into the report.
+7. **File** (§7): `gh issue create --title "<title>" --body "<body>" --label "scout"` per finding, then route each by
+   its certainty call (§10.5) — deterministic → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`,
+   interpretive → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:needs-decision"`, unsure → no status write —
+   plus anything this repo's lens table adds. A plain loop is correct here; these are REST calls,
+   and there is nothing to batch around. Tracker unreachable → say so and stop; don't pretend it
+   filed.
 8. **Report.** What was filed (links, labels, which ones flag a §5 brake for later), what was found
    but not filed (dups, below-the-cut, "clean on this lens"), and point at `/next`.
 
@@ -188,14 +193,16 @@ call — file it with the options sketched and flag it as needing a decision, no
 - **Verify every finding against the real file before it reaches the slate.** Non-negotiable.
 - **Respect the budget.** Fewer, sharper issues beat a flood; zero is a fine outcome.
 - **Dedup is not optional.**
-- **Read-only until the step-6 confirmation.** Nothing is created before the slate is shown.
+- **Read-only until the step-6 slate is shown.** Presenting it is a §5 plan, not a "Proceed?"
+  prompt — but nothing is created before it exists.
 - **Always-brake findings still get filed** — just clearly labeled as needing `/security-review` at
   build time, never framed as a quick auto-mergeable patch.
 
 ## How it fits the pipeline
 
 - **`/scout`** = code → candidate issues (the discovery front door).
-- **`/next`** = ranks and picks. A scout-filed issue arrives unrouted (§10), so it surfaces under
-  **Untriaged** and needs promoting to a pickable Status before the loop will take it.
+- **`/next`** = ranks and picks. A scout-filed issue arrives already routed by §10.5's certainty
+  call: deterministic findings are pickable on arrival, interpretive ones sit on Brandon's
+  decision queue with the fix pre-drafted, and only the genuinely unsure land under **Untriaged**.
 - **`/implement` / `/cycle`** = build a picked issue; §5 still brakes regardless of who filed it.
 - **`/burndown`** = curates the believed-safe subset and loops `/cycle` over it.

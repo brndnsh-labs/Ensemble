@@ -62,7 +62,8 @@
     "status": {
       "pickable": "status:ready",
       "active": "status:in-progress",
-      "done": "status:in-review"
+      "done": "status:in-review",
+      "decision": "status:needs-decision"
     },
     "ranking": "milestone (a real numbered epic > a \"candidate epic\" / no milestone), then Size (S < M < L, read off the `size/*` **label** — Size is not a board field), then issue number. Model is *not* a ranking factor",
     "milestones": []

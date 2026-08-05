@@ -2,7 +2,7 @@
 name: next
 description: Pick up the next Ensemble work story. Finds the highest-priority pickable issue, the in-flight work, and the finding pile, and lays out enough to choose /implement (one issue) vs /cycle (full loop). Add `--board` for the whole-queue orientation view instead of a single pick. Plan-first — read-only, no spawn, no edit. Use at session start or whenever deciding what to pick up.
 ---
-<!-- cycle:rendered template=skills/next.md.tmpl hash=e31349d0f936 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/next.md.tmpl hash=c9a1a420aeae — managed by the-cycle; edit the template, not this file -->
 
 # /next — surface the next work story
 
@@ -32,9 +32,10 @@ mechanics, including the "unreachable → stop" rule). Don't restate them; apply
 1. **Pull the open set** — one call, no join.
 2. **Partition by status label** (§1): pickable · in flight (note, don't re-pick) ·
    the `finding` pile (review debt — count and sample, don't pick) · **unrouted** (no `status:*` label).
-   Unrouted is not an empty bucket: §10 has `/intake` and `/scout` file without routing on purpose,
-   so everything they file lands here. Never silently drop it — count it, and surface the top
-   candidates under **Untriaged** so it can be promoted.
+   Unrouted is not an empty bucket: it's everything still waiting on a §10.5 certainty call —
+   review-carved observations (§2), and findings their filer couldn't confidently route. Never
+   silently drop it — count it, and surface the top candidates under **Untriaged** so it can be
+   promoted.
 3. **Rank the pickable issues** by the §1 rule: milestone (a real numbered epic > a "candidate epic" / no milestone), then Size (S < M < L, read off the `size/*` **label** — Size is not a board field), then issue number. Model is *not* a ranking factor.
 4. **Read the top pick's body** — Why / Touches / Acceptance.
 5. **Check it hasn't already shipped** (§1) — an umbrella issue's slices often land under
