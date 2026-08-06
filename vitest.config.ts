@@ -24,6 +24,15 @@ export default defineConfig({
                 'public/App.tsx',
             ],
         },
-        exclude: [...configDefaults.exclude, 'tests/e2e/**', 'tests/browser/**', 'tests/bench/**'],
+        exclude: [
+            ...configDefaults.exclude,
+            'tests/e2e/**',
+            'tests/browser/**',
+            'tests/bench/**',
+            // Agent-tool worktrees are full checkouts under the repo root — without
+            // this, every vitest run (and any filename filter) also discovers and
+            // runs their copies of the whole suite.
+            '.claude/worktrees/**',
+        ],
     },
 });
