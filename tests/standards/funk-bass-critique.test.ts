@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import {
     BASS_VELOCITY_DOMAIN_MAX,
@@ -554,16 +555,24 @@ describe('Funk Bass Critique', () => {
 
         expect(chorus.length).toBeGreaterThan(20);
         // intent: base / accent / ceiling all survive as separate levels ;
-        // measured 3 levels, deterministic across 30 runs ; floor 3.
-        expect(levels).toBeGreaterThanOrEqual(3);
+        // measured 5 levels post-#1342 (was 3), deterministic across 30 runs ;
+        // floor 4 — ratcheted with the measurement (#942 review: the modalShare
+        // ceiling below was ratcheted on the same improvement, and leaving this
+        // floor at the stale pre-#1342 value while moving that one was an
+        // inconsistent policy; 1 level of headroom against the deterministic 5).
+        expect(levels).toBeGreaterThanOrEqual(4);
         // intent: the bar's dynamic contrast clears the JND ; measured 1.37 dB ; floor 1.0 (37% headroom).
         expect(spread).toBeGreaterThanOrEqual(1.0);
-        // intent: no single rendered level dominates the bar ; measured 81%
-        // (funk's slap+intensity product still rails the domain ceiling at
-        // i≳0.83, #1334/#1336) ; non-regression ratchet at 85% (small headroom
-        // for run-to-run ghost-lane noise). Target after #1334/#1336 land is
-        // ≤50% — tighten this ceiling then, don't just watch the log line.
-        expect(modalShare).toBeLessThanOrEqual(0.85);
+        // intent: no single rendered level dominates the bar ; measured 71%
+        // post-#1342, down from 81% — dropping funk's generic backbeat accent
+        // took a ×1.15 off the notes that were pinning hardest to the domain
+        // ceiling, so two more rendered levels came back. Funk's slap+intensity
+        // product still rails at i≳0.83 (#1336, untouched). Non-regression
+        // ratchet moved 85% -> 78% with the measurement (7pt headroom; the old
+        // pair ran 4pt — #942 review corrected an earlier draft that claimed
+        // "same margin"). Target once #1336 lands is ≤50% — tighten
+        // again then, don't just watch the log line.
+        expect(modalShare).toBeLessThanOrEqual(0.78);
         // NOT asserted: acceptance 4c ("accent/base ratio at i=0.9 >= at i=0.3").
         // It is not reachable from this fix and the residual causes are both
         // explicitly out of scope. At i=0.9 the intensity term alone is 1.23, so
@@ -575,6 +584,15 @@ describe('Funk Bass Critique', () => {
         // probabilistic, so a comparison against it would be a flaky assertion
         // even if the engine allowed it.
         // Both numbers are logged above so the regression stays visible.
+        //
+        // Honest cost of #1342, stated rather than buried (#942 review): the
+        // backbeat accent it removed was carrying the only above-JND full-note
+        // contrast in the VERSE — post-fix the i=0.3 spread runs ~0.6-0.8 dB,
+        // one dynamic level to a listener, separated by the metric envelope
+        // alone. Right trade (it was WRONG contrast — a rock 2&4 lift on a funk
+        // line), but the completion is widening funk's own authored ladder at
+        // low intensity, tracked as #947. Watch the i=0.3 log line above until
+        // that lands.
     });
 
     it('swells the bass with the band instead of flattening (#1331 acceptance 4b)', () => {
@@ -640,20 +658,21 @@ describe('Funk Bass Critique', () => {
     //   1. At i>=0.7, this term and `popVel` both saturate
     //      `BASS_VELOCITY_DOMAIN_MAX` and render IDENTICALLY regardless of
     //      either one's own slope — a structural ceiling (#1336's territory).
-    //   2. Below that ceiling, funk is not in `EVEN_ACCENT_BASS_STYLES`
+    //   2. Below that ceiling, funk was not in `EVEN_ACCENT_BASS_STYLES`
     //      (#1335 deliberately left it accented), so the pop (odd `intBeat`)
-    //      still carries the +15% backbeat accent The One (even `intBeat`)
-    //      doesn't — measured: the pop is actually LOUDER than The One from
-    //      i~0.1 to i~0.65. A funk-specific accent profile (1&3 over 2&4) is
-    //      a design call beyond this story — filed as #1342.
+    //      still carried the +15% backbeat accent The One (even `intBeat`)
+    //      doesn't — measured: the pop was actually LOUDER than The One from
+    //      i~0.1 to i~0.65. RESOLVED BY #1342 (funk now opts out of the
+    //      generic accent via `GESTURE_ACCENT_BASS_STYLES`); the dominance
+    //      sweep at the bottom of this file is that fix's gate.
     //
     // What IS real, testable, and asserted below: this fix makes the
     // downbeat measurably louder through the verse->chorus BUILD (i=0.4-0.7,
     // before the ceiling saturates everything), where pre-fix it was making
     // no independent contribution at all. That is a genuine, if modest,
-    // improvement — it is NOT "The One is now the loudest thing in the bar,"
-    // which the issue pictured and which is not achievable in this story's
-    // scope.
+    // improvement. It was NOT, on its own, "The One is now the loudest thing
+    // in the bar" — that claim only became true once #1342 landed, and it is
+    // asserted there, not here.
     const meanOf = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1);
     const theOneAmplitude = (bandIntensity) => {
         const perf = simulatePerformance(32, {
@@ -717,6 +736,281 @@ describe('Funk Bass Critique', () => {
         };
         for (const r of results) {
             expect(r.mean).toBeGreaterThan(oldAmplitudeAt(r.bi));
+        }
+    });
+
+    // --- #1342: "The One" is the loudest thing in the funk bar -------------
+    //
+    // #1335 exempted 'quarter'/'bossa' from the generic odd-beat velocity
+    // accent (`intBeat % 2 === 1 ? 1.15 : 1.0` in `bass-engine.ts`) and
+    // deliberately left funk accented. That accent lands on beats 2 and 4 — a
+    // rock/pop BACKBEAT — while funk's own authored accents (the thumb slap on
+    // The One, the secondary slap on beat 3) sit on beats 1 and 3. Measured
+    // during #1334's review: the "and" pop, riding the +15% backbeat accent,
+    // rendered LOUDER than The One from i~0.1 to i~0.65 — the genre's
+    // structural anchor ("everything on The One") was not the loudest thing in
+    // its own bar across most of the practical dynamic range.
+    //
+    // #1342's design call: funk is exempted from the generic metric accent
+    // ENTIRELY (`GESTURE_ACCENT_BASS_STYLES`, `bass-styles.ts`) rather than
+    // moved onto a beats-1&3 accent set. Funk authors a per-gesture velocity
+    // for every note it emits (slap / secondary slap / pop / "a"-pop /
+    // hammer-on / approach / 0.5 dead-note chuck), so a blanket per-BEAT
+    // multiplier — on either pair — scales whatever gesture happens to land
+    // inside the accented beat and re-orders that authored hierarchy. Full
+    // reasoning lives in that set's doc comment.
+    //
+    // THE HONEST BOUND, read this before tightening: at i >= 0.7 The One and
+    // the "and" pop share the same authored token (1.25 + intensity*0.2) and
+    // BOTH saturate `BASS_VELOCITY_DOMAIN_MAX`, so they render bit-identically
+    // — the stacked-intensity structural ceiling (#1336), not this fix's
+    // business. So "strictly loudest" is asserted only below saturation;
+    // "never beaten" is asserted at EVERY sampled intensity, which is the
+    // claim that actually failed before this fix.
+    const funkBarDominance = (bandIntensity, numBars = 64, grooveOverride = null) => {
+        const perf = simulatePerformance(numBars, {
+            playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+            ...(grooveOverride ? { groove: grooveOverride } : {}),
+        });
+        const gain = conductorGain(bandIntensity);
+        const amp = (p) => bassVelocityToAmplitude(p.note.velocity * gain);
+        const bars = new Map();
+        for (const p of perf) {
+            const bar = Math.floor(p.step / 16);
+            if (!bars.has(bar)) {
+                bars.set(bar, { one: null, others: [], pops: [] });
+            }
+            const b = bars.get(bar);
+            if (p.stepInMeasure === 0) {
+                b.one = amp(p);
+            } else {
+                b.others.push(amp(p));
+                // The "and" pops: the funk engine fires them at
+                // `stepInBeat === stepsPerBeat / 2` (steps 2/6/10/14 in 4/4).
+                // `>= 0.8` keeps the ghost/chuck lane (authored 0.2-0.5) out —
+                // same split `renderedFullNotes` uses.
+                if (p.stepInMeasure % 4 === 2 && p.note.velocity >= 0.8) {
+                    b.pops.push(amp(p));
+                }
+            }
+        }
+        // why 1e-9: the tie case is a genuine bit-identical saturation at the
+        // domain ceiling (both operands are `Math.min(1.5, ...)` of the same
+        // token), so this epsilon only absorbs accumulated float rounding — it
+        // is not wide enough to hide a real dynamic difference (the smallest
+        // real gap in this bar is the +5%/-3.5% metric envelope step, ~0.2 dB).
+        const EPS = 1e-9;
+        let checked = 0;
+        let strict = 0;
+        let tied = 0;
+        let beaten = 0;
+        let marginSum = 0;
+        let worstMargin = Number.POSITIVE_INFINITY;
+        const oneAmps = [];
+        const popAmps = [];
+        for (const b of bars.values()) {
+            if (b.one === null) {
+                continue;
+            }
+            oneAmps.push(b.one);
+            popAmps.push(...b.pops);
+            if (b.others.length === 0) {
+                continue;
+            }
+            checked++;
+            const loudestOther = Math.max(...b.others);
+            const marginDb = dB(b.one / loudestOther);
+            marginSum += marginDb;
+            worstMargin = Math.min(worstMargin, marginDb);
+            if (b.one > loudestOther + EPS) {
+                strict++;
+            } else if (b.one >= loudestOther - EPS) {
+                tied++;
+            } else {
+                beaten++;
+            }
+        }
+        return {
+            checked,
+            strict,
+            tied,
+            beaten,
+            meanMarginDb: marginSum / (checked || 1),
+            worstMarginDb: worstMargin,
+            onePop: popAmps.length ? dB(meanOf(oneAmps) / meanOf(popAmps)) : Number.NaN,
+            nPops: popAmps.length,
+        };
+    };
+
+    // #942 review P0: this file's shared harness runs `instruments: []`, which
+    // silences `getBassNote`'s kick-lock early return (`hasKickTrigger` is
+    // permanently false — harness-silencing, smell (e)). The shipped Funk
+    // preset has a kick ON The One (step 0, accented), and pre-patch that
+    // branch intercepted the downbeat ahead of the authored slap and rendered
+    // it at ~1.06 (i=0.5) against the pop's 1.35 — the #942 inversion, alive in
+    // production while the kickless sweep read green. So the dominance sweep
+    // runs BOTH lanes: kickless isolates the gesture ladder + accent fix; the
+    // kick lane replays it under the production Funk preset's real kick grid
+    // and is what makes the claim true of what ships. Kick-coincident non-One
+    // steps still render at the generic lock level — that open design call is
+    // #948, and until it lands the kick lane's population is a mix of authored
+    // gestures (non-kick steps) and lock-level notes (kick steps), all of which
+    // must stay under The One.
+    const funkKickGroove = () => {
+        const preset = DRUM_PRESETS.Funk;
+        return {
+            genreFeel: 'Funk',
+            pocket: 0,
+            measures: preset.measures,
+            instruments: [{ name: 'Kick', steps: preset.variations[0].Kick }],
+        };
+    };
+
+    it('"The One" is never out-rendered in the funk bar across 0.1-0.9, kickless AND on the production kick grid (#1342/#942)', () => {
+        const intensities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+        const sweep = intensities.map((bi) => ({ bi, ...funkBarDominance(bi) }));
+        const kickSweep = intensities.map((bi) => ({
+            bi,
+            ...funkBarDominance(bi, 64, funkKickGroove()),
+        }));
+
+        const fmt = (r) =>
+            `[i=${r.bi}]  bars=${r.checked}  strict=${r.strict}  tied=${r.tied}  ` +
+            `BEATEN=${r.beaten}  margin(mean/worst)=${r.meanMarginDb.toFixed(
+                2,
+            )}/${r.worstMarginDb.toFixed(2)}dB  ` +
+            `One-vs-pop=${r.onePop >= 0 ? '+' : ''}${r.onePop.toFixed(2)}dB (n=${r.nPops})`;
+        console.log(
+            [
+                '',
+                '--- #1342 FUNK "THE ONE" vs THE REST OF THE BAR (kickless) ---',
+                ...sweep.map(fmt),
+                '--- #942 same sweep, production Funk kick grid loaded ---',
+                ...kickSweep.map(fmt),
+                '(pre-#1342, kickless, per-bar: The One out-rendered in 50/54/55 of 64 bars at i=0.4/0.5/0.6)',
+                '(pre-#942 kick carve-out, kick grid: The One out-rendered in 64/64 bars at i=0.4-0.6, worst -1.5dB)',
+                '---------------------------------------------------',
+            ].join('\n'),
+        );
+
+        // intent: the sample can't collapse — a bar count near zero would let
+        // "never beaten" pass vacuously. Low intensities legitimately thin out
+        // (the `intensity < 0.4 && !isDownbeat` lay-out branch), so the floor
+        // is deliberately low there and tight above it. The kick lane lays out
+        // LESS at low intensity (kick-coincident steps bypass the lay-out
+        // branch), so the same floors hold there a fortiori.
+        for (const r of [...sweep, ...kickSweep]) {
+            expect(r.checked).toBeGreaterThanOrEqual(r.bi < 0.4 ? 8 : 60);
+        }
+
+        // intent (the acceptance): nothing in the bar is EVER louder than The
+        // One, at any sampled intensity, in EITHER lane. Kickless, this was
+        // false before #1342 — measured 50/54/55 of 64 bars beaten at
+        // i=0.4/0.5/0.6 (deterministic there; NOT the 64/64 an earlier draft of
+        // this comment claimed). On the kick grid it was false before the #942
+        // kick carve-out — 64/64 bars beaten at i=0.4-0.6, by up to -1.5 dB.
+        for (const r of [...sweep, ...kickSweep]) {
+            expect(r.beaten).toBe(0);
+        }
+
+        // intent: below the domain-ceiling saturation point The One is
+        // STRICTLY the loudest, in every bar — not merely tied. Saturation
+        // engages at i~0.65 for the downbeat token (#1336), so this is
+        // asserted on the 0.1-0.6 half of the sweep, in both lanes (the kick
+        // lane's loudest challenger is still a NON-kick-step pop at full
+        // `popVel`, so the margins match the kickless lane's).
+        for (const r of [...sweep, ...kickSweep].filter((s) => s.bi <= 0.6)) {
+            expect(r.strict).toBe(r.checked);
+            // intent: the margin is a real level difference, not a rounding
+            // artifact ; measured worst-case ~0.10dB at i=0.1 (the sqrt half of
+            // `bassVelocityToAmplitude` compresses the soft end) ; floor 0.05dB.
+            expect(r.worstMarginDb).toBeGreaterThan(0.05);
+        }
+
+        // intent: at/above saturation the honest claim is "never quieter" —
+        // both notes rail at `BASS_VELOCITY_DOMAIN_MAX` and tie. Asserting a
+        // strict win here would be asserting against #1336's ceiling.
+        for (const r of [...sweep, ...kickSweep].filter((s) => s.bi >= 0.7)) {
+            expect(r.worstMarginDb).toBeGreaterThanOrEqual(0);
+        }
+
+        // intent: SUPPORTING metric in the issue's own terms — mean The One vs
+        // mean "and" pop. The per-bar `beaten === 0` above is the load-bearing
+        // acceptance guard; this mean-based pair is looser (pre-fix it already
+        // sat positive at the band edges, i=0.1 and i=0.6, so it alone would
+        // NOT have caught the regression) and is kept for the report line and
+        // as a cheap direction check, not as the gate. The bound is -1e-6 dB
+        // rather than 0 because at i >= 0.7 both populations are pinned to the
+        // same domain-ceiling value and the two means differ only by float
+        // accumulation (measured -1.6e-14 dB) — a true tie, not a loss.
+        for (const r of [...sweep, ...kickSweep]) {
+            expect(r.onePop).toBeGreaterThan(-1e-6);
+        }
+    });
+
+    it('drops the rock/pop 2&4 backbeat accent from funk (#1342 mutation guard)', () => {
+        // The dominance test above can be satisfied by several shapes; this one
+        // pins the actual mechanism. Compare the "and" pops on ODD `intBeat`
+        // (the & of 2 and the & of 4 — steps 6 and 14, which carried the +15%
+        // generic backbeat accent) against those on EVEN `intBeat` (the & of 1
+        // and the & of 3 — steps 2 and 10, which never did). Both populations
+        // share one authored token (`popVel`), so post-#1342 the ONLY thing
+        // separating them is the genre-neutral metric envelope (+2.5% into a
+        // strong beat vs -3.5% just after one, `bassEnvelope` in
+        // `bass-engine.ts`) — a ~0.45 dB rendered step. Pre-#1342 the backbeat
+        // accent stacked ~1.5 dB on top of that. Measured at intensities where
+        // the domain clamp is NOT engaged, and where the deliberately unseeded
+        // low-intensity lay-out branch is NOT live, so this is deterministic.
+        const rows = [0.4, 0.5, 0.6].map((bandIntensity) => {
+            const perf = simulatePerformance(32, {
+                playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+            });
+            const gain = conductorGain(bandIntensity);
+            const pops = (steps) =>
+                perf
+                    .filter((p) => steps.includes(p.stepInMeasure) && p.note.velocity >= 0.8)
+                    .map((p) => bassVelocityToAmplitude(p.note.velocity * gain));
+            const backbeat = pops([6, 14]);
+            const evenBeatPops = pops([2, 10]);
+            return {
+                bandIntensity,
+                nBack: backbeat.length,
+                nOn: evenBeatPops.length,
+                gapDb: dB(meanOf(backbeat) / meanOf(evenBeatPops)),
+            };
+        });
+
+        console.log(
+            [
+                '',
+                '--- #1342 FUNK BACKBEAT-ACCENT RESIDUE ---',
+                ...rows.map(
+                    (r) =>
+                        `[i=${r.bandIntensity}]  &of2/&of4 n=${r.nBack}  &of1/&of3 n=${r.nOn}  ` +
+                        `gap=${r.gapDb >= 0 ? '+' : ''}${r.gapDb.toFixed(2)}dB ` +
+                        '(envelope-only target ~0.45dB; pre-#1342 ~1.5dB)',
+                ),
+                '------------------------------------------',
+            ].join('\n'),
+        );
+
+        for (const r of rows) {
+            expect(r.nBack).toBeGreaterThan(20);
+            expect(r.nOn).toBeGreaterThan(20);
+            // intent: only the metric envelope may separate the two pop
+            // positions ; measured 0.45/0.47/0.47 dB ; ceiling 0.70 dB (~49%
+            // headroom). Mutation-checked in both directions: reverting the
+            // engine fix measures 1.54/1.50/0.83 dB, red at all three sampled
+            // intensities. (0.9 was the first ceiling tried and let the i=0.6
+            // pre-fix value through — the domain clamp already eats part of the
+            // accent there, so the mutation signal is weakest at the top of
+            // this band and the ceiling has to be set against THAT value, not
+            // the headline 1.5.)
+            expect(r.gapDb).toBeLessThan(0.7);
+            // intent: the envelope itself must survive — this is not a
+            // "flatten everything" fix. The & of 2/4 lean INTO the coming
+            // strong beat and stay slightly above the & of 1/3.
+            expect(r.gapDb).toBeGreaterThan(0.1);
         }
     });
 });

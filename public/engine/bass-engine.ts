@@ -39,6 +39,7 @@ import {
     approachBend,
     checkBassActiveStyle,
     EVEN_ACCENT_BASS_STYLES,
+    GESTURE_ACCENT_BASS_STYLES,
     getBassNoteStyle,
     isChordChangeApproach,
 } from './bass-styles.js';
@@ -458,7 +459,22 @@ export function getBassNote(
     // anticipation hierarchy (bass-styles.ts) was getting inverted by this
     // same accent multiplying through the shared `result()` closure — see
     // `EVEN_ACCENT_BASS_STYLES` for the full reasoning on both.
-    const velocity = EVEN_ACCENT_BASS_STYLES.has(style) ? 1.0 : intBeat % 2 === 1 ? 1.15 : 1.0;
+    //
+    // #1342 added the second opt-out set. `intBeat % 2 === 1` is beats 2 and 4
+    // — a rock/pop BACKBEAT. Funk's own accents sit on beats 1 and 3 (the
+    // thumb slap on The One below, the secondary slap in `bass-styles.ts`), so
+    // for funk this generic accent didn't reinforce the idiom, it inverted it:
+    // measured, the "and" pop rendered LOUDER than The One from i≈0.1 to
+    // i≈0.65. Funk opts out entirely rather than moving to a 1&3 accent,
+    // because it authors a per-gesture velocity on every note it emits and a
+    // blanket per-beat multiplier re-orders that ladder whichever pair of beats
+    // it lands on — see `GESTURE_ACCENT_BASS_STYLES` for the full call.
+    const velocity =
+        EVEN_ACCENT_BASS_STYLES.has(style) || GESTURE_ACCENT_BASS_STYLES.has(style)
+            ? 1.0
+            : intBeat % 2 === 1
+              ? 1.15
+              : 1.0;
 
     // --- Imperfect Symmetry: per-phrase octave displacement on repeat passes ---
     // why: epic-form-arrangement S2 — when a section repeats (Verse 2 vs Verse 1),
@@ -729,9 +745,14 @@ export function getBassNote(
         // contour tables yet). `stepInMeasure` is already measure-relative, so no #923
         // wrap is needed. KNOWN LIMITATION (#1006): multiplicative-then-clamped, so the
         // swell fades when the base is already hot — same tradeoff as the soloist envelope.
-        // Note the envelope anchors beats 1 & 3 (metric) while the existing accent favors
-        // the backbeat (2 & 4), so per-beat weight reads 1.05 / 1.15 / 1.05 / 1.15 — a
-        // coherent metric-under-backbeat interplay, intentional for the genre-neutral pass.
+        // Note the envelope anchors beats 1 & 3 (metric). For styles still carrying
+        // the generic backbeat accent (2 & 4) the combined per-beat weight reads
+        // 1.05 / 1.15 / 1.05 / 1.15 — a coherent metric-under-backbeat interplay,
+        // intentional for the genre-neutral pass. For the accent-exempt styles
+        // (`EVEN_ACCENT_BASS_STYLES` since #1335, `GESTURE_ACCENT_BASS_STYLES`
+        // since #1342) this envelope is the ONLY per-beat weight left — for funk
+        // its 1.05-vs-1.025 strong-beat lean is what keeps The One on top of the
+        // same-token "and" pop at all.
         const spb = ts.stepsPerBeat;
         const spBar = ts.beats * spb;
         const midBeatStepB = Math.floor(ts.beats / 2) * spb;
@@ -1115,9 +1136,18 @@ export function getBassNote(
             // why: duration=1 (one sub-beat step) — short, punchy approach note that
             // doesn't blur into the new downbeat.
             1,
-            // why: slight accent (×1.05) so the anticipation "pops" audibly before
-            // the new section lands; subtler than a downbeat accent (×1.15).
-            velocity * 1.05,
+            // why: slight accent so the anticipation "pops" audibly before the new
+            // section lands. (The ×1.15 inside `velocity` is the generic BACKBEAT
+            // accent — beats 2 & 4 — not a downbeat accent; accent-carrying styles
+            // land this walk-in on an odd beat and render it at 1.15 × 1.05 ≈ 1.21.)
+            // Funk opts out of the per-beat accent (`GESTURE_ACCENT_BASS_STYLES`,
+            // #1342), which left this walk-in — funk's one velocity-derived
+            // emission — at a bare 1.05, the quietest full note in its bar at the
+            // exact moment the comment above says it should pop (#942 review).
+            // Authored at 1.15 instead: above the ornament band (hammer-on 1.1,
+            // chuck 0.5) so the lead-in reads, below the slap family (1.2+) so it
+            // doesn't rival the downbeat it resolves into.
+            style === 'funk' ? 1.15 : velocity * 1.05,
         );
     }
 
@@ -1182,7 +1212,22 @@ export function getBassNote(
         kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
     );
 
-    if ((style === 'rock' || style === 'funk') && hasKickTrigger) {
+    if (
+        (style === 'rock' || style === 'funk') &&
+        hasKickTrigger &&
+        // #942 review: funk's chord-start slap ("The One") must not be intercepted
+        // by the generic kick-lock. The shipped Funk preset has a kick ON step 0,
+        // so this early return was intercepting the authored downbeat slap below and
+        // handing The One `kickVel * (0.7 + 0.3i)` (~1.06 at i=0.5) — under
+        // `popVel`, re-creating in the kick layer the exact inversion #1342 fixed
+        // in the accent layer, invisible to any kickless harness. A slap player
+        // locking to the kick digs the slap in HARDER, they don't drop to a
+        // generic lock level: let funk's chord start fall through to its authored
+        // gesture (which also owns the #1295 register fold this path lacks).
+        // Kick-lock keeps every OTHER funk kick-coincident step — locking the line
+        // to the syncopated kick is this branch's actual job.
+        !(style === 'funk' && stepInChord === 0)
+    ) {
         const kickVel =
             kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
         const dynamicKickVel = Math.max(0.8, kickVel * (0.7 + intensity * 0.3));
@@ -1296,18 +1341,22 @@ export function getBassNote(
             // the verse->chorus build (i≈0.4-0.7, +0.2 to +0.5dB over the old
             // flat value there).
             //
-            // What this does NOT fix, verified, not assumed: (1) at i≥0.7 this
-            // term and `popVel` both saturate `BASS_VELOCITY_DOMAIN_MAX` and
-            // render identically regardless of either one's own slope — a
-            // structural ceiling (#1336's un-stacked-intensity territory), not
-            // a tuning problem. (2) Below that ceiling, funk is NOT one of
-            // `EVEN_ACCENT_BASS_STYLES` (#1335 deliberately left it accented),
-            // so the pop (an odd `intBeat`) still carries the +15% backbeat
-            // accent The One (even `intBeat`) doesn't — measured: the pop is
-            // actually LOUDER than The One from i≈0.1 to i≈0.65, despite this
-            // fix. The One is not "the loudest thing in the bar" the issue
-            // pictured; that needs a funk-specific accent profile (1&3 over
-            // 2&4), a design call beyond this story's scope — filed as #1342.
+            // What this does NOT fix, verified, not assumed: at i≥0.7 this term
+            // and `popVel` both saturate `BASS_VELOCITY_DOMAIN_MAX` and render
+            // identically regardless of either one's own slope — a structural
+            // ceiling (#1336's un-stacked-intensity territory), not a tuning
+            // problem. Below that ceiling The One is now never out-rendered by
+            // any other note — an ORDERING claim, not audible dominance: the
+            // margin over the same-token "and" pop is only the metric
+            // envelope's 1.05 vs 1.025 (~0.1-0.19 dB rendered, under the ~1 dB
+            // JND), because this token deliberately equals `popVel`. Making the
+            // downbeat audibly dominant is a token-retuning question, tracked
+            // as a follow-up (#942 review). #1342 removed the generic +15%
+            // backbeat accent from funk
+            // (`GESTURE_ACCENT_BASS_STYLES`), which until then rode the "and"
+            // pop (odd `intBeat`) and not The One (even `intBeat`) and made the
+            // pop measurably louder from i≈0.1 to i≈0.65. Guarded by the
+            // #1342 assertions in `tests/standards/funk-bass-critique.test.ts`.
             //
             // #1340: 'quarter' (jazz walking) gets flat 1.0 here, not the
             // `1.0 + intensity*0.25` rock/disco/neo share. `isStraightStyle`

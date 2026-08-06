@@ -48,8 +48,85 @@ type ChordChangeShape = {
  * pair isn't railed at `BASS_VELOCITY_DOMAIN_MAX` (both saturate and read
  * equal above roughly intensity 0.88 — #1331's clamp, not this gate's
  * business). This gate restores the ordering below that ceiling.
+ *
+ * See also `GESTURE_ACCENT_BASS_STYLES` below: a SECOND set feeding the same
+ * gate, for styles suppressed because they author their own per-gesture
+ * dynamics rather than because their idiom is flat. Two sets, one gate — the
+ * reason a style is listed is the part worth keeping separate.
  */
 export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
+
+/**
+ * #1342: bass styles that author their OWN per-gesture velocity for every note
+ * they emit, and therefore opt out of `bass-engine.ts`'s generic per-BEAT
+ * velocity accent (`intBeat % 2 === 1 ? 1.15 : 1.0`) the same way
+ * `EVEN_ACCENT_BASS_STYLES` does — but for a different musical reason, which is
+ * why it's a separate set rather than a new member of that one. Those styles are
+ * suppressed because their idiom is dynamically FLAT (a walking line's drive is
+ * note-length, not level). Funk is the opposite: it is the most accented idiom
+ * in the file. Its accents just aren't METRIC.
+ *
+ * 'funk': every note the funk branch emits already carries an authored,
+ * intensity-scaled velocity naming the GESTURE that produced it — thumb slap on
+ * The One (`BASS_AUTHORING_CEILING + intensity*0.2`, `bass-engine.ts`'s
+ * `stepInChord === 0` early return), secondary slap on beat 3 (`slapVel`,
+ * `1.2 + intensity*0.2`), the "and" pop (`popVel`, `1.25 + intensity*0.2`), the
+ * high-complexity "a" pop (1.15), hammer-on (1.1), chord-change approach (1.1),
+ * and the dead-note chuck (0.5). That ladder IS funk's accent map. Layering a
+ * blanket per-beat multiplier on top of it scales whatever gesture happens to
+ * fall inside the accented beat — a muted 0.5 ghost chuck on a beat-2 16th gets
+ * the same +15% as the pop, which is a category error: a dead note is quiet by
+ * definition. (#942 review: making "every note" true took two style-agnostic
+ * early returns in `bass-engine.ts` as well — the kick-lock branch now lets
+ * funk's chord start fall through to the authored slap instead of a generic
+ * lock level, and the section-anticipation walk-in carries its own authored
+ * 1.15 token instead of the `velocity`-derived product this exemption zeroed.)
+ *
+ * Two shapes were considered (#1342 is explicitly a design call):
+ *   (a) move funk to a beats-1&3 accent set, so the generic metric weight
+ *       reinforces the slap positions instead of fighting them; or
+ *   (b) exempt funk from the generic accent entirely. THIS is what shipped.
+ *
+ * (b) won on three counts. First, funk's accents are SYNCOPATED by definition —
+ * the weight lands on The One and on the offbeat pops, not on a fixed
+ * strong-beat grid, so ANY per-beat multiplier is the wrong instrument; (a)
+ * would only move the ghost-chuck category error from beats 2&4 onto 1&3.
+ * Second, it is redundant: The One and the beat-3 slap already carry their own
+ * intensity-scaled terms (#1334), deliberately 0.05 apart so The One stays the
+ * louder of the two — a further ×1.15 on both preserves nothing and buys
+ * nothing. Third — the decisive one, measured by building (a) and running the
+ * suite against it rather than reasoning about it: stacking a ×1.15 on The One
+ * ON TOP of its own `1.25 + intensity*0.2` token rails it against
+ * `BASS_VELOCITY_DOMAIN_MAX` a whole intensity band earlier, which flattens the
+ * chorus. Under (a) the #1331 chorus-hierarchy metric drops to a 0.81 dB spread
+ * over 4 rendered levels — RED against that test's own 1.0 dB floor — and the
+ * macro swell falls from +6.03 dB to +5.42 dB; The One also stops being
+ * STRICTLY the loudest note from i≈0.6 up instead of i≈0.7. Under (b) the same
+ * metrics improve on the status quo (1.37 dB over 5 levels, modal share 81% →
+ * 71%): removing a multiplier that was pinning notes to the rail buys back
+ * dynamic resolution the whole bar was losing. (a) would have fixed the
+ * ordering by making everything else quieter relative to a railed downbeat;
+ * (b) fixes it by letting the authored ladder through untouched.
+ *
+ * What funk keeps is `bass-engine.ts`'s `bassEnvelope` (#1006): +5% on the
+ * downbeat and bar midpoint, −7% on the step right after, tapering. That is a
+ * phrasing swell an order of magnitude gentler than a 15% level accent, and it
+ * anchors beats 1 and 3 — with it, and with the generic accent gone, the
+ * rendered order in a funk bar is The One on top, then the "and" pops and the
+ * beat-3 slap interleaved by that envelope (a pop leaning INTO a strong beat
+ * edges the slap; a pop landing just AFTER one sits under it), then the "a" pop,
+ * then hammer-on/approach, then the chuck — the authored ladder read back with
+ * only phrasing shading on it, instead of a metric multiplier re-sorting it.
+ * Guarded by `tests/standards/funk-bass-critique.test.ts` (#1342).
+ *
+ * Before adding a style here, check it actually authors a velocity on EVERY
+ * return path — a style that leaves some notes at `result()`'s default 1.0 needs
+ * the metric accent to have any dynamic shape at all. That audit must include
+ * `bass-engine.ts`'s style-AGNOSTIC early returns (kick-lock, section
+ * anticipation, the quiet-offbeat ghost), which emit for a style without ever
+ * entering its own branch — two of the three bit funk (#942 review).
+ */
+export const GESTURE_ACCENT_BASS_STYLES = new Set(['funk']);
 
 /**
  * Type-guard returning true only when nextChord represents an actual chord
