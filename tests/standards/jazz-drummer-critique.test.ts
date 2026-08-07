@@ -127,7 +127,8 @@ describe('Jazz Drummer Critique', () => {
                 }
 
                 // --- CRITIQUE: Snare Comping ---
-                // Engine routes snare → Sidestick at intensity < 0.4 (jazz.ts:222),
+                // Engine routes snare → Sidestick via the `shouldPlay && intensity < 0.4`
+                // trim in the Snare branch of `applyOverrides` (jazz.ts),
                 // so count both as snare-voice comping events.
                 if (stepData.instruments.Snare || stepData.instruments.Sidestick) {
                     snareCompingHits++;
@@ -170,7 +171,8 @@ describe('Jazz Drummer Critique', () => {
         console.log('------------------------------------\n');
 
         // CRITICAL: the quarter-note ride pulse is the bedrock of swing time —
-        // the engine sets rideProb=1.0 on every beat (jazz.ts:101), so this is
+        // the engine sets rideProb=1.0 on every beat (the `rideProb` ternary in the
+        // Open/Ride branch of `applyOverrides`, jazz.ts), so this is
         // deterministic at 100%. Measured 1.0 across 128 bars; threshold 0.95
         // gives a 5pt cushion and still fails outright if the quarter pulse is
         // dropped (a removed lane scores 0).
@@ -190,7 +192,8 @@ describe('Jazz Drummer Critique', () => {
         expect(footChickSolidity).toBe(1.0);
 
         // MUSICAL: Kick feathering should be the default quarter note behavior
-        // Engine plays quiet kick on every beat-start (jazz.ts:123-128); delivers 100%.
+        // Engine plays quiet kick on every beat-start (the `isFeatherStep` branch in
+        // the Kick branch of `applyOverrides`, jazz.ts); delivers 100%.
         expect(kickFeatheringScore).toBeGreaterThan(0.95);
 
         // MUSICAL: Comping should be active but conversational
@@ -225,7 +228,8 @@ describe('Jazz Drummer Critique', () => {
         // Count snare/sidestick/brush hits there — with S3's floor active at
         // intensity ≤ 0.45, this must be zero. Counting all three sound names
         // captures the lane regardless of routing (intensity 0.3 + bpm 120
-        // routes snare → Brush per jazz.ts:236).
+        // routes snare → Brush per the `intensity < 0.35 && bpm < 130` branch in
+        // the Snare branch of `applyOverrides`, jazz.ts).
         let oddStepCount = 0;
         let snareOnOddSteps = 0;
         performance.forEach((bar) => {
@@ -271,7 +275,8 @@ describe('Jazz Drummer Critique', () => {
             perf.forEach((bar) =>
                 bar.forEach((step) => {
                     // Count both Snare and Sidestick — engine routes to Sidestick
-                    // at intensity < 0.4 (jazz.ts:222). Counting only Snare would
+                    // at intensity < 0.4 (the `shouldPlay && intensity < 0.4` Sidestick
+                    // trim in the Snare branch of `applyOverrides`, jazz.ts). Counting only Snare would
                     // measure the routing threshold, not the comping density claim.
                     if (step.instruments.Snare || step.instruments.Sidestick) {
                         hits++;
@@ -292,7 +297,8 @@ describe('Jazz Drummer Critique', () => {
             `[Jazz Intensity] Low (0.2) Comping: ${lowComping}, High (0.9) Comping: ${highComping}, Ratio: ${ratio.toFixed(2)}x`,
         );
         // Engine drives comping density mostly via intensity-scaled kick bombs
-        // (bombProb = intensity * 0.12, jazz.ts:146). Snare/Sidestick comping density
+        // (the `bombProb` const in the "General Kick Bombs" branch of `applyOverrides`,
+        // jazz.ts). Snare/Sidestick comping density
         // is rhythm-driven (drumComplexity, soloistBusy) so it does not scale steeply
         // with intensity — at high intensity the snare comping gets LOUDER (Snare
         // instead of Sidestick) more than it gets DENSER. Engine delivers ~1.7x ratio.

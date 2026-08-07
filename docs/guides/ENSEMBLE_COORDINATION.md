@@ -11,10 +11,7 @@ Per-genre micro-timing lean is NOT a `CoordinationContext` field — the band-gl
 ## Strict Register Slotting
 To ensure a clean mix and avoid harmonic masking, instruments are strictly assigned to specific MIDI note ranges:
 Implementation source of truth lives in `public/engine/coordination-engine.ts`.
-*   **Bass:** Claims MIDI 23 to 57 (Expanded 5-String Range). This is subdivided into a "Three-Lane" model:
-    *   **Sub-Basement (23-35):** The deep pocket for Neo-Soul, Dub, and Reggae.
-    *   **The Meat (36-47):** The standard home for Rock, Funk, and Pop (low E/A strings).
-    *   **The Attic (48-57):** Reserved for high-intensity fills and melodic peaks, restricted by downward gravity algorithms.
+*   **Bass:** Claims MIDI 23 to 57 (expanded 5-string range — supports the low B and melodic fills). Enforced as a single flat clamp by `enforceRegisterSlotting`'s `bass` case (`smoothOctaveClamp(midi, 23, 57, targetMidi)`) — there are no register sub-tiers. Per-genre register character (Neo-Soul/Dub/Reggae sitting deeper, fills reaching higher) is an emergent property of each style's pitch selection, not a coordination-layer rule.
 *   **Chords:** Restricted to MIDI 52 to 84. A hard "Musical Firewall" prevents Chords and Harmonies from ever bleeding below MIDI 52 to ensure the Bass has exclusive ownership of the low-end spectrum.
 *   **Harmony:** Dynamically evaluates the Chords and Soloist averages before selecting an inversion to avoid clashing.
 *   **Soloist:** Has free range across the keyboard, but priority is given in the MIDI 60 to 90 range. Only notes that would fall below the chord floor (MIDI 52) are clamped upward into that lane.
@@ -24,4 +21,4 @@ Instruments must yield to each other rhythmically to maintain a clear arrangemen
 *   **Priority:** Top priority goes to the Groove (Drums) and the Soloist.
 *   **Bass:** Yields melodic complexity to the Soloist but strictly locks its rhythm to the Kick drum.
 *   **Chords:** Yield density to the Soloist (playing sparser voicings or comping less frequently when the soloist is busy).
-*   **Harmony:** Yields to all other instruments, filling in only when space allows. **As of v2.36**, the Harmony section also performs **Thematic Reinforcement**: during the song's Head (Loop 0), it proactively "shadows" the soloist's seeded melody by providing reinforcement stabs on anchor points, strengthening the thematic hook.
+*   **Harmony:** Yields to all other instruments, filling in only when space allows. The Harmony section also performs **Thematic Reinforcement**: during the song's Head (Loop 0), it proactively "shadows" the soloist's seeded melody by providing reinforcement stabs on anchor points, strengthening the thematic hook.

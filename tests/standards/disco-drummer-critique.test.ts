@@ -136,9 +136,11 @@ describe('Disco Drummer Critique', () => {
         console.log('------------------------------------\n');
 
         expect(kickScore).toBe(1.0);
-        // Backbeat is unconditional in the engine (disco.ts:82). Strict 100%.
+        // Backbeat is unconditional in the engine (the "Standard Disco backbeat"
+        // `isBackbeat` branch in the Snare branch of `applyOverrides`, disco.ts). Strict 100%.
         expect(backbeatScore).toBe(1.0);
-        // Offbeat Open hat fires on every isOffbeat (disco.ts:120), independent of
+        // Offbeat Open hat fires on every isOffbeat (the "Core Offbeat Open Hat" branch
+        // in the HiHat/Open branch of `applyOverrides`, disco.ts), independent of
         // motif. Engine delivers 100%. Prior threshold > 0.4 left 60pt of unused
         // headroom.
         expect(offbeatScore).toBeGreaterThan(0.95);
@@ -202,7 +204,9 @@ describe('Disco Drummer Critique', () => {
             bar.forEach((stepData) => {
                 const s = stepData.loopStep;
                 if (stepData.instruments.Snare && s !== 4 && s !== 12 && s !== 15) {
-                    // Exclude turnaround-final-step snare crack (disco.ts:124-130).
+                    // Exclude turnaround-final-step snare crack (the `isTurnaround &&
+                    // loopStep === stepsPerBar - 1` "Full crack" branch in the Snare
+                    // branch of `applyOverrides`, disco.ts).
                     offBackbeatSnares++;
                 }
                 const percSound = stepData.instruments.Perc?.sound;

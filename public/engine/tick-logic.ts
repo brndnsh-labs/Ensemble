@@ -125,7 +125,7 @@ export function generateNotesForStep(
                 chord || null,
                 nextChordData?.chord || null,
                 step,
-                (soloist.audio.lastFreq || null) as any,
+                soloist.audio.lastFreq || null,
                 soloist.octave,
                 soloist.style || '',
                 stepInChord,
@@ -149,7 +149,7 @@ export function generateNotesForStep(
                             'soloist',
                             res.midi,
                             coordination,
-                            lastSoloMidi as any,
+                            lastSoloMidi,
                         );
 
                         if (!res.freq) {
@@ -210,7 +210,7 @@ export function generateNotesForStep(
                     chord,
                     nextChordData?.chord,
                     stepInChord / ts.stepsPerBeat,
-                    (bass.lastFreq || null) as any,
+                    bass.lastFreq || null,
                     bass.octave,
                     bass.style,
                     chordData.chordIndex,
@@ -229,7 +229,7 @@ export function generateNotesForStep(
                         'bass',
                         bassResult.midi,
                         coordination,
-                        lastBassMidi as any,
+                        lastBassMidi,
                     );
 
                     if (!bassResult.freq) {

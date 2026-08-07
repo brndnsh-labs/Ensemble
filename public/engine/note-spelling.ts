@@ -47,10 +47,10 @@ export function spellPitchClass(
         return SHARP_NOTE_ORDER[pitchClass];
     }
     if (accidentalHint === 'b' || explicitNote.includes('b')) {
-        return (KEY_ORDER as any)[pitchClass];
+        return KEY_ORDER[pitchClass];
     }
 
     const tonic = (keyContext || '').replace(/m$/, '');
     const sharpKeys = keyIsMinor ? SHARP_FRIENDLY_MINOR_KEYS : SHARP_FRIENDLY_MAJOR_KEYS;
-    return sharpKeys.has(tonic) ? SHARP_NOTE_ORDER[pitchClass] : (KEY_ORDER as any)[pitchClass];
+    return sharpKeys.has(tonic) ? SHARP_NOTE_ORDER[pitchClass] : KEY_ORDER[pitchClass];
 }

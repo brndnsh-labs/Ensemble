@@ -3,7 +3,9 @@
 //
 // Critique test for `coordination-contract/S1` — make `lastActiveSoloistMidi` sticky
 // across soloist rests so harmony's spectral-gap octave-shift branch
-// (harmonies.ts:535-548) actually fires in production.
+// (the "Spectral Gaps: Register Awareness" `targetOctave` shift, gated by
+// `lastActiveSoloistMidi`/`SOLOIST_STICKY_STALE_STEPS`, in `finalizeHarmonyNotes`,
+// harmonies.ts) actually fires in production.
 //
 // Setup: simulate the realistic scenario where the soloist plays a HIGH (>72) note on
 // one step and then RESTS on the harmony stab step a few steps later. The harmony's
