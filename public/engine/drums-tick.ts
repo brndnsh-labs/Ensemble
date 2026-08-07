@@ -168,15 +168,14 @@ export function runDrumTick(
                 // is populated in), hence the shared `remainingSteps <= stepsPerMeasure`
                 // guard. (`barsUntilSectionChange` is the exception — Epic 3 S12 moved
                 // it to a wider penultimate-bar window above; see that block.)
-                const upcomingLabel = (nextSectionChordData.chord as any)?.sectionLabel ?? null;
+                const upcomingLabel = nextSectionChordData.chord?.sectionLabel ?? null;
                 coordination.upcomingSectionLabel = upcomingLabel;
                 // why: energy delta uses form-analysis.ts's 0..1 SECTION_ENERGY_MAP
                 // (drop=1.0, breakdown=0.3, chorus=0.9, …). A large positive delta
                 // means "the band is about to lift hard"; the drop mechanic and
                 // S2's rock push both gate on it.
                 coordination.upcomingSectionEnergyDelta =
-                    getSectionEnergy(upcomingLabel) -
-                    getSectionEnergy((currentChord as any)?.sectionLabel);
+                    getSectionEnergy(upcomingLabel) - getSectionEnergy(currentChord?.sectionLabel);
                 // note (Epic 3 S12): `barsUntilSectionChange` is NO LONGER written here.
                 // It moved to the wider `<= stepsPerMeasure * 2` block above so it can
                 // hold `1` on the penultimate bar (the bass approach-window tier). The
@@ -366,7 +365,7 @@ export function runDrumTick(
         // don't consume `isFinalMeasure` from honoring the outro mute on the
         // sub-beats of the final bar — symmetry with S4's own sub-beat
         // silence is cleaner).
-        const currentLabel = (currentChord as any)?.sectionLabel;
+        const currentLabel = currentChord?.sectionLabel;
         if (isIntroSectionLabel(currentLabel)) {
             // why: `step >= sectionStart` is guaranteed by `getChordAtStep`'s
             // lookup contract, but floor() handles the boundary cleanly.

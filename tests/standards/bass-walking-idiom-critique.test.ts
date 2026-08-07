@@ -14,8 +14,9 @@
  *    didn't kill the original idiom).
  *
  *  • Sub-item 2 (bass.md P1 #10): the generic walking fallback in
- *    bass-engine.ts:1191-1265 now applies a target-distance multiplier on
- *    top of hand-position weighting when nextChord is a chord-change
+ *    `getBassNote`'s `APPROACH_STRENGTH` weighting block (bass-engine.ts) now
+ *    applies a target-distance multiplier on top of hand-position weighting
+ *    when nextChord is a chord-change
  *    approach. On beat 2 of a chord-change bar (intBeat=1) using non-jazz
  *    quarter style — the slot that falls through to the generic walking
  *    fallback — the chosen pitch should sit measurably closer to the next
@@ -222,7 +223,8 @@ describe('Walking-ska scale-aware sixth (bass.md P1 #9)', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * The generic walking fallback (`bass-engine.ts:1191-1265`) only applies its
+ * The generic walking fallback (the `APPROACH_STRENGTH` weighting block in
+ * `getBassNote`, bass-engine.ts) only applies its
  * target-distance multiplier when `isChordChangeApproach(nextChord, chord)`.
  * To discriminate the multiplier from confounders (prevMidi bleed from the
  * chromatic-approach branch, parity-pick variance, hand-position weighting)
@@ -239,8 +241,10 @@ describe('Walking-ska scale-aware sixth (bass.md P1 #9)', () => {
  *
  * Slot: beat 2 (stepInMeasure=4, intBeat=1) under non-jazz `quarter` style —
  * the cleanest slot that reaches the fallback. (Beat 3 is intercepted by the
- * 5th/root branch in bass-styles.ts:1177; beat 4 is intercepted by
- * chromatic-approach in bass-engine.ts:1116 when a chord change is present.)
+ * 5th/root branch (the "Beat 3: High preference for 5th or Octave" branch in
+ * `getBassNoteStyle`, bass-styles.ts); beat 4 is intercepted by
+ * chromatic-approach (the `isApproachPoint && isChordChangeApproach(...)` branch
+ * in `getBassNote`, bass-engine.ts) when a chord change is present.)
  * beatScale at intBeat=1 is 1/3, so this is the weakest pull slot by design
  * — if the multiplier is too gentle here, the test will fail and that's the
  * correct signal to tune the multiplier (see [[feedback_multiplier_value_tuning]]).
@@ -361,7 +365,8 @@ describe('Generic walking fallback target-awareness (bass.md P1 #10)', () => {
         expect(biasOn.length).toBeGreaterThan(50);
         expect(biasOff.length).toBeGreaterThan(50);
 
-        // why: P1 #10 — the target-distance multiplier at bass-engine.ts:1241
+        // why: P1 #10 — the target-distance multiplier at the `APPROACH_STRENGTH`
+        // weighting block in `getBassNote` (bass-engine.ts)
         // must move the picker's distribution measurably toward the next
         // chord's root. The bias-off control is byte-identical to bias-on
         // except `isChordChangeApproach` returns false, so the multiplier
@@ -497,7 +502,8 @@ describe('#1335 — the generic odd-beat velocity accent respects style idiom', 
 
     it('blues keeps its odd-beat accent unchanged (negative control)', () => {
         // Blues is NOT in `EVEN_ACCENT_BASS_STYLES` — its own early-return
-        // branch (`bass-engine.ts:1208`) still calls the same shared
+        // branch (the `style === 'blues'` branch in `getBassNote`, bass-engine.ts)
+        // still calls the same shared
         // `result()` closure every other style does, so it still carries the
         // odd-beat accent (per-style literals multiply INTO the shared
         // `velocity`, they don't replace it — see the gate's own doc comment).

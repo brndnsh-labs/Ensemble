@@ -341,7 +341,9 @@ describe('Acoustic Drummer Critique', () => {
         console.log(
             `[Acoustic Dynamics] Low Intensity: ${sidestickHits} Sidesticks, ${snareHits} Snares (Target: Sidesticks >25, Snares 0)`,
         );
-        // Engine routes snare → Sidestick when intensity < 0.75 (acoustic.ts:50).
+        // Engine routes snare → Sidestick when intensity < 0.75 (the `soundName =
+        // intensity >= 0.75 ? 'Snare' : 'Sidestick'` line in the Snare branch of
+        // `applyOverrides`, acoustic.ts).
         // Motif distribution at intensity 0.3 averages ~1.4 snare events/bar.
         // Over 32 bars expect ~40 Sidesticks; threshold 25 keeps statistical headroom.
         expect(sidestickHits).toBeGreaterThan(25);

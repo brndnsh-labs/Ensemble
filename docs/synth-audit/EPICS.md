@@ -1,7 +1,7 @@
 # Synth Audit Epics
 
-> **⛔ FROZEN ARCHIVE (2026-06-18).** Work is now tracked in **GitHub Project #2** ("Ensemble — Work"),
-> not here — a story = an issue (Track `synth`, listening-gated). See `.claude/skills/DOCTRINE.md` §1/§3.
+> **⛔ FROZEN ARCHIVE (2026-06-18).** Work is now tracked as **GitHub issues**
+> (`brndnsh-labs/Ensemble`, Track `synth`, listening-gated) — the Projects board was retired in #946. See `.claude/skills/DOCTRINE.md` §1/§3.
 > Epics 0–5 and 7 shipped; **Epic 6 (Packs) was migrated to issues** (the 6 stories of
 > `epic-6-packs.md`). Do **not** read this file as the live tracker. Run the synth track via
 > `/cycle #<n>` (Track-aware) — the old `/synth-cycle` was folded in.

@@ -152,7 +152,7 @@ Source of truth: `public/engine/coordination-engine.ts`. Always pass `Coordinati
 - Before any rename: grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
 - Preserve compatibility shims when a rename touches saved sessions, share URLs, or presets.
 - Split labels from logic: display labels in UI/data layer, behavior keys in engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
-- Known alias families: `Rock`/`Shred`, `Neo-Soul`/`Neo`. Add new aliases to the same map instead of creating one-off fixes.
+- Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`public/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `public/`; don't resurrect the pairing.
 
 ### TypeScript
 
