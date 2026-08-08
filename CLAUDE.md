@@ -105,7 +105,7 @@ Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches
 
 Single chart-first surface (`ChartSurface`): the chord chart is always visible, with transport and key/time controls in a topbar, the instrument rail always accessible along one edge, and a 🌈 button that opens a full-screen visualizer overlay. There are no workspace tabs. New UI work should follow this model — controls radiate outward from the chart rather than living in separate navigable views.
 
-**Reserved surfaces:** the **section-label tap** and a **one-line sticky slot at the chart's edge** are earmarked for the banked #1019 conductor lens ("lead, don't play" — see the #1019 issue thread). Don't spend them on ad-hoc affordances, and don't further overload the section headers; new section-header gestures must be designed against that banked contract (mode-owned tap, queued-pill horizon), not added piecemeal.
+**Reserved surfaces:** the **section-label tap** and a **one-line sticky slot at the chart's edge** are earmarked for the banked #937 conductor lens (was Forgejo #1019; "lead, don't play" — see the #937 issue thread). Don't spend them on ad-hoc affordances, and don't further overload the section headers; new section-header gestures must be designed against that banked contract (mode-owned tap, queued-pill horizon), not added piecemeal.
 
 ### Data / Config split
 

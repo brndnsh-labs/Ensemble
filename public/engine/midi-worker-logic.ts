@@ -24,6 +24,7 @@ import { isSilentSentinel, muteGain } from './mute-contract.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
+import type { DrumHitInfo } from './tick-types.js';
 import { soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep } from './worker-utils.js';
 
@@ -211,7 +212,7 @@ export class ExportProcessor {
         // Displayed BPM is quarter-notes/min for every meter, matching the MIDI
         // tempo convention — write it straight through with no conversion.
         this.metaTrack.setTempo(0, playback.bpm || 120);
-        this.metaTrack.setKeySig(0, (arranger.key as any) || 'C', arranger.isMinor || false);
+        this.metaTrack.setKeySig(0, arranger.key || 'C', arranger.isMinor || false);
         const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
         this.metaTrack.setTimeSig(0, tsNum, tsDenom);
 
@@ -805,9 +806,9 @@ export class ExportProcessor {
                 }
             }
 
-            drumHits.forEach((hit: any) => {
-                const soundName = hit.soundName as any;
-                const instName = (hit.inst as any).name;
+            drumHits.forEach((hit: DrumHitInfo) => {
+                const soundName = hit.soundName;
+                const instName = hit.inst.name;
                 const name = soundName || instName;
                 const midi = resolveExportDrumMidi(
                     soundName,
@@ -890,7 +891,7 @@ export class ExportProcessor {
                 soloist: this.includedTracks.includes('soloist'),
                 harmony: this.includedTracks.includes('harmonies'),
                 groove: this.includedTracks.includes('drums'),
-            } as any,
+            },
             playback.bpm,
             groove,
             soloist,
