@@ -77,6 +77,109 @@ export function soloistIntensityGain(bandIntensity: number | undefined): number 
 }
 
 /**
+ * The conductor's BAND-WIDE velocity law: `0.7 + 0.45·I`, the value
+ * `applyConductor` (`conductor.ts`) publishes as `playback.conductorVelocity`
+ * and `scheduler-core.ts` multiplies onto the drums, chords, soloist and
+ * harmony lanes.
+ *
+ * Lives here rather than inline in `conductor.ts` because #941 made the
+ * conductor the OWNER of the bass lane's macro dynamic law too — `bassMacroGain`
+ * below is this curve, re-scaled for the bass. Two hand-maintained copies of
+ * "the conductor's velocity law" is exactly how the #1322 curve drifts start, so
+ * both are derived from one authored floor/span pair here.
+ *
+ * why 0.7 / 0.45: unchanged from the value `applyConductor` has always emitted —
+ * this is a relocation, not a retune. A ×1.64 low-to-high swing is ~4.3 dB, the
+ * deliberately gentle band-wide "everyone leans in together" gesture that sits
+ * UNDER each lane's own dynamic law rather than replacing it.
+ */
+const CONDUCTOR_VELOCITY_FLOOR = 0.7;
+const CONDUCTOR_VELOCITY_SPAN = 0.45;
+
+/**
+ * @param bandIntensity `playback.bandIntensity`, 0..1.
+ * @returns the band-wide conductor velocity multiplier, `[0.7, 1.15]`.
+ */
+export function conductorVelocityFor(bandIntensity: number): number {
+    const intensity = Number.isFinite(bandIntensity) ? bandIntensity : 0.5;
+    return CONDUCTOR_VELOCITY_FLOOR + intensity * CONDUCTOR_VELOCITY_SPAN;
+}
+
+/**
+ * Authored floor/span of `bassMacroGain`. Exported so critique tests can assert
+ * the swell against the real constants instead of re-deriving the literals.
+ */
+export const BASS_MACRO_FLOOR = 0.4;
+export const BASS_MACRO_SPAN = 1.1;
+
+/**
+ * The BASS lane's macro dynamic law (#941) — how much louder the bass plays as
+ * the conductor drives the band harder, and the **only** intensity-driven term
+ * left in the bass velocity product.
+ *
+ * Before #941 the bass stacked THREE multiplicative intensity terms: an
+ * intensity-scaled style token (`bass-styles.ts`, e.g. `1.0 + intensity*0.25`),
+ * a generic `intensityFactor` (`0.6 + intensity*0.7`, `bass-engine.ts`), and the
+ * band-wide `conductorVelocity`. Their product railed against whatever ceiling
+ * existed — at `bandIntensity` 1.0 EVERY style's downbeat came out at the same
+ * clamped 1.725, so the chorus erased both the accent hierarchy and the
+ * inter-style dynamic character it had spent three terms building. #941's
+ * decision: the conductor owns the lane's macro law, style tokens go back to
+ * expressing RELATIVE ARTICULATION only (accent vs ghost vs base), and
+ * `intensityFactor` is gone.
+ *
+ * **Apply this as a FINAL-STAGE multiplier, DOWNSTREAM of the engine's
+ * `BASS_VELOCITY_DOMAIN_MAX` clamp** — same placement as `soloistIntensityGain`,
+ * and load-bearing for the same reason the pre-#941 `conductorVelocity` was: the
+ * authored articulation vocabulary already reaches ~1.5 on its own (a 1.25 slap
+ * token × a 1.15 accent × a 1.05 envelope), so a macro swell folded INSIDE that
+ * clamp has nowhere to go and re-creates the flat chorus this issue removed.
+ * `BASS_AUTHORING_CEILING`-to-`BASS_VELOCITY_DOMAIN_MAX` is only ×1.2 of
+ * headroom (1.6 dB) — a 6–8 dB swell provably does not fit in it.
+ *
+ * why `0.40 + 1.10·I` (×3.75 low-to-high) rather than the conductor's own
+ * ×1.64: the bass amplitude law (`bassVelocityToAmplitude`, below) is
+ * COMPRESSIVE — `sqrt` under unity — so an authored ×1.64 renders as barely
+ * 2.6 dB on this lane, inaudible as a macro arc. ×3.75 authored renders as
+ * **+6.3 to +7.0 dB** across the bass style vocabulary (measured through the
+ * real product path; the funk downbeat lands at +7.0 dB from i=0.1 to i=1.0).
+ * That is the intended lane swell: the bass swells with the band but stays
+ * deliberately compressed against the soloist's arc, whose live curve
+ * (`conductorVelocityFor × soloistIntensityGain`) swings ×4.6 and accelerates
+ * quadratically. The bass anchors the mix floor — it should never be the lane
+ * that disappears in a verse or the lane that leads a climax.
+ *
+ * why LINEAR (where the soloist's live curve is quadratic): the soloist "commits
+ * late" into a peak, which is what the accelerating shape encodes. A rhythm
+ * section's job is the opposite — a steady, predictable proportional response
+ * the rest of the band can lean on. One term, one slope.
+ *
+ * The floor/span are pinned to the conductor's own so the ownership is auditable
+ * rather than coincidental: `0.40 = 0.7 × 4/7` and `1.10 = 0.45 × 22/9` are not
+ * meaningful ratios, so the two curves are related by INTENT (same input, same
+ * "band leans in" gesture) and calibrated independently — mid-intensity is the
+ * calibration point. At `I = 0.5` this returns 0.95, which holds every style's
+ * rendered mid-intensity level within ±0.5 dB of its pre-#941 value (measured
+ * across rock / funk / jazz-walking / bossa / metal downbeats and backbeats;
+ * most land within ±0.31 dB, the outlier is rock's downbeat at +0.43 dB where
+ * the old chain stacked two sub-unity mid-intensity terms) — under the ~1 dB
+ * JND for a low-register tone in a mix. The un-stacking is therefore audible as
+ * restored dynamic RANGE, not as a level change.
+ *
+ * @param bandIntensity `playback.bandIntensity`, 0..1. Non-finite → 0.5 (the
+ *   production default band), matching `soloistIntensityGain`'s guard: this is
+ *   the first term in the live bass velocity product that can carry
+ *   non-finiteness, and `dispatchMidiBass` → `normalizeMidiVelocity` would pass a
+ *   NaN through as a MIDI data byte.
+ * @returns a gain multiplier in `[0.4, 1.5]`. Total function — every input,
+ *   including NaN, yields a finite gain.
+ */
+export function bassMacroGain(bandIntensity: number | undefined): number {
+    const intensity = Number.isFinite(bandIntensity) ? (bandIntensity as number) : 0.5;
+    return BASS_MACRO_FLOOR + intensity * BASS_MACRO_SPAN;
+}
+
+/**
  * Top of the bass velocity **domain** (#1331). Every emission-side clamp in
  * `bass-engine.ts` uses this — it is the widest value a generated bass note may
  * carry, NOT the loudest value a style is allowed to author.
@@ -90,6 +193,14 @@ export function soloistIntensityGain(bandIntensity: number | undefined): number 
  * i≈0.70 and the base note at i≈0.93, so at chorus intensity every note in the
  * bar came out at one identical velocity — the accent hierarchy and the macro
  * swell both erased.
+ *
+ * #941 removed the stacking itself: the emitted product is now
+ * `velocityParam × accent × bassEnvelope`, all three intensity-FREE, and the
+ * lane's macro swell moved downstream into `bassMacroGain`. This clamp is
+ * consequently near-unreachable in practice (the loudest authored combination is
+ * a 1.25 slap token × a 1.15 accent × a 1.05 envelope = 1.51) — which is the
+ * point. It is a contract on what an engine may EMIT, not a working ceiling the
+ * dynamics have to fight.
  */
 export const BASS_VELOCITY_DOMAIN_MAX = 1.5;
 
@@ -100,14 +211,16 @@ export const BASS_VELOCITY_DOMAIN_MAX = 1.5;
  * is the headroom the intensity/envelope terms multiply into, which is exactly
  * what the old single-number ceiling had no room for.
  *
- * Not a hard invariant today: several tokens already add an intensity term on
- * top of it by design (`bass-styles.ts`'s `popVel`/`slapVel`, ~1.25 + intensity
- * * 0.1-0.2, reaching ~1.35-1.45) — #1334/#1336 are about giving those terms
- * real headroom to swell, which will push authored peaks further past this
- * number, not less. Read this as "the base-case ceiling a style starts from,"
- * not an enforced cap — module-local (not exported) so nothing downstream can
- * mistake it for a runtime guard. Referenced by the funk slap token
- * (`bass-engine.ts`) — the one static token that literally IS this ceiling.
+ * As of #941 this is a genuine ceiling on the STATIC tokens again: the
+ * intensity terms that used to ride on top of it (`bass-styles.ts`'s
+ * `popVel`/`slapVel`, ~1.25 + intensity*0.1-0.2, reaching ~1.35-1.45) were
+ * removed when the conductor took ownership of the lane's macro law, so a
+ * style's authored token is now a pure articulation level and none of them
+ * exceed 1.25. Still not runtime-enforced — the shared odd-beat accent (×1.15)
+ * and metric envelope (×1.05) multiply on top, so the emitted product can reach
+ * ~1.51 — and still module-local (not exported) so nothing downstream can
+ * mistake it for a guard. Referenced by the funk slap token (`bass-engine.ts`) —
+ * the one static token that literally IS this ceiling.
  */
 export const BASS_AUTHORING_CEILING = 1.25;
 
@@ -127,14 +240,23 @@ const BASS_ACCENT_EXPONENT = 0.9;
 /**
  * Defensive input bound for the bass voice — NOT a musical ceiling.
  *
- * why 2.0: the loudest value the live chain can hand the voice is
- * `BASS_VELOCITY_DOMAIN_MAX (1.5) × conductorVelocity (≤1.15) × humanize
- * velocityMult (≤1.1)` = 1.90, so 2.0 sits just above every reachable product
+ * why 2.5: the loudest value the live chain can hand the voice is
+ * `BASS_VELOCITY_DOMAIN_MAX (1.5) × bassMacroGain (≤1.5) × humanize
+ * velocityMult (≤1.1)` = 2.48, so 2.5 sits just above every reachable product
  * and only ever engages if an upstream producer breaks its own contract. Bounded
  * rather than open-ended because this multiplies an oscillator gain: a runaway
  * velocity from a future producer bug should distort, not blow up the bus.
+ *
+ * Raised from 2.0 by #941 for exactly one reason: the bass lane's macro term
+ * grew from the band-wide `conductorVelocity` (≤1.15) to `bassMacroGain` (≤1.5)
+ * when it became the lane's SOLE intensity term. This is a defensive bound
+ * tracking a changed reachable maximum, NOT a decision to make the bass louder —
+ * mid-intensity level is unchanged (see `bassMacroGain`), and the realistic
+ * chorus peak (funk's The One at i=1.0 with +10% humanize) is 2.22, still below
+ * this. Leaving it at 2.0 would have re-introduced the #1331 bug one layer down:
+ * a hard clamp flattening the top of the swell.
  */
-const BASS_VOICE_INPUT_MAX = 2.0;
+const BASS_VOICE_INPUT_MAX = 2.5;
 
 /**
  * The live bass velocity → rendered amplitude law (#1331): the one authority for
@@ -155,14 +277,12 @@ const BASS_VOICE_INPUT_MAX = 2.0;
  * **This law deliberately does NOT clamp at `BASS_VELOCITY_DOMAIN_MAX`.** That
  * constant is an *emission-side* contract — what `bass-engine.ts` may generate —
  * and the voice legitimately receives more, because `scheduler-core.ts`
- * multiplies the emitted velocity by the band-wide `conductorVelocity`
- * (`0.7 + bandIntensity*0.45`, up to 1.15) and by per-note humanize
- * (`velSpread` 0.1 → up to 1.1) AFTER the engine clamped. Re-clamping at 1.5
- * here would just move the original bug one layer down: at chorus intensity the
- * top two velocity tiers (1.41 and 1.50 × 1.105 conductor) both land above 1.5
- * and would collapse onto one amplitude again. `BASS_VOICE_INPUT_MAX` is a
- * defensive bound sitting just above the highest reachable product, not a
- * musical ceiling.
+ * multiplies the emitted velocity by the lane's macro swell (`bassMacroGain`,
+ * up to 1.5) and by per-note humanize (`velSpread` 0.1 → up to 1.1) AFTER the
+ * engine clamped. Re-clamping at 1.5 here would just move the original bug one
+ * layer down: at chorus intensity every note above ~1.0 emitted would collapse
+ * onto one amplitude again. `BASS_VOICE_INPUT_MAX` is a defensive bound sitting
+ * just above the highest reachable product, not a musical ceiling.
  *
  * Mute attenuation is NOT applied here (the caller multiplies by the
  * `mute-contract.ts` factor) — this is the velocity axis only.
@@ -170,7 +290,7 @@ const BASS_VOICE_INPUT_MAX = 2.0;
  * @param velocity the velocity as the VOICE receives it: an engine note velocity
  *   on the `[0, 1.5]` domain, times any downstream band/humanize gain.
  *   Non-finite → 0 (silent), matching the voice's finite-guard discipline.
- * @returns rendered amplitude, `[0, 1.87]`. Strictly increasing across every
+ * @returns rendered amplitude, `[0, 2.28]`. Strictly increasing across every
  *   reachable input — no flat region anywhere.
  */
 export function bassVelocityToAmplitude(velocity: number): number {

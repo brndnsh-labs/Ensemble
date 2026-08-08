@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { bassMacroGain } from '../../public/engine/velocity-shaping.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -161,22 +162,47 @@ describe('Bossa Nova Bassist Critique', () => {
 
     it('should scale velocity and lay-back with intensity', () => {
         // Bossa keeps density constant across intensity (always 4 hits/bar).
-        // The intensity axis is loudness (1.1 + intensity*0.1 on downbeats,
-        // 1.0 + intensity*0.15 on offbeats) and lay-back (0.01 + intensity*0.005).
+        // The intensity axis is loudness and lay-back (0.01 + intensity*0.005).
+        //
+        // #941 moved WHERE the loudness axis lives. Bossa's tokens were
+        // `1.1 + intensity*0.1` (downbeat anchors) and `1.0 + intensity*0.15`
+        // (offbeat anticipations); they are now flat 1.1 / 1.0. That is the
+        // hierarchy `EVEN_ACCENT_BASS_STYLES` exists to protect, and the old
+        // slopes were NARROWING it as the band got louder (0.1 apart at i=0,
+        // 0.05 at i=1) before the emission clamp flattened both above i≈0.88.
+        // The lane's swell is one downstream term now (`bassMacroGain`), so the
+        // loudness claim is asserted on the rendered chain and the engine side
+        // becomes the invariance guard.
+        const LOW_I = 0.2;
+        const HIGH_I = 0.95;
         const low = simulatePerformance(8, {
-            playback: { bandIntensity: 0.2, complexity: 0.5, bpm: 120 },
+            playback: { bandIntensity: LOW_I, complexity: 0.5, bpm: 120 },
         });
         const high = simulatePerformance(8, {
-            playback: { bandIntensity: 0.95, complexity: 0.5, bpm: 120 },
+            playback: { bandIntensity: HIGH_I, complexity: 0.5, bpm: 120 },
         });
 
         expect(low.length).toBe(high.length); // density constant
         const avgVel = (perf) => perf.reduce((s, p) => s + p.note.velocity, 0) / perf.length;
         const avgLag = (perf) => perf.reduce((s, p) => s + p.note.timingOffset, 0) / perf.length;
+        const lowRendered = avgVel(low) * bassMacroGain(LOW_I);
+        const highRendered = avgVel(high) * bassMacroGain(HIGH_I);
         console.log(
-            `[Bossa Critique] Intensity scaling: vel low=${avgVel(low).toFixed(2)} high=${avgVel(high).toFixed(2)}, lag low=${avgLag(low).toFixed(3)} high=${avgLag(high).toFixed(3)}`,
+            `[Bossa Critique] Intensity scaling: engine vel low=${avgVel(low).toFixed(2)} high=${avgVel(high).toFixed(2)} (ratio ${(avgVel(high) / avgVel(low)).toFixed(3)}, target 1.000) | ` +
+                `rendered low=${lowRendered.toFixed(2)} high=${highRendered.toFixed(2)} (ratio ${(highRendered / lowRendered).toFixed(2)}, informational), ` +
+                `lag low=${avgLag(low).toFixed(3)} high=${avgLag(high).toFixed(3)}`,
         );
-        expect(avgVel(high)).toBeGreaterThan(avgVel(low) * 1.05);
+        // Rendered ratio is informational only: with engine velocity pinned
+        // exactly equal (below), the rendered ratio IS bassMacroGain's own ratio
+        // (~2.1×) — a floor here would only re-test the macro law's
+        // monotonicity, which funk-bass-critique's 6–8 dB bracket guards
+        // end-to-end.
+        // intent (#941): bossa's density AND note selection are both intensity-
+        // invariant, so with the macro term gone from the tokens the engine's mean
+        // velocity is EXACTLY equal at the two intensities — a strict equality is
+        // correct here by construction, not a snapshot. Re-introduce any intensity
+        // term into a bossa token and this is the assertion that catches it.
+        expect(avgVel(high)).toBe(avgVel(low));
         expect(avgLag(high)).toBeGreaterThan(avgLag(low));
     });
 });

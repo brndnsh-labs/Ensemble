@@ -17,8 +17,10 @@ type ChordChangeShape = {
  *
  * The gate is applied once, at `bass-engine.ts`'s `const velocity`
  * definition — so it covers every consumer of that shared value: the
- * `result()` closure's `velocityParam * velocity * intensityFactor *
- * bassEnvelope` product (used by every `getBassNoteStyle` branch, including
+ * `result()` closure's `velocityParam * velocity * bassEnvelope` product
+ * (#941 removed the `intensityFactor` term that used to sit in it — the
+ * lane's macro swell is now the single downstream `bassMacroGain`, see
+ * `velocity-shaping.ts`) (used by every `getBassNoteStyle` branch, including
  * `quarter`'s own — search `style === 'quarter'` inside that function, it
  * DOES have dedicated handling, contrary to an earlier draft of this
  * comment), the two return sites in `bass-engine.ts` that bypass `result()`
@@ -37,17 +39,18 @@ type ChordChangeShape = {
  * pulse-start/pickup slots in compound). BUT every one of those foundation
  * notes is built by calling `result(...)` — the SAME `result` closure
  * `getBassNote` defines and passes down as a context argument, which still
- * multiplies `velocityParam * velocity * intensityFactor * bassEnvelope` —
+ * multiplies `velocityParam * velocity * bassEnvelope` —
  * so the shared `velocity` (this gate) DOES reach every bossa note, just
  * through that shared closure rather than the generic fallback. Verified
  * empirically: pre-fix, the "& of 2/4" anticipation notes (odd `intBeat`,
- * authored quieter at `1.0 + intensity*0.15`) picked up the spurious ×1.15
- * accent while the "1/3" downbeat anchors (even `intBeat`, authored louder
- * at `1.1 + intensity*0.1`) did not — inverting bossa's intended
- * downbeat-anchor-over-anticipation hierarchy at every intensity where the
- * pair isn't railed at `BASS_VELOCITY_DOMAIN_MAX` (both saturate and read
- * equal above roughly intensity 0.88 — #1331's clamp, not this gate's
- * business). This gate restores the ordering below that ceiling.
+ * authored quieter, 1.0) picked up the spurious ×1.15
+ * accent while the "1/3" downbeat anchors (even `intBeat`, authored louder,
+ * 1.1) did not — inverting bossa's intended
+ * downbeat-anchor-over-anticipation hierarchy. (The tokens carried
+ * `+ intensity*0.15` / `+ intensity*0.1` slopes at the time, so the pair also
+ * saturated `BASS_VELOCITY_DOMAIN_MAX` and read equal above roughly intensity
+ * 0.88 — never this gate's business, and removed outright by #941.) This gate
+ * restores the ordering.
  *
  * See also `GESTURE_ACCENT_BASS_STYLES` below: a SECOND set feeding the same
  * gate, for styles suppressed because they author their own per-gesture
@@ -66,13 +69,16 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * note-length, not level). Funk is the opposite: it is the most accented idiom
  * in the file. Its accents just aren't METRIC.
  *
- * 'funk': every note the funk branch emits already carries an authored,
- * intensity-scaled velocity naming the GESTURE that produced it — thumb slap on
- * The One (`BASS_AUTHORING_CEILING + intensity*0.2`, `bass-engine.ts`'s
- * `stepInChord === 0` early return), secondary slap on beat 3 (`slapVel`,
- * `1.2 + intensity*0.2`), the "and" pop (`popVel`, `1.25 + intensity*0.2`), the
+ * 'funk': every note the funk branch emits already carries an authored
+ * velocity naming the GESTURE that produced it — thumb slap on
+ * The One (`BASS_AUTHORING_CEILING` = 1.25, `bass-engine.ts`'s
+ * `stepInChord === 0` early return), secondary slap on beat 3 (`slapVel`, 1.2),
+ * the "and" pop (`popVel`, 1.25), the
  * high-complexity "a" pop (1.15), hammer-on (1.1), chord-change approach (1.1),
- * and the dead-note chuck (0.5). That ladder IS funk's accent map. Layering a
+ * and the dead-note chuck (0.5). (Every rung carried an identical
+ * `+ intensity*0.2` macro slope until #941 moved the lane's swell into the
+ * single `bassMacroGain` term; the ladder's ratios are unchanged.)
+ * That ladder IS funk's accent map. Layering a
  * blanket per-beat multiplier on top of it scales whatever gesture happens to
  * fall inside the accented beat — a muted 0.5 ghost chuck on a beat-2 16th gets
  * the same +15% as the pop, which is a category error: a dead note is quiet by
@@ -92,11 +98,11 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * strong-beat grid, so ANY per-beat multiplier is the wrong instrument; (a)
  * would only move the ghost-chuck category error from beats 2&4 onto 1&3.
  * Second, it is redundant: The One and the beat-3 slap already carry their own
- * intensity-scaled terms (#1334), deliberately 0.05 apart so The One stays the
+ * authored levels (#1334), deliberately 0.05 apart so The One stays the
  * louder of the two — a further ×1.15 on both preserves nothing and buys
  * nothing. Third — the decisive one, measured by building (a) and running the
  * suite against it rather than reasoning about it: stacking a ×1.15 on The One
- * ON TOP of its own `1.25 + intensity*0.2` token rails it against
+ * ON TOP of its own 1.25 token rails it against
  * `BASS_VELOCITY_DOMAIN_MAX` a whole intensity band earlier, which flattens the
  * chorus. Under (a) the #1331 chorus-hierarchy metric drops to a 0.81 dB spread
  * over 4 rendered levels — RED against that test's own 1.0 dB floor — and the
@@ -674,10 +680,15 @@ export function getBassNoteStyle(
             (isLastBeatOfBar || isLastBeatAndOfBar)
         ) {
             const nextTarget = normalizeToRange(nextChord.rootMidi);
-            // why: walk-ups punch slightly hotter than Two-Step roots
-            // (0.95 + intensity*0.3) to articulate the line as a pickup gesture.
-            // Slope is shallower (0.2 vs 0.3) so they don't overpower the downbeat.
-            const walkVel = 1.0 + intensity * 0.2;
+            // why: walk-ups punch slightly hotter than Two-Step roots (0.95) to
+            // articulate the line as a pickup gesture.
+            // #941: was `1.0 + intensity * 0.2` against the roots' `0.95 +
+            // intensity * 0.3` — the two slopes crossed at i=0.5, so above mid
+            // intensity the roots actually OUT-punched the walk-up, inverting the
+            // intent this comment states. With both slopes moved into the single
+            // `bassMacroGain` term the authored bases are all that's left, and the
+            // walk-up is hotter at every dynamic, as written.
+            const walkVel = 1.0;
 
             if (isLastBeatAndOfBar) {
                 // Step "&" of 4 — chromatic neighbor a half-step from target.
@@ -770,7 +781,10 @@ export function getBassNoteStyle(
             }
         }
 
-        const pluckVel = 0.95 + intensity * 0.3;
+        // why: 0.95 — the honky-tonk root/fifth alternation sits a touch UNDER the
+        // neutral 1.0 base; it is a steady foundation, not an accent. #941 removed
+        // the `+ intensity * 0.3` macro slope (see `walkVel` above).
+        const pluckVel = 0.95;
         return result(getFrequency(note), 2, pluckVel); // Plucky duration
     }
 
@@ -869,7 +883,10 @@ export function getBassNoteStyle(
             }
         }
 
-        const res = result(getFrequency(note), dur, 1.0 + intensity * 0.2, 0, bendStartInterval);
+        // why: 1.0 — an 808 sub is the neutral foundation level by definition; its
+        // character is register and sustain, not level. #941 removed the
+        // `+ intensity * 0.2` macro slope (now `bassMacroGain`, once, downstream).
+        const res = result(getFrequency(note), dur, 1.0, 0, bendStartInterval);
         res.timingOffset += lag;
         return res;
     }
@@ -896,7 +913,10 @@ export function getBassNoteStyle(
             }
         }
 
-        const res = result(getFrequency(clampAndNormalize(note)), dur, 0.95 + intensity * 0.15);
+        // why: 0.95 — an upright/acoustic bass is played with the fingers, under
+        // the neutral 1.0 electric base; warmth over attack. #941 removed the
+        // `+ intensity * 0.15` macro slope (now `bassMacroGain`, once, downstream).
+        const res = result(getFrequency(clampAndNormalize(note)), dur, 0.95);
         res.timingOffset += lag;
         return res;
     }
@@ -905,13 +925,18 @@ export function getBassNoteStyle(
         const isEighth = stepInBeat % 2 === 0;
 
         // 1. The "One" (and Beat 3) - Heavy Anchor
+        // why: 1.25 (the authoring ceiling) vs the pedal's 1.1 — metal's anchor/
+        // pedal hierarchy is a fixed +14%, the whole point of a chugging pedal
+        // under accented anchors. #941 removed the shared `+ intensity * 0.1`
+        // macro slope from both; the ratio between them is what carried the idiom
+        // and it is preserved exactly.
         if (isDownbeat || (isBeatStart && intBeat === 2)) {
-            return result(getFrequency(baseRoot), 0.9, 1.25 + intensity * 0.1);
+            return result(getFrequency(baseRoot), 0.9, 1.25);
         }
 
         // 2. Rhythmic Foundation: 8th Note Roots (Pedal)
         if (isEighth && !isBeatStart) {
-            return result(getFrequency(baseRoot), 0.7, 1.1 + intensity * 0.1);
+            return result(getFrequency(baseRoot), 0.7, 1.1);
         }
 
         // 3. The "Gallop" (16-16-8 feel)
@@ -970,7 +995,12 @@ export function getBassNoteStyle(
             const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
             if (kickStepVal > 0) {
                 const kickVel = kickStepVal === 2 ? 1.25 : 1.1;
-                return result(getFrequency(baseRoot), 0.8, kickVel * (0.8 + intensity * 0.2));
+                // why (#941): the `0.8` survives as the "doubling the drummer"
+                // articulation offset — a kick-locked note sits under the authored
+                // downbeat tokens because it follows rather than leads — while the
+                // `+ intensity * 0.2` macro slope moved into `bassMacroGain`.
+                // Paired with the two kick-lock sites in `bass-engine.ts`.
+                return result(getFrequency(baseRoot), 0.8, kickVel * 0.8);
             }
         }
 
@@ -1053,7 +1083,11 @@ export function getBassNoteStyle(
                 // Harmonic Anticipation: Play the NEXT root early (Stones-style default)
                 return result(getFrequency(nextTarget), 0.8, 1.2, 1);
             }
-            return result(getFrequency(baseRoot), 0.8, 1.1 + intensity * 0.1);
+            // why: 1.1 — the quarter-note pulse is the accented backbone against
+            // the 0.95 "and" eighths below. #941 removed the `+ intensity * 0.1`
+            // macro slope; the pulse-over-syncopation ratio is what matters here
+            // and it is unchanged.
+            return result(getFrequency(baseRoot), 0.8, 1.1);
         }
 
         // 3. Syncopation: Eighth note "ands"
@@ -1064,7 +1098,9 @@ export function getBassNoteStyle(
 
         // High Intensity: Add variation (5ths or Octaves)
         let note = baseRoot;
-        let vel = 0.95 + intensity * 0.15;
+        // why: 0.95 — the "and" is a connective eighth, deliberately under the 1.1
+        // pulse. #941 removed the `+ intensity * 0.15` macro slope.
+        let vel = 0.95;
         if (intensity > 0.65 && Math.random() < 0.3 + intensity * 0.2 && !isSoloistBusy) {
             const hasFlat5 = chord.quality === 'dim' || chord.quality === 'halfdim';
             const fifthOffset = hasFlat5 ? 6 : 7;
@@ -1101,17 +1137,21 @@ export function getBassNoteStyle(
         // positions below), so those would all fall through to `return null` here. Mirror
         // the gate: root on the felt pulse (the bossa "1 and 3"), fifth on the pickup
         // (the anticipation into the next pulse, matching the 4/4 upbeat-fifth voicing).
+        // why (#941): bossa's four velocity tokens lose their macro intensity
+        // slopes here and in the 4/4 block below — 1.1 for the felt-pulse ROOT
+        // anchors, 1.0 for the anticipation FIFTHS. That +10% anchor-over-
+        // anticipation hierarchy is bossa's identity (it is the same ordering
+        // `EVEN_ACCENT_BASS_STYLES` exists to protect from the generic odd-beat
+        // accent) and it was previously being widened by intensity — 0.1 apart at
+        // i=0, 0.05 at i=1 before the old clamp flattened both entirely above
+        // i≈0.88. Flat tokens hold the intended hierarchy at every dynamic.
         if (_stepInfo?.isCompound === true) {
             if (_stepInfo.isPulseStart) {
-                const res = result(
-                    getFrequency(root),
-                    ts.stepsPerBeat * 0.9,
-                    1.1 + intensity * 0.1,
-                );
+                const res = result(getFrequency(root), ts.stepsPerBeat * 0.9, 1.1);
                 res.timingOffset += lag;
                 return res;
             }
-            const res = result(getFrequency(fifthUp), 0.8, 1.0 + intensity * 0.15);
+            const res = result(getFrequency(fifthUp), 0.8, 1.0);
             res.timingOffset += lag + 0.005;
             return res;
         }
@@ -1128,28 +1168,28 @@ export function getBassNoteStyle(
 
         // Note Logic: Root on downbeats, Fifth on upbeats (with octave variations)
         if (isOne) {
-            const res = result(getFrequency(root), ts.stepsPerBeat * 0.6, 1.1 + intensity * 0.1);
+            const res = result(getFrequency(root), ts.stepsPerBeat * 0.6, 1.1);
             res.timingOffset += lag;
             return res;
         }
 
         if (isThree) {
             const pitch = useOctaveUpOnThree ? rootOctaveUp : root;
-            const res = result(getFrequency(pitch), ts.stepsPerBeat * 0.6, 1.1 + intensity * 0.1);
+            const res = result(getFrequency(pitch), ts.stepsPerBeat * 0.6, 1.1);
             res.timingOffset += lag;
             return res;
         }
 
         if (isOffbeatTwo) {
             const pitch = useDeepFifthOnTwoAnd ? fifthDown : fifthUp;
-            const res = result(getFrequency(pitch), 0.8, 1.0 + intensity * 0.15);
+            const res = result(getFrequency(pitch), 0.8, 1.0);
             res.timingOffset += lag + 0.005; // Upbeats often lag even more
             return res;
         }
 
         if (isOffbeatFour) {
             const pitch = useDeepFifthOnFourAnd ? fifthDown : fifthUp;
-            const res = result(getFrequency(pitch), 0.8, 1.0 + intensity * 0.15);
+            const res = result(getFrequency(pitch), 0.8, 1.0);
             res.timingOffset += lag + 0.005;
             return res;
         }
@@ -1187,7 +1227,14 @@ export function getBassNoteStyle(
         // `isOne` — that's a pre-existing dead-code seam unrelated to #1295, flagged
         // out of scope rather than fixed here.
         if (isOne || isSecondarySlap) {
-            const slapVel = 1.2 + intensity * 0.2;
+            // why (#941): flat 1.2, was `1.2 + intensity * 0.2`. Funk's authored
+            // ladder (The One 1.25 / secondary slap 1.2 / pop 1.25 / "a" pop 1.15 /
+            // hammer-on 1.1 / chuck 0.5) IS its accent map, and every rung carried
+            // the SAME macro slope — so the slope encoded no hierarchy, it only
+            // pushed the whole ladder into the emission clamp from i≈0.7 up, where
+            // the top rungs flattened onto each other. Dropping it from every rung
+            // preserves the ladder exactly and un-rails the chorus.
+            const slapVel = 1.2;
             // why: #1295 — a slap-bass downbeat is played KNOWING the pop is coming right
             // after it on the "and" (popProb is 60-100%): a real player leaves headroom
             // for that octave-up snap by choosing the lower hand position, not by
@@ -1245,7 +1292,10 @@ export function getBassNoteStyle(
                     );
                 const note = slappedRoot + 12;
                 // Pop velocity: triggers bright, snappy tone
-                const popVel = 1.25 + intensity * 0.2;
+                // why (#941): flat 1.25, was `1.25 + intensity * 0.2` — same rung
+                // of funk's authored ladder as `slapVel` above, same reasoning, and
+                // still deliberately 0.05 above the secondary slap.
+                const popVel = 1.25;
                 // Headroom fallback: never fold back down into an inversion — if the lift
                 // would clear the ceiling, hold the unison instead (same non-inverting
                 // shape as the disco pump's upbeat lift and the "a" 16th pop below).
@@ -1470,7 +1520,13 @@ export function getBassNoteStyle(
         // Keeps the WHEN gate and the WHAT note in sync across meters.
         const is44 = ts.beats === 4 && ts.stepsPerBeat === 4;
         if (!is44 && _stepInfo) {
-            const tunedVel = 1.0 * (0.8 + intensity * 0.3);
+            // why (#941): 0.8, was `1.0 * (0.8 + intensity * 0.3)`. The riddim sits
+            // deliberately under the 1.0 neutral base — dub bass is felt, not
+            // struck — and that offset is the articulation; the intensity slope was
+            // macro and now lives once, in `bassMacroGain`. Paired with the 4/4
+            // `tunedVel` below AND with `bass-engine.ts`'s reggae coordination fill,
+            // which mirrors this exact number.
+            const tunedVel = 1.0 * 0.8;
             const res = result(
                 getFrequency(clampAndNormalize(finalDeepRoot)),
                 2,
@@ -1487,7 +1543,10 @@ export function getBassNoteStyle(
 
         if (match) {
             const [, interval, vel, dur] = match;
-            const tunedVel = vel * (0.8 + intensity * 0.3);
+            // why (#941): ×0.8, was `vel * (0.8 + intensity * 0.3)` — see the
+            // compound-meter sibling above. `vel` is the riddim table's own
+            // per-onset articulation, which this offset seats under the neutral 1.0.
+            const tunedVel = vel * 0.8;
 
             // Add extra 'lay-back' for the lazy Reggae feel
             const res = result(
@@ -1552,11 +1611,11 @@ export function getBassNoteStyle(
         }
 
         // Fundamental Pulse
-        const res = result(
-            getFrequency(clampAndNormalize(baseRoot + targetInterval)),
-            0.8,
-            1.0 + intensity * 0.2,
-        );
+        // why: 1.0 — the ska walking eighth IS the neutral base level; the 1.2
+        // chromatic approach above is what stands out against it. #941 removed the
+        // `+ intensity * 0.2` macro slope, which at high intensity had grown the
+        // pulse to 1.2 and erased that approach-vs-pulse contrast entirely.
+        const res = result(getFrequency(clampAndNormalize(baseRoot + targetInterval)), 0.8, 1.0);
 
         // Micro-timing: Rush slightly at high intensity to drive the energy
         res.timingOffset -= 0.004 + intensity * 0.004;
