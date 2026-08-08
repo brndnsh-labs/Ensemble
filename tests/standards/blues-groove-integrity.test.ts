@@ -67,7 +67,8 @@ describe('Blues Groove Integrity', () => {
 
         it('plays the straight-8th HiHat grid for Motif 0 (shuffle is swing, not step placement)', () => {
             // The Blues hat lane emits on the STRAIGHT 8th grid — `isBeatStart ||
-            // isOffbeat` = steps 0,2,4,6,8,10,12,14 (blues.ts:76). The triplet
+            // isOffbeat` = steps 0,2,4,6,8,10,12,14 (the "--- HiHat / Ride (The
+            // Shuffle Engine) ---" block in applyOverrides, blues.ts). The triplet
             // "shuffle" FEEL comes from the global swing transform in
             // calculateStepDuration, NOT from the engine emitting on the swung
             // 16ths 3/7/11/15. (The old test asserted [0,3,4,7,8,11,12,15] —

@@ -14,7 +14,7 @@
  * WHAT CHANGED FROM THE LEGACY TEST: the legacy version asserted phrase-starts
  * CLUSTER on the dotted-quarter PULSE ({0,6} in 6/8) — it guarded a specific
  * legacy bug where `isGoodEntry` degenerated to `measureStep % 1 === 0` (always
- * true) in compound (soloist.ts:1685). The live phrase-first engine is theme-
+ * true) in compound (in the now-deleted legacy `soloist.ts`). The live phrase-first engine is theme-
  * driven (`phrasing.isResting` flips false only when a seeded theme note sounds),
  * and the seeder places theme notes across the eighth-note grid — NOT tightly on
  * the dotted-quarter pulse. So the strict pulse-clustering claim is FALSE on the

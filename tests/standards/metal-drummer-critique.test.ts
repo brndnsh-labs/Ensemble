@@ -178,7 +178,8 @@ describe('Metal Drummer Critique', () => {
         // why: drums.md P1 #6 — section-accent block at metal.ts used to write
         // soundName='Open' despite the "China/Crash" comment. After the fix it emits
         // 'China' on downbeats at intensity > 0.8, scoped to the Open lane only
-        // (matches the post-turnaround Crash convention at groove-engine.ts:226).
+        // (matches the Metal entry in groove-engine.ts's PER_GENRE_FINAL_BAR table,
+        // which also scopes the post-turnaround accent to the Open lane).
         // The HiHat and Crash lanes keep their steady-state eighth-pulse voicing on
         // the downbeat — guards against the triple-stack regression that produced
         // three China hits choking each other via groove.lastCrashGain.
@@ -240,7 +241,8 @@ describe('Metal Drummer Critique', () => {
     });
 
     it('should ride eighth-pulse cymbals at high intensity', () => {
-        // Engine fires HiHat/Open on every eighth (metal.ts:138). At intensity > 0.75
+        // The CYMBALS / HATS block in applyOverrides (metal.ts) fires HiHat/Open on
+        // every eighth. At intensity > 0.75
         // it switches to Ride/Open; at > 0.5 to Open; else HiHat. Density should be
         // ~100% of eighth positions regardless of timbre.
         const numBars = 32;

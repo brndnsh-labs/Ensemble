@@ -18,8 +18,9 @@ vi.mock('../../public/state.js', () => ({
  * ska skank — while the genuinely-ska offbeat pattern lived in a dead
  * `feel === 'Ska-Punk'` branch (production genreFeel is 'Ska', so it never ran).
  *
- * The chord channel (`accompaniment.ts:837`) already chops every offbeat
- * upstroke, so the horn-section harmony layer punctuates SPARSELY above it:
+ * The chord channel (the `genre === 'Ska'` branch in `generateCompingPattern`,
+ * accompaniment.ts) already chops every offbeat upstroke, so the horn-section
+ * harmony layer punctuates SPARSELY above it:
  * stabs on the &-of-2 and &-of-4 (steps 6, 14 per bar) — locking with the chop
  * without doubling the full chop into mud. This test pins that placement.
  */

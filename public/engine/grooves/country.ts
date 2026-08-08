@@ -74,7 +74,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
             if (isBackbeat) {
                 // why: gate lowered from 0.4 → 0.3 (S8 sweep). Same conductor-
-                // calibration story as `funk.ts:195`: at default bandIntensity
+                // calibration story as funk.ts's backbeat Snare/Sidestick gate
+                // (the "gate lowered from 0.4 → 0.3 (S8)" comment): at default bandIntensity
                 // the train-beat backbeat read as rim, not the country snare crack.
                 soundName = intensity > 0.3 ? 'Snare' : 'Sidestick';
                 velocity = scaleVelocity(0.95, intensity, 0.1) + jitter;

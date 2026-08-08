@@ -7,8 +7,9 @@
  *
  * --- Why this test exists ---
  *
- * Pre-S8: `grooves/funk.ts:195` gated the backbeat at `intensity > 0.4`,
- * routing snare hits to Sidestick at default bandIntensity 0.35. Listening
+ * Pre-S8: the Snare-Pocket branch (`context.inst.name === 'Snare'`) of
+ * `applyOverrides` in `grooves/funk.ts` gated the backbeat at `intensity >
+ * 0.4`, routing snare hits to Sidestick at default bandIntensity 0.35. Listening
  * test 2026-05-17 confirmed the funk groove read as polite rim-shot, not the
  * crack a real funk drummer plays on 2 and 4. The S8 fix lowers the gate to
  * 0.3 (a conductor-calibration choice, not a musical one). This test is the
@@ -154,7 +155,8 @@ describe('Funk Backbeat Presence at Default Intensity (S8)', () => {
     };
 
     it('>=80% of backbeats on Snare at default bandIntensity 0.35 over 32 bars', () => {
-        // why bandIntensity 0.35: matches `public/state/playback.ts:43` default.
+        // why bandIntensity 0.35: matches the `playback` deepSignal slice's
+        // `bandIntensity` default (public/state/playback.ts).
         // The whole point of S8 is the default-state listening experience.
         const backbeats = collectBackbeats(32, 0.35);
         const snareCount = backbeats.filter((b) => b === 'Snare').length;
@@ -246,8 +248,9 @@ describe('Funk Backbeat Presence at Default Intensity (S8)', () => {
 // PART 2 — Conductor arc: default playback reaches bandIntensity >= 0.5
 // within the first 16 bars (S8 second acceptance criterion).
 //
-// Pre-S8: asymmetric down-ramp (`multiplier = 2.5` for down, `1.0` for up at
-// conductor.ts:185) created a structural pull toward floor. S8 inverted to
+// Pre-S8: asymmetric down-ramp (`multiplier = 2.5` for down, `1.0` for up —
+// the `multiplier`/`RAMP_INTENSITY_MULTIPLIER` ramp in `updateAutoConductor`,
+// conductor.ts) created a structural pull toward floor. S8 inverted to
 // 0.5 / 1.5; Epic 12 S6 / LISTEN_TESTS B2 then softened to 0.75 / 1.25 to keep
 // the rise from leaping ≈+0.25 in a single measure (it would read as a lurch).
 // Per-genre floors (Funk 0.45) keep targetIntensity from sagging below the
@@ -271,7 +274,8 @@ function makeAutoIntensityState() {
         playback: {
             isPlaying: true,
             autoIntensity: true,
-            bandIntensity: 0.35, // default per state/playback.ts:43
+            bandIntensity: 0.35, // default per the `playback` deepSignal slice
+            // (state/playback.ts)
             complexity: 0.5,
             bpm: 100,
             songMode: false,
@@ -576,10 +580,12 @@ describe('Funk Backbeat Presence — integrated conductor-driven arc (S8 PART 3)
     // The opening window is the [0.35, 0.4) intensity band — where reverting
     // the S8 gate (216: `intensity > 0.3`) back to `> 0.4` actually flips
     // routing. The band's bounds are NOT arbitrary:
-    //   - lower 0.35: funk.ts:255 "low-intensity fallback" re-routes any
-    //     full-velocity backbeat below 0.35 to Sidestick regardless of the
-    //     216 gate, so below 0.35 Sidestick is *correct* and the 216-gate
-    //     revert is invisible. 0.35 is the effective Snare threshold.
+    //   - lower 0.35: the "Low intensity fallback" branch (`intensity < 0.35
+    //     && velocity > 0.8`) in the Snare-Pocket block of `applyOverrides`
+    //     (grooves/funk.ts) re-routes any full-velocity backbeat below 0.35
+    //     to Sidestick regardless of the 216 gate, so below 0.35 Sidestick
+    //     is *correct* and the 216-gate revert is invisible. 0.35 is the
+    //     effective Snare threshold.
     //   - upper 0.4: at >= 0.4 the OLD gate (`> 0.4`-ish) would also pass, so
     //     a revert no longer flips routing there.
     // Only inside [0.35, 0.4) does the gate value decide Snare vs Sidestick.

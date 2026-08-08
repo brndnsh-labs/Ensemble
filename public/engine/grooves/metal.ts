@@ -205,7 +205,8 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
 
         // Section Accents
         // why: scope the China splash to the Open lane only — same pattern as the
-        // section-boundary Crash at groove-engine.ts:226 and crash-catch at :247.
+        // section-boundary Crash in groove-engine.ts's 'Phase 2b: Section-boundary
+        // Crash' block, and crash-catch in its accent.type === 'crash-catch' branch.
         // Firing on HiHat + Open + Crash lanes produces three stacked drumHits per
         // downbeat that route through `groove.lastCrashGain` and choke each other
         // (audible flam + gain stutter). HiHat and Crash lanes keep the steady-state

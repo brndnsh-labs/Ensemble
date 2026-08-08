@@ -11,8 +11,9 @@
  * Genres under test: Funk, Jazz, Country, Acoustic, Hip Hop, Neo-Soul, Reggae
  * (the genres cited in P1 #14 that previously got no crash on boundary).
  *
- * Note: the `pendingCrash` fill-map path (tick-logic.ts:194-210) is not exercised
- * here — that path was already wired correctly before S1 and is covered by
+ * Note: the `pendingCrash` fill-map path (the "Phase 2: Thematic Fill Memory" block
+ * in tick-logic.ts's applyWorkerTransition) is not exercised here — that path was
+ * already wired correctly before S1 and is covered by
  * `seeded-fill-firing.test.ts`. S1 fixed the turnaround + accent paths only.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -447,7 +448,8 @@ describe('Crash Routing Critique', () => {
         );
 
         // why: each genre should produce exactly 1 Crash at the section downbeat
-        // (Open lane only — see groove-engine.ts:187). The previous implementation
+        // (Open lane only — see the final-bar `inst.name === 'Open'` branch in
+        // applyGrooveOverrides, groove-engine.ts). The previous implementation
         // double-fired across both HiHat+Open lanes, which produced 2 per boundary
         // and choked the first voice via lastCrashGain ramp-down. Threshold is
         // >= genres.length confirming one-per-genre; the helper at L429-433 still

@@ -26,7 +26,8 @@
  *       zero hits on off-pulse 4/4-cell {2, 8} (S13).
  *
  * Production-shape harness:
- *   - Real All Blues progression (`public/data/chord-presets.ts:639`).
+ *   - Real All Blues progression (the `'All Blues'` entry in the `PRESETS_RAW`
+ *     array, `public/data/chord-presets.ts`, exported as `CHORD_PRESETS`).
  *   - Preset BPM = 60, TS = '6/8', style = 'jazz'.
  *   - Session seed populated like state-effects.ts does (the sessionSeed value
  *     maps to soloist.session.seed, which the live phrase-first engine replays).
@@ -57,7 +58,8 @@ vi.mock('../../public/state.js', () => ({
     dispatch: vi.fn(),
 }));
 
-// why: All Blues preset values from public/data/chord-presets.ts:639-666.
+// why: All Blues preset values from the `'All Blues'` entry in the
+// `PRESETS_RAW` array (public/data/chord-presets.ts).
 const PRESET = {
     bpm: 90, // quarter-notes/min (= 60 dotted-quarter pulses/min — the felt waltz tempo)
     timeSignature: '6/8',
@@ -119,15 +121,17 @@ function buildAllBluesProgression() {
 // itself up and runs its real budget timer. sessionSeed structured as the
 // soloist-seeder output (`{ notes: [...], loopLengthSteps }`) so the soloist
 // engine takes the seeded-budget 1.5× motivic-preserve path. This mirrors
-// the state-effects.ts:43 TOGGLE_PLAY path which always seeds the soloist
-// via generateSessionSeed() on play start.
+// the `regenerateSessionSeeds` helper (state-effects.ts), invoked from the
+// `ACTIONS.TOGGLE_PLAY` case, which always seeds the soloist via
+// generateSessionSeed() on play start.
 function buildAllBluesState(currentLoopCount: number, sessionSeed: any) {
     const soloist = makeSoloistMock({
         enabled: true,
         style: 'jazz',
         mode: 'monophonic',
         octave: 64,
-        sessionSeed, // why: simulates state-effects.ts:43 UPDATE_SB seeding
+        sessionSeed, // why: simulates the `ACTIONS.UPDATE_SB` dispatch inside
+        // `regenerateSessionSeeds` (state-effects.ts)
         sessionSteps: 0,
         phrasingState: 'rest',
         isResting: true,
@@ -580,12 +584,16 @@ describe('All Blues 6/8 End-to-End Critique (S7 — cycle DoD)', () => {
         // cell. S13 hardcodes `soloistResting: false`, which keeps the
         // comper in `currentVibe = 'balanced'`; in production-shape state
         // with a live phrasing FSM the soloist's rest-flips push the
-        // comper into `currentVibe = 'active'` (accompaniment.ts:1361)
-        // which adds a beat-2 ornament — `getBeatStep(1) = 2` in 6/8
-        // (accompaniment.ts:1100-1107). That ornament is 4/4-shaped and
-        // non-idiomatic for compound meter, but it sits OUTSIDE S7's named
-        // acceptance. See REPORT: documented as engine finding for a
-        // follow-up active-vibe-compound-aware story.
+        // comper into `currentVibe = 'active'` (the `soloistJustStopped`
+        // branch inside `updateRhythmicIntent`, accompaniment.ts), which
+        // adds a phrase-keyed ornament in `generateCompingPattern`'s
+        // Jazz/Bossa Nova `vibe === 'active'` block. That block is now
+        // compound-meter-aware (`ts.isCompound` routes 6/8 to the
+        // and-of-pulse anticipation slot instead of the 4/4 beat-2/&-of-3
+        // ornament) — the non-idiomatic-in-compound-meter concern this
+        // comment used to flag has since been fixed; the off-pulse assertion
+        // is still left out here as an S13-only structural guard, not a
+        // known gap.
         // ---------------------------------------------------------------
         it('(5) comping density: per-step <= 35%, pulse-aligned share >= 70%, hits/bar ∈ [1, 4]', () => {
             const hitsPerBar = metrics.compHits / metrics.totalBars;
