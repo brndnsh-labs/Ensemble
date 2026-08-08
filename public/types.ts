@@ -601,9 +601,10 @@ export interface MotifSignatureNote {
 }
 
 /**
- * A captured phrase signature used for motivic response (sectionRecall, formArc)
- * and for the soloist's call/response logic across loops. Built by
- * `buildPhraseSignatureFromEvents` / `buildSeedPhraseSignature`.
+ * Reserved phrase-signature shape for future motivic response and call/response
+ * logic across loops. DORMANT: no builder constructs a non-null value; the live
+ * holding fields are initialized/reset to null in `public/state/instruments.ts`
+ * and `resetSoloistState` in `public/engine/soloist-session.ts`.
  */
 export interface MotifSignature {
     sourceKind: 'performed' | 'seed';
@@ -777,14 +778,11 @@ export interface SoloistPhraseContext {
     sectionLabel: string | null;
     sectionOccurrence: number;
     /**
-     * The just-finished Statement phrase's signature, captured when the
-     * current phrase derives to `restatement` and the prior phrase was a
-     * `statement`. The rhythm engine echoes this signature's attack grid +
-     * duration shape and the pitch picker echoes its contour directions, so
-     * Restatement audibly *confirms* the Statement instead of sounding like
-     * an independent phrase. `null` whenever the current phrase is not a
-     * Statement-following Restatement. Set by `setupPhraseContext` in
-     * soloist.ts. (SRDC Restatement motif-echo — Epic 11 S4.)
+     * Reserved field for the just-finished Statement phrase's signature in a
+     * future SRDC Restatement motif-echo. DORMANT: no code constructs a
+     * non-null value; it is initialized/reset to null in
+     * `public/state/instruments.ts` and `resetSoloistState` in
+     * `public/engine/soloist-session.ts`.
      */
     restatementEcho: MotifSignature | null;
 }
