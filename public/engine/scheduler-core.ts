@@ -246,7 +246,7 @@ export function togglePlay(
                     ) {
                         playback.audio.suspend();
                     }
-                }, 3000) as any;
+                }, 3000);
         }
     } else {
         if (playback.suspendTimeout) {
@@ -817,7 +817,7 @@ export function scheduleBass(
             if (noteEntry?.freq) {
                 const { freq, durationSteps, velocity, timingOffset, muted, bendStartInterval } =
                     noteEntry;
-                const { chord } = chordData as any;
+                const { chord } = chordData;
                 const h = humanizeNote(
                     humanizeSeed(step, 'bass', 0),
                     HUMANIZE_PROFILES.bass,
@@ -952,7 +952,7 @@ export function scheduleSoloist(
                     vibrato,
                     expression,
                 } = noteEntry;
-                const { chord } = chordData as any;
+                const { chord } = chordData;
                 const offsetS = timingOffset || 0;
 
                 if (!noteEntry.isDoubleStop) {
@@ -1075,9 +1075,7 @@ export function scheduleChordVisuals(
             // compound), so route through `secondsPerBeatFor` (which scales by
             // stepsPerBeat) for the chord-event viz lifetime rather than a bare
             // per-quarter duration.
-            const tsForChordViz =
-                (TIME_SIGNATURES as any)[arranger?.timeSignature] ||
-                (TIME_SIGNATURES as any)['4/4'];
+            const tsForChordViz = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
             queueVisualizerChordEvent(playback, {
                 time: t,
                 index: chordData.chordIndex,
@@ -1563,7 +1561,7 @@ export function scheduleGlobalEvent(
     const chordData = getChordAtStep(state, musicalStep);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
-            (playback as Mutable<typeof playback>).currentKey = chordData.chord.key as any; // @direct-mutation
+            (playback as Mutable<typeof playback>).currentKey = chordData.chord.key; // @direct-mutation
             window.dispatchEvent(
                 new CustomEvent('key-change', { detail: { key: playback.currentKey } }),
             );
@@ -1620,6 +1618,6 @@ function syncAndFlushWorker(
     }
 
     killAllNotes(state);
-    flushWorker(step, syncData as any);
+    flushWorker(step, syncData);
     restoreGains(state);
 }

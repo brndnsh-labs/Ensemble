@@ -1,5 +1,5 @@
 import { getSectionEnergy } from '../song/form-analysis.js';
-import type { SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
+import type { Chord, SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
 import type { DropMuteStyle } from './drop-mechanic.js';
 
 /**
@@ -281,7 +281,7 @@ export function createCoordinationContext(
     carryover: CoordinationCarryover | null = null,
 ) {
     // Initial context derived from the "anchor" (Groove)
-    const ts = (stepInfo as any)?.tsConfig || { beats: 4, stepsPerBeat: 4 };
+    const ts = stepInfo?.tsConfig || { beats: 4, stepsPerBeat: 4 };
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
     const mStep = stepInfo ? stepInfo.mStep : step % stepsPerBar;
 
@@ -367,7 +367,7 @@ export function createCoordinationContext(
         isTurnaround: false,
         // writer: tick-logic.ts chord-data preamble (before producers run)
         // readable-after: chord-data preamble (any producer including soloist)
-        upcomingSectionFirstChord: null as any,
+        upcomingSectionFirstChord: null as Chord | null,
         // why: epic-form-arrangement S2 (Imperfect Symmetry). Same value the soloist
         // derives from `getSectionContext(arranger, step)` (soloist.ts). Published
         // through the coordination context so bass/drums/accompaniment producers can

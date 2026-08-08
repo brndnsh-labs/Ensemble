@@ -4,8 +4,8 @@
  *
  * The S12 density gate (commit 82c4e547) fires the engine on the right STEPS
  * in 6/8 — pulses {0, 6}, pickups {4, 10}, approach {2, 8} at high intensity.
- * But the pitch picker in `getBassNoteStyle 'quarter'` (bass-styles.ts:1264+)
- * was still 4/4-shaped:
+ * But the pitch picker in the "--- QUARTER NOTE (WALKING) STYLE ---" branch of
+ * `getBassNoteStyle` (bass-styles.ts) was still 4/4-shaped:
  *   - `intBeat === 2` ("beat 3 → fifth" 4/4 idiom) fires on mStep 4 in 6/8 —
  *     the PICKUP slot — and played the 5th 70% of the time instead of a
  *     chromatic / scale-step leading-tone into the next pulse.

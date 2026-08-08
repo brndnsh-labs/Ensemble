@@ -237,10 +237,14 @@ describe('Comper Phrase-End Critique', () => {
     }
 
     it('Bossa: NOT thinned (own partido-alto idiom is S5.c work, not S2.a)', () => {
-        // why: confirm we didn't accidentally include Bossa in the gate. Bossa
-        // currently shares Jazz's cell bank as a port-for-fidelity (see
-        // accompaniment.ts:148-156); thinning Bossa here would compound with
-        // the upcoming S5.c partido-alto bank when it ships. Leave Bossa alone.
+        // why: confirm we didn't accidentally include Bossa in the gate.
+        // `PHRASE_END_THIN_GENRES` (comping-emit.ts) is `Jazz`/`Blues`/`Funk`
+        // only — Bossa now has its own partido-alto cell bank (S5.c shipped;
+        // see the `genre === 'Bossa Nova' && !ts.isCompound` branch in
+        // `generateCompingPattern`, accompaniment.ts), which already encodes
+        // soloist-busy thinning via its sparse cell/vibe drop. Stacking this
+        // gate's 65% post-phrase thin on top would compound with that and
+        // contradict Bossa's continuous-comp identity. Leave Bossa alone.
         groove.genreFeel = 'Bossa Nova';
 
         const phraseEndCoord = () => ({

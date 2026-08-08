@@ -15,8 +15,9 @@
  * Canonical genre key: the Ska-Punk *smart-genre* sets `genreFeel = 'Ska'`
  * (smart-genres.ts) — NOT the preset name 'Ska-Punk'. The accompaniment
  * branch keys on `genre === 'Ska'`, so the mock sets `groove.genreFeel =
- * 'Ska'`. (Confirmed against the engine's style-override block,
- * accompaniment.ts:1301-1303, and the many `genreFeel === 'Ska'` comments
+ * 'Ska'`. (Confirmed against the "--- Style Override ---" block in
+ * updateRhythmicIntent (accompaniment.ts) — `chords.style === 'ska-upstroke'`
+ * sets `genre = 'Ska'` — and the many `genreFeel === 'Ska'` comments
  * across grooves/fills/conductor.)
  *
  * This is a CHARACTERIZATION test of existing behavior — no engine change.

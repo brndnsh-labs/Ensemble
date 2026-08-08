@@ -323,7 +323,8 @@ export function generateHarmonyCompingPattern(
         // double-stack bug that Epic 6 S5 deleted from the chord channel.
         //
         // When the harmony route lands on 'organ' (the smart-style default
-        // for Reggae — see getHarmonyNotes:873-874), play the **organ
+        // for Reggae — see getHarmonyNotes's style selection via
+        // resolveHarmonyProfile/profile.smartStyle), play the **organ
         // bubble** instead: eighth-note offbeats on chord tones (steps 2,
         // 6, 10, 14 per bar). The bubble is the organist's idiom — it sits
         // BETWEEN the keyboardist's skank hits, filling the offbeat grid
