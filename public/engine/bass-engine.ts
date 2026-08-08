@@ -733,16 +733,25 @@ export function getBassNote(
             }
         }
 
-        const intensityFactor = 0.6 + intensity * 0.7;
+        // #941 — the generic `intensityFactor` (`0.6 + intensity * 0.7`) that used
+        // to sit in this product is GONE. It was one of three multiplicative
+        // intensity terms on the bass velocity (style token × intensityFactor ×
+        // the band-wide conductor velocity), and their product railed against the
+        // emission clamp: at chorus intensity every style's downbeat came out at
+        // one identical velocity. The conductor now owns the lane's macro dynamic
+        // law as a single term (`bassMacroGain` in `velocity-shaping.ts`), applied
+        // FINAL-STAGE downstream of this clamp — see that function for why the
+        // swell cannot live inside the emission domain. Everything left in this
+        // product is intensity-FREE and expresses relative ARTICULATION only.
 
         // #1006 — WITHIN-PHRASE velocity envelope (design §4.6). The bass had NO
-        // note-to-note dynamic shape: `velocity` (odd-beat accent) × `intensityFactor`
-        // (a slow macro term) left every note in a bar at essentially one weight. A
+        // note-to-note dynamic shape: `velocity` (odd-beat accent) × a slow macro
+        // term left every note in a bar at essentially one weight. A
         // real bassist swells INTO the metric anchors (the downbeat and the bar
         // midpoint) and eases off the step right after. This is a distance-to-target
-        // shaping term applied FINAL-STAGE — a `* envelope` AFTER the accent × intensity
+        // shaping term applied FINAL-STAGE — a `* envelope` AFTER the accent × token
         // product — per the final-stage-multiplier rule; folded into the accent it would
-        // wash out against intensityFactor. Genre-neutral first pass (no per-genre
+        // wash out against the other factors. Genre-neutral first pass (no per-genre
         // contour tables yet). `stepInMeasure` is already measure-relative, so no #923
         // wrap is needed. KNOWN LIMITATION (#1006): multiplicative-then-clamped, so the
         // swell fades when the base is already hot — same tradeoff as the soloist envelope.
@@ -786,14 +795,15 @@ export function getBassNote(
             }
         }
         // why: clamp to the DOMAIN ceiling (1.5), not the authoring ceiling (1.25)
-        // — #1331. The product below stacks four terms (style token × odd-beat
-        // accent × intensity × metric envelope); clamping it at the loudest value a
-        // style is allowed to *author* meant the accent hit the rail at i≈0.70 and
-        // the base note at i≈0.93, so a chorus played every note in the bar at one
-        // identical velocity. See `BASS_VELOCITY_DOMAIN_MAX` for the split.
+        // — #1331. The product below is three ARTICULATION terms (style token ×
+        // odd-beat accent × metric envelope); clamping it at the loudest value a
+        // style is allowed to *author* would rail the accent even with the macro
+        // term gone (1.25 × 1.15 × 1.05 = 1.51). Since #941 removed the stacked
+        // intensity terms this clamp is effectively never reached — see
+        // `BASS_VELOCITY_DOMAIN_MAX` for the split and why it stays anyway.
         const finalVel = Math.min(
             BASS_VELOCITY_DOMAIN_MAX,
-            velocityParam * velocity * intensityFactor * bassEnvelope,
+            velocityParam * velocity * bassEnvelope,
         );
         const isLongStyle = ['acoustic'].includes(style);
         const maxSafeDuration =
@@ -951,11 +961,15 @@ export function getBassNote(
     const isFinalMeasureBass = context?.stepCoordination?.isFinalMeasure === true;
     if (isFinalMeasureBass) {
         if (isDownbeat) {
-            const intensityFactor = 0.6 + intensity * 0.7;
             // why: same domain-vs-authoring split as `result()` above (#1331) —
-            // the cadence's 1.1 token times the accent and intensity terms must
-            // stay free to swell instead of railing at the authoring ceiling.
-            const finalVel = Math.min(BASS_VELOCITY_DOMAIN_MAX, 1.1 * velocity * intensityFactor);
+            // the cadence's 1.1 token times the accent must stay free to swell
+            // instead of railing at the authoring ceiling. #941 removed this
+            // path's own copy of the generic `intensityFactor` for the same
+            // reason `result()` lost it: the lane's macro swell is one term,
+            // applied downstream (`bassMacroGain`), so the cadence rides the
+            // band's dynamic exactly like every other bass note instead of
+            // double-counting intensity here.
+            const finalVel = Math.min(BASS_VELOCITY_DOMAIN_MAX, 1.1 * velocity);
             let timingOffset = getBandPocket(groove.genreFeel, chord?.sectionLabel ?? null);
             if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
                 // #1005: see the main timing block — residual retuned against the 25ms
@@ -1156,7 +1170,11 @@ export function getBassNote(
         const isUpbeat = step % ts.stepsPerBeat !== 0;
         const isSecondaryAnchor = stepInMeasure / ts.stepsPerBeat === 2;
         if (isDownbeat || isSecondaryAnchor) {
-            return result(getFrequency(baseRoot), 0.9, 1.15 + intensity * 0.1);
+            // why (#941): was `1.15 + intensity * 0.1`. The intensity term was macro
+            // loudness, not articulation — neo-soul's anchors are a fixed +15% over
+            // the upbeat chatter whether the room is quiet or roaring. The lane's
+            // swell is `bassMacroGain`'s job now; 1.15 is the anchor's articulation.
+            return result(getFrequency(baseRoot), 0.9, 1.15);
         }
         if (isUpbeat) {
             // why: base 20% upbeat-chatter floor, +40% at full band intensity and
@@ -1231,7 +1249,12 @@ export function getBassNote(
     ) {
         const kickVel =
             kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
-        const dynamicKickVel = Math.max(0.8, kickVel * (0.7 + intensity * 0.3));
+        // why (#941): was `kickVel * (0.7 + intensity * 0.3)`. The `0.7` survives as
+        // the articulation offset — a kick-locked note DOUBLES the drummer, it
+        // doesn't lead, so it sits a fixed notch under the authored downbeat tokens
+        // — while the intensity slope moved to `bassMacroGain`. The 0.8 floor stays:
+        // even the softest lock has to read as a played note, not a ghost.
+        const dynamicKickVel = Math.max(0.8, kickVel * 0.7);
         return result(getFrequency(withOctaveJump(baseRoot)), null, dynamicKickVel);
     } else if (
         (style === 'rock' || style === 'funk') &&
@@ -1256,11 +1279,10 @@ export function getBassNote(
         if (hasKickTrigger) {
             const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
             const kickVel = kickStepVal === 2 ? 1.25 : 1.15;
-            return result(
-                getFrequency(baseRoot),
-                null,
-                Math.max(0.8, kickVel * (0.7 + intensity * 0.3)),
-            );
+            // why (#941): same de-stacking as the generic kick-lock above — the
+            // `0.7` is the "doubling the drummer" articulation offset, the
+            // intensity slope now lives once, in `bassMacroGain`.
+            return result(getFrequency(baseRoot), null, Math.max(0.8, kickVel * 0.7));
         }
         if (stepInMeasure % ts.stepsPerBeat === 0 && !isUpbeat) {
             const beatInPattern = intBeat % 4;
@@ -1342,11 +1364,14 @@ export function getBassNote(
             // the verse->chorus build (i≈0.4-0.7, +0.2 to +0.5dB over the old
             // flat value there).
             //
-            // What this does NOT fix, verified, not assumed: at i≥0.7 this term
-            // and `popVel` both saturate `BASS_VELOCITY_DOMAIN_MAX` and render
-            // identically regardless of either one's own slope — a structural
-            // ceiling (#1336's un-stacked-intensity territory), not a tuning
-            // problem. Below that ceiling The One is now never out-rendered by
+            // #941 FOLLOW-THROUGH: the `+ intensity * 0.2` slope is gone from
+            // both this token and `popVel` — they are now flat 1.25 and 1.2,
+            // the same 0.05 apart as before, and the lane's macro swell is the
+            // single downstream `bassMacroGain` term. The saturation this
+            // paragraph described is what that change removed: at i≥0.7 the two
+            // used to saturate `BASS_VELOCITY_DOMAIN_MAX` and render identically
+            // regardless of either one's own slope — a structural ceiling, not a
+            // tuning problem. Below that ceiling The One is now never out-rendered by
             // any other note — an ORDERING claim, not audible dominance: the
             // margin over the same-token "and" pop is only the metric
             // envelope's 1.05 vs 1.025 (~0.1-0.19 dB rendered, under the ~1 dB
@@ -1377,11 +1402,20 @@ export function getBassNote(
             // `bassEnvelope` (`#1006`, `isStrongBeatB` above), same as every
             // other style's downbeat. rock/disco/neo are unchanged pending a
             // by-ear call on whether they want this too (out of scope here).
-            style === 'funk'
-                ? BASS_AUTHORING_CEILING + intensity * 0.2
-                : style === 'quarter'
-                  ? 1.0
-                  : 1.0 + intensity * 0.25,
+            // #941: `1.0 + intensity*0.25` became a flat 1.1 for rock/disco/neo.
+            // The slope was pure macro loudness (the token IS 1.0 — i.e. no accent
+            // at all — at low intensity, and only becomes an anchor accent at
+            // chorus), which is precisely the "louder when the band is louder"
+            // shape that now belongs to `bassMacroGain` alone. But collapsing it to
+            // a bare 1.0 would have erased #1340's deliberate rock-vs-jazz-walking
+            // distinction AND left rock's downbeat permanently quieter than its own
+            // 1.15 backbeat accent — a rock bassist digs into The One at every
+            // dynamic, not only at chorus. 1.1 is that accent expressed as
+            // articulation: the old token's value at the reference mid intensity
+            // (1.125) rounded onto the file's existing accent vocabulary, so the
+            // rendered mid-intensity downbeat moves +0.4 dB (under the ~1 dB JND)
+            // while the accent now holds at i=0.1 as well as i=1.0.
+            style === 'funk' ? BASS_AUTHORING_CEILING : style === 'quarter' ? 1.0 : 1.1,
         );
     }
 
@@ -1490,13 +1524,15 @@ export function getBassNote(
 
             // why: mirror dub style's velocity envelope so the fill lives in
             // the same dynamic pocket as the riddim hits — the dub style
-            // handler in bass-styles.ts (tunedVel) scales the riddim's stored velocity by
-            // (0.8 + intensity * 0.3) and jitters by (0.95 + rand * 0.1).
+            // handler in bass-styles.ts (tunedVel) scales the riddim's stored
+            // velocity by 0.8 and jitters by (0.95 + rand * 0.1).
             // Without this mirror, the fill pops out as a different voice
             // (Epic 9 S2.b review P1 #4). The ×1.05 accent on top encodes
             // the "deliberate gesture" reading.
-            const reggaeFillVel =
-                velocity * (0.8 + intensity * 0.3) * (0.95 + Math.random() * 0.1) * 1.05;
+            // #941: the mirrored term lost its `+ intensity * 0.3` slope at the
+            // same time `tunedVel` did — this is a PAIRED SITE, and the two have
+            // to keep matching or the fill stops sitting in the riddim's pocket.
+            const reggaeFillVel = velocity * 0.8 * (0.95 + Math.random() * 0.1) * 1.05;
             const reggaeFillRes = result(
                 getFrequency(approachMidi),
                 // why: short duration (1 step) — pickup into the next downbeat,

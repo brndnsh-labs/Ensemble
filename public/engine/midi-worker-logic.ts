@@ -24,7 +24,7 @@ import { isSilentSentinel, muteGain } from './mute-contract.js';
 import { generateResolutionNotes } from './resolution.js';
 import { resetSoloistState } from './soloist-session.js';
 import { applyWorkerTransition, generateNotesForStep, type NoteResult } from './tick-logic.js';
-import { soloistIntensityGain } from './velocity-shaping.js';
+import { bassMacroGain, soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep } from './worker-utils.js';
 
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
@@ -497,7 +497,21 @@ export class ExportProcessor {
                     // Deliberately drops `polyphonyComp`: the live bass lane is
                     // strictly monophonic (`scheduleBass` applies no polyphony
                     // compensation either), so there is nothing to compensate for.
-                    finalVel = Math.sqrt(noteVel);
+                    //
+                    // #941: `bassMacroGain` is applied here for the same reason
+                    // #1325 put `soloistIntensityGain` in the branch below — it is
+                    // now the bass lane's ONLY intensity-driven term, so without it
+                    // the exported bass would be dynamically dead. That is not a
+                    // hypothetical: `applyWorkerTransition` (`tick-logic.ts`) ramps
+                    // `playback.bandIntensity` per step across the whole export, so
+                    // the `.mid` has a genuine macro arc that the bass used to
+                    // express through the engine's (now removed) `intensityFactor`.
+                    // Applied to the velocity BEFORE this branch's own curve so the
+                    // ordering matches live (`scheduleBass` multiplies, then
+                    // `bassVelocityToAmplitude` compresses).
+                    finalVel = Math.sqrt(
+                        noteVel * bassMacroGain(this.state.playback.bandIntensity),
+                    );
                 } else if (moduleName === 'soloist') {
                     // #1325: live playback now applies this same swell
                     // (`scheduleSoloist` in scheduler-core.ts), which it previously

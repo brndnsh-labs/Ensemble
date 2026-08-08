@@ -3,10 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
-import {
-    BASS_VELOCITY_DOMAIN_MAX,
-    bassVelocityToAmplitude,
-} from '../../public/engine/velocity-shaping.js';
+import { bassMacroGain, bassVelocityToAmplitude } from '../../public/engine/velocity-shaping.js';
 import { getState } from '../../public/state.js';
 import { getFrequency, getStepInfo } from '../../public/utils.js';
 
@@ -471,14 +468,19 @@ describe('Funk Bass Critique', () => {
     // dB throughout, because that is the unit the musical claim is in: ~1 dB is
     // roughly the JND for a low-register tone inside a mix.
     const dB = (ratio) => 20 * Math.log10(ratio);
-    // The band-wide swell gain `scheduler-core.ts` multiplies onto every bass
-    // note between the engine and the voice — `applyConductor` in `conductor.ts`,
-    // running every step because `autoIntensity` is ON by default. It is part of
-    // the rendered chain, so a rendered-dynamics test that skipped it would be
-    // measuring a signal path no listener ever hears. (Per-note humanize —
-    // `velSpread` 0.1 — also multiplies in live; it is omitted here because it is
-    // ±10% seeded jitter AROUND each level, not a level of its own.)
-    const conductorGain = (bandIntensity) => 0.7 + bandIntensity * 0.45;
+    // The lane's macro swell gain `scheduler-core.ts` multiplies onto every bass
+    // note between the engine and the voice. It is part of the rendered chain, so
+    // a rendered-dynamics test that skipped it would be measuring a signal path
+    // no listener ever hears. (Per-note humanize — `velSpread` 0.1 — also
+    // multiplies in live; it is omitted here because it is ±10% seeded jitter
+    // AROUND each level, not a level of its own.)
+    //
+    // #941: this used to re-derive the band-wide conductor curve
+    // (`0.7 + bandIntensity * 0.45`) as a local literal. It now calls the
+    // production function, because the bass lane's macro law is the ONE thing
+    // this suite's swell assertion is measuring — a hand-copied curve here would
+    // let the engine and the test drift in lockstep and still read green.
+    const conductorGain = (bandIntensity) => bassMacroGain(bandIntensity);
     const renderedFullNotes = (perf, bandIntensity) =>
         perf
             .map((p) => p.note.velocity)
@@ -595,12 +597,19 @@ describe('Funk Bass Critique', () => {
         // that lands.
     });
 
-    it('swells the bass with the band instead of flattening (#1331 acceptance 4b)', () => {
+    it('swells the bass 6-8 dB from verse to chorus, one intensity term only (#1331 4b / #941)', () => {
         // The macro swell, measured on the bar downbeat — the one note every
         // intensity plays. Pre-#1331 the rendered downbeat was FLAT from i=0.4
         // upward (mutation-tested: exactly 1.000 at every intensity from 0.4 to
         // 1.0, even with the conductor gain applied — the unity clamp ate that
         // too): the conductor drove the band harder and the bass did not move.
+        //
+        // #941 turned this from a "not flat" test into the LANE LAW's gate. The
+        // bass velocity product used to stack three multiplicative intensity
+        // terms; it now has exactly one (`bassMacroGain`, applied downstream of
+        // the emission clamp by `scheduleBass` and the `.mid` exporter), and this
+        // assertion brackets the swell it produces on BOTH sides. See the band
+        // rationale at the assertion below.
         const ramp = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((bandIntensity) => {
             const perf = simulatePerformance(8, {
                 playback: { bandIntensity, bpm: 110, complexity: 0.8 },
@@ -617,20 +626,43 @@ describe('Funk Bass Critique', () => {
                 .map((v) => v.toFixed(3))
                 .join(
                     ' ',
-                )} | total=+${dB(ramp[9] / ramp[0]).toFixed(2)}dB (was +1.84dB, flat from i=0.4)`,
+                )} | total=+${dB(ramp[9] / ramp[0]).toFixed(2)}dB (target band 6-8dB; was +1.84dB pre-#1331, +6.10dB pre-#941)`,
         );
 
         // intent: NO flat region anywhere as the band swells ; strictly increasing
-        // at all ten points, deterministic across 30 runs. Funk's slap token does
-        // still hit the engine's emission ceiling around i≈0.8 (the residual
-        // stacked intensity terms, #1336) — the ramp keeps climbing past it only
-        // because `conductorVelocity` is applied downstream of that clamp, which
-        // is also why `bassVelocityToAmplitude` must not re-clamp at the domain max.
+        // at all ten points, deterministic across 30 runs. Pre-#941 funk's slap
+        // token hit the engine's emission ceiling around i≈0.8 and the ramp kept
+        // climbing past it only because the macro gain is applied downstream of
+        // that clamp. That is still why `bassVelocityToAmplitude` must not
+        // re-clamp at the domain max — but the clamp itself is no longer reached:
+        // with the intensity slopes off the style tokens, funk's downbeat emits a
+        // flat 1.3125 and every step of this ramp is pure macro law.
         for (let i = 1; i < ramp.length; i++) {
             expect(ramp[i]).toBeGreaterThan(ramp[i - 1]);
         }
-        // intent: the swell is audible, not a rounding artifact ; measured +6.10 dB ; floor 5.0.
-        expect(dB(ramp[9] / ramp[0])).toBeGreaterThanOrEqual(5.0);
+        // intent (#941): the lane swells 6-8 dB from verse to chorus — bracketed on
+        // BOTH sides, because each side fails for a different musical reason.
+        //
+        // FLOOR 6.0: under this the bass stops participating in the band's
+        // dynamic arc; the conductor drives a chorus and the bottom end just sits
+        // there. This is also the anti-regression side — the #1331 bug rendered
+        // +1.84 dB here.
+        // CEILING 8.0: over this the bass is no longer the mix's anchor. The
+        // soloist's live arc (`conductorVelocityFor × soloistIntensityGain`)
+        // swings ×4.6 and accelerates; the bass is deliberately COMPRESSED against
+        // it, and it is also the lane a listener notices disappearing in a verse.
+        // The ceiling is what makes re-stacking a second intensity term fail:
+        // mutation-tested both ways — re-adding the old `intensityFactor` to the
+        // engine product takes this to +9.82 dB (RED on the ceiling), and shrinking
+        // `bassMacroGain` back to the band-wide `0.7 + 0.45i` curve gives +3.32 dB
+        // (RED on the floor).
+        //
+        // Measured +7.04 dB, 30/30 runs identical (this downbeat is deterministic
+        // — flat token × flat envelope × the macro law), so both brackets have
+        // ~1 dB of headroom and there is no run-to-run variance to absorb.
+        const swellDb = dB(ramp[9] / ramp[0]);
+        expect(swellDb).toBeGreaterThanOrEqual(6.0);
+        expect(swellDb).toBeLessThanOrEqual(8.0);
     });
 
     // --- #1334: funk downbeat slap responds to intensity -------------------
@@ -702,41 +734,31 @@ describe('Funk Bass Critique', () => {
             expect(r.n).toBeGreaterThan(20);
         }
         // intent: strictly increasing through the build — the downbeat must
-        // keep climbing as the band lifts, not plateau. This alone doesn't
-        // distinguish the fix from pre-fix behavior (intensityFactor/
-        // bassEnvelope already gave every note SOME growth) — the mutation
-        // check below does that.
+        // keep climbing as the band lifts, not plateau.
         for (let i = 1; i < results.length; i++) {
             expect(results[i].mean).toBeGreaterThan(results[i - 1].mean);
         }
-        // intent: the mutation check — reconstructs what the OLD flat-1.25
-        // velocityParam would have rendered to at each build intensity, via
-        // the same closed-form chain the engine itself uses
-        // (velocityParam * accent(1.0, downbeat is always even intBeat) *
-        // intensityFactor(0.6+i*0.7) * bassEnvelope(1.05, the downbeat is
-        // always a strong beat) * conductorGain, domain-clamped, then
-        // bassVelocityToAmplitude). Verified this closed form matches the
-        // real simulation's measured amplitude to 4 decimal places at every
-        // build intensity — confirms the downbeat's ONLY per-note inputs here
-        // are velocityParam and intensity, so this is a faithful reconstruction,
-        // not an approximation. Pre-fix, velocityParam contributed nothing
-        // beyond the shared intensityFactor/bassEnvelope terms every OTHER
-        // note also gets; measured post-fix gain is +0.2 to +0.4dB across the
-        // build (i=0.4-0.7) — small but real, and this proves it's the fix's
-        // doing, not simulation noise.
-        const oldAmplitudeAt = (bandIntensity) => {
-            const intensityFactor = 0.6 + bandIntensity * 0.7;
-            const bassEnvelope = 1.05;
-            const gain = conductorGain(bandIntensity);
-            const oldRaw = Math.min(
-                BASS_VELOCITY_DOMAIN_MAX,
-                1.25 * intensityFactor * bassEnvelope,
-            );
-            return bassVelocityToAmplitude(oldRaw * gain);
-        };
-        for (const r of results) {
-            expect(r.mean).toBeGreaterThan(oldAmplitudeAt(r.bi));
-        }
+        // #941 REPLACED THIS TEST'S MUTATION CHECK, and the reason is the story
+        // of the issue. The old check reconstructed what a FLAT 1.25 velocityParam
+        // would have rendered to and asserted #1334's sloped `1.25 + intensity*0.2`
+        // token beat it — a comparison that no longer exists, because #941 took the
+        // slope back OFF that token. That is not a regression of #1334: the slope
+        // was one of three stacked intensity terms whose product railed the
+        // emission clamp, and its own comment already recorded that "at i>=0.7 this
+        // term and popVel both saturate BASS_VELOCITY_DOMAIN_MAX and render
+        // identically regardless of either one's own slope." #1334's real claim —
+        // The One responds to the band's dynamic build — is now carried by the
+        // lane's single macro term, and is what the assertions here measure.
+        //
+        // The build gain is the durable form of that claim. Pre-#941 the same
+        // i=0.4->0.7 window rendered +2.65 dB (hand-derived through the old
+        // three-term chain); post-#941 it measures +2.59 dB — i.e. the build is
+        // preserved to within 0.06 dB while the chorus saturation is gone.
+        // Floor 2.0 dB leaves ~23% headroom under the measured value.
+        // The anti-restacking guard lives in the dedicated swell test below,
+        // which brackets the whole lane law on BOTH sides.
+        const buildGainDb = dB(results[results.length - 1].mean / results[0].mean);
+        expect(buildGainDb).toBeGreaterThanOrEqual(2.0);
     });
 
     // --- #1342: "The One" is the loudest thing in the funk bar -------------

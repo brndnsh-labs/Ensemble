@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { bassMacroGain } from '../../public/engine/velocity-shaping.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -280,32 +281,57 @@ describe('Country Bassist Critique', () => {
     });
 
     it('should boost velocity with intensity', () => {
-        // pluckVel = 0.95 + intensity * 0.3 (bass-styles.ts:285) — the engine's
-        // intensity axis is loudness, not density. Verify scaling.
+        // Country's intensity axis is loudness, not density — but #941 moved
+        // WHERE the loudness lives. `pluckVel` was `0.95 + intensity * 0.3` and is
+        // now a flat 0.95, with the lane's macro swell applied once, downstream
+        // (`bassMacroGain`). The old slope was doing real damage on this style:
+        // paired against the walk-up's `1.0 + intensity * 0.2`, the two crossed at
+        // i=0.5, so above mid intensity the steady roots OUT-punched the walk-up
+        // pickup — inverting the "walk-ups punch slightly hotter than Two-Step
+        // roots" intent the engine comment states. Flat 0.95 vs 1.0 holds that
+        // ordering at every dynamic.
+        //
+        // The pre-#941 numbers this assertion used to encode are worth keeping as
+        // the record of what un-stacking bought: engine velocity ran low=0.88,
+        // high=1.50 — the high end being the DOMAIN clamp, i.e. every quarter-tier
+        // note at i=0.95 sat on the rail at one identical velocity.
+        const LOW_I = 0.3;
+        const HIGH_I = 0.95;
         const low = simulatePerformance(8, {
-            playback: { bandIntensity: 0.3, complexity: 0.5, bpm: 115 },
+            playback: { bandIntensity: LOW_I, complexity: 0.5, bpm: 115 },
         });
         const high = simulatePerformance(8, {
-            playback: { bandIntensity: 0.95, complexity: 0.5, bpm: 115 },
+            playback: { bandIntensity: HIGH_I, complexity: 0.5, bpm: 115 },
         });
 
         const avg = (perf) => perf.reduce((s, p) => s + p.note.velocity, 0) / perf.length;
         const lowVel = avg(low);
         const highVel = avg(high);
+        const lowRendered = lowVel * bassMacroGain(LOW_I);
+        const highRendered = highVel * bassMacroGain(HIGH_I);
         console.log(
-            `[Country Critique] Velocity scaling: low=${lowVel.toFixed(2)} high=${highVel.toFixed(2)}`,
+            `[Country Critique] Velocity scaling: engine low=${lowVel.toFixed(2)} high=${highVel.toFixed(2)} (ratio ${(highVel / lowVel).toFixed(3)}, target ~1.0) | ` +
+                `rendered low=${lowRendered.toFixed(2)} high=${highRendered.toFixed(2)} (ratio ${(highRendered / lowRendered).toFixed(2)}, informational)`,
         );
 
-        // Expected: pluckVel 0.95 + 0.3*0.3 = 1.04 vs 0.95 + 0.95*0.3 = 1.235,
-        // each then times the intensity/envelope terms. #1331 moved the engine's
-        // emission clamp from the AUTHORING ceiling (1.25) to the DOMAIN ceiling
-        // (`BASS_VELOCITY_DOMAIN_MAX` = 1.5), so the high-intensity mean rose
-        // 1.25 -> 1.50: at 0.95 intensity country's quarter-tier notes were
-        // previously all sitting on the old rail. They now sit on the new one —
-        // the residual triple-stacked intensity multiplication is #1336, not this
-        // test's business. This assertion measures ENGINE velocity; the rendered
-        // dynamics (what a listener hears through `bassVelocityToAmplitude`) are
-        // asserted in `funk-bass-critique.test.ts`.
-        expect(highVel).toBeGreaterThan(lowVel * 1.1); // measured: engine delivers low=0.88, high=1.50 (~1.70x); floor 1.1x leaves ~0.6x headroom
+        // Rendered ratio is informational only: with the chord-downbeat engine
+        // velocity pinned exactly equal (below), the rendered ratio IS
+        // bassMacroGain's own ratio (~2.1×) — a floor here would only re-test
+        // the macro law's monotonicity, which funk-bass-critique's 6–8 dB
+        // bracket guards end-to-end.
+        // intent (#941): no macro intensity term survives in the engine's output.
+        // Measured on the CHORD DOWNBEAT only, deliberately: country switches from
+        // Two-Step half-note roots to the quarter-tier R-5-R-5 pattern at i=0.6 and
+        // adds walk-ups above i=0.5, so an all-notes mean shifts with the note mix
+        // (~5%) and can't bracket tightly enough to catch a small re-added slope.
+        // The downbeat root is the same gesture in both tiers, so with the macro
+        // term gone its velocity is EXACTLY equal — correct by construction, and
+        // red on any intensity term re-entering `pluckVel`.
+        const downbeatVel = (perf) => {
+            const d = perf.filter((p) => p.loopStep === 0).map((p) => p.note.velocity);
+            expect(d.length).toBeGreaterThan(4);
+            return d.reduce((s, v) => s + v, 0) / d.length;
+        };
+        expect(downbeatVel(high)).toBe(downbeatVel(low));
     });
 });

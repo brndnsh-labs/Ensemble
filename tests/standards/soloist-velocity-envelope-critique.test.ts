@@ -346,7 +346,7 @@ describe.each([
         const delta = meanStrong - meanRelease;
 
         console.log(
-            `[#1006 bass ${genre}] paired=${paired} notes=${on.length} OFFmaxVel=${maxOff.toFixed(4)} (Target <1.19) | ` +
+            `[#1006 bass ${genre}] paired=${paired} notes=${on.length} OFFmaxVel=${maxOff.toFixed(4)} (Target <1.35) |` +
                 `strongRatio=${meanStrong.toFixed(4)} (Target >1.03, n${strongR.length}) ` +
                 `releaseRatio=${meanRelease.toFixed(4)} (Target <0.99, n${releaseR.length}) ` +
                 `contour delta=${delta.toFixed(4)} (Target >0.04)`,
@@ -359,11 +359,20 @@ describe.each([
 
         // Unsaturated: the bass clamps at `BASS_VELOCITY_DOMAIN_MAX` (1.5 since
         // #1331, 1.25 before it); ON = OFF × 1.05 must stay under that or the ratio
-        // understates the envelope. The 1.19 floor is kept as-is rather than
-        // relaxed to the new ceiling — it was measured against the ENGINE's output
-        // here (1.05), not derived from the clamp, so it stays a tight guard.
-        // intent: below clamp ; measured 1.05 ; floor 1.19.
-        expect(maxOff).toBeLessThan(1.19);
+        // understates the envelope.
+        //
+        // #941 retuned this bound from 1.19 to 1.35, and the threshold moved
+        // because the MEASURED QUANTITY changed, not because the invariant weakened.
+        // The old 1.19 was measured when the engine multiplied every note by
+        // `intensityFactor` (0.6-1.3), which at this harness's intensity scaled the
+        // emitted velocity DOWN. With the lane's macro swell moved downstream
+        // (`bassMacroGain`) the engine now emits the authored articulation value
+        // itself — rock's 1.1 anchor and metal's 1.1 pedal, each × the 1.15 odd-beat
+        // accent = 1.265. Nothing is closer to the clamp in the sense this guard
+        // cares about: 1.265 × 1.05 = 1.33, still a comfortable margin under 1.5,
+        // and the true saturation point for this test is maxOff = 1.4286.
+        // intent: below clamp ; measured 1.265 ; ceiling 1.35 (saturates at 1.43).
+        expect(maxOff).toBeLessThan(1.35);
 
         // The envelope lifts strong beats and dips the release notes — a contour that is
         // exactly 0 with the envelope OFF (all ratios 1.0), so this is non-vacuous.

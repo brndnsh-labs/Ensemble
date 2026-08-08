@@ -79,7 +79,7 @@ import {
 } from './section-overrides.js';
 import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
-import { soloistIntensityGain } from './velocity-shaping.js';
+import { bassMacroGain, soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
 
 type Dispatch = (action: any, payload?: any) => void;
@@ -836,8 +836,24 @@ export function scheduleBass(
                 // step → seconds via the canonical step duration.
                 const stepSecBass = secondsPerStepFor(playback.bpm);
                 const duration = (durationSteps || 4) * stepSecBass;
+                // #941: the bass lane reads `bassMacroGain(bandIntensity)` here
+                // instead of the band-wide `playback.conductorVelocity` every other
+                // lane multiplies. Two reasons, and they are both load-bearing:
+                //   1. This is the lane's SOLE intensity term now (the engine's
+                //      `intensityFactor` and the style tokens' intensity slopes are
+                //      gone), so it has to carry the whole ~7 dB macro swell — more
+                //      than the band-wide 0.7-1.15 curve can express on a lane whose
+                //      amplitude law is compressive. Widening `conductorVelocity`
+                //      itself would have moved drums/chords/soloist/harmony too.
+                //   2. `applyConductor` only publishes `conductorVelocity` while
+                //      `autoIntensity` is ON and a ramp is in flight, so with
+                //      auto-intensity off it sits at a stale 1.0 — reading it as the
+                //      lane's only dynamic law would make the manual intensity
+                //      slider do nothing to the bass. `bandIntensity` is always live.
+                // `bassMacroGain` is the conductor's own curve, bass-scaled — see
+                // `velocity-shaping.ts`, which owns both.
                 const finalVel =
-                    (velocity || 1.0) * (playback.conductorVelocity || 1.0) * h.velocityMult;
+                    (velocity || 1.0) * bassMacroGain(playback.bandIntensity) * h.velocityMult;
                 if (vizState.enabled) {
                     const chordNotes = getChordMidiNotes(chord);
 

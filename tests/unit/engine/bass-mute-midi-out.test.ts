@@ -18,6 +18,7 @@ import {
     muteGain,
     normalizeMuteAmount,
 } from '../../../public/engine/mute-contract.js';
+import { BASS_MACRO_FLOOR, BASS_MACRO_SPAN } from '../../../public/engine/velocity-shaping.js';
 
 vi.mock('../../../public/engine/engine.js', () => ({
     initAudio: vi.fn(),
@@ -52,6 +53,20 @@ const { playBassNote } = await import('../../../public/engine/engine.js');
 const E2_FREQ = 82.4069;
 
 /**
+ * The `bandIntensity` at which the bass lane's macro law is exactly unity, so
+ * the velocity assertions below measure the MUTE GAIN and nothing else.
+ *
+ * #941 made `bassMacroGain(playback.bandIntensity)` the bass lane's single
+ * intensity term, replacing the band-wide `playback.conductorVelocity` this mock
+ * used to pin to 1.0. Derived from the exported constants rather than
+ * hard-coded, so a future retune of the curve keeps this at unity instead of
+ * silently biasing every assertion in this file by a few percent (which is
+ * exactly what happened when the field changed under a mock that didn't set it —
+ * `bassMacroGain(undefined)` falls back to the 0.5-intensity gain, 0.95).
+ */
+const UNITY_MACRO_INTENSITY = (1 - BASS_MACRO_FLOOR) / BASS_MACRO_SPAN;
+
+/**
  * Minimal state in the shape `scheduleBass` actually reads. Humanization is
  * pinned OFF (`groove.humanize = 0`) so velocity assertions measure the mute gain
  * and nothing else — with it on, the ±10% velocity spread would swamp the signal.
@@ -59,7 +74,7 @@ const E2_FREQ = 82.4069;
 function makeState(notes: Array<Record<string, unknown>>) {
     return {
         bass: { buffer: new Map([[0, notes]]) },
-        playback: { bpm: 120, conductorVelocity: 1.0 },
+        playback: { bpm: 120, bandIntensity: UNITY_MACRO_INTENSITY },
         vizState: { enabled: false },
         groove: { humanize: 0 },
     } as never;

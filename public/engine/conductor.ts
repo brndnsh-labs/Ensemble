@@ -12,6 +12,7 @@ import { getPhraseSeed } from './grooves/utils.js';
 import { createPRNG, deriveSectionSeed, stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
 import { effectiveTargetIntensity, RAMP_INTENSITY_MULTIPLIER } from './section-overrides.js';
+import { conductorVelocityFor } from './velocity-shaping.js';
 
 /**
  * Genres that get the lush hall reverb preset; everything else gets the tight
@@ -135,7 +136,12 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
         targetDensity = 'rich';
     }
 
-    const targetVelocity = 0.7 + intensity * 0.45; // 0.7x to 1.15x (Adjusted to avoid overloads)
+    // 0.7x to 1.15x. #941 moved the literals into `velocity-shaping.ts` so this
+    // curve has exactly one authored home: the conductor now also OWNS the bass
+    // lane's macro dynamic law (`bassMacroGain`, the same gesture re-scaled for a
+    // compressive lane), and two hand-maintained copies of "the conductor's
+    // velocity law" is how the #1322 curve drifts start. Value unchanged.
+    const targetVelocity = conductorVelocityFor(intensity);
 
     // --- 4. Harmony Evolution ---
     // Harmonies follow the complexity signal for activity level.
