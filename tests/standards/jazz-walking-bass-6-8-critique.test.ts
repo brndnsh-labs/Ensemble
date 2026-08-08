@@ -2,8 +2,9 @@
 /**
  * Jazz 6/8 walking-bass density critique (epic-1-compound-meter S12).
  *
- * Before this story, `bass-styles.ts:74` (jazz/walking branch) gated onsets
- * on `isQuarter` (= `isBeatStart` = `mStep % stepsPerBeat === 0`). In 6/8
+ * Before this story, the jazz/walking branch of `checkBassActiveStyle`
+ * (bass-styles.ts) gated onsets on `isQuarter` (= `isBeatStart` =
+ * `mStep % stepsPerBeat === 0`). In 6/8
  * (stepsPerBeat=2) that fires on every eighth (mStep 0,2,4,6,8,10) producing
  * 6+ onsets/bar — a running line, not a walking jazz waltz.
  *

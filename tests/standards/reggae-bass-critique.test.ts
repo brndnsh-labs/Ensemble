@@ -154,10 +154,11 @@ describe('Reggae Bassist Critique', () => {
     });
 
     it('should stay grounded in the ultra-deep sub register (23-42)', () => {
-        // bass-engine.ts:127-128 sets extended-range softMin=23 / softMax=57 for Reggae.
-        // bass-styles.ts:700-708 then forces finalDeepRoot <= 38 (octave-down loop) and
-        // >= absMin. The added riddim interval (0 or 7) can push the resulting note up
-        // to ~45. Range 23–42 covers both pure-root and 5th-of-root riddim slots.
+        // getBassNote's isExtendedRangeGenre register clamp sets softMin=23 / softMax=57
+        // for Reggae. The DUB STYLE (Reggae) branch in getBassNoteStyle then forces
+        // finalDeepRoot <= 38 (octave-down loop) and >= absMin. The added riddim interval
+        // (0 or 7) can push the resulting note up to ~45. Range 23–42 covers both
+        // pure-root and 5th-of-root riddim slots.
         const performance = simulatePerformance(32, {
             playback: { bandIntensity: 0.8, complexity: 0.5, bpm: 90 },
         });
@@ -170,7 +171,7 @@ describe('Reggae Bassist Critique', () => {
     });
 
     it('should switch riddims based on intensity', () => {
-        // bass-styles.ts:710-719 picks riddim by intensity bands:
+        // The DUB STYLE (Reggae) branch in getBassNoteStyle picks riddim by intensity bands:
         //   > 0.85 Steppers (positions 0, 4, 8, 12 — 4 hits/bar)
         //   > 0.65 Stalag (positions 0, 2, 4, 6, 10, 12 — 6 hits/bar)
         //   > 0.45 54-46 (positions 0, 2, 6, 8, 10, 14 — 6 hits/bar)

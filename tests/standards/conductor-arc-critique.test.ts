@@ -4,7 +4,9 @@
  * Baseline coverage for `public/engine/conductor.ts` — previously zero
  * critique-test coverage of:
  *   1. Session-timer macro-arc (the `progress < 0.15 / 0.4 / 0.65 / 0.85 / else`
- *      floor/ceiling ladder at conductor.ts:357-372 that drives `targetIntensity`).
+ *      floor/ceiling ladder in the shared `macroArcLadder` helper —
+ *      coordination-engine.ts, called from conductor.ts — that drives
+ *      `targetIntensity`).
  *   2. Section-transition fill (dispatch of TRIGGER_FILL on the bar BEFORE a
  *      role change, not on the boundary itself — i.e. start of the last measure
  *      of section N when next measure is section N+1).
@@ -34,14 +36,20 @@
  *   the realized target equals rung + offset, and a 30-iteration sweep over
  *   distinct formIterations exercises the full ±0.075 jitter envelope.
  *
- * Role-based switch (conductor.ts:401-428): The switch handles roles
- *   `Exposition / Development / Contrast / Build / Climax / Recapitulation /
- *   Resolution`, but `form-analysis.ts:analyzeForm` only ever assigns
- *   `Main Theme / Theme B / Bridge / Variation / Refrain / Build / Peak /
- *   Intro / Outro`. The only intersection is `Build`. We use `conductor.form
- *   = null` (the production code-path that actually happens for nearly every
- *   chart) so the test exercises `getSectionEnergy(label)` instead of the
- *   never-reached cases. See `Findings discovered` in the test report.
+ * Role-based switch (the `switch (role)` block inside `applyConductor`'s
+ *   `if (conductor.form && ...)` branch, conductor.ts): its arms are now
+ *   named to mirror `form-analysis.ts:analyzeForm`'s actual output
+ *   (`Intro / Outro / Peak / Main Theme / Theme B / Bridge / Variation /
+ *   Refrain / Build`) — no longer the old formal-music vocabulary
+ *   (`Exposition / Development / ...`) that only intersected `analyzeForm`
+ *   on `Build`. It stays unreached in production regardless: `conductor.form`
+ *   is only ever populated via `analyzeFormUI`'s `dispatch(UPDATE_CONDUCTOR_STATE,
+ *   { form })`, and both call sites (`main.ts`, `arranger-controller.ts`) call
+ *   `analyzeFormUI` without its optional `dispatch` argument, so that dispatch
+ *   never fires and `conductor.form` stays `null` for the life of the app. We
+ *   use `conductor.form = null` (the actual, permanent production state) so
+ *   the test exercises `getSectionEnergy(label)` instead of the switch's
+ *   still-unreached cases. See `Findings discovered` in the test report.
  *
  * --- Test pattern mirrored ---
  *
@@ -391,9 +399,10 @@ describe('Conductor Arc Critique (S7)', () => {
         it('low-energy next section -> targetIntensity is the section energy, not the ceiling', () => {
             const state = makeMockState();
             // makeMockState sets `conductor.form = null` (the production path —
-            // see header note), so the role-switch at conductor.ts:441-504 is
-            // skipped and the `else` fallback at conductor.ts:506 runs:
-            // `targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel)`.
+            // see header note), so the `switch (role)` block in `applyConductor`
+            // (conductor.ts) is skipped and the outer `else` fallback (paired
+            // with the `if (conductor.form && (conductor.form as any).sections)`
+            // check) runs: `targetEnergy = getSectionEnergy(nextEntry.chord.sectionLabel)`.
             // That's the line under test — relabel the stepMap chord B (the
             // section the step-16 transition lands in) to Verse. `sections[1]`
             // is relabelled too only to keep the mock internally consistent;
@@ -891,13 +900,19 @@ describe('Conductor Arc Critique (S7)', () => {
     });
 
     // ---------------------------------------------------------------------
-    // 4. Section-boundary crash — the conductor signals `crash: true` on
-    //    the procedural-fallback transition fill (conductor.ts:478).
+    // 4. Section-boundary crash — the conductor signals a crash on the
+    //    procedural-fallback transition fill (the `shouldUseProceduralFallback`
+    //    branch of `checkSectionTransition`, conductor.ts).
     //
     //    Audit-doc claim: "verify a crash cymbal is part of the transition
     //    fill where the conductor signals one."
-    //    Engine reality: the procedural-fallback path hard-codes `crash:
-    //    true` regardless of genre/intensity. This test pins that invariant.
+    //    Engine reality (post-#799 "Crash Contract"): the procedural-fallback
+    //    dispatch now sets `crash: fillCrash`, where `fillCrash = energyRising
+    //    || targetEnergy > 0.4` — no longer an unconditional `true`. This
+    //    test's fixture (progress 0.5, macro window floor 0.5) always lands
+    //    `targetEnergy` above 0.4, so `fillCrash` still evaluates `true` here;
+    //    the invariant this test pins is narrower than the comment used to
+    //    claim (see report — worth re-deriving with a below-0.4 fixture).
     // ---------------------------------------------------------------------
     describe('section-boundary crash flag', () => {
         it('TRIGGER_FILL on section transition carries crash: true', () => {

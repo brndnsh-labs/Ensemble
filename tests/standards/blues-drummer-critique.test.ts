@@ -306,7 +306,8 @@ describe('Blues Drummer Critique', () => {
     });
 
     it('should occasionally fire crash cymbals on bar downbeats at high intensity', () => {
-        // Engine logic (blues.ts:59): isDownbeat && intensity > 0.75 && roll(0.25).
+        // Engine logic (the "--- Crashes ---" block in applyOverrides, blues.ts):
+        // isDownbeat && intensity > 0.75 && roll(0.25).
         // The crash fires on ANY bar downbeat, not specifically at section boundaries —
         // the prior test name ("structural transitions") implied a section-aware crash
         // that the engine does not actually have. (Engine improvement queued.) For now
@@ -341,7 +342,7 @@ describe('Blues Drummer Critique', () => {
         // still failing if the gate were silently broken (0) or hyperactive (>30).
         expect(crashCount).toBeGreaterThan(7);
         expect(crashCount).toBeLessThan(30);
-        // All crashes are stamped at velocity 1.25 (blues.ts:61).
+        // All crashes are stamped at velocity 1.25 (same "--- Crashes ---" block).
         expect(crashVelocityFloor).toBeGreaterThan(1.1);
     });
 

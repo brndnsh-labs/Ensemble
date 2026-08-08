@@ -12,7 +12,8 @@
  *   • Jazz + quarter style: regression — approach rate must stay above prior threshold.
  *   • Rock genre + quarter style: NEW — gate removal means approaches now fire where
  *     they were previously blocked (pullTension < 0.7 in the old Jazz/Blues OR gate).
- *   • Funk + funk style: verifies funk's own approach branch (bass-styles.ts:612-622)
+ *   • Funk + funk style: verifies funk's own approach branch (the "4. Harmonic
+ *     Approaches" block in `getBassNoteStyle`'s Funk branch, bass-styles.ts)
  *     fires on the 'a' of beat 4 before chord changes — that branch has no genre gate
  *     (S1 already fixed it) and is unaffected by S2.
  *
@@ -159,7 +160,8 @@ const measureApproachRate = (
 
 /**
  * Measure funk-specific approach rate on step 15 (the "a" of beat 4).
- * Funk's own approach branch (bass-styles.ts:612-622) fires at stepInBeat === 3,
+ * Funk's own approach branch (the "4. Harmonic Approaches" block in
+ * `getBassNoteStyle`'s Funk branch, bass-styles.ts) fires at stepInBeat === 3,
  * which is steps 3, 7, 11, 15 in a 16-step 4/4 measure. Step 15 is the last
  * 16th note of the bar, immediately before the next bar's chord lands.
  */
@@ -549,7 +551,8 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         expect(rate).toBeLessThan(0.25);
     });
 
-    // why: Funk's own approach branch (bass-styles.ts:612-622) was fixed in S1 to
+    // why: Funk's own approach branch (the "4. Harmonic Approaches" block in
+    // `getBassNoteStyle`'s Funk branch, bass-styles.ts) was fixed in S1 to
     // use isChordChangeApproach (no genre gate). S2 does not affect this branch.
     // This test verifies funk still produces chromatic leading tones on the "a" of
     // beat 4 before chord changes — the idiomatic slap-bass approach gesture.
@@ -567,7 +570,8 @@ describe('Multi-Genre Chord-Change Chromatic Approach Critique', () => {
         );
 
         expect(chordChangeCount).toBeGreaterThan(100);
-        // why: funk approach branch (bass-styles.ts:612-622) fires on stepInBeat === 3 with
+        // why: funk approach branch (the "4. Harmonic Approaches" block in
+        // `getBassNoteStyle`'s Funk branch, bass-styles.ts) fires on stepInBeat === 3 with
         // intensity > 0.75 and a 60% raw probability gate; both ±1 outcomes are chromatic.
         // Theoretical ceiling ≈ 60% but the branch competes with other funk fills and slap
         // gestures — a constant 24.71%, because this funk path rolls `scrambleHash`, not

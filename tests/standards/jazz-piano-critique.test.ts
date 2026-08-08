@@ -145,7 +145,8 @@ describe('Jazz Piano Critique', () => {
 
     // why: chords.md P0 #2 / epic-deterministic-phrasing S2. Charleston-family
     //      comping for Jazz/Bossa/Blues currently re-rolls `Math.random()` every
-    //      bar (`accompaniment.ts:680-727` for Jazz/Bossa, `:633-678` for Blues),
+    //      bar (the `genre === 'Jazz' || genre === 'Bossa Nova'` and
+    //      `genre === 'Blues'` branches of `generateCompingPattern`, accompaniment.ts),
     //      so the comping reads as amnesiac across a phrase. S2 replaces this
     //      with a deterministic bank keyed by `(sectionId, barIndex >> 2)` — one
     //      pattern is held for the full 4-bar phrase, with in-phrase variation

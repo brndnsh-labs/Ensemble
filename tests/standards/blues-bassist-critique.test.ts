@@ -212,7 +212,9 @@ describe('Blues Bassist Critique', () => {
 
         console.log(`[Bassist Critique] Low Intensity Lope hits: ${lopeHits.length}`);
 
-        // bass-styles.ts:140 hard-gates `bandIntensity < 0.3` → returns false. Deterministic 0.
+        // The "Lope" offbeat branch of the `style === 'blues'` block in
+        // checkBassActiveStyle (bass-styles.ts) hard-gates `bandIntensity < 0.3`
+        // → returns false. Deterministic 0.
         expect(lopeHits.length).toBe(0);
     });
 
