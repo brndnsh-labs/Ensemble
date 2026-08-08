@@ -1259,7 +1259,7 @@ export interface GlobalContext {
     /** Whether to log messages from the audio worker. */
     readonly workerLogging: boolean;
     /** ID of the timeout for audio context suspension. */
-    readonly suspendTimeout: number | null | any;
+    readonly suspendTimeout: ReturnType<typeof setTimeout> | null;
     /** The current musical key being tracked by playback. */
     readonly currentKey: string | null;
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */

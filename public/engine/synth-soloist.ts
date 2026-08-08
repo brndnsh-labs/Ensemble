@@ -404,8 +404,8 @@ function attachVibrato(
         vibratoFlag,
     );
     vibrato.connect(vibGain);
-    vibGain.connect(osc1.frequency as any);
-    vibGain.connect(osc2.frequency as any);
+    vibGain.connect(osc1.frequency);
+    vibGain.connect(osc2.frequency);
     voiceObj.nodes.push(vibrato, vibGain, ...depthModNodes);
 }
 
@@ -860,7 +860,7 @@ function createVibrato(
     const depthModGain = ctx.createGain();
     depthModGain.gain.setValueAtTime(finalVibDepth * 0.2, time);
     depthMod.connect(depthModGain);
-    depthModGain.connect(vibGain.gain as any);
+    depthModGain.connect(vibGain.gain);
 
     const vibRuns = duration > 0.15 || forceVibrato;
     if (vibRuns) {
@@ -885,7 +885,7 @@ function createVibrato(
         ampDepthGain.gain.setValueAtTime(0, time + vibDelay);
         ampDepthGain.gain.linearRampToValueAtTime(Math.max(0.0001, vol * 0.04), rampEnd);
         vibrato.connect(ampDepthGain);
-        ampDepthGain.connect(outputGain.gain as any);
+        ampDepthGain.connect(outputGain.gain);
         couplingNodes.push(ampDepthGain);
 
         // Timbral wobble — correlated cutoff movement on the voice's filter.

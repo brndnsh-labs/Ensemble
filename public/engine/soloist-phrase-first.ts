@@ -1,6 +1,14 @@
 import { TIME_SIGNATURES } from '../config.js';
 import { getSectionEnergy } from '../song/form-analysis.js';
-import type { EnsembleState, Mutable, SoloistExpression, SoloistQaHang } from '../types.js';
+import type {
+    Chord,
+    EnsembleState,
+    Mutable,
+    SeedNote,
+    SoloistExpression,
+    SoloistQaHang,
+    SoloistSessionSeed,
+} from '../types.js';
 import { clamp01 } from '../utils.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
@@ -100,7 +108,7 @@ const qaWindowCache = new WeakMap<
 >();
 
 function computeQaWindows(
-    seed: { notes: any[]; loopLengthSteps: number },
+    seed: SoloistSessionSeed,
     spb: number,
     spm: number,
     totalSteps: number,
@@ -219,7 +227,7 @@ function computeQaWindows(
  * overlap, so at most one window contains any step.
  */
 export function getQaHangAt(
-    seed: { notes: any[]; loopLengthSteps: number; seedId?: number } | null,
+    seed: SoloistSessionSeed | null,
     step: number,
     stepsPerBeat: number,
     stepsPerMeasure: number,
@@ -464,10 +472,10 @@ function snapToNearestPc(midi: number, pcSet: Set<number>): number {
  * inside this lane. (They can't collide in practice — the hook lives at a block's
  * measure 0, cadences at the end of each half.)
  */
-function ownerOfStep(atStep: any[]): any {
+function ownerOfStep(atStep: SeedNote[]): SeedNote | null {
     return (
-        atStep.find((n: any) => n?.qaRole === 'question' || n?.qaRole === 'answer') ??
-        atStep.find((n: any) => n?.hookRole) ??
+        atStep.find((n) => n.qaRole === 'question' || n.qaRole === 'answer') ??
+        atStep.find((n) => n.hookRole) ??
         atStep[0] ??
         null
     );
@@ -475,8 +483,8 @@ function ownerOfStep(atStep: any[]): any {
 
 export function getSoloistNotePhraseFirst(
     state: EnsembleState,
-    currentChord: any,
-    nextChord: any,
+    currentChord: Chord | null,
+    nextChord: Chord | null,
     step: number,
     // prevFreq/octave/stepInChord/coordination/stepInfo are vestigial: they exist
     // only to keep the positional call contract with tick-logic (the signature was
@@ -568,7 +576,7 @@ export function getSoloistNotePhraseFirst(
     const curWindow = Math.floor(stepInLoop / cycleLen);
     let themeApexMidi = -1;
     let apexStepInLoop = -1;
-    for (const n of seed.notes as any[]) {
+    for (const n of seed.notes) {
         if (n.step < 0) {
             continue;
         }
@@ -593,9 +601,15 @@ export function getSoloistNotePhraseFirst(
     // note's own midi, so the comper's echo would otherwise answer a tone the lead
     // never played. The apex still outranks both — and a question sharing the apex
     // step loses nothing, since `computeQaWindows` excludes those windows entirely.
-    const primary = isApexStep
-        ? here.reduce((hi: any, n: any) => (n.midi > hi.midi ? n : hi), here[0])
-        : ownerOfStep(here);
+    // `ownerOfStep`'s signature covers an empty `atStep` (returns null), but `here`
+    // is guaranteed non-empty here (the `here.length === 0` guard above already
+    // returned) — so this can never actually be null; the assertion documents that
+    // invariant rather than casting away a real possibility.
+    const primary: SeedNote = (
+        isApexStep
+            ? here.reduce((hi, n) => (n.midi > hi.midi ? n : hi), here[0])
+            : ownerOfStep(here)
+    )!;
     const isAnchor = here.some((n: any) => n?.isAnchor);
     // #1009 — the seed-planned question/answer cadence role of the note sounding here
     // (set on the LAST note of each half of a 4-bar block; absent otherwise). Drives
@@ -603,13 +617,13 @@ export function getSoloistNotePhraseFirst(
     // asymmetry in the pitch block below (answers re-land at every depth; questions
     // roam). Read off `primary` — which #1162 makes the cadence note whenever one
     // shares this step, so this can no longer miss it.
-    const qaRole = (primary as any)?.qaRole as 'question' | 'answer' | undefined;
+    const qaRole = primary.qaRole;
     const isQaCadence = qaRole === 'question' || qaRole === 'answer';
     // #1056 — the seed-planned hook figure (the first few notes of a block's measure 0,
     // pitch-pinned and chord-rooted at seed time). Exempt from the density gate exactly
     // like a Q&A cadence, so the repeating, identifiable figure always sounds and the
     // ear has something to grab in the exposed early loops.
-    const isHook = Boolean((primary as any)?.hookRole);
+    const isHook = Boolean(primary.hookRole);
 
     // --- Dramatic arc → how active the lead is right now (0..1) ---
     // Two deliberately simple contributions (tuned by ear in later builds):
@@ -701,8 +715,8 @@ export function getSoloistNotePhraseFirst(
         const prevEntry = arranger.stepMap.find(
             (e: any) => prevStep >= e.start && prevStep < e.end,
         );
-        const curEnergy = getSectionEnergy((currentChord as any)?.sectionLabel ?? null);
-        const prevEnergy = getSectionEnergy((prevEntry?.chord as any)?.sectionLabel ?? null);
+        const curEnergy = getSectionEnergy(currentChord?.sectionLabel ?? null);
+        const prevEnergy = getSectionEnergy(prevEntry?.chord?.sectionLabel ?? null);
         enteredOnRise = curEnergy > prevEnergy + 0.15;
     }
     // Bar position of a step within the current section (0 = first bar;
@@ -845,7 +859,7 @@ export function getSoloistNotePhraseFirst(
         // negative step maps via the modulo to a high stepInLoop near the loop end),
         // exactly as the live `here` filter does. Skipping them here falsely
         // reported silence at the form tail and let a held note overrun the pickup.
-        for (const n of seed.notes as any[]) {
+        for (const n of seed.notes) {
             if (((n.step % loopLen) + loopLen) % loopLen === sInLoop) {
                 present = true;
                 if (n.isAnchor) {
@@ -930,8 +944,8 @@ export function getSoloistNotePhraseFirst(
         // the gate rests) and re-develops at the CURRENT loop's depth (a next-bar
         // target across a loop seam will actually voice at the next depth). Both are
         // rare and only nudge an approach note by a scale step — harmless.
-        const atStep: any[] = [];
-        for (const n of seed.notes as any[]) {
+        const atStep: SeedNote[] = [];
+        for (const n of seed.notes) {
             if (((n.step % loopLen) + loopLen) % loopLen === sIL) {
                 atStep.push(n);
             }

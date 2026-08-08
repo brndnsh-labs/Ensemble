@@ -14,8 +14,12 @@
 //   - Chords: Root-position cadence voicing (root + 3rd + 5th, optional 7th)
 //     on beat 1; silence on subsequent sub-beats so the voicing rings out.
 //
-// Currently only the soloist senses the form's end via SRDC's `conclusion`
-// phase (`soloist.ts:1257`). This makes the rest of the band end together.
+// Historical motivation (pre-epic-form-arrangement S4): before this feature
+// landed, only the soloist sensed the form's end (via the now-deleted
+// soloist.ts's SRDC conclusion phase — see public/engine/CLAUDE.md's Soloist
+// section). This test guards the S4 fix: drums/bass/chords now also react to
+// coordination.isFinalMeasure (bass-engine.ts, groove-engine.ts,
+// accompaniment.ts), so the whole band ends together, not just the soloist.
 //
 // Test strategy: rather than going through the full `generateNotesForStep`
 // pipeline (which would require mocking every engine), this test exercises

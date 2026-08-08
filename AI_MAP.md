@@ -114,7 +114,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/engine/midi-utils.ts` | Shared MIDI byte conversion utilities. | `noteToMidi`, `midiToFreq` |
 | `public/engine/midi-worker-logic.ts` | Offline MIDI generation and file export. | `handleExport`, `ExportProcessor` |
 | `public/engine/midi-constants.ts` | Constants for MIDI logic like `DRUM_MAP`. | `DRUM_MAP` |
-| `public/engine/mute-contract.ts` | Import-free leaf owning what a note's `muted` field means — the bass's numeric palm-mute amount vs the chords lanes' boolean ghost/CC sentinel. Read the field through here, never with `!muted`. | `isMuteSentinel`, `normalizeMuteAmount`, `muteGain` |
+| `public/engine/mute-contract.ts` | Import-free leaf owning what a note's `muted` field means — the bass's numeric palm-mute amount vs the chords lanes' boolean ghost/CC sentinel. Read the field through here, never with `!muted`. | `isSilentSentinel`, `normalizeMuteAmount`, `muteGain` |
 | `public/engine/velocity-shaping.ts` | Import-free leaf owning the band-intensity velocity laws: the soloist's swell, the conductor's band-wide curve, and (since #941) the bass lane's macro dynamic law — each shared by live playback and the `.mid` export. Change a curve here, never at a call site. | `soloistIntensityGain`, `conductorVelocityFor`, `bassMacroGain`, `BASS_MACRO_FLOOR`, `BASS_MACRO_SPAN` |
 
 ## Live vs Worker Responsibilities
@@ -195,7 +195,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/song/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/export/sharing.ts` | URL-based song sharing. | `getShareURL` |
+| `public/export/sharing.ts` | URL-based song sharing. | `generateShareUrl`, `shareProgression` |
 | `public/utils.ts` | Worker-safe musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
 | `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
 | `public/data/manual-metadata.ts` | Generates the Self-Building Manual's auto-populated tables (`{{GENRE_TABLE}}`, `{{BASS_STYLES}}`, …) from the live config files. | `injectManualMetadata`, `generateGenreTable` |
