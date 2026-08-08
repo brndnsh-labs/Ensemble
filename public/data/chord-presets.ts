@@ -2,7 +2,11 @@
 
 const DEFAULT_SETTINGS = {
     bpm: 120,
-    style: 'pop',
+    // 'smart' — the resolver-chooses default (#940): a preset that authors no explicit
+    // style must still merge to a live `KNOWN_CHORD_STYLES` id, or applying it with
+    // "Apply preset settings" dispatches a dead `chords.style` and silently turns
+    // smart comping off.
+    style: 'smart',
 };
 
 const PRESETS_RAW = [
@@ -74,7 +78,7 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             bpm: 140,
-            style: 'rock',
+            style: 'smart',
             timeSignature: '4/4',
         },
     },
@@ -104,7 +108,7 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             bpm: 90,
-            style: 'arpeggio',
+            style: 'arp',
         },
     },
     {
@@ -119,7 +123,7 @@ const PRESETS_RAW = [
         isMinor: true,
         settings: {
             bpm: 130,
-            style: 'skank',
+            style: 'ska-upstroke',
         },
     },
     {
@@ -134,7 +138,7 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             bpm: 100,
-            style: 'blues',
+            style: 'smart',
         },
     },
     {
@@ -149,7 +153,7 @@ const PRESETS_RAW = [
         isMinor: true,
         settings: {
             bpm: 90,
-            style: 'blues',
+            style: 'smart',
         },
     },
     {
@@ -164,7 +168,7 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             bpm: 110,
-            style: 'blues',
+            style: 'smart',
         },
     },
     {
@@ -429,7 +433,7 @@ const PRESETS_RAW = [
         isMinor: false,
         settings: {
             bpm: 85,
-            style: 'neo',
+            style: 'smart',
         },
     },
     {
@@ -591,7 +595,7 @@ const PRESETS_RAW = [
         isMinor: true,
         settings: {
             bpm: 140,
-            style: 'bossa',
+            style: 'smart',
         },
         provenance: {
             variant: 'Minor form with local major-key bridge',
