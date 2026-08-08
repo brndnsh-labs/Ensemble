@@ -18,6 +18,36 @@ describe('Funk Bass Critique', () => {
         vi.restoreAllMocks();
     });
 
+    // The production Funk kick grid, as a `simulatePerformance` groove override.
+    //
+    // #942 review P0: this file's shared harness runs `instruments: []`, which makes
+    // `hasKickTrigger` permanently false inside `getBassNote` and silences its kick
+    // path entirely (harness-silencing, smell (e)). That is how the #942 inversion —
+    // The One intercepted by the kick-lock and rendered under the pop — stayed alive in
+    // production while the kickless sweep read green, and it is how #948's wider
+    // version of the same bug (EVERY kick-coincident gesture flattened onto the lock
+    // level, not just The One) survived the #942 patch round.
+    //
+    // So the assertions that make a claim about funk's dynamic ladder run BOTH lanes:
+    // kickless isolates the authored gesture ladder, and this lane replays the same
+    // claim under the shipped Funk preset's real kick grid (kicks on steps
+    // 0/3/6/9/14 and 16/19/22/25/28/30 of its 2-measure pattern), which is what makes
+    // the claim true of what ships. Post-#948 the two lanes agree wherever a step
+    // carries an authored gesture — that IS the fix — and differ only where the lock
+    // still owns the step (funk authors nothing on the beat-4 downbeat, and a 0.5
+    // chuck loses to the lock).
+    const funkKickGroove = () => {
+        const preset = DRUM_PRESETS.Funk;
+        return {
+            genreFeel: 'Funk',
+            pocket: 0,
+            measures: preset.measures,
+            instruments: [{ name: 'Kick', steps: preset.variations[0].Kick }],
+        };
+    };
+    /** `...kickLane()` spreads the production kick grid into a state override. */
+    const kickLane = () => ({ groove: funkKickGroove() });
+
     const simulatePerformance = (numBars, stateOverrides = {}) => {
         const mockState = {
             playback: { bandIntensity: 0.9, bpm: 110, complexity: 0.8 },
@@ -530,21 +560,25 @@ describe('Funk Bass Critique', () => {
         // The headline symptom: at i=0.9 the engine's emission clamp put EVERY
         // full note on the 1.25 rail, so the whole bar rendered at one identical
         // amplitude — measured 1 distinct level, 0.00 dB of spread.
-        const chorus = renderedFullNotes(
-            simulatePerformance(8, { playback: { bandIntensity: 0.9, bpm: 110, complexity: 0.8 } }),
-            0.9,
-        );
+        //
+        // #948 added the kick lane. The claim ("the bar has more than one rendered
+        // level at chorus") is not the one #948 fixed — it held in both eras on both
+        // lanes — but the kick grid is where this engine actually runs, so the
+        // hierarchy has to survive there too, not only in the kickless vacuum.
+        const chorusOf = (extra = {}) =>
+            renderedFullNotes(
+                simulatePerformance(8, {
+                    playback: { bandIntensity: 0.9, bpm: 110, complexity: 0.8 },
+                    ...extra,
+                }),
+                0.9,
+            );
+        const chorus = chorusOf();
+        const chorusKick = chorusOf(kickLane());
         const verse = renderedFullNotes(
             simulatePerformance(8, { playback: { bandIntensity: 0.3, bpm: 110, complexity: 0.8 } }),
             0.3,
         );
-        const spread = dB(Math.max(...chorus) / Math.min(...chorus));
-        const levelCounts = new Map();
-        for (const v of chorus) {
-            const key = v.toFixed(4);
-            levelCounts.set(key, (levelCounts.get(key) ?? 0) + 1);
-        }
-        const levels = levelCounts.size;
         // why: `levels`/`spread` alone are extrema-only — satisfied by a
         // handful of outliers even if the bulk of the bar collapses onto one
         // rail (measured: this exact shape, 50/62 notes on one level, before
@@ -552,16 +586,42 @@ describe('Funk Bass Critique', () => {
         // patch round). `modalShare` is the fraction of full notes sharing the
         // single most common rendered level — the metric that actually detects
         // "the bar plays at one dynamic," regardless of how many outliers exist.
-        const modalCount = Math.max(...levelCounts.values());
-        const modalShare = modalCount / chorus.length;
+        const shapeOf = (amps) => {
+            const counts = new Map();
+            for (const v of amps) {
+                const key = v.toFixed(4);
+                counts.set(key, (counts.get(key) ?? 0) + 1);
+            }
+            return {
+                n: amps.length,
+                levels: counts.size,
+                spread: dB(Math.max(...amps) / Math.min(...amps)),
+                modalShare: Math.max(...counts.values()) / amps.length,
+            };
+        };
+        const { levels, spread, modalShare } = shapeOf(chorus);
+        const kick = shapeOf(chorusKick);
         console.log(
             `[#1331 Chorus Hierarchy] i=0.9 n=${chorus.length} levels=${levels} ` +
                 `spread=${spread.toFixed(2)}dB modalShare=${(modalShare * 100).toFixed(0)}% ` +
                 `(was 1 level / 0.00dB / 100%) | ` +
+                `kick grid: n=${kick.n} levels=${kick.levels} spread=${kick.spread.toFixed(
+                    2,
+                )}dB modalShare=${(kick.modalShare * 100).toFixed(0)}% | ` +
                 `i=0.3 spread=${dB(Math.max(...verse) / Math.min(...verse)).toFixed(2)}dB`,
         );
 
         expect(chorus.length).toBeGreaterThan(20);
+        // intent (#948): the same three bounds hold on the production kick grid.
+        // Measured there: n=70, 9 levels, 3.82 dB, modalShare 23% — one level MORE
+        // than the kickless lane, because the lock keeps its own rung on the steps
+        // funk authors nothing for (the beat-4 downbeat) and on the chucks it
+        // out-ranks. Same floors, no separate calibration: the kick lane is strictly
+        // the more spread of the two, so it clears them with more headroom.
+        expect(kick.n).toBeGreaterThan(20);
+        expect(kick.levels).toBeGreaterThanOrEqual(4);
+        expect(kick.spread).toBeGreaterThanOrEqual(1.0);
+        expect(kick.modalShare).toBeLessThanOrEqual(0.78);
         // intent: base / accent / ceiling all survive as separate levels ;
         // measured 5 levels post-#1342 (was 3), deterministic across 30 runs ;
         // floor 4 — ratcheted with the measurement (#942 review: the modalShare
@@ -639,10 +699,16 @@ describe('Funk Bass Critique', () => {
         // ever LOUDER than The One) is the dominance sweep further down; this
         // test is about the bar's total range and says nothing about its top.
         const bandIntensity = 0.3;
-        const verse = renderedFullNotes(
-            simulatePerformance(64, { playback: { bandIntensity, bpm: 110, complexity: 0.8 } }),
-            bandIntensity,
-        );
+        const verseOf = (extra = {}) =>
+            renderedFullNotes(
+                simulatePerformance(64, {
+                    playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+                    ...extra,
+                }),
+                bandIntensity,
+            );
+        const verse = verseOf();
+        const verseKick = verseOf(kickLane());
         const loudest = Math.max(...verse);
         const spread = dB(loudest / Math.min(...verse));
         // why: the anti-outlier half. `spread` is an extrema metric, so a single
@@ -651,6 +717,10 @@ describe('Funk Bass Critique', () => {
         // This asks how much of the bar actually LIVES in the quiet band.
         const quiet = verse.filter((a) => dB(loudest / a) >= 1.0);
         const quietShare = quiet.length / verse.length;
+        const loudestKick = Math.max(...verseKick);
+        const spreadKick = dB(loudestKick / Math.min(...verseKick));
+        const quietShareKick =
+            verseKick.filter((a) => dB(loudestKick / a) >= 1.0).length / verseKick.length;
 
         console.log(
             [
@@ -659,6 +729,8 @@ describe('Funk Bass Critique', () => {
                 `n=${verse.length}  spread=${spread.toFixed(2)}dB  ` +
                     `quiet-band share=${(quietShare * 100).toFixed(1)}%  ` +
                     `(pre-#947: 0.57dB / 0.0% — the whole bar inside one JND)`,
+                `kick grid: n=${verseKick.length}  spread=${spreadKick.toFixed(2)}dB  ` +
+                    `quiet-band share=${(quietShareKick * 100).toFixed(1)}%`,
                 '---------------------------------------------',
             ].join('\n'),
         );
@@ -685,6 +757,25 @@ describe('Funk Bass Critique', () => {
         // minimum). Pre-#947 this was exactly 0% — nothing in the bar sat a full
         // dB below the loudest note.
         expect(quietShare).toBeGreaterThanOrEqual(0.05);
+
+        // intent (#948): the verse spreads on the production kick grid too, which is
+        // where a listener meets it. Measured n=250-253, spread 2.12 dB (deterministic
+        // — both extremes are structural), quiet-band share 31-34% (membership is
+        // stochastic at this intensity, same unseeded lay-out branch as the kickless
+        // lane) — WIDER than the kickless lane on both counts, and that widening is
+        // real, not a loosening: the lock's own 0.805 note is a genuine rung below the
+        // authored ladder, and it sounds on every kick step funk authors nothing for.
+        // Same floors as the kickless lane deliberately — the claim is "a verse funk
+        // bar reads as more than one level," and it must clear the same bar in both
+        // lanes rather than being graded on a curve. Mutation-tested: with kick-lock
+        // back to intercepting, spread is unchanged at 2.12 dB (the lock note is the
+        // quiet extreme either way) but the quiet-band share balloons to 57.5% —
+        // i.e. the pre-#948 "range" was mostly the lock flattening the top half of
+        // the ladder onto its own level, which is why this pair is NOT the #948 gate.
+        // The backbeat-gap test at the bottom of this file is.
+        expect(verseKick.length).toBeGreaterThan(100);
+        expect(spreadKick).toBeGreaterThanOrEqual(1.0);
+        expect(quietShareKick).toBeGreaterThanOrEqual(0.05);
     });
 
     it('swells the bass 6-8 dB from verse to chorus, one intensity term only (#1331 4b / #941)', () => {
@@ -954,30 +1045,8 @@ describe('Funk Bass Critique', () => {
         };
     };
 
-    // #942 review P0: this file's shared harness runs `instruments: []`, which
-    // silences `getBassNote`'s kick-lock early return (`hasKickTrigger` is
-    // permanently false — harness-silencing, smell (e)). The shipped Funk
-    // preset has a kick ON The One (step 0, accented), and pre-patch that
-    // branch intercepted the downbeat ahead of the authored slap and rendered
-    // it at ~1.06 (i=0.5) against the pop's 1.35 — the #942 inversion, alive in
-    // production while the kickless sweep read green. So the dominance sweep
-    // runs BOTH lanes: kickless isolates the gesture ladder + accent fix; the
-    // kick lane replays it under the production Funk preset's real kick grid
-    // and is what makes the claim true of what ships. Kick-coincident non-One
-    // steps still render at the generic lock level — that open design call is
-    // #948, and until it lands the kick lane's population is a mix of authored
-    // gestures (non-kick steps) and lock-level notes (kick steps), all of which
-    // must stay under The One.
-    const funkKickGroove = () => {
-        const preset = DRUM_PRESETS.Funk;
-        return {
-            genreFeel: 'Funk',
-            pocket: 0,
-            measures: preset.measures,
-            instruments: [{ name: 'Kick', steps: preset.variations[0].Kick }],
-        };
-    };
-
+    // (`funkKickGroove` is declared next to `simulatePerformance` at the top of this
+    // file — #948 gave every dynamics assertion below a kick lane, not just this one.)
     it('"The One" is never out-rendered in the funk bar across 0.1-0.9, kickless AND on the production kick grid (#1342/#942)', () => {
         const intensities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
         const sweep = intensities.map((bi) => ({ bi, ...funkBarDominance(bi) }));
@@ -1028,9 +1097,13 @@ describe('Funk Bass Critique', () => {
         // intent: below the domain-ceiling saturation point The One is
         // STRICTLY the loudest, in every bar — not merely tied. Saturation
         // engages at i~0.65 for the downbeat token (#1336), so this is
-        // asserted on the 0.1-0.6 half of the sweep, in both lanes (the kick
-        // lane's loudest challenger is still a NON-kick-step pop at full
-        // `popVel`, so the margins match the kickless lane's).
+        // asserted on the 0.1-0.6 half of the sweep, in both lanes. The kick
+        // lane's loudest challenger is an "and" pop at full `popVel` in both
+        // eras — before #948 only the pops OFF the kick grid could reach that
+        // token, and since #948 the kick-coincident ones do too (that is the
+        // fix) — so the margins match the kickless lane's either way, and this
+        // assertion is not the one that guards #948. That is the backbeat-gap
+        // test at the bottom of this file.
         for (const r of [...sweep, ...kickSweep].filter((s) => s.bi <= 0.6)) {
             expect(r.strict).toBe(r.checked);
             // intent: the margin is a real level difference, not a rounding
@@ -1073,40 +1146,59 @@ describe('Funk Bass Critique', () => {
         // accent stacked ~1.5 dB on top of that. Measured at intensities where
         // the domain clamp is NOT engaged, and where the deliberately unseeded
         // low-intensity lay-out branch is NOT live, so this is deterministic.
-        const rows = [0.4, 0.5, 0.6].map((bandIntensity) => {
-            const perf = simulatePerformance(32, {
-                playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+        //
+        // #948 GAVE THIS TEST A SECOND JOB, and it is the one the kick lane exists
+        // for. In the shipped Funk preset the & of 2 and the & of 4 (steps 6 and 14)
+        // are ON the kick grid and the & of 1 and & of 3 (steps 2 and 10) are not — so
+        // the same two populations that isolate the backbeat accent ALSO isolate
+        // kick-coincident pops against their off-grid twins. Before #948 the kick-lock
+        // intercepted the first pair and rendered them at 0.805-0.875 against the
+        // second pair's full 1.25 `popVel`: measured gap -1.43 / -1.86 / -2.23 dB at
+        // i=0.4/0.5/0.6, i.e. the pop got QUIETER for landing with the drummer. Post-
+        // #948 the kick lane measures the identical +0.47 dB as the kickless lane,
+        // because a kick-coincident pop is now emitted at its authored token and the
+        // only thing left between the two positions is the metric envelope.
+        const rowsFor = (extra = {}) =>
+            [0.4, 0.5, 0.6].map((bandIntensity) => {
+                const perf = simulatePerformance(32, {
+                    playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+                    ...extra,
+                });
+                const gain = conductorGain(bandIntensity);
+                const pops = (steps) =>
+                    perf
+                        .filter((p) => steps.includes(p.stepInMeasure) && p.note.velocity >= 0.8)
+                        .map((p) => bassVelocityToAmplitude(p.note.velocity * gain));
+                const backbeat = pops([6, 14]);
+                const evenBeatPops = pops([2, 10]);
+                return {
+                    bandIntensity,
+                    nBack: backbeat.length,
+                    nOn: evenBeatPops.length,
+                    gapDb: dB(meanOf(backbeat) / meanOf(evenBeatPops)),
+                };
             });
-            const gain = conductorGain(bandIntensity);
-            const pops = (steps) =>
-                perf
-                    .filter((p) => steps.includes(p.stepInMeasure) && p.note.velocity >= 0.8)
-                    .map((p) => bassVelocityToAmplitude(p.note.velocity * gain));
-            const backbeat = pops([6, 14]);
-            const evenBeatPops = pops([2, 10]);
-            return {
-                bandIntensity,
-                nBack: backbeat.length,
-                nOn: evenBeatPops.length,
-                gapDb: dB(meanOf(backbeat) / meanOf(evenBeatPops)),
-            };
-        });
+        const rows = rowsFor();
+        const kickRows = rowsFor(kickLane());
 
+        const fmtRow = (r) =>
+            `[i=${r.bandIntensity}]  &of2/&of4 n=${r.nBack}  &of1/&of3 n=${r.nOn}  ` +
+            `gap=${r.gapDb >= 0 ? '+' : ''}${r.gapDb.toFixed(2)}dB ` +
+            '(envelope-only target ~0.45dB; pre-#1342 ~1.5dB)';
         console.log(
             [
                 '',
-                '--- #1342 FUNK BACKBEAT-ACCENT RESIDUE ---',
-                ...rows.map(
-                    (r) =>
-                        `[i=${r.bandIntensity}]  &of2/&of4 n=${r.nBack}  &of1/&of3 n=${r.nOn}  ` +
-                        `gap=${r.gapDb >= 0 ? '+' : ''}${r.gapDb.toFixed(2)}dB ` +
-                        '(envelope-only target ~0.45dB; pre-#1342 ~1.5dB)',
-                ),
+                '--- #1342 FUNK BACKBEAT-ACCENT RESIDUE (kickless) ---',
+                ...rows.map(fmtRow),
+                '--- #948 same pair, production Funk kick grid loaded ---',
+                '    (& of 2 / & of 4 are kick-coincident; & of 1 / & of 3 are not)',
+                ...kickRows.map(fmtRow),
+                '    (pre-#948 kick lane: -1.43 / -1.86 / -2.23 dB — the pop INVERTED by the lock)',
                 '------------------------------------------',
             ].join('\n'),
         );
 
-        for (const r of rows) {
+        for (const r of [...rows, ...kickRows]) {
             expect(r.nBack).toBeGreaterThan(20);
             expect(r.nOn).toBeGreaterThan(20);
             // intent: only the metric envelope may separate the two pop
@@ -1121,8 +1213,109 @@ describe('Funk Bass Critique', () => {
             expect(r.gapDb).toBeLessThan(0.7);
             // intent: the envelope itself must survive — this is not a
             // "flatten everything" fix. The & of 2/4 lean INTO the coming
-            // strong beat and stay slightly above the & of 1/3.
+            // strong beat and stay slightly above the & of 1/3. On the kick
+            // lane this same floor is #948's acceptance: a kick-coincident pop
+            // may not render below its off-grid twin ; measured +0.47 dB in both
+            // lanes (identical to 2 dp, as it must be — same token, same
+            // envelope) ; pre-#948 the kick lane sat at -1.43 to -2.23 dB, red
+            // by a wide margin at all three intensities.
             expect(r.gapDb).toBeGreaterThan(0.1);
         }
+    });
+
+    it('locks the kick as a FLOOR under funk gestures, not over them (#948)', () => {
+        // The mechanism test for #948, on the production Funk kick grid. Three
+        // separate claims, because the fix has three distinct outcomes depending on
+        // what the style authored for the kick-coincident step:
+        //
+        //   (a) an authored gesture ABOVE the lock  -> the gesture is emitted whole
+        //   (b) nothing authored at all             -> the lock is emitted, unchanged
+        //   (c) an authored gesture BELOW the lock  -> the lock still wins the step
+        //
+        // (b) and (c) are non-regression pins, not new behavior: they are what the
+        // kick-lock always did, and the point of pinning them is that #948 must not
+        // have quietly turned the lock into a velocity-raise on notes that should
+        // still be the lock's own thump.
+        const bars = 64;
+        const bandIntensity = 0.5;
+        const perf = simulatePerformance(bars, {
+            playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+            ...kickLane(),
+        });
+        const kickless = simulatePerformance(bars, {
+            playback: { bandIntensity, bpm: 110, complexity: 0.8 },
+        });
+        // The Funk preset is 2 measures / 32 steps; kicks land on 0,3,6,9,14 and
+        // 16,19,22,25,28,30. Positions are addressed `step % 32` so both measures
+        // are distinguishable (step 28 exists only in the second measure).
+        const at = (mods, src = perf) => src.filter((p) => mods.includes(p.step % 32));
+
+        // (a) THE POP. Steps 6/14/22/30 are the kick-coincident "and"s.
+        const kickPops = at([6, 14, 22, 30]).filter((p) => p.note.velocity >= 0.8);
+        const popTokenShare =
+            kickPops.filter((p) => p.note.authoredVelocity >= 1.2).length / kickPops.length;
+
+        // (b) THE GESTURE-LESS KICK STEP. Step 28 is the second measure's beat-4
+        // downbeat: funk authors nothing there (not The One, not the beat-3 slap, not
+        // an "and", not a 16th) and the kickless lane emits NOTHING on it at this
+        // intensity, so whatever sounds there is the lock and only the lock.
+        const lockOnly = at([28]);
+        const LOCK_TOKEN = Math.max(0.8, 1.15 * 0.7); // normal (non-accented) kick
+
+        // (c) THE CHUCK. Steps 3/9/19/25 are kick-coincident odd 16ths — the chuck's
+        // home. A 0.5 chuck loses to the 0.805 lock, so the kick lane must show the
+        // lock's note (non-ghost) where the kickless lane shows dead notes.
+        const kickOdd = [3, 9, 19, 25];
+        const ghostsOnKick = at(kickOdd).filter((p) => p.note.muted === 1).length;
+        const ghostsKickless = at(kickOdd, kickless).filter((p) => p.note.muted === 1).length;
+
+        console.log(
+            [
+                '',
+                '--- #948 KICK-LOCK AS A FLOOR (Funk preset, i=0.5) ---',
+                `(a) kick-coincident "and" pops: n=${kickPops.length}  ` +
+                    `authored-pop share=${(popTokenShare * 100).toFixed(0)}%  ` +
+                    `min authored=${Math.min(
+                        ...kickPops.map((p) => p.note.authoredVelocity),
+                    ).toFixed(3)} (pre-#948: 0.805/0.875, the lock)`,
+                `(b) gesture-less kick step 28: n=${lockOnly.length}/${bars / 2} bars  ` +
+                    `authored=${[
+                        ...new Set(lockOnly.map((p) => p.note.authoredVelocity.toFixed(4))),
+                    ].join(',')}  (kickless lane emits n=${at([28], kickless).length})`,
+                `(c) kick-coincident 16ths: ghosts on kick lane=${ghostsOnKick}  ` +
+                    `kickless=${ghostsKickless} (chucks still lose their note to the lock)`,
+                '------------------------------------------------------',
+            ].join('\n'),
+        );
+
+        // (a) intent: a pop that lands with the kick is still a pop. Every one of
+        // them carries `popVel` (1.25) ; measured 100% of 77 ; floor 90% leaves room
+        // for the case where the pop's own probability gate declines and the lock
+        // legitimately owns the step (it cannot happen at the current gate values —
+        // the funk active-gate draw and the pop draw are the same hash and the pop's
+        // threshold is the looser of the two — but the floor should not depend on
+        // that coincidence). Pre-#948 this share was 0%.
+        expect(kickPops.length).toBeGreaterThan(40);
+        expect(popTokenShare).toBeGreaterThanOrEqual(0.9);
+
+        // (b) intent: BYTE-IDENTICAL to pre-#948 on a step with no authored gesture.
+        // The lock fires on every one of the 32 second measures, at exactly its own
+        // token, un-ghosted. Strict equality is correct here — nothing about this
+        // step is stochastic: funk's branch returns null unconditionally and the lock
+        // is plain arithmetic off the preset's kick value.
+        expect(lockOnly.length).toBe(bars / 2);
+        for (const p of lockOnly) {
+            expect(p.note.authoredVelocity).toBeCloseTo(LOCK_TOKEN, 10);
+            expect(p.note.muted).toBe(0);
+        }
+
+        // (c) intent: the chuck still loses, whole note and all. `max()` is taken
+        // between GESTURES, not applied as a velocity raise in place — a 0.5 dead
+        // note lifted to 0.805 would be a shouted mute, which is not what the lock is
+        // asking for. Pinned as a pair: the kickless lane proves the chucks are being
+        // drawn at all (25 of them at this intensity), the kick lane proves they are
+        // replaced rather than amplified.
+        expect(ghostsKickless).toBeGreaterThan(10);
+        expect(ghostsOnKick).toBe(0);
     });
 });

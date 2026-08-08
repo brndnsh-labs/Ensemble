@@ -838,6 +838,14 @@ export function getBassNote(
             muted,
             bendStartInterval,
             approachTargetRoot,
+            // #948 — the PRE-envelope authored token this note was emitted with
+            // (`velocityParam`), carried out so the kick-lock floor below can compare
+            // gesture-to-gesture instead of comparing a rendered velocity against a
+            // flat lock level. See `withKickLockFloor` for why the comparison has to
+            // happen in the authored domain. Inert downstream: like
+            // `approachTargetRoot`, neither the scheduler nor the MIDI exporter reads
+            // it.
+            authoredVelocity: velocityParam,
         };
     };
 
@@ -1080,6 +1088,94 @@ export function getBassNote(
         return null;
     }
 
+    const kickInst = (groove.instruments || []).find((i: any) => i.name === 'Kick');
+    const hasKickTrigger = !!(
+        kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
+    );
+
+    // --- Kick-lock: a FLOOR under the authored gesture, not an interceptor (#948) ---
+    //
+    // why: doubling the drummer's syncopated kick is this branch's job, and it keeps
+    // that job on every step where the style has nothing of its own to say. But a step
+    // that DOES carry an authored gesture is not made more kick-coherent by being
+    // flattened onto the lock level. A bassist popping on a kick-coincident step leans
+    // IN — they don't back off to a generic thump because the drummer happens to be
+    // there too. Before #948 this was an early return, so every rock/funk step on the
+    // preset's kick grid rendered at `max(0.8, kickVel * 0.7)` and funk's own pop
+    // population came out INVERTED: the shipped Funk preset kicks on steps 3/6/9/14,
+    // so the "and" pops of beats 2 and 4 (steps 6/14 — kick-coincident by
+    // construction) rendered at 0.805-0.875 while the same authored 1.25 pop on the
+    // "and" of 1 and 3 rendered in full. #942 had already hand-carved The One out of
+    // this return for exactly that reason; the floor generalizes that carve-out to
+    // every authored gesture, so the special case is gone rather than duplicated.
+    //
+    // The comparison is between AUTHORED TOKENS — pre-envelope, pre-accent — and the
+    // metric envelope then applies once, inside `result`, to whichever token won.
+    // Comparing rendered velocities instead would silently RAISE the quiet end of the
+    // ladder: funk's 0.90 hammer-on renders 0.837 in the envelope's -7% post-strong-
+    // beat trough, under an accented kick's flat 0.875, so a post-envelope max() would
+    // re-create a gesture-vs-lock inversion on exactly the 16ths #947 widened the
+    // ladder to reach.
+    //
+    // A gesture the lock OUT-ranks keeps losing its whole note to the lock, as it
+    // always has — funk's 0.5 dead-note chuck is the case that matters: a chuck is a
+    // percussive non-note, and a kick landing under one is the lock doing its job.
+    //
+    // Hoisted here (#948 review P1), ahead of the Section-Transition Chromatic
+    // Anticipation exit below, so that exit can be wrapped in the floor too — it used
+    // to emit via a bare `result(...)` before this computation existed, bypassing the
+    // floor entirely. Only the FLOOR half of the original if/else-if moved up; the
+    // sibling "quiet rock/funk off-beats" branch (the `!hasKickTrigger` case, which
+    // early-returns) stays at its original position further down, past the
+    // anticipation exit — see the comment there for why hoisting it too would be a
+    // real behavior change.
+    let kickLockFloorVel: number | null = null;
+    if ((style === 'rock' || style === 'funk') && hasKickTrigger) {
+        const kickVel =
+            kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
+        // why (#941): was `kickVel * (0.7 + intensity * 0.3)`. The `0.7` survives as
+        // the articulation offset — a kick-locked note DOUBLES the drummer, it
+        // doesn't lead, so it sits a fixed notch under the authored downbeat tokens
+        // — while the intensity slope moved to `bassMacroGain`. The 0.8 floor stays:
+        // even the softest lock has to read as a played note, not a ghost.
+        kickLockFloorVel = Math.max(0.8, kickVel * 0.7);
+    }
+
+    /**
+     * #948 — apply the kick-lock floor to whatever the style authored for this step.
+     *
+     * Returns `note` untouched when there is no kick under this step (the floor is
+     * `null` for every style but rock/funk, and for every non-kick step). Otherwise it
+     * is a straight token comparison: the authored gesture is emitted whole when its
+     * PRE-envelope token clears the lock, and the lock's own note is emitted whole when
+     * it doesn't (including when the style authored nothing at all — `note === null`,
+     * e.g. funk's beat-4 downbeat, where the lock behaves exactly as it did before this
+     * change).
+     *
+     * The winner is emitted whole rather than having its velocity raised in place: a
+     * lock that out-ranks the authored gesture is out-ranking a chuck, and a chuck at
+     * lock velocity would be a shouted dead note rather than the thump the lock is
+     * asking for.
+     *
+     * PRNG-stream safety (the reason this is a post-hoc comparison and not a "run the
+     * style twice and pick" loop): the style function runs exactly ONCE per step, and
+     * the lock's own note is built from plain arithmetic. Both funk gates
+     * (`slapSeedBase + n`) and the rock/funk active gates are `scrambleHash` — stateless
+     * and indexed by an explicit (step, loopCount) tuple — so nothing here can shift a
+     * draw sequence some later step depends on. `withOctaveJump` is likewise
+     * scrambleHash-seeded and idempotent for a given step.
+     */
+    const withKickLockFloor = (note: any): any => {
+        if (kickLockFloorVel === null) {
+            return note;
+        }
+        const authored = typeof note?.authoredVelocity === 'number' ? note.authoredVelocity : -1;
+        if (note && authored >= kickLockFloorVel) {
+            return note;
+        }
+        return result(getFrequency(withOctaveJump(baseRoot)), null, kickLockFloorVel);
+    };
+
     // --- Section-Transition Chromatic Anticipation ---
     // why: "The transition feels like the drummer is leading a band that didn't get
     // the chart" (form-arranger.md P0 #2). When the upcoming section's first chord
@@ -1146,31 +1242,39 @@ export function getBassNote(
             approachMidi -= 12;
         }
 
-        return result(
-            getFrequency(approachMidi),
-            // why: duration=1 (one sub-beat step) — short, punchy approach note that
-            // doesn't blur into the new downbeat.
-            1,
-            // why: slight accent so the anticipation "pops" audibly before the new
-            // section lands. (The ×1.15 inside `velocity` is the generic BACKBEAT
-            // accent — beats 2 & 4 — not a downbeat accent; accent-carrying styles
-            // land this walk-in on an odd beat and render it at 1.15 × 1.05 ≈ 1.21.)
-            // Funk opts out of the per-beat accent (`GESTURE_ACCENT_BASS_STYLES`,
-            // #1342), which left this walk-in — funk's one velocity-derived
-            // emission — at a bare 1.05, the quietest full note in its bar at the
-            // exact moment the comment above says it should pop (#942 review).
-            // Authored explicitly instead: above the ornament band so the lead-in
-            // reads, below the slap family so it doesn't rival the downbeat it
-            // resolves into.
-            //
-            // why 1.02 (#947): was 1.15, which sat inside the slap family's own
-            // 1.15-1.25 huddle and helped flatten the bar. This is a FRETTED
-            // walk-in with no percussive attack, so it belongs on the lead-in rung
-            // of funk's articulation ladder — the same rung as the chord-change
-            // harmonic approach in `bass-styles.ts`, where the canonical ladder
-            // table lives. 0.81 dB under the secondary slap, 0.90 dB over the
-            // ornament band.
-            style === 'funk' ? 1.02 : velocity * 1.05,
+        // why (#948 review P1): wrapped in `withKickLockFloor` — this exit used to
+        // emit via a bare `result(...)`, bypassing the kick-lock floor entirely (the
+        // floor computation sat lower in the function, after this exit). Currently
+        // benign: funk's 1.02 anticipation token clears the 0.875 max floor value with
+        // room to spare, so this is a future-proofing refactor, not a behavior change
+        // — see the hoisted floor computation above for the mutation-safety reasoning.
+        return withKickLockFloor(
+            result(
+                getFrequency(approachMidi),
+                // why: duration=1 (one sub-beat step) — short, punchy approach note that
+                // doesn't blur into the new downbeat.
+                1,
+                // why: slight accent so the anticipation "pops" audibly before the new
+                // section lands. (The ×1.15 inside `velocity` is the generic BACKBEAT
+                // accent — beats 2 & 4 — not a downbeat accent; accent-carrying styles
+                // land this walk-in on an odd beat and render it at 1.15 × 1.05 ≈ 1.21.)
+                // Funk opts out of the per-beat accent (`GESTURE_ACCENT_BASS_STYLES`,
+                // #1342), which left this walk-in — funk's one velocity-derived
+                // emission — at a bare 1.05, the quietest full note in its bar at the
+                // exact moment the comment above says it should pop (#942 review).
+                // Authored explicitly instead: above the ornament band so the lead-in
+                // reads, below the slap family so it doesn't rival the downbeat it
+                // resolves into.
+                //
+                // why 1.02 (#947): was 1.15, which sat inside the slap family's own
+                // 1.15-1.25 huddle and helped flatten the bar. This is a FRETTED
+                // walk-in with no percussive attack, so it belongs on the lead-in rung
+                // of funk's articulation ladder — the same rung as the chord-change
+                // harmonic approach in `bass-styles.ts`, where the canonical ladder
+                // table lives. 0.81 dB under the secondary slap, 0.90 dB over the
+                // ornament band.
+                style === 'funk' ? 1.02 : velocity * 1.05,
+            ),
         );
     }
 
@@ -1234,37 +1338,19 @@ export function getBassNote(
     }
 
     const isSameAsPrev = (midi: number | null) => !!prevMidi && midi === prevMidi;
-    const kickInst = (groove.instruments || []).find((i: any) => i.name === 'Kick');
-    const hasKickTrigger = !!(
-        kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
-    );
 
+    // --- Kick-lock, continued: quiet rock/funk off-beats (low intensity) (#948) ---
+    // why: `kickInst`/`hasKickTrigger`/`kickLockFloorVel`/`withKickLockFloor` were
+    // hoisted above the Section-Transition Chromatic Anticipation exit (#948 review
+    // P1, so that exit can be wrapped in the floor too — see the comment up there).
+    // Only the FLOOR half of the original if/else-if moved. This sibling branch (the
+    // `!hasKickTrigger` case, which early-returns) deliberately stayed here: hoisting
+    // it above the anticipation exit would let it preempt that exit's gesture on
+    // funk steps satisfying both conditions (funk is in ANTICIPATION_STYLES and this
+    // branch's style set), a real behavior change. The two conditions remain mutually
+    // exclusive on `hasKickTrigger`, so splitting the if/else-if into two independent
+    // ifs changes nothing.
     if (
-        (style === 'rock' || style === 'funk') &&
-        hasKickTrigger &&
-        // #942 review: funk's chord-start slap ("The One") must not be intercepted
-        // by the generic kick-lock. The shipped Funk preset has a kick ON step 0,
-        // so this early return was intercepting the authored downbeat slap below and
-        // handing The One `kickVel * (0.7 + 0.3i)` (~1.06 at i=0.5) — under
-        // `popVel`, re-creating in the kick layer the exact inversion #1342 fixed
-        // in the accent layer, invisible to any kickless harness. A slap player
-        // locking to the kick digs the slap in HARDER, they don't drop to a
-        // generic lock level: let funk's chord start fall through to its authored
-        // gesture (which also owns the #1295 register fold this path lacks).
-        // Kick-lock keeps every OTHER funk kick-coincident step — locking the line
-        // to the syncopated kick is this branch's actual job.
-        !(style === 'funk' && stepInChord === 0)
-    ) {
-        const kickVel =
-            kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
-        // why (#941): was `kickVel * (0.7 + intensity * 0.3)`. The `0.7` survives as
-        // the articulation offset — a kick-locked note DOUBLES the drummer, it
-        // doesn't lead, so it sits a fixed notch under the authored downbeat tokens
-        // — while the intensity slope moved to `bassMacroGain`. The 0.8 floor stays:
-        // even the softest lock has to read as a played note, not a ghost.
-        const dynamicKickVel = Math.max(0.8, kickVel * 0.7);
-        return result(getFrequency(withOctaveJump(baseRoot)), null, dynamicKickVel);
-    } else if (
         (style === 'rock' || style === 'funk') &&
         !hasKickTrigger &&
         intensity < 0.4 &&
@@ -1355,85 +1441,91 @@ export function getBassNote(
         // downbeat's register for the whole performance.
         const safeBaseRoot = style === 'funk' && baseRoot > absMax - 12 ? baseRoot - 12 : baseRoot;
         const slapNote = withOctaveJump(safeBaseRoot);
-        return result(
-            getFrequency(slapNote),
-            null,
-            // #1334: was a flat 1.25 (BASS_AUTHORING_CEILING) — funk was the
-            // only branch here with no intensity term, so the downbeat slap
-            // didn't respond to the band's dynamic build at all. `1.25 +
-            // intensity*0.2` matches `popVel`'s exact slope/base (`bass-
-            // styles.ts`) and sits 0.05 above the beat-3 "secondary slap"'s
-            // `slapVel` (`1.2 + intensity*0.2`, same gesture class per that
-            // file's own "The One (and Beat 3) - Primary Slaps" grouping) —
-            // preserving The One as the loudest of the two rather than making
-            // them identical.
-            //
-            // Measured effect: the downbeat gets measurably louder through
-            // the verse->chorus build (i≈0.4-0.7, +0.2 to +0.5dB over the old
-            // flat value there).
-            //
-            // #941 FOLLOW-THROUGH: the `+ intensity * 0.2` slope is gone from
-            // both this token and `popVel` — they are now flat 1.25 and 1.2,
-            // the same 0.05 apart as before, and the lane's macro swell is the
-            // single downstream `bassMacroGain` term. The saturation this
-            // paragraph described is what that change removed: at i≥0.7 the two
-            // used to saturate `BASS_VELOCITY_DOMAIN_MAX` and render identically
-            // regardless of either one's own slope — a structural ceiling, not a
-            // tuning problem. Below that ceiling The One is now never out-rendered by
-            // any other note — an ORDERING claim, not audible dominance: the
-            // margin over the same-token "and" pop is only the metric
-            // envelope's 1.05 vs 1.025 (~0.1-0.19 dB rendered, under the ~1 dB
-            // JND), because this token deliberately equals `popVel`.
-            //
-            // #947 DECISION (2026-08-07): ordering is the intended contract and
-            // this token STAYS at the ceiling alongside `popVel`. "On The One" is
-            // a structural idea, not a loudness ranking — in real slap bass the
-            // pop is very often the brightest event in the bar — so The One is
-            // an anchor, not a mandatory loudness winner, and nothing here should
-            // push it above the pop. What #947 fixed instead was the bar's total
-            // dynamic RANGE: the rungs BELOW this one (secondary slap, fingered
-            // lead-ins, the "a" flick-pop, the hammer-on) were bunched within
-            // ~1.1 dB of it and were re-spaced downward. Canonical ladder table:
-            // the top of the `style === 'funk'` branch in `bass-styles.ts`.
-            // #1342 removed the generic +15%
-            // backbeat accent from funk
-            // (`GESTURE_ACCENT_BASS_STYLES`), which until then rode the "and"
-            // pop (odd `intBeat`) and not The One (even `intBeat`) and made the
-            // pop measurably louder from i≈0.1 to i≈0.65. Guarded by the
-            // #1342 assertions in `tests/standards/funk-bass-critique.test.ts`.
-            //
-            // #1340: 'quarter' (jazz walking) gets flat 1.0 here, not the
-            // `1.0 + intensity*0.25` rock/disco/neo share. `isStraightStyle`
-            // is reused above purely to decide which styles emit their
-            // downbeat through THIS branch (a rhythmic/entry-gate question);
-            // this velocity literal is a separate, dynamics-only decision,
-            // and jazz walking's drive is note-length + the quarter pulse,
-            // not a downbeat accent — same reasoning #1335 already applied to
-            // the generic backbeat accent (`EVEN_ACCENT_BASS_STYLES`). Every
-            // OTHER quarter-note step in the bar already reaches `result()`
-            // (via `getBassNoteStyle`, downstream of this early-return) at
-            // 1.0 or an intentionally SOFTER literal (path/pickup notes are
-            // `velocity * 0.9`/`0.85` in `bass-styles.ts`) — never a boosted
-            // one — so 1.0 here just makes the downbeat consistent with the
-            // rest of the walking line, not louder than any of it. It
-            // still gets the genre-neutral +5% strong-beat swell from
-            // `bassEnvelope` (`#1006`, `isStrongBeatB` above), same as every
-            // other style's downbeat. rock/disco/neo are unchanged pending a
-            // by-ear call on whether they want this too (out of scope here).
-            // #941: `1.0 + intensity*0.25` became a flat 1.1 for rock/disco/neo.
-            // The slope was pure macro loudness (the token IS 1.0 — i.e. no accent
-            // at all — at low intensity, and only becomes an anchor accent at
-            // chorus), which is precisely the "louder when the band is louder"
-            // shape that now belongs to `bassMacroGain` alone. But collapsing it to
-            // a bare 1.0 would have erased #1340's deliberate rock-vs-jazz-walking
-            // distinction AND left rock's downbeat permanently quieter than its own
-            // 1.15 backbeat accent — a rock bassist digs into The One at every
-            // dynamic, not only at chorus. 1.1 is that accent expressed as
-            // articulation: the old token's value at the reference mid intensity
-            // (1.125) rounded onto the file's existing accent vocabulary, so the
-            // rendered mid-intensity downbeat moves +0.4 dB (under the ~1 dB JND)
-            // while the accent now holds at i=0.1 as well as i=1.0.
-            style === 'funk' ? BASS_AUTHORING_CEILING : style === 'quarter' ? 1.0 : 1.1,
+        // #948: the downbeat claim is an authored gesture like any other, so it goes
+        // through the floor. In practice it always wins — funk's 1.25 and rock's 1.1
+        // both clear the loudest lock (0.875) — which is precisely what makes the #942
+        // hand-carve-out of The One unnecessary now.
+        return withKickLockFloor(
+            result(
+                getFrequency(slapNote),
+                null,
+                // #1334: was a flat 1.25 (BASS_AUTHORING_CEILING) — funk was the
+                // only branch here with no intensity term, so the downbeat slap
+                // didn't respond to the band's dynamic build at all. `1.25 +
+                // intensity*0.2` matches `popVel`'s exact slope/base (`bass-
+                // styles.ts`) and sits 0.05 above the beat-3 "secondary slap"'s
+                // `slapVel` (`1.2 + intensity*0.2`, same gesture class per that
+                // file's own "The One (and Beat 3) - Primary Slaps" grouping) —
+                // preserving The One as the loudest of the two rather than making
+                // them identical.
+                //
+                // Measured effect: the downbeat gets measurably louder through
+                // the verse->chorus build (i≈0.4-0.7, +0.2 to +0.5dB over the old
+                // flat value there).
+                //
+                // #941 FOLLOW-THROUGH: the `+ intensity * 0.2` slope is gone from
+                // both this token and `popVel` — they are now flat 1.25 and 1.2,
+                // the same 0.05 apart as before, and the lane's macro swell is the
+                // single downstream `bassMacroGain` term. The saturation this
+                // paragraph described is what that change removed: at i≥0.7 the two
+                // used to saturate `BASS_VELOCITY_DOMAIN_MAX` and render identically
+                // regardless of either one's own slope — a structural ceiling, not a
+                // tuning problem. Below that ceiling The One is now never out-rendered by
+                // any other note — an ORDERING claim, not audible dominance: the
+                // margin over the same-token "and" pop is only the metric
+                // envelope's 1.05 vs 1.025 (~0.1-0.19 dB rendered, under the ~1 dB
+                // JND), because this token deliberately equals `popVel`.
+                //
+                // #947 DECISION (2026-08-07): ordering is the intended contract and
+                // this token STAYS at the ceiling alongside `popVel`. "On The One" is
+                // a structural idea, not a loudness ranking — in real slap bass the
+                // pop is very often the brightest event in the bar — so The One is
+                // an anchor, not a mandatory loudness winner, and nothing here should
+                // push it above the pop. What #947 fixed instead was the bar's total
+                // dynamic RANGE: the rungs BELOW this one (secondary slap, fingered
+                // lead-ins, the "a" flick-pop, the hammer-on) were bunched within
+                // ~1.1 dB of it and were re-spaced downward. Canonical ladder table:
+                // the top of the `style === 'funk'` branch in `bass-styles.ts`.
+                // #1342 removed the generic +15%
+                // backbeat accent from funk
+                // (`GESTURE_ACCENT_BASS_STYLES`), which until then rode the "and"
+                // pop (odd `intBeat`) and not The One (even `intBeat`) and made the
+                // pop measurably louder from i≈0.1 to i≈0.65. Guarded by the
+                // #1342 assertions in `tests/standards/funk-bass-critique.test.ts`.
+                //
+                // #1340: 'quarter' (jazz walking) gets flat 1.0 here, not the
+                // `1.0 + intensity*0.25` rock/disco/neo share. `isStraightStyle`
+                // is reused above purely to decide which styles emit their
+                // downbeat through THIS branch (a rhythmic/entry-gate question);
+                // this velocity literal is a separate, dynamics-only decision,
+                // and jazz walking's drive is note-length + the quarter pulse,
+                // not a downbeat accent — same reasoning #1335 already applied to
+                // the generic backbeat accent (`EVEN_ACCENT_BASS_STYLES`). Every
+                // OTHER quarter-note step in the bar already reaches `result()`
+                // (via `getBassNoteStyle`, downstream of this early-return) at
+                // 1.0 or an intentionally SOFTER literal (path/pickup notes are
+                // `velocity * 0.9`/`0.85` in `bass-styles.ts`) — never a boosted
+                // one — so 1.0 here just makes the downbeat consistent with the
+                // rest of the walking line, not louder than any of it. It
+                // still gets the genre-neutral +5% strong-beat swell from
+                // `bassEnvelope` (`#1006`, `isStrongBeatB` above), same as every
+                // other style's downbeat. rock/disco/neo are unchanged pending a
+                // by-ear call on whether they want this too (out of scope here).
+                // #941: `1.0 + intensity*0.25` became a flat 1.1 for rock/disco/neo.
+                // The slope was pure macro loudness (the token IS 1.0 — i.e. no accent
+                // at all — at low intensity, and only becomes an anchor accent at
+                // chorus), which is precisely the "louder when the band is louder"
+                // shape that now belongs to `bassMacroGain` alone. But collapsing it to
+                // a bare 1.0 would have erased #1340's deliberate rock-vs-jazz-walking
+                // distinction AND left rock's downbeat permanently quieter than its own
+                // 1.15 backbeat accent — a rock bassist digs into The One at every
+                // dynamic, not only at chorus. 1.1 is that accent expressed as
+                // articulation: the old token's value at the reference mid intensity
+                // (1.125) rounded onto the file's existing accent vocabulary, so the
+                // rendered mid-intensity downbeat moves +0.4 dB (under the ~1 dB JND)
+                // while the accent now holds at i=0.1 as well as i=1.0.
+                style === 'funk' ? BASS_AUTHORING_CEILING : style === 'quarter' ? 1.0 : 1.1,
+            ),
         );
     }
 
@@ -1565,7 +1657,11 @@ export function getBassNote(
             // rhythmically ahead of the surrounding hits and reads as a
             // different player. (Epic 9 S2.b review P1 #4.)
             reggaeFillRes.timingOffset += 0.01 + intensity * 0.01;
-            return reggaeFillRes;
+            // #948: reachable for rock/funk only when the genre feel is Reggae (a funk
+            // bass style under a reggae groove), which is exactly the case the floor
+            // has to cover — before #948 the kick-lock early return claimed this step
+            // first, so a fill quieter than the lock must still lose to it.
+            return withKickLockFloor(reggaeFillRes);
         }
     }
 
@@ -1620,7 +1716,22 @@ export function getBassNote(
         context?.stepCoordination?.barsUntilSectionChange,
     );
     if (styleResult !== undefined) {
-        return styleResult;
+        // #948: this exit's own floor application. Once a rock/funk step reaches
+        // `getBassNoteStyle`, that call returns on EVERY path (rock: `null` off the
+        // eighth grid and below i=0.35, a note otherwise; funk: `null` when no gate
+        // fires) — so the step never falls through to the generic approach/fallback
+        // returns further below, and this wrap is guaranteed to see it.
+        //
+        // This is NOT the only rock/funk return path in the function, and doesn't need
+        // to be: three other exits bypass `getBassNoteStyle` and carry their own
+        // `withKickLockFloor` wrap instead — the Section-Transition Chromatic
+        // Anticipation return (funk only; #948 review P1 closed this gap), the
+        // isStraightStyle downbeat claim's `slapNote` return, and the reggae fill
+        // return (a no-op there, since the floor is only ever non-null for
+        // rock/funk). Between the four, every rock/funk-relevant return path in this
+        // function passes through the floor — but each wraps its OWN result, not this
+        // one; this comment only speaks for the exit it sits on.
+        return withKickLockFloor(styleResult);
     }
 
     const isLastBeatOfMeasure = intBeat === ts.beats - 1;
