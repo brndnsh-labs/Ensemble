@@ -10,6 +10,20 @@
   },
   "profile": "full",
   "backend": "github",
+  // Corrects the github backend's safe default (`auto_merge: false`), which exists
+  // because branch protection isn't guaranteed — see the-cycle's docs/BACKENDS.md.
+  // Ensemble genuinely has it: `main` requires the `checks` and `e2e-tests` contexts
+  // and blocks force-pushes and deletions, so `gh pr merge --auto` really waits rather
+  // than firing on the spot. Enabled on the repo 2026-08-07 alongside
+  // `delete_branch_on_merge`, which is why `--delete-branch` is no longer needed.
+  //
+  // This is a per-repo call, NOT a fleet one: songsiknow is private on a Free org, and
+  // a private repo there cannot be protected by classic rules or rulesets (both 403),
+  // so it must keep the poll-then-merge guard. Do not "fix" it by copying this block.
+  //
+  // Verify rather than trust: `cycle check --verify-forge` fails if this declaration
+  // and the live repo ever disagree.
+  "backend_overrides": { "auto_merge": true },
   // Codex CLI alongside Claude Code — renders a second, independent skill tree at
   // .agents/skills/. See the-cycle's docs/HARNESSES.md. (The tree already existed
   // untracked before the 2026-08-04 flip; declaring it here is what makes `cycle
