@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
+import { DRUM_PRESETS } from '../../public/data/drum-presets.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
@@ -565,6 +566,151 @@ describe('Rock Bassist Critique', () => {
             expect(boundaryRate).toBeGreaterThan(0);
         } else {
             expect(boundaryRate / midSectionRate).toBeGreaterThanOrEqual(3);
+        }
+    });
+
+    // --- #948 review P0: rock kick-lane coverage ---------------------------
+    //
+    // Every mock above runs `instruments: []`, which makes `hasKickTrigger`
+    // permanently false inside `getBassNote` and silences rock's kick path
+    // entirely — the same harness-silencing smell #942/#948 found and fixed on
+    // the funk side (`tests/standards/funk-bass-critique.test.ts`'s
+    // `funkKickGroove`/`kickLane`), never mirrored here. That gap is how a
+    // style-level kick-lock arm in `bass-styles.ts`'s rock branch — DEAD CODE
+    // until #948 (bass-engine.ts's outer early-return used to intercept every
+    // kick step before `getBassNoteStyle` ran), revived LIVE by #948 — survived
+    // a full review round: it preempted rock's own pulse (1.1) and
+    // syncopation (0.95/1.045) tokens with `kickVel*0.8` (1.0/0.88) whenever
+    // `complexity>0.6 || intensity>0.7`, rendering an accented kick-coincident
+    // beat QUIETER than an un-kicked one (measured 1.05 vs 1.265 rendered at
+    // complexity 0.8 / intensity 0.9) — the exact inversion the #948 policy
+    // ("a bassist on a kick-coincident step leans in, not back") prohibits.
+    //
+    // This replays the shipped 'Basic Rock' preset's kick grid
+    // (`[2,0,0,0,0,0,0,0,2,0,1,0,0,0,0,0]` — accents on steps 0/8, a plain hit
+    // on step 10) through the real kick path. It goes RED if a style-level
+    // kick interception for rock is ever reintroduced (mutation-tested: see
+    // #948 patch notes) and stays GREEN with the dead arm gone, because rock
+    // has no inner arm of its own — kick coherence is entirely the
+    // engine-level `withKickLockFloor`'s job, the same way funk has none.
+    it('kick-coincident beats never dip below the off-kick pulse — the inversion guard (#948 review P0)', () => {
+        const rockKickGroove = {
+            genreFeel: 'Rock',
+            lastDrumPreset: 'Rock',
+            // why: the shipped grid is one 16-step (4/4) measure; `hasKickTrigger`
+            // indexes it via `step % (groove.measures * stepsPerMeasure)`, so an
+            // undefined `measures` (the preset has none — only multi-bar presets
+            // like Funk carry one) would NaN that index and silence the lane.
+            measures: 1,
+            instruments: [{ name: 'Kick', steps: DRUM_PRESETS['Basic Rock'].Kick }],
+        };
+        const numBars = 32;
+        // why: one unchanging chord for the whole sweep. Rock's beat-4 downbeat
+        // has its own probabilistic push-point/chromatic-anticipation branch
+        // (bass-styles.ts, gated on `isChordChangeApproach`) that would make its
+        // authoredVelocity vary (1.1 vs 1.2) if a chord change were ever in
+        // play — this test needs beat 2/3/4 downbeats to be the plain
+        // deterministic 1.1 pulse token so the kick-vs-no-kick comparison isn't
+        // confounded by an unrelated gesture.
+        const chord = { rootMidi: 48, quality: 'maj', beats: 4 };
+
+        const mockState = {
+            playback: { bandIntensity: 0.9, complexity: 0.8, bpm: 120 },
+            groove: rockKickGroove,
+            arranger: {
+                timeSignature: '4/4',
+                totalSteps: numBars * 16,
+                stepMap: Array.from({ length: numBars }, (_, m) => ({
+                    start: m * 16,
+                    end: (m + 1) * 16,
+                    chord,
+                })),
+            },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(mockState);
+
+        const tsConfig = TIME_SIGNATURES['4/4'];
+        const beat2Downbeats = []; // step%16===4  — off-kick
+        const beat3Downbeats = []; // step%16===8  — kick-coincident, accented (grid value 2)
+        const beat4Downbeats = []; // step%16===12 — off-kick
+        const kickAndSteps = []; // step%16===10 — kick-coincident, plain (grid value 1) — syncopation "and"
+        let prevFreq = 0;
+
+        for (let i = 0; i < numBars * 16; i++) {
+            const stepInMeasure = i % 16;
+            const info = getStepInfo(i, tsConfig, [], TIME_SIGNATURES);
+            const active = isBassActive(getState(), 'rock', i, stepInMeasure, info, {});
+            if (!active) {
+                continue;
+            }
+            const note = getBassNote(
+                getState(),
+                chord,
+                chord,
+                info.beatIndex,
+                prevFreq,
+                48,
+                'rock',
+                0,
+                i,
+                stepInMeasure,
+                {},
+                info,
+            );
+            if (!note) {
+                continue;
+            }
+            prevFreq = note.freq;
+            if (stepInMeasure === 4) {
+                beat2Downbeats.push(note.authoredVelocity);
+            }
+            if (stepInMeasure === 8) {
+                beat3Downbeats.push(note.authoredVelocity);
+            }
+            if (stepInMeasure === 12) {
+                beat4Downbeats.push(note.authoredVelocity);
+            }
+            if (stepInMeasure === 10) {
+                kickAndSteps.push(note.authoredVelocity);
+            }
+        }
+
+        const avg = (arr) => arr.reduce((s, v) => s + v, 0) / (arr.length || 1);
+        console.log(
+            '\n--- ROCK KICK-LANE CRITIQUE (#948 review P0) ---\n' +
+                `[Beat 2 downbeat, off-kick]     n=${beat2Downbeats.length} avg=${avg(beat2Downbeats).toFixed(3)}\n` +
+                `[Beat 3 downbeat, kick+accent]  n=${beat3Downbeats.length} avg=${avg(beat3Downbeats).toFixed(3)}\n` +
+                `[Beat 4 downbeat, off-kick]     n=${beat4Downbeats.length} avg=${avg(beat4Downbeats).toFixed(3)}\n` +
+                `[Kick "and" (step 10)]          n=${kickAndSteps.length} min=${(kickAndSteps.length ? Math.min(...kickAndSteps) : 0).toFixed(3)}\n` +
+                '(pre-fix, authoredVelocity: beat3 dropped to 1.00 vs off-kick 1.10; step10 could drop to 0.88)\n' +
+                '--------------------------------------------------\n',
+        );
+
+        // Non-vacuous: every downbeat/step should have fired on every bar.
+        expect(beat2Downbeats.length).toBe(numBars);
+        expect(beat3Downbeats.length).toBe(numBars);
+        expect(beat4Downbeats.length).toBe(numBars);
+        expect(kickAndSteps.length).toBe(numBars);
+
+        // THE INVERSION GUARD: the kick-coincident, accented beat-3 downbeat
+        // must render EXACTLY the same authoredVelocity as the off-kick beat-2
+        // and beat-4 downbeats — never a dip. With the dead style-level lock
+        // arm gone, all three are the plain, deterministic 1.1 pulse token (no
+        // push-point randomness — see the single-chord note above).
+        for (const v of beat3Downbeats) {
+            expect(v).toBe(1.1);
+        }
+        for (const v of [...beat2Downbeats, ...beat4Downbeats]) {
+            expect(v).toBe(1.1);
+        }
+
+        // The kick-"and" (step 10) must carry rock's own syncopation-vocabulary
+        // token — 0.95, or 0.95*1.1=1.045 on the ~30-50% draw that adds a 5th/
+        // octave — never the deleted lock's sub-0.95 value (a plain kick hit
+        // would have rendered `kickVel*0.8` = 1.1*0.8 = 0.88).
+        for (const v of kickAndSteps) {
+            expect(v).toBeGreaterThanOrEqual(0.95);
         }
     });
 });

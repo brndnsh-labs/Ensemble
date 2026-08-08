@@ -635,8 +635,13 @@ export function getBassNoteStyle(
         bend?: number,
     ) => { timingOffset: number; [key: string]: unknown },
     _isGroupStart: boolean,
-    hasKickTrigger: boolean,
-    kickInst: { steps: number[] } | null,
+    // why (#948 review P0): no longer read here — the only reader was rock's
+    // now-deleted style-level kick-lock arm (revived-dead-code inversion; the
+    // engine-level `withKickLockFloor` in bass-engine.ts owns kick coherence).
+    // Kept as positional parameters since bass-engine.ts's call site still
+    // passes them positionally (same precedent as `_beatsInChord` above).
+    _hasKickTrigger: boolean,
+    _kickInst: { steps: number[] } | null,
     barsUntilSectionChange?: number,
 ) {
     // why: #1256 — `isSameAsPrev` is no longer read here; the only call site was
@@ -994,19 +999,17 @@ export function getBassNoteStyle(
             return null;
         }
 
-        // 1. Kick Locking: Mirror the drummer's kick pattern at high complexity
-        if (hasKickTrigger && kickInst && (playback.complexity > 0.6 || intensity > 0.7)) {
-            const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
-            if (kickStepVal > 0) {
-                const kickVel = kickStepVal === 2 ? 1.25 : 1.1;
-                // why (#941): the `0.8` survives as the "doubling the drummer"
-                // articulation offset — a kick-locked note sits under the authored
-                // downbeat tokens because it follows rather than leads — while the
-                // `+ intensity * 0.2` macro slope moved into `bassMacroGain`.
-                // Paired with the two kick-lock sites in `bass-engine.ts`.
-                return result(getFrequency(baseRoot), 0.8, kickVel * 0.8);
-            }
-        }
+        // why (#948 review P0): this style-level kick-lock arm was DEAD CODE until
+        // #948 (bass-engine.ts's outer early-return always intercepted kick steps
+        // before getBassNoteStyle ran), and #948 revived it live. Revived, it
+        // preempted rock's own pulse (1.1) and syncopation (0.95/1.045) tokens
+        // with `kickVel*0.8` (1.0/0.88) at complexity>0.6 || intensity>0.7 —
+        // rendering an accented kick-coincident beat QUIETER than an un-kicked one
+        // (measured 1.05 vs 1.265 rendered at complexity 0.8 / intensity 0.9), the
+        // exact inversion the #948 policy ("a bassist on a kick-coincident step
+        // leans in, not back") prohibits. Deleted: the engine-level
+        // `withKickLockFloor` in bass-engine.ts fully subsumes kick coherence for
+        // rock, the same way funk has no inner arm of its own.
 
         // 2. Fundamental Pulse: Quarter notes are solid roots
         if (isBeatStart) {
