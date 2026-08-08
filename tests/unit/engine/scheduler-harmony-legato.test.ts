@@ -85,7 +85,7 @@ function padNote(midi, opts = {}) {
     return {
         freq: 440 * 2 ** ((midi - 69) / 12),
         midi,
-        velocity: 0.5,
+        velocity: 'velocity' in opts ? opts.velocity : 0.5,
         durationSteps: 8,
         style: 'pads',
         timingOffset: 0,
@@ -188,6 +188,29 @@ describe('Harmony legato chain — scheduler + synth integration (Epic 10 S3.g)'
         expect(state.harmony.activeVoices.map((v) => v.midi).sort((a, b) => a - b)).toEqual([
             61, 65, 68,
         ]);
+    });
+
+    it('guards an undefined velocity before audio and visual dispatch', () => {
+        state.playback.drawQueue = [];
+        state.vizState.enabled = true;
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        state.harmony.buffer.set(0, [padNote(60, { isChordStart: true, velocity: undefined })]);
+
+        scheduleHarmonies(state, {}, 0, 10);
+
+        expect(warn).toHaveBeenCalledWith(
+            'scheduleHarmonies: non-finite velocity (undefined) — 0.5 fallback',
+        );
+        const voice = state.harmony.activeVoices[0];
+        const attackLevels = voice.gain.gain.linearRampToValueAtTime.mock.calls.map(
+            ([level]) => level,
+        );
+        expect(attackLevels.some((level) => Number.isFinite(level))).toBe(true);
+        expect(attackLevels).toContain(0.5);
+
+        const visual = state.playback.drawQueue.find((event) => event.track === 'harmony');
+        expect(visual.renderVelocity).toBe(0.5);
+        expect(Number.isFinite(visual.renderVelocity)).toBe(true);
     });
 
     it('B11 (#710) — schedules the prior-pad release at the scheduled onset, not currentTime', () => {

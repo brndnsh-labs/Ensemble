@@ -1353,7 +1353,18 @@ export function scheduleHarmonies(
 
             if (freq || m) {
                 const duration = (durationSteps || 1) * stepSecHarmony;
-                const baseVel = velocity * (playback.conductorVelocity || 1.0);
+                // Worker notes can be malformed at the dispatch boundary. Keep a
+                // non-finite velocity from poisoning the synth, MIDI, and visual
+                // audit paths with NaN; match the chord scheduler's established
+                // fallback idiom so the note still sounds audibly.
+                let safeVelocity = velocity;
+                if (!Number.isFinite(safeVelocity)) {
+                    console.warn(
+                        `scheduleHarmonies: non-finite velocity (${velocity}) — 0.5 fallback`,
+                    );
+                    safeVelocity = 0.5;
+                }
+                const baseVel = safeVelocity * (playback.conductorVelocity || 1.0);
                 const finalVel = baseVel * polyphonyComp;
 
                 playHarmonyNote(
