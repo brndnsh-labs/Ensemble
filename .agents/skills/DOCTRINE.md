@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=d4dd242cf053 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=164c94e3ff8c — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -287,14 +287,22 @@ The pipeline pushes + opens PRs. **Auto-merge SAFE stories** (none of §5's alwa
 AND green CI); **a judgment-call story's PR is left open for Brandon's manual merge** —
 report "ready for your merge: <url>" + *why* it's gated.
 
-There is **no server-side auto-merge-on-green** here, so the **poll-then-merge guard IS the
-enforcement**. Never use a fire-and-forget auto-merge flag — with nothing to wait on it merges
-immediately. Run the guard in the **background** (the poll takes minutes; a foreground `sleep` is
-harness-blocked):
+**Server-side auto-merge is enabled here**, and the forge enforces the required checks — so queue
+the merge and let it do the waiting:
 
 ```bash
-(until gh pr checks "<pr>" >/dev/null 2>&1; do sleep 30; done; gh pr checks "<pr>" --watch --interval 30 --fail-fast && gh pr merge "<pr>" --squash --delete-branch) &
+gh pr merge "<pr>" --auto --squash
 ```
+
+It cannot merge early: `--auto` waits until the repo's merge requirements are satisfied, and with
+required status checks configured those requirements *are* the checks. Prefer this to a
+client-side poll — enforcement survives a killed session, a crashed harness, or a denied background
+command, and it costs no polling quota.
+
+If it errors `Auto merge is not allowed for this repository`, the forge setting was turned off:
+the declaration in `.cycle/config.jsonc` is now a lie. Re-enable it, or drop
+`backend_overrides.auto_merge` and fall back to the poll guard. `cycle check --verify-forge`
+catches that drift before it bites.
 
 Closing rides on the PR body's `Closes #<n>` keyword — GitHub fires it anywhere in the body
 regardless of surrounding prose (§8), so a multi-phase PR must never place that token next to an
@@ -323,7 +331,7 @@ serves the new files the instant rsync finishes. `scripts/deploy.sh <test|prod>`
 the mechanics for both.
 
 **Prod is continuous.** A push to `main` only happens via a green PR merge (branch-
-protected, required CI contexts `CI / checks` + `CI / e2e-tests`), so the CI `deploy`
+protected, required CI contexts `checks` + `e2e-tests`), so the CI `deploy`
 job ships every merge to `ensemble.brndn.zip` automatically — including unattended
 overnight `/burndown`/`/nightly` merges. `/deploy-prod` is now the manual break-glass
 path (CI down, or forcing a known-good build), not the normal route.

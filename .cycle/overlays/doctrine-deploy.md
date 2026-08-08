@@ -4,7 +4,7 @@ serves the new files the instant rsync finishes. `scripts/deploy.sh <test|prod>`
 the mechanics for both.
 
 **Prod is continuous.** A push to `main` only happens via a green PR merge (branch-
-protected, required CI contexts `CI / checks` + `CI / e2e-tests`), so the CI `deploy`
+protected, required CI contexts `checks` + `e2e-tests`), so the CI `deploy`
 job ships every merge to `ensemble.brndn.zip` automatically — including unattended
 overnight `/burndown`/`/nightly` merges. `/deploy-prod` is now the manual break-glass
 path (CI down, or forcing a known-good build), not the normal route.
