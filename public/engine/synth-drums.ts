@@ -749,16 +749,16 @@ function noiseOffset(): number {
 
 function getBandLayerCount(state: EnsembleState): number {
     let layers = 0;
-    if ((state as any).bass?.enabled) {
+    if (state.bass?.enabled) {
         layers++;
     }
-    if ((state as any).chords?.enabled) {
+    if (state.chords?.enabled) {
         layers++;
     }
-    if ((state as any).harmony?.enabled) {
+    if (state.harmony?.enabled) {
         layers++;
     }
-    if ((state as any).soloist?.enabled) {
+    if (state.soloist?.enabled) {
         layers++;
     }
     return layers;
@@ -768,9 +768,9 @@ function getBandLayerCount(state: EnsembleState): number {
  * Keep cymbals supportive when the full arrangement is active.
  */
 export function getCymbalMixScale(state: EnsembleState, name: CymbalName): number {
-    const bandIntensity = clamp01((state.playback as any)?.bandIntensity ?? 0.5);
+    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
     const crowding = getBandLayerCount(state) / 4;
-    const genreFeel = (state.groove as any)?.genreFeel;
+    const genreFeel = state.groove?.genreFeel;
     const instrumentBase =
         name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;
     const intensityTrim = 1 - Math.max(0, bandIntensity - 0.6) * 0.18;
@@ -787,8 +787,8 @@ export function getCymbalMixScale(state: EnsembleState, name: CymbalName): numbe
  * Keep the snare present as the backbeat anchor, with a small lift for rock/blues.
  */
 export function getSnareMixScale(state: EnsembleState, velocity: number): number {
-    const bandIntensity = clamp01((state.playback as any)?.bandIntensity ?? 0.5);
-    const genreFeel = (state.groove as any)?.genreFeel;
+    const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
+    const genreFeel = state.groove?.genreFeel;
     const genreBoost =
         genreFeel === 'Rock' || genreFeel === 'Blues' ? 1.06 : genreFeel === 'Jazz' ? 1.03 : 1;
     const intensityLift = 1 + Math.max(0, bandIntensity - 0.55) * 0.04;
@@ -802,7 +802,7 @@ export function getSnareMixScale(state: EnsembleState, velocity: number): number
  * inflating cymbal presence.
  */
 export function getRhythmBodyMixScale(state: EnsembleState, name: string): number {
-    const genreFeel = (state.groove as any)?.genreFeel;
+    const genreFeel = state.groove?.genreFeel;
 
     if (name === 'Kick') {
         return genreFeel === 'Jazz' ? 1.05 : genreFeel === 'Blues' ? 1.04 : 1;
@@ -1650,7 +1650,7 @@ function setupNewCymbalHit(
     const voiceConfig = getCymbalVoiceConfig(
         family,
         ctx.hitVelocity,
-        (state.playback as any).bandIntensity || 0.5,
+        state.playback.bandIntensity || 0.5,
     );
     if (!voiceConfig) {
         safeDisconnect([ctx.panner]);
@@ -2137,7 +2137,7 @@ function playDrumSoundCurrent(
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
 
     if (name === 'Kick') {
-        const voiceConfig = getKickVoiceConfig(velocity, (playback as any).bandIntensity || 0.5);
+        const voiceConfig = getKickVoiceConfig(velocity, playback.bandIntensity || 0.5);
         const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
@@ -2299,11 +2299,7 @@ function playDrumSoundCurrent(
     } else if (name === 'HiHat' || name === 'Open' || name === 'Ride') {
         const isRide = name === 'Ride';
         const isClosedHat = name === 'HiHat';
-        const voiceConfig = getCymbalVoiceConfig(
-            name,
-            velocity,
-            (playback as any).bandIntensity || 0.5,
-        );
+        const voiceConfig = getCymbalVoiceConfig(name, velocity, playback.bandIntensity || 0.5);
         if (!voiceConfig) {
             safeDisconnect([panner]);
             return;
@@ -2429,7 +2425,7 @@ function playDrumSoundCurrent(
         const voiceConfig = getCymbalVoiceConfig(
             cymbalName,
             velocity,
-            (playback as any).bandIntensity || 0.5,
+            playback.bandIntensity || 0.5,
         );
         if (!voiceConfig) {
             safeDisconnect([panner]);
