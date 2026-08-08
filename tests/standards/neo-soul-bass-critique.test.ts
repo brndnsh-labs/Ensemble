@@ -91,11 +91,13 @@ describe('Neo-Soul Bassist Critique', () => {
     });
 
     it('should implement syncopated "hammer-ons" at high complexity', () => {
-        // The neo-soul bass engine (bass-engine.ts:399-431) fires anchors on the
-        // downbeat and beat 3, then on the 8th-note "& of each beat" picks
-        // probabilistically between root, 5th, and a "hammer-on" interval — a
-        // half or whole step above the root with shortened duration (0.2). That
-        // is the genre-defining ornament the test name claims to enforce.
+        // The neo-soul bass engine (the `style === 'neo' || groove.genreFeel ===
+        // 'Neo-Soul'` branch in getBassNote) fires root anchors on the downbeat
+        // and beat 3, then on the 8th-note "& of each beat" picks probabilistically
+        // among a 5th above root, a diatonic passing tone (a 2nd when in-scale,
+        // else the b7) at shortened duration (0.2), or a ghost note. That
+        // passing-tone branch is the genre-defining ornament the test name calls
+        // a "hammer-on."
         //
         // The previous metric just counted `p.info.mStep % 4 !== 0` and asserted
         // `> 5` over 16 bars (0.3 syncopated notes per bar). That captures "any

@@ -66,7 +66,8 @@ const simulate = (genreFeel, tsKey, intensity, numBars) => {
             instruments: [],
         },
         // why: applyGrooveOverrides reads arranger.timeSignature and recomputes
-        // stepsPerBar/loopStep INTERNALLY (groove-engine.ts:369-371) — without this it
+        // stepsPerBar/loopStep INTERNALLY (near the top of the function, groove-engine.ts)
+        // — without this it
         // falls back to 4/4 (16 steps) and the whole sweep silently measures a 4/4
         // engine while iterating odd-meter bars. [[tests-passing-on-wrong-path]] (S10 review).
         arranger: { timeSignature: tsKey, totalSteps: numBars * stepsPerBar },
