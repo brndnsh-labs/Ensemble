@@ -72,12 +72,15 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * 'funk': every note the funk branch emits already carries an authored
  * velocity naming the GESTURE that produced it — thumb slap on
  * The One (`BASS_AUTHORING_CEILING` = 1.25, `bass-engine.ts`'s
- * `stepInChord === 0` early return), secondary slap on beat 3 (`slapVel`, 1.2),
- * the "and" pop (`popVel`, 1.25), the
- * high-complexity "a" pop (1.15), hammer-on (1.1), chord-change approach (1.1),
- * and the dead-note chuck (0.5). (Every rung carried an identical
+ * `stepInChord === 0` early return), secondary slap on beat 3 (`slapVel`),
+ * the "and" pop (`popVel`), the
+ * high-complexity "a" pop, hammer-on, chord-change approach,
+ * and the dead-note chuck. The canonical rung table lives at the top of the
+ * `style === 'funk'` branch below — read it there, not here, so there is one
+ * copy to keep true. (Every rung carried an identical
  * `+ intensity*0.2` macro slope until #941 moved the lane's swell into the
- * single `bassMacroGain` term; the ladder's ratios are unchanged.)
+ * single `bassMacroGain` term, and #947 then re-spaced the flat rungs downward
+ * so the ladder is audible at verse intensity as well as chorus.)
  * That ladder IS funk's accent map. Layering a
  * blanket per-beat multiplier on top of it scales whatever gesture happens to
  * fall inside the accented beat — a muted 0.5 ghost chuck on a beat-2 16th gets
@@ -86,7 +89,7 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * early returns in `bass-engine.ts` as well — the kick-lock branch now lets
  * funk's chord start fall through to the authored slap instead of a generic
  * lock level, and the section-anticipation walk-in carries its own authored
- * 1.15 token instead of the `velocity`-derived product this exemption zeroed.)
+ * lead-in token instead of the `velocity`-derived product this exemption zeroed.)
  *
  * Two shapes were considered (#1342 is explicitly a design call):
  *   (a) move funk to a beats-1&3 accent set, so the generic metric weight
@@ -98,9 +101,9 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * strong-beat grid, so ANY per-beat multiplier is the wrong instrument; (a)
  * would only move the ghost-chuck category error from beats 2&4 onto 1&3.
  * Second, it is redundant: The One and the beat-3 slap already carry their own
- * authored levels (#1334), deliberately 0.05 apart so The One stays the
- * louder of the two — a further ×1.15 on both preserves nothing and buys
- * nothing. Third — the decisive one, measured by building (a) and running the
+ * authored levels (#1334, re-spaced to a full 0.95 dB apart by #947) so The One
+ * stays the louder of the two — a further ×1.15 on both preserves nothing and
+ * buys nothing. Third — the decisive one, measured by building (a) and running the
  * suite against it rather than reasoning about it: stacking a ×1.15 on The One
  * ON TOP of its own 1.25 token rails it against
  * `BASS_VELOCITY_DOMAIN_MAX` a whole intensity band earlier, which flattens the
@@ -120,10 +123,11 @@ export const EVEN_ACCENT_BASS_STYLES = new Set(['quarter', 'bossa']);
  * anchors beats 1 and 3 — with it, and with the generic accent gone, the
  * rendered order in a funk bar is The One on top, then the "and" pops and the
  * beat-3 slap interleaved by that envelope (a pop leaning INTO a strong beat
- * edges the slap; a pop landing just AFTER one sits under it), then the "a" pop,
- * then hammer-on/approach, then the chuck — the authored ladder read back with
- * only phrasing shading on it, instead of a metric multiplier re-sorting it.
- * Guarded by `tests/standards/funk-bass-critique.test.ts` (#1342).
+ * edges the slap; a pop landing just AFTER one sits under it), then the fingered
+ * lead-ins, then the "a" pop and hammer-on, then the chuck — the authored ladder
+ * read back with only phrasing shading on it, instead of a metric multiplier
+ * re-sorting it.
+ * Guarded by `tests/standards/funk-bass-critique.test.ts` (#1342, #947).
  *
  * Before adding a style here, check it actually authors a velocity on EVERY
  * return path — a style that leaves some notes at `result()`'s default 1.0 needs
@@ -1198,6 +1202,46 @@ export function getBassNoteStyle(
     }
 
     // --- FUNK STYLE (Slap & Pop) ---
+    //
+    // FUNK'S AUTHORED ARTICULATION LADDER (#947) — the canonical table. Every
+    // funk velocity literal in this file and in `bass-engine.ts` is one rung of
+    // it; edit the table and the rung together or the ladder stops meaning
+    // anything. Post-#941 these are FLAT articulation tokens (no intensity
+    // term) — the lane's macro swell is `bassMacroGain`'s single downstream job
+    // — so the rung-to-rung spacing below is intensity-INVARIANT and is the only
+    // dynamic contrast funk has inside a bar.
+    //
+    //   1.25  primary slap family — The One (thumb slap, `bass-engine.ts`) and
+    //         the "and" pop (`popVel`). Both sit ON `BASS_AUTHORING_CEILING`.
+    //   1.12  secondary slap — beat 3 (`slapVel`).            (-0.95 dB)
+    //   1.02  fingered lead-ins — the section walk-in (`bass-engine.ts`) and the
+    //         chord-change harmonic approach.                 (-0.81 dB)
+    //   0.92  ornament band — the "a" 16th flick-pop …        (-0.90 dB)
+    //   0.90  … and the hammer-on, a hair under it (no right-hand strike at all).
+    //   0.50  chuck / dead note — the ghost lane, a separate layer.  (-5.1 dB)
+    //
+    // why this shape: #942 fixed the ORDER of funk's accents but left every full
+    // note inside ~0.6 dB rendered at verse intensity — one dynamic level to a
+    // listener, i.e. the bar had a hierarchy on paper and none in the air. The
+    // rungs above are the real gesture classes of slap technique separated by an
+    // audible step: a thumb slap and a pop are struck hard; the beat-3 slap is
+    // the answering thump, not the anchor; a fretted lead-in has no percussive
+    // attack at all; the 16th ornaments are flicks the hand never gets full
+    // leverage on; the chuck carries no pitch. Widening had to go DOWNWARD — 1.25 is
+    // `BASS_AUTHORING_CEILING` and the top of the ladder was already there.
+    //
+    // why The One and the pop share the top rung: "on The One" is a STRUCTURAL
+    // idea, not a loudness ranking — in real slap bass the pop is very often the
+    // brightest event in the bar. The One stays nominally on top only via the
+    // genre-neutral metric envelope (+5% on the downbeat vs +2.5% into it), which
+    // is ordering, not dominance, and that is the intended contract (#947
+    // DECISION 2026-08-07). Do not "fix" this by pushing The One above the pop.
+    //
+    // Measured through the real product path (engine emission × `bassMacroGain` ×
+    // `bassVelocityToAmplitude`): the full-note population spans 0.57 dB -> 1.54 dB
+    // at verse (i=0.3), 1.03 dB -> 2.31 dB at i=0.5, and 1.95 dB -> 3.52 dB at
+    // chorus (i=0.9), all at the critique harness's complexity 0.8. Guarded by the
+    // #947 spread assertion in `tests/standards/funk-bass-critique.test.ts`.
     if (style === 'funk') {
         const stepInBeat = step % ts.stepsPerBeat;
         const isOne = stepInChord === 0;
@@ -1227,14 +1271,22 @@ export function getBassNoteStyle(
         // `isOne` — that's a pre-existing dead-code seam unrelated to #1295, flagged
         // out of scope rather than fixed here.
         if (isOne || isSecondarySlap) {
-            // why (#941): flat 1.2, was `1.2 + intensity * 0.2`. Funk's authored
-            // ladder (The One 1.25 / secondary slap 1.2 / pop 1.25 / "a" pop 1.15 /
-            // hammer-on 1.1 / chuck 0.5) IS its accent map, and every rung carried
-            // the SAME macro slope — so the slope encoded no hierarchy, it only
-            // pushed the whole ladder into the emission clamp from i≈0.7 up, where
-            // the top rungs flattened onto each other. Dropping it from every rung
-            // preserves the ladder exactly and un-rails the chorus.
-            const slapVel = 1.2;
+            // why (#941): flat, was `1.2 + intensity * 0.2`. Funk's authored
+            // ladder (see the table at the top of this branch) IS its accent map,
+            // and every rung carried the SAME macro slope — so the slope encoded
+            // no hierarchy, it only pushed the whole ladder into the emission
+            // clamp from i≈0.7 up, where the top rungs flattened onto each other.
+            // Dropping it from every rung preserved the ladder and un-railed the
+            // chorus.
+            //
+            // why 1.12 (#947): was 1.20, only 0.35 dB under the primary slap
+            // family — the "secondary" in "secondary slap" was a label, not a
+            // level. Beat 3 is the ANSWERING thump of the two-slap figure: a
+            // player commits their weight to The One and lets beat 3 land softer.
+            // 1.12 puts it 0.95 dB under the 1.25 rung — an authored step you can
+            // actually hear once the lane's macro gain is applied, and the first
+            // real rung of the widened ladder.
+            const slapVel = 1.12;
             // why: #1295 — a slap-bass downbeat is played KNOWING the pop is coming right
             // after it on the "and" (popProb is 60-100%): a real player leaves headroom
             // for that octave-up snap by choosing the lower hand position, not by
@@ -1292,9 +1344,15 @@ export function getBassNoteStyle(
                     );
                 const note = slappedRoot + 12;
                 // Pop velocity: triggers bright, snappy tone
-                // why (#941): flat 1.25, was `1.25 + intensity * 0.2` — same rung
-                // of funk's authored ladder as `slapVel` above, same reasoning, and
-                // still deliberately 0.05 above the secondary slap.
+                // why (#941): flat, was `1.25 + intensity * 0.2` — same reasoning
+                // as `slapVel` above (the slope was macro loudness, not
+                // articulation).
+                // why 1.25 UNCHANGED by #947: this is the top rung of the ladder
+                // and it stays there. The pop is the brightest event in a slap bar
+                // — the right-hand index snap on the upper string is the loudest
+                // thing a slap player produces — so it shares `BASS_AUTHORING_
+                // CEILING` with The One rather than being pushed under it. #947
+                // widened the ladder DOWNWARD from this rung, not upward past it.
                 const popVel = 1.25;
                 // Headroom fallback: never fold back down into an inversion — if the lift
                 // would clear the ceiling, hold the unison instead (same non-inverting
@@ -1324,7 +1382,17 @@ export function getBassNoteStyle(
             ) {
                 const note = baseRoot + 12;
                 const finalNote = note > absMax ? baseRoot : note;
-                return result(getFrequency(finalNote), 0.2, 1.15);
+                // why 0.92 (#947): was 1.15, which put this ornament within 1.1 dB
+                // of the structural "and" pop and made it the FLOOR of the verse
+                // population — the single reason funk's verse read as one dynamic
+                // level (the hammer-on and the harmonic approach below are both
+                // gated above i=0.6/0.75 and never sound at verse intensity, so
+                // this rung alone sets the bottom there). An "a" pop is a flick:
+                // the hand is already moving on to the next beat and never gets
+                // the leverage the "and" pop gets. 0.92 puts it 2.66 dB under The
+                // One — a real ornament band, still 5.3 dB clear of the 0.5 chuck
+                // lane so it never reads as a ghost.
+                return result(getFrequency(finalNote), 0.2, 0.92);
             }
 
             // Dead-note/Ghost chucks to maintain engine
@@ -1358,7 +1426,16 @@ export function getBassNoteStyle(
                 !isSoloistBusyLocal
             ) {
                 const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
-                return result(getFrequency(clampAndNormalize(hammerNote)), 0.2, 1.1);
+                // why 0.90 (#947): was 1.10 — louder than a fretted lead-in and
+                // only ~1.1 dB under the primary slap, for a note the right hand
+                // never touches. A hammer-on is sounded by the fretting hand
+                // alone, so it is physically the quietest FULL note in slap
+                // technique; it sits a hair under the "a" flick-pop (0.92) at the
+                // bottom of the ornament band. Floor is deliberate: 0.90 × the
+                // metric envelope's 0.93 trough = 0.837, which still clears the
+                // critique suite's 0.8 ghost/full-note split with margin, so a
+                // hammer-on is never mis-read as a chuck.
+                return result(getFrequency(clampAndNormalize(hammerNote)), 0.2, 0.9);
             }
         }
 
@@ -1371,7 +1448,14 @@ export function getBassNoteStyle(
         ) {
             const target = normalizeToRange(nextChord.rootMidi);
             const approach = scrambleHash((slapSeedBase + 6) | 0) < 0.5 ? target - 1 : target + 1;
-            return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.1);
+            // why 1.02 (#947): was 1.10. This is a FRETTED note — a chromatic
+            // walk-in to the next chord, plucked or pulled, with none of the
+            // percussive attack of a thumb slap or a pop. It shares the lead-in
+            // rung with the section walk-in in `bass-engine.ts` (same gesture
+            // class, and they were gratuitously 0.4 dB apart before), sitting
+            // 0.81 dB under the secondary slap so the approach reads as a
+            // lead-IN rather than competing with the slap it resolves into.
+            return result(getFrequency(clampAndNormalize(approach)), 0.4, 1.02);
         }
 
         return null;

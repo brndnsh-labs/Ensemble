@@ -1159,10 +1159,18 @@ export function getBassNote(
             // #1342), which left this walk-in — funk's one velocity-derived
             // emission — at a bare 1.05, the quietest full note in its bar at the
             // exact moment the comment above says it should pop (#942 review).
-            // Authored at 1.15 instead: above the ornament band (hammer-on 1.1,
-            // chuck 0.5) so the lead-in reads, below the slap family (1.2+) so it
-            // doesn't rival the downbeat it resolves into.
-            style === 'funk' ? 1.15 : velocity * 1.05,
+            // Authored explicitly instead: above the ornament band so the lead-in
+            // reads, below the slap family so it doesn't rival the downbeat it
+            // resolves into.
+            //
+            // why 1.02 (#947): was 1.15, which sat inside the slap family's own
+            // 1.15-1.25 huddle and helped flatten the bar. This is a FRETTED
+            // walk-in with no percussive attack, so it belongs on the lead-in rung
+            // of funk's articulation ladder — the same rung as the chord-change
+            // harmonic approach in `bass-styles.ts`, where the canonical ladder
+            // table lives. 0.81 dB under the secondary slap, 0.90 dB over the
+            // ornament band.
+            style === 'funk' ? 1.02 : velocity * 1.05,
         );
     }
 
@@ -1375,9 +1383,19 @@ export function getBassNote(
             // any other note — an ORDERING claim, not audible dominance: the
             // margin over the same-token "and" pop is only the metric
             // envelope's 1.05 vs 1.025 (~0.1-0.19 dB rendered, under the ~1 dB
-            // JND), because this token deliberately equals `popVel`. Making the
-            // downbeat audibly dominant is a token-retuning question, tracked
-            // as a follow-up (#942 review). #1342 removed the generic +15%
+            // JND), because this token deliberately equals `popVel`.
+            //
+            // #947 DECISION (2026-08-07): ordering is the intended contract and
+            // this token STAYS at the ceiling alongside `popVel`. "On The One" is
+            // a structural idea, not a loudness ranking — in real slap bass the
+            // pop is very often the brightest event in the bar — so The One is
+            // an anchor, not a mandatory loudness winner, and nothing here should
+            // push it above the pop. What #947 fixed instead was the bar's total
+            // dynamic RANGE: the rungs BELOW this one (secondary slap, fingered
+            // lead-ins, the "a" flick-pop, the hammer-on) were bunched within
+            // ~1.1 dB of it and were re-spaced downward. Canonical ladder table:
+            // the top of the `style === 'funk'` branch in `bass-styles.ts`.
+            // #1342 removed the generic +15%
             // backbeat accent from funk
             // (`GESTURE_ACCENT_BASS_STYLES`), which until then rode the "and"
             // pop (odd `intBeat`) and not The One (even `intBeat`) and made the

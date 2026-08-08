@@ -487,7 +487,13 @@ describe('Funk Bass Critique', () => {
             // why: ghost/chuck notes (authored 0.2-0.5) are a separate dynamic
             // layer, not part of the base-vs-accent hierarchy under test. 0.8
             // sits in the empty gap between the two populations at every
-            // intensity (measured: ghosts top out ~0.79, full notes start ~1.01).
+            // intensity: ghosts top out at 0.525 (the 0.5 chuck × the metric
+            // envelope's 1.05 peak), and the quietest full note funk emits is the
+            // hammer-on at 0.90 × the envelope's 0.93 trough = 0.837. #947
+            // narrowed that gap by design (it re-spaced the ornament rungs DOWN
+            // from 1.10/1.15 to 0.90/0.92 — see the ladder table in
+            // `bass-styles.ts`); the split stays at 0.8 because it is still in
+            // clear air, but any further widening downward has to move it.
             .filter((v) => v >= 0.8)
             .map((v) => bassVelocityToAmplitude(v * conductorGain(bandIntensity)));
 
@@ -589,12 +595,96 @@ describe('Funk Bass Critique', () => {
         //
         // Honest cost of #1342, stated rather than buried (#942 review): the
         // backbeat accent it removed was carrying the only above-JND full-note
-        // contrast in the VERSE — post-fix the i=0.3 spread runs ~0.6-0.8 dB,
+        // contrast in the VERSE — post-fix the i=0.3 spread ran ~0.6-0.8 dB,
         // one dynamic level to a listener, separated by the metric envelope
         // alone. Right trade (it was WRONG contrast — a rock 2&4 lift on a funk
-        // line), but the completion is widening funk's own authored ladder at
-        // low intensity, tracked as #947. Watch the i=0.3 log line above until
-        // that lands.
+        // line), and #947 completed it by re-spacing funk's own authored ladder
+        // downward (secondary slap 1.20 -> 1.12, lead-ins 1.15/1.10 -> 1.02,
+        // "a" pop 1.15 -> 0.92, hammer-on 1.10 -> 0.90). The i=0.3 spread logged
+        // above now runs 1.54 dB and has its own dedicated assertion below.
+    });
+
+    it('spreads the funk VERSE across an audible dynamic range (#947)', () => {
+        // #947's acceptance. #942 fixed the ORDER of funk's accents; this is the
+        // RANGE. At verse intensity every full note in the bar used to render
+        // within 0.57 dB — under the ~1 dB JND for a low-register tone in a mix,
+        // i.e. one dynamic level to a listener. The bar had a hierarchy on paper
+        // (six authored gesture tokens) and none in the air, because the tokens
+        // were bunched: 1.25 slap / 1.25 pop / 1.20 secondary slap / 1.15 "a" pop
+        // / 1.15 walk-in / 1.10 hammer-on, a 1.15 dB authored span that the
+        // sqrt half of `bassVelocityToAmplitude` then halves.
+        //
+        // Measured at i=0.3 specifically, not at chorus: this is the intensity
+        // where the problem lives. The macro gain is 0.73 there, so the whole
+        // population sits under unity and every authored dB is COMPRESSED to
+        // half by `bassVelocityToAmplitude`'s `sqrt` branch — a verse needs
+        // roughly twice the authored spread a chorus does to read the same.
+        //
+        // SCOPE, stated rather than buried: `complexity` is 0.8 here (this
+        // file's shared harness value), and TWO of the rungs #947 re-spaced are
+        // gated behind `playback.complexity > 0.7` — the "a" flick-pop and the
+        // hammer-on. Production's DEFAULT complexity is 0.3 (`state/playback.ts`),
+        // where funk emits only slaps, pops and 0.5 chucks, and the full-note
+        // spread is the secondary slap's 0.95 dB authored step alone (0.36 dB ->
+        // 0.47 dB rendered across #947). That is arguably the right shape — a
+        // simple groove IS a two-level figure, struck notes over chucks — but it
+        // means this assertion measures the ORNAMENTED bar, not every bar. If the
+        // low-complexity verse turns out to read flat by ear, the fix is another
+        // rung, not a retune of these; filed as a follow-up, not fixed here.
+        //
+        // NOT ASSERTED, deliberately (#947 DECISION 2026-08-07): that The One
+        // out-renders the pop. "On The One" is a structural idea, not a loudness
+        // ranking — the pop is allowed to be the brightest authored event in the
+        // bar, as it usually is on a real slap bass. The ordering claim (nothing
+        // ever LOUDER than The One) is the dominance sweep further down; this
+        // test is about the bar's total range and says nothing about its top.
+        const bandIntensity = 0.3;
+        const verse = renderedFullNotes(
+            simulatePerformance(64, { playback: { bandIntensity, bpm: 110, complexity: 0.8 } }),
+            bandIntensity,
+        );
+        const loudest = Math.max(...verse);
+        const spread = dB(loudest / Math.min(...verse));
+        // why: the anti-outlier half. `spread` is an extrema metric, so a single
+        // stray quiet note could satisfy it while the bar still played at one
+        // level — the same trap the #1331 chorus test caught with `modalShare`.
+        // This asks how much of the bar actually LIVES in the quiet band.
+        const quiet = verse.filter((a) => dB(loudest / a) >= 1.0);
+        const quietShare = quiet.length / verse.length;
+
+        console.log(
+            [
+                '',
+                '--- #947 FUNK VERSE DYNAMIC RANGE (i=0.3) ---',
+                `n=${verse.length}  spread=${spread.toFixed(2)}dB  ` +
+                    `quiet-band share=${(quietShare * 100).toFixed(1)}%  ` +
+                    `(pre-#947: 0.57dB / 0.0% — the whole bar inside one JND)`,
+                '---------------------------------------------',
+            ].join('\n'),
+        );
+
+        // intent: the sample can't collapse. The low-intensity lay-out branch
+        // (`bass-engine.ts`, raw `Math.random`, ~60% skip) makes MEMBERSHIP
+        // stochastic at this intensity, so this is the guard that a thin bar
+        // can't pass the spread check vacuously ; measured 118-149 over 40 runs
+        // at 64 bars ; floor 100.
+        expect(verse.length).toBeGreaterThan(100);
+
+        // intent (the acceptance): the full-note population spans at least the
+        // ~1 dB JND, so a verse funk bar reads as more than one dynamic level.
+        // Measured 1.54 dB — and IDENTICAL on all 40 probe runs despite the
+        // stochastic membership, because both extremes are structurally always
+        // present (The One is on every bar downbeat, and the 0.92 "a" flick-pop
+        // recurs ~10-22× per 64 bars). Floor 1.0 = 54% headroom. Mutation-tested
+        // both directions: restoring the pre-#947 tokens measures 0.57 dB (RED),
+        // and the retuned ladder is green at 1.54 dB.
+        expect(spread).toBeGreaterThanOrEqual(1.0);
+
+        // intent: the quiet end is a real population, not one outlier ; measured
+        // 7.9-15.7% over 40 runs ; floor 5% (~37% headroom under the observed
+        // minimum). Pre-#947 this was exactly 0% — nothing in the bar sat a full
+        // dB below the loudest note.
+        expect(quietShare).toBeGreaterThanOrEqual(0.05);
     });
 
     it('swells the bass 6-8 dB from verse to chorus, one intensity term only (#1331 4b / #941)', () => {
