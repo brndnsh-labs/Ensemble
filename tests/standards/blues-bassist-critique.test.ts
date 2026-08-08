@@ -166,6 +166,43 @@ describe('Blues Bassist Critique', () => {
         expect(avgShort).toBeLessThan(0.85);
     });
 
+    it('should clip kick-triggered blues notes to 0.4 beats', () => {
+        const state = {
+            playback: { bandIntensity: 0.6, complexity: 0.5 },
+            groove: {
+                genreFeel: 'Blues',
+                lastDrumPreset: 'Blues Shuffle',
+                measures: 1,
+                instruments: [{ name: 'Kick', steps: [1] }],
+            },
+            arranger: { timeSignature: '4/4', totalSteps: 16 },
+            soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
+        };
+        getState.mockReturnValue(state);
+
+        const chordC7 = { rootMidi: 60, intervals: [0, 4, 7, 10], quality: '7', beats: 4 };
+        const tsConfig = TIME_SIGNATURES['4/4'];
+        const info = getStepInfo(0, tsConfig, [], TIME_SIGNATURES);
+
+        expect(isBassActive(state, 'blues', 0, 0, info, {})).toBe(true);
+        const note = getBassNote(
+            state,
+            chordC7,
+            null,
+            info.beatIndex,
+            null,
+            48,
+            'blues',
+            0,
+            0,
+            0,
+            {},
+            info,
+        );
+
+        expect(note.durationSteps).toBeCloseTo(tsConfig.stepsPerBeat * 0.4);
+    });
+
     it('should remain strictly quarter-note based at low intensity', () => {
         const lowIntensityPerf = simulatePerformance(32, {
             playback: { bandIntensity: 0.1, complexity: 0.1 },

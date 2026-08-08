@@ -703,14 +703,15 @@ export function getBassNote(
             } else if (style === 'funk') {
                 durationSteps = 0.8;
             } else if (
-                (style as any) === 'disco' ||
+                style === 'disco' ||
                 style === 'metal' ||
                 style === 'neo' ||
                 style === 'walking-ska' ||
-                style === 'quarter'
+                style === 'quarter' ||
+                style === 'blues'
             ) {
                 durationSteps =
-                    style === 'quarter' || (style as any) === 'blues'
+                    style === 'quarter' || style === 'blues'
                         ? ts.stepsPerBeat * 0.4
                         : style === 'neo'
                           ? ts.stepsPerBeat * 0.5
