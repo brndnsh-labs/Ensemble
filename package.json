@@ -54,7 +54,7 @@
         "@biomejs/biome": "^2.4.10",
         "@playwright/test": "^1.59.1",
         "@preact/preset-vite": "^2.10.5",
-        "@size-limit/preset-app": "^13.0.1",
+        "@size-limit/file": "^13.0.1",
         "@types/chai": "^5.2.3",
         "@vitest/browser": "^4.1.10",
         "@vitest/browser-playwright": "^4.1.10",
