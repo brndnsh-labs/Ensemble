@@ -2,7 +2,7 @@
 name: deploy-prod
 description: Deploy Ensemble to production — the gated ritual. Preflight (clean pushed main, what's actually shipping, any migration plan), then STOP for Brandon's explicit go, then deploy, then independently verify the public origin. Includes the rollback path. Never runs unattended. Usage `/deploy-prod`.
 ---
-<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=9a184e9cf489 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=77f9fa34eadc — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-prod — ship to production
 
@@ -82,7 +82,11 @@ have a go, you don't.
 
 ## 3. Deploy
 
-`./scripts/deploy.sh prod` — backup → migrate → deploy → verify as one sequence, streamed.
+`./scripts/deploy.sh prod`
+
+What that command does — and does *not* — do is the `deploy` overlay's job to say. Don't
+assume it takes a backup, runs migrations, or waits for a healthy result; assume none of
+those unless the overlay says otherwise.
 
 ## 4. Verify independently
 
