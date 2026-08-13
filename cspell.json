@@ -440,6 +440,8 @@
         "scripts/*.mjs",
         "tests/**/fixtures/**",
         "tests/**/__snapshots__/**",
-        "public/*.svg"
+        "public/*.svg",
+        "scripts/calibration/*.json",
+        "scripts/calibration/*.jsonl"
     ]
 }
