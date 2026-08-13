@@ -15,6 +15,7 @@
         "format": "npx @biomejs/biome check --write .",
         "lint": "npx @biomejs/biome check .",
         "lint:docs": "node scripts/validate-docs.ts",
+        "spellcheck": "cspell --no-must-find-files .",
         "depcheck": "biome lint --only=suspicious/noImportCycles .",
         "knip": "knip",
         "jscpd": "jscpd public --no-tips",
