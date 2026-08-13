@@ -1,6 +1,7 @@
 {
     "version": "0.2",
-    "language": "en",
+    "language": "en,en-GB",
+    "useGitignore": true,
     "words": [
         "AABA",
         "Ableton",
@@ -97,6 +98,7 @@
         "crossfade",
         "crossfades",
         "Csus",
+        "darkreader",
         "dBFS",
         "Dbmaj",
         "dbmaj",
@@ -106,6 +108,7 @@
         "decorrelation",
         "dedup",
         "deepsignal",
+        "depcruise",
         "desync",
         "desynced",
         "desyncs",
@@ -119,6 +122,7 @@
         "downmix",
         "downscope",
         "dpdm",
+        "dragstart",
         "drange",
         "drawbar",
         "drawtext",
@@ -201,6 +205,7 @@
         "Jank",
         "jscpd",
         "Karoryfer",
+        "keygen",
         "kickless",
         "Karplus",
         "keyspace",
@@ -217,6 +222,7 @@
         "lintstagedrc",
         "lockfiles",
         "Locrian",
+        "lookaheads",
         "loudnorm",
         "lowpass",
         "Maceo",
@@ -245,6 +251,7 @@
         "nonlinearly",
         "noopener",
         "nosniff",
+        "nums",
         "octaveNode",
         "oneline",
         "onmidimessage",
@@ -342,6 +349,7 @@
         "synth-utils",
         "synthwave",
         "synthy",
+        "tailnet",
         "Thelonious",
         "theory-scales",
         "timbral",
@@ -390,6 +398,7 @@
         "viio",
         "viiø",
         "Virtuosity",
+        "vite",
         "Viterbi",
         "vitest",
         "Vivm",
@@ -423,5 +432,14 @@
         "touchend",
         "focusout"
     ],
-    "ignorePaths": ["node_modules", "dist", "coverage", ".git", "scripts/*.mjs"]
+    "ignorePaths": [
+        "node_modules",
+        "dist",
+        "coverage",
+        ".git",
+        "scripts/*.mjs",
+        "tests/**/fixtures/**",
+        "tests/**/__snapshots__/**",
+        "public/*.svg"
+    ]
 }
