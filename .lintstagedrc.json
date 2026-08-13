@@ -1,8 +1,5 @@
 {
-    "*.{js,mjs,ts,tsx,json,md}": [
-        "biome check --write --no-errors-on-unmatched",
-        "cspell --no-must-find-files || true"
-    ],
+    "*.{js,mjs,ts,tsx,json,md}": ["biome check --write --no-errors-on-unmatched"],
     "public/**/*.{ts,tsx}": [
         "node scripts/check-mutations.ts",
         "npm run depcheck",
