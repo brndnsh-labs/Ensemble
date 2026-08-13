@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=164c94e3ff8c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=a77e8f5e6ca8 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -478,8 +478,21 @@ file* — neither fixes, branches, or merges.
    - **Unsure → no status label.** It lands in the untriaged pile (§1) for a human look — the
      filing-time twin of §5's "when unsure, exclude and surface."
 
-   A finding that touches a §5 brake surface is **never** deterministic, however certain the fix
-   looks — certainty and safety are different axes, and pickable requires both.
+   On a §5 brake surface, test the **direction of the change, not the surface it touches**. A
+   finding there is deterministic only when it *tightens* — more validation, more redaction,
+   stricter gates, fewer accepted inputs — **and** §4's gates can demonstrate both the tightening
+   and that nothing legitimate was lost. Anything that loosens, exempts, widens, or re-opens is
+   **never** deterministic, however small the diff: certainty and safety are different axes, and
+   pickable requires both.
+
+   The second half of that test is load-bearing, because tightening is not automatically safe. A
+   redaction rule greedy enough to eat the evidence a validator needs, or a gate strict enough to
+   reject legitimate traffic, fails *closed* — which is the quiet direction, and the one that
+   hides. Pickable means the gates prove both halves; if they can only prove the tightening, it is
+   interpretive.
+
+   A brake entry describing an **irreversible action** rather than a code change — running a
+   destructive verb, writing to production — has no direction to test and never becomes pickable.
 6. **Budget.** Filing zero is a success. A sweep that files 20 low-grade issues has made the queue
    worse, not better. Cap a focused pass at **3–5** findings; a multi-lens sweep caps *per lens* and
    stays in single digits overall. Rank by (impact × how-actionable) and file only the top ones —
