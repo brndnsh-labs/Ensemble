@@ -25,7 +25,7 @@ Three reads on this data:
 - **Side ratio > 2% is the real stereo discriminator, not correlation.** Daft Punk's "Get Lucky" sits at correlation 0.94 (almost in our engine's mono range) but sounds genuinely stereo because side energy is 3%. Bill Evans at correlation 0.095 / side 45% is also great — but that's a 1961 hard-pan we don't need to imitate. Our engine at 0.984 / side 0.9% is the outlier on side energy across every reference. Target the side ratio, not the correlation number.
 - **The 7.2 kHz air probe may be in the wrong place.** Get Lucky's audibly aggressive hi-hat content registers only 0.5% at our probe — *lower than our engine.* That can't be right; the probe is likely missing where modern hat / shaker energy actually lives (~5 kHz). S3a investigates before S3b commits to engine work.
 
-Calibration baked in at `scripts/mix-report-utils.ts` (`DEFAULT_FINDING_THRESHOLDS` + per-scene `findingThresholds`); the raw reference numbers persist at `tmp/references/calibration.json`.
+Calibration baked in at `scripts/mix-report-utils.ts` (`DEFAULT_FINDING_THRESHOLDS` + per-scene `findingThresholds`); the raw reference numbers persist at `scripts/calibration/calibration.json`.
 
 ## DoD pattern (different from Epic 0–5)
 
@@ -39,7 +39,7 @@ These stories change the **shared audio graph and the conductor**, not individua
 
 ## Source findings
 
-`scripts/mix-report-utils.ts` `summarizeRenderedFindings` — the four architectural findings calibrated against `tmp/references/calibration.json`.
+`scripts/mix-report-utils.ts` `summarizeRenderedFindings` — the four architectural findings calibrated against `scripts/calibration/calibration.json`.
 
 Memory references:
 - `feedback_synth_audit_cross_layer.md` — frozen-Current hygiene exception applies here (any mix-bus change touches the audio path used by both `current` and `new` voices).
@@ -58,7 +58,7 @@ Every instrument bus is dead-center. Reference span is wide: Bill Evans 1961 at 
 - Side ratio doesn't exceed 0.20 (don't out-pan Miles).
 - Listening: no instrument feels hard-panned; mono compatibility intact (no phase cancellation when L+R summed).
 
-**Effort:** ~3h. **Model:** opus (placement by ear). **Reviewer:** synth-graph-reviewer. **Source:** Reference comparison (8 tracks across 6 genres; see `tmp/references/calibration.json`).
+**Effort:** ~3h. **Model:** opus (placement by ear). **Reviewer:** synth-graph-reviewer. **Source:** Reference comparison (8 tracks across 6 genres; see `scripts/calibration/calibration.json`).
 
 **Status — partial (2026-05-25, overnight branch `overnight/synth-epic-7-2026-05-25`).** Bus-pan widening + Haas-style stereo widener on the reverb wet. Acceptance is partially met — see `tmp/overnight-report.md` for the full audit and the morning A/B WAVs in `tmp/references/{before,after}-s1/`. Summary against the 4 default scenes (`full+solo` stem, which is what plays in real sessions):
 
@@ -105,7 +105,7 @@ Implementation lever: read `groove.genreFeel` plus instrumentation flags in `ini
 
 **Status — shipped 2026-05-24 (re-calibration close-out).** Hardcoded `groove.genreFeel === 'Jazz'` branch in `initAudio()` applies for jazz only: bass-bus highpass 20 → 55 Hz, bass weight low-shelf +2 dB → -1 dB, chord low-shelf -2 dB → -5 dB, drum-bus highpass 40 → 95 Hz. The bus-EQ lever moves jazz-ride sub+low only 91.3% → 90.8% in isolation — bus EQ alone is too small a lever to close the gap to Miles "So What" at 47%, because the bass voice itself produces a fundamentally bass-heavy spectrum (the synthesized electric-bass topology — sine+triangle thump + sawtooth growl + dual-lowpass — IS an electric bass; no EQ can make it upright). Real movement would need a second bass voice (upright/acoustic) plus a softer jazz kick voicing — an instrument-addition story, not an EQ story. Owner deferred 2026-05-24 ("pandora's box") in favor of re-honest calibration instead.
 
-The re-calibration: Miles "So What" (1959, Paul Chambers upright bass) was the wrong reference for our jazz-ride scene whose synthesized bass is electric — comparing an electric-bass engine to an upright-bass recording produced an unachievable 47% target. Two electric-bass jazz references were added to `tmp/references/calibration.json`:
+The re-calibration: Miles "So What" (1959, Paul Chambers upright bass) was the wrong reference for our jazz-ride scene whose synthesized bass is electric — comparing an electric-bass engine to an upright-bass recording produced an unachievable 47% target. Two electric-bass jazz references were added to `scripts/calibration/calibration.json`:
 
 | reference | bass | sub+low |
 |---|---|---|

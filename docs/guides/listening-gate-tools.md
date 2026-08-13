@@ -124,9 +124,10 @@ the **genre-agnostic** `DEFAULT_FINDING_THRESHOLDS` — these are looser than
 the per-scene thresholds in `DEFAULT_MIX_REPORT_SCENES` and are tuned not to
 false-positive on pro reference mixes.
 
-`tmp/references/calibration.json` is the persisted reference baseline
+`scripts/calibration/calibration.json` is the persisted reference baseline
 (Miles Davis "So What" / Chic / STP / B.B. King), used to calibrate the
-per-scene thresholds at `scripts/mix-report-utils.ts`.
+per-scene thresholds at `scripts/mix-report-utils.ts`. It is tracked in git —
+the WAV renders it was measured against stay disposable under `tmp/references/`.
 
 ## `npm run --silent mix:verify -- --scene=<id>`
 

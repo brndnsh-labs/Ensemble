@@ -1,0 +1,356 @@
+{
+    "analyses": [
+        {
+            "path": "tmp/references/jazz-ride-full-ALPHA.wav",
+            "label": "jazz-ride-full-ALPHA.wav",
+            "durationSeconds": 16.1630625,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -7.750600346798995,
+            "rmsDb": -23.376644509744043,
+            "crestDb": 15.626044162945048,
+            "stereo": {
+                "correlation": 0.9839754206080077,
+                "sideRatio": 0.008687331668013751
+            },
+            "probes": {
+                "sub": 0.4860350817910993,
+                "low": 0.23807219145107214,
+                "lowMid": 0.08367388972495844,
+                "mid": 0.12224293854666282,
+                "presence": 0.03287936309336338,
+                "air5k": 0.024336626709766596,
+                "air": 0.012759908683077267,
+                "centroid": 522.1479210811699
+            },
+            "transients": {
+                "maxDelta": 0.059245675802230835,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 0.3511668829306338
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans - So What [9rD3zdscDRQ].mp3",
+            "label": "Miles Davis, John Coltrane, Cannonball Adderley, Bill Evans - So What [9rD3zdscDRQ].mp3",
+            "durationSeconds": 562.4,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -1.1001676188089566,
+            "rmsDb": -20.67546046601768,
+            "crestDb": 19.575292847208722,
+            "stereo": {
+                "correlation": 0.5887631077220729,
+                "sideRatio": 0.20919876786998873
+            },
+            "probes": {
+                "sub": 0.3025269167172774,
+                "low": 0.16061105910666906,
+                "lowMid": 0.25545320206211025,
+                "mid": 0.17465400223619398,
+                "presence": 0.03772418387498395,
+                "air5k": 0.02515331809318849,
+                "air": 0.043877317909577,
+                "centroid": 859.674376562618
+            },
+            "transients": {
+                "maxDelta": 0.45782630145549774,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 0.4629292284657976
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Bill Evans Trio - All Of You (Live At The Village Vanguard, 1961 ⧸ Take 2) [qeylrI0cXG8].mp3",
+            "label": "Bill Evans Trio - All Of You (Live At The Village Vanguard, 1961 ⧸ Take 2) [qeylrI0cXG8].mp3",
+            "durationSeconds": 495.73333333333335,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -2.4735288042624095,
+            "rmsDb": -22.911199902580933,
+            "crestDb": 20.437671098318525,
+            "stereo": {
+                "correlation": 0.09497613067409919,
+                "sideRatio": 0.4551169509022378
+            },
+            "probes": {
+                "sub": 0.4919802919480527,
+                "low": 0.33192236904810074,
+                "lowMid": 0.10599440651175093,
+                "mid": 0.0215370408531329,
+                "presence": 0.011991524970673316,
+                "air5k": 0.012475336075849573,
+                "air": 0.02409903059244007,
+                "centroid": 407.2688350739172
+            },
+            "transients": {
+                "maxDelta": 0.5902601480484009,
+                "spikeCount": 20,
+                "spikeRate": 0.04034427280898134,
+                "threshold": 0.3576102994621345
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Steely Dan - Aja [CYZwVf07tHA].mp3",
+            "label": "Steely Dan - Aja [CYZwVf07tHA].mp3",
+            "durationSeconds": 480.46666666666664,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -0.18012265591033025,
+            "rmsDb": -20.982732575878043,
+            "crestDb": 20.80260991996771,
+            "stereo": {
+                "correlation": 0.6322113689464625,
+                "sideRatio": 0.18390122176458418
+            },
+            "probes": {
+                "sub": 0.47150462984984887,
+                "low": 0.09613824667588775,
+                "lowMid": 0.13327289050264446,
+                "mid": 0.11769875607532468,
+                "presence": 0.09992597604406372,
+                "air5k": 0.05562459537173657,
+                "air": 0.025834905480493983,
+                "centroid": 954.0191160335628
+            },
+            "transients": {
+                "maxDelta": 0.9124060273170471,
+                "spikeCount": 248,
+                "spikeRate": 0.5208667197713858,
+                "threshold": 0.44854133508061433
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Weather Report - Birdland [SvhmaNlLgRM].mp3",
+            "label": "Weather Report - Birdland [SvhmaNlLgRM].mp3",
+            "durationSeconds": 356.76,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -0.3547518833067378,
+            "rmsDb": -19.725765655968203,
+            "crestDb": 19.371013772661467,
+            "stereo": {
+                "correlation": 0.4333419571156449,
+                "sideRatio": 0.29302580384100757
+            },
+            "probes": {
+                "sub": 0.49845215244346364,
+                "low": 0.19752862779861566,
+                "lowMid": 0.08404391093998896,
+                "mid": 0.16209364420534175,
+                "presence": 0.023117238961199108,
+                "air5k": 0.021257675884358705,
+                "air": 0.013506749767032098,
+                "centroid": 519.8567142367338
+            },
+            "transients": {
+                "maxDelta": 0.4950989782810211,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 0.5165640178002936
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Chic, Chic - I Want Your Love [Lgc2MUkY0iQ].mp3",
+            "label": "Chic, Chic - I Want Your Love [Lgc2MUkY0iQ].mp3",
+            "durationSeconds": 415.68333333333334,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": 0.658286708864275,
+            "rmsDb": -15.28181482484269,
+            "crestDb": 15.940101533706965,
+            "stereo": {
+                "correlation": 0.8342213138595486,
+                "sideRatio": 0.08290057321573856
+            },
+            "probes": {
+                "sub": 0.4676277750256411,
+                "low": 0.26351609389220265,
+                "lowMid": 0.16263697879727007,
+                "mid": 0.044344762740515166,
+                "presence": 0.02363487922392539,
+                "air5k": 0.02182913956001672,
+                "air": 0.016410370760429067,
+                "centroid": 464.5747634320886
+            },
+            "transients": {
+                "maxDelta": 0.8773055672645569,
+                "spikeCount": 2,
+                "spikeRate": 0.004822971814753672,
+                "threshold": 0.8617929425489597
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Daft Punk, Pharrell Williams, Nile Rodgers - Get Lucky (feat. Pharrell Williams and Nile Rodgers) [4D7u5KF7SP8].mp3",
+            "label": "Daft Punk, Pharrell Williams, Nile Rodgers - Get Lucky (feat. Pharrell Williams and Nile Rodgers) [4D7u5KF7SP8].mp3",
+            "durationSeconds": 369.62666666666667,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": 1.6796745128358155,
+            "rmsDb": -12.488900268788438,
+            "crestDb": 14.168574781624253,
+            "stereo": {
+                "correlation": 0.9401230569422925,
+                "sideRatio": 0.03012345893603545
+            },
+            "probes": {
+                "sub": 0.4616936920779282,
+                "low": 0.2879865655987745,
+                "lowMid": 0.1464793469031772,
+                "mid": 0.08312427481448885,
+                "presence": 0.0092283283999517,
+                "air5k": 0.006295170487318223,
+                "air": 0.005192621718361153,
+                "centroid": 301.5082156748565
+            },
+            "transients": {
+                "maxDelta": 0.817832313477993,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 1.190967185859988
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Stone Temple Pilots - Interstate Love Song [BsdXUx61un8].mp3",
+            "label": "Stone Temple Pilots - Interstate Love Song [BsdXUx61un8].mp3",
+            "durationSeconds": 193.61333333333334,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": 2.14398563694375,
+            "rmsDb": -11.13014148993883,
+            "crestDb": 13.27412712688258,
+            "stereo": {
+                "correlation": 0.6948765113848278,
+                "sideRatio": 0.15338348089894388
+            },
+            "probes": {
+                "sub": 0.2436373839972246,
+                "low": 0.4614754753601908,
+                "lowMid": 0.13314788048793852,
+                "mid": 0.057645713190898354,
+                "presence": 0.047677117720274574,
+                "air5k": 0.0401175164250074,
+                "air": 0.01629891281846566,
+                "centroid": 638.9024014013338
+            },
+            "transients": {
+                "maxDelta": 0.9367689192295074,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 1.3923797900404042
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Queens Of The Stone Age - No One Knows [z_59a_hnYdU].mp3",
+            "label": "Queens Of The Stone Age - No One Knows [z_59a_hnYdU].mp3",
+            "durationSeconds": 278.70666666666665,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": 1.7537821419239343,
+            "rmsDb": -9.778616228372716,
+            "crestDb": 11.53239837029665,
+            "stereo": {
+                "correlation": 0.729674489856348,
+                "sideRatio": 0.13522562952294864
+            },
+            "probes": {
+                "sub": 0.4753235213728591,
+                "low": 0.3289705706021791,
+                "lowMid": 0.08017430937334862,
+                "mid": 0.06716018426745415,
+                "presence": 0.019492298307205662,
+                "air5k": 0.021263030840398437,
+                "air": 0.007616085236554854,
+                "centroid": 387.9311161613663
+            },
+            "transients": {
+                "maxDelta": 0.9619509279727936,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 1.6219565248804617
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "B.B. King - The Thrill Is Gone [9x9x3aAF8GA].mp3",
+            "label": "B.B. King - The Thrill Is Gone [9x9x3aAF8GA].mp3",
+            "durationSeconds": 378.9066666666667,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": -1.1523195849230077,
+            "rmsDb": -18.8154712104362,
+            "crestDb": 17.663151625513194,
+            "stereo": {
+                "correlation": 0.7157123473870504,
+                "sideRatio": 0.14255588085624196
+            },
+            "probes": {
+                "sub": 0.686483664885302,
+                "low": 0.09658882035857638,
+                "lowMid": 0.10147167399258859,
+                "mid": 0.05022948433037977,
+                "presence": 0.02010646630285814,
+                "air5k": 0.009816389832368187,
+                "air": 0.035303500297926796,
+                "centroid": 503.0654321457989
+            },
+            "transients": {
+                "maxDelta": 0.31270337104797363,
+                "spikeCount": 0,
+                "spikeRate": 0,
+                "threshold": 0.5730551973696334
+            },
+            "loopRmsDb": null,
+            "arc": null
+        },
+        {
+            "path": "Reel Big Fish - Beer [nMpxb-PsEss].mp3",
+            "label": "Reel Big Fish - Beer [nMpxb-PsEss].mp3",
+            "durationSeconds": 210.53333333333333,
+            "sampleRate": 48000,
+            "channelCount": 2,
+            "peakDb": 0.8491709274701004,
+            "rmsDb": -14.34525539262565,
+            "crestDb": 15.194426320095749,
+            "stereo": {
+                "correlation": 0.8162910135187306,
+                "sideRatio": 0.0959965282933906
+            },
+            "probes": {
+                "sub": 0.6522425854810983,
+                "low": 0.25244751779152946,
+                "lowMid": 0.03228323951652546,
+                "mid": 0.017033620185083653,
+                "presence": 0.03044990012964702,
+                "air5k": 0.007179779978267435,
+                "air": 0.00836335691784859,
+                "centroid": 285.15324888390205
+            },
+            "transients": {
+                "maxDelta": 1.0584610104560852,
+                "spikeCount": 2,
+                "spikeRate": 0.009499685223971903,
+                "threshold": 0.9587541960524506
+            },
+            "loopRmsDb": null,
+            "arc": null
+        }
+    ]
+}

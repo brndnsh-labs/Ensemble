@@ -10,7 +10,7 @@ import {
 const DEFAULT_SEED = 'MIX_AUDIT';
 
 // Per-scene finding thresholds calibrated 2026-05-24 against pro reference
-// mixes via `npm run mix:analyze` (see tmp/references/calibration.json):
+// mixes via `npm run mix:analyze` (see scripts/calibration/calibration.json):
 //   Jazz target  — Miles Davis "So What": sub+low 47%, air 4.5%, corr 0.59
 //   Rock target  — Stone Temple Pilots "Interstate Love Song": 73% / 1.7% / 0.70
 //   Blues target — B.B. King "The Thrill Is Gone": 79% / 3.6% / 0.72
