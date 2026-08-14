@@ -194,6 +194,12 @@ test.describe('Instrument settings — mobile @mobile', () => {
         const settings = settingsSurfaceFor(page, 'Chords');
         await expect(settings).toBeVisible();
 
+        // `StudioSurface` renders before useModalA11y's effect adds it to the
+        // shared Escape stack. Its aria-label is set by that same effect just
+        // before registration, so this waits for the top-sheet contract rather
+        // than racing the effect with the keypress.
+        await expect(settings).toHaveAttribute('aria-label', 'Chords settings');
+
         await page.keyboard.press('Escape');
 
         // Top sheet (settings) closes; the Mix sheet it was stacked on stays open.
