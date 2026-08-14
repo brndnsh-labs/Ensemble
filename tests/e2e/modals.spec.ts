@@ -105,12 +105,20 @@ test.describe('Modals Responsiveness @ui', () => {
         const panel = page.locator('#settingsOverlay .settings-content');
         await expect(panel).toBeVisible();
 
+        // useModalA11y focuses the close button after opening. That focus scrolls the
+        // panel to the top, so wait for it to complete before setting the precondition.
+        await expect(page.locator('#closeSettingsBtn')).toBeFocused();
+
         // Scroll to the bottom of the Playback tab, then toggle the last control.
-        await panel.evaluate((el) => {
-            el.scrollTop = el.scrollHeight;
-        });
+        await expect
+            .poll(() =>
+                panel.evaluate((el) => {
+                    el.scrollTop = el.scrollHeight;
+                    return el.scrollTop;
+                }),
+            )
+            .toBeGreaterThan(0);
         const before = await panel.evaluate((el) => el.scrollTop);
-        expect(before).toBeGreaterThan(0);
 
         await page.locator('label.toggle-switch[for="applyPresetSettingsCheck"]').click();
         // Wait past the old 50ms focus-on-open timeout that caused the jump.
