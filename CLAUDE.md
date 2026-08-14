@@ -60,6 +60,11 @@ npx playwright test -g "@mobile"
 
 Local-dev note: `npm run dev` runs Vite's dev server with HMR on port 5173. The build pipeline lives in `vite.config.ts`; deploy scripts are thin wrappers around `vite build` + `rsync`.
 
+Agent-environment note: hosted agent sessions are headless unless audio/display access has been
+explicitly verified. Never claim a by-ear check from local execution. For an audible review, use
+`/deploy-test` so Brandon can listen to the test build; automated browser-audio guards remain
+deterministic evidence, not a substitute for the `Needs-ear` gate.
+
 ## Architecture
 
 Ensemble is a browser-based "virtual band" PWA: a Preact UI, deep-signal state slices, a real-time logic worker for generative note creation, and a separate OffscreenCanvas worker for visuals.
