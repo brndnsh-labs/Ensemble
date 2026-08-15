@@ -162,11 +162,11 @@ engine *generated* (snapshotted from the lane buffers before the scheduler
 consumes them) must surface at a dispatch site with the same track + midi in the
 same step bin (±1 bin absorbs humanization/swing). This is what catches the class
 where audio dispatch and the visualizer tap sit behind the *same* gate, so a
-dropped note vanishes from both and the old single-stage check read clean — the
-#1299 boolean chord ghost is the type specimen, and its ghosts print as
-`sentinel-muted` in the missing list until #1299 makes them audible. CC-only
-carriers (`midi: 0`) are deliberately not notes; drums never enter the buffers,
-so a drums stem prints `NOT VERIFIABLE` here rather than fabricated intent.
+dropped note vanishes from both and the old single-stage check read clean. Audible
+chord ghosts now participate as ordinary reduced-velocity intents (#938), so dropping
+one reports `MISSING`. Boolean `muted: true` and CC-only carriers (`midi: 0`) are
+explicit non-notes and are excluded deliberately; drums never enter the buffers, so
+a drums stem prints `NOT VERIFIABLE` here rather than fabricated intent.
 
 **`--json`** prints the full structured results instead of the table: per stem,
 everything above plus `intentParity` and a per-attack `attacks` array

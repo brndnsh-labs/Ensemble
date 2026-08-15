@@ -436,7 +436,7 @@ export class ExportProcessor {
         const humanizeFactor = (this.state.groove.humanize || 0) / 100;
 
         notes.forEach((res) => {
-            if (res.midi && res.midi > 0) {
+            if (res.midi && res.midi > 0 && !isSilentSentinel(res.muted)) {
                 const noteTimeS = stepTimeS + (res.timingOffset || 0);
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
@@ -535,29 +535,12 @@ export class ExportProcessor {
                     finalVel = noteVel * soloistIntensityGain(this.state.playback.bandIntensity);
                 }
 
-                // The bass's `muted` is a numeric palm-mute amount and the other
-                // lanes' is a boolean ghost/CC sentinel (`mute-contract.ts`), so they
-                // scale differently: `muteGain` reads the amount (and is exactly the
-                // 0.15 this used to hard-code at a full mute, so today's producers —
-                // which only ever emit 0 or 1 — export byte-identically), while a
-                // ghosted comp voice keeps its flat 0.3.
-                //
-                // Known asymmetry, unreachable today: a boolean `true` on the BASS lane
-                // would be attenuated here but dropped outright by the live path's
-                // `isSilentSentinel` gate. Bass only ever writes numbers, so neither
-                // branch fires; the live gate is itself defensive. Not resolved with an
-                // early return here because that would also skip this note's CC events.
-                //
-                // #1322: read through isSilentSentinel rather than bare truthiness —
-                // for today's boolean-only chords/harmony producers this is a no-op
-                // (a boolean `true` is already the only truthy value they emit), but
-                // it stops being coincidental if a future producer emits a numeric
-                // partial value here. The 0.3 flat attenuation itself is #1299's open
-                // question (does a ghost sound at all?) and is deliberately UNCHANGED.
+                // Bass numeric palm-mute amounts are real notes and retain the shared
+                // attenuation curve. Boolean `true` was excluded by the outer
+                // `isSilentSentinel` gate; audible chord ghosts arrive as `muted: false`
+                // with their reduced velocity already computed by the engine (#938).
                 if (moduleName === 'bass') {
                     finalVel *= muteGain(res.muted);
-                } else if (isSilentSentinel(res.muted)) {
-                    finalVel *= 0.3;
                 }
 
                 // Apply global humanization to velocity

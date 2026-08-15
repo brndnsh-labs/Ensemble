@@ -129,8 +129,9 @@ describe('Funk Piano Critique', () => {
                 { isBeatStart: stepInMeasure % 4 === 0 },
                 {},
             );
-            // Audible stabs only — drop muted ghost "chucks".
-            const audible = notes.filter((n) => n.midi > 0 && !n.muted);
+            // Full-strength stabs only — the now-audible 0.1-step ghost chucks
+            // have their own #938 critique and should not change this voicing metric.
+            const audible = notes.filter((n) => n.midi > 0 && n.durationSteps !== 0.1);
             if (audible.length > 0) {
                 totalStabs++;
                 // why: assert on voicing *content*, not note count — a 3-5-b7

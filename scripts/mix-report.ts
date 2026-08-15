@@ -703,8 +703,10 @@ async function renderSceneReports({
                     // scheduler consumes them (scheduleGlobalEvent deletes each step's
                     // entry as it dispatches). This is the engine's generated truth —
                     // the stream `mix:verify` reconciles dispatch against. Freq-less
-                    // and midi-0 entries are CC-only carriers, not notes; a pitched
-                    // boolean-muted ghost (#1299) IS captured, deliberately. Drums
+                    // and midi-0 entries are CC-only carriers, not notes. Boolean-muted
+                    // entries are retained in the dump so `mix:verify` can report that
+                    // it explicitly excluded the silent sentinel; audible chord ghosts
+                    // carry `muted: false` plus their authored low velocity (#938). Drums
                     // never enter these buffers (includeDrums stays false here).
                     function collectIntentEvents(
                         state,

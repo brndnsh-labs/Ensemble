@@ -1177,11 +1177,11 @@ export function scheduleChords(
         // lengths match their `durationSteps` count.
         const stepSecChords = secondsPerStepFor(playback.bpm);
         // Count how many non-muted notes are in this step for volume normalization.
-        // #1299/#1322: read through isSilentSentinel, not bare truthiness — this
-        // lane only ever writes a boolean today (true = non-note), so the count is
-        // unchanged, but it must move together with the dispatch gate and the
-        // strum-rank loop below (the paired-site trap: changing one without the
-        // others desyncs the voice count from the notes actually played).
+        // #938/#1322: read through isSilentSentinel, not bare truthiness — audible
+        // ghosts carry `muted: false`; only CC carriers use `true`. This count must
+        // move together with the dispatch gate and the strum-rank loop below (the
+        // paired-site trap: changing one without the others desyncs the voice count
+        // from the notes actually played).
         let numVoices = 0;
         for (let i = 0; i < notes.length; i++) {
             if (!isSilentSentinel(notes[i].muted) && notes[i].freq) {

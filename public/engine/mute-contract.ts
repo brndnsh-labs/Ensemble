@@ -8,10 +8,10 @@
  *   see `getBassNote`'s `@param muted` in `bass-engine.ts`. The funk slap "chuck"
  *   and the palm-muted chromatic pickups emit `1`. These are **real notes a bassist
  *   plays**; they sound, quietly.
- * - **Chords** write a BOOLEAN. `true` on a note with `midi: 0` is a CC-only carrier
- *   (a sustain-pedal event with no pitch); `true` on a real pitch is a ghost note;
- *   `false` is an ordinary audible note. See `getAccompanimentNotes` in
- *   `accompaniment.ts` and `emitCompNotes` in `comping-emit.ts`.
+ * - **Chords** write a BOOLEAN. `true` is a CC-only carrier (a sustain-pedal event
+ *   with no pitch); `false` is an audible note, including a deliberately quiet ghost
+ *   articulation. See `getAccompanimentNotes` in `accompaniment.ts` and
+ *   `emitCompNotes` in `comping-emit.ts`.
  * - **Soloist, harmony and drums** never write the field at all, so they always read
  *   `undefined` — which normalizes to "open", the same as `0`.
  *
@@ -36,9 +36,9 @@
 export const MUTE_ATTENUATION = 0.85;
 
 /**
- * True when `muted` marks a **non-note** — the chords lanes' boolean `true`, which is
- * either a CC carrier with no pitch or a deliberately-ghosted comp voice. Those lanes
- * own their own emission rules, so a non-note must not be forwarded as a note.
+ * True when `muted` marks a **non-note** — the chords lanes' boolean `true`, used for
+ * CC carriers with no pitch. Ghost comp articulations carry their own reduced velocity
+ * and `muted: false`, so a sentinel must never be forwarded as a note.
  *
  * Deliberately `=== true`, not `typeof muted === 'boolean'`: those same lanes write
  * `muted: false` on perfectly ordinary audible notes, so a check keyed on the boolean

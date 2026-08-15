@@ -165,16 +165,15 @@ describe('mix-verify — intent → dispatch existence parity (#1351)', () => {
         expect(healed.missing).toHaveLength(0);
     });
 
-    it('a pitched boolean-muted chord ghost is visible in intent and fails parity while inaudible', () => {
-        // Acceptance 2: the #1299 class. The ghost is generated (intent), the
-        // sentinel gate drops it from every sink (no dispatch).
-        const ghost = intent({ track: 'chords', step: 6, midi: 64, muted: true });
+    it('a pitched boolean sentinel is explicitly excluded as a non-note', () => {
+        const sentinel = intent({ track: 'chords', step: 6, midi: 64, muted: true });
         const audible = intent({ track: 'chords', step: 2, midi: 60 });
-        const parity = verifyIntentParity([audible, ghost], [dispatchFor(audible)], META, [
+        const parity = verifyIntentParity([audible, sentinel], [dispatchFor(audible)], META, [
             'chords',
         ]);
-        expect(parity.missing).toHaveLength(1);
-        expect(parity.missingSentinelMuted).toBe(1);
+        expect(parity.intentCount).toBe(1);
+        expect(parity.missing).toHaveLength(0);
+        expect(parity.excludedSilentSentinels).toBe(1);
     });
 
     it('a CC-only midi-0 carrier is not counted as a pitched-note drop', () => {
@@ -196,21 +195,21 @@ describe('mix-verify — intent → dispatch existence parity (#1351)', () => {
         expect(slipped.extraDispatches).toBe(1);
     });
 
-    it("a ghost in a neighboring bin cannot steal a dispatch from that bin's own intent", () => {
+    it("a dropped audible ghost in a neighboring bin cannot steal that bin's dispatch", () => {
         // The two-pass regression (measured on funk-pocket/chords as 54 false
-        // pairs): a sentinel ghost at step 1 exact-misses, and a greedy single
+        // pairs): a ghost at step 1 exact-misses, and a greedy single
         // pass let its ±1 fallback consume step 2's dispatch before step 2's own
         // intent claimed it — reporting the audible chord missing and the ghost
         // matched. Exact-bin claims must settle first.
-        const ghost = intent({ track: 'chords', step: 1, midi: 66, muted: true });
+        const ghost = intent({ track: 'chords', step: 1, midi: 66, muted: false, velocity: 0.18 });
         const audible = intent({ track: 'chords', step: 2, midi: 66 });
         const parity = verifyIntentParity([ghost, audible], [dispatchFor(audible)], META, [
             'chords',
         ]);
         expect(parity.matchedCount).toBe(1);
         expect(parity.missing).toHaveLength(1);
-        expect(parity.missing[0].muted).toBe(true);
-        expect(parity.missingSentinelMuted).toBe(1);
+        expect(parity.missing[0]).toMatchObject({ muted: false, velocity: 0.18 });
+        expect(parity.excludedSilentSentinels).toBe(0);
     });
 
     it('drums report NOT VERIFIABLE rather than fabricated intent', () => {
