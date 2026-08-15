@@ -124,6 +124,37 @@ describe('Drum Seeder', () => {
         expect(Object.keys(map1).length).toBeGreaterThan(0);
     });
 
+    it('uses a snare for syncopated Rock peaks and reserves crashes for on-grid peaks', () => {
+        const offbeat = generateSoloistAccents(
+            mockState,
+            mockArranger,
+            { notes: [{ step: 10, velocity: 0.9, midi: 60 }] },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+        const onBeat = generateSoloistAccents(
+            mockState,
+            mockArranger,
+            { notes: [{ step: 20, velocity: 0.9, midi: 60 }] },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+        const metalOffbeat = generateSoloistAccents(
+            mockState,
+            mockArranger,
+            { notes: [{ step: 10, velocity: 0.9, midi: 60 }] },
+            'Metal',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(offbeat[10]?.type).toBe('snare-stab');
+        expect(onBeat[20]?.type).toBe('crash-catch');
+        expect(metalOffbeat[10]?.type).toBe('crash-catch');
+    });
+
     it('should respect cooldown for accent catching', () => {
         const soloistSeed = {
             notes: [

@@ -16,7 +16,7 @@ import {
     isTensionChordForSoloist,
 } from './coordination-engine.js';
 import { dropMuteStyleFor, shouldFireDropMute } from './drop-mechanic.js';
-import { applyGrooveOverrides } from './groove-engine.js';
+import { applyGrooveOverrides, getAudibleSnareCatchAtStep } from './groove-engine.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import type { DrumHitInfo, TickCursors } from './tick-types.js';
 import { type ChordAtStep, getChordAtStep } from './worker-utils.js';
@@ -65,6 +65,10 @@ export function runDrumTick(
     // makes the distinction explicit: when true, latch the bar-downbeat intensity
     // for bar-stable motif selection instead of trusting the stale conductor ramp.
     noLiveConductor = false,
+    // Some offline callers keep every lane enabled in their cloned state but
+    // select exported tracks through GenerateNotesOptions. A shared ensemble
+    // hit must not be published when either its drummer or soloist is excluded.
+    allowSharedCatch = true,
 ): DrumTickResult {
     const { arranger, groove, playback } = state;
 
@@ -496,6 +500,14 @@ export function runDrumTick(
     }
 
     if (!fillPlayed) {
+        const snare = groove.instruments.find((inst) => inst.name === 'Snare');
+        const sharedSnareCatch = getAudibleSnareCatchAtStep(
+            groove,
+            step,
+            drumStep,
+            stepsPerBar,
+            stepInfo.isMeasureStart,
+        );
         // Variations lookup
         const checkHit = (instName: string, evaluateOnly: boolean = true): boolean => {
             const inst = groove.instruments.find((i) => i.name === instName);
@@ -582,6 +594,25 @@ export function runDrumTick(
         coordination.kickHit = checkHit('Kick', true);
         // writer: drum preamble; readable-after: any producer
         coordination.snareHit = checkHit('Snare', true);
+        // why (#994): publish only after the complete drum interpretation has
+        // confirmed the snare still sounds. Repeat-pass ghost permutation and
+        // other post-accent rules may remove a seeded hit, so the raw accent
+        // lookup alone is not sufficient evidence for an ensemble catch.
+        if (
+            allowSharedCatch &&
+            includeSoloist &&
+            includeDrums &&
+            groove.genreFeel === 'Rock' &&
+            snare &&
+            !snare.muted &&
+            sharedSnareCatch &&
+            coordination.snareHit
+        ) {
+            coordination.sharedCatch = {
+                type: 'snare-stab',
+                velocity: sharedSnareCatch.velocity,
+            };
+        }
 
         // If including drums, process all instruments for actual playback
         if (includeDrums) {

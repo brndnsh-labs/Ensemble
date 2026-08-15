@@ -2,7 +2,7 @@ import type { TimeSignatureConfig } from '../config.js';
 import type { Chord, EnsembleState, SoloistQaHang, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import type { CompingState } from './comping-state.js';
-import { getBandPocket } from './coordination-engine.js';
+import { getBandPocket, type SharedCatch } from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
 import {
@@ -55,6 +55,9 @@ export interface AccompanimentCoordination {
     // the comper may CATCH it: one lean echo of the hang tone in the carved
     // breath, and a top-voice re-landing with the soloist's answer.
     soloistQaHang?: SoloistQaHang | null;
+    // writer: runDrumTick after final snare evaluation. Narrow Rock pilot only —
+    // consumers must not treat this as a generic gesture bus.
+    sharedCatch?: SharedCatch | null;
     bassHit?: boolean;
     bassMidi?: number;
     kickHit?: boolean;
@@ -243,6 +246,34 @@ function applyPerHitEconomy(
     }
 
     return answer;
+}
+
+/**
+ * Reduce a Rock ensemble catch to a compact shell while leaving the full
+ * voicing in comping memory. Prefer guide/support tones that do not double the
+ * active soloist pitch class; a one-note shell is valid when that is the only
+ * clean option.
+ */
+function selectSharedCatchVoicing(
+    voicingMidis: number[],
+    chord: Chord,
+    soloistMidi: number,
+): number[] {
+    const unique = [...new Set(voicingMidis)].sort((a, b) => a - b);
+    if (unique.length === 0) {
+        return [];
+    }
+
+    const soloistPc = soloistMidi > 0 ? ((soloistMidi % 12) + 12) % 12 : null;
+    const nonDoubling =
+        soloistPc === null
+            ? unique
+            : unique.filter((midi) => ((midi % 12) + 12) % 12 !== soloistPc);
+    const pool = nonDoubling.length > 0 ? nonDoubling : unique;
+    const targetVoices = Math.min(2, pool.length);
+    const supportive = selectSupportiveVoicing(pool, chord, targetVoices);
+    const selected = supportive.length >= targetVoices ? supportive : pool.slice(-targetVoices);
+    return [...new Set(selected)].sort((a, b) => a - b).slice(-2);
 }
 
 /**
@@ -532,6 +563,18 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         }
         compingState.ringSuppressStep = -1;
         compingState.ringSuppressChordKey = null;
+    }
+
+    // --- #994: Rock comper joins the drummer's seeded snare catch ---
+    // This force happens after ordinary density/yield/breath decisions so the
+    // shared hit is one deliberate exception, not another probability layered
+    // onto the comp cell. Final cadence, intro/outro, subtraction and drop
+    // precedence already returned before this standard emitter is reached.
+    const sharedCatch = genre === 'Rock' ? coordination.sharedCatch : null;
+    const sharedCatchActive =
+        sharedCatch?.type === 'snare-stab' && chords.style !== 'pad' && chords.style !== 'arp';
+    if (sharedCatchActive) {
+        isHit = true; // insert into silence or re-voice the one existing attack
     }
 
     // --- #1157: the comper CATCHES the soloist's question ---
@@ -937,6 +980,23 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         const finalVoicingMidis = getMidiVoicing(voicing);
         if (finalVoicingMidis.length > 0) {
             compingState.lastVoicingMidis = [...finalVoicingMidis];
+        }
+
+        if (sharedCatchActive && sharedCatch) {
+            const catchMidis = selectSharedCatchVoicing(
+                finalVoicingMidis,
+                chord,
+                coordination.soloistMidi || 0,
+            );
+            if (catchMidis.length > 0) {
+                voicing = catchMidis.map((midi) => getFrequency(midi));
+            }
+            // One sixteenth-ish stab: enough body to read with the snare, short
+            // enough not to become a second comp phrase under the lead.
+            durationSteps = Math.min(durationSteps, Math.max(0.5, ts.stepsPerBeat * 0.25));
+            const catchVelocity =
+                0.38 * intensityFactor * Math.min(1.2, Math.max(0.6, sharedCatch.velocity));
+            velocity = Math.min(0.72, Math.max(0.28, catchVelocity));
         }
 
         // #715 — per-hit comp economy: keep the full voicing for voice-leading

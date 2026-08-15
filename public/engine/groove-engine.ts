@@ -10,6 +10,7 @@ import {
     isSectionTurnaround,
     secondsPerStepFor,
 } from '../utils.js';
+import type { AccentCatch } from './drum-seeder.js';
 import * as acoustic from './grooves/acoustic.js';
 import * as blues from './grooves/blues.js';
 import * as country from './grooves/country.js';
@@ -26,6 +27,45 @@ import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
 import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-overrides.js';
+
+/**
+ * Resolve a seeded soloist accent in the same timeline frame used by the
+ * audible drummer. Mid-play reseeds shift the seed origin; callers must not
+ * index `accentMap` with the raw transport step directly.
+ */
+export function getSoloistAccentAtStep(
+    groove: EnsembleState['groove'],
+    step: number,
+): AccentCatch | null {
+    const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
+    const timelineStep = step - seedTimelineStartStep;
+    return timelineStep >= 0
+        ? ((groove.accentMap?.[timelineStep] as AccentCatch | undefined) ?? null)
+        : null;
+}
+
+/**
+ * Return the snare catch that the audible drum path can actually add at this
+ * position. The crowding discipline is shared with `applyGrooveOverrides` so
+ * coordination can never announce a catch the snare itself suppresses.
+ */
+export function getAudibleSnareCatchAtStep(
+    groove: EnsembleState['groove'],
+    step: number,
+    loopStep: number,
+    stepsPerBar: number,
+    isDownbeat: boolean,
+): AccentCatch | null {
+    const accent = getSoloistAccentAtStep(groove, step);
+    if (
+        accent?.type !== 'snare-stab' ||
+        isDownbeat ||
+        isBackbeatAdjacentStep(loopStep, stepsPerBar)
+    ) {
+        return null;
+    }
+    return accent;
+}
 
 /**
  * Groove strategy key → its implementing module. The KEYS are owned by
@@ -614,8 +654,8 @@ export function applyGrooveOverrides(
     // loud snare on the downbeat (no backbeat lives on beat 1) or a 16th from
     // beats 2/4 — the "early snare" / "two snares in a row" the owner reported. A
     // snare-stab catching a syncopation in open space is still musical and kept.
-    const snareCrowdsBackbeat = isBackbeatAdjacentStep(loopStep, stepsPerBar);
-    const accent = timelineStep >= 0 ? groove.accentMap?.[timelineStep] : null;
+    const snareCatch = getAudibleSnareCatchAtStep(groove, step, loopStep, stepsPerBar, isDownbeat);
+    const accent = getSoloistAccentAtStep(groove, step);
     if (accent) {
         if (accent.type === 'crash-catch') {
             if (inst.name === 'Kick') {
@@ -641,7 +681,7 @@ export function applyGrooveOverrides(
             // downbeat snare — e.g. a Metal blast — keeps it); we only stop the
             // accent from ADDING a crowding snare. The Kick reinforcement is
             // musical anywhere and is left untouched.
-            if (inst.name === 'Snare' && !isDownbeat && !snareCrowdsBackbeat) {
+            if (inst.name === 'Snare' && snareCatch) {
                 currentState.shouldPlay = true;
                 currentState.soundName = 'Snare';
                 currentState.velocity = 1.2;

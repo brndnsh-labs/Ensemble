@@ -1752,6 +1752,8 @@ declare global {
             initAudio: (state: EnsembleState) => unknown;
             loadDrumPreset: (name: string) => unknown;
             generateNotesForStep: (...args: any[]) => any;
+            generateSessionSeed: (...args: any[]) => SoloistSessionSeed;
+            generateSoloistAccents: (...args: any[]) => Record<number, any>;
             loopArcMultiplier: (loopCount: number, loopLimit: number) => number;
             ensurePackLoaded: (audio: BaseAudioContext, packId: string) => Promise<void>;
             getPackZones: (packId: string) => unknown[] | null;

@@ -685,6 +685,9 @@ export class ExportProcessor {
                 includeChords: this.includedTracks.includes('chords'),
                 includeHarmony: this.includedTracks.includes('harmonies'),
                 includeDrums: this.includedTracks.includes('drums'),
+                allowSharedCatch:
+                    this.includedTracks.includes('soloist') &&
+                    this.includedTracks.includes('drums'),
                 // #842: MIDI export ramps `bandIntensity` per step via
                 // `applyWorkerTransition` against only a stale default conductor, so
                 // bar-latch the drum-motif intensity to stop the exported motif

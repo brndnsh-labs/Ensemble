@@ -114,6 +114,11 @@ export async function renderStemsToWav(
             const sliceKey = STEM_ENABLE_SLICE[stem];
             state[sliceKey].enabled = stem === instrument; // @direct-mutation — throwaway clone
         }
+        if (!state.soloist.enabled) {
+            // A solo stem is a sound-source isolation, not permission to render
+            // gestures driven by a lane that is absent from that stem.
+            state.groove.accentMap = null; // @direct-mutation — throwaway clone
+        }
 
         const filename = `${baseFilename}-stem-${instrument}`;
         const result = await renderClonedStateToWav(state, loops, sampleRate, filename);
@@ -157,15 +162,21 @@ async function renderClonedStateToWav(
         enableWatchdog: false,
     });
 
-    fillBuffersForExport(state);
+    for (let loopIndex = 0; loopIndex < loops; loopIndex++) {
+        const timelineStartStep = loopIndex * stepsPerLoop;
+        state.playback.currentLoopCount = loopIndex; // @direct-mutation — throwaway clone
+        fillBuffersForExport(state, timelineStartStep);
 
-    for (let step = 0; step < totalSteps; step++) {
-        const time = leadIn + step * sixteenth;
-        // Throwaway cloned state, not the live deepSignal — no reactivity to
-        // route through. Same pattern as the schedule loop in scripts/mix-report.ts.
-        state.playback.nextNoteTime = time; // @direct-mutation
-        state.playback.unswungNextNoteTime = time; // @direct-mutation
-        scheduleGlobalEvent(state, step % stepsPerLoop, time);
+        for (let step = 0; step < stepsPerLoop; step++) {
+            const absoluteStep = timelineStartStep + step;
+            const time = leadIn + absoluteStep * sixteenth;
+            // Throwaway cloned state, not the live deepSignal — no reactivity to
+            // route through. Absolute steps match live/MIDI seed framing; buffers
+            // are refilled per loop because the scheduler consumes each entry.
+            state.playback.nextNoteTime = time; // @direct-mutation
+            state.playback.unswungNextNoteTime = time; // @direct-mutation
+            scheduleGlobalEvent(state, absoluteStep, time);
+        }
     }
 
     const rendered = await offlineCtx.startRendering();
@@ -266,7 +277,17 @@ function cloneStateForRender(liveState: any): any {
             buffer: new Map(),
             fillSteps: null,
             fillMap: null,
-            accentMap: null,
+            accentMap: liveState.groove.accentMap
+                ? Object.fromEntries(
+                      Object.entries(liveState.groove.accentMap).map(([step, accent]) => [
+                          step,
+                          { ...(accent as object) },
+                      ]),
+                  )
+                : null,
+            // Export starts the current plan at the beginning of its own
+            // detached timeline, even when the live map was reseeded mid-play.
+            seedTimelineStartStep: 0,
             lastHatGain: null,
             lastSampledHatVoice: null,
             lastRideGain: null,
@@ -288,6 +309,7 @@ function cloneStateForRender(liveState: any): any {
         },
         soloist: {
             ...liveState.soloist,
+            session: JSON.parse(JSON.stringify(liveState.soloist.session)),
             audio: {
                 ...(liveState.soloist.audio || {}),
                 activeVoices: [],
@@ -319,14 +341,15 @@ function cloneStateForRender(liveState: any): any {
     };
 }
 
-function fillBuffersForExport(state: any): void {
+function fillBuffersForExport(state: any, timelineStartStep: number): void {
     const cursors = {
         mainCursor: { index: 0, sectionIndex: 0 },
         lookaheadCursor: { index: 0, sectionIndex: 0 },
     };
 
     for (let step = 0; step < state.arranger.totalSteps; step++) {
-        const result = generateNotesForStep(state, step, cursors, {
+        const absoluteStep = timelineStartStep + step;
+        const result = generateNotesForStep(state, absoluteStep, cursors, {
             includeBass: state.bass.enabled,
             includeChords: state.chords.enabled,
             includeSoloist: state.soloist.enabled,
@@ -336,13 +359,13 @@ function fillBuffersForExport(state: any): void {
 
         for (const note of result.notes) {
             if (note.module === 'bass') {
-                storeNote(state.bass.buffer, step, note);
+                storeNote(state.bass.buffer, absoluteStep, note);
             } else if (note.module === 'chords') {
-                storeNote(state.chords.buffer, step, note);
+                storeNote(state.chords.buffer, absoluteStep, note);
             } else if (note.module === 'harmony') {
-                storeNote(state.harmony.buffer, step, note);
+                storeNote(state.harmony.buffer, absoluteStep, note);
             } else if (note.module === 'soloist') {
-                storeNote(state.soloist.audio.buffer, step, note);
+                storeNote(state.soloist.audio.buffer, absoluteStep, note);
             }
         }
     }
