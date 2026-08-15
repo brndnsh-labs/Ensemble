@@ -179,7 +179,12 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             velocity = 1.2;
         }
 
-        // Texas Shuffle snare participation (isOffbeat ghosting)
+        // why (#973): motif 3 is Texas Double Shuffle, so at
+        // sufficient complexity it gets 0.7 non-backbeat shuffle-grid ghost
+        // participation. Other Blues Shuffle motifs borrow the gesture only at
+        // intensity >0.7, and then at 0.3, keeping ordinary shuffles, backbeats,
+        // and low-complexity playing clear. These magnitudes are by-ear balance,
+        // not a stronger taste oracle.
         const texasProb = activeMotif === 3 ? 0.7 : intensity > 0.7 ? 0.3 : 0;
         if (isOffbeat && !isBackbeat && drumComplexity > 0.6) {
             if (roll(texasProb, 1.0, rollSeed(context, 5))) {
