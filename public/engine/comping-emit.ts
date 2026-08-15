@@ -314,7 +314,13 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
 
     // --- NEW: Multi-way Coordination ---
     if (isHit && chords.style === 'smart') {
-        // 1. Yield to Bass: If bass is hitting hard, ~40% chance to skip the step.
+        // why (#973): on a coincident bass/chord attack, the smart
+        // comp yields 40% of the time to partially declutter the low-register
+        // attack while retaining the harmonic pulse. That stays below the
+        // active-soloist yield below (at least 50%), because a bass hit alone
+        // should not hollow out the comp as much as an active lead voice. 0.4
+        // is a by-ear balance, not a stronger taste oracle; compDraw(1) keeps
+        // the decision deterministic and loop-stable.
         if (bassHit && compDraw(1) < 0.4) {
             isHit = false; // Yield the step entirely
         }

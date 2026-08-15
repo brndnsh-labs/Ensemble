@@ -190,9 +190,19 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             } else {
                 // General Kick Bombs
                 let bombProb = intensity * 0.12;
+                // why (#973): the x1.4 busy-solo lift is deliberate
+                // kick counterpoint — a strong horn phrase earns occasional low
+                // answering accents. It is distinct from snare comping's
+                // rest-space behavior below: snares get chattier when the
+                // soloist rests, while these kick bombs answer a busy soloist.
+                // 1.4 is a by-ear balance, not a stronger taste oracle.
                 if (isSoloistBusy) {
                     bombProb *= 1.4;
                 }
+                // why (#973): in simple meter only, fast swing above
+                // 175 BPM needs the x0.3 trim so ride and feathering keep the
+                // time legible. Its magnitude is by ear, not a stronger taste
+                // oracle; compound meter deliberately does not inherit this trim.
                 if (context.playback.bpm && context.playback.bpm > 175) {
                     bombProb *= 0.3;
                 }
@@ -203,7 +213,9 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
                 }
             }
         } else {
-            // Compound meter general kick bombs
+            // why: compound-meter kick bombs retain the same busy-solo x1.4
+            // counterpoint, but have no >175 BPM x0.3 trim: their skip-beat
+            // placement already leaves the dotted-quarter pulse clear.
             let bombProb = intensity * 0.12;
             if (isSoloistBusy) {
                 bombProb *= 1.4;
