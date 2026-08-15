@@ -11,9 +11,9 @@
  *   emission sites — a future divergence like #963 is now structurally
  *   impossible rather than merely alarmed-on.
  * - Note existence: does a generated note actually sound, on the live path?
- *   Bass (mute-contract-routed on both live and export) is expected to
- *   AGREE. Chords ghost notes are a KNOWN, DELIBERATE divergence pending
- *   #1299's decision — pinned here as an exclusion, not silently normalized.
+ *   Bass and chords are both expected to agree across live playback and export.
+ *   #938 resolved the former chord-ghost exclusion: a ghost is a reduced-velocity
+ *   real note, while boolean `true` is silence on every sink.
  *
  * #1325 adds the VELOCITY-CURVE dimension: the soloist's band-intensity swell
  * (which the export applied and live didn't, until live gained it) and the
@@ -230,8 +230,7 @@ describe('#1325 — soloist band-intensity swell: live playback now applies the 
     });
 
     it('KNOWN DIVERGENCE: live is strictly louder than the export above I≈0.667 and quieter below — the shared formula does not equalize them', () => {
-        // Pinned as an exclusion, not a bug, matching how #1299's ghost-note
-        // divergence is recorded above. The exporter never reads
+        // Pinned as an explicit exclusion, not a bug. The exporter never reads
         // `conductorVelocity` even though it IS synced to the worker.
         const exportVel = (i: number) => 1.0 * soloistIntensityGain(i);
         expect(liveSoloistVelocity(0)).toBeLessThan(exportVel(0));
@@ -299,7 +298,8 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         moduleName: string,
         noteVel: number,
         bandIntensity = 0.5,
-    ): number {
+        overrides: Record<string, unknown> = {},
+    ): number | null {
         const processor = new ExportProcessor(
             exportState(bandIntensity) as never,
             {
@@ -310,14 +310,22 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         processor._writeNotesToTrack(
             track,
             0,
-            [{ midi: 60, velocity: noteVel, durationSteps: 1, timingOffset: 0 }] as never,
+            [
+                {
+                    midi: 60,
+                    velocity: noteVel,
+                    durationSteps: 1,
+                    timingOffset: 0,
+                    ...overrides,
+                },
+            ] as never,
             0,
             moduleName,
             {} as never,
             0,
         );
         const noteOn = track.events.find((e) => (e.data[0] & 0xf0) === 0x90);
-        return (noteOn as { data: number[] }).data[2];
+        return noteOn ? (noteOn as { data: number[] }).data[2] : null;
     }
 
     it("BASS: #1325 DECLINED live's [0,1] clamp here — accents above 1.0 must stay distinguishable in the exported .mid", () => {
@@ -348,9 +356,20 @@ describe('#1325 — the EXPORTER actually calls the shared curves (not just the 
         expect(low).toBeLessThan(mid);
         expect(mid).toBeLessThan(high);
     });
+
+    it('CHORDS: an audible ghost keeps its engine velocity without a second export attenuation', () => {
+        const ghostVelocity = 0.18;
+        expect(exportedVelocityByte('chords', ghostVelocity, 0.5, { muted: false })).toBe(
+            exportedVelocityByte('chords', ghostVelocity),
+        );
+    });
+
+    it('CHORDS: a boolean silent sentinel never becomes an exported note', () => {
+        expect(exportedVelocityByte('chords', 0.5, 0.5, { muted: true })).toBeNull();
+    });
 });
 
-describe('#1322 — note-existence parity: chords ghost notes (KNOWN divergence, pinned to #1299)', () => {
+describe('#938 — note-existence parity: audible chord ghosts and silent sentinels', () => {
     const CHORD_DATA = { chord: { absName: 'C' } };
 
     function makeChordsState(notes: Array<Record<string, unknown>>, voice = 'Piano') {
@@ -361,6 +380,7 @@ describe('#1322 — note-existence parity: chords ghost notes (KNOWN divergence,
                 sustainActive: false,
                 activeChordVoices: [],
                 lastChordKey: null,
+                drawQueue: [],
             },
             vizState: { enabled: false },
         } as never;
@@ -383,13 +403,27 @@ describe('#1322 — note-existence parity: chords ghost notes (KNOWN divergence,
         expect(dispatchMidiChordNote).toHaveBeenCalledTimes(1);
     });
 
-    it("#1299 KNOWN EXCLUSION — a ghost note (muted: true) is silent live. Do NOT 'fix' this here: #1299 owns the sound-or-not decision; #1322 only routes the read through mute-contract.ts, it doesn't decide the question", () => {
+    it('a boolean silent sentinel is dropped by live audio and MIDI-out', () => {
         scheduleChords(makeChordsState([chordNote({ muted: true })]), CHORD_DATA, 0, 0);
         expect(playNote).not.toHaveBeenCalled();
         expect(dispatchMidiChordNote).not.toHaveBeenCalled();
     });
 
-    it('numVoices/strum-rank stay in sync with the dispatch gate (#1299 paired-site trap) — a mixed ghost+real step counts only the real note', () => {
+    it('an audible ghost reaches audio, MIDI-out, and the visualizer at its reduced velocity', () => {
+        const state = makeChordsState([chordNote({ velocity: 0.18, durationSteps: 0.1 })]);
+        state.vizState.enabled = true;
+
+        scheduleChords(state, CHORD_DATA, 0, 0);
+
+        expect(playNote).toHaveBeenCalledTimes(1);
+        expect((vi.mocked(playNote).mock.calls[0][4] as { vol: number }).vol).toBeCloseTo(0.18, 10);
+        expect(vi.mocked(dispatchMidiChordNote).mock.calls[0][2]).toBeCloseTo(0.18, 10);
+        expect(state.playback.drawQueue).toEqual([
+            expect.objectContaining({ track: 'chords', velocity: 0.18 }),
+        ]);
+    });
+
+    it('numVoices/strum-rank stay in sync with the dispatch gate (#938 paired-site trap) — a mixed sentinel+real step counts only the real note', () => {
         scheduleChords(
             makeChordsState([
                 chordNote({ muted: true, freq: 300 }),
@@ -405,14 +439,14 @@ describe('#1322 — note-existence parity: chords ghost notes (KNOWN divergence,
         expect(opts.numVoices).toBe(1);
     });
 
-    it('the strum-rank loop excludes the ghost too and ranks by pitch, not array position (only engages for a guitar voice — isStrummedChordVoice, chords-styles.ts)', () => {
+    it('the strum-rank loop excludes the sentinel too and ranks by pitch, not array position (only engages for a guitar voice — isStrummedChordVoice, chords-styles.ts)', () => {
         // Array order deliberately puts the HIGHER-freq real note first, so a
         // rank computed from array position (wrong) would disagree with a rank
         // computed from sorted pitch (right, and what the code actually does).
         scheduleChords(
             makeChordsState(
                 [
-                    chordNote({ muted: true, freq: 300 }), // ghost — excluded from strum ranking
+                    chordNote({ muted: true, freq: 300 }), // sentinel — excluded from ranking
                     chordNote({ freq: 400 }), // higher pitch — should rank LAST (1)
                     chordNote({ freq: 200 }), // lower pitch — should rank FIRST (0)
                 ],

@@ -1860,7 +1860,11 @@ export function getAccompanimentNotes(
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.012 + playback.intent.layBack + drunk,
                     instrument: 'Piano',
-                    muted: isGhost,
+                    // why: a comp ghost is a real, deliberately quiet attack. `muted: true`
+                    // is reserved for CC-only non-notes, so every playback/export sink hears
+                    // this velocity exactly once instead of live dropping it and MIDI export
+                    // applying a second attenuation (#938).
+                    muted: false,
                     dry: true,
                 });
             });
@@ -2100,7 +2104,10 @@ export function getAccompanimentNotes(
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.003 + (isGhost ? 0.005 + compDraw(240 + i) * 0.01 : -0.005),
                     instrument: 'Piano',
-                    muted: isGhost,
+                    // why: short Funk chucks are audible ghost articulations, not rests.
+                    // Their 0.18 velocity owns the attenuation; `muted: true` remains the
+                    // explicit CC-only silent sentinel across every sink (#938).
+                    muted: false,
                     dry: true,
                 });
             });

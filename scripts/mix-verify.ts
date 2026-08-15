@@ -78,20 +78,20 @@ export interface IntentParity {
     reason?: string;
     intentCount: number;
     matchedCount: number;
-    /** Intents no dispatch accounted for — each one is a note the scheduler dropped. */
+    /** Audible intents no dispatch accounted for — each one is a note the scheduler dropped. */
     missing: IntentEvent[];
-    /** How many of `missing` are boolean-sentinel ghosts (the #1299 class). */
-    missingSentinelMuted: number;
+    /** Pitched boolean sentinels excluded as explicit non-notes. */
+    excludedSilentSentinels: number;
     /** Dispatches with no matching intent — informational, not a parity failure. */
     extraDispatches: number;
 }
 
 /**
- * Exact existence parity: every pitched intent must surface as a dispatch with the
- * same track + midi in the same step bin (±1 bin absorbs humanization/swing, which
- * are bounded well under a step). CC-only carriers (`midi: 0`) are deliberately
- * excluded — they are not notes, and counting them would fabricate parity failures
- * on every sustain-pedal step. Drums never enter the pitched lane buffers, so a
+ * Exact existence parity: every audible pitched intent must surface as a dispatch
+ * with the same track + midi in the same step bin (±1 bin absorbs humanization/swing,
+ * which are bounded well under a step). CC-only carriers (`midi: 0`) and boolean
+ * silent sentinels are deliberately excluded — they are not notes, and counting them
+ * would fabricate parity failures. Drums never enter the pitched lane buffers, so a
  * drums-only stem reports NOT VERIFIABLE rather than fabricated intent.
  */
 export function verifyIntentParity(
@@ -108,7 +108,7 @@ export function verifyIntentParity(
             intentCount: 0,
             matchedCount: 0,
             missing: [],
-            missingSentinelMuted: 0,
+            excludedSilentSentinels: 0,
             extraDispatches: 0,
         };
     }
@@ -128,11 +128,13 @@ export function verifyIntentParity(
         poolSize++;
     }
 
-    const considered = intents.filter(
+    const pitchedIntents = intents.filter(
         (intent) => pitchedTracks.includes(intent.track) && intent.midi > 0,
     );
+    const excludedSilentSentinels = pitchedIntents.filter((intent) => intent.muted === true).length;
+    const considered = pitchedIntents.filter((intent) => intent.muted !== true);
     // Two passes, exact bin first: a single greedy pass let an intent whose exact
-    // bin was empty (a sentinel ghost, typically) STEAL a neighboring bin's
+    // bin was empty (a dropped audible ghost, for example) STEAL a neighboring bin's
     // dispatch through the ±1 fallback before that bin's own intent claimed it —
     // measured on funk-pocket/chords as 54 false missing/matched pairs. The
     // fallback only runs for intents nothing exact-matched.
@@ -171,7 +173,7 @@ export function verifyIntentParity(
         intentCount: considered.length,
         matchedCount,
         missing,
-        missingSentinelMuted: missing.filter((intent) => intent.muted === true).length,
+        excludedSilentSentinels,
         extraDispatches: poolSize,
     };
 }
@@ -351,7 +353,7 @@ function verifyDumpParity(dump: EventDump): IntentParity {
             intentCount: 0,
             matchedCount: 0,
             missing: [],
-            missingSentinelMuted: 0,
+            excludedSilentSentinels: 0,
             extraDispatches: 0,
         };
     }
@@ -362,16 +364,15 @@ function formatParityLine(stemId: string, parity: IntentParity): string {
     if (!parity.verifiable) {
         return `${stemId.padEnd(14)} NOT VERIFIABLE — ${parity.reason}`;
     }
-    const ghosts =
-        parity.missingSentinelMuted > 0
-            ? ` (${parity.missingSentinelMuted} sentinel-muted ghost${parity.missingSentinelMuted === 1 ? '' : 's'})`
+    const sentinels =
+        parity.excludedSilentSentinels > 0
+            ? `  excluded ${parity.excludedSilentSentinels} silent sentinel${parity.excludedSilentSentinels === 1 ? '' : 's'}`
             : '';
     const extras = parity.extraDispatches > 0 ? `  extra ${parity.extraDispatches}` : '';
-    const verdict =
-        parity.missing.length === 0 ? 'exact' : `MISSING ${parity.missing.length}${ghosts}`;
+    const verdict = parity.missing.length === 0 ? 'exact' : `MISSING ${parity.missing.length}`;
     return (
         `${stemId.padEnd(14)} intents ${String(parity.intentCount).padStart(4)}  ` +
-        `matched ${String(parity.matchedCount).padStart(4)}  ${verdict}${extras}`
+        `matched ${String(parity.matchedCount).padStart(4)}  ${verdict}${extras}${sentinels}`
     );
 }
 
