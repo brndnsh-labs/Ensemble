@@ -15,13 +15,14 @@
  * isolated each acceptance against a synthetic chord; this test guards
  * end-to-end emergent behavior.
  *
- * What this test asserts (S7 spec):
+ * What this test covers (S7 spec; item 4 is exercise-only):
  *   (1) secondsPerStepFor at BPM=60 in 6/8 == 60/60/6 == 1/3 s (S1 contract).
  *   (2) Ride hits cluster on {0, 4, 6, 10} >= empirical threshold over N bars.
  *   (3) Walking-bass density 2-5 onsets/bar AND pulses {0, 6} land on the
  *       current chord's root pitch-class >= 90% (S12 + S15 together).
- *   (4) Soloist mean active-streak <= 10 bars; no streak > 16 bars (S14 budget
- *       at intensity 0.7 + 1.5x session-seed multiplier).
+ *   (4) Exercise the live phrase-first soloist from a non-empty session seed
+ *       so it updates phrasing.isResting for comping coordination. Dedicated
+ *       phrase-first critiques own the soloist assertions.
  *   (5) Comping hits <= 35% per-step density; >= 70% on pulse-aligned {0,4,6,10};
  *       zero hits on off-pulse 4/4-cell {2, 8} (S13).
  *
@@ -43,10 +44,10 @@ import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
-// THE live soloist engine (epic #10 — legacy getSoloistNote retired). Reads
-// soloist.session.seed (mapped from the makeSoloistMock `sessionSeed` option) and
-// maintains phrasing.isResting each tick, which this harness feeds to the comper
-// via coord.soloistResting.
+// The live phrase-first soloist requires a non-empty soloist.session.seed,
+// reads its loopLengthSteps/notes, applies apex/theme/density logic, and
+// maintains phrasing.isResting each tick. This harness feeds the prior-tick
+// resting state to the comper via coord.soloistResting.
 import { getSoloistNotePhraseFirst as getSoloistNote } from '../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../public/state.js';
 import { getFrequency, getStepInfo, secondsPerStepFor } from '../../public/utils.js';
@@ -117,12 +118,12 @@ function buildAllBluesProgression() {
 }
 
 // why: production-shape state. Mirrors the resting-defaults pattern used in
-// soloist-rest-cadence-critique.test.ts (S14) so the phrasing FSM wakes
-// itself up and runs its real budget timer. sessionSeed structured as the
-// soloist-seeder output (`{ notes: [...], loopLengthSteps }`) so the soloist
-// engine takes the seeded-budget 1.5× motivic-preserve path. This mirrors
-// the `regenerateSessionSeeds` helper (state-effects.ts), invoked from the
-// `ACTIONS.TOGGLE_PLAY` case, which always seeds the soloist via
+// soloist-rest-cadence-critique.test.ts (S14) so the live phrase-first path
+// can update its phrasing state. sessionSeed keeps the non-empty
+// soloist-seeder shape (`{ notes: [...], loopLengthSteps }`) that
+// getSoloistNotePhraseFirst requires and reads for its apex/theme/density
+// logic. This mirrors the `regenerateSessionSeeds` helper (state-effects.ts),
+// invoked from the `ACTIONS.TOGGLE_PLAY` case, which seeds the soloist via
 // generateSessionSeed() on play start.
 function buildAllBluesState(currentLoopCount: number, sessionSeed: any) {
     const soloist = makeSoloistMock({
@@ -250,12 +251,12 @@ function runAllBlues(numLoops: number) {
         };
 
         resetCompingState();
-        // why: minimal seeded-soloist payload — one anchor per pulse (mStep 0
-        // and 6) for 12 bars. The soloist's hasSessionSeed gate is
-        // `seed && seed.notes.length > 0`, and the budget multiplier path
-        // (soloist.ts:1881) takes 1.5× only when this is true. Note pitches
-        // are G7-rooted (G=67) — placeholders; the budget assertion below
-        // measures phrasing, not pitch.
+        // why: minimal non-empty phrase-first payload — one note per pulse
+        // (mStep 0 and 6) for 12 bars. getSoloistNotePhraseFirst requires a
+        // non-empty session.seed, reads loopLengthSteps and notes, then applies
+        // apex/theme/density logic while updating phrasing.isResting. Note
+        // pitches are G7-rooted (G=67) — placeholders; this fixture exercises
+        // phrasing and comping coordination, not pitch.
         const seedNotes: { step: number; midi: number }[] = [];
         for (let bar = 0; bar < 12; bar++) {
             seedNotes.push({ step: bar * STEPS_PER_BAR + 0, midi: 67 });
@@ -564,7 +565,6 @@ describe('All Blues 6/8 End-to-End Critique (S7 — cycle DoD)', () => {
         // soloist's live phrasing is guarded by compound-soloist-phrasing-critique
         // (compound boundary placement) and soloist-rest-cadence-critique (rest
         // cadence). The soloist lane still runs above to feed coord.soloistResting.
-
         // ---------------------------------------------------------------
         // (5) Comping density + pulse alignment.
         //
