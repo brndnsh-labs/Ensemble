@@ -5,7 +5,7 @@ import {
     isKnownHarmonyStyle,
     isKnownSoloistStyle,
 } from '../data/instrument-styles.js';
-import { GENRE_FEELS, resolveGenre } from '../data/smart-genres.js';
+import { GENRE_FEELS, resolveGenre, SMART_GENRES } from '../data/smart-genres.js';
 import { hydrateVoice } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { escapeHTML, normalizeSongSeed, stripDangerousChars } from '../sanitize.js';
@@ -700,10 +700,17 @@ function hydrateSavedState(): void {
     }
 }
 
-export function loadFromUrl(): void {
+export interface UrlHydrationResult {
+    genreName: string | null;
+    genreGrooveOverrides: Pick<GrooveState, 'swing' | 'swingSub' | 'humanize'> | null;
+}
+
+export function loadFromUrl(): UrlHydrationResult {
     const { arranger, groove, soloist, bass, chords, harmony } = getState();
     const params = new URLSearchParams(window.location.search);
     let hasParams = false;
+    let genreName: string | null = null;
+    let genreGrooveOverrides: UrlHydrationResult['genreGrooveOverrides'] = null;
 
     const sParam = params.get('s');
     if (sParam) {
@@ -751,14 +758,6 @@ export function loadFromUrl(): void {
         }
     }
 
-    const styleParam = params.get('style');
-    if (styleParam) {
-        // Same union as the `bnd` reader — a `?style=arp` permalink is legitimate.
-        if (isKnownChordStyle(styleParam)) {
-            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: styleParam });
-        }
-    }
-
     const genreParam = params.get('genre');
     if (genreParam) {
         // #1200 — the share writer emits the FEEL (`groove.genreFeel`), while older
@@ -768,8 +767,25 @@ export function loadFromUrl(): void {
         // and writing a name straight into `genreFeel` misses every feel-keyed table.
         const resolvedGenre = resolveGenre(genreParam);
         if (resolvedGenre) {
-            (groove as Mutable<typeof groove>).lastSmartGenre = resolvedGenre.name; // @direct-mutation
-            (groove as Mutable<typeof groove>).genreFeel = resolvedGenre.feel; // @direct-mutation
+            genreName = resolvedGenre.name;
+            // #1000 — run the same REDUCER pipeline as the picker while boot is still
+            // pre-subscriber. This applies the canonical lane styles + groove feel;
+            // main.ts reconciles the async drum/Auto-voice effects once the worker and
+            // subscriber are live. The `bnd` block below intentionally runs afterward,
+            // so its explicit high-fidelity settings remain the final authority.
+            dispatch(ACTIONS.SET_GENRE_FEEL, {
+                genreName,
+                ...SMART_GENRES[genreName],
+            });
+        }
+    }
+
+    const styleParam = params.get('style');
+    if (styleParam) {
+        // Same union as the `bnd` reader — a `?style=arp` permalink is legitimate.
+        // Apply after the genre pipeline so an explicit permalink style still wins.
+        if (isKnownChordStyle(styleParam)) {
+            dispatch(ACTIONS.SET_STYLE, { module: 'chords', style: styleParam });
         }
     }
 
@@ -904,7 +920,7 @@ export function loadFromUrl(): void {
                 } satisfies Partial<HarmonyState>);
             }
             if (band.g) {
-                Object.assign(groove, {
+                const explicitGroove = {
                     enabled: !!band.g.e,
                     volume: hasMixerVersion ? clamp(band.g.v, 0, 1, 1.0) : 1.0,
                     reverb: hasMixerVersion
@@ -913,7 +929,13 @@ export function loadFromUrl(): void {
                     swing: clamp(band.g.sw, 0, 100, 0),
                     swingSub: normalizeSwingSub(band.g.ss),
                     humanize: clamp(band.g.hu, 0, 100, 20),
-                } satisfies Partial<GrooveState>);
+                } satisfies Partial<GrooveState>;
+                Object.assign(groove, explicitGroove);
+                genreGrooveOverrides = {
+                    swing: explicitGroove.swing,
+                    swingSub: explicitGroove.swingSub,
+                    humanize: explicitGroove.humanize,
+                };
             }
         }
     }
@@ -934,6 +956,8 @@ export function loadFromUrl(): void {
     if (params.get('autoplay') === '1') {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'audition', open: true });
     }
+
+    return { genreName, genreGrooveOverrides };
 }
 
 function clearChordPresetHighlight() {}

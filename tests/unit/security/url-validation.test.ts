@@ -47,6 +47,7 @@ describe('Security: URL Parameter Validation', () => {
         // Reset mock state
         mockState.arranger.timeSignature = '4/4';
         mockState.groove.genreFeel = 'Rock';
+        mockState.groove.lastSmartGenre = 'Rock';
         mockState.playback.bpm = 120;
         mockState.chords.style = 'smart';
         mockState.arranger.notation = 'roman';
@@ -110,13 +111,22 @@ describe('Security: URL Parameter Validation', () => {
     it('rejects invalid genre', () => {
         window.location.search = '?genre=Hack';
         loadFromUrl();
-        expect(mockState.groove.genreFeel).toBe('Rock');
+        expect(dispatchSpy).not.toHaveBeenCalledWith(ACTIONS.SET_GENRE_FEEL, expect.anything());
     });
 
     it('accepts valid genre', () => {
         window.location.search = '?genre=Disco';
         loadFromUrl();
-        expect(mockState.groove.genreFeel).toBe('Disco');
+        expect(dispatchSpy).toHaveBeenCalledWith(
+            ACTIONS.SET_GENRE_FEEL,
+            expect.objectContaining({
+                genreName: 'Disco',
+                feel: 'Disco',
+                drum: 'Disco',
+                bass: 'disco',
+                soloist: 'disco',
+            }),
+        );
     });
 
     it('rejects invalid notation', () => {
