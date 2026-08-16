@@ -248,6 +248,243 @@ describe('Drum Seeder', () => {
     });
 });
 
+describe('Drum Seeder — Rock section-return memory (#996)', () => {
+    const repeatedChorusArranger = {
+        timeSignature: '4/4',
+        totalSteps: 192,
+        sectionMap: [
+            { id: 'intro', start: 0, end: 32, label: 'Intro' },
+            { id: 'verse', start: 32, end: 64, label: 'Verse' },
+            { id: 'chorus-1', start: 64, end: 96, label: 'Chorus 1' },
+            { id: 'bridge', start: 96, end: 128, label: 'Bridge' },
+            { id: 'chorus-2', start: 128, end: 160, label: 'Chorus II' },
+            { id: 'outro', start: 160, end: 192, label: 'Outro' },
+        ],
+    };
+
+    it('repeats the first post-Head Chorus snare catch at one section-relative step', () => {
+        const sourceStep = 192 + 64 + 6;
+        const map = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            {
+                loopLengthSteps: 576,
+                notes: [{ step: sourceStep, velocity: 0.9, midi: 72 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(map[sourceStep]).toMatchObject({ type: 'snare-stab' });
+        expect(map[sourceStep].role).toBeUndefined();
+        // Base-form templates are consumed only by the practice-folded lookup.
+        expect(map[64 + 6]).toMatchObject({ type: 'snare-stab', role: 'section-return' });
+        expect(map[128 + 6]).toMatchObject({ type: 'snare-stab', role: 'section-return' });
+        // Ordinary playback/export gets the same offset in every later match.
+        expect(map[192 + 128 + 6]).toMatchObject({ role: 'section-return' });
+        expect(map[384 + 64 + 6]).toMatchObject({ role: 'section-return' });
+        expect(map[384 + 128 + 6]).toMatchObject({ role: 'section-return' });
+
+        const sameSeedMap = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            {
+                loopLengthSteps: 576,
+                notes: [{ step: sourceStep, velocity: 0.9, midi: 72 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+        expect(sameSeedMap).toEqual(map);
+    });
+
+    it('does not fall through when the first repeated Chorus has no eligible source', () => {
+        const map = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            {
+                loopLengthSteps: 576,
+                notes: [{ step: 192 + 128 + 6, velocity: 0.9 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(Object.values(map).some((accent) => accent.role === 'section-return')).toBe(false);
+    });
+
+    it('skips crowded raw stabs and selects the first audibly eligible catch', () => {
+        const crowdedOffset = 3; // a 16th before the beat-2 backbeat
+        const eligibleOffset = 22;
+        const map = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            {
+                loopLengthSteps: 576,
+                notes: [
+                    { step: 192 + 64 + crowdedOffset, velocity: 0.9 },
+                    { step: 192 + 64 + eligibleOffset, velocity: 0.9 },
+                ],
+            },
+            'Rock',
+            0.8,
+            'S0',
+        );
+
+        expect(map[64 + crowdedOffset]?.role).toBeUndefined();
+        expect(map[128 + crowdedOffset]?.role).toBeUndefined();
+        expect(map[64 + eligibleOffset]).toMatchObject({ role: 'section-return' });
+        expect(map[128 + eligibleOffset]).toMatchObject({ role: 'section-return' });
+    });
+
+    it('does not treat labels that merely begin with chorus as Chorus sections', () => {
+        const arranger = {
+            ...repeatedChorusArranger,
+            sectionMap: [
+                { id: 'verse', start: 0, end: 64, label: 'Verse' },
+                { id: 'chorusline-1', start: 64, end: 96, label: 'Chorusline 1' },
+                { id: 'bridge', start: 96, end: 128, label: 'Bridge' },
+                { id: 'chorusline-2', start: 128, end: 160, label: 'Chorusline II' },
+                { id: 'outro', start: 160, end: 192, label: 'Outro' },
+            ],
+        };
+        const map = generateSoloistAccents(
+            {},
+            arranger,
+            {
+                loopLengthSteps: 576,
+                notes: [{ step: 192 + 64 + 6, velocity: 0.9 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(Object.values(map).some((accent) => accent.role === 'section-return')).toBe(false);
+    });
+
+    it('does not memorize a source catch suppressed by the pre-Drop cut', () => {
+        const arranger = {
+            timeSignature: '4/4',
+            totalSteps: 160,
+            sectionMap: [
+                { id: 'intro', start: 0, end: 32, label: 'Intro' },
+                { id: 'chorus-1', start: 32, end: 64, label: 'Chorus 1' },
+                { id: 'drop', start: 64, end: 96, label: 'Drop' },
+                { id: 'chorus-2', start: 96, end: 128, label: 'Chorus II' },
+                { id: 'outro', start: 128, end: 160, label: 'Outro' },
+            ],
+        };
+        const sourceStep = arranger.totalSteps + 32 + 22;
+        const map = generateSoloistAccents(
+            {},
+            arranger,
+            {
+                loopLengthSteps: 480,
+                notes: [{ step: sourceStep, velocity: 0.9 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(map[sourceStep]).toMatchObject({ type: 'snare-stab' });
+        expect(Object.values(map).some((accent) => accent.role === 'section-return')).toBe(false);
+    });
+
+    it('does not invent a return without a source or a repeated normalized Chorus', () => {
+        const noSource = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            { loopLengthSteps: 576, notes: [{ step: 262, velocity: 0.5 }] },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+        expect(Object.values(noSource).some((accent) => accent.role === 'section-return')).toBe(
+            false,
+        );
+
+        const singleChorus = {
+            ...repeatedChorusArranger,
+            sectionMap: [
+                { id: 'verse', start: 0, end: 64, label: 'Verse' },
+                { id: 'chorus', start: 64, end: 128, label: 'Chorus' },
+                { id: 'outro', start: 128, end: 192, label: 'Outro' },
+            ],
+        };
+        const noRepeat = generateSoloistAccents(
+            {},
+            singleChorus,
+            { loopLengthSteps: 576, notes: [{ step: 262, velocity: 0.9 }] },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+        expect(Object.values(noRepeat).some((accent) => accent.role === 'section-return')).toBe(
+            false,
+        );
+    });
+
+    it('stays Rock-only and 4/4-only', () => {
+        const seed = {
+            loopLengthSteps: 576,
+            notes: [{ step: 262, velocity: 0.9 }],
+        };
+        const funk = generateSoloistAccents(
+            {},
+            repeatedChorusArranger,
+            seed,
+            'Funk',
+            0.8,
+            'TYPE_0',
+        );
+        const threeFour = generateSoloistAccents(
+            {},
+            { ...repeatedChorusArranger, timeSignature: '3/4' },
+            seed,
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(Object.values(funk).some((accent) => accent.role === 'section-return')).toBe(false);
+        expect(Object.values(threeFour).some((accent) => accent.role === 'section-return')).toBe(
+            false,
+        );
+    });
+
+    it('leaves the form-final cadence measure to the established ending gesture', () => {
+        const arranger = {
+            timeSignature: '4/4',
+            totalSteps: 128,
+            sectionMap: [
+                { id: 'verse', start: 0, end: 64, label: 'Verse' },
+                { id: 'chorus-1', start: 64, end: 96, label: 'Chorus 1' },
+                { id: 'chorus-2', start: 96, end: 128, label: 'Chorus 2' },
+            ],
+        };
+        const map = generateSoloistAccents(
+            {},
+            arranger,
+            {
+                loopLengthSteps: 400,
+                notes: [{ step: 128 + 64 + 22, velocity: 0.9 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(map[96 + 22]).toBeUndefined();
+        expect(map[128 + 96 + 22]).toBeUndefined();
+        expect(map[256 + 64 + 22]).toMatchObject({ role: 'section-return' });
+    });
+});
+
 describe('Drum Seeder — fill restraint + defer-to-soloist (drum audit 2026-05-29)', () => {
     // Four same-label 'Verse' sections give pure base-rate (minor) seams: no
     // chorus/drop arrival, no role change, flat energy, and not the loop return.

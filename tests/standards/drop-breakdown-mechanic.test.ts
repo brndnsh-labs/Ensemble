@@ -315,6 +315,25 @@ describe('Drop/Breakdown S1(b) — pre-drop mute window', () => {
         expect(harmonySpy).not.toHaveBeenCalled();
     });
 
+    it('suppresses a rehearsed section return inside the protected Rock drop cell', () => {
+        const state = makeState({ nextLabel: 'Drop', genreFeel: 'Rock', includeDrums: true });
+        const catchStep = 3 * SPB + 6;
+        state.groove.accentMap = {
+            [catchStep]: { type: 'snare-stab', velocity: 1.1, role: 'section-return' },
+        };
+        state.groove.seedTimelineStartStep = 0;
+        state.playback.currentLoopCount = 1;
+
+        const result = generateNotesForStep(state, catchStep, freshCursors(), {
+            ...ALL_ENGINES,
+            includeDrums: true,
+        });
+
+        expect(result.coordination.dropMuteActive).toBe(true);
+        expect(result.coordination.sharedCatch).toBeNull();
+        expect(accompSpy).not.toHaveBeenCalled();
+    });
+
     it('fires exactly one Crash on the downbeat of the cut bar (drums exempt)', () => {
         const state = makeState({ nextLabel: 'Drop', genreFeel: 'Rock', includeDrums: true });
         const cursors = freshCursors();

@@ -26,7 +26,11 @@ import * as rock from './grooves/rock.js';
 import * as skaPunk from './grooves/ska-punk.js';
 import { DEFAULT_CONFIG, isBackbeatAdjacentStep } from './grooves/utils.js';
 import { deriveSectionSeed, scrambleHash, stringHash31, stringHash33 } from './hash-utils.js';
-import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-overrides.js';
+import {
+    isInstrumentActiveAtStep,
+    isPracticeLooping,
+    motifSelectionIntensity,
+} from './section-overrides.js';
 
 /**
  * Resolve a seeded soloist accent in the same timeline frame used by the
@@ -36,12 +40,43 @@ import { isInstrumentActiveAtStep, motifSelectionIntensity } from './section-ove
 export function getSoloistAccentAtStep(
     groove: EnsembleState['groove'],
     step: number,
+    sectionReturnActive = true,
+    sectionReturnPracticeFold = false,
 ): AccentCatch | null {
+    // Practice asks the engine for a chart-relative step even when the current
+    // seed began later on the transport. Return templates deliberately live at
+    // chart coordinates, so resolve that narrow role before applying the normal
+    // seed-timeline offset. Ordinary accents continue to use the exact seeded
+    // timeline lookup below.
+    if (sectionReturnPracticeFold) {
+        const foldedAccent = groove.accentMap?.[step] as AccentCatch | undefined;
+        if (foldedAccent?.role === 'section-return') {
+            return foldedAccent;
+        }
+    }
     const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
     const timelineStep = step - seedTimelineStartStep;
-    return timelineStep >= 0
-        ? ((groove.accentMap?.[timelineStep] as AccentCatch | undefined) ?? null)
-        : null;
+    const accent =
+        timelineStep >= 0
+            ? ((groove.accentMap?.[timelineStep] as AccentCatch | undefined) ?? null)
+            : null;
+    return accent?.role === 'section-return' && !sectionReturnActive ? null : accent;
+}
+
+/**
+ * Section-return templates are silent on the normal Head, but practice folding
+ * activates them because every drill pass intentionally reuses the same chart
+ * coordinates instead of advancing through the absolute seed timeline.
+ */
+export function isSectionReturnActive(playback: EnsembleState['playback']): boolean {
+    return isSectionReturnPracticeFold(playback) || (playback.currentLoopCount ?? 0) > 0;
+}
+
+export function isSectionReturnPracticeFold(playback: EnsembleState['playback']): boolean {
+    return isPracticeLooping({
+        loopStartStep: playback.loopStartStep,
+        loopEndStep: playback.loopEndStep,
+    });
 }
 
 /**
@@ -55,8 +90,15 @@ export function getAudibleSnareCatchAtStep(
     loopStep: number,
     stepsPerBar: number,
     isDownbeat: boolean,
+    sectionReturnActive = true,
+    sectionReturnPracticeFold = false,
 ): AccentCatch | null {
-    const accent = getSoloistAccentAtStep(groove, step);
+    const accent = getSoloistAccentAtStep(
+        groove,
+        step,
+        sectionReturnActive,
+        sectionReturnPracticeFold,
+    );
     if (
         accent?.type !== 'snare-stab' ||
         isDownbeat ||
@@ -654,8 +696,18 @@ export function applyGrooveOverrides(
     // loud snare on the downbeat (no backbeat lives on beat 1) or a 16th from
     // beats 2/4 — the "early snare" / "two snares in a row" the owner reported. A
     // snare-stab catching a syncopation in open space is still musical and kept.
-    const snareCatch = getAudibleSnareCatchAtStep(groove, step, loopStep, stepsPerBar, isDownbeat);
-    const accent = getSoloistAccentAtStep(groove, step);
+    const practiceFoldActive = isSectionReturnPracticeFold(playback);
+    const sectionReturnActive = practiceFoldActive || (playback.currentLoopCount ?? 0) > 0;
+    const snareCatch = getAudibleSnareCatchAtStep(
+        groove,
+        step,
+        loopStep,
+        stepsPerBar,
+        isDownbeat,
+        sectionReturnActive,
+        practiceFoldActive,
+    );
+    const accent = getSoloistAccentAtStep(groove, step, sectionReturnActive, practiceFoldActive);
     if (accent) {
         if (accent.type === 'crash-catch') {
             if (inst.name === 'Kick') {

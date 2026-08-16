@@ -88,6 +88,8 @@ vi.mock('../../../public/engine/groove-engine.js', () => ({
         instTimeOffset: 0,
     })),
     getAudibleSnareCatchAtStep: vi.fn(() => null),
+    isSectionReturnActive: vi.fn(() => true),
+    isSectionReturnPracticeFold: vi.fn(() => false),
 }));
 
 import {
@@ -303,6 +305,44 @@ describe('Producer order guard', () => {
         );
 
         expect(accompanimentCoordinationArg?.sharedCatch).toBeNull();
+    });
+
+    it('#996 publishes a rehearsed section return even when the drummer is muted', () => {
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValueOnce({
+            type: 'snare-stab',
+            velocity: 1.1,
+            role: 'section-return',
+        });
+        const state = makeState();
+        state.groove.enabled = false;
+        state.groove.genreFeel = 'Rock';
+        state.groove.instruments = [
+            { name: 'Kick', muted: false, steps: new Array(16).fill(0) },
+            { name: 'Snare', muted: true, steps: new Array(16).fill(0) },
+        ];
+        state.playback.currentLoopCount = 1;
+
+        generateNotesForStep(
+            state,
+            6,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                includeSoloist: false,
+                includeHarmony: false,
+                includeBass: false,
+                includeChords: true,
+                includeDrums: false,
+            },
+        );
+
+        expect(accompanimentCoordinationArg?.sharedCatch).toEqual({
+            type: 'snare-stab',
+            velocity: 1.1,
+            role: 'section-return',
+        });
     });
 
     it('#994 honors an explicit shared-catch exclusion without overloading sink flags', () => {

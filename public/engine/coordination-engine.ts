@@ -283,6 +283,7 @@ export function macroArcLadder(progress: number): { macroFloor: number; macroCei
 export interface SharedCatch {
     type: 'snare-stab';
     velocity: number;
+    role?: 'section-return';
 }
 
 export function createCoordinationContext(
@@ -536,11 +537,12 @@ export function createCoordinationContext(
         // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (chords/harmony can read this)
         soloistQaHang: null as SoloistQaHang | null,
-        // why (#994, #995): the drummer already plans sparse catches against
+        // why (#994, #995, #996): the drummer already plans sparse catches against
         // seeded soloist peaks. Publish the eligible Rock/Funk snare catch
         // through the per-tick contract so each comper can interpret the SAME
         // moment idiomatically without reading groove.accentMap or re-deriving
-        // its timeline offset.
+        // its timeline offset. A narrow optional `section-return` role marks a
+        // rehearsed Rock Chorus recurrence without creating a gesture bus.
         // writer: drums-tick.ts runDrumTick (after final snare evaluation)
         // readable-after: drum producer (soloist, bass, chords, harmony)
         sharedCatch: null as SharedCatch | null,
