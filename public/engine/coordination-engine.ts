@@ -536,10 +536,11 @@ export function createCoordinationContext(
         // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (chords/harmony can read this)
         soloistQaHang: null as SoloistQaHang | null,
-        // why (#994): the drummer already plans sparse catches against seeded
-        // soloist peaks. Publish the eligible Rock snare catch through the
-        // per-tick contract so the comper can join the SAME moment without
-        // reading groove.accentMap or re-deriving its timeline offset.
+        // why (#994, #995): the drummer already plans sparse catches against
+        // seeded soloist peaks. Publish the eligible Rock/Funk snare catch
+        // through the per-tick contract so each comper can interpret the SAME
+        // moment idiomatically without reading groove.accentMap or re-deriving
+        // its timeline offset.
         // writer: drums-tick.ts runDrumTick (after final snare evaluation)
         // readable-after: drum producer (soloist, bass, chords, harmony)
         sharedCatch: null as SharedCatch | null,

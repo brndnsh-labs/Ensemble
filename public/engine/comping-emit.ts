@@ -55,8 +55,8 @@ export interface AccompanimentCoordination {
     // the comper may CATCH it: one lean echo of the hang tone in the carved
     // breath, and a top-voice re-landing with the soloist's answer.
     soloistQaHang?: SoloistQaHang | null;
-    // writer: runDrumTick after final snare evaluation. Narrow Rock pilot only —
-    // consumers must not treat this as a generic gesture bus.
+    // writer: runDrumTick after final snare evaluation. Narrow Rock/Funk pilot
+    // only — consumers must not treat this as a generic gesture bus.
     sharedCatch?: SharedCatch | null;
     bassHit?: boolean;
     bassMidi?: number;
@@ -249,12 +249,12 @@ function applyPerHitEconomy(
 }
 
 /**
- * Reduce a Rock ensemble catch to a compact shell while leaving the full
- * voicing in comping memory. Prefer guide/support tones that do not double the
- * active soloist pitch class; a one-note shell is valid when that is the only
- * clean option.
+ * Reduce a shared ensemble catch to a compact shell while leaving the full
+ * genre-owned voicing in comping memory. Prefer guide/support tones that do not
+ * double the active soloist pitch class; a one-note shell is valid when that is
+ * the only clean option.
  */
-function selectSharedCatchVoicing(
+export function selectSharedCatchVoicing(
     voicingMidis: number[],
     chord: Chord,
     soloistMidi: number,
