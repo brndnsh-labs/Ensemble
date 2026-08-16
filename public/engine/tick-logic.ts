@@ -8,6 +8,7 @@ import {
     type CoordinationContext,
     enforceRegisterSlotting,
     macroArcLadder,
+    selectRockQaResponseOwner,
     updateCoordinationContext,
 } from './coordination-engine.js';
 import { runDrumTick } from './drums-tick.js';
@@ -92,7 +93,7 @@ export function generateNotesForStep(
     options: GenerateNotesOptions = {},
     carryover: CoordinationCarryover | null = null,
 ): GenerateNotesResult {
-    const { arranger, bass, soloist, harmony } = state;
+    const { arranger, bass, groove, soloist, harmony } = state;
 
     // Drum preamble + drum block: coordination assembly and all drum-hit
     // generation. Moved verbatim into `drums-tick.ts` (the clean, lane-free
@@ -212,13 +213,56 @@ export function generateNotesForStep(
         }
     }
 
+    // #997 — publish one stable owner for an eligible Rock Q&A breath. This is
+    // intentionally outside the soloist sink block: live/MIDI generators can
+    // fill the bass and chord buffers separately, but ownership must remain a
+    // property of the musical window rather than whichever sink ran first.
+    // `drumTick.include*` reflects the musical lane state; the option-derived
+    // `include*` values above reflect only this call's output sink.
+    if (groove.genreFeel === 'Rock' && drumTick.includeSoloist && !dropMuteActive) {
+        const sessionSeed =
+            soloist.session.seed && typeof soloist.session.seed === 'object'
+                ? soloist.session.seed
+                : null;
+        const qaHang =
+            coordination.soloistQaHang ??
+            getQaHangAt(
+                sessionSeed,
+                step,
+                ts.stepsPerBeat,
+                ts.beats * ts.stepsPerBeat,
+                arranger.totalSteps,
+            );
+        coordination.soloistQaHang = qaHang;
+        coordination.soloistQaResponseOwner = selectRockQaResponseOwner(
+            qaHang,
+            groove.genreFeel,
+            drumTick.includeChords,
+            drumTick.includeBass,
+        );
+    }
+
     // 3. Bass Generation (Yields to Soloist, Locks to Kick)
     // `!dropMuteActive`: see the soloist gate above — S1(b) drop cut bar.
     if (includeBass && !dropMuteActive) {
         if (chordData) {
             const { chord, stepInChord } = chordData;
             if (isBassActive(state, bass.style, step, stepInChord, stepInfo, coordination)) {
-                const nextChordData = getChordAtStep(step + 4, arranger, cursors.lookaheadCursor);
+                // #997: on a bass-owned Q&A response, approach the harmony at
+                // the soloist's actual answer entry rather than assuming one
+                // beat of lookahead. Use a throwaway cursor so the rare farther
+                // lookup cannot move the hot-path cursor past the next tick.
+                const qaAnswerStep =
+                    coordination.soloistQaResponseOwner === 'bass'
+                        ? coordination.soloistQaHang?.answerEntryStep
+                        : undefined;
+                const nextChordData = getChordAtStep(
+                    qaAnswerStep ?? step + 4,
+                    arranger,
+                    qaAnswerStep === undefined
+                        ? cursors.lookaheadCursor
+                        : { index: 0, sectionIndex: 0 },
+                );
                 const { sectionStart, sectionEnd } = chordData;
                 const bassResult = getBassNote(
                     state,

@@ -78,6 +78,25 @@ export function resetBassState(state: EnsembleState): void {
     (bass as Mutable<typeof bass>).lastMidiPlayed = null; // @worker-mutation
 }
 
+/**
+ * Shared activation/emission predicate for #997's Rock bass response. Keeping
+ * this as one function prevents the classic dual-gate failure where the bass
+ * lane activates without emitting the intended pickup (or the pickup code is
+ * unreachable because activation skipped the step).
+ */
+export function isRockQaBassResponseStep(
+    state: EnsembleState,
+    step: number,
+    coordination: any,
+): boolean {
+    return Boolean(
+        state.groove.genreFeel === 'Rock' &&
+            coordination?.soloistQaResponseOwner === 'bass' &&
+            coordination?.soloistQaHang?.echoStep === step &&
+            coordination?.isFinalMeasure !== true,
+    );
+}
+
 export function isBassActive(
     state: EnsembleState,
     style: string,
@@ -195,6 +214,10 @@ export function isBassActive(
     const subtractionMutes = coordination?.subtractionMutedLanes;
     if (Array.isArray(subtractionMutes) && subtractionMutes.includes('bass')) {
         return false;
+    }
+
+    if (isRockQaBassResponseStep(state, step, coordination)) {
+        return true;
     }
 
     const intBeat = stepInfo
@@ -1086,6 +1109,26 @@ export function getBassNote(
     const bassSubtractionMutes = context?.stepCoordination?.subtractionMutedLanes;
     if (Array.isArray(bassSubtractionMutes) && bassSubtractionMutes.includes('bass')) {
         return null;
+    }
+
+    if (isRockQaBassResponseStep(state, step, context?.stepCoordination)) {
+        const answerChord = nextChord ?? chord;
+        const answerRoot = normalizeToRange(answerChord.bassMidi ?? answerChord.rootMidi);
+        const answerScale = getScaleForChord(state, answerChord, null, style);
+        const below = answerRoot + (answerScale.at(-1) ?? 10) - 12;
+        const above = answerRoot + (answerScale[1] ?? 2);
+        const pickupMidi =
+            prevMidi !== null && Math.abs(above - prevMidi) < Math.abs(below - prevMidi)
+                ? above
+                : below;
+
+        // A short diatonic neighbor into the answer/downbeat root: one pickup,
+        // not a second bass phrase competing with the soloist's re-entry.
+        return result(
+            getFrequency(clampAndNormalizeMidi(pickupMidi, prevMidi)),
+            Math.max(0.5, ts.stepsPerBeat * 0.25),
+            0.95,
+        );
     }
 
     const kickInst = (groove.instruments || []).find((i: any) => i.name === 'Kick');
