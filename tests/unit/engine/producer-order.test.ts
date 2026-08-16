@@ -26,6 +26,7 @@ const { makeSoloistMock } = await vi.hoisted(
 // Capture the harmony spy across test scope.
 let harmonyCoordinationArg: any = null;
 let accompanimentCoordinationArg: any = null;
+let bassCoordinationArg: any = null;
 
 // ── module mocks ─────────────────────────────────────────────────────────────
 // Mock the soloist to return a deterministic non-rest note (midi=72, F5).
@@ -68,7 +69,10 @@ vi.mock('../../../public/config.js', () => ({
 // Silence the bass engine (not the module under test here).
 vi.mock('../../../public/engine/bass-engine.js', () => ({
     getBassNote: vi.fn(() => null),
-    isBassActive: vi.fn(() => false),
+    isBassActive: vi.fn((...args) => {
+        bassCoordinationArg = args[5];
+        return false;
+    }),
 }));
 
 // Silence the accompaniment engine.
@@ -98,6 +102,7 @@ import {
 } from '../../../public/engine/groove-engine.js';
 // ── imports (after mocks) ────────────────────────────────────────────────────
 import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
+import { getQaHangAt } from '../../../public/engine/soloist-phrase-first.js';
 import { generateNotesForStep } from '../../../public/engine/tick-logic.js';
 import { getFrequency } from '../../../public/utils.js';
 
@@ -175,6 +180,7 @@ describe('Producer order guard', () => {
     beforeEach(() => {
         harmonyCoordinationArg = null;
         accompanimentCoordinationArg = null;
+        bassCoordinationArg = null;
         vi.clearAllMocks();
         vi.mocked(applyGrooveOverrides).mockReturnValue({
             shouldPlay: false,
@@ -183,6 +189,7 @@ describe('Producer order guard', () => {
             instTimeOffset: 0,
         });
         vi.mocked(getAudibleSnareCatchAtStep).mockReturnValue(null);
+        vi.mocked(getQaHangAt).mockReturnValue(null);
     });
 
     it('coordination.soloistMidi is non-zero when harmony receives the context (soloist ran before harmony)', () => {
@@ -234,6 +241,82 @@ describe('Producer order guard', () => {
         expect(harmonyCoordinationArg).not.toBeNull();
         // Soloist was skipped — soloistMidi must remain 0
         expect(harmonyCoordinationArg.soloistMidi).toBe(0);
+    });
+
+    it('#997 publishes one Rock Q&A owner before separate bass and chord sinks run', () => {
+        const qaHang = {
+            pc: 5,
+            drawSalt: 997,
+            hangStartStep: 2,
+            echoStep: 6,
+            answerEntryStep: 10,
+            resolutionBarStart: 16,
+            resolutionBarEnd: 32,
+        };
+        vi.mocked(getQaHangAt).mockReturnValue(qaHang);
+        const state = makeState();
+        state.groove.genreFeel = 'Rock';
+        state.bass.enabled = true;
+
+        generateNotesForStep(
+            state,
+            qaHang.echoStep,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                // Simulate split buffer filling: the soloist sink is already
+                // filled, while bass/chords still need this musical step.
+                includeSoloist: false,
+                includeBass: true,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+        );
+
+        expect(bassCoordinationArg?.soloistQaHang).toEqual(qaHang);
+        expect(accompanimentCoordinationArg?.soloistQaHang).toEqual(qaHang);
+        expect(['bass', 'chords']).toContain(bassCoordinationArg?.soloistQaResponseOwner);
+        expect(accompanimentCoordinationArg?.soloistQaResponseOwner).toBe(
+            bassCoordinationArg?.soloistQaResponseOwner,
+        );
+    });
+
+    it('#997 publishes no owner when the soloist musical lane is muted', () => {
+        vi.mocked(getQaHangAt).mockReturnValue({
+            pc: 5,
+            drawSalt: 997,
+            hangStartStep: 2,
+            echoStep: 6,
+            answerEntryStep: 10,
+            resolutionBarStart: 16,
+            resolutionBarEnd: 32,
+        });
+        const state = makeState();
+        state.groove.genreFeel = 'Rock';
+        state.soloist.enabled = false;
+        state.bass.enabled = true;
+
+        generateNotesForStep(
+            state,
+            6,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                includeSoloist: false,
+                includeBass: true,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+        );
+
+        expect(bassCoordinationArg?.soloistQaResponseOwner).toBeNull();
+        expect(accompanimentCoordinationArg?.soloistQaResponseOwner).toBeNull();
     });
 
     it('#994 publishes an eligible Rock snare catch before the chord producer runs', () => {

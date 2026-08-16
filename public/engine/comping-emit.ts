@@ -2,7 +2,11 @@ import type { TimeSignatureConfig } from '../config.js';
 import type { Chord, EnsembleState, SoloistQaHang, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import type { CompingState } from './comping-state.js';
-import { getBandPocket, type SharedCatch } from './coordination-engine.js';
+import {
+    getBandPocket,
+    type SharedCatch,
+    type SoloistQaResponseOwner,
+} from './coordination-engine.js';
 import { scrambleHash } from './hash-utils.js';
 import { chordTargetTones } from './soloist-pitch-engine.js';
 import {
@@ -55,6 +59,9 @@ export interface AccompanimentCoordination {
     // the comper may CATCH it: one lean echo of the hang tone in the carved
     // breath, and a top-voice re-landing with the soloist's answer.
     soloistQaHang?: SoloistQaHang | null;
+    // writer: tick-logic after the Q&A digest. Exactly one Rock responder may
+    // own the live window; null means the ordinary comp cell is unchanged.
+    soloistQaResponseOwner?: SoloistQaResponseOwner | null;
     // writer: runDrumTick after final snare evaluation. Narrow Rock/Funk pilot
     // plus Rock's section-return marker only — consumers must not treat this as
     // a generic gesture bus.
@@ -599,6 +606,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
     // adjacent loop tier live vs export. Boundary windows only.)
     const qaHang = coordination.soloistQaHang;
     let qaEcho = false;
+    let rockQaHandoffEcho = false;
     let qaResolution = false;
     // Style gate: 'smart' AND 'jazz' both land in this standard emit lane —
     // Smart Genres sets style 'jazz' (not 'smart') for Jazz/Blues (see the
@@ -611,7 +619,20 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
     // but keeps genre 'Bossa Nova' through the override, so the RING gate
     // still excludes it.
     const qaStyleLive = chords.style === 'smart' || chords.style === 'jazz';
-    if (qaHang && RING_THROUGH_GENRES.has(genre) && qaStyleLive) {
+    if (
+        qaHang &&
+        genre === 'Rock' &&
+        coordination.soloistQaResponseOwner === 'chords' &&
+        qaStyleLive &&
+        step === qaHang.echoStep
+    ) {
+        // #997: the owner assignment already made the participation decision.
+        // Reuse the established Q&A delay and lean voicing below, but emit one
+        // short answer rather than the Jazz/Blues ring-and-resolution pair.
+        qaEcho = true;
+        rockQaHandoffEcho = true;
+        isHit = true;
+    } else if (qaHang && RING_THROUGH_GENRES.has(genre) && qaStyleLive) {
         const qaLoop = Math.min(Math.max(playback.currentLoopCount ?? 0, 0), 3);
         // ~25% of questions answered on loop 0 → ~55% by loop 3+.
         const answerRate = 0.25 + 0.1 * qaLoop;
@@ -1146,7 +1167,9 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
             // before the answer lands (no pedal across the change — correct);
             // the connection the listener hears is the sustained decay into
             // the re-entry, not a literal overlap.
-            durationSteps = Math.max(durationSteps, qaHang.answerEntryStep - step + 0.5);
+            durationSteps = rockQaHandoffEcho
+                ? Math.min(durationSteps, Math.max(0.5, ts.stepsPerBeat * 0.25))
+                : Math.max(durationSteps, qaHang.answerEntryStep - step + 0.5);
         } else if (qaResolution && qaHang) {
             // RESOLUTION — re-land WITH the soloist: if this hit's emitted top
             // voice is a non-pillar, snap it down onto the nearest pillar PC so

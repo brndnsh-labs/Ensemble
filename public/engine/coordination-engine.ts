@@ -1,6 +1,7 @@
 import { getSectionEnergy } from '../song/form-analysis.js';
 import type { Chord, SoloistHook, SoloistQaHang, SoloistSessionSeed, StepInfo } from '../types.js';
 import type { DropMuteStyle } from './drop-mechanic.js';
+import { scrambleHash } from './hash-utils.js';
 
 /**
  * Coordination Context Management and Contract Enforcement
@@ -286,6 +287,37 @@ export interface SharedCatch {
     role?: 'section-return';
 }
 
+export type SoloistQaResponseOwner = 'chords' | 'bass';
+
+/**
+ * Pick one responder for a Rock Q&A window. The window's absolute start and
+ * seed-derived salt make the choice stable for every tick in the window while
+ * still varying across questions and sessions. Availability is the musical
+ * lane state, not a caller's current buffer sink, so separate bass/chord fills
+ * cannot independently claim the same breath.
+ */
+export function selectRockQaResponseOwner(
+    qaHang: SoloistQaHang | null,
+    genreFeel: string,
+    chordsAvailable: boolean,
+    bassAvailable: boolean,
+): SoloistQaResponseOwner | null {
+    if (!qaHang || genreFeel !== 'Rock' || (!chordsAvailable && !bassAvailable)) {
+        return null;
+    }
+    if (!chordsAvailable) {
+        return 'bass';
+    }
+    if (!bassAvailable) {
+        return 'chords';
+    }
+
+    const ownerDraw = scrambleHash(
+        Math.imul(qaHang.hangStartStep, 0x9e3779b1) ^ qaHang.drawSalt ^ 0x51ed270b,
+    );
+    return ownerDraw < 0.5 ? 'chords' : 'bass';
+}
+
 export function createCoordinationContext(
     step: number,
     stepInfo: StepInfo | null = null,
@@ -537,6 +569,14 @@ export function createCoordinationContext(
         // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (chords/harmony can read this)
         soloistQaHang: null as SoloistQaHang | null,
+        // why (#997): one Rock player answers the soloist's planned breath.
+        // Nullable and deliberately narrower than a gesture/role allocator:
+        // the owner exists only while a Q&A window is live. The writer uses
+        // musical lane availability rather than per-call sink flags so split
+        // worker/MIDI fills cannot assign both players independently.
+        // writer: tick-logic.ts (after soloist Q&A digest publication)
+        // readable-after: soloist producer (bass and chords can read this)
+        soloistQaResponseOwner: null as SoloistQaResponseOwner | null,
         // why (#994, #995, #996): the drummer already plans sparse catches against
         // seeded soloist peaks. Publish the eligible Rock/Funk snare catch
         // through the per-tick contract so each comper can interpret the SAME
