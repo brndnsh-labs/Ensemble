@@ -11,7 +11,12 @@ import {
     FUNK_COMPING_ORNAMENTS,
     JAZZ_COMPING_CELLS,
 } from './comping-cells.js';
-import { type AccompanimentCoordination, type CCEvent, emitCompNotes } from './comping-emit.js';
+import {
+    type AccompanimentCoordination,
+    type CCEvent,
+    emitCompNotes,
+    selectSharedCatchVoicing,
+} from './comping-emit.js';
 import { compingState } from './comping-state.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
 import {
@@ -1988,10 +1993,26 @@ export function getAccompanimentNotes(
         // (vel ≈ 0.18) and the soloist's breath dissolves into noise floor.
         // The gate's whole point is loop-coherent silence — gate the ghost
         // too. (Epic 9 S2.a review P1 #1+#2.)
-        const ghostProb = 0.15 + intensity * 0.35;
-        const isGhost = !isHit && !funkPhraseEndThinned && compDraw(24) < ghostProb;
+        // --- #995: Funk interpretation of the drummer's shared snare catch ---
+        // The ordinary cell wins when it already attacks here: the catch should
+        // never stack a second clav event on top of Funk's own syncopation. A
+        // phrase-end breath also wins. Otherwise the drummer-authored intent may
+        // replace incidental ghost-note chance with one deliberate upper-shell
+        // stab. The producer already gates the intent on audible drum + enabled
+        // soloist participation. Do not re-gate on `soloistActive` here: the live
+        // worker may be filling the chord lane after the soloist lane has already
+        // buffered this step, so that current-tick field is intentionally absent.
+        const funkSharedCatch =
+            coordination.sharedCatch?.type === 'snare-stab' && !isHit && !funkPhraseEndThinned
+                ? coordination.sharedCatch
+                : null;
+        const funkSharedCatchActive = funkSharedCatch !== null;
 
-        if (isHit || isGhost) {
+        const ghostProb = 0.15 + intensity * 0.35;
+        const isGhost =
+            !isHit && !funkPhraseEndThinned && !funkSharedCatchActive && compDraw(24) < ghostProb;
+
+        if (isHit || isGhost || funkSharedCatchActive) {
             const reserveBassSpace = shouldReserveBassSpace(state);
             const groundingRequired = shouldPreferGroundedPracticeVoicing(
                 state,
@@ -2093,14 +2114,29 @@ export function getAccompanimentNotes(
             voicing = rotateVoicingMidi(voicing);
             compingState.lastVoicingMidis = [...voicing];
 
+            if (funkSharedCatchActive) {
+                voicing = selectSharedCatchVoicing(voicing, chord, coordination.soloistMidi || 0);
+            }
+
             voicing.forEach((m: any, i: number) => {
+                const velocityFactor = 0.5 + intensity * 0.9;
+                const catchVelocity = funkSharedCatch
+                    ? Math.min(
+                          0.68,
+                          Math.max(
+                              0.3,
+                              0.44 *
+                                  velocityFactor *
+                                  Math.min(1.15, Math.max(0.7, funkSharedCatch.velocity)),
+                          ),
+                      )
+                    : null;
                 notes.push({
                     midi: m,
                     velocity:
-                        (isGhost ? 0.18 : 0.65) *
-                        (0.5 + intensity * 0.9) *
-                        (0.9 + compDraw(220 + i) * 0.2),
-                    durationSteps: isGhost ? 0.1 : 0.35, // Super short ghost "chucks"
+                        catchVelocity ??
+                        (isGhost ? 0.18 : 0.65) * velocityFactor * (0.9 + compDraw(220 + i) * 0.2),
+                    durationSteps: funkSharedCatchActive ? 0.25 : isGhost ? 0.1 : 0.35, // Super short ghost "chucks"
                     ccEvents: i === 0 ? ccEvents : [],
                     timingOffset: i * 0.003 + (isGhost ? 0.005 + compDraw(240 + i) * 0.01 : -0.005),
                     instrument: 'Piano',

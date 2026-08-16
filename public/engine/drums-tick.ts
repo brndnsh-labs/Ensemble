@@ -594,15 +594,16 @@ export function runDrumTick(
         coordination.kickHit = checkHit('Kick', true);
         // writer: drum preamble; readable-after: any producer
         coordination.snareHit = checkHit('Snare', true);
-        // why (#994): publish only after the complete drum interpretation has
-        // confirmed the snare still sounds. Repeat-pass ghost permutation and
-        // other post-accent rules may remove a seeded hit, so the raw accent
-        // lookup alone is not sufficient evidence for an ensemble catch.
+        // why (#994, #995): publish only after the complete drum interpretation
+        // has confirmed the snare still sounds. Repeat-pass ghost permutation
+        // and other post-accent rules may remove a seeded hit, so the raw accent
+        // lookup alone is not sufficient evidence for an ensemble catch. Rock
+        // and Funk consume the same narrow intent through different comp paths.
         if (
             allowSharedCatch &&
             includeSoloist &&
             includeDrums &&
-            groove.genreFeel === 'Rock' &&
+            (groove.genreFeel === 'Rock' || groove.genreFeel === 'Funk') &&
             snare &&
             !snare.muted &&
             sharedSnareCatch &&
