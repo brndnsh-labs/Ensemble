@@ -20,7 +20,7 @@ import { ensurePackLoaded } from '../engine/pack-runtime.js';
 import { togglePlay } from '../engine/scheduler-core.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { generateSessionSeed } from '../engine/soloist-seeder.js';
-import type { EnsembleState, InstrumentModule, InstrumentVoice } from '../types.js';
+import type { EnsembleState, GrooveState, InstrumentModule, InstrumentVoice } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { clearToastActions } from '../ui.js';
 import { debounceSaveState } from './persistence.js';
@@ -127,6 +127,52 @@ export function deriveSoloistModeOnBoot(
     dispatch: HandleEffectsContext['dispatch'],
 ): void {
     syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
+}
+
+type GenreGrooveOverrides = Pick<GrooveState, 'swing' | 'swingSub' | 'humanize'>;
+
+/**
+ * Run the side-effect half of SET_GENRE_FEEL and expose its completion to boot.
+ * Manual picker changes remain fire-and-forget; URL hydration awaits this before
+ * mounting so its first Play cannot race the async drum-preset import (#1000).
+ */
+async function applyGenreEffects(
+    stateMap: EnsembleState,
+    payload: any,
+    dispatch: HandleEffectsContext['dispatch'],
+): Promise<void> {
+    const drumReady =
+        payload.drum && !stateMap.playback.isPlaying
+            ? loadDrumPreset(payload.drum)
+            : Promise.resolve();
+    resolveAutoVoices(stateMap, payload.genreName, dispatch);
+    await drumReady;
+}
+
+/**
+ * Complete a URL genre's canonical pipeline after the worker subscriber is live.
+ * The reducer half already ran pre-mount in loadFromUrl(), before `bnd` overrides;
+ * only the async effects run here. A drum preset owns its pattern but not explicit
+ * high-fidelity groove controls, so restore those after the preset settles.
+ */
+export async function reconcileUrlGenreOnBoot(
+    stateMap: EnsembleState,
+    genreName: string,
+    grooveOverrides: GenreGrooveOverrides | null,
+    dispatch: HandleEffectsContext['dispatch'],
+): Promise<void> {
+    const config = SMART_GENRES[genreName];
+    if (!config) {
+        return;
+    }
+
+    await applyGenreEffects(stateMap, { genreName, ...config }, dispatch);
+
+    if (grooveOverrides) {
+        for (const [param, value] of Object.entries(grooveOverrides)) {
+            dispatch(ACTIONS.SET_PARAM, { module: 'groove', param, value });
+        }
+    }
 }
 
 /**
@@ -326,13 +372,9 @@ export function handleEffects(
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
-            const { playback } = stateMap;
-            if (payload.drum && !playback.isPlaying) {
-                loadDrumPreset(payload.drum);
-            }
-            // #675 — auto-follow: Auto-mode lanes track the genre's mapped sound.
-            // (#856 — resolveAutoVoices also re-derives the soloist phrasing mode.)
-            resolveAutoVoices(stateMap, payload.genreName, dispatch);
+            // #675 — Auto voices + soloist mode, and the async drum preset. URL
+            // boot awaits this same helper through reconcileUrlGenreOnBoot (#1000).
+            void applyGenreEffects(stateMap, payload, dispatch);
             break;
         }
         case ACTIONS.SET_SOLOIST_AUTO_MODE: {

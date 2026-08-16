@@ -22,19 +22,23 @@ import { isSoloistMonophonicMode } from './engine/soloist-mode-policy.js';
 import { maybeShowPackInstallNudge } from './pack-nudge.js';
 import { initPWA } from './pwa.js';
 import { saveCurrentState } from './state/persistence.js';
-import { deriveSoloistModeOnBoot, handleEffects } from './state/state-effects.js';
+import {
+    deriveSoloistModeOnBoot,
+    handleEffects,
+    reconcileUrlGenreOnBoot,
+} from './state/state-effects.js';
 import { hydrateState, loadFromUrl } from './state/state-hydration.js';
 import { dispatch, getState, subscribe } from './state.js';
 import { mountComponents } from './ui-root.jsx';
 import { initWorker, syncWorker } from './worker-client.js';
 
-function init() {
+async function init() {
     const { playback, groove } = getState();
     try {
         // --- HYDRATE STATE FIRST ---
         // Ensure state is populated BEFORE the UI mounts so components initialize with correct data.
         hydrateState();
-        loadFromUrl();
+        const urlHydration = loadFromUrl();
 
         // #675 — warm the registry's installed-pack set from the SW cache so
         // genre auto-follow knows which mapped packs are available before the
@@ -45,25 +49,35 @@ function init() {
         // the one-time "install a pack" nudge (#684) off it — deferred ~2s so it
         // lands after the UI has settled, never on first paint, and never blocks
         // interaction. Self-gates on the seen-flag + zero installed packs.
-        void detectInstalledPacks().then(() => {
-            setTimeout(maybeShowPackInstallNudge, 2000);
+        const installedPacksReady = detectInstalledPacks()
+            .then(() => true)
+            .catch((error) => {
+                // Cache access is an enhancement, not a bootstrap requirement.
+                // Keep URL genres usable with their synth fallbacks, and do not
+                // claim that zero packs are installed when the scan is unknown.
+                console.warn('[pack-runtime] unable to detect installed packs', error);
+                return false;
+            });
+        void installedPacksReady.then((didDetectPacks) => {
+            if (didDetectPacks) {
+                setTimeout(maybeShowPackInstallNudge, 2000);
+            }
         });
 
-        // Pre-decode any selected sample-pack voice now, off a gesture-free
-        // OfflineAudioContext, so first playback comes up sampled instead of
-        // flashing the synth fallback while decode runs. The pack bytes are
-        // already in the SW cache after install; only the decode is left, and
-        // initAudio's ensurePacksForVoices later short-circuits on the warmed
-        // pack. Re-read post-hydrate state — the top-of-init destructure predates
-        // hydrateState(), so its voices are stale.
-        const hydrated = getState();
-        warmPacksForVoices([
-            hydrated.chords.voice,
-            hydrated.bass.voice,
-            hydrated.soloist.voice,
-            hydrated.harmony.voice,
-            hydrated.groove.voice,
-        ]);
+        // Preserve the ordinary bootstrap path exactly: only a genre URL needs
+        // to wait for installed-pack detection before choosing its Auto voices.
+        // That keeps unrelated launches interactive on the same schedule while
+        // the audition path below remains gated until reconciliation is complete.
+        if (!urlHydration.genreName) {
+            const hydrated = getState();
+            warmPacksForVoices([
+                hydrated.chords.voice,
+                hydrated.bass.voice,
+                hydrated.soloist.voice,
+                hydrated.harmony.voice,
+                hydrated.groove.voice,
+            ]);
+        }
 
         // E2E/dev helpers attach engine internals to `window.ensemble` for
         // Playwright tooling (and local-dev debugging). The gate has two arms:
@@ -87,8 +101,10 @@ function init() {
 
         validateProgression(getState(), (a: any, p: any) => dispatch(a, p));
 
-        // --- ASSEMBLE UI ---
-        mountComponents(() => getVisualTime(getState()));
+        if (!urlHydration.genreName) {
+            // --- ASSEMBLE UI ---
+            mountComponents(() => getVisualTime(getState()));
+        }
 
         // --- WORKER INIT ---
         initWorker(
@@ -168,11 +184,13 @@ function init() {
             scheduler(getState(), (a: any, p: any) => dispatch(a, p)),
         );
 
-        const hasDrumPattern = groove.instruments.some((inst: any) =>
-            inst.steps.some((s: number) => s > 0),
-        );
-        if (!hasDrumPattern) {
-            loadDrumPreset(groove.lastDrumPreset || 'Basic Rock');
+        if (!urlHydration.genreName) {
+            const hasDrumPattern = groove.instruments.some((inst: any) =>
+                inst.steps.some((s: number) => s > 0),
+            );
+            if (!hasDrumPattern) {
+                loadDrumPreset(groove.lastDrumPreset || 'Basic Rock');
+            }
         }
 
         // --- BACKGROUND RECOVERY ---
@@ -190,18 +208,55 @@ function init() {
             }
         });
 
-        analyzeFormUI(getState().arranger);
+        if (!urlHydration.genreName) {
+            analyzeFormUI(getState().arranger);
+        }
 
         subscribe((action: any, payload: any, stateMap: any, context: any) => {
             syncWorker(action, payload);
             handleEffects(action, payload, stateMap, context);
         });
+
+        // #1000 — pack detection, genre side effects, and the async drum preset
+        // must settle before the audition overlay can expose its first Play. The
+        // reducer half ran pre-subscriber in loadFromUrl(), so bnd lane settings
+        // already override genre defaults; this completes only the effect half.
+        if (urlHydration.genreName) {
+            await installedPacksReady;
+            await reconcileUrlGenreOnBoot(
+                getState(),
+                urlHydration.genreName,
+                urlHydration.genreGrooveOverrides,
+                dispatch,
+            );
+        }
+
+        // Send one authoritative post-reconciliation snapshot. All later writes
+        // use the subscriber's action deltas as before.
         syncWorker();
 
         // #856 — derive the soloist phrasing mode now that the worker + subscriber
         // are live. No SET_GENRE_FEEL fires on boot, so guitar genres would
         // otherwise stay monophonic until the next genre change.
         deriveSoloistModeOnBoot(getState(), dispatch);
+
+        if (urlHydration.genreName) {
+            // Pre-decode the FINAL post-genre Auto voices, not the persisted
+            // decoys the URL was meant to replace. The cache detection above
+            // makes those mappings authoritative before warming begins.
+            const hydrated = getState();
+            warmPacksForVoices([
+                hydrated.chords.voice,
+                hydrated.bass.voice,
+                hydrated.soloist.voice,
+                hydrated.harmony.voice,
+                hydrated.groove.voice,
+            ]);
+
+            // Expose the audition UI only after every genre side effect is done.
+            mountComponents(() => getVisualTime(getState()));
+            analyzeFormUI(getState().arranger);
+        }
 
         // Signal to E2E tests that hydration and mounting are complete
         document.documentElement.dataset.hydrated = 'true';
@@ -247,7 +302,7 @@ window.previewChord = (index: number) => {
 
 window.addEventListener('load', () => {
     requestAnimationFrame(() => {
-        init();
+        void init();
         initPWA();
     });
 });

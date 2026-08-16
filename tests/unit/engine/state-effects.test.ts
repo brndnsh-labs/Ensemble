@@ -14,7 +14,7 @@ import {
     markPackInstalled,
 } from '../../../public/engine/instrument-registry.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
-import { handleEffects } from '../../../public/state/state-effects.js';
+import { handleEffects, reconcileUrlGenreOnBoot } from '../../../public/state/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock all the imported functions
@@ -79,6 +79,57 @@ describe('State Effects Handler', () => {
         stateMap.playback.isPlaying = true;
         handleEffects(ACTIONS.SET_GENRE_FEEL, payload, stateMap, { dispatch });
         expect(loadDrumPreset).not.toHaveBeenCalled();
+    });
+
+    it('reconciles URL genre effects after boot while restoring explicit groove settings (#1000)', async () => {
+        __resetPackCacheForTest();
+        markPackInstalled('horns-section', true);
+        stateMap = {
+            playback: { isPlaying: false },
+            chords: { autoSound: false, voice: 'pack:clavinet' },
+            bass: { autoSound: false, voice: 'synth' },
+            soloist: {
+                autoSound: false,
+                voice: 'synth',
+                autoMode: false,
+                mode: 'monophonic',
+            },
+            harmony: { autoSound: true, voice: 'synth' },
+            groove: { autoSound: false, voice: 'synth' },
+        };
+
+        await reconcileUrlGenreOnBoot(
+            stateMap,
+            'Funk',
+            { swing: 73, swingSub: '8th', humanize: 9 },
+            dispatch,
+        );
+
+        expect(loadDrumPreset).toHaveBeenCalledWith('Funk');
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+            module: 'harmony',
+            voice: 'pack:horns-section',
+            auto: true,
+        });
+        expect(dispatch).not.toHaveBeenCalledWith(
+            ACTIONS.SET_INSTRUMENT_VOICE,
+            expect.objectContaining({ module: 'chords' }),
+        );
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'swing',
+            value: 73,
+        });
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'swingSub',
+            value: '8th',
+        });
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'humanize',
+            value: 9,
+        });
     });
 
     describe('genre auto-follow on SET_GENRE_FEEL (#675)', () => {

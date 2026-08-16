@@ -269,6 +269,81 @@ test.describe('Modals Responsiveness @ui', () => {
         await expect(page.getByTestId('audition-play')).toBeVisible();
     });
 
+    test('a Funk audition URL routes the first playback through the full genre pipeline (#1000)', async ({
+        page,
+    }) => {
+        // Persist a non-Funk session and a pinned sound choice first. The URL must
+        // replace its musical lane/preset routing while preserving that pin.
+        await page.evaluate(() => {
+            const { ACTIONS, dispatch } = window.ensemble;
+            dispatch(ACTIONS.SET_GENRE_FEEL, {
+                genreName: 'Rock',
+                feel: 'Rock',
+                swing: 0,
+                sub: '8th',
+                chord: 'smart',
+                bass: 'rock',
+                soloist: 'rock',
+                harmony: 'smart',
+                drum: 'Basic Rock',
+            });
+            dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module: 'chords',
+                voice: 'pack:clavinet',
+                auto: false,
+            });
+        });
+        await expect
+            .poll(() =>
+                page.evaluate(() => {
+                    const saved = localStorage.getItem('ensemble_currentState');
+                    return saved ? JSON.parse(saved).groove?.lastSmartGenre : null;
+                }),
+            )
+            .toBe('Rock');
+
+        await gotoHydrated(
+            page,
+            '/?prog=C+%7C+F+%7C+G+%7C+C&genre=Funk&autoplay=1&seed=URL_GENRE_E2E',
+        );
+        await expect(page.locator('.audition-scene')).toContainText('Funk');
+
+        const routedState = () =>
+            page.evaluate(() => {
+                const state = window.ensemble.getState();
+                return {
+                    genreFeel: state.groove.genreFeel,
+                    genreName: state.groove.lastSmartGenre,
+                    drum: state.groove.lastDrumPreset,
+                    chords: state.chords.style,
+                    bass: state.bass.style,
+                    soloist: state.soloist.style,
+                    harmony: state.harmony.style,
+                    soloistMode: state.soloist.mode,
+                    pinnedChordVoice: state.chords.voice,
+                    pinnedChordAuto: state.chords.autoSound,
+                    playing: state.playback.isPlaying,
+                };
+            });
+
+        await expect.poll(routedState).toMatchObject({
+            genreFeel: 'Funk',
+            genreName: 'Funk',
+            drum: 'Funk',
+            chords: 'funk',
+            bass: 'funk',
+            soloist: 'funk',
+            harmony: 'horns',
+            soloistMode: 'guitar',
+            pinnedChordVoice: 'pack:clavinet',
+            pinnedChordAuto: false,
+            playing: false,
+        });
+
+        await page.getByTestId('audition-play').click();
+        await expect.poll(routedState).toMatchObject({ playing: true, drum: 'Funk' });
+    });
+
     test('Library — three modes accessible from the topbar', async ({ page }) => {
         // Topbar 📚 Library on desktop; overflow → Library on mobile.
         const topbarBtn = page
