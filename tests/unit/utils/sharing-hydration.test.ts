@@ -326,6 +326,80 @@ describe('Genre share round-trip (#1200)', () => {
         expect(groove.genreFeel).toBe('Funk');
         expect(groove.lastSmartGenre).toBe('Funk');
     });
+
+    it('applies a URL genre through the same reducer configuration as the picker (#1000)', () => {
+        const resetToRock = () => {
+            groove.genreFeel = 'Rock';
+            groove.lastSmartGenre = 'Rock';
+            groove.swing = 0;
+            groove.swingSub = '8th';
+            chords.style = 'smart';
+            bass.style = 'rock';
+            soloist.style = 'rock';
+            harmony.style = 'smart';
+        };
+        const snapshot = () => ({
+            genreFeel: groove.genreFeel,
+            lastSmartGenre: groove.lastSmartGenre,
+            swing: groove.swing,
+            swingSub: groove.swingSub,
+            chords: chords.style,
+            bass: bass.style,
+            soloist: soloist.style,
+            harmony: harmony.style,
+        });
+
+        resetToRock();
+        vi.stubGlobal('location', new URL('http://localhost/?genre=Funk'));
+        const result = loadFromUrl();
+        const urlState = snapshot();
+
+        resetToRock();
+        dispatch(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk', ...SMART_GENRES.Funk });
+
+        expect(result.genreName).toBe('Funk');
+        expect(urlState).toEqual(snapshot());
+        expect(urlState).toMatchObject({
+            genreFeel: 'Funk',
+            lastSmartGenre: 'Funk',
+            chords: 'funk',
+            bass: 'funk',
+            soloist: 'funk',
+            harmony: 'horns',
+        });
+    });
+
+    it('keeps explicit permalink and bnd settings above URL genre defaults (#1000)', () => {
+        const bnd = encodeBase64Unicode(
+            JSON.stringify({
+                mv: MIXER_SETTINGS_VERSION,
+                s: { e: 1, s: 'blues', m: 'monophonic', am: 0 },
+                b: { e: 1, s: 'quarter' },
+                c: { e: 1, s: 'jazz', d: 'thin' },
+                h: { e: 1, s: 'strings' },
+                g: { e: 1, sw: 73, ss: '8th', hu: 9 },
+            }),
+        );
+        vi.stubGlobal(
+            'location',
+            new URL(`http://localhost/?genre=Funk&style=arp&bnd=${encodeURIComponent(bnd)}`),
+        );
+
+        const result = loadFromUrl();
+
+        expect(chords.style).toBe('jazz');
+        expect(bass.style).toBe('quarter');
+        expect(soloist.style).toBe('blues');
+        expect(harmony.style).toBe('strings');
+        expect(groove.swing).toBe(73);
+        expect(groove.swingSub).toBe('8th');
+        expect(groove.humanize).toBe(9);
+        expect(result.genreGrooveOverrides).toEqual({
+            swing: 73,
+            swingSub: '8th',
+            humanize: 9,
+        });
+    });
 });
 
 describe('swingSub share round-trip (#1257)', () => {
