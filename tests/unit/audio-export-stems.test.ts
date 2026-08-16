@@ -58,6 +58,8 @@ function makeLiveState() {
         groove: {
             enabled: true,
             instruments: [{ name: 'Kick', steps: [1, 0, 0, 0] }],
+            accentMap: { 20: { type: 'snare-stab', velocity: 1.1 } },
+            seedTimelineStartStep: 48,
         },
         chords: { enabled: true, buffer: new Map() },
         bass: { enabled: true, buffer: new Map() },
@@ -201,5 +203,51 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         expect(firstState.harmony.enabled).toBe(false);
         expect(secondState.soloist.enabled).toBe(false);
         expect(secondState.harmony.enabled).toBe(true);
+    });
+
+    it('preserves a detached accent plan for a full-session export and rebases its timeline', async () => {
+        const liveState = makeLiveState();
+        vi.doMock('../../public/state.js', () => ({
+            getState: () => liveState,
+        }));
+        const { renderCurrentSessionToWav } = await import('../../public/export/audio-export.js');
+
+        await renderCurrentSessionToWav();
+
+        const [clonedState] = initAudioMock.mock.calls[0];
+        expect(clonedState.groove.accentMap).toEqual(liveState.groove.accentMap);
+        expect(clonedState.groove.accentMap).not.toBe(liveState.groove.accentMap);
+        expect(clonedState.groove.accentMap[20]).not.toBe(liveState.groove.accentMap[20]);
+        expect(clonedState.groove.seedTimelineStartStep).toBe(0);
+    });
+
+    it('does not carry a soloist-driven accent plan into an isolated non-soloist stem', async () => {
+        vi.doMock('../../public/state.js', () => ({
+            getState: () => makeLiveState(),
+        }));
+        const { renderStemsToWav } = await import('../../public/export/audio-export.js');
+
+        await renderStemsToWav(['soloist', 'chords', 'drums']);
+
+        expect(initAudioMock.mock.calls[0][0].groove.accentMap).not.toBeNull();
+        expect(initAudioMock.mock.calls[1][0].groove.accentMap).toBeNull();
+        expect(initAudioMock.mock.calls[2][0].groove.accentMap).toBeNull();
+    });
+
+    it('refills and schedules repeated exports on the absolute seed timeline', async () => {
+        vi.doMock('../../public/state.js', () => ({
+            getState: () => makeLiveState(),
+        }));
+        const { renderCurrentSessionToWav } = await import('../../public/export/audio-export.js');
+
+        await renderCurrentSessionToWav({ loops: 2 });
+
+        expect(generateNotesForStepMock).toHaveBeenCalledTimes(32);
+        expect(generateNotesForStepMock.mock.calls.map((call) => call[1])).toEqual(
+            Array.from({ length: 32 }, (_, step) => step),
+        );
+        expect(scheduleGlobalEventMock.mock.calls.map((call) => call[1])).toEqual(
+            Array.from({ length: 32 }, (_, step) => step),
+        );
     });
 });

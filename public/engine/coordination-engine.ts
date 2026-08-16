@@ -275,6 +275,16 @@ export function macroArcLadder(progress: number): { macroFloor: number; macroCei
     return { macroFloor: 0.2, macroCeiling: 0.5 };
 }
 
+/**
+ * One drummer-authored peak catch that another lane may interpret on this tick.
+ * Intentionally narrow: the Rock pilot shares only an audible snare stab, not
+ * the drummer's full accent vocabulary or a generic gesture hierarchy.
+ */
+export interface SharedCatch {
+    type: 'snare-stab';
+    velocity: number;
+}
+
 export function createCoordinationContext(
     step: number,
     stepInfo: StepInfo | null = null,
@@ -526,6 +536,13 @@ export function createCoordinationContext(
         // writer: soloist producer (tick-logic.ts, after getSoloistNotePhraseFirst)
         // readable-after: soloist producer (chords/harmony can read this)
         soloistQaHang: null as SoloistQaHang | null,
+        // why (#994): the drummer already plans sparse catches against seeded
+        // soloist peaks. Publish the eligible Rock snare catch through the
+        // per-tick contract so the comper can join the SAME moment without
+        // reading groove.accentMap or re-deriving its timeline offset.
+        // writer: drums-tick.ts runDrumTick (after final snare evaluation)
+        // readable-after: drum producer (soloist, bass, chords, harmony)
+        sharedCatch: null as SharedCatch | null,
         // why: epic-deferred-followups S1(a) — section-boundary lookahead.
         // `upcomingSectionFirstChord` (above) already publishes WHICH chord
         // the next section opens on; these three fields publish the surrounding

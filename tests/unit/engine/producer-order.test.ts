@@ -25,6 +25,7 @@ const { makeSoloistMock } = await vi.hoisted(
 
 // Capture the harmony spy across test scope.
 let harmonyCoordinationArg: any = null;
+let accompanimentCoordinationArg: any = null;
 
 // ── module mocks ─────────────────────────────────────────────────────────────
 // Mock the soloist to return a deterministic non-rest note (midi=72, F5).
@@ -72,7 +73,10 @@ vi.mock('../../../public/engine/bass-engine.js', () => ({
 
 // Silence the accompaniment engine.
 vi.mock('../../../public/engine/accompaniment.js', () => ({
-    getAccompanimentNotes: vi.fn(() => []),
+    getAccompanimentNotes: vi.fn((...args) => {
+        accompanimentCoordinationArg = args[6];
+        return [];
+    }),
 }));
 
 // Silence the groove engine overrides (avoid grooves mutating anything).
@@ -83,8 +87,13 @@ vi.mock('../../../public/engine/groove-engine.js', () => ({
         soundName: '',
         instTimeOffset: 0,
     })),
+    getAudibleSnareCatchAtStep: vi.fn(() => null),
 }));
 
+import {
+    applyGrooveOverrides,
+    getAudibleSnareCatchAtStep,
+} from '../../../public/engine/groove-engine.js';
 // ── imports (after mocks) ────────────────────────────────────────────────────
 import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
 import { generateNotesForStep } from '../../../public/engine/tick-logic.js';
@@ -163,7 +172,15 @@ function makeState() {
 describe('Producer order guard', () => {
     beforeEach(() => {
         harmonyCoordinationArg = null;
+        accompanimentCoordinationArg = null;
         vi.clearAllMocks();
+        vi.mocked(applyGrooveOverrides).mockReturnValue({
+            shouldPlay: false,
+            velocity: 0,
+            soundName: '',
+            instTimeOffset: 0,
+        });
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValue(null);
     });
 
     it('coordination.soloistMidi is non-zero when harmony receives the context (soloist ran before harmony)', () => {
@@ -215,6 +232,146 @@ describe('Producer order guard', () => {
         expect(harmonyCoordinationArg).not.toBeNull();
         // Soloist was skipped — soloistMidi must remain 0
         expect(harmonyCoordinationArg.soloistMidi).toBe(0);
+    });
+
+    it('#994 publishes an eligible Rock snare catch before the chord producer runs', () => {
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValueOnce({
+            type: 'snare-stab',
+            velocity: 1.1,
+        });
+        vi.mocked(applyGrooveOverrides).mockImplementation((_state, options) => ({
+            shouldPlay: options.inst.name === 'Snare',
+            velocity: options.inst.name === 'Snare' ? 1.2 : 0,
+            soundName: options.inst.name,
+            instTimeOffset: 0,
+        }));
+        const state = makeState();
+        state.groove.enabled = true;
+        state.groove.genreFeel = 'Rock';
+        state.groove.instruments = [
+            { name: 'Kick', muted: false, steps: new Array(16).fill(0) },
+            { name: 'Snare', muted: false, steps: new Array(16).fill(0) },
+        ];
+        const cursors = {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+
+        generateNotesForStep(state, 6, cursors, {
+            // Sink flags may be false in the live worker once these lanes are
+            // already buffered/rendered elsewhere; state still says both play.
+            includeSoloist: false,
+            includeHarmony: false,
+            includeBass: false,
+            includeChords: true,
+            includeDrums: false,
+        });
+
+        expect(accompanimentCoordinationArg?.sharedCatch).toEqual({
+            type: 'snare-stab',
+            velocity: 1.1,
+        });
+    });
+
+    it('#994 does not publish when later drum interpretation removes the seeded snare', () => {
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValueOnce({
+            type: 'snare-stab',
+            velocity: 1.1,
+        });
+        const state = makeState();
+        state.groove.enabled = true;
+        state.groove.genreFeel = 'Rock';
+        state.groove.instruments = [
+            { name: 'Kick', muted: false, steps: new Array(16).fill(0) },
+            { name: 'Snare', muted: false, steps: new Array(16).fill(0) },
+        ];
+
+        generateNotesForStep(
+            state,
+            6,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                includeSoloist: true,
+                includeHarmony: false,
+                includeBass: false,
+                includeChords: true,
+                includeDrums: true,
+            },
+        );
+
+        expect(accompanimentCoordinationArg?.sharedCatch).toBeNull();
+    });
+
+    it('#994 honors an explicit shared-catch exclusion without overloading sink flags', () => {
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValue({
+            type: 'snare-stab',
+            velocity: 1.1,
+        });
+        vi.mocked(applyGrooveOverrides).mockImplementation((_state, options) => ({
+            shouldPlay: options.inst.name === 'Snare',
+            velocity: options.inst.name === 'Snare' ? 1.2 : 0,
+            soundName: options.inst.name,
+            instTimeOffset: 0,
+        }));
+
+        const state = makeState();
+        state.groove.enabled = true;
+        state.groove.genreFeel = 'Rock';
+        state.groove.instruments = [
+            { name: 'Kick', muted: false, steps: new Array(16).fill(0) },
+            { name: 'Snare', muted: false, steps: new Array(16).fill(0) },
+        ];
+
+        generateNotesForStep(
+            state,
+            6,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                includeSoloist: false,
+                includeHarmony: false,
+                includeBass: false,
+                includeChords: true,
+                includeDrums: false,
+                allowSharedCatch: false,
+            },
+        );
+
+        expect(accompanimentCoordinationArg?.sharedCatch).toBeNull();
+    });
+
+    it('#994 does not publish a catch when the soloist lane is disabled', () => {
+        vi.mocked(getAudibleSnareCatchAtStep).mockReturnValueOnce({
+            type: 'snare-stab',
+            velocity: 1.1,
+        });
+        const state = makeState();
+        state.soloist.enabled = false;
+        state.groove.enabled = true;
+        state.groove.genreFeel = 'Rock';
+        state.groove.instruments = [
+            { name: 'Kick', muted: false, steps: new Array(16).fill(0) },
+            { name: 'Snare', muted: false, steps: new Array(16).fill(0) },
+        ];
+        const cursors = {
+            mainCursor: { index: 0, sectionIndex: 0 },
+            lookaheadCursor: { index: 0, sectionIndex: 0 },
+        };
+
+        generateNotesForStep(state, 6, cursors, {
+            includeSoloist: false,
+            includeHarmony: false,
+            includeBass: false,
+            includeChords: true,
+            includeDrums: false,
+        });
+
+        expect(accompanimentCoordinationArg?.sharedCatch).toBeNull();
     });
 
     it('#709 (B8) — harmony freq is recomputed from the register-clamped midi', () => {

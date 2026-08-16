@@ -56,6 +56,11 @@ export interface GenerateNotesOptions {
     includeSoloist?: boolean;
     includeHarmony?: boolean;
     includeDrums?: boolean;
+    // Coordination is independent of which sink this caller fills: the live
+    // worker intentionally generates pitched buffers with includeDrums=false
+    // while the main-thread drummer remains audible. Only callers that truly
+    // exclude a participant (currently selective MIDI export) disable this.
+    allowSharedCatch?: boolean;
     // #842: true on the conductor-less generators (logic worker + MIDI export),
     // where `state.conductor` is a stale default rather than the live ramp source.
     // Routes drum-motif selection through the bar-downbeat latch in `runDrumTick`
@@ -93,7 +98,14 @@ export function generateNotesForStep(
     // returned `coordination`/`chordData`/`stepInfo`/`ts` are the SAME objects
     // the lane sections below read — preserving byte-identical output and the
     // load-bearing publication ordering.
-    const drumTick = runDrumTick(state, step, cursors, carryover, options.noLiveConductor);
+    const drumTick = runDrumTick(
+        state,
+        step,
+        cursors,
+        carryover,
+        options.noLiveConductor,
+        options.allowSharedCatch !== false,
+    );
     const { coordination, chordData, stepInfo, ts, dropMuteActive, drumHits } = drumTick;
 
     // The drum-only path honors `isInstrumentActiveAtStep` gating internally; the

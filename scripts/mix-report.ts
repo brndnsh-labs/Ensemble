@@ -378,6 +378,8 @@ async function renderSceneReports({
                         loadDrumPreset,
                         scheduleGlobalEvent,
                         generateNotesForStep,
+                        generateSessionSeed,
+                        generateSoloistAccents,
                         loopArcMultiplier,
                     } = ensemble;
 
@@ -462,6 +464,7 @@ async function renderSceneReports({
                             },
                             soloist: {
                                 ...liveState.soloist,
+                                session: JSON.parse(JSON.stringify(liveState.soloist.session)),
                                 audio: {
                                     ...(liveState.soloist.audio || {}),
                                     activeVoices: [],
@@ -502,7 +505,7 @@ async function renderSceneReports({
                         };
                     }
 
-                    function createSceneState(scene, stem, voiceOverride) {
+                    function createSceneState(scene, stem, voiceOverride, seedLabel) {
                         const liveState = getState();
                         const state = cloneState(liveState);
                         state.arranger.sections = scene.sections.map((section) => ({
@@ -512,6 +515,8 @@ async function renderSceneReports({
                             timeSignature: section.timeSignature || scene.timeSignature || '4/4',
                         }));
                         state.arranger.key = scene.key;
+                        const planSeed = `${scene.id}:${seedLabel}`;
+                        state.arranger.seed = planSeed;
                         state.arranger.timeSignature = scene.timeSignature || '4/4';
                         state.playback.bpm = scene.bpm;
                         state.playback.bandIntensity = scene.intensity;
@@ -555,6 +560,26 @@ async function renderSceneReports({
                         );
 
                         validateProgression(state);
+
+                        const sessionSeed = generateSessionSeed(
+                            state,
+                            state.arranger,
+                            state.soloist.style || 'smart',
+                            state.playback.bandIntensity,
+                            planSeed,
+                        );
+                        state.soloist.session.seed = sessionSeed;
+                        state.groove.accentMap = state.soloist.enabled
+                            ? generateSoloistAccents(
+                                  state,
+                                  state.arranger,
+                                  sessionSeed,
+                                  state.groove.genreFeel,
+                                  state.playback.bandIntensity,
+                                  planSeed,
+                              )
+                            : null;
+                        state.groove.seedTimelineStartStep = 0;
 
                         const stepsPerMeasure =
                             state.arranger.measureMap?.[0]?.end -
@@ -646,14 +671,20 @@ async function renderSceneReports({
                         targetMap.get(step).push(note);
                     }
 
-                    function fillBuffers(state) {
+                    function fillBuffers(
+                        state,
+                        timelineStartStep,
+                        captureSharedCatchEvents = false,
+                    ) {
                         const cursors = {
                             mainCursor: { index: 0, sectionIndex: 0 },
                             lookaheadCursor: { index: 0, sectionIndex: 0 },
                         };
+                        const sharedCatchEvents = [];
 
                         for (let step = 0; step < state.arranger.totalSteps; step++) {
-                            const result = generateNotesForStep(state, step, cursors, {
+                            const absoluteStep = timelineStartStep + step;
+                            const result = generateNotesForStep(state, absoluteStep, cursors, {
                                 includeBass: state.bass.enabled,
                                 includeChords: state.chords.enabled,
                                 includeSoloist: state.soloist.enabled,
@@ -661,18 +692,37 @@ async function renderSceneReports({
                                 includeDrums: false,
                             });
 
+                            if (captureSharedCatchEvents && result.coordination?.sharedCatch) {
+                                sharedCatchEvents.push({
+                                    step,
+                                    absoluteStep,
+                                    type: result.coordination.sharedCatch.type,
+                                    velocity: result.coordination.sharedCatch.velocity,
+                                    chordMidis: result.notes
+                                        .filter(
+                                            (note) =>
+                                                note.module === 'chords' &&
+                                                note.midi > 0 &&
+                                                note.muted !== true,
+                                        )
+                                        .map((note) => note.midi),
+                                });
+                            }
+
                             for (const note of result.notes) {
                                 if (note.module === 'bass') {
-                                    storeNote(state.bass.buffer, step, note);
+                                    storeNote(state.bass.buffer, absoluteStep, note);
                                 } else if (note.module === 'chords') {
-                                    storeNote(state.chords.buffer, step, note);
+                                    storeNote(state.chords.buffer, absoluteStep, note);
                                 } else if (note.module === 'harmony') {
-                                    storeNote(state.harmony.buffer, step, note);
+                                    storeNote(state.harmony.buffer, absoluteStep, note);
                                 } else if (note.module === 'soloist') {
-                                    storeNote(state.soloist.audio.buffer, step, note);
+                                    storeNote(state.soloist.audio.buffer, absoluteStep, note);
                                 }
                             }
                         }
+
+                        return sharedCatchEvents;
                     }
 
                     function collectScheduleBuffer(state, modules) {
@@ -711,7 +761,7 @@ async function renderSceneReports({
                     function collectIntentEvents(
                         state,
                         stem,
-                        loopIndex,
+                        timelineStartStep,
                         stepsPerLoop,
                         leadInSeconds,
                         stepSeconds,
@@ -728,7 +778,12 @@ async function renderSceneReports({
                                 continue;
                             }
                             for (const [step, notes] of buffer.entries()) {
-                                if (step < 0 || step >= stepsPerLoop || !Array.isArray(notes)) {
+                                const timelineEndStep = timelineStartStep + stepsPerLoop;
+                                if (
+                                    step < timelineStartStep ||
+                                    step >= timelineEndStep ||
+                                    !Array.isArray(notes)
+                                ) {
                                     continue;
                                 }
                                 for (const note of notes) {
@@ -740,10 +795,10 @@ async function renderSceneReports({
                                     if (!(midi > 0)) {
                                         continue;
                                     }
-                                    const absoluteStep = loopIndex * stepsPerLoop + step;
+                                    const absoluteStep = step;
                                     const entry = {
                                         track,
-                                        step,
+                                        step: absoluteStep - timelineStartStep,
                                         absoluteStep,
                                         time: leadInSeconds + absoluteStep * stepSeconds,
                                         midi,
@@ -1114,7 +1169,7 @@ async function renderSceneReports({
 
                     async function renderStem(scene, stem, seedLabel, voiceOverride) {
                         await loadDrumPreset(scene.drumPreset || 'Basic Rock');
-                        const state = createSceneState(scene, stem, voiceOverride);
+                        const state = createSceneState(scene, stem, voiceOverride, seedLabel);
                         // Preload any pack a scene-pinned voice needs (same
                         // module-global cache idiom as the cohesion render).
                         for (const module of ['bass', 'chords', 'harmony', 'soloist', 'groove']) {
@@ -1157,24 +1212,16 @@ async function renderSceneReports({
                         try {
                             initAudio(state, { audioContext: offlineCtx, enableWatchdog: false });
 
-                            // Schedule analysis runs once per stem from the
-                            // first-loop note buffer; the absolute schedule
-                            // density is comparable across stems/scenes that
-                            // way. Per-loop *audio* arcs come from slicing the
-                            // rendered output below.
-                            fillBuffers(state);
-                            const schedule = stem.schedule
-                                ? analyzeNoteSchedule(
-                                      collectScheduleBuffer(state, stem.schedule.modules),
-                                      sixteenth,
-                                      renderLeadIn,
-                                      stem.schedule.voiceLimit,
-                                  )
-                                : null;
+                            // Schedule analysis is captured from the first loop
+                            // only; each loop below refills the consumed buffers
+                            // in the same absolute timeline frame as live/MIDI.
+                            let schedule = null;
 
                             const intentEvents = [];
+                            const sharedCatchEvents = [];
 
                             for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
+                                const timelineStartStep = loopIndex * stepsPerLoop;
                                 // Drive the soloist's chorus-evolution machinery
                                 // (Loop 0 head → Loop 1 themed → Loop 2+ exploratory)
                                 // by bumping currentLoopCount the way scheduler-core
@@ -1191,11 +1238,23 @@ async function renderSceneReports({
                                     0.1,
                                     Math.min(1.0, scene.intensity * arcMult),
                                 );
-                                if (loopIndex > 0) {
-                                    // Re-fill so chorus-evolution biases (ornamentation
-                                    // rate, fatigue decay, common-tone reward) actually
-                                    // express in the generated notes for this loop.
-                                    fillBuffers(state);
+                                // Re-fill every loop because scheduleGlobalEvent
+                                // consumes buffer entries. Absolute generation is
+                                // load-bearing for session-seed notes and accentMap.
+                                sharedCatchEvents.push(
+                                    ...fillBuffers(
+                                        state,
+                                        timelineStartStep,
+                                        Boolean(writeEvents && !voiceOverride),
+                                    ),
+                                );
+                                if (loopIndex === 0 && stem.schedule) {
+                                    schedule = analyzeNoteSchedule(
+                                        collectScheduleBuffer(state, stem.schedule.modules),
+                                        sixteenth,
+                                        renderLeadIn,
+                                        stem.schedule.voiceLimit,
+                                    );
                                 }
                                 // Same gate as the sidecar write below: intent capture
                                 // is part of event capture, so the default render path
@@ -1205,7 +1264,7 @@ async function renderSceneReports({
                                         ...collectIntentEvents(
                                             state,
                                             stem,
-                                            loopIndex,
+                                            timelineStartStep,
                                             stepsPerLoop,
                                             renderLeadIn,
                                             sixteenth,
@@ -1213,11 +1272,11 @@ async function renderSceneReports({
                                     );
                                 }
                                 for (let step = 0; step < stepsPerLoop; step++) {
-                                    const absoluteStep = loopIndex * stepsPerLoop + step;
+                                    const absoluteStep = timelineStartStep + step;
                                     const time = renderLeadIn + absoluteStep * sixteenth;
                                     state.playback.nextNoteTime = time;
                                     state.playback.unswungNextNoteTime = time;
-                                    scheduleGlobalEvent(state, step, time);
+                                    scheduleGlobalEvent(state, absoluteStep, time);
                                 }
                             }
 
@@ -1310,6 +1369,9 @@ async function renderSceneReports({
                                         intentEvents: intentEvents
                                             .slice()
                                             .sort((a, b) => a.time - b.time || a.midi - b.midi),
+                                        sharedCatchEvents: sharedCatchEvents
+                                            .slice()
+                                            .sort((a, b) => a.absoluteStep - b.absoluteStep),
                                     },
                                 );
                             }

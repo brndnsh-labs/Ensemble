@@ -402,8 +402,15 @@ export function generateSoloistAccents(
                 type = 'snare-stab'; // Jazz catching is usually snare+kick, no crash
             } else if (genre === 'Funk' || genre === 'Disco' || genre === 'Bossa Nova') {
                 type = prng() > 0.5 ? 'hat-bark' : 'snare-stab';
+            } else if (genre === 'Rock') {
+                // Rock only: on-grid peaks can carry a crash, while a syncopated
+                // peak gets the tighter snare answer. Treating every strong peak
+                // as a crash made snare-stab unreachable for the production Rock
+                // seeder (#994) and over-washed offbeat figures.
+                type = isStrongAccent && !isOffbeat ? 'crash-catch' : 'snare-stab';
             } else {
-                // Rock / Ska / Metal: Use Crash for high-velocity peaks
+                // Preserve the established crash vocabulary for Ska / Metal /
+                // other high-energy feels; #994 is deliberately a Rock pilot.
                 type = isStrongAccent ? 'crash-catch' : 'snare-stab';
             }
 
