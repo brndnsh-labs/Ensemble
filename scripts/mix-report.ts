@@ -698,6 +698,7 @@ async function renderSceneReports({
                                     absoluteStep,
                                     type: result.coordination.sharedCatch.type,
                                     velocity: result.coordination.sharedCatch.velocity,
+                                    role: result.coordination.sharedCatch.role || null,
                                     chordMidis: result.notes
                                         .filter(
                                             (note) =>

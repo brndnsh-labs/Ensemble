@@ -1,9 +1,12 @@
 import { TIME_SIGNATURES } from '../config.js';
+import { getSectionEnergy } from '../song/form-analysis.js';
 import type { ArrangerState } from '../state/arranger.js';
 import type { EnsembleState } from '../types.js';
 import { generateRandomSeed } from '../utils.js';
 import { unrollArrangement } from './arranger-utils.js';
+import { shouldFireDropMute } from './drop-mechanic.js';
 import { generateDeterministicFill } from './fills.js';
+import { isBackbeatAdjacentStep } from './grooves/utils.js';
 import { createPRNG } from './hash-utils.js';
 
 /**
@@ -34,6 +37,181 @@ export interface AccentCatch {
     /** Catch type ('crash-catch', 'snare-stab', 'hat-bark'). */
     type: string;
     velocity: number;
+    /** A rehearsed recurrence of an earlier Rock Chorus catch. */
+    role?: 'section-return';
+}
+
+interface ChorusRange {
+    start: number;
+    end: number;
+    label: string;
+    normalizedLabel: string;
+}
+
+/**
+ * Normalize occurrence suffixes without collapsing genuinely different Chorus
+ * names. `Chorus 1`, `Chorus-2`, and `Chorus III` match; `Chorus A` and
+ * `Chorus B` remain distinct. Pre-choruses and other labels never qualify.
+ */
+function normalizeRepeatedChorusLabel(label: unknown): string | null {
+    const normalized = String(label || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[-_–—]+/g, ' ')
+        .replace(/\s+/g, ' ');
+    if (!/^chorus(?:\s|$)/.test(normalized)) {
+        return null;
+    }
+    return normalized.replace(/\s+(?:\(?\d+\)?|[ivx]+)$/i, '').trim();
+}
+
+/**
+ * Let one eligible Rock catch become a tiny piece of arrangement memory.
+ *
+ * The base-form entries are dormant templates for section-practice folding:
+ * practice playback repeatedly asks the engine for the same folded chart step,
+ * so an absolute-only return would disappear there. The audible lookup keeps
+ * these templates silent during the normal Head and activates them only on a
+ * later loop or while practice looping. Absolute later-Chorus entries preserve
+ * the same section-relative offset for ordinary playback and export.
+ */
+function seedRockSectionReturns(
+    accentMap: Record<number, AccentCatch>,
+    arranger: ArrangerState,
+    soloistSeed: { notes: any[]; loopLengthSteps?: number },
+): void {
+    if (arranger.timeSignature !== '4/4') {
+        return;
+    }
+
+    const totalSteps = arranger.totalSteps || 0;
+    if (totalSteps <= 0 || !Array.isArray(arranger.sectionMap)) {
+        return;
+    }
+
+    const chorusRanges: ChorusRange[] = arranger.sectionMap
+        .map((section: any) => ({
+            start: Number(section?.start),
+            end: Number(section?.end),
+            label: String(section?.label || ''),
+            normalizedLabel: normalizeRepeatedChorusLabel(section?.label) || '',
+        }))
+        .filter(
+            (section) =>
+                section.normalizedLabel.length > 0 &&
+                Number.isFinite(section.start) &&
+                Number.isFinite(section.end) &&
+                section.start >= 0 &&
+                section.end > section.start &&
+                section.end <= totalSteps,
+        )
+        .sort((a, b) => a.start - b.start);
+
+    const occurrenceCounts = new Map<string, number>();
+    for (const section of chorusRanges) {
+        occurrenceCounts.set(
+            section.normalizedLabel,
+            (occurrenceCounts.get(section.normalizedLabel) || 0) + 1,
+        );
+    }
+    const repeatedChoruses = chorusRanges.filter(
+        (section) => (occurrenceCounts.get(section.normalizedLabel) || 0) >= 2,
+    );
+    if (repeatedChoruses.length === 0) {
+        return;
+    }
+
+    // The source must be a real, audible catch in the FIRST repeated Chorus
+    // after the protected Head. An ineligible catch is skipped within that
+    // Chorus, but an empty source Chorus never falls through to a later one.
+    const sourceSection = repeatedChoruses[0];
+    const sourceCycle = 1;
+    const sourceSectionStart = sourceCycle * totalSteps + sourceSection.start;
+    const sourceSectionEnd = sourceCycle * totalSteps + sourceSection.end;
+    const stepsPerBar = 16;
+    const nextSection = arranger.sectionMap
+        .map((section: any) => ({
+            start: Number(section?.start),
+            label: String(section?.label || ''),
+        }))
+        .filter((section) => Number.isFinite(section.start) && section.start >= sourceSection.end)
+        .sort((a, b) => a.start - b.start)
+        .at(0);
+    const sourceDropMuted = (step: number): boolean => {
+        const stepInForm = step - sourceCycle * totalSteps;
+        const remainingSteps = sourceSection.end - stepInForm;
+        if (!nextSection || remainingSteps > stepsPerBar) {
+            return false;
+        }
+        return shouldFireDropMute(
+            'Rock',
+            0,
+            nextSection.label,
+            getSectionEnergy(nextSection.label) - getSectionEnergy(sourceSection.label),
+            stepInForm / totalSteps,
+        );
+    };
+    const sourceEntry = Object.entries(accentMap)
+        .map(([step, accent]) => ({ step: Number(step), accent }))
+        .filter(
+            ({ step, accent }) =>
+                Number.isFinite(step) &&
+                step >= sourceSectionStart &&
+                step < sourceSectionEnd &&
+                accent.type === 'snare-stab' &&
+                accent.role !== 'section-return' &&
+                step % stepsPerBar !== 0 &&
+                !isBackbeatAdjacentStep(step % stepsPerBar, stepsPerBar) &&
+                !sourceDropMuted(step),
+        )
+        .sort((a, b) => a.step - b.step)
+        .at(0);
+    if (!sourceEntry) {
+        return;
+    }
+
+    const sectionOffset = sourceEntry.step - sourceSectionStart;
+    const matchingSections = repeatedChoruses.filter(
+        (section) => section.normalizedLabel === sourceSection.normalizedLabel,
+    );
+    const maxNoteStep = soloistSeed.notes.reduce(
+        (max, note) => Math.max(max, Number.isFinite(note?.step) ? note.step + 1 : 0),
+        0,
+    );
+    const horizon = Math.max(soloistSeed.loopLengthSteps || 0, maxNoteStep);
+    const addReturn = (targetStep: number, section: ChorusRange): void => {
+        if (sectionOffset >= section.end - section.start || targetStep >= horizon) {
+            return;
+        }
+        const targetInForm = ((targetStep % totalSteps) + totalSteps) % totalSteps;
+        // The form's last measure belongs to the established cadence gesture;
+        // never layer the remembered catch into that protected cell.
+        if (targetInForm >= totalSteps - stepsPerBar) {
+            return;
+        }
+        accentMap[targetStep] = {
+            type: 'snare-stab',
+            velocity: sourceEntry.accent.velocity,
+            role: 'section-return',
+        };
+    };
+
+    // Dormant base-form templates keep the relative hit visible after practice
+    // folding. The lookup suppresses them during ordinary loop 0 playback.
+    for (const section of matchingSections) {
+        addReturn(section.start + sectionOffset, section);
+    }
+
+    const lastCycle = Math.floor(Math.max(0, horizon - 1) / totalSteps);
+    for (let cycle = sourceCycle; cycle <= lastCycle; cycle++) {
+        for (const section of matchingSections) {
+            const sectionStart = cycle * totalSteps + section.start;
+            if (sectionStart <= sourceSectionStart) {
+                continue;
+            }
+            addReturn(sectionStart + sectionOffset, section);
+        }
+    }
 }
 
 /**
@@ -354,7 +532,7 @@ export function generateDrumFills(
 export function generateSoloistAccents(
     _state: EnsembleState,
     arranger: ArrangerState,
-    soloistSeed: { notes: any[] },
+    soloistSeed: { notes: any[]; loopLengthSteps?: number },
     genre: string,
     intensity: number,
     seedStr?: string,
@@ -421,6 +599,10 @@ export function generateSoloistAccents(
             lastCatchStep = note.step;
         }
     });
+
+    if (genre === 'Rock') {
+        seedRockSectionReturns(accentMap, arranger, soloistSeed);
+    }
 
     return accentMap;
 }

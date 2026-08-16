@@ -59,7 +59,9 @@ export interface GenerateNotesOptions {
     // Coordination is independent of which sink this caller fills: the live
     // worker intentionally generates pitched buffers with includeDrums=false
     // while the main-thread drummer remains audible. Only callers that truly
-    // exclude a participant (currently selective MIDI export) disable this.
+    // exclude a participant (currently selective MIDI export) disable ORIGINAL
+    // catches. A rehearsed section return has independent lane ownership and can
+    // still be recalled by an exported comper without the drum sink.
     allowSharedCatch?: boolean;
     // #842: true on the conductor-less generators (logic worker + MIDI export),
     // where `state.conductor` is a stale default rather than the live ramp source.

@@ -56,7 +56,8 @@ export interface AccompanimentCoordination {
     // breath, and a top-voice re-landing with the soloist's answer.
     soloistQaHang?: SoloistQaHang | null;
     // writer: runDrumTick after final snare evaluation. Narrow Rock/Funk pilot
-    // only — consumers must not treat this as a generic gesture bus.
+    // plus Rock's section-return marker only — consumers must not treat this as
+    // a generic gesture bus.
     sharedCatch?: SharedCatch | null;
     bassHit?: boolean;
     bassMidi?: number;

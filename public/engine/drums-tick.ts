@@ -16,7 +16,12 @@ import {
     isTensionChordForSoloist,
 } from './coordination-engine.js';
 import { dropMuteStyleFor, shouldFireDropMute } from './drop-mechanic.js';
-import { applyGrooveOverrides, getAudibleSnareCatchAtStep } from './groove-engine.js';
+import {
+    applyGrooveOverrides,
+    getAudibleSnareCatchAtStep,
+    isSectionReturnActive,
+    isSectionReturnPracticeFold,
+} from './groove-engine.js';
 import { isInstrumentActiveAtStep } from './section-overrides.js';
 import type { DrumHitInfo, TickCursors } from './tick-types.js';
 import { type ChordAtStep, getChordAtStep } from './worker-utils.js';
@@ -507,6 +512,8 @@ export function runDrumTick(
             drumStep,
             stepsPerBar,
             stepInfo.isMeasureStart,
+            isSectionReturnActive(playback),
+            isSectionReturnPracticeFold(playback),
         );
         // Variations lookup
         const checkHit = (instName: string, evaluateOnly: boolean = true): boolean => {
@@ -594,24 +601,31 @@ export function runDrumTick(
         coordination.kickHit = checkHit('Kick', true);
         // writer: drum preamble; readable-after: any producer
         coordination.snareHit = checkHit('Snare', true);
-        // why (#994, #995): publish only after the complete drum interpretation
+        // why (#994, #995): publish an ORIGINAL catch only after the complete drum interpretation
         // has confirmed the snare still sounds. Repeat-pass ghost permutation
         // and other post-accent rules may remove a seeded hit, so the raw accent
         // lookup alone is not sufficient evidence for an ensemble catch. Rock
         // and Funk consume the same narrow intent through different comp paths.
+        // #996 section returns are different: the band has already rehearsed the
+        // moment, so the comper may remember it even when the drummer is muted.
+        // Each lane still honors its own mute; this only prevents one mute from
+        // suppressing the other participant's recurrence.
+        const isSectionReturn = sharedSnareCatch?.role === 'section-return';
         if (
-            allowSharedCatch &&
             includeSoloist &&
-            includeDrums &&
             (groove.genreFeel === 'Rock' || groove.genreFeel === 'Funk') &&
-            snare &&
-            !snare.muted &&
             sharedSnareCatch &&
-            coordination.snareHit
+            (isSectionReturn ||
+                (allowSharedCatch &&
+                    includeDrums &&
+                    snare &&
+                    !snare.muted &&
+                    coordination.snareHit))
         ) {
             coordination.sharedCatch = {
                 type: 'snare-stab',
                 velocity: sharedSnareCatch.velocity,
+                ...(isSectionReturn ? { role: 'section-return' as const } : {}),
             };
         }
 
