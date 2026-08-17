@@ -14,14 +14,14 @@ Ensemble is for musicians who want to practice, compose, teach, or perform — w
 - **The songwriter** opens the editor, types in chords, and hears an arrangement immediately.
 - **The producer** uses a template or generates a song structure to quickly sketch an idea, then exports to MIDI to take the bones of a project into their DAW.
 - **The music teacher** charts a song and sends a link to a student.
-- **The student** opens the link and the band is already playing.
+- **The student** opens a prepared audition scene and taps Play once; the band starts.
 - **The live performer** configures Ensemble to fill the seats that humans aren't — a drummer, a keys player, a bassist — and plays alongside it in the room.
 
 ## What makes Ensemble different?
 
 Unlike AI music generators that produce audio from statistical patterns, Ensemble follows real musical rules. It understands chord quality, voice leading, scale modes, rhythm section conventions, and song form. The result is a band that plays your chart — not an approximation of what music statistically sounds like.
 
-Every session is shareable as a URL. A teacher can chart a song and send a link. A student opens it and the band is already playing. No account, no install, no subscription required on either end. A chord progression, genre, tempo, and arrangement encode cleanly into a URL without a backend.
+Every session is shareable as a URL. A teacher can chart a song and send a link. The recipient opens a prepared audition scene and taps Play once; the band starts. No account, no install, no subscription required on either end. A chord progression, genre, tempo, and arrangement encode cleanly into a URL without a backend.
 
 Ensemble is free and open source, with no account required and no subscription. It runs as a PWA from a single URL and works offline after the first load.
 
@@ -67,7 +67,7 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 - Large test suite
 
 ### What needs work
-- The sharing feature deserves more prominence as a marquee feature — the "band is already playing" autoplay landing exists but isn't yet produced by the Share UI (was Forgejo #1126, closed in the read-only `Ensemble-archive` rather than migrated — no live GitHub issue; re-file if still wanted)
+- The sharing feature deserves more prominence as a marquee feature — make the existing opt-in one-tap audition link more prominent in the Share UI.
 - The engine outgrew the surface: the **live-performer** persona still has the least product coverage — live band control is one intensity slider, pending the #937 (was Forgejo #1019) conductor-lens probe decision. (Section looping / start-from-section, MIDI-in play-along, and the practice tempo ramp — Forgejo #1016/#1017/#1021, closed on ship and so left in the read-only `Ensemble-archive` repo rather than migrated — all shipped in the July 2026 sweep, so the practicing-musician gap is largely closed.)
 
 ### Open work

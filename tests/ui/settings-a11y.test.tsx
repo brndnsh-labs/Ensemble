@@ -112,4 +112,48 @@ describe('Settings Accessibility', () => {
         const label = complexitySlider.getAttribute('aria-valuetext');
         expect(['Low', 'Medium', 'High']).toContain(label);
     });
+
+    it('uses roving keyboard tabs with linked tab panels', async () => {
+        // Let the modal's initial focus timer settle before proving that tab
+        // navigation itself owns focus after a keyboard command.
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        const tab = (id: string) =>
+            document.getElementById(`settingsTab-${id}`) as HTMLButtonElement;
+        const panel = () => document.querySelector<HTMLElement>('[role="tabpanel"]');
+        const press = async (id: string, key: string) => {
+            tab(id).focus();
+            tab(id).dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        };
+
+        for (const id of ['playback', 'packs', 'appearance', 'midi', 'about']) {
+            expect(tab(id).getAttribute('aria-controls')).toBe('settingsPanel');
+        }
+        expect(tab('playback').getAttribute('tabindex')).toBe('0');
+        expect(tab('packs').getAttribute('tabindex')).toBe('-1');
+        expect(panel()?.getAttribute('id')).toBe('settingsPanel');
+        expect(panel()?.getAttribute('aria-labelledby')).toBe('settingsTab-playback');
+
+        await press('playback', 'ArrowRight');
+        expect(document.activeElement).toBe(tab('packs'));
+        expect(tab('packs').getAttribute('aria-selected')).toBe('true');
+        expect(tab('packs').getAttribute('tabindex')).toBe('0');
+        expect(tab('playback').getAttribute('tabindex')).toBe('-1');
+        expect(panel()?.getAttribute('id')).toBe('settingsPanel');
+        expect(panel()?.getAttribute('aria-labelledby')).toBe('settingsTab-packs');
+
+        await press('packs', 'End');
+        expect(document.activeElement).toBe(tab('about'));
+        expect(tab('about').getAttribute('aria-selected')).toBe('true');
+
+        await press('about', 'Home');
+        expect(document.activeElement).toBe(tab('playback'));
+        expect(tab('playback').getAttribute('aria-selected')).toBe('true');
+
+        await press('playback', 'ArrowLeft');
+        expect(document.activeElement).toBe(tab('about'));
+        expect(tab('about').getAttribute('aria-selected')).toBe('true');
+        expect(tab('about').getAttribute('tabindex')).toBe('0');
+        expect(tab('playback').getAttribute('tabindex')).toBe('-1');
+    });
 });

@@ -7,6 +7,7 @@ import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { getStepsPerMeasure } from '../utils.js';
+import type { VisualizerQueuedEvent } from '../visualizer/visualizer-events.js';
 import {
     resolveVisualizerTrack,
     VISUALIZER_CHORD_SWATCHES,
@@ -26,9 +27,9 @@ const RETAINED_DRAW_QUEUE_EVENTS = 200;
  * Old events are dropped in a single batch so Visuals startup never replays a long stale queue.
  */
 export function partitionDrawQueue(
-    drawQueue: Array<{ time?: number }>,
+    drawQueue: VisualizerQueuedEvent[],
     now: number,
-): { readyEvents: Array<any>; remainingEvents: Array<any> } {
+): { readyEvents: VisualizerQueuedEvent[]; remainingEvents: VisualizerQueuedEvent[] } {
     let startIndex = 0;
 
     while (startIndex < drawQueue.length) {
@@ -333,7 +334,6 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                         dispatch(ACTIONS.VIS_UPDATE, { type: 'chord', index: ev.index });
                     }
                     if (enabled && playback.isDrawing && vizRef.current) {
-                        ev.notes = ev.chordNotes;
                         vizRef.current.pushChord(ev);
                     }
                 } else if (ev.type === 'note') {
