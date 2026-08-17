@@ -234,10 +234,17 @@ export function generateNotesForStep(
                 arranger.totalSteps,
             );
         coordination.soloistQaHang = qaHang;
+        // #1010: comping-emit.ts's qaStyleLive gate only emits the chord
+        // response for style 'smart'/'jazz' — an owner assigned on any other
+        // style has no responder and the breath is silently lost. Gate
+        // availability here to match, so bass can claim the response instead.
+        const chordsQaAvailable =
+            drumTick.includeChords &&
+            (state.chords.style === 'smart' || state.chords.style === 'jazz');
         coordination.soloistQaResponseOwner = selectRockQaResponseOwner(
             qaHang,
             groove.genreFeel,
-            drumTick.includeChords,
+            chordsQaAvailable,
             drumTick.includeBass,
         );
     }

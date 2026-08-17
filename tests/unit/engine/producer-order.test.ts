@@ -284,6 +284,113 @@ describe('Producer order guard', () => {
         );
     });
 
+    // Windows chosen to vary selectRockQaResponseOwner's internal hash draw
+    // (keyed on hangStartStep ^ drawSalt). Load-bearing for the 'smart'
+    // sanity sweep below, where chordsAvailable is true and the draw is live
+    // — a single fixed window can't prove the sweep is capable of landing on
+    // 'chords' at all. For the unsupported-style sweeps, chordsAvailable is
+    // false on every window (selectRockQaResponseOwner short-circuits to
+    // 'bass' before the hash draw runs), so any one window would prove the
+    // same thing; reused here anyway to keep one shared sweep helper.
+    const OWNER_DRAW_WINDOWS = [
+        { hangStartStep: 2, drawSalt: 997 },
+        { hangStartStep: 10, drawSalt: 113 },
+        { hangStartStep: 18, drawSalt: 4451 },
+        { hangStartStep: 26, drawSalt: 8801 },
+        { hangStartStep: 34, drawSalt: 21 },
+        { hangStartStep: 42, drawSalt: 65535 },
+        { hangStartStep: 50, drawSalt: 271828 },
+        { hangStartStep: 58, drawSalt: 12 },
+    ].map(({ hangStartStep, drawSalt }) => ({
+        pc: 5,
+        drawSalt,
+        hangStartStep,
+        echoStep: hangStartStep + 4,
+        answerEntryStep: hangStartStep + 8,
+        resolutionBarStart: 16,
+        resolutionBarEnd: 32,
+    }));
+
+    function sweepOwners(style) {
+        const owners = [];
+        for (const qaHang of OWNER_DRAW_WINDOWS) {
+            vi.mocked(getQaHangAt).mockReturnValue(qaHang);
+            const state = makeState();
+            state.groove.genreFeel = 'Rock';
+            state.chords.style = style;
+            state.bass.enabled = true;
+            bassCoordinationArg = null;
+            generateNotesForStep(
+                state,
+                qaHang.echoStep,
+                {
+                    mainCursor: { index: 0, sectionIndex: 0 },
+                    lookaheadCursor: { index: 0, sectionIndex: 0 },
+                },
+                {
+                    includeSoloist: false,
+                    includeBass: true,
+                    includeChords: true,
+                    includeHarmony: false,
+                    includeDrums: false,
+                },
+            );
+            owners.push(bassCoordinationArg?.soloistQaResponseOwner);
+        }
+        return owners;
+    }
+
+    it('#1010 sanity: the draw sweep can land on chords when style is smart (proves the sweep is meaningful)', () => {
+        const owners = sweepOwners('smart');
+        expect(owners).toContain('chords');
+    });
+
+    // Real CHORD_STYLES ids (public/data/instrument-styles.ts), minus
+    // 'smart'/'jazz' — the two the emit-side qaStyleLive gate allows through.
+    it.each(['pad', 'strum8', 'strum-country', 'power-metal', 'funk', 'ska-upstroke'])(
+        "#1010 never assigns 'chords' ownership across a draw sweep when chords.style is '%s'",
+        (style) => {
+            const owners = sweepOwners(style);
+            expect(owners).not.toContain('chords');
+            expect(owners).toContain('bass');
+        },
+    );
+
+    it("#1010 assigns null (not 'chords') when style is unsupported and bass is unavailable", () => {
+        const qaHang = {
+            pc: 5,
+            drawSalt: 997,
+            hangStartStep: 2,
+            echoStep: 6,
+            answerEntryStep: 10,
+            resolutionBarStart: 16,
+            resolutionBarEnd: 32,
+        };
+        vi.mocked(getQaHangAt).mockReturnValue(qaHang);
+        const state = makeState();
+        state.groove.genreFeel = 'Rock';
+        state.chords.style = 'pad';
+        state.bass.enabled = false;
+
+        generateNotesForStep(
+            state,
+            qaHang.echoStep,
+            {
+                mainCursor: { index: 0, sectionIndex: 0 },
+                lookaheadCursor: { index: 0, sectionIndex: 0 },
+            },
+            {
+                includeSoloist: false,
+                includeBass: false,
+                includeChords: true,
+                includeHarmony: false,
+                includeDrums: false,
+            },
+        );
+
+        expect(accompanimentCoordinationArg?.soloistQaResponseOwner).toBeNull();
+    });
+
     it('#997 publishes no owner when the soloist musical lane is muted', () => {
         vi.mocked(getQaHangAt).mockReturnValue({
             pc: 5,
