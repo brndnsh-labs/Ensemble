@@ -3,8 +3,34 @@
  */
 import { describe, expect, it } from 'vitest';
 import { partitionDrawQueue } from '../../../public/components/Visualizer.jsx';
+import type {
+    VisualizerChordEvent,
+    VisualizerQueuedEvent,
+} from '../../../public/visualizer/visualizer-events.js';
 
 describe('partitionDrawQueue', () => {
+    it('preserves the queued chord event shape during render preparation', () => {
+        const chord: VisualizerChordEvent = {
+            type: 'chord',
+            time: 10,
+            index: 2,
+            chordNotes: [60, 64, 67],
+            rootMidi: 60,
+            intervals: [0, 4, 7],
+            duration: 2,
+            label: 'C',
+            sectionId: 'verse',
+        };
+        const queue: VisualizerQueuedEvent[] = [chord];
+        const before = structuredClone(chord);
+
+        const { readyEvents, remainingEvents } = partitionDrawQueue(queue, 10);
+
+        expect(readyEvents).toEqual([before]);
+        expect(remainingEvents).toEqual([]);
+        expect(chord).toEqual(before);
+    });
+
     it('drops stale backlog and returns only due events for the current frame', () => {
         const queue = [
             { type: 'step', time: 5, step: 4 },

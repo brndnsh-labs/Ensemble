@@ -1,3 +1,5 @@
+import type { VisualizerQueuedEvent } from './visualizer/visualizer-events.js';
+
 /**
  * Centralized Action Types for the Ensemble State Manager.
  *
@@ -1185,7 +1187,7 @@ export interface GlobalContext {
     readonly rampStartPct: number;
     readonly rampBpmTarget: number;
     /** Queue of normalized visual events waiting to be rendered. */
-    readonly drawQueue: any[];
+    readonly drawQueue: VisualizerQueuedEvent[];
     /** Whether the metronome count-in is active. */
     readonly isCountingIn: boolean;
     /** Current beat of the count-in (0-3). */

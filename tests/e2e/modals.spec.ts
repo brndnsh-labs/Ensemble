@@ -66,6 +66,40 @@ test.describe('Modals Responsiveness @ui', () => {
         await page.waitForSelector('#settingsOverlay', { state: 'hidden' });
     });
 
+    test('Settings tabs support roving keyboard selection', async ({ page }) => {
+        await openSettings(page);
+        const settingsModal = page.locator('#settingsOverlay .settings-content');
+        const playback = settingsModal.getByRole('tab', { name: 'Playback' });
+        const packs = settingsModal.getByRole('tab', { name: 'Packs' });
+        const about = settingsModal.getByRole('tab', { name: 'About' });
+        const panel = settingsModal.getByRole('tabpanel');
+
+        // Settle the dialog's deliberate initial focus lifecycle before the
+        // keyboard checks take ownership of focus.
+        await expect(page.locator('#closeSettingsBtn')).toBeFocused();
+        await expect(playback).toHaveAttribute('aria-controls', 'settingsPanel');
+        await playback.focus();
+        await page.keyboard.press('ArrowRight');
+        await expect(packs).toBeFocused();
+        await expect(packs).toHaveAttribute('aria-selected', 'true');
+        await expect(packs).toHaveAttribute('tabindex', '0');
+        await expect(playback).toHaveAttribute('tabindex', '-1');
+        await expect(panel).toHaveAttribute('id', 'settingsPanel');
+        await expect(panel).toHaveAttribute('aria-labelledby', 'settingsTab-packs');
+
+        await page.keyboard.press('End');
+        await expect(about).toBeFocused();
+        await expect(about).toHaveAttribute('aria-selected', 'true');
+
+        await page.keyboard.press('Home');
+        await expect(playback).toBeFocused();
+        await expect(playback).toHaveAttribute('aria-selected', 'true');
+
+        await page.keyboard.press('ArrowLeft');
+        await expect(about).toBeFocused();
+        await expect(about).toHaveAttribute('aria-selected', 'true');
+    });
+
     test('Settings About tab - identity, support card, and troubleshooting footer', async ({
         page,
     }) => {

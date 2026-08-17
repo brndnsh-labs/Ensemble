@@ -133,6 +133,34 @@ export function Settings() {
     // e.g. the pack-install nudge (#684) opens straight to Packs.
     const tab = useEnsembleState((s) => s.playback.settingsTab);
     const setTab = (id: string) => dispatch(ACTIONS.SET_SETTINGS_TAB, id);
+    const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+    const handleTabKeyDown = (event: KeyboardEvent, currentTabId: string) => {
+        const currentIndex = SETTINGS_TABS.findIndex((candidate) => candidate.id === currentTabId);
+        let nextIndex: number | null = null;
+
+        switch (event.key) {
+            case 'ArrowRight':
+                nextIndex = (currentIndex + 1) % SETTINGS_TABS.length;
+                break;
+            case 'ArrowLeft':
+                nextIndex = (currentIndex - 1 + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+                break;
+            case 'Home':
+                nextIndex = 0;
+                break;
+            case 'End':
+                nextIndex = SETTINGS_TABS.length - 1;
+                break;
+            default:
+                return;
+        }
+
+        event.preventDefault();
+        const nextTab = SETTINGS_TABS[nextIndex];
+        setTab(nextTab.id);
+        tabRefs.current[nextTab.id]?.focus();
+    };
 
     const isOpen = useEnsembleState((s) => s.playback.modals.settings);
     const notation = useEnsembleState((s) => s.arranger.notation);
@@ -175,15 +203,26 @@ export function Settings() {
                                 type="button"
                                 role="tab"
                                 id={`settingsTab-${t.id}`}
+                                ref={(element) => {
+                                    tabRefs.current[t.id] = element;
+                                }}
+                                tabIndex={tab === t.id ? 0 : -1}
                                 aria-selected={tab === t.id}
+                                aria-controls="settingsPanel"
                                 class={`settings-tab${tab === t.id ? ' is-active' : ''}`}
                                 onClick={() => setTab(t.id)}
+                                onKeyDown={(event) => handleTabKeyDown(event, t.id)}
                             >
                                 {t.label}
                             </button>
                         ))}
                     </nav>
-                    <div class="settings-panel" role="tabpanel">
+                    <div
+                        id="settingsPanel"
+                        class="settings-panel"
+                        role="tabpanel"
+                        aria-labelledby={`settingsTab-${tab}`}
+                    >
                         {tab === 'packs' && <PacksSettings />}
                         {tab === 'playback' && (
                             <SettingGroup title="Audio & Setup">
