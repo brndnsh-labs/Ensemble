@@ -83,7 +83,7 @@
     "milestones": []
   },
   "routing": {
-    "model": "`sonnet` | `opus` via the `model/*` label (default opus when untagged). Tag `sonnet` for well-specified, gate-verifiable stories — including musical work, where the critique tests + the `Needs-ear` stop gate the result regardless of executor; reserve `opus` for design-call / open-investigation stories (which usually carry `Needs-decision` anyway). **Model never gates autonomy** (§5) — it only picks the executor's model.",
+    "model": "`frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state/worker work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.",
     "executor_default": "orchestrator-inline"
   },
   "gates": {

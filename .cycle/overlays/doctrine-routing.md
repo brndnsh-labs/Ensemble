@@ -14,7 +14,7 @@ of Done and the reviewer set:
   multiplier, deterministic phrasing, register slotting, coordination-context discipline).
 - `critique-test-author` — when the deliverable **is** a new/tightened critique test
   (not a one-line threshold bump an engine implementer can do inline).
-- `orchestrator-inline` — default for opus/small/taste stories, for audio-DSP/synthesis
+- `orchestrator-inline` — default for frontier/small/taste stories, for audio-DSP/synthesis
   voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph
   wiring), and for finicky infra (state-slice schema, worker sync contract, hydration) —
   anywhere a cold agent re-derives brittle detail and ships latent bugs.
@@ -31,4 +31,5 @@ of Done and the reviewer set:
 `/code-review` (correctness pass, any non-trivial diff) ·
 a **test-quality lens** for test-only diffs (coverage gaps, intent-vs-implementation,
 vacuous/brittle asserts — `critique-test-author`'s lens for a critique test, `/code-review`
-otherwise) · a **Sonnet second-perspective** pass when the implementer was Opus.
+otherwise) · a **balanced-tier second-perspective** pass when the implementer was frontier-tier
+(or vice versa).

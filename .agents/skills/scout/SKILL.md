@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=836631763675 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=ce817df20251 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -55,7 +55,9 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
   tab-order. **Don't park as `status:needs-ear`** — file as **`status:needs-decision` with the concrete fix
   attached** ("text is 3.8:1, AA wants 4.5:1, here's the darker token — apply?").
 - **Classify:** `track:bundle`? No — `area:ui`, `finding`/`enhancement`, `lens:code-review`;
-  Class 1 → `status:ready` + `burndown` + `verify-on-device`; Class 2 → `status:needs-decision` fix-pre-drafted.
+  Class 1 → `status:ready` + `burndown` + `verify-on-device`, Model `economy` for a single
+  native-element fix or `balanced` for a focus/lifecycle contract; Class 2 →
+  `status:needs-decision` fix-pre-drafted, Model `frontier` when the interaction itself needs design.
 
 ### `security` — hardening (the *least* burndown-able lens; deliberately small here)
 This is a client-only PWA: no auth, no payments, no server. The real surface is **untrusted input**
@@ -69,9 +71,11 @@ This is a client-only PWA: no auth, no payments, no server. The real surface is 
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
   **code-level input-parsing change** is a judgment call — file it, route to a human `/cycle` with a
   `/security-review`, **never `burndown`-tag it** (a wrong hardening change is worse than the gap).
-- **Classify:** CVE bump → `burndown`. Input-hardening code → `status:needs-decision` with the fix
-  pre-drafted ("approve adding shape validation to the share-URL reader?") → on clear, `status:ready`,
-  `lens:code-review` + "needs `/security-review`", **off `burndown`**.
+- **Classify:** CVE bump → `burndown`, Model `economy` when it is a routine compatible bump or
+  `balanced` when migration work is required. Input-hardening code → `status:needs-decision` with
+  the fix pre-drafted ("approve adding shape validation to the share-URL reader?") → on clear,
+  `status:ready`, Model `frontier`, `lens:code-review` + "needs `/security-review`", **off
+  `burndown`**.
 
 ### `perf` — performance, *floor-aware*
 Speedups must keep playback glitch-free on weak hardware — a synthetic bench can't hear an audio
@@ -80,16 +84,18 @@ dropout. **The split that decides everything — which side of the audio path is
   workers, `tick-logic`) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
   `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, leave off
-  `burndown` (often `needs-ear`). Model per the §3 routing rule: `sonnet` when the acceptance is
-  critique-test-verifiable, `opus` only when the finding is itself a design call.
+  `burndown` (often `needs-ear`). Model `frontier` for synth/worker/audio-lifecycle work and open
+  design; Model `balanced` for a narrow musical claim with a critique-test oracle.
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `track:bundle`, `lens:bundle-hygiene`. Drop an unused dep, lazy-load a
   route/overlay, code-split a heavy component, memoize a *verified*-hot render. `npm run build` /
   the size check **is** the proof and it never touches the audio floor. Pure ones (drop a dep) →
   `burndown`; tradeoff ones (a lazy-load adds a loading state) → `status:needs-decision`-with-fix.
-- **Classify:** audio-path → `track:synth`/`musical`, Model per the §3 routing rule (`sonnet` if
-  gate-verifiable, `opus` for design calls), caveat or `status:needs-ear`. Off-path →
-  `track:bundle`, Model `sonnet`, `status:ready` + `burndown` (or `status:needs-decision`-with-fix for tradeoffs).
+- **Classify:** audio-path → `track:synth`/`musical`, Model `frontier` for synth/worker lifecycle
+  or design calls and `balanced` for critique-test-verifiable musical structure, caveat or
+  `status:needs-ear`. Off-path → `track:bundle`, Model `economy` for a closed-form deletion or
+  `balanced` for non-trivial splitting/memoization, `status:ready` + `burndown` (or Model
+  `frontier` + `status:needs-decision`-with-fix for tradeoffs).
 
 ### `hygiene` — type-safety, dead code, duplication, drift (the most `burndown`-able lens)
 The mechanical-wins lens — where overnight discovery most feeds same-week auto-grind.
@@ -101,10 +107,12 @@ The mechanical-wins lens — where overnight discovery most feeds same-week auto
   `worker-client.ts`" not "remove all `any`". An unbounded sweep isn't `burndown`-safe. **Engine
   hygiene that changes generative behavior is NOT hygiene** — if a "cleanup" could shift a critique
   test, it's a `musical` Track story, not a `burndown` nit.
-- **Classify:** `area:*`, `finding`, Model `sonnet`, Size `S`, `status:ready` **+ `burndown`** for the
-  genuinely build-verifiable ones (a bounded `any`-tighten, a knip dead-code removal, a jscpd
-  de-dup); the judgment-tail ("is this export dead or kept API?") → `status:needs-decision`-with-fix. Track
-  `bundle` for dead-code removal; otherwise leave Track unset / `musical` if it's engine-adjacent.
+- **Classify:** `area:*`, `finding`, Model `economy`, Size `S`, `status:ready` **+ `burndown`** for
+  genuinely mechanical, build-verifiable work with an existing seam (a bounded `any`-tighten or
+  knip dead-code removal); use Model `balanced` when the contract spans several modules. The
+  judgment-tail ("is this export dead or kept API?") → Model `frontier` +
+  `status:needs-decision`-with-fix. Track `bundle` for dead-code removal; otherwise leave Track
+  unset / `musical` if it's engine-adjacent.
 
 ### `context` — does the map match the territory (the project-unique lens)
 The dev loop here is **agent-driven**, so code that lies to a cold reader has a *direct, recurring*
@@ -125,8 +133,9 @@ cost. Two faces of one failure: **doc↔code drift** and **undocumented load-bea
   musical-intent comment) → `burndown` (build/lint-verifiable or doc-only + directionally
   unambiguous). **Interpretive drift** ("is the *doc* wrong or the *code*?") → `status:needs-decision`
   with the likely correction pre-drafted.
-- **Classify:** `area:infra` (or the owning area), `finding`, Model `sonnet`, Size `S`; factual-sync →
-  `status:ready` + `burndown`; interpretive → `status:needs-decision`-with-fix. `lens:code-review`.
+- **Classify:** `area:infra` (or the owning area), `finding`, Size `S`; factual-sync → Model
+  `economy` + `status:ready` + `burndown`; interpretive → Model `frontier` +
+  `status:needs-decision`-with-fix. `lens:code-review`.
 
 ## The budget — quality over flood (load-bearing)
 
