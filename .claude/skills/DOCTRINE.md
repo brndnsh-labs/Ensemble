@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=c4f491c67d60 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=02722d43db6b — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -84,7 +84,7 @@ skill at `/cycle` time, from what the diff actually touches, not at filing time.
 
 ## §3 Routing
 
-- **Model:** `sonnet` | `opus` via the `model/*` label (default opus when untagged). Tag `sonnet` for well-specified, gate-verifiable stories — including musical work, where the critique tests + the `Needs-ear` stop gate the result regardless of executor; reserve `opus` for design-call / open-investigation stories (which usually carry `Needs-decision` anyway). **Model never gates autonomy** (§5) — it only picks the executor's model.
+- **Model:** `frontier` | `balanced` | `economy` via the `model/*` label (default `frontier` when untagged). The labels are provider-neutral routing tiers: `frontier` = Codex Sol / Claude Opus for ambiguous design, independent diagnosis, §5 brake surfaces, and deceptively complex concurrency or state/worker work; `balanced` = Codex Terra / Claude Sonnet for bounded but non-trivial implementation, including critique-test-verifiable musical work; `economy` = Codex Luna / Claude Haiku for precise, safe, S-sized mechanical work with an existing test seam and centralized verification. **Model never gates autonomy** (§5) — it only picks the executor's model.
 - **Executor:** **`orchestrator-inline` by default** — the main thread builds directly,
   keeping accumulated context. **Spawn parallel agents only for
   independent mechanical work** (the same change across several files); keep shared-file edits
@@ -114,7 +114,7 @@ of Done and the reviewer set:
   multiplier, deterministic phrasing, register slotting, coordination-context discipline).
 - `critique-test-author` — when the deliverable **is** a new/tightened critique test
   (not a one-line threshold bump an engine implementer can do inline).
-- `orchestrator-inline` — default for opus/small/taste stories, for audio-DSP/synthesis
+- `orchestrator-inline` — default for frontier/small/taste stories, for audio-DSP/synthesis
   voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, scheduler audio-graph
   wiring), and for finicky infra (state-slice schema, worker sync contract, hydration) —
   anywhere a cold agent re-derives brittle detail and ships latent bugs.
@@ -131,7 +131,8 @@ of Done and the reviewer set:
 `/code-review` (correctness pass, any non-trivial diff) ·
 a **test-quality lens** for test-only diffs (coverage gaps, intent-vs-implementation,
 vacuous/brittle asserts — `critique-test-author`'s lens for a critique test, `/code-review`
-otherwise) · a **Sonnet second-perspective** pass when the implementer was Opus.
+otherwise) · a **balanced-tier second-perspective** pass when the implementer was frontier-tier
+(or vice versa).
 
 **Re-verify agent claims:** a spawned agent's "gates green / tests pass" is a *claim*. Re-run the
 gates **yourself** before trusting it — a spawned "all green" has failed in a clean shell before.
