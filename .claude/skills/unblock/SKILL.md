@@ -2,7 +2,7 @@
 name: unblock
 description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via `AskUserQuestion`, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=c3acaae68b31 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=15cf376e83bb — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
@@ -51,6 +51,7 @@ both and presents desk first, then hands-on.
 
 6. **Ask.** Via `AskUserQuestion` — one question per item, **recommended
    option first and labeled `(Recommended)`**, max 4 per call.
+
    - **desk** verdicts: the actual options, recommendation first.
    - **hands-on** verdicts: **Works** / **Doesn't work** / **Not now**.
      **"Not now" is a first-class answer, not a failure** — declining to go test something is a

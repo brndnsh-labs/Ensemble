@@ -2,7 +2,7 @@
 name: deploy-test
 description: Deploy Ensemble to the test environment — low ceremony, for previewing a branch or an uncommitted tree before it merges. Runs the deploy, verifies the right build actually landed, and derives a per-change check-in list from what shipped. Usage `/deploy-test`.
 ---
-<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=5dddaaea40cf — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=99b68b9e2bac — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-test — put it on the test box
 
@@ -77,9 +77,10 @@ failures are the SSH alias/key; the build succeeded locally, nothing shipped.
    `Acceptance:` line. **Derive it; don't invent it.** No generic "click around and see if it
    works" filler: only *user-visible* surfaces earn a checkbox, and each one names what changed and
    what should now be true.
-5. **Ask for a verdict** — via `ask_user_question`, with **Works** / **Something's off** / **Haven't
-   checked**. Skip this step entirely when nothing observable shipped (a refactor, a test-only
-   change); asking for a verdict on an invisible change trains people to click through.
+
+5. **Ask for a verdict** — directly in chat, offering **Works** / **Something's off** / **Haven't checked**.
+   Skip this step entirely when nothing observable shipped (a refactor, a test-only change);
+   asking for a verdict on an invisible change trains people to click through.
 6. **On "Something's off": capture, don't debug.** Get Brandon's description verbatim first
    — the raw words are the evidence. Then decide whether it's a fix-now or a `finding`.
 

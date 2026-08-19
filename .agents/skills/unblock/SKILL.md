@@ -1,8 +1,8 @@
 ---
 name: unblock
-description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via `ask_user_question`, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
+description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via plain chat, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=e01220454802 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=c4023e2cca4e — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
@@ -49,8 +49,9 @@ both and presents desk first, then hands-on.
    **A recommendation is mandatory on every item.** "What do you want to do?" hands the work back;
    the point of this skill is to hand back only the *decision*.
 
-6. **Ask.** Via `ask_user_question` — one question per item, **recommended
-   option first and labeled `(Recommended)`**, max 4 per call.
+6. **Ask.** This harness has no structured menu tool — ask one question
+   per item directly in chat, stating the recommendation first, and wait for the reply before
+   moving to the next item.
    - **desk** verdicts: the actual options, recommendation first.
    - **hands-on** verdicts: **Works** / **Doesn't work** / **Not now**.
      **"Not now" is a first-class answer, not a failure** — declining to go test something is a
