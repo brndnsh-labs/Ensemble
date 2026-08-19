@@ -3,8 +3,11 @@
  * Main thread class that manages the VisualizerWorker.
  */
 
+import type { TimeSignatureConfig } from '../config.js';
+import type { VisualizerChordEvent, VisualizerNoteEvent } from './visualizer-events.js';
+
 interface WorkerLike {
-    postMessage(message: any, transfer?: Transferable[]): void;
+    postMessage(message: unknown, transfer?: Transferable[]): void;
     terminate(): void;
 }
 
@@ -12,8 +15,8 @@ export class UnifiedVisualizer {
     canvas: HTMLCanvasElement;
     staticCanvas: HTMLCanvasElement;
     worker: Worker | WorkerLike | null;
-    themeCache: any;
-    tracks: Record<string, any>;
+    themeCache: unknown;
+    tracks: Record<string, { color: string; resolvedColor: string; label: string }>;
 
     constructor(canvas: HTMLCanvasElement, staticCanvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -51,18 +54,18 @@ export class UnifiedVisualizer {
         );
     }
 
-    toRaw(val: any): any {
+    toRaw<T>(val: T): T {
         if (!val || typeof val !== 'object') {
             return val;
         }
         try {
-            return JSON.parse(JSON.stringify(val));
+            return JSON.parse(JSON.stringify(val)) as T;
         } catch (_e) {
             return val;
         }
     }
 
-    setTheme(themeCache: any): void {
+    setTheme(themeCache: unknown): void {
         this.themeCache = themeCache;
         if (this.worker) {
             this.worker.postMessage({ type: 'THEME', themeCache: this.toRaw(themeCache) }, []);
@@ -97,7 +100,7 @@ export class UnifiedVisualizer {
         }
     }
 
-    setRegister(name: string, midi: any): void {
+    setRegister(name: string, midi: number): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'SET_REGISTER', name, midi: this.toRaw(midi) }, []);
         }
@@ -134,13 +137,13 @@ export class UnifiedVisualizer {
         }
     }
 
-    pushNote(name: string, event: any): void {
+    pushNote(name: string, event: VisualizerNoteEvent): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_NOTE', name, event: this.toRaw(event) }, []);
         }
     }
 
-    pushChord(event: any): void {
+    pushChord(event: VisualizerChordEvent): void {
         if (this.worker) {
             this.worker.postMessage({ type: 'PUSH_CHORD', event: this.toRaw(event) }, []);
         }
@@ -158,7 +161,7 @@ export class UnifiedVisualizer {
         }
     }
 
-    render(currentTime: number, bpm: number, tsConfig: any): void {
+    render(currentTime: number, bpm: number, tsConfig: TimeSignatureConfig): void {
         if (this.worker) {
             this.worker.postMessage(
                 { type: 'RENDER', currentTime, bpm, tsConfig: this.toRaw(tsConfig) },
