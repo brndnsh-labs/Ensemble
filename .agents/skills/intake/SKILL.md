@@ -2,7 +2,7 @@
 name: intake
 description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon ONE question at a time until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=208c757ce107 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=e9825e8153fa — managed by the-cycle; edit the template, not this file -->
 
 # /intake — turn an idea into an actionable issue
 
@@ -32,8 +32,8 @@ the issue. So:
   operator-side fix, not both stacks — sound right?"* beats *"what's the scope?"*
 - **Stop the moment it's actionable.** Three crisp exchanges is great; ten is a slog.
 
-Use `ask_user_question` only for a genuinely discrete single choice (2–4
-options, recommendation first) — never to fire several at once.
+This harness has no structured menu tool — ask each question directly in chat, one at a time,
+leading with a recommendation, and wait for the reply.
 
 ## Workflow
 

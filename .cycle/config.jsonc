@@ -98,6 +98,18 @@
       "npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)"
     ]
   },
+  "deps": {
+    "outdated": "npm outdated",
+    "audit": "npm audit",
+    "audit_fix": "npm audit fix",
+    "update": "npm update",
+    "install": "npm install",
+    "lockfile": "package-lock.json",
+    "manifests": [
+      "package.json",
+      "package-lock.json"
+    ]
+  },
   "brakes": [
     "Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop)",
     "destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state)",

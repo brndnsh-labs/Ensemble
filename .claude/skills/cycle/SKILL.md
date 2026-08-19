@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=2cde4896eef6 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=59349f4e97de — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -57,7 +57,7 @@ unattended.
    | implement | gates green when **the orchestrator re-runs them itself** (§4) | gates red, agent Blocked, a spawned "green" that doesn't reproduce (§3), **or the diff lands on a §5 always-brake surface** |
    | review | findings all mechanical, no design call | any P0, a finding that needs a design decision, or one that contradicts a memory note (§5) |
    | patch | gates green | gates red, a fix needs a design call |
-   | done | safe story: §6 poll-then-merge → issue closed | CI red / conflict / a hook failure that isn't a trivial retry · **judgment-call class → PR left open** (not a failure — stop the chain there and report) |
+   | done | safe story: §6 server-side merge queued; issue closes when the forge lands it | CI red / conflict / a hook failure that isn't a trivial retry · **judgment-call class → PR left open** (not a failure — stop the chain there and report) |
    | deploy-test | deploy + verify green | deploy non-zero, or the external check fails after retries |
 
 6. **On `--until-blocked`, after `/done`** (and the optional deploy):

@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=b6a8fc18479c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=c7c9cf4cc253 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -95,8 +95,8 @@ skill at `/cycle` time, from what the diff actually touches, not at filing time.
     **human-triggered** — the loop cannot invoke it; offer it on a large or risky diff and leave
     the call to Brandon.
   - **`/security-review`** — **additionally**, whenever the diff touches Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field).
-  - A **second-model angle** (a Sonnet pass over an opus diff, or vice-versa) is a cheap way to
-    catch same-prior blind spots on a meaty diff.
+  - A **second-model angle** (a different model family or tier from the implementer) is a cheap
+    way to catch same-prior blind spots on a meaty diff.
 
 `track:*` is the load-bearing routing namespace — it picks the Definition
 of Done and the reviewer set:
