@@ -2,7 +2,7 @@
 name: review
 description: Review the current uncommitted Ensemble diff. Inspects git status + diff --stat to route reviewers — an inline correctness pass for any non-trivial change, plus `/security-review` whenever the diff touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)), and optionally a second-model angle on a meaty diff. Presents the reviewer plan before running. Does NOT change Status — review happens within status:in-progress. Use after /implement, before /done.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=12effc0dd9d2 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=342ba215f104 — managed by the-cycle; edit the template, not this file -->
 
 # /review — review the uncommitted tree
 
@@ -15,8 +15,13 @@ story stays `status:in-progress` through review and patch.
 
 ## Workflow
 
-1. **Survey the diff.** `git status` + `git diff --stat`. If the diff is empty, say so and stop.
-2. **Route reviewers.** Rows are **additive** — union the reviewers and run each once.
+1. **Check for a fast-path receipt** (§5). If `/implement`'s `## Verification receipt` is in
+   context, recompute its diff fingerprint over the same file list. A match (and every gate in it
+   still PASS) means the issue read and the file list already stand proven — skip straight to step
+   2's routing with that instead of re-surveying. A stale fingerprint or no receipt: proceed
+   normally below, without comment.
+2. **Survey the diff.** `git status` + `git diff --stat`. If the diff is empty, say so and stop.
+3. **Route reviewers.** Rows are **additive** — union the reviewers and run each once.
 
    | If the diff touches... | Run |
    | :- | :- |
@@ -26,7 +31,7 @@ story stays `status:in-progress` through review and patch.
    | **the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)** | **`/security-review`** *in addition* — non-optional here (§5). Reason about this flow's specific threat model, not just generic categories. |
    | A **test-only** diff | the **test-quality lens** (below) — the tests *are* the deliverable. |
    | A meaty diff built by the default model | optionally a **second-model angle** (below). |
-   | Docs only (`*.md`) and no code | None — report "docs-only, skipping review." |
+   | Docs only (`*.md`) and/or config, no application code | the **editorial lens** (below) — never "skipping review." |
 
    **`/code-review` is human-triggered, not a loop step.** The heavyweight multi-angle cloud review
    exists, but only Brandon can invoke it — no skill can run it, and a routing table that
@@ -108,7 +113,20 @@ story stays `status:in-progress` through review and patch.
    - If a test appears to **codify a bug** — the behavior is wrong but the test enshrines it —
      **flag it as a finding**; never bless it because it passes.
 
-3. **Present the plan** (a status update, not a gate — §5):
+   ### Editorial lens
+
+   A docs/config-only diff gets read as an editor, not a code reviewer — light, but never skipped:
+   - **Issue fidelity** — does the change actually satisfy the issue's `Acceptance:` line?
+   - **Contradictory wording** — does it conflict with something else this doc/config already says?
+   - **References** — do the section numbers, file paths, and links it points at still resolve?
+   - **Formatting** — table alignment, heading levels, list markers consistent with the rest of the
+     file?
+   - **Unintended edits** — anything touched outside what `Touches:` (or the diff itself) named?
+
+   No specialized reviewer, no automatic gate rerun — this lens is deliberately light because §4's
+   gates already proved the deterministic part.
+
+4. **Present the plan** (a status update, not a gate — §5):
 
    ```
    ## Review plan
@@ -117,8 +135,8 @@ story stays `status:in-progress` through review and patch.
    **Reviewers:** <those firing> — <why each>
    ```
 
-4. **Run them immediately** in the same turn — no "Run them?" wait.
-5. **Present consolidated findings,** each with severity (P0/P1/P2) + `file:line` + a **verbatim
+5. **Run them immediately** in the same turn — no "Run them?" wait.
+6. **Present consolidated findings,** each with severity (P0/P1/P2) + `file:line` + a **verbatim
    quote** of the offending line, then a recommendation:
 
    ```
@@ -129,7 +147,7 @@ story stays `status:in-progress` through review and patch.
    - 🛑 A finding contradicts a project memory note → memory wins by default; surface it
    ```
 
-6. **Suggest the next step** from the recommendation.
+7. **Suggest the next step** from the recommendation.
 
 ## Safety
 
@@ -142,6 +160,8 @@ story stays `status:in-progress` through review and patch.
 ## Edge cases
 
 - **Empty diff:** report; suggest `/next`. Don't run reviewers.
+- **Fast-path receipt present but stale or missing a PASS** (§5): treat it as absent — survey and
+  route normally, without flagging the mismatch as a finding.
 - **Diff mixes story work + unrelated drift:** flag the drift; ask whether to revert before
   reviewing.
 - **Finding contradicts a memory note** (an architecture rule, an invariant): the memory wins
