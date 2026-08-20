@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=5cad77e59dfd — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=5ac563892ff6 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -203,6 +203,45 @@ always-brake set**: an item is safe only if it is *none* of the classes above AN
 well-specified, small-to-medium, single-area, and **gate-verifiable** (provable by §4). When
 unsure, **exclude and surface** — a mis-graded autonomous merge costs trust; a skipped-safe item
 only costs throughput.
+
+**The fast path (`/implement` → `/review` → `/done`).** Ceremony should scale with risk, not apply
+uniformly. A story is fast-path eligible only when it is **all** of: touches **one or two files**,
+every one of them **docs and/or config** (no application/library code), the change is
+**deterministic** — the diff would be the same no matter who wrote it — and §4's gates can **prove**
+it, and it is **none** of the always-brake classes above. When unsure, it is **not** eligible; fall
+back to the normal flow. A mis-graded fast path costs more than the ceremony it was meant to save.
+
+On the fast path, `/implement` fetches the issue once, states a **one-sentence plan** in place of
+the full `## Plan` block, skips task-list/subagent ceremony, makes the edit, runs §4's gates, and
+emits a **verification receipt** instead of a separate narrative report:
+
+```
+## Verification receipt
+**Issue:** #<n>
+**Files:** <changed files, exhaustive>
+**Diff fingerprint:** <first 12 hex chars of sha256(`git diff -- <files>`)>
+**Gates:**
+- `npm run typecheck     # tsc over public/**/*.{ts,tsx}` — <PASS/FAIL>
+- `npm run lint          # Biome lint + format check` — <PASS/FAIL>
+- `npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)` — <PASS/FAIL>
+- `npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)` — <PASS/FAIL>
+- `npm run test:e2e      # Playwright vs a `vite preview` build (Desktop Chrome, Mobile Chrome, Mobile Safari)` — <PASS/FAIL>
+```
+
+`/review` and `/done` may **consume** that receipt — skipping the reads and re-derivations it
+already proves — but only while a **freshly recomputed** fingerprint over the same file list still
+matches the one in the receipt and every gate in it reads PASS. A stale fingerprint (the tree
+changed since), a missing receipt (a new session, or a normal-path `/implement`), or any gate
+reading FAIL all mean the same thing: fall back to that skill's normal verification, silently and
+without complaint — a receipt is an optimization a skill can always live without, never a
+requirement it depends on.
+
+The fast path still performs tracker status, branch policy, §4's gates, and normal delivery safety
+in full; it compresses **ceremony and duplicate reads**, never the checks themselves. Each phase
+still answers its own question — implement proves acceptance, review looks for what implement's own
+proof can't see (missed defects, contradictory wording, unintended edits), patch resolves what
+review finds, done handles delivery and freshness — the receipt lets a later phase skip *re-proving*
+an earlier one's answer, not skip asking its own question.
 
 **Provenance & attribution (multi-model).** Tracker comments post under Brandon's
 account token, so an in-comment marker is the ONLY provenance signal a thread has.
@@ -420,7 +459,9 @@ that isn't in the §1 table.
   🤖 Generated with [Claude Code](https://claude.com/claude-code)
   ```
 - The `Closes/Fixes/Resolves #N` keyword fires **anywhere** in the body regardless of surrounding
-  prose — writing "`Closes #844` is NOT set" still closes #844. When carving one item out of a
+  prose — writing "Closes #844 is NOT set" still closes #844 — **except inside a code span or code
+  block, which suppresses it entirely.** Never backtick the token when the close is wanted, and
+  never leave it bare next to a number that shouldn't close. When carving one item out of a
   multi-item umbrella issue, never put that token next to the umbrella's number at all, not even to
   deny it — write "part of #844" instead.
 - Post a one-line issue comment linking the PR; the narrative lives in the PR body.

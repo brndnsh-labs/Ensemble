@@ -2,7 +2,7 @@
 name: done
 description: Ship a Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) queue server-side auto-merge; a judgment-call story's PR is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n>`. Use after /review (+ /patch) pass clean.
 ---
-<!-- cycle:rendered template=skills/done.md.tmpl hash=f2bbec141665 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/done.md.tmpl hash=fbee444410c5 — managed by the-cycle; edit the template, not this file -->
 
 # /done #<n> — ship a story
 
@@ -11,8 +11,9 @@ queueing a safe story for CI-gated server-side auto-merge, or leaving a
 judgment-call PR for Brandon.
 
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This skill
-leans on §4 Gates, §5 Judgment calls (the safe-vs-brake split), §6 Merge guard, §7 Tracker
-mechanics, §8 Commit & PR conventions, §9 Branch policy. The procedure below is just the ordering.
+leans on §4 Gates, §5 Judgment calls (the safe-vs-brake split; the fast path's receipt), §6 Merge
+guard, §7 Tracker mechanics, §8 Commit & PR conventions, §9 Branch policy. The procedure below is
+just the ordering.
 
 **Done = the issue closes.** `Closes #<n>` closes it on merge (§1).
 
@@ -20,7 +21,10 @@ mechanics, §8 Commit & PR conventions, §9 Branch policy. The procedure below i
 
 1. **Parse the issue ref(s)** — `#<n>`. Several only if one diff genuinely ships them together;
    usually one PR = one issue.
-2. **Confirm gates green** (§4) — never `/done` over a red build:
+2. **Confirm gates green** (§4) — never `/done` over a red build. If a fast-path verification
+   receipt (§5) is in context, recompute its diff fingerprint over the same file list: a match,
+   with every gate in it reading PASS, **stands as this confirmation** — don't re-run. A stale
+   fingerprint, a missing receipt, or any gate reading FAIL: run them here as usual:
    ```
    npm run typecheck     # tsc over public/**/*.{ts,tsx}
    npm run lint          # Biome lint + format check
