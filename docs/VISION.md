@@ -80,7 +80,7 @@ The layout is responsive, designed primarily for desktop and tablet, and degrade
 - Chart-first single surface replaces the four-workspace model
 - Default I | V | vi | IV progression with the band ready to play on load
 - Responsive layout optimized for desktop and tablet, graceful degradation to phone
-- TypeScript migration is gradual, not a big bang rewrite
+- TypeScript migration completed incrementally in May 2026
 - Musical engine is untouched to start — it is the core differentiator
 - Synthesis quality improvement is a named phase, not an afterthought
 - Sharing via URL is treated as a marquee feature, not a hidden one
