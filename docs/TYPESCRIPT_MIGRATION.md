@@ -1,6 +1,6 @@
-# TypeScript Migration Tracker
+# TypeScript Migration Record (completed May 2026)
 
-Ensemble is migrating from JSDoc-annotated JavaScript to TypeScript incrementally. Files are converted one at a time: rename `.js` → `.ts`, convert JSDoc `@typedef` to real TypeScript syntax, run `npm run typecheck` after each change.
+The incremental migration completed in May 2026. This document is historical; use `CLAUDE.md` and `AI_MAP.md` for the current source layout and conventions.
 
 ## Status Legend
 
