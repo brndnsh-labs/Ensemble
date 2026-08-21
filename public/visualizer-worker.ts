@@ -26,6 +26,62 @@ let needsPausedRender = false;
 let reducedMotionLocal = false;
 /** Last step index painted under reduced-motion, so we skip intra-step frames. */
 let lastReducedStepIndex = -1;
+/**
+ * #1008 — explicit pending-frame lifecycle. The loop never free-spins: every
+ * frame must be requested (by an incoming message, or by the previous playing
+ * frame), so a paused worker sits at zero steady-state rAF callbacks.
+ */
+let framePending = false;
+
+/** Schedule exactly one frame; coalesces bursts and no-ops while one is queued. */
+function requestFrame() {
+    if (!isRunning || framePending) {
+        return;
+    }
+    framePending = true;
+    requestAnimationFrame(runFrame);
+}
+
+function runFrame() {
+    framePending = false;
+    if (!isRunning || !engine) {
+        return;
+    }
+
+    const now = getInterpolatedTime();
+
+    // Paused: paint at most the one requested frozen frame, then stop scheduling
+    // until playback resumes or a message changes what's on screen.
+    if (!isPlayingLocal) {
+        if (needsPausedRender) {
+            needsPausedRender = false;
+            if (now > 0) {
+                engine.render(now, currentBpm, currentTS);
+            }
+        }
+        return;
+    }
+
+    if (now > 0) {
+        if (reducedMotionLocal) {
+            // Event-stepped: quantize to the current step boundary and only
+            // repaint when the step changes — no smooth interpolation between
+            // steps (the /unblock 2026-06-18 decision for reduced-motion).
+            const stepsPerBeat = currentTS.stepsPerBeat || 4;
+            const stepIndex = reducedMotionStepIndex(now, currentBpm, stepsPerBeat);
+            if (stepIndex !== lastReducedStepIndex) {
+                lastReducedStepIndex = stepIndex;
+                const stepDur = 60 / currentBpm / stepsPerBeat;
+                engine.render(stepIndex * stepDur, currentBpm, currentTS);
+            }
+        } else {
+            engine.render(now, currentBpm, currentTS);
+        }
+    }
+
+    // Playing: the continuous animation loop — each frame requests the next.
+    requestFrame();
+}
 
 /**
  * #540 — reduced-motion quantization. Maps a continuous time (seconds) to the
@@ -45,47 +101,6 @@ function getInterpolatedTime() {
         return syncAudioTime;
     }
     return syncAudioTime + (performance.now() - syncPerfTime) / 1000;
-}
-
-function tick() {
-    if (!isRunning) {
-        return;
-    }
-
-    if (engine) {
-        // While paused, only render once to paint the frozen frame, then skip
-        // every subsequent frame until playback resumes.
-        if (!isPlayingLocal) {
-            if (needsPausedRender) {
-                needsPausedRender = false;
-                const now = getInterpolatedTime();
-                if (now > 0) {
-                    engine.render(now, currentBpm, currentTS);
-                }
-            }
-            requestAnimationFrame(tick);
-            return;
-        }
-
-        const now = getInterpolatedTime();
-        if (now > 0) {
-            if (reducedMotionLocal) {
-                // Event-stepped: quantize to the current step boundary and only
-                // repaint when the step changes — no smooth interpolation between
-                // steps (the /unblock 2026-06-18 decision for reduced-motion).
-                const stepsPerBeat = currentTS.stepsPerBeat || 4;
-                const stepIndex = reducedMotionStepIndex(now, currentBpm, stepsPerBeat);
-                if (stepIndex !== lastReducedStepIndex) {
-                    lastReducedStepIndex = stepIndex;
-                    const stepDur = 60 / currentBpm / stepsPerBeat;
-                    engine.render(stepIndex * stepDur, currentBpm, currentTS);
-                }
-            } else {
-                engine.render(now, currentBpm, currentTS);
-            }
-        }
-    }
-    requestAnimationFrame(tick);
 }
 
 if (typeof self !== 'undefined') {
@@ -118,7 +133,6 @@ if (typeof self !== 'undefined') {
             case 'INIT':
                 engine = new VisualizerEngine(canvas, staticCanvas);
                 isRunning = true;
-                requestAnimationFrame(tick);
                 break;
 
             case 'RESIZE':
@@ -143,10 +157,13 @@ if (typeof self !== 'undefined') {
                 const wasPlaying = isPlayingLocal;
                 isPlayingLocal = !!isPlaying;
                 // Transitioning playing→paused: request one final render so the
-                // frozen frame is correct, then skip all subsequent frames until play resumes.
+                // frozen frame is correct, then the loop stops scheduling entirely.
                 if (wasPlaying && !isPlayingLocal) {
                     needsPausedRender = true;
                 }
+                // Resume (or any playing transition) explicitly requests the next
+                // frame — #1008, nothing restarts the loop implicitly anymore.
+                requestFrame();
                 break;
             }
 
@@ -210,5 +227,10 @@ if (typeof self !== 'undefined') {
                 lastReducedStepIndex = -1;
                 break;
         }
+
+        // #1008 — every message that can change what's on screen requests exactly
+        // one frame (theme flip, resize, a pushed note while paused, …). While
+        // playing this is usually a no-op: the loop already has a frame queued.
+        requestFrame();
     };
 }
