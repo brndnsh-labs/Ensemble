@@ -2,7 +2,7 @@
 name: done
 description: Ship a Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) queue server-side auto-merge; a judgment-call story's PR is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n>`. Use after /review (+ /patch) pass clean.
 ---
-<!-- cycle:rendered template=skills/done.md.tmpl hash=fbee444410c5 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/done.md.tmpl hash=fa91a5a7473b — managed by the-cycle; edit the template, not this file -->
 
 # /done #<n> — ship a story
 
@@ -19,8 +19,9 @@ just the ordering.
 
 ## Workflow
 
-1. **Parse the issue ref(s)** — `#<n>`. Several only if one diff genuinely ships them together;
-   usually one PR = one issue.
+1. **Parse and read the issue ref(s)** — `#<n>`. Several only if one diff genuinely ships them
+   together; usually one PR = one issue. Run `gh issue view "<n>" --json number,title,state,url,labels,milestone,body` for each and capture its title
+   plus milestone/epic before choosing a branch.
 2. **Confirm gates green** (§4) — never `/done` over a red build. If a fast-path verification
    receipt (§5) is in context, recompute its diff fingerprint over the same file list: a match,
    with every gate in it reading PASS, **stands as this confirmation** — don't re-run. A stale
@@ -35,17 +36,29 @@ just the ordering.
 3. **Confirm findings were actioned, not parked** (§5) — `/patch` fixed every real finding, or
    each was an explicit escalation to a `finding` issue. Never a silent defer.
 4. **Survey the diff** — `git status` + `git diff --stat`. Only expected files; flag drift.
-5. **Branch check** (§9) — must be on a feature branch, not `main`. If on `main`, stop.
+5. **Branch check** (§9) — inspect `git status --short` and the current branch before staging.
+   - If an existing epic branch applies, switch to and reuse it as `/implement` does. Otherwise,
+     on a feature branch, continue.
+   - On `main` with a reviewed uncommitted diff that has something to ship and no applicable epic
+     branch, derive `<slug>` from the issue title, create `fix/<issue>-<slug>`, and continue
+     (`git checkout -b fix/<issue>-<slug>`). If that branch name already exists, STOP for the
+     naming collision — do not guess or build on `main`.
+   - On `main` with no diff or nothing to ship, STOP. Never stage, commit, or otherwise build on
+     `main`; branch before delivery work.
 6. **Compose the narrative** — the "what shipped + which findings were actioned + why" summary
    that becomes the **PR body**.
-7. **Commit** (§8) — Conventional Commit, explicit paths (never `-A` / `.`), HEREDOC body.
-   Include the configured `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` trailer.
+7. **Commit** (§8) — Conventional Commit, explicit paths (never `-A` / `.`), HEREDOC body. Include
+   `Co-Authored-By` only when the active runtime explicitly supplies a truthful identity for this
+   work. Otherwise omit it. Never infer an identity from repo config, the harness/product name, a
+   model name, or a historical commit.
 8. **Push** — `git push -u origin <branch>`.
 9. **Open the PR** (§8) — `gh pr create --head "<branch>" --base main --title "<title>" --body "<body>"` — base `main`, the
    narrative body, **`Closes #<n>`**, the attribution trailer at the end (§8), the
    Conventional-Commit subject as title.
-10. **Post a one-line issue comment** linking the PR: `gh issue comment "<n>" --body "<text>"`
-11. **Land it — the auto-merge decision (§5 + §6):**
+10. **Mark it `status:in-review`** — the PR is now open, so its review-routing state is
+    truthful: `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:in-review"`.
+11. **Post a one-line issue comment** linking the PR: `gh issue comment "<n>" --body "<text>"`
+12. **Land it — the auto-merge decision (§5 + §6):**
     - **Safe story** — none of §5's always-brake classes (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) → **queue the
       server-side merge** (§6). No polling, no background job: the forge holds it until the
       required checks pass.
@@ -53,12 +66,11 @@ just the ordering.
       gh pr merge "<pr>" --auto --squash
       ```
       This returns immediately with the merge *queued*, so the PR is normally still open when
-      you look — that is success, not a pending failure. Set Status explicitly right away:
-      `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:in-review"`. Sync local main and prune on the next
-      run that needs it, rather than waiting around for the merge to land.
+      you look — that is success, not a pending failure. Sync local main and prune on the next run
+      that needs it, rather than waiting around for the merge to land.
     - **Judgment-call story** → **leave the PR open**, report "ready for your merge: <url>" + *why*
       it's gated. Do NOT auto-merge.
-12. **Suggest next:** `/deploy-test`, `/next`, or `/cycle` continues.
+13. **Suggest next:** `/deploy-test`, `/next`, or `/cycle` continues.
 
 ## Edge cases
 

@@ -2,7 +2,7 @@
 name: nightly
 description: The unattended overnight composition for Ensemble — timestamp, grind the safe queue via /burndown, then when it's dry run ONE /scout lens by day-of-week rotation, deploy what merged to test, and leave a morning report with a smoke-test checklist derived from the night's diff. Runs under a standing go. Usage `/nightly`.
 ---
-<!-- cycle:rendered template=skills/nightly.md.tmpl hash=6fac44f8d5c5 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/nightly.md.tmpl hash=bc395bf125fb — managed by the-cycle; edit the template, not this file -->
 
 # /nightly — the unattended overnight run
 
@@ -91,7 +91,8 @@ The smoke-test checklist is the part that earns its keep, so build it properly:
 - **Never deploys to prod.** That's `/deploy-prod`, and it requires an explicit human go that
   cannot exist at 3am.
 - **Never lifts a §5 brake.** Parked work stays parked.
-- Honors `/burndown`'s stop conditions unchanged — including the 5-item guard.
+- Continues through `/burndown`'s five-item visibility checkpoints; its real stop conditions stay
+  unchanged.
 - **Scout output is never built in the run that filed it.** `/burndown` runs first and the run
   never loops back, so everything `/scout` files sits in at least one morning report before any
   unattended path can pick it up. That one-night latency is the loop's only guaranteed human

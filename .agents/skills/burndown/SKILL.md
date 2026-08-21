@@ -1,8 +1,8 @@
 ---
 name: burndown
-description: Autonomously grind through the SAFE, self-contained subset of the Ensemble backlog — pre-filters out anything touching DOCTRINE §5's always-brake surfaces (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) or posing an open decision, then loops `/cycle #<n>` over the rest, plus standing hygiene (`/dep-update`, a bounded dead-code sweep) when the issue queue is thin. A judgment call parks that item and the loop moves on; the run itself stops at 5 shipped items, a red gate, or a dry queue. Plan-first. Never touches prod. Usage `/burndown`.
+description: Autonomously grind through the SAFE, self-contained subset of the Ensemble backlog — pre-filters out anything touching DOCTRINE §5's always-brake surfaces (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state/worker contract (a `@direct-mutation` outside the sanctioned categories, a half-synced worker field)) or posing an open decision, then loops `/cycle #<n>` over the rest, plus standing hygiene (`/dep-update`, a bounded dead-code sweep) when the issue queue is thin. A judgment call parks that item and the loop moves on; it reports progress every 5 shipped items but stops only for a real gate, a dry queue, or an interrupt. Plan-first. Never touches prod. Usage `/burndown`.
 ---
-<!-- cycle:rendered template=skills/burndown.md.tmpl hash=fd39c957ebc6 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/burndown.md.tmpl hash=4ccb8570bda0 — managed by the-cycle; edit the template, not this file -->
 
 # /burndown — grind the safe backlog autonomously
 
@@ -68,12 +68,14 @@ If an item *almost* qualifies but has one catch, it's **out** — leave it for a
    PR open, per `/cycle`'s own behavior) **and continue to the next queued item**.
 4. **When the issue queue is dry, run the hygiene fallback.** Re-verify gates yourself after each —
    never trust a spawned "green" (§3).
-5. **Stop — and report — when ANY of:**
-   - **5 items shipped** this run (issues + hygiene combined) → check in (runaway guard).
+5. **After every 5 shipped items, report a progress checkpoint** (issues + hygiene combined),
+   refresh the open set, and reapply the safe filter before continuing. This is visibility, not a
+   confirmation gate.
+6. **Stop — and report — when ANY of:**
    - **Gates or CI red**, and not a trivial retry.
    - **The safe queue AND the hygiene fallback are both dry.**
    - Interrupt.
-6. **Report:** what shipped (issue/PR links), what was excluded and why (so Brandon can
+7. **Report:** what shipped (issue/PR links), what was excluded and why (so Brandon can
    `/cycle #<n>` those himself), and anything left running or blocked.
 
 ## Safety

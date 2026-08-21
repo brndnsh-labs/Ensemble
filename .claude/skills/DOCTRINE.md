@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=5ac563892ff6 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=e5bd481dc5be — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -28,17 +28,22 @@ nothing to be on or off. Status is one `status:*` label on the issue itself.
 | `status:blocked` | blocked on a dependency | skip; name the blocker |
 | *(none)* | the idea pile — filed but not scheduled | triage/scope it first; don't pick |
 
-Exactly one `status:*` label at a time: every write clears the whole set before adding one, so
-the states can't overlap. **No label is a real state**, not a gap — it's every issue still waiting
-on a §10.5 certainty call (a review-carved observation, §2; a finding the filer couldn't
-confidently route), and that untriaged pile is where triage starts.
+After a successful status transition, exactly one `status:*` label remains. The ordered write
+clears the whole set before adding the target, so there is a brief unlabeled intermediate event
+but never overlapping status values. Outside that in-flight transition, **no label is a real
+state**, not a gap — it's every issue still waiting on a §10.5 certainty call (a review-carved
+observation, §2; a finding the filer couldn't confidently route), and that untriaged pile is where
+triage starts.
 
 **Ranking pickable work** (`/next`): milestone (a real numbered epic > a "candidate epic" / no milestone), then Size (S < M < L, read off the `size/*` **label** — Size is not a board field), then issue number. Model is *not* a ranking factor.
 
 **A closed issue is "done."** `Closes #<n>` closes the issue on merge, and that close *is* the
 completion record — there is no `status:done`, because a second source of truth can disagree with
-the close and will eventually go stale. The last label the pipeline writes is `status:in-review`;
-the merge finishes the story. The pipeline doesn't argue with the close; it lets the close speak.
+the close and will eventually go stale. Status labels route **open** issues only; the last one may
+remain as the issue's final open-state history after closure, but the open-only board ignores it.
+The pipeline writes `status:in-review` when the PR opens, then lets the merge finish the
+story. Reopening starts a new routing decision: explicitly set the next status; never infer it
+from the retained label.
 
 **A stale-*open* issue may already be shipped.** An umbrella/parent issue's slices often ship
 under sibling-numbered PRs that never reference the umbrella's own number — `git log --grep=#<n>`
@@ -358,7 +363,7 @@ unexplained red a hard stop.
 After a safe merge: **sync local main** (`git checkout main && git fetch origin && git reset --hard
 origin/main`) and prune the branch.
 
-**The harness's own auto-mode classifier can independently deny the background merge command**, even
+**The harness's own auto-mode classifier can independently deny the merge command**, even
 on a safe story with everything above satisfied. That's an environment-level permission gate, not a
 pipeline judgment call, and no skill text can route around it. If it fires: report the open,
 CI-pending PR and ask Brandon for a one-turn approval to re-run the merge (or to
@@ -400,8 +405,8 @@ no way for a stale row to linger.
 
 - **Read the tracker:** `gh issue list --state open --json number,title,labels,milestone,url` (one label: `gh issue list --state open --label "<label>" --json number,title,labels,milestone,url`)
 - **Read one issue:** `gh issue view "<n>" --json number,title,state,url,labels,milestone,body`
-- **Write a routing value:** `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "<status:label>"` — clears the other status
-  labels and sets this one, in a single call. Non-status labels: `gh issue edit "<n>" --add-label "<label>"` ·
+- **Write a routing value:** `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "<status:label>"` — clears the status set,
+  then sets this one in an explicitly ordered second call. Non-status labels: `gh issue edit "<n>" --add-label "<label>"` ·
   `gh issue edit "<n>" --remove-label "<label>"`
 - **Bulk writes:** an ordinary loop, one call per issue. These are REST calls against the
   5,000/hr core pool, not GraphQL points, so there is nothing to batch around.
@@ -412,7 +417,12 @@ A status label that doesn't exist in the repo makes `gh` **fail loudly** — tha
 behavior. Create the label rather than working around the error, and never invent a status value
 that isn't in the §1 table.
 
-**Unreachable → STOP.** `gh` unauthenticated or offline: say so and stop. Never guess tracker state.
+**Confirm unreachable, then STOP.** A first transport or OS-permission failure can be the harness
+sandbox rather than the tracker. When the error is compatible with a sandbox restriction and the
+harness exposes a policy-supported escalation or approval path, retry the **exact same read once**
+through that path — same target and arguments, with no weakened authentication or command. Stop if
+that retry fails, `gh` is unauthenticated, the API rejects the authenticated request, or no allowed
+escalation path exists. Never loop, guess tracker state, or substitute cached data.
 
 - **Routing is all labels, in one namespace-per-dimension scheme** (the Projects v2 board was
   retired 2026-08-05; before that the first three lived as board fields, and under Forgejo
@@ -446,10 +456,9 @@ that isn't in the §1 table.
 ## §8 Commit & PR conventions
 
 - **Conventional Commit** (`feat(scope)` / `fix` / `docs` / `chore` / `test`), scoped to the area;
-  body names the story. Ends with:
-  ```
-  Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-  ```
+  body names the story. Include `Co-Authored-By` only when the active runtime explicitly supplies
+  a truthful identity for this work. Otherwise omit it. Never infer an identity from repo config,
+  the harness/product name, a model name, or a historical commit.
 - **`git add <explicit paths>` — never `-A` / `.`**. Never `--no-verify`; never amend; never
   **force**-push.
 - **PR:** base `main`, a "what shipped + which findings were actioned" narrative as the body,

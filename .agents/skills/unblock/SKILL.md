@@ -2,7 +2,7 @@
 name: unblock
 description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via plain chat, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=c4023e2cca4e — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=8863ee984be4 — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
@@ -57,7 +57,7 @@ both and presents desk first, then hands-on.
      **"Not now" is a first-class answer, not a failure** — declining to go test something is a
      legitimate outcome, and making it feel like a punt is how a queue becomes a guilt pile.
 7. **Read-only until they answer.** Nothing is written during gathering or asking.
-8. **Apply the answers** (§7) — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "<status:label>"` per issue, in a plain
+8. **Apply the answers** (§7) — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "<status:label>"` per issue, in a plain
    loop. Apply them together, after all the answers are in, so a half-answered session never
    leaves the queue half-moved.
    - **Works** → unblock it: merge via §6's guard, or close it.
