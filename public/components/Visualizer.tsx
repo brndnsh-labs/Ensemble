@@ -236,7 +236,8 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             const { playback, groove, chords, bass, soloist, harmony, arranger } = state;
 
             if (!playback.isDrawing) {
-                loopRef.current = requestAnimationFrame(loop);
+                // #1008 — nothing left to draw; stop scheduling instead of spinning.
+                loopRef.current = null;
                 return;
             }
 
@@ -262,7 +263,11 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                         param: 'isDrawing',
                         value: false,
                     });
+                    // #1008 — paused with no audio clock: settle and stop.
+                    loopRef.current = null;
+                    return;
                 }
+                // Still starting up — keep waiting for the audio clock.
                 loopRef.current = requestAnimationFrame(loop);
                 return;
             }
@@ -290,7 +295,8 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                 if (enabled && vizRef.current) {
                     vizRef.current.clear();
                 }
-                loopRef.current = requestAnimationFrame(loop);
+                // #1008 — drain complete: final frame painted, state settled, stop.
+                loopRef.current = null;
                 return;
             }
 
@@ -379,7 +385,21 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
         }
 
         prevPlayingRef.current = isPlaying;
-        loopRef.current = requestAnimationFrame(loop);
+        // #1008 — a fresh draw session starts the frame clock over: a stale
+        // lastFrameTime from before an idle pause would read as one huge frame
+        // delta and spuriously escalate to emergency lookahead on resume.
+        lastFrameTime = 0;
+        missedFrames = 0;
+        if (isPlaying) {
+            loopRef.current = requestAnimationFrame(loop);
+        } else {
+            // Paused (or pause transition): schedule only a final drain pass if a
+            // draw session is still open — the loop stops itself once it settles.
+            const { playback: pausedPlayback } = getState();
+            if (pausedPlayback.isDrawing) {
+                loopRef.current = requestAnimationFrame(loop);
+            }
+        }
 
         return () => {
             if (loopRef.current) {
