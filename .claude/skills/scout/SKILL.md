@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=30269dc076be — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=454498d21294 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -187,8 +187,8 @@ never pickable.
    lands on a §5 brake. This is a §5 plan — shown for visibility, then acted on in the same turn;
    an unattended run's standing go folds it into the report.
 7. **File** (§7): `gh issue create --title "<title>" --body "<body>" --label "scout"` per finding, then route each by
-   its certainty call (§10.5) — deterministic → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`,
-   interpretive → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:needs-decision"`, unsure → no status write —
+   its certainty call (§10.5) — deterministic → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:ready"`,
+   interpretive → `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:needs-decision"`, unsure → no status write —
    plus anything this repo's lens table adds. A plain loop is correct here; these are REST calls,
    and there is nothing to batch around. Tracker unreachable → say so and stop; don't pretend it
    filed.

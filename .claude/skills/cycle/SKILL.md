@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=59349f4e97de — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=e51d333c0b1c — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -82,9 +82,12 @@ unattended.
 ## Runaway / sanity guards
 
 Runaway detectors, not cost throttles:
-- **`--until-blocked` checks in after 5 stories** per invocation, then confirms — so a wrong turn
-  can't compound across many.
-- **>30 min on a single cycle → pause and ask** (a diverging test loop, a confused agent).
+- **`--until-blocked` emits a progress checkpoint after every 5 stories, then continues.** It is
+  visibility, not a confirmation gate: re-read `/next` and apply the governing rule before each
+  subsequent story, as usual.
+- **>30 min on a single cycle is a no-progress detector, not a timer gate.** If 30 minutes pass
+  without fresh evidence of progress — a meaningful diff, a green gate, or a CI state transition —
+  pause and surface the diagnostic. Elapsed time alone does not require confirmation.
 - Prefer **`orchestrator-inline`** (§3) — accumulated context beats a cold spawn on
   anything finicky.
 

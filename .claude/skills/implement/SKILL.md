@@ -2,7 +2,7 @@
 name: implement
 description: Implement a single Ensemble work story from its issue. Reads the spec from the issue body (Why / Touches / Acceptance), picks the executor (orchestrator-inline by default; a parallel agent only for independent mechanical work across several files), moves it to status:in-progress, and presents a plan before building. Plan-first. Usage `/implement #<n>`.
 ---
-<!-- cycle:rendered template=skills/implement.md.tmpl hash=3b838f26c0e8 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/implement.md.tmpl hash=f63f5e3dbd61 — managed by the-cycle; edit the template, not this file -->
 
 # /implement #<n> — ship a single story
 
@@ -32,7 +32,7 @@ below is just the ordering.
    where a cold agent re-derives brittle detail and ships latent bugs). **Spawn a parallel agent
    only for independent mechanical work** (the same change across several files); keep shared-file
    edits (indexes, schema) and the §4 gates on the main thread.
-6. **Mark it `status:in-progress`:** `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:in-progress"`
+6. **Mark it `status:in-progress`:** `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:in-progress"`
 7. **Branch check** (§9) — if on `main`, branch first (`git checkout -b <short-slug>`); reuse an
    epic branch if one exists. Never build on `main`.
 8. **Present the plan** (a status update, not a gate — §5):
@@ -100,7 +100,7 @@ below is just the ordering.
   longer matches the code (refresh the issue body), or the acceptance criterion can't be measured.
 - **Gates red:** report; don't hand off to `/review` against a broken build.
 - **Build abandoned** (not handed to `/review`): roll the label back to `status:ready`
-  (`gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" --add-label "status:ready"`) so nothing is stranded mid-flight.
+  (`gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "status:ready"`) so nothing is stranded mid-flight.
 
 Before building, read: the `CLAUDE.md` section matching the story's Track/area (always
 § Musical Logic & Generative Standards for a musical story; § Coordination if context
