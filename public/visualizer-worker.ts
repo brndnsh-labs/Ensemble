@@ -161,9 +161,6 @@ if (typeof self !== 'undefined') {
                 if (wasPlaying && !isPlayingLocal) {
                     needsPausedRender = true;
                 }
-                // Resume (or any playing transition) explicitly requests the next
-                // frame — #1008, nothing restarts the loop implicitly anymore.
-                requestFrame();
                 break;
             }
 
