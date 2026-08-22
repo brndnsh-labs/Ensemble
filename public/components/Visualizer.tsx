@@ -78,6 +78,35 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     const vizRef = useRef<UnifiedVisualizer | null>(null);
     const loopRef = useRef<number | null>(null);
     const prevPlayingRef = useRef(false);
+    /**
+     * #1009 — last MIDI register transmitted per lane. The drawing frame used to
+     * post all four SET_REGISTER messages every rAF (~240 redundant cross-thread
+     * messages/sec at 60fps); now each lane sends once on change only.
+     */
+    const registerCacheRef = useRef<Record<string, number> | null>(null);
+
+    const syncRegisters = (state: EnsembleState) => {
+        const viz = vizRef.current;
+        if (!viz) {
+            return;
+        }
+        if (!registerCacheRef.current) {
+            registerCacheRef.current = {};
+        }
+        const cache = registerCacheRef.current;
+        const lanes: [string, number][] = [
+            ['bass', state.bass.octave],
+            ['soloist', state.soloist.octave],
+            ['chords', state.chords.octave],
+            ['harmony', state.harmony.octave],
+        ];
+        for (const [lane, octave] of lanes) {
+            if (cache[lane] !== octave) {
+                cache[lane] = octave;
+                viz.setRegister(lane, octave);
+            }
+        }
+    };
 
     const { isPlaying, palette, mode, bpm, timeSignature } = useEnsembleState((s) => ({
         isPlaying: s.playback.isPlaying,
@@ -109,6 +138,13 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
         }
 
         vizRef.current = viz;
+
+        // #1009 — a fresh visualizer starts with the four current registers
+        // (the cache is seeded with them, so subsequent frames stay silent
+        // until an octave actually changes).
+        const initialState = getState();
+        registerCacheRef.current = {};
+        syncRegisters(initialState);
 
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
@@ -233,7 +269,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
         const loop = () => {
             const state = getState();
-            const { playback, groove, chords, bass, soloist, harmony, arranger } = state;
+            const { playback, groove, chords, arranger } = state;
 
             if (!playback.isDrawing) {
                 // #1008 — nothing left to draw; stop scheduling instead of spinning.
@@ -361,10 +397,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             }
 
             if (enabled && playback.isDrawing && vizRef.current) {
-                vizRef.current.setRegister('bass', bass.octave);
-                vizRef.current.setRegister('soloist', soloist.octave);
-                vizRef.current.setRegister('chords', chords.octave);
-                vizRef.current.setRegister('harmony', harmony.octave);
+                syncRegisters(state);
             }
 
             loopRef.current = requestAnimationFrame(loop);

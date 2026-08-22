@@ -436,4 +436,64 @@ describe('Visualizer component paused-frame lifecycle (#1008)', () => {
         expect(lastViz().destroy).toHaveBeenCalled();
         expect(pendingFrames.size).toBe(0);
     });
+
+    // --- #1009: SET_REGISTER traffic is proportional to octave changes, not frames ---
+
+    const registerCalls = (viz) => viz.setRegister.mock.calls;
+
+    it('static registers send four initial messages and none on subsequent frames', async () => {
+        mockState.playback.isPlaying = true;
+        await mountViz();
+
+        const viz = lastViz();
+        // Creation seeds the cache with the current registers — exactly one
+        // message per lane, no duplicates.
+        expect(registerCalls(viz)).toHaveLength(4);
+
+        for (let i = 0; i < 10; i++) {
+            flushQueuedFrames(2000 + i * 16);
+        }
+        expect(registerCalls(viz)).toHaveLength(4);
+    });
+
+    it('one lane changing sends exactly one message', async () => {
+        mockState.playback.isPlaying = true;
+        await mountViz();
+        const viz = lastViz();
+        expect(registerCalls(viz)).toHaveLength(4);
+
+        mockState.bass.octave = 3;
+        flushQueuedFrames(3000);
+
+        expect(registerCalls(viz)).toHaveLength(5);
+        expect(registerCalls(viz)[4]).toEqual(['bass', 3]);
+
+        // And the change is sticky — following frames stay silent.
+        for (let i = 0; i < 5; i++) {
+            flushQueuedFrames(4000 + i * 16);
+        }
+        expect(registerCalls(viz)).toHaveLength(5);
+    });
+
+    it('recreating the visualizer resets the register cache and re-seeds all four lanes', async () => {
+        mockState.playback.isPlaying = true;
+        await mountViz();
+        const firstViz = lastViz();
+        mockState.bass.octave = 3;
+        flushQueuedFrames(3000);
+        expect(registerCalls(firstViz)).toHaveLength(5);
+
+        render(null, container);
+        await act(() => {
+            render(<VisualizerComponent enabled={true} getVisualTime={() => 100} />, container);
+        });
+        const secondViz = lastViz();
+        expect(secondViz).not.toBe(firstViz);
+
+        // Same octaves as the old instance's final state — a fresh worker must
+        // still be told all four, and the new cache must start from them.
+        expect(registerCalls(secondViz)).toHaveLength(4);
+        flushQueuedFrames(5000);
+        expect(registerCalls(secondViz)).toHaveLength(4);
+    });
 });
