@@ -35,7 +35,7 @@ The public instance lives at **[ensemble.brndn.zip](https://ensemble.brndn.zip/)
 
 Ensemble is a static PWA — build it once and serve the `dist/` folder from anywhere.
 
-**Prerequisites:** Node.js (current LTS) and npm. This project is **npm-only** — don't use `pnpm`, `yarn`, or `bun`.
+**Prerequisites:** Node.js 26+ and npm. This project is **npm-only** — don't use `pnpm`, `yarn`, or `bun`.
 
 ```bash
 npm install
@@ -62,7 +62,7 @@ This emits an optimized bundle into `dist/`, including the service worker (via `
 npm test            # mutation check + lint + docs lint + Vitest
 npm run test:e2e    # Playwright smoke suite (Desktop + Mobile)
 npm run typecheck   # tsc over public/ and scripts/
-npm run validate    # full pipeline: typecheck + knip + jscpd + format + npm test
+npm run validate    # full pipeline: format + jscpd + typecheck + depcheck + knip + npm test + size-limit
 ```
 
 Run `npm run validate` before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
