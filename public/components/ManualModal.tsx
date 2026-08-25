@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { injectManualMetadata } from '../data/manual-metadata.js';
 import { escapeHTML } from '../sanitize.js';
 import { dispatch } from '../state.js';
+import { isStyleGallerySlug, track } from '../telemetry.js';
 import { ACTIONS } from '../types.js';
 import { useModalA11y } from './use-modal-a11y.js';
 
@@ -98,6 +99,21 @@ export function ManualModal() {
         dispatch(ACTIONS.SET_MODAL_OPEN, { modal: 'manual', open: false });
     };
 
+    const handleManualLink = (event: MouseEvent) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+        const anchor = target.closest<HTMLAnchorElement>('a');
+        if (!anchor) {
+            return;
+        }
+        const slug = new URL(anchor.href, location.href).searchParams.get('gallery');
+        if (isStyleGallerySlug(slug)) {
+            track('style_gallery_link', { slug });
+        }
+    };
+
     const overlayRef = useRef<HTMLDivElement | null>(null);
     useModalA11y(overlayRef, true, close, 'Ensemble manual');
 
@@ -111,7 +127,11 @@ export function ManualModal() {
                     </button>
                 </div>
 
-                <div class="manual-content" dangerouslySetInnerHTML={{ __html: content }} />
+                <div
+                    class="manual-content"
+                    onClick={handleManualLink}
+                    dangerouslySetInnerHTML={{ __html: content }}
+                />
 
                 <div class="modal-footer manual-modal-footer">
                     <div class="footer-primary-actions">

@@ -8,6 +8,7 @@ import {
 import { exportToMidi } from '../export/midi-export.js';
 import { generateShareUrl } from '../export/sharing.js';
 import { dispatch, getState } from '../state.js';
+import { track } from '../telemetry.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { Icon } from './Icon.jsx';
@@ -86,6 +87,7 @@ export function ShareModal() {
             navigator.clipboard
                 .writeText(url)
                 .then(() => {
+                    track('share_copied', { audition: autoplayOnOpen });
                     const display = url.length > 60 ? `${url.slice(0, 57)}…` : url;
                     dispatch(ACTIONS.SHOW_TOAST, {
                         message: `Copied: ${display}`,
@@ -112,6 +114,7 @@ export function ShareModal() {
                     text: 'Check out this arrangement I made in Ensemble!',
                     url: url,
                 });
+                track('share_sent', { audition: autoplayOnOpen });
             } catch (err) {
                 console.warn('Share failed or cancelled:', err);
             }
@@ -125,6 +128,7 @@ export function ShareModal() {
         try {
             const options = getExportOptions();
             await exportToMidi(options);
+            track('export_midi');
             dispatch(ACTIONS.SHOW_TOAST, {
                 message: 'MIDI Export complete!',
                 type: 'success',
@@ -150,6 +154,7 @@ export function ShareModal() {
                 filename: options.filename,
             });
             downloadExportResult(result);
+            track('export_wav', { stems: false });
             const secs = Math.round(result.durationSeconds);
             dispatch(ACTIONS.SHOW_TOAST, {
                 message: `WAV ready — ${secs}s, ${Math.round(result.blob.size / 1024)} KB`,
@@ -199,6 +204,7 @@ export function ShareModal() {
             for (const result of results) {
                 downloadExportResult(result);
             }
+            track('export_wav', { stems: true });
             dispatch(ACTIONS.SHOW_TOAST, {
                 message: `${results.length} stem${results.length === 1 ? '' : 's'} exported`,
                 type: 'success',

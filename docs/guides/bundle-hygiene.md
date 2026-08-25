@@ -9,12 +9,12 @@ If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth,
 - `docs/archive/BUNDLE_AUDIT.md` — completed audit chapter (history, story-by-story status). Frozen.
 - `.claude/skills/cycle/SKILL.md` — per-story workflow (implement → review → patch → done); Track `bundle` gates it on the measured KB delta.
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
-- `.size-limit.json` — current budgets (baselines, not targets — see below).
+- `.size-limit.js` — current budgets and the Vite-emitted initial JavaScript graph (baselines, not targets — see below).
 - `package.json` — `npm run build:size` (size-limit), `npm run knip` (unused exports), `npm run build` (emits `stats.html` at the repo root).
 
 ## Budgets are baselines, not targets
 
-The numbers in `.size-limit.json` are arbitrary historical baselines. They're useful as a regression tripwire (*"this chunk used to fit; what just changed?"*) but **not** a finish line.
+The limits in `.size-limit.js` are historical baselines. The initial-JavaScript budget follows the entry and exact `modulepreload` graph emitted into `dist/index.html`, without charging lazy chunks to startup. These budgets are useful as a regression tripwire (*"this chunk used to fit; what just changed?"*) but **not** a finish line.
 
 The operative goal is **smaller is better when behavior is unchanged**, not "must hit budget." Don't promote risky structural changes just to close a budget gap. A speculative refactor that breaks audio-graph timing to save 8 KB is a bad trade.
 

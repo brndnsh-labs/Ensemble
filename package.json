@@ -41,7 +41,7 @@
         "audition-link": "tsx scripts/audition-link.ts",
         "screenshots": "tsx scripts/capture-screenshots.ts",
         "size": "size-limit",
-        "build:size": "npm run build && size-limit",
+        "build:size": "npx vite build --mode production && size-limit",
         "ci": "npm run typecheck && npm run depcheck && npm run knip && npm test && npm run build:size",
         "validate": "npm run format && npm run jscpd && npm run ci",
         "build": "npx vite build --mode test",

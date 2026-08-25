@@ -27,6 +27,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/controllers/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
 | `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
 | `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
+| `public/telemetry.ts` | Production-only, privacy-safe Umami event boundary. | `initializeTelemetry`, `track` |
 
 ## State Management (Domain Slices)
 

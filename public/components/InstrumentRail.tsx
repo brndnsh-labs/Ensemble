@@ -5,6 +5,7 @@ import { COMPACT_MQ } from '../breakpoints.js';
 import { togglePower } from '../controllers/instrument-controller.js';
 import { GENRE_NAMES, SMART_GENRES } from '../data/smart-genres.js';
 import { dispatch } from '../state.js';
+import { track } from '../telemetry.js';
 import { ACTIONS, type InstrumentModule } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import type { StyleObject } from '../ui-types.js';
@@ -339,6 +340,9 @@ function StudioBandFeelChooser({
                                     aria-pressed={isActive}
                                     onClick={() => {
                                         setGenre(genreName);
+                                        if (!isActive) {
+                                            track('genre_changed', { genre: genreName });
+                                        }
                                         onClose();
                                     }}
                                 >

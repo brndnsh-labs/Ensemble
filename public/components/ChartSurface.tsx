@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'preact/compat';
 import { useCallback, useState } from 'preact/hooks';
 import { COMPACT_MQ } from '../breakpoints.js';
 import { dispatch } from '../state.js';
+import { track } from '../telemetry.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
@@ -47,6 +48,10 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
     }, [chartLocked]);
 
     const closeViz = useCallback(() => setIsVizOpen(false), []);
+    const openViz = useCallback(() => {
+        track('visualizer_opened');
+        setIsVizOpen(true);
+    }, []);
 
     return (
         <div class="chart-surface">
@@ -113,7 +118,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                                 aria-label="Open visualizer"
                                 aria-haspopup="dialog"
                                 aria-expanded={isVizOpen}
-                                onClick={() => setIsVizOpen(true)}
+                                onClick={openViz}
                             >
                                 <Icon name="visualizer" />
                             </button>
@@ -186,9 +191,7 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
                     <InstrumentRail />
                 </div>
             )}
-            {isNarrow && (
-                <MobileActionBar isVizOpen={isVizOpen} onOpenViz={() => setIsVizOpen(true)} />
-            )}
+            {isNarrow && <MobileActionBar isVizOpen={isVizOpen} onOpenViz={openViz} />}
             {isVizOpen && (
                 <Suspense fallback={null}>
                     <VisualizerOverlay getVisualTime={getVisualTime} onClose={closeViz} />
