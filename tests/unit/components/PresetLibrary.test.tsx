@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDispatch = vi.fn();
 const mockShowToast = vi.fn();
+const mockTrack = vi.fn();
 const mockState = {
     arranger: { key: 'C', lastChordPreset: 'Pop (Standard)', isDirty: false },
     playback: { applyPresetSettings: false },
@@ -33,6 +34,10 @@ vi.mock('../../../public/controllers/arranger-controller.js', () => ({
 
 vi.mock('../../../public/ui.js', () => ({
     showToast: (...args) => mockShowToast(...args),
+}));
+
+vi.mock('../../../public/telemetry.js', () => ({
+    track: (...args) => mockTrack(...args),
 }));
 
 vi.mock('../../../public/data/chord-presets.js', () => ({
@@ -110,6 +115,7 @@ describe('PresetLibrary', () => {
         });
         mockDispatch.mockClear();
         mockShowToast.mockClear();
+        mockTrack.mockClear();
         mockState.arranger.key = 'C';
         mockState.arranger.lastChordPreset = 'Pop (Standard)';
         mockState.arranger.isDirty = false;
@@ -265,6 +271,38 @@ describe('PresetLibrary', () => {
             },
         ]);
         expect(mockDispatch).toHaveBeenCalledWith('SET_BPM', 140);
+        expect(mockTrack).toHaveBeenCalledWith('preset_loaded', {
+            source: 'built-in',
+            name: 'Autumn Leaves',
+            mode: 'replace',
+        });
+    });
+
+    it('never sends a user-authored preset name', async () => {
+        storageData.ensemble_userPresets = JSON.stringify([
+            {
+                name: 'Private rehearsal title',
+                sections: [{ label: 'Main', value: 'I | IV | V | I' }],
+                timestamp: 123,
+            },
+        ]);
+
+        await act(async () => {
+            render(<PresetLibrary />, container);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        const userPreset = container.querySelector(
+            '.preset-library-chip-name[aria-label="Private rehearsal title"]',
+        );
+        await act(async () => {
+            userPreset?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(mockTrack).toHaveBeenCalledWith('preset_loaded', {
+            source: 'user',
+            mode: 'replace',
+        });
+        expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Private rehearsal title');
     });
 
     it('delegates the worker resync to refreshArrangerUI AFTER swapping the arrangement (#1120)', async () => {

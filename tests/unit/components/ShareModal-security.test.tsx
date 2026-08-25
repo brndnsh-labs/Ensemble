@@ -8,13 +8,16 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies using vi.hoisted to avoid reference errors
-const { mockUseEnsembleState, mockDispatch, mockExportToMidi } = vi.hoisted(() => {
-    return {
-        mockUseEnsembleState: vi.fn(),
-        mockDispatch: vi.fn(),
-        mockExportToMidi: vi.fn(),
-    };
-});
+const { mockUseEnsembleState, mockDispatch, mockExportToMidi, mockGenerateShareUrl, mockTrack } =
+    vi.hoisted(() => {
+        return {
+            mockUseEnsembleState: vi.fn(),
+            mockDispatch: vi.fn(),
+            mockExportToMidi: vi.fn(),
+            mockGenerateShareUrl: vi.fn(() => 'https://ensemble.brndn.zip/?s=safe'),
+            mockTrack: vi.fn(),
+        };
+    });
 
 vi.mock('../../../public/ui-bridge.js', () => ({
     useEnsembleState: (selector) => mockUseEnsembleState(selector),
@@ -37,6 +40,14 @@ vi.mock('../../../public/export/midi-export.js', () => ({
     exportToMidi: mockExportToMidi,
 }));
 
+vi.mock('../../../public/export/sharing.js', () => ({
+    generateShareUrl: mockGenerateShareUrl,
+}));
+
+vi.mock('../../../public/telemetry.js', () => ({
+    track: mockTrack,
+}));
+
 import { ShareModal } from '../../../public/components/ShareModal.jsx';
 
 describe('ShareModal Security', () => {
@@ -47,6 +58,12 @@ describe('ShareModal Security', () => {
         document.body.appendChild(container);
         mockUseEnsembleState.mockReturnValue(true); // isOpen = true
         mockExportToMidi.mockClear();
+        mockGenerateShareUrl.mockClear();
+        mockTrack.mockClear();
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: undefined,
+        });
     });
 
     afterEach(() => {
@@ -94,5 +111,51 @@ describe('ShareModal Security', () => {
         expect(filename).not.toContain('/');
         // Expected behavior: clean filename
         expect(filename).toMatch(/^[a-zA-Z0-9\s\-_()]+$/);
+    });
+
+    it('records native shares only after the share sheet succeeds', async () => {
+        const nativeShare = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: nativeShare,
+        });
+        act(() => {
+            render(<ShareModal />, container);
+        });
+        const shareButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent.trim() === 'Share',
+        );
+
+        await act(async () => {
+            shareButton.click();
+            await Promise.resolve();
+        });
+
+        expect(nativeShare).toHaveBeenCalledWith(
+            expect.objectContaining({ url: 'https://ensemble.brndn.zip/?s=safe' }),
+        );
+        expect(mockTrack).toHaveBeenCalledWith('share_sent', { audition: false });
+    });
+
+    it('does not record a cancelled native share', async () => {
+        const nativeShare = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'));
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: nativeShare,
+        });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        act(() => {
+            render(<ShareModal />, container);
+        });
+        const shareButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent.trim() === 'Share',
+        );
+
+        await act(async () => {
+            shareButton.click();
+            await Promise.resolve();
+        });
+
+        expect(mockTrack).not.toHaveBeenCalledWith('share_sent', expect.anything());
     });
 });

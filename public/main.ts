@@ -29,10 +29,12 @@ import {
 } from './state/state-effects.js';
 import { hydrateState, loadFromUrl } from './state/state-hydration.js';
 import { dispatch, getState, subscribe } from './state.js';
+import { initializeTelemetry, trackPlaybackTransition } from './telemetry.js';
 import { mountComponents } from './ui-root.jsx';
 import { initWorker, syncWorker } from './worker-client.js';
 
 async function init() {
+    initializeTelemetry();
     const { playback, groove } = getState();
     try {
         // --- HYDRATE STATE FIRST ---
@@ -215,6 +217,9 @@ async function init() {
         subscribe((action: any, payload: any, stateMap: any, context: any) => {
             syncWorker(action, payload);
             handleEffects(action, payload, stateMap, context);
+            // One post-reducer chokepoint covers the button, keyboard shortcut,
+            // audition overlay, and practice flows without double-counting stops.
+            trackPlaybackTransition(action, stateMap.playback.isPlaying);
         });
 
         // #1000 — pack detection, genre side effects, and the async drum preset

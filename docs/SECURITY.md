@@ -4,9 +4,9 @@ Threat model and standing security checklist for Ensemble. Written 2026-05-30 as
 
 ## Threat model: this is a static client-side PWA
 
-Ensemble has **no backend**. It is a Vite-built static bundle deployed by `rsync` to a web root (`scripts/deploy-{prod,test}.sh`). There is no server process, database, authentication, session, or server-held secret. Consequently the classic server-side threat classes are **out of scope by construction**: SQL/command injection, SSRF, auth bypass, IDOR, server-side secret leakage.
+Ensemble has **no application backend**. It is a Vite-built static bundle deployed by `rsync` to a web root (`scripts/deploy-{prod,test}.sh`). There is no Ensemble server process, database, authentication, session, or server-held secret. Consequently the classic server-side threat classes are **out of scope by construction** for the app: SQL/command injection, SSRF, auth bypass, IDOR, server-side secret leakage.
 
-The real attack surface is **client-side**: untrusted input reaching a dangerous browser sink, supply-chain, and the PWA/deploy pipeline. The app makes **no network egress** beyond a same-origin `fetch('MANUAL.md')` — no telemetry, no third-party calls, no WebSocket.
+The real attack surface is **client-side**: untrusted input reaching a dangerous browser sink, supply-chain, and the PWA/deploy pipeline. Network egress is limited to same-origin static assets (including `fetch('MANUAL.md')`) plus production-only aggregate telemetry to the self-hosted Umami service at `umami.brndn.zip`. The telemetry boundary disables automatic collection, allow-lists event fields, and strips URL queries, fragments, and referrers so arrangement contents do not leave the browser.
 
 ## Attack-surface map
 
@@ -14,7 +14,8 @@ The real attack surface is **client-side**: untrusted input reaching a dangerous
 | :- | :- | :- |
 | Share-URL / persisted-state deserialization | `state-hydration.ts`, `export/sharing.ts`, `state/share-codec.ts` (`compress/decompressSections`) | **Well defended.** Allowlists + `clamp()` + length caps + schema validation on every field; 100KB payload cap against memory exhaustion. |
 | The one HTML-injection sink | `components/ManualModal.tsx` (`dangerouslySetInnerHTML`), `data/manual-metadata.ts` | **Defended (defense-in-depth).** Input is same-origin static (`MANUAL.md` + repo config), not user-controlled at runtime; `escapeHTML` runs before markdown transforms; link schemes blocked. See F1/F2. |
-| Content-Security-Policy | `public/index.html` `<meta>` | **Strong but `<meta>`-only.** `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`. Cannot carry `frame-ancestors`/HSTS — see F5. |
+| Content-Security-Policy | `public/index.html` `<meta>` | **Strong but `<meta>`-only.** Scripts and connections are same-origin except the explicit `umami.brndn.zip` telemetry origin; `object-src 'none'`, `base-uri 'self'`. Cannot carry `frame-ancestors`/HSTS — see F5. |
+| Production telemetry | `telemetry.ts`, event call sites | **Aggregate and allow-listed.** Canonical production-host gate, no automatic tracking, no query/referrer egress, bounded pre-load queue, and failure is non-blocking. Umami availability and hardening remain an infrastructure responsibility. |
 | Service worker (PWA cache) | `public/sw.ts` | **Clean.** Workbox precache + `cleanupOutdatedCaches`; standard `SKIP_WAITING`/`clients.claim`. |
 | Web MIDI | `midi-controller.ts` | Low risk — permission-gated, local devices, no data egress. |
 | Supply chain | `package.json`, `package-lock.json` | **Small & clean.** 3 runtime deps (preact, @preact/signals, deepsignal); `npm audit` = 0 vulnerabilities. Dependabot + weekly `npm update` (`/dep-update`). |

@@ -5,6 +5,7 @@ import { CHORD_PRESETS } from '../data/chord-presets.js';
 import type { Section } from '../state/arranger.js';
 import { decompressSections, generateId } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
+import { track } from '../telemetry.js';
 import { ACTIONS } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
@@ -510,6 +511,12 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
             // (BPM/style/timeSig) since they belong to a "fresh start" gesture.
             appendSections(sections);
             recordRecentPreset(entry.id);
+            track(
+                'preset_loaded',
+                entry.source === 'built-in'
+                    ? { source: 'built-in', name: entry.name, mode }
+                    : { source: 'user', mode },
+            );
             onSelect?.();
             return;
         }
@@ -545,6 +552,12 @@ export function PresetLibrary({ onSelect, mode = 'replace' }: PresetLibraryProps
         // flushBuffers, in that order). See refreshArrangerUI() for why order
         // matters; hand-copying it here is exactly the drift #1128 removed.
         refreshArrangerUI();
+        track(
+            'preset_loaded',
+            entry.source === 'built-in'
+                ? { source: 'built-in', name: entry.name, mode }
+                : { source: 'user', mode },
+        );
         onSelect?.();
     };
 

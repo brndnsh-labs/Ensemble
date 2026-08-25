@@ -2,6 +2,7 @@ import type { ComponentType } from 'preact';
 import { Fragment } from 'preact';
 import { lazy, Suspense } from 'preact/compat';
 import { useEffect, useState } from 'preact/hooks';
+import { track } from '../telemetry.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { AuditionOverlay } from './AuditionOverlay.jsx';
 
@@ -103,6 +104,12 @@ export function Modals() {
             document.body.classList.remove('modal-open');
         }
     }, [settingsOpen, surpriseMeOpen, shareOpen, manualOpen, auditionOpen]);
+
+    useEffect(() => {
+        if (manualOpen) {
+            track('manual_opened');
+        }
+    }, [manualOpen]);
 
     return (
         <Fragment>
