@@ -44,7 +44,7 @@ describe('telemetry', () => {
         expect(append).not.toHaveBeenCalled();
     });
 
-    it('loads Umami with auto-pageviews disabled and sends only safe event data', async () => {
+    it('sends one safe manual pageview before the queued custom events', async () => {
         const { telemetry, appendedScript: script } = await initializeAt(
             'production',
             'https://ensemble.brndn.zip/session?bnd=private-chart-data&autoplay=1#secret',
@@ -79,6 +79,10 @@ describe('telemetry', () => {
 
         expect(payloads).toEqual([
             expect.objectContaining({
+                url: '/session',
+                referrer: '',
+            }),
+            expect.objectContaining({
                 name: 'session_class',
                 url: '/session',
                 referrer: '',
@@ -102,6 +106,7 @@ describe('telemetry', () => {
                 referrer: '',
             }),
         ]);
+        expect(payloads[0]).not.toHaveProperty('name');
         expect(JSON.stringify(payloads)).not.toContain('private-chart-data');
         expect(JSON.stringify(payloads)).not.toContain('student=name');
     });
@@ -111,16 +116,16 @@ describe('telemetry', () => {
             'production',
             'https://ensemble.brndn.zip/?prog=I-IV-V&gallery=jazz-blues-bb',
         );
-        const names: string[] = [];
+        const names: Array<string | undefined> = [];
         const client = {
             track: (buildPayload: (defaults: Payload) => Payload) => {
-                names.push(String(buildPayload({}).name));
+                names.push(buildPayload({}).name as string | undefined);
             },
         };
         (window as Window & { umami?: typeof client }).umami = client;
         script?.dispatchEvent(new Event('load'));
 
-        expect(names).toEqual(['session_class']);
+        expect(names).toEqual([undefined, 'session_class']);
     });
 
     it('drops queued and future events when the tracker fails to load', async () => {
