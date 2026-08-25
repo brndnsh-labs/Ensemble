@@ -65,6 +65,23 @@ function getUmamiClient(): UmamiClient | undefined {
     return (window as Window & { umami?: UmamiClient }).umami;
 }
 
+function sendPageview(client: UmamiClient): void {
+    try {
+        const request = client.track((defaults) => ({
+            ...defaults,
+            // Populate Umami's overview without sending shared arrangement data
+            // from the query string, hash, or referrer.
+            url: location.pathname,
+            referrer: '',
+        }));
+        if (request) {
+            void request.catch(() => {});
+        }
+    } catch {
+        // Analytics is optional. A blocked/broken tracker must never affect the app.
+    }
+}
+
 function send(client: UmamiClient, event: QueuedEvent): void {
     try {
         const request = client.track((defaults) => ({
@@ -140,6 +157,7 @@ export function initializeTelemetry(): void {
             return;
         }
 
+        sendPageview(client);
         const pending = queue.splice(0);
         for (const event of pending) {
             send(client, event);
