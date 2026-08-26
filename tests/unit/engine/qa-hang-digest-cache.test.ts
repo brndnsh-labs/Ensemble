@@ -112,6 +112,47 @@ describe('#1157 getQaHangAt — worker in-place seed regeneration', () => {
         expect(in44?.resolutionBarStart).not.toBe(in34?.resolutionBarStart);
     });
 
+    it('uses the answer section actual measure bounds in a mixed-meter chart', () => {
+        const seed: any = {
+            seedId: 40,
+            loopLengthSteps: 46,
+            notes: [
+                { step: 13, midi: 84, isAnchor: false, durationSteps: 4, velocity: 0.7 },
+                {
+                    step: 20,
+                    midi: 62,
+                    isAnchor: false,
+                    durationSteps: 4,
+                    velocity: 0.7,
+                    qaRole: 'question',
+                },
+                {
+                    step: 30,
+                    midi: 64,
+                    isAnchor: true,
+                    durationSteps: 4,
+                    velocity: 0.7,
+                    qaRole: 'answer',
+                },
+            ],
+        };
+        const arranger: any = {
+            totalSteps: 46,
+            timeSignature: '7/8',
+            grouping: null,
+            measureMap: [
+                { start: 0, end: 14, ts: '7/8' },
+                { start: 14, end: 30, ts: '4/4' },
+                { start: 30, end: 46, ts: '4/4' },
+            ],
+        };
+
+        const hang = getQaHangAt(seed, 30, 4, 16, 46, arranger);
+
+        expect(hang?.resolutionBarStart).toBe(30);
+        expect(hang?.resolutionBarEnd).toBe(46);
+    });
+
     it('tolerates a seed with no seedId (hand-built fixture) without throwing', () => {
         const seed: any = makeSeed(0, 0);
         seed.seedId = undefined;

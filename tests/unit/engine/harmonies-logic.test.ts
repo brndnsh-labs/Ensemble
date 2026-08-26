@@ -438,6 +438,108 @@ describe('Harmony Engine Logic', () => {
 
             expect(hits1).toEqual(hits2);
         });
+
+        it('keeps offset-section horn figures stable at the same point on later loops', () => {
+            _groove.genreFeel = 'Blues';
+            _playback.bandIntensity = 0.5;
+            _soloist.enabled = false;
+            getState().arranger.totalSteps = 64;
+            const chord = { ...chordC, sectionId: 'B' };
+            const coordination = {
+                sectionStart: 14,
+                soloistResting: true,
+                soloistNotesInPhrase: 0,
+            };
+            const renderBar = (transportStart) => {
+                clearHarmonyMemory(getState());
+                return Array.from({ length: 16 }, (_, localStep) =>
+                    getHarmonyNotes(
+                        getState(),
+                        chord,
+                        null,
+                        transportStart + localStep,
+                        60,
+                        'smart',
+                        localStep,
+                        null,
+                        coordination,
+                        {
+                            mStep: localStep,
+                            tsConfig: { beats: 4, stepsPerBeat: 4 },
+                        },
+                    ).map((note) => note.midi),
+                );
+            };
+
+            expect(renderBar(14)).toEqual(renderBar(64 + 14));
+        });
+
+        it('keeps Rock 3rd-vs-6th voicing local to an offset section bar', () => {
+            _groove.genreFeel = 'Rock';
+            _playback.bandIntensity = 0.55;
+            _soloist.enabled = false;
+            getState().arranger.totalSteps = 64;
+            const chord = { ...chordC, rootMidi: 48, sectionId: 'rock-offset' };
+            const coordination = {
+                sectionStart: 14,
+                soloistResting: true,
+                soloistNotesInPhrase: 0,
+            };
+            const renderDownbeat = (step) => {
+                clearHarmonyMemory(getState());
+                return getHarmonyNotes(
+                    getState(),
+                    chord,
+                    null,
+                    step,
+                    60,
+                    'smart',
+                    0,
+                    null,
+                    coordination,
+                    { mStep: 0, tsConfig: { beats: 4, stepsPerBeat: 4 } },
+                ).map((note) => (((note.midi - chord.rootMidi) % 12) + 12) % 12);
+            };
+
+            expect(renderDownbeat(14)).toEqual(renderDownbeat(64 + 14));
+        });
+
+        it('starts an offset-section comp motif at its own origin on every loop', () => {
+            _groove.genreFeel = 'Funk';
+            _playback.bandIntensity = 0.6;
+            _soloist.enabled = false;
+            // One 7/8 bar followed by this 4/4 section: the 30-step form is not
+            // divisible by the comp motif's 32-step window.
+            getState().arranger.totalSteps = 30;
+            const chord = { ...chordC, sectionId: 'funk-offset' };
+            const coordination = {
+                sectionStart: 14,
+                soloistResting: true,
+                soloistNotesInPhrase: 0,
+            };
+            const renderBar = (transportStart) => {
+                clearHarmonyMemory(getState());
+                return Array.from({ length: 16 }, (_, localStep) =>
+                    getHarmonyNotes(
+                        getState(),
+                        chord,
+                        null,
+                        transportStart + localStep,
+                        60,
+                        'smart',
+                        localStep,
+                        null,
+                        coordination,
+                        {
+                            mStep: localStep,
+                            tsConfig: { beats: 4, stepsPerBeat: 4 },
+                        },
+                    ).map((note) => note.midi),
+                );
+            };
+
+            expect(renderBar(14)).toEqual(renderBar(30 + 14));
+        });
     });
 
     describe('Practice Mode', () => {
@@ -465,6 +567,32 @@ describe('Harmony Engine Logic', () => {
 
             const requested = getLastRequestedIntervals();
             expect(requested).not.toContain(0);
+        });
+
+        it('reserves or releases bass space from the effective section lane gate', () => {
+            _playback.practiceMode = false;
+            _groove.genreFeel = 'Funk';
+            const chord = {
+                rootMidi: 60,
+                intervals: [0, 4, 7, 10],
+                quality: '7',
+                sectionId: 'override',
+                beats: 4,
+            };
+
+            _bass.enabled = false;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, {
+                bassEffectiveEnabled: true,
+            });
+            expect(getLastRequestedIntervals()).not.toContain(0);
+
+            vi.clearAllMocks();
+            clearHarmonyMemory(getState());
+            _bass.enabled = true;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, {
+                bassEffectiveEnabled: false,
+            });
+            expect(getLastRequestedIntervals()).toContain(0);
         });
 
         it('should keep half-diminished grounding tones in Jazz practice mode', () => {
@@ -685,6 +813,35 @@ describe('Harmony Engine Logic', () => {
             expect(hypeNotes[0].isLatched).toBe(true);
 
             randomSpy.mockRestore();
+        });
+    });
+
+    describe('Effective soloist register policy', () => {
+        it('ignores a fresh sticky soloist register when this section force-mutes the lane', () => {
+            const firstAnchor = (soloistEffectiveEnabled) => {
+                clearHarmonyMemory(getState());
+                getBestInversion.mockClear();
+                for (let step = 2; step < 32; step++) {
+                    getHarmonyNotes(getState(), chordC, null, step, 60, 'smart', step % 16, null, {
+                        soloistEffectiveEnabled,
+                        soloistResting: true,
+                        lastActiveSoloistMidi: 84,
+                        lastActiveSoloistStep: step - 1,
+                        step,
+                    });
+                    const call = getBestInversion.mock.calls.at(-1);
+                    if (call) {
+                        return call[4].anchor;
+                    }
+                }
+                throw new Error('expected harmony to emit within two bars');
+            };
+
+            _soloist.enabled = false;
+            expect(firstAnchor(true)).toBe(48);
+
+            _soloist.enabled = true;
+            expect(firstAnchor(false)).toBe(60);
         });
     });
 

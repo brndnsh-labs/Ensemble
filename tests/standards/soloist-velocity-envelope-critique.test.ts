@@ -42,6 +42,7 @@ import {
     SOLOIST_VELOCITY_ENVELOPE,
 } from '../../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
+import { getEffectiveTimeSignature, getEffectiveTimeSignatures } from '../../public/meter.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS } from '../../public/types.js';
 import { getFrequency, getStepInfo } from '../../public/utils.js';
@@ -382,5 +383,52 @@ describe.each([
         expect(meanRelease).toBeLessThan(0.99);
         // intent: the shaping contrast is the envelope's ; measured ≈0.086 ; floor 0.04 (2× headroom).
         expect(delta).toBeGreaterThan(0.04);
+    });
+});
+
+describe('Bass grouping-aware velocity envelope', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('moves its strong-note lift with the authored 5/4 grouping', () => {
+        const ratioAt = (grouping: number[], step: number): number => {
+            const state = buildBassState('Jazz', 'quarter');
+            state.arranger.timeSignature = '5/4';
+            state.arranger.grouping = grouping;
+            state.arranger.totalSteps = 20;
+            const ts = getEffectiveTimeSignature('5/4', grouping);
+            const signatures = getEffectiveTimeSignatures('5/4', grouping);
+            const info = getStepInfo(step, ts, [], signatures);
+            const chord: any = {
+                rootMidi: 48,
+                quality: 'maj',
+                beats: 5,
+                intervals: [0, 4, 7],
+            };
+            const emit = (enabled: boolean) => {
+                BASS_VELOCITY_ENVELOPE.enabled = enabled;
+                return getBassNote(
+                    state,
+                    chord,
+                    null,
+                    info.beatIndex,
+                    null,
+                    38,
+                    'quarter',
+                    0,
+                    step,
+                    step,
+                    {},
+                    info,
+                ).velocity;
+            };
+            return emit(true) / emit(false);
+        };
+
+        expect(ratioAt([3, 2], 12)).toBeCloseTo(1.05, 6);
+        expect(ratioAt([3, 2], 8)).toBeCloseTo(1, 6);
+        expect(ratioAt([2, 3], 8)).toBeCloseTo(1.05, 6);
+        expect(ratioAt([2, 3], 12)).toBeCloseTo(1, 6);
     });
 });

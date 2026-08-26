@@ -1,4 +1,4 @@
-import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveTimeSignature } from '../meter.js';
 import type { ArrangerState } from '../state/arranger.js';
 
 /**
@@ -101,9 +101,12 @@ export interface UnrolledArrangement {
 
 export function unrollArrangement(arranger: ArrangerState, targetBars = 64): UnrolledArrangement {
     const originalTotalSteps = arranger.totalSteps || 0;
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts = getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
-    const originalBars = originalTotalSteps / stepsPerBar;
+    const originalBars =
+        Array.isArray(arranger.measureMap) && arranger.measureMap.length > 0
+            ? arranger.measureMap.length
+            : originalTotalSteps / stepsPerBar;
 
     // 1. If it's already a "long" song, don't unroll
     if (originalBars >= targetBars / 2 || originalTotalSteps === 0) {
@@ -122,7 +125,6 @@ export function unrollArrangement(arranger: ArrangerState, targetBars = 64): Unr
     let currentStep = 0;
 
     for (let i = 0; i < iterations; i++) {
-        const iterationStart = currentStep;
         const progress = (i * originalBars) / targetBars;
 
         // Determine the "Musical Role" based on overall song progress (0.0 - 1.0)
@@ -150,11 +152,19 @@ export function unrollArrangement(arranger: ArrangerState, targetBars = 64): Unr
             ),
         );
 
-        // Clone Step Map
+        // Clone Step Map and retain the meter seams inside this virtual role.
+        // One virtual Intro/Verse range may repeat a mixed-meter source chart;
+        // seeders need those seams rather than one global meter for the range.
+        const iterationMeterRanges: Array<{
+            start: number;
+            end: number;
+            timeSignature: string;
+        }> = [];
         arranger.stepMap.forEach((entry) => {
             const steps = entry.end - entry.start;
+            const entryStart = currentStep;
             unrolledStepMap.push({
-                start: currentStep,
+                start: entryStart,
                 end: currentStep + steps,
                 chord: {
                     ...entry.chord,
@@ -162,28 +172,42 @@ export function unrollArrangement(arranger: ArrangerState, targetBars = 64): Unr
                 },
             });
             currentStep += steps;
+            const timeSignature = entry.chord?.timeSignature || arranger.timeSignature;
+            const lastRange = iterationMeterRanges[iterationMeterRanges.length - 1];
+            if (lastRange?.timeSignature === timeSignature) {
+                lastRange.end = currentStep;
+            } else {
+                iterationMeterRanges.push({
+                    start: entryStart,
+                    end: currentStep,
+                    timeSignature,
+                });
+            }
         });
 
-        // Add or extend virtual section map
-        if (
-            unrolledSectionMap.length > 0 &&
-            unrolledSectionMap[unrolledSectionMap.length - 1].label === roleLabel
-        ) {
-            unrolledSectionMap[unrolledSectionMap.length - 1].end = currentStep;
-            unrolledSectionMap[unrolledSectionMap.length - 1].sourceLabels = Array.from(
-                new Set([
-                    ...(unrolledSectionMap[unrolledSectionMap.length - 1].sourceLabels || []),
-                    ...sourceLabels,
-                ]),
-            );
-        } else {
-            unrolledSectionMap.push({
-                id: `v-loop-${i}`,
-                start: iterationStart,
-                end: currentStep,
-                label: roleLabel,
-                sourceLabels,
-            });
+        // Add or extend virtual section map. Adjacent equal-role/equal-meter
+        // ranges retain the historical coalescing behavior; meter changes split.
+        for (let meterIndex = 0; meterIndex < iterationMeterRanges.length; meterIndex++) {
+            const meterRange = iterationMeterRanges[meterIndex];
+            const lastSection = unrolledSectionMap[unrolledSectionMap.length - 1];
+            if (
+                lastSection?.label === roleLabel &&
+                lastSection.timeSignature === meterRange.timeSignature
+            ) {
+                lastSection.end = meterRange.end;
+                lastSection.sourceLabels = Array.from(
+                    new Set([...(lastSection.sourceLabels || []), ...sourceLabels]),
+                );
+            } else {
+                unrolledSectionMap.push({
+                    id: `v-loop-${i}-meter-${meterIndex}`,
+                    start: meterRange.start,
+                    end: meterRange.end,
+                    label: roleLabel,
+                    sourceLabels,
+                    timeSignature: meterRange.timeSignature,
+                });
+            }
         }
     }
 

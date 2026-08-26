@@ -427,6 +427,59 @@ describe('Conductor Logic', () => {
             );
         });
 
+        it('arms the next audible entrance after a drum-muted section', () => {
+            groove.enabled = false;
+            groove.sectionSeedMap = {};
+            groove.fillActive = false;
+            groove.fillMap = {
+                16: {
+                    steps: { 0: [{ name: 'Snare', vel: 0.8 }] },
+                    length: 16,
+                    crash: true,
+                },
+            };
+            groove.orchestrationMap = [
+                { start: 0, end: 16, energyLevel: 0.4 },
+                { start: 16, end: 32, energyLevel: 0.3 },
+                { start: 32, end: 48, energyLevel: 0.8 },
+            ];
+            groove.seedTimelineStartStep = 0;
+            playback.autoIntensity = true;
+            arranger.totalSteps = 48;
+            arranger.stepMap = [
+                { start: 0, end: 16, chord: { sectionId: 's1', sectionLabel: 'Verse' } },
+                { start: 16, end: 32, chord: { sectionId: 's2', sectionLabel: 'Break' } },
+                { start: 32, end: 48, chord: { sectionId: 's3', sectionLabel: 'Chorus' } },
+            ];
+            arranger.sectionMap = [
+                { id: 's1', start: 0, end: 16 },
+                { id: 's2', start: 16, end: 32 },
+                { id: 's3', start: 32, end: 48 },
+            ];
+            arranger.sections = [
+                { id: 's1', instruments: { groove: true } },
+                { id: 's2', instruments: { groove: false } },
+                { id: 's3', instruments: { groove: true } },
+            ];
+
+            checkSectionTransition(getState(), 16, 16, dispatch);
+
+            expect(dispatch).toHaveBeenCalledWith('TRIGGER_FILL', {
+                steps: { 0: [{ name: 'Snare', vel: 0.8 }] },
+                startStep: 16,
+                length: 16,
+                crash: true,
+            });
+
+            expect(dispatch).toHaveBeenCalledWith(
+                'SET_GROOVE_SEED',
+                expect.objectContaining({
+                    sectionId: 's3',
+                    seed: expect.any(Number),
+                }),
+            );
+        });
+
         it('should suppress fills if the next section is seamless', () => {
             groove.enabled = true;
             arranger.stepMap = [
@@ -497,6 +550,25 @@ describe('Conductor Logic', () => {
             expect(payload.crash).toBe(false);
             expect(payload.length).toBe(4); // stepsPerBeat in 4/4
             expect(payload.startStep).toBe(60); // 48 + (16 - 4): lands on the last beat
+        });
+
+        it('sizes an interior phrase pickup to the current mixed-meter denominator beat', () => {
+            setupLongSection();
+            arranger.totalSteps = 112;
+            arranger.stepMap = [
+                { start: 0, end: 112, chord: { sectionId: 's1', sectionLabel: 'A' } },
+            ];
+            arranger.sectionMap = [{ id: 's1', start: 0, end: 112, label: 'A' }];
+
+            // Bar 4 of a 7/8 section begins at 42. The local denominator beat is
+            // two internal steps even though the chart's global meter is 4/4.
+            checkSectionTransition(getState(), 42, 14, dispatch, true, 2);
+
+            const fills = triggerFillCalls();
+            expect(fills).toHaveLength(1);
+            expect(fills[0][1]).toEqual(
+                expect.objectContaining({ crash: false, startStep: 54, length: 2 }),
+            );
         });
 
         it('does NOT pick up on a non-phrase-boundary bar', () => {

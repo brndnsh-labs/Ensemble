@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveTimeSignature } from '../meter.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
@@ -64,6 +65,8 @@ interface HarmonyContext {
     ts: TimeSignatureConfig;
     measureStep: number;
     stepsPerMeasure: number;
+    /** Zero-based bar within the current section, stable across transport loops. */
+    sectionBarIndex: number;
     stepInChord: number;
     motif: MotifCacheEntry;
     /** #716 — BB King horn-section mode (sparse call-and-response stabs). */
@@ -88,6 +91,36 @@ interface HarmonyNote {
      * a new voice. See epic-harmony-polish.md S1.
      */
     isLegato?: boolean;
+}
+
+/**
+ * Resolve the soloist gate for harmony consumers.
+ *
+ * The live tick contract now publishes `soloistEffectiveEnabled` explicitly, so
+ * section overrides always win there. Direct/legacy callers predate that field;
+ * when they publish an activity signal, preserve the old meaning that the
+ * soloist is participating instead of silently discarding the signal because a
+ * minimal state fixture has the global lane disabled.
+ */
+function resolveSoloistEffectiveEnabled(
+    state: EnsembleState,
+    step: number,
+    coordination: any,
+): boolean {
+    if (typeof coordination?.soloistEffectiveEnabled === 'boolean') {
+        return coordination.soloistEffectiveEnabled;
+    }
+    if (
+        coordination &&
+        (Object.hasOwn(coordination, 'soloistActive') ||
+            Object.hasOwn(coordination, 'soloistBusy') ||
+            Object.hasOwn(coordination, 'soloistResting') ||
+            Object.hasOwn(coordination, 'soloistMidi') ||
+            Object.hasOwn(coordination, 'lastActiveSoloistMidi'))
+    ) {
+        return true;
+    }
+    return isInstrumentActiveAtStep(state, 'soloist', step);
 }
 
 // Internal memory for motif consistency
@@ -417,6 +450,9 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
     if (context.hornSection) {
         return null;
     }
+    if (!context.soloistEffectiveEnabled) {
+        return null;
+    }
 
     // B. Shared Hook Reinforcement (Ska-Punk)
     // why: S9(b) — the soloist's shared-hook buffer is published through the
@@ -501,8 +537,17 @@ function playShadowMode(context: HarmonyContext): HarmonyBehavior | null {
  * Standard procedural rhythmic comping.
  */
 function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
-    const { step, motif, playback, coordination, ts, measureStep, soloistEffectiveEnabled } =
-        context;
+    const {
+        step,
+        motif,
+        playback,
+        coordination,
+        ts,
+        measureStep,
+        stepsPerMeasure,
+        sectionBarIndex,
+        soloistEffectiveEnabled,
+    } = context;
 
     const isSoloistBusy =
         // why: soloistResting is published to the coordination context by tick-logic.ts
@@ -510,14 +555,19 @@ function playComperMode(context: HarmonyContext): HarmonyBehavior | null {
         // private session state directly ensures mocked tests exercise this branch.
         // soloistEffectiveEnabled respects per-section overrides, so a section that
         // mutes the soloist no longer leaves harmonies in "yield to the soloist" mode.
-        coordination.soloistBusy || (soloistEffectiveEnabled && !coordination.soloistResting);
+        soloistEffectiveEnabled && (coordination.soloistBusy || !coordination.soloistResting);
 
     // Coordination: Yield to soloist if not reinforcing
-    if (lastPlayedStep !== -1 && step === lastPlayedStep + 1 && coordination.soloistActive) {
+    if (
+        lastPlayedStep !== -1 &&
+        step === lastPlayedStep + 1 &&
+        soloistEffectiveEnabled &&
+        coordination.soloistActive
+    ) {
         return null;
     }
 
-    const patternStep = step % motif.pattern.length;
+    const patternStep = (sectionBarIndex * stepsPerMeasure + measureStep) % motif.pattern.length;
     const val = motif.pattern[patternStep];
 
     if (val > 0) {
@@ -589,20 +639,19 @@ function playSeaMode(context: HarmonyContext): HarmonyBehavior | null {
  */
 function playHornSectionMode(context: HarmonyContext): HarmonyBehavior | null {
     const {
-        step,
         motif,
         playback,
         coordination,
         ts,
         measureStep,
         soloistEffectiveEnabled,
-        stepsPerMeasure,
+        sectionBarIndex,
     } = context;
     const intensity = playback.bandIntensity;
     const spb = ts.stepsPerBeat;
 
     const isSoloistBusy =
-        coordination.soloistBusy || (soloistEffectiveEnabled && !coordination.soloistResting);
+        soloistEffectiveEnabled && (coordination.soloistBusy || !coordination.soloistResting);
     // Lay out under the solo — the section answers in the gaps (playShadowMode
     // antiphony), it doesn't comp over the top of a phrase.
     if (isSoloistBusy) {
@@ -627,13 +676,12 @@ function playHornSectionMode(context: HarmonyContext): HarmonyBehavior | null {
     // Some bars the section rests so it breathes (fewer rests as the band drives);
     // the rest play one figure, rotated bar-to-bar for conversational movement.
     // Seeded so it's deterministic/reproducible.
-    const barIndex = Math.floor(step / Math.max(1, stepsPerMeasure));
     const playBarProb = 0.55 + intensity * 0.4;
-    if (scrambleHash(motif.seed + barIndex * 17 + 9) > playBarProb) {
+    if (scrambleHash(motif.seed + sectionBarIndex * 17 + 9) > playBarProb) {
         return null;
     }
     const figure =
-        FIGURES[Math.floor(scrambleHash(motif.seed + barIndex * 23 + 5) * FIGURES.length)] ||
+        FIGURES[Math.floor(scrambleHash(motif.seed + sectionBarIndex * 23 + 5) * FIGURES.length)] ||
         FIGURES[0];
     if (!figure.includes(measureStep)) {
         return null;
@@ -669,12 +717,13 @@ function applyGenreVoicingOverride(
         isLatched: boolean;
         isTensionChord: boolean;
         bandIntensity: number;
-        step: number;
+        sectionBarIndex: number;
         pedalSteel: boolean;
         powerChord: boolean;
     },
 ): number[] {
-    const { profile, chord, isBloom, isLatched, isTensionChord, bandIntensity, step } = ctx;
+    const { profile, chord, isBloom, isLatched, isTensionChord, bandIntensity, sectionBarIndex } =
+        ctx;
     let result = intervals;
 
     // --- ROCK: harmonized twin-guitar 3rds/6ths (#557) ---
@@ -694,7 +743,7 @@ function applyGenreVoicingOverride(
         if (profile.voicing.powerDoubling && bandIntensity > 0.7) {
             result = bandIntensity > 0.85 ? [0, 7, 12] : [0, 7];
         } else {
-            const useSixth = scrambleHash(chord.rootMidi * 100 + Math.floor(step / 16)) < 0.45;
+            const useSixth = scrambleHash(chord.rootMidi * 100 + sectionBarIndex) < 0.45;
             result = useSixth ? [harmonizedThird, 12] : [harmonizedThird, 7];
         }
     }
@@ -778,6 +827,7 @@ function finalizeHarmonyNotes(
     styleConfig: StyleConfig,
     coordination: any,
     octave: number,
+    sectionBarIndex: number,
 ): HarmonyNote[] {
     const { playback, harmony, groove, chords } = activeState;
     const { duration: baseDuration, isLatched, isBloom, isGhost, anchorMidi } = behavior;
@@ -788,19 +838,24 @@ function finalizeHarmonyNotes(
     const feel = groove.genreFeel;
     const profile = resolveHarmonyProfile(feel);
 
+    const soloistEffectiveEnabled = resolveSoloistEffectiveEnabled(activeState, step, coordination);
     const isSoloistBusy =
         // why: soloistResting and soloistNotesInPhrase are published via coordination
         // context by the tick-logic soloist producer block (S4); reading from the
         // contract surface rather than private session state keeps the contract honest.
         // `isInstrumentActiveAtStep` threads through section-override semantics so
         // muting the soloist for a section lets harmonies stop yielding to a phantom.
-        coordination.soloistBusy ||
-        (isInstrumentActiveAtStep(activeState, 'soloist', step) &&
-            (!coordination.soloistResting || coordination.soloistNotesInPhrase > 3));
+        soloistEffectiveEnabled &&
+        (coordination.soloistBusy ||
+            !coordination.soloistResting ||
+            coordination.soloistNotesInPhrase > 3);
     const accompanimentCrowding = coordination.accompanimentHit && !isLatched && !isBloom;
 
     // --- VOICING REFINEMENT (Musical Taste) ---
-    const reserveBassSpace = shouldReserveBassSpace(activeState);
+    const reserveBassSpace = shouldReserveBassSpace(
+        activeState,
+        coordination.bassEffectiveEnabled ?? isInstrumentActiveAtStep(activeState, 'bass', step),
+    );
     const isCompingGenre = ['Jazz', 'Funk', 'Neo-Soul', 'Blues'].includes(feel);
     const groundingRequired = shouldPreferGroundedPracticeVoicing(activeState, chord.quality, feel);
     const isTensionChord = isTensionChordQuality(chord.quality);
@@ -899,7 +954,7 @@ function finalizeHarmonyNotes(
         isLatched: !!isLatched,
         isTensionChord,
         bandIntensity: playback.bandIntensity,
-        step,
+        sectionBarIndex,
         pedalSteel,
         powerChord,
     });
@@ -1009,7 +1064,9 @@ function finalizeHarmonyNotes(
         lastStep > 0 && stickyAge <= SOLOIST_STICKY_STALE_STEPS
             ? coordination.lastActiveSoloistMidi || 0
             : 0;
-    const soloistMidi = coordination.avgSoloistMidi || coordination.soloistMidi || stickyMidi || 0;
+    const soloistMidi = soloistEffectiveEnabled
+        ? coordination.avgSoloistMidi || coordination.soloistMidi || stickyMidi || 0
+        : 0;
     if (soloistMidi > 72 && targetOctave > 48) {
         targetOctave -= 12;
     } else if (soloistMidi > 0 && soloistMidi < 60 && targetOctave < 72) {
@@ -1149,7 +1206,7 @@ export function getHarmonyNotes(
     stepInChord: number,
     _soloistResult: any = null,
     coordination: any = {},
-    _stepInfo?: StepInfo,
+    stepInfo?: StepInfo,
 ): HarmonyNote[] {
     if (!chord) {
         return [];
@@ -1204,10 +1261,18 @@ export function getHarmonyNotes(
     }
 
     const feel = groove.genreFeel;
-    const tsConfigs: any = TIME_SIGNATURES;
-    const ts = tsConfigs[arranger.timeSignature] || tsConfigs['4/4'];
+    const ts =
+        stepInfo?.tsConfig || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
-    const measureStep = step % stepsPerMeasure;
+    const measureStep =
+        stepInfo?.mStep ?? ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
+    const chartStep =
+        arranger.totalSteps > 0
+            ? ((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps
+            : step;
+    const sectionBarIndex = Math.floor(
+        Math.max(0, chartStep - (coordination?.sectionStart ?? 0)) / Math.max(1, stepsPerMeasure),
+    );
     const isTensionChord = isTensionChordQuality(chord.quality);
 
     // 1. STYLE SELECTION
@@ -1343,7 +1408,7 @@ export function getHarmonyNotes(
     const context: HarmonyContext = {
         step,
         soloist,
-        soloistEffectiveEnabled: isInstrumentActiveAtStep(activeState, 'soloist', step),
+        soloistEffectiveEnabled: resolveSoloistEffectiveEnabled(activeState, step, coordination),
         coordination,
         playback,
         chord,
@@ -1351,6 +1416,7 @@ export function getHarmonyNotes(
         ts,
         measureStep,
         stepsPerMeasure,
+        sectionBarIndex,
         stepInChord,
         motif,
         hornSection: !!profile.voicing?.hornSection,
@@ -1365,7 +1431,9 @@ export function getHarmonyNotes(
     if (
         !behavior &&
         isTensionChord &&
-        (coordination.accompanimentHit || coordination.soloistActive || coordination.soloistBusy)
+        (coordination.accompanimentHit ||
+            (context.soloistEffectiveEnabled &&
+                (coordination.soloistActive || coordination.soloistBusy)))
     ) {
         return [];
     }
@@ -1403,5 +1471,14 @@ export function getHarmonyNotes(
     }
 
     // 4. GENERATION
-    return finalizeHarmonyNotes(activeState, chord, step, behavior, config, coordination, octave);
+    return finalizeHarmonyNotes(
+        activeState,
+        chord,
+        step,
+        behavior,
+        config,
+        coordination,
+        octave,
+        sectionBarIndex,
+    );
 }

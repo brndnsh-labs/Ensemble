@@ -45,6 +45,9 @@ function updateTimeSignature(
     lastDrumPreset: string | null,
     dispatch: (action: any, ...args: any[]) => void,
 ) {
+    if (arranger.timeSignature === timeSignature) {
+        return;
+    }
     dispatch(ACTIONS.SET_TIME_SIGNATURE, timeSignature);
     dispatch(ACTIONS.SET_GROUPING, null);
     if (lastDrumPreset) {

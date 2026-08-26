@@ -1,4 +1,5 @@
 import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveTimeSignature } from '../meter.js';
 import type { Chord, EnsembleState, Mutable, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
@@ -19,6 +20,7 @@ import {
 } from './comping-emit.js';
 import { compingState } from './comping-state.js';
 import { scrambleHash, stringHash31 } from './hash-utils.js';
+import { isInstrumentActiveAtStep, isSoloistBusyAtStep } from './section-overrides.js';
 import {
     averageMidi,
     getBassSpaceFloor,
@@ -696,10 +698,11 @@ function updateRhythmicIntent(
     soloistBusy: boolean,
     spm = 16,
     sectionId: string | null = null,
+    sectionTs: any = null,
+    sectionStart = 0,
 ): void {
     const { playback, chords, groove, arranger } = state;
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const ts = sectionTs || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
 
     // --- Section Change Detection ---
     if (sectionId && compingState.lastSectionId !== sectionId) {
@@ -845,7 +848,8 @@ function updateRhythmicIntent(
     const loopSteps = arranger.totalSteps && arranger.totalSteps > 0 ? arranger.totalSteps : 0;
     const inLoopStep =
         loopSteps > 0 ? (((step % loopSteps) + loopSteps) % loopSteps) | 0 : step | 0;
-    const barIndex = Math.floor(inLoopStep / spm);
+    const sectionStep = Math.max(0, inLoopStep - sectionStart);
+    const barIndex = Math.floor(sectionStep / spm);
     const funkPickIndex = compingState.funkRotationIndex;
     if (genre === 'Funk') {
         // Advance the counter so the next rotation draws a fresh cell. We snapshot
@@ -873,7 +877,7 @@ function updateRhythmicIntent(
         pickerBarIndex,
         sectionId,
     );
-    if (genre === 'Jazz' && compingState.lastVoicingMidis.length === 0 && step % spm === 0) {
+    if (genre === 'Jazz' && compingState.lastVoicingMidis.length === 0 && sectionStep % spm === 0) {
         // Give the first jazz bar a voiced downbeat so the harmony has a real
         // reference point for the continuity cache instead of starting empty.
         newCell[0] = 1;
@@ -1105,16 +1109,18 @@ export function getAccompanimentNotes(
     stepInfo: StepInfo,
     coordination: AccompanimentCoordination = {},
 ): any[] {
-    const { playback, arranger, chords, bass, soloist, groove } = state;
-    if (!chords.enabled || !chord) {
+    const { playback, arranger, chords, bass, groove } = state;
+    if (!chord) {
         return [];
     }
 
     const notes: any[] = [];
     const genre = groove.genreFeel;
     const intensity = playback.bandIntensity;
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const bassEffectiveEnabled =
+        coordination.bassEffectiveEnabled ?? isInstrumentActiveAtStep(state, 'bass', step);
+    const ts =
+        stepInfo.tsConfig || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
     const spm = ts.beats * ts.stepsPerBeat;
 
     // why (#712): seed for the per-step comp gates — both the per-genre lanes
@@ -1151,7 +1157,9 @@ export function getAccompanimentNotes(
     //         docs/audit/epic-form-arrangement.md S3.
     const compSectionOccurrence: number = coordination?.sectionOccurrence ?? 1;
     const isRepeatPassComp = compSectionOccurrence >= 2;
-    const compBarIndex = Math.floor(step / spm);
+    const compBarIndex = Math.floor(
+        Math.max(0, compInLoopStep - (coordination?.sectionStart ?? 0)) / spm,
+    );
     const COMP_PHRASE_BARS = 4; // why: standard 4-bar phrase, matches bass S2.
     const compPhraseIndex = Math.floor(compBarIndex / COMP_PHRASE_BARS);
     const compBarInPhrase = compBarIndex % COMP_PHRASE_BARS;
@@ -1375,10 +1383,16 @@ export function getAccompanimentNotes(
     );
 
     // Rhythmic Yielding (Contract Compliance)
-    const isSoloistBusy =
-        coordination?.soloistBusy ||
-        (soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0);
-    updateRhythmicIntent(state, step, isSoloistBusy, spm, chord.sectionId);
+    const isSoloistBusy = isSoloistBusyAtStep(state, step, coordination?.soloistBusy === true);
+    updateRhythmicIntent(
+        state,
+        step,
+        isSoloistBusy,
+        spm,
+        chord.sectionId,
+        ts,
+        coordination?.sectionStart ?? 0,
+    );
 
     if (isSoloistBusy && !stepInfo.isMeasureStart && compDraw(20) < 0.7) {
         // Yield density to busy soloist: Skip offbeats and less-foundational hits
@@ -1592,7 +1606,7 @@ export function getAccompanimentNotes(
             // rather than a unison doubling of the bassist. When bass is absent
             // the original low-register boom is kept (the guitar IS the bass).
             const boomBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
-            if (bass.enabled && boomBassMidi > 0) {
+            if (bassEffectiveEnabled && boomBassMidi > 0) {
                 const boomFloor = Math.max(52, boomBassMidi + 5);
                 // cap the lift at the chord-register ceiling (84) so an
                 // unusually high band-bass note (the un-clamped `bass.lastFreq`
@@ -1641,7 +1655,9 @@ export function getAccompanimentNotes(
             // its own R-5 in bass register above (1700-1726), but the band
             // bassist runs alongside; the strum is the chord half and should
             // sit above the bassist. Fallback to 52 when bass not running.
-            const strumBassMidi = coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0;
+            const strumBassMidi = bassEffectiveEnabled
+                ? coordination?.bassMidi || getMidi(bass.lastFreq || 0) || 0
+                : 0;
             const strumFloor = Math.max(52, strumBassMidi + 7);
 
             // Anchor the strum cluster around middle-C (MIDI 60), then re-pick the
@@ -1820,7 +1836,7 @@ export function getAccompanimentNotes(
         const isGhost = !isHit && compDraw(22) < ghostProb;
 
         if (isHit || isGhost) {
-            const reserveBassSpace = shouldReserveBassSpace(state);
+            const reserveBassSpace = shouldReserveBassSpace(state, bassEffectiveEnabled);
             const groundingRequired = shouldPreferGroundedPracticeVoicing(
                 state,
                 chord.quality,
@@ -1838,7 +1854,9 @@ export function getAccompanimentNotes(
                 voicing,
                 compingState.lastVoicingMidis,
                 groundingRequired ? Math.min(4, voicing.length) : Math.min(3, voicing.length),
-                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state),
+                reserveBassSpace && bassMidi
+                    ? bassMidi + 13
+                    : getBassSpaceFloor(state, bassEffectiveEnabled),
             );
 
             if (reserveBassSpace && bassMidi) {
@@ -1980,8 +1998,7 @@ export function getAccompanimentNotes(
             coordination?.soloistResting === true &&
             (coordination?.soloistNotesInPhrase ?? 0) >= 3
         ) {
-            const funkBarIndex = Math.floor(step / spm);
-            const funkPhraseEndHash = (funkBarIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
+            const funkPhraseEndHash = (compBarIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
             if (funkPhraseEndHash % 20 < 13) {
                 isHit = false;
                 funkPhraseEndThinned = true;
@@ -2013,7 +2030,7 @@ export function getAccompanimentNotes(
             !isHit && !funkPhraseEndThinned && !funkSharedCatchActive && compDraw(24) < ghostProb;
 
         if (isHit || isGhost || funkSharedCatchActive) {
-            const reserveBassSpace = shouldReserveBassSpace(state);
+            const reserveBassSpace = shouldReserveBassSpace(state, bassEffectiveEnabled);
             const groundingRequired = shouldPreferGroundedPracticeVoicing(
                 state,
                 chord.quality,
@@ -2067,7 +2084,9 @@ export function getAccompanimentNotes(
             // pool, so the gapped {3,b7,9} identity is preserved (any 3-window
             // of three distinct cycling pitch classes is a cell inversion).
             const clavFloor =
-                reserveBassSpace && bassMidi ? bassMidi + 13 : getBassSpaceFloor(state);
+                reserveBassSpace && bassMidi
+                    ? bassMidi + 13
+                    : getBassSpaceFloor(state, bassEffectiveEnabled);
             const cellPcs = [clavThird, clavSeventh, clavNinth].map((m) => ((m % 12) + 12) % 12);
             const cellPool: number[] = [];
             for (let octave = 48; octave <= 84; octave += 12) {
@@ -2190,6 +2209,7 @@ export function getAccompanimentNotes(
         ccEvents,
         isBeatStart,
         intBeat,
+        compBarIndex,
         compDraw,
         rotateVoicingFreqs,
     });

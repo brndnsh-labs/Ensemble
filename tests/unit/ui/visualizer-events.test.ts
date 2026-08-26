@@ -63,7 +63,7 @@ describe('visualizer event contract', () => {
             duration: 2,
             label: 'Cmaj7',
         });
-        queueVisualizerStepEvent(playback, 1.25, 12);
+        queueVisualizerStepEvent(playback, 1.25, 12, 28);
         queueVisualizerFillEvent(playback, 1.5, true);
 
         expect(playback.drawQueue).toEqual([
@@ -90,6 +90,7 @@ describe('visualizer event contract', () => {
                 type: 'step',
                 time: 1.25,
                 step: 12,
+                chartStep: 28,
             },
             {
                 type: 'fill',

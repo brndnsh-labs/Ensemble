@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
-import { TIME_SIGNATURES } from '../config.js';
 import { resolveMode } from '../controllers/app-controller.js';
 import { switchMeasure } from '../controllers/instrument-controller.js';
+import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js';
 import { dispatch, getState, stateMap } from '../state.js';
 import type { EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState } from '../ui-bridge.js';
-import { getStepsPerMeasure } from '../utils.js';
 import type { VisualizerQueuedEvent } from '../visualizer/visualizer-events.js';
 import {
     resolveVisualizerTrack,
@@ -71,6 +70,22 @@ interface VisualizerProps {
     getVisualTime: (stateMap: EnsembleState) => number;
 }
 
+/** Resolve the visual grid config and its audio-time measure origin for one step. */
+export function getVisualizerMeterFrame(
+    arranger: EnsembleState['arranger'],
+    step: number,
+    eventTime: number,
+    bpm: number,
+) {
+    const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, step);
+    const secondsPerStep = 60 / bpm / 4;
+    return {
+        key: `${stepInfo.tsName || arranger.timeSignature}:${ts.grouping.join('+')}`,
+        ts,
+        referenceTime: eventTime - stepInfo.mStep * secondsPerStep,
+    };
+}
+
 export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,6 +93,7 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
     const vizRef = useRef<UnifiedVisualizer | null>(null);
     const loopRef = useRef<number | null>(null);
     const prevPlayingRef = useRef(false);
+    const meterCacheRef = useRef<string | null>(null);
     /**
      * #1009 — last MIDI register transmitted per lane. The drawing frame used to
      * post all four SET_REGISTER messages every rAF (~240 redundant cross-thread
@@ -108,12 +124,13 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
         }
     };
 
-    const { isPlaying, palette, mode, bpm, timeSignature } = useEnsembleState((s) => ({
+    const { isPlaying, palette, mode, bpm, timeSignature, grouping } = useEnsembleState((s) => ({
         isPlaying: s.playback.isPlaying,
         palette: s.playback.palette,
         mode: s.playback.mode,
         bpm: s.playback.bpm,
         timeSignature: s.arranger.timeSignature,
+        grouping: s.arranger.grouping,
     }));
 
     useLayoutEffect(() => {
@@ -257,10 +274,11 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
 
     useEffect(() => {
         if (vizRef.current) {
-            const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
+            const ts = getEffectiveTimeSignature(timeSignature, grouping);
             vizRef.current.render(0, bpm, ts);
+            meterCacheRef.current = null;
         }
-    }, [bpm, timeSignature]);
+    }, [bpm, grouping, timeSignature]);
 
     useEffect(() => {
         if (!vizRef.current) {
@@ -344,15 +362,25 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
                     value: remainingEvents,
                 });
             }
-            const spm = getStepsPerMeasure(arranger.timeSignature);
-
             for (const ev of readyEvents) {
                 if (!ev) {
                     continue;
                 }
 
                 if (ev.type === 'step') {
-                    const stepMeasure = Math.floor(ev.step / spm);
+                    const meterFrame = getVisualizerMeterFrame(
+                        arranger,
+                        ev.chartStep,
+                        ev.time,
+                        bpm,
+                    );
+                    if (meterCacheRef.current !== meterFrame.key && vizRef.current) {
+                        meterCacheRef.current = meterFrame.key;
+                        vizRef.current.setBeatReference(meterFrame.referenceTime);
+                        vizRef.current.render(now, bpm, meterFrame.ts);
+                    }
+                    const localStepsPerMeasure = meterFrame.ts.beats * meterFrame.ts.stepsPerBeat;
+                    const stepMeasure = Math.floor(ev.step / localStepsPerMeasure);
                     // #1181: `groove.followPlayback` gated this and was removed — it had
                     // been persisted and hydrated but no control could set it since the
                     // chart-first migration, so the false branch was unreachable and the
@@ -408,12 +436,15 @@ export function Visualizer({ enabled, getVisualTime }: VisualizerProps) {
             dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'isDrawing', value: true });
             if (enabled) {
                 const { playback, arranger } = typedStateMap2;
-                const secondsPerBeat = 60.0 / playback.bpm;
-                const sixteenth = 0.25 * secondsPerBeat;
-                const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
-                const measureTime =
-                    playback.unswungNextNoteTime - (playback.step % stepsPerMeasure) * sixteenth;
-                vizRef.current!.setBeatReference(measureTime);
+                const meterFrame = getVisualizerMeterFrame(
+                    arranger,
+                    playback.step,
+                    playback.unswungNextNoteTime,
+                    playback.bpm,
+                );
+                meterCacheRef.current = meterFrame.key;
+                vizRef.current!.setBeatReference(meterFrame.referenceTime);
+                vizRef.current!.render(getVisualTime(typedStateMap2), playback.bpm, meterFrame.ts);
             }
         }
 

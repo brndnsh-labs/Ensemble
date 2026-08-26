@@ -18,6 +18,7 @@ import {
 import { isPackInstalled, packIdFromVoice } from '../engine/instrument-registry.js';
 import { ensurePackLoaded } from '../engine/pack-runtime.js';
 import { togglePlay } from '../engine/scheduler-core.js';
+import { isInstrumentEverActive } from '../engine/section-overrides.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { generateSessionSeed } from '../engine/soloist-seeder.js';
 import type { EnsembleState, GrooveState, InstrumentModule, InstrumentVoice } from '../types.js';
@@ -198,7 +199,7 @@ function regenerateSessionSeeds(
 
     dispatch(ACTIONS.UPDATE_SB, { sessionSeed: soloGenerated });
 
-    if (groove.enabled) {
+    if (isInstrumentEverActive(stateMap, 'groove')) {
         const genreFeel = groove.genreFeel || 'Rock';
         const drumOrchGenerated = generateDrumOrchestration(
             stateMap,
@@ -218,7 +219,7 @@ function regenerateSessionSeeds(
             // soloist) — but ONLY when the soloist is enabled. With no audible solo there
             // is no line to step on, so the drummer should fill at the full base rate.
             // soloGenerated carries { notes, loopLengthSteps }.
-            soloist.enabled ? soloGenerated : undefined,
+            isInstrumentEverActive(stateMap, 'soloist') ? soloGenerated : undefined,
         );
         const drumAccentsGenerated = generateSoloistAccents(
             stateMap,
@@ -354,6 +355,7 @@ export function handleEffects(
         case ACTIONS.UPDATE_SECTION:
         case ACTIONS.SET_KEY:
         case ACTIONS.SET_TIME_SIGNATURE:
+        case ACTIONS.SET_GROUPING:
         case ACTIONS.SET_IS_MINOR: {
             validateProgression(stateMap, dispatch);
             // If arrangement changes during playback, we must regenerate seeds

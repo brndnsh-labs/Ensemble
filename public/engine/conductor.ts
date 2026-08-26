@@ -1,4 +1,4 @@
-import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveTimeSignature } from '../meter.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../song/form-analysis.js';
 import { saveCurrentState } from '../state/persistence.js';
 import type { ChordDensity, EnsembleState } from '../types.js';
@@ -11,7 +11,12 @@ import { generatePhrasePickup, generateProceduralFill } from './fills.js';
 import { getPhraseSeed } from './grooves/utils.js';
 import { createPRNG, deriveSectionSeed, stringHash31 } from './hash-utils.js';
 import { REVERB_PRESETS } from './reverb.js';
-import { effectiveTargetIntensity, RAMP_INTENSITY_MULTIPLIER } from './section-overrides.js';
+import {
+    effectiveTargetIntensity,
+    foldPracticeStep,
+    isInstrumentActiveAtStep,
+    RAMP_INTENSITY_MULTIPLIER,
+} from './section-overrides.js';
 import { conductorVelocityFor } from './velocity-shaping.js';
 
 /**
@@ -267,9 +272,28 @@ export function checkSectionTransition(
     currentStep: number,
     stepsPerMeasure: number,
     dispatch: Dispatch,
+    isMeasureStart = currentStep % stepsPerMeasure === 0,
+    stepsPerBeat = getEffectiveTimeSignature(
+        state.arranger.timeSignature,
+        state.arranger.grouping,
+    ).stepsPerBeat,
 ) {
     const { groove, arranger, playback, conductor } = state;
-    if (!groove.enabled) {
+    // A section can force the drummer on while its global lane is muted. Keep
+    // conductor work alive for the current measure and for a transition into an
+    // enabled next measure so the forced-on drummer receives its seeded fills,
+    // accents, arrivals, and section memo before it starts sounding.
+    const grooveActiveNow = isInstrumentActiveAtStep(
+        state,
+        'groove',
+        foldPracticeStep(currentStep, playback),
+    );
+    const grooveActiveNextMeasure = isInstrumentActiveAtStep(
+        state,
+        'groove',
+        foldPracticeStep(currentStep + stepsPerMeasure, playback),
+    );
+    if (!grooveActiveNow && !grooveActiveNextMeasure) {
         return;
     }
 
@@ -288,7 +312,7 @@ export function checkSectionTransition(
 
     // Trigger major transitions (fills/intensity updates) only at the start of a measure.
     // We want to trigger when the measure about to be scheduled is the LAST measure of a section or the loop.
-    if (modStep % stepsPerMeasure === 0) {
+    if (isMeasureStart) {
         const seededFill = seededTimelineActive ? groove.fillMap?.[seedTimelineStep] : null;
         const nextSeededOrchestration =
             seededTimelineActive && groove.orchestrationMap
@@ -752,9 +776,6 @@ export function checkSectionTransition(
                             PHRASE_BARS,
                             1,
                         );
-                        const tsConf =
-                            TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-                        const stepsPerBeat = tsConf.stepsPerBeat;
                         const pickup = generatePhrasePickup(
                             stepsPerBeat,
                             playback.bandIntensity,

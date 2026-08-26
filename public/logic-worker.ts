@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { TIME_SIGNATURES } from './config.js';
+
 import { compingState, resetCompingState } from './engine/accompaniment.js';
 import { resetBassState } from './engine/bass-engine.js';
 import { createCoordinationContext } from './engine/coordination-engine.js';
@@ -10,6 +10,7 @@ import { resetSoloistState } from './engine/soloist-session.js';
 import { fillBuffers } from './engine/worker-buffer-manager.js';
 import { resetWorkerContext, workerContext } from './engine/worker-orchestrator.js';
 import { recursiveSafeSync, resetCursors } from './engine/worker-utils.js';
+import { getEffectiveTimeSignatures } from './meter.js';
 
 import { getState } from './state.js';
 import type { EnsembleState } from './types.js';
@@ -144,8 +145,9 @@ export function handleResolution(
     processStartTime: number | null = null,
 ): void {
     const { arranger, bass, chords, soloist, harmony, groove, playback } = state;
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES) || {
+    const signatures = getEffectiveTimeSignatures(arranger.timeSignature, arranger.grouping);
+    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const stepInfo = getStepInfo(step, ts, arranger.measureMap, signatures) || {
         mStep: 0,
         isMeasureStart: false,
         isBeatStart: false,

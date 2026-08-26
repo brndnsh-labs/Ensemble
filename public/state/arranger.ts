@@ -37,8 +37,12 @@ export function arrangerReducer(action: Action): boolean {
                 // slice can only ever hold a value all three readers agree on. This
                 // generic back door has no `seed` caller today; it is normalized anyway
                 // because "the reducer is the bound" is only true if it has no hole.
+                const meterChanged = param === 'timeSignature' && a.timeSignature !== value;
                 (arranger as Record<string, unknown>)[param] =
                     param === 'seed' ? normalizeSongSeed(value) : value;
+                if (meterChanged) {
+                    a.grouping = null;
+                }
                 return true;
             }
             break;
@@ -70,7 +74,10 @@ export function arrangerReducer(action: Action): boolean {
             a.notation = action.payload;
             return true;
         case ACTIONS.SET_TIME_SIGNATURE:
-            a.timeSignature = action.payload;
+            if (a.timeSignature !== action.payload) {
+                a.timeSignature = action.payload;
+                a.grouping = null;
+            }
             return true;
         case ACTIONS.SET_GROUPING:
             a.grouping = action.payload;
@@ -88,6 +95,7 @@ export function arrangerReducer(action: Action): boolean {
             }
             if (action.payload.timeSignature !== undefined) {
                 a.timeSignature = action.payload.timeSignature;
+                a.grouping = null;
             }
             a.isDirty = true;
             return true;

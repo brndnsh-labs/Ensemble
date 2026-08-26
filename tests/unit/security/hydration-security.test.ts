@@ -2,7 +2,8 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
-import { hydrateState } from '../../../public/state/state-hydration.js';
+import { saveCurrentState } from '../../../public/state/persistence.js';
+import { hydrateState, loadFromUrl } from '../../../public/state/state-hydration.js';
 import * as stateModule from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -14,7 +15,13 @@ const { makeSoloistMock } = await vi.hoisted(
 vi.mock('../../../public/state.js', () => {
     const mockState = {
         playback: { bpm: 100, bandIntensity: 0.5, complexity: 0.3 },
-        arranger: { sections: [], key: 'C', timeSignature: '4/4', notation: 'roman' },
+        arranger: {
+            sections: [],
+            key: 'C',
+            timeSignature: '4/4',
+            grouping: null,
+            notation: 'roman',
+        },
         groove: {
             enabled: true,
             measures: 1,
@@ -94,6 +101,7 @@ describe('Security: Hydration & Storage Resilience', () => {
 
         // Setup localStorage mock using Vitest stubbing
         vi.stubGlobal('localStorage', mockStorage);
+        vi.stubGlobal('location', new URL('http://localhost'));
         mockStorage.clear();
 
         // Reset state defaults
@@ -101,8 +109,10 @@ describe('Security: Hydration & Storage Resilience', () => {
         state.arranger.sections = [];
         state.arranger.key = 'C';
         state.arranger.timeSignature = '4/4';
+        state.arranger.grouping = null;
         state.arranger.notation = 'roman';
         state.playback.bpm = 100;
+        state.playback.rampBpmTarget = 0;
         state.playback.bandIntensity = 0.5;
         state.playback.complexity = 0.3;
         state.groove.measures = 1;
@@ -250,6 +260,139 @@ describe('Security: Hydration & Storage Resilience', () => {
             const state = stateModule.getState();
             expect(state.groove.volume).toBe(1.0);
             expect(state.groove.swing).toBe(100);
+        });
+    });
+
+    describe('Songbook foundation round-trip (#1029)', () => {
+        it('preserves valid section, grouping, and complexity fields through save, JSON, and hydrate', () => {
+            const state = stateModule.getState();
+            state.arranger.sections = [
+                {
+                    id: 'verse-1',
+                    label: 'Verse',
+                    value: 'I | vi | IV | V',
+                    targetIntensity: 0.68,
+                    instruments: {
+                        groove: true,
+                        bass: true,
+                        chords: false,
+                        harmony: false,
+                        soloist: true,
+                    },
+                },
+            ];
+            state.arranger.timeSignature = '5/4';
+            state.arranger.grouping = [2, 3];
+            state.playback.complexity = 0.61;
+
+            // Reproduce the production boundary: persistence writes an object, browser
+            // storage JSON-serializes it, then hydration parses that JSON on the next boot.
+            vi.mocked(stateModule.storage.save).mockImplementationOnce((key, data) => {
+                localStorage.setItem(`ensemble_${key}`, JSON.stringify(data));
+            });
+            saveCurrentState();
+
+            state.arranger.sections = [];
+            state.arranger.grouping = null;
+            state.playback.complexity = 0;
+            hydrateState();
+
+            expect(stateModule.storage.save).toHaveBeenCalledTimes(1);
+            expect(stateModule.storage.save).toHaveBeenCalledWith(
+                'currentState',
+                expect.any(Object),
+            );
+            expect(localStorage.length).toBe(1);
+            expect(localStorage.key(0)).toBe('ensemble_currentState');
+            expect(state.arranger.sections).toEqual([
+                expect.objectContaining({
+                    id: 'verse-1',
+                    targetIntensity: 0.68,
+                    instruments: {
+                        groove: true,
+                        bass: true,
+                        chords: false,
+                        harmony: false,
+                        soloist: true,
+                    },
+                }),
+            ]);
+            expect(state.arranger.grouping).toEqual([2, 3]);
+            expect(state.playback.complexity).toBe(0.61);
+        });
+
+        it('drops a persisted custom grouping when a URL meter takes ownership', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [{ id: 'local', label: 'Local', value: 'I' }],
+                    timeSignature: '5/4',
+                    grouping: [2, 3],
+                }),
+            );
+            hydrateState();
+            expect(stateModule.getState().arranger.grouping).toEqual([2, 3]);
+
+            vi.stubGlobal('location', new URL('http://localhost/?ts=7%2F4'));
+            loadFromUrl();
+
+            expect(stateModule.getState().arranger.timeSignature).toBe('7/4');
+            expect(stateModule.getState().arranger.grouping).toBeNull();
+        });
+
+        it('bounds section intensity and rejects malformed overrides and grouping', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({
+                    sections: [
+                        {
+                            id: 'bounded',
+                            label: 'Bounded',
+                            value: 'I',
+                            targetIntensity: 9,
+                            instruments: {
+                                groove: false,
+                                bass: 'off',
+                                soloist: true,
+                                constructor: true,
+                            },
+                        },
+                        {
+                            id: 'rejected',
+                            label: 'Rejected',
+                            value: 'IV',
+                            targetIntensity: '0.5',
+                            instruments: ['groove'],
+                        },
+                    ],
+                    timeSignature: '5/4',
+                    grouping: [3, 0, 2],
+                }),
+            );
+
+            hydrateState();
+
+            const [bounded, rejected] = stateModule.getState().arranger.sections;
+            expect(bounded.targetIntensity).toBe(1);
+            expect(bounded.instruments).toEqual({ groove: false, soloist: true });
+            expect(rejected).not.toHaveProperty('targetIntensity');
+            expect(rejected).not.toHaveProperty('instruments');
+            expect(stateModule.getState().arranger.grouping).toBeNull();
+        });
+
+        it('keeps legacy defaults when the additive fields are absent', () => {
+            localStorage.setItem(
+                'ensemble_currentState',
+                JSON.stringify({ sections: [{ id: 'legacy', label: 'Legacy', value: 'I' }] }),
+            );
+
+            hydrateState();
+
+            const state = stateModule.getState();
+            expect(state.arranger.sections[0]).not.toHaveProperty('targetIntensity');
+            expect(state.arranger.sections[0]).not.toHaveProperty('instruments');
+            expect(state.arranger.grouping).toBeNull();
+            expect(state.playback.complexity).toBe(0.3);
         });
     });
 

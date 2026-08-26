@@ -849,6 +849,7 @@ function parseProgressionPart(
     timeSignature: string,
     initialMidis: number[],
     keyIsMinor: boolean = false,
+    bassActive = Boolean(state.bass?.enabled),
 ): { chords: Chord[]; finalMidis: number[] } {
     const { chords, groove } = state;
     const parsed: Chord[] = [];
@@ -960,9 +961,10 @@ function parseProgressionPart(
                     is7th,
                     chords.density,
                     groove.genreFeel,
+                    bassActive,
                 );
                 // Reduce mud: keep the comping pocket above the bass lane when that lane is active.
-                const pianoMin = getBassSpaceFloor(state);
+                const pianoMin = getBassSpaceFloor(state, bassActive);
                 const isPivot = parsed.length === 0;
                 // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
                 // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
@@ -1101,6 +1103,10 @@ export function validateProgression(
             const sectionTS = section.timeSignature || arranger.timeSignature;
             const sectionIsMinor =
                 typeof section.isMinor === 'boolean' ? section.isMinor : arranger.isMinor;
+            const sectionBassActive =
+                typeof section.instruments?.bass === 'boolean'
+                    ? section.instruments.bass
+                    : Boolean(state.bass?.enabled);
 
             for (let r = 0; r < repeats; r++) {
                 const { chords, finalMidis } = parseProgressionPart(
@@ -1110,6 +1116,7 @@ export function validateProgression(
                     sectionTS,
                     lastMidis,
                     sectionIsMinor,
+                    sectionBassActive,
                 );
                 const taggedChords = chords.map((c, idx) => ({
                     ...c,
@@ -1209,6 +1216,7 @@ function updateProgressionCache(state: any): void {
             end: sectionStart + totalSectionSteps,
             label: section.label,
             syllables: section.syllables,
+            timeSignature: section.timeSignature || arranger.timeSignature,
         });
         sectionAcc += totalSectionSteps;
 

@@ -87,6 +87,7 @@ describe('Engine Bus Management', () => {
             harmony: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             groove: { enabled: true, volume: 1.0, reverb: 0.2, voice: 'synth' },
             midi: { enabled: false, muteLocal: false },
+            arranger: { sections: [] },
         };
     });
 
@@ -149,6 +150,32 @@ describe('Engine Bus Management', () => {
             restoreGains(state);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
         });
+
+        it('keeps every globally muted bus audible when a section forces the lane on', () => {
+            for (const lane of ['chords', 'bass', 'soloist', 'harmony', 'groove']) {
+                state[lane].enabled = false;
+            }
+            state.arranger.sections = [
+                {
+                    id: 'feature',
+                    instruments: {
+                        chords: true,
+                        bass: true,
+                        soloist: true,
+                        harmony: true,
+                        groove: true,
+                    },
+                },
+            ];
+            mockGain.gain.setTargetAtTime.mockClear();
+
+            restoreGains(state);
+
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
+            expect(
+                mockGain.gain.setTargetAtTime.mock.calls.every(([target]) => target > 0.0001),
+            ).toBe(true);
+        });
     });
 
     describe('syncBusReverbSend (#686)', () => {
@@ -199,6 +226,13 @@ describe('Engine Bus Management', () => {
             state.chords.enabled = false;
             syncBusVolume(state, 'chords');
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.0001, 10.0, 0.04);
+        });
+
+        it('does not floor a disabled module that a section forces on', () => {
+            state.chords.enabled = false;
+            state.arranger.sections = [{ id: 'feature', instruments: { chords: true } }];
+            syncBusVolume(state, 'chords');
+            expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0.135, 10.0, 0.04);
         });
 
         it('floors to near-silent if MIDI local-mute is active', () => {

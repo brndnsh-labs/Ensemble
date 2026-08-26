@@ -1,5 +1,9 @@
-import { TIME_SIGNATURES } from '../config.js';
 import { flushBuffers, loadDrumPreset } from '../controllers/instrument-controller.js';
+import {
+    getEffectiveMeterAtStep,
+    getEffectiveTimeSignatures,
+    getSectionPhaseStep,
+} from '../meter.js';
 import {
     buildArrangerSyncPayload,
     buildBassSyncPayload,
@@ -15,7 +19,6 @@ import { ACTIONS, isSwingSub } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
     getMidi,
-    getStepInfo,
     getStepsPerMeasure,
     isSectionTurnaround,
     midiToNote,
@@ -73,6 +76,7 @@ import {
 } from './platform-orchestrator.js';
 import {
     foldPracticeStep,
+    isInstrumentActiveAtStep,
     isPracticeLooping,
     practiceRampNextBpm,
     sectionAtStep,
@@ -394,9 +398,11 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
 
         // Update genre UI (countdowns)
         if (groove.pendingGenreFeel && dispatch) {
-            const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
-            const stepsRemaining = stepsPerMeasure - (playback.step % stepsPerMeasure);
-            const beatsRemaining = Math.ceil(stepsRemaining / 4);
+            const musicalStep = foldPracticeStep(playback.step, playback);
+            const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, musicalStep);
+            const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
+            const stepsRemaining = stepsPerMeasure - stepInfo.mStep;
+            const beatsRemaining = Math.ceil(stepsRemaining / ts.stepsPerBeat);
 
             if (groove.genreSwitchCountdown !== beatsRemaining) {
                 dispatch(ACTIONS.SET_GENRE_COUNTDOWN, beatsRemaining);
@@ -413,8 +419,6 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                 scheduleCountIn(state, playback.countInBeat, playback.nextNoteTime);
                 advanceCountIn(state);
             } else {
-                const spm = getStepsPerMeasure(arranger.timeSignature);
-
                 // --- Session Timer Check ---
                 if (playback.songMode && playback.sessionTimer > 0 && !playback.isEndingPending) {
                     const elapsedMins = (performance.now() - playback.sessionStartTime) / 60000;
@@ -458,7 +462,9 @@ export function scheduler(state: EnsembleState, dispatch: Dispatch | undefined =
                     }
                 }
 
-                if (playback.step % spm === 0 && groove.pendingGenreFeel) {
+                const musicalStep = foldPracticeStep(playback.step, playback);
+                const { stepInfo } = getEffectiveMeterAtStep(arranger, musicalStep);
+                if (stepInfo.isMeasureStart && groove.pendingGenreFeel) {
                     applyPendingGenre(state);
                 }
 
@@ -514,8 +520,7 @@ function applyPendingGenre(state: EnsembleState): void {
 function advanceCountIn(state: EnsembleState): void {
     const { playback, arranger } = state;
     const effectiveBpm = playback.bpm;
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const ts = getEffectiveMeterAtStep(arranger, seedStartStep(playback, arranger)).ts;
     // count-in clicks `ts.beats` per bar (4 quarters in 4/4, 6 eighths in 6/8).
     // `secondsPerBeatFor` returns one ts.beats-native unit: 60/bpm (a quarter)
     // in stepsPerBeat=4 meters, (60/bpm)/2 (an eighth) in stepsPerBeat=2 meters.
@@ -545,8 +550,7 @@ function scheduleCountIn(state: EnsembleState, beat: number, time: number): void
     if (playback.audioGraph) {
         gain.connect(playback.audioGraph.master.gain);
     }
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const ts = getEffectiveMeterAtStep(arranger, seedStartStep(playback, arranger)).ts;
     let freq = 440;
     if (beat === 0) {
         freq = 1000;
@@ -586,20 +590,14 @@ function advanceGlobalStep(state: EnsembleState, dispatch?: Dispatch): void {
     const { playback, groove, arranger } = state;
     const effectiveBpm = playback.bpm;
 
-    const signatures: any = TIME_SIGNATURES;
-    const sInfo = getStepInfo(
-        playback.step,
-        signatures[arranger.timeSignature] || signatures['4/4'],
-        arranger.measureMap,
-        signatures,
-    );
-    const ts = signatures[sInfo.tsName || '4/4'] || signatures['4/4'];
+    const musicalStep = foldPracticeStep(playback.step, playback);
+    const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, musicalStep);
 
     // the "unswung" grid clock advances by one plain step (a 16th) so the
     // soloistTime blend in `scheduleGlobalEvent` stays aligned with the swung
     // `nextNoteTime`.
     const stepSec = secondsPerStepFor(effectiveBpm);
-    const duration = calculateStepDuration(playback.step, effectiveBpm, ts, groove);
+    const duration = calculateStepDuration(stepInfo.mStep, effectiveBpm, ts, groove);
 
     (playback as Mutable<typeof playback>).nextNoteTime += duration; // @direct-mutation
     (playback as Mutable<typeof playback>).unswungNextNoteTime += stepSec; // @direct-mutation
@@ -661,6 +659,43 @@ function getChordAtStep(state: EnsembleState, step: number): ChordAtStep | null 
 }
 
 /**
+ * Advance the drummer's fill lifecycle even when a section override mutes drum
+ * emission. Fill state is transport state, not audio-output state: leaving the
+ * cleanup inside `scheduleDrums` lets a muted section freeze an expired fill and
+ * block the conductor from arming the next audible entrance.
+ */
+function expireMutedDrumFillAtStep(
+    state: EnsembleState,
+    absoluteStep: number,
+    drumsActive: boolean,
+    dispatch: Dispatch | undefined,
+): void {
+    const { groove } = state;
+    // The audible path preserves its established order: generate the arrival
+    // crash first, then clean up inside scheduleDrums. This out-of-band path is
+    // only for muted steps where scheduleDrums will not run at all.
+    if (drumsActive || !groove.fillActive) {
+        return;
+    }
+    const fillStep = absoluteStep - (groove.fillStartStep || 0);
+    if (fillStep < (groove.fillLength || 0)) {
+        return;
+    }
+    if (dispatch) {
+        dispatch(ACTIONS.SET_PARAM, {
+            module: 'groove',
+            param: 'fillActive',
+            value: false,
+        });
+    } else {
+        (groove as Mutable<typeof groove>).fillActive = false; // @direct-mutation
+    }
+    if (groove.pendingCrash) {
+        (groove as Mutable<typeof groove>).pendingCrash = false; // @direct-mutation
+    }
+}
+
+/**
  * Schedules drum sounds for a specific step.
  * Applies pocket/timing offsets, handles fills, and pushes events to the visualizer queue.
  */
@@ -669,7 +704,7 @@ function scheduleDrums(
     params: any,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { time, absoluteStep } = params;
+    const { time, absoluteStep, chartStep = absoluteStep } = params;
 
     const { playback, groove, vizState, arranger } = state;
 
@@ -683,13 +718,15 @@ function scheduleDrums(
 
     // Evaluate fills and standard groove patterns via our unified tick logic
     // This maintains 1:1 playback/export parity.
-    const sectionIndex = findSectionIndexFromCursor(arranger.sectionMap, absoluteStep);
+    const sectionIndex = findSectionIndexFromCursor(arranger.sectionMap, chartStep);
     const tickResult = generateDrumsForStep(state, absoluteStep, {
         mainCursor: { index: 0, sectionIndex: Math.max(0, sectionIndex) },
         lookaheadCursor: { index: 0, sectionIndex: 0 },
     });
 
-    // Handle fill state cleanup
+    // Preserve the established audible lifecycle order: generateDrumsForStep
+    // above gets first chance to emit a pending arrival crash, then expiry is
+    // cleared. Muted steps use expireMutedDrumFillAtStep instead.
     if (groove.fillActive) {
         const fillStep = absoluteStep - (groove.fillStartStep || 0);
         if (fillStep >= (groove.fillLength || 0)) {
@@ -713,7 +750,6 @@ function scheduleDrums(
             }
         }
     } else if (vizState.enabled) {
-        // Ensure fill visual state is cleared when fill is not active
         queueVisualizerFillEvent(playback, finalTime, false);
     }
 
@@ -1075,7 +1111,12 @@ export function scheduleChordVisuals(
             // compound), so route through `secondsPerBeatFor` (which scales by
             // stepsPerBeat) for the chord-event viz lifetime rather than a bare
             // per-quarter duration.
-            const tsForChordViz = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+            const signatures = getEffectiveTimeSignatures(
+                arranger.timeSignature,
+                arranger.grouping,
+            );
+            const chordMeter = chordData.chord.timeSignature || arranger.timeSignature;
+            const tsForChordViz = signatures[chordMeter] || signatures['4/4'];
             queueVisualizerChordEvent(playback, {
                 time: t,
                 index: chordData.chordIndex,
@@ -1426,9 +1467,7 @@ export function scheduleGlobalEvent(
     swungTime: number,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { arranger, playback, groove, soloist, chords, bass, harmony, vizState } = state;
-    const signatures: any = TIME_SIGNATURES;
-    const globalTS = signatures[arranger.timeSignature] || signatures['4/4'];
+    const { arranger, playback, groove, soloist, vizState } = state;
     // #1016 — section practice. `step` stays monotonic for buffer-key lookups
     // (the lane schedulers `.get(step)` the worker notes keyed by monotonic
     // step). `musicalStep` folds into the drill window for chart-position work:
@@ -1436,8 +1475,17 @@ export function scheduleGlobalEvent(
     // two coincide (musicalStep === step) whenever no loop is active, so
     // non-practice playback is unchanged.
     const musicalStep = foldPracticeStep(step, playback);
-    const stepInfo = getStepInfo(step, globalTS, arranger.measureMap, signatures);
-    const ts = signatures[stepInfo.tsName || '4/4'] || globalTS;
+    const { chartStep, stepInfo, ts } = getEffectiveMeterAtStep(arranger, musicalStep);
+    const grooveActive = isInstrumentActiveAtStep(state, 'groove', musicalStep);
+    const bassActive = isInstrumentActiveAtStep(state, 'bass', musicalStep);
+    const soloistActive = isInstrumentActiveAtStep(state, 'soloist', musicalStep);
+    const chordsActive = isInstrumentActiveAtStep(state, 'chords', musicalStep);
+    const harmonyActive = isInstrumentActiveAtStep(state, 'harmony', musicalStep);
+
+    // Must precede checkSectionTransition below: an expired fill from an audible
+    // section may cross a muted section seam, and the conductor needs to see it
+    // cleared before deciding whether to arm the next section's entrance.
+    expireMutedDrumFillAtStep(state, musicalStep, grooveActive, dispatch);
 
     if (dispatch) {
         updateAutoConductor(state, dispatch);
@@ -1446,7 +1494,7 @@ export function scheduleGlobalEvent(
     // --- NEW: Rhythm Section Mask Calculation ---
     // Extract the snare pattern for the current measure to share with the ensemble
     const spm = getStepsPerMeasure(stepInfo.tsName || arranger.timeSignature || '4/4');
-    if (step % spm === 0) {
+    if (stepInfo.isMeasureStart) {
         let snareMask = 0;
         const snare = groove.instruments.find((i) => i.name === 'Snare');
         if (snare) {
@@ -1468,13 +1516,23 @@ export function scheduleGlobalEvent(
     }
 
     if (dispatch) {
-        checkSectionTransition(state, musicalStep, spm, dispatch);
+        checkSectionTransition(
+            state,
+            musicalStep,
+            spm,
+            dispatch,
+            stepInfo.isMeasureStart,
+            ts.stepsPerBeat,
+        );
     }
 
     // MIDI Automation
     dispatchMidiAutomation(state, stepInfo, swungTime);
 
-    const drumStep = step % (groove.measures * spm);
+    const chordDataForDrums = getChordAtStep(state, chartStep);
+    const sectionStart = chordDataForDrums?.sectionStart ?? 0;
+    const drumCycle = groove.measures * spm;
+    const drumStep = getSectionPhaseStep(chartStep, sectionStart, drumCycle);
     // Legacy shared per-tick timing jitter. Drums no longer use this — S6 gave
     // them independent seeded humanization (`humanizeNote`). Bass, chords,
     // harmonies and the soloist still ride this shared `t` until Epics 5/2/1/3
@@ -1518,17 +1576,19 @@ export function scheduleGlobalEvent(
     const soloistTime =
         playback.unswungNextNoteTime * straightness + swungTime * (1.0 - straightness);
 
-    if (groove.enabled) {
-        if (vizState.enabled) {
-            queueVisualizerStepEvent(playback, swungTime, drumStep);
-        }
+    // The step event carries the visual grid's chart meter as well as the drum
+    // pattern cursor. Pitched-only playback still needs meter seam events when
+    // the drum lane is disabled.
+    if (vizState.enabled) {
+        queueVisualizerStepEvent(playback, swungTime, drumStep, chartStep);
+    }
 
-        const chordDataForDrums = getChordAtStep(state, musicalStep);
+    if (grooveActive) {
         const sectionId = chordDataForDrums?.chord?.sectionId || null;
 
         // --- Port Turnaround Logic from Worker ---
         const stepsPerBar = spm;
-        const isTurnaround = isSectionTurnaround(musicalStep, arranger.sectionMap, stepsPerBar, 1);
+        const isTurnaround = isSectionTurnaround(chartStep, arranger.sectionMap, stepsPerBar, 1);
 
         scheduleDrums(
             state,
@@ -1542,6 +1602,7 @@ export function scheduleGlobalEvent(
                 isBeatStart: stepInfo.isBeatStart,
                 isBackbeat: stepInfo.isBackbeat,
                 absoluteStep: musicalStep,
+                chartStep,
                 isGroupStart: stepInfo.isGroupStart,
                 sectionId,
                 beatIndex: stepInfo.beatIndex,
@@ -1558,7 +1619,7 @@ export function scheduleGlobalEvent(
     // Chord for this step's chart position (folded during a practice drill). The
     // lane schedulers below still take the monotonic `step` — that's their
     // worker-buffer key — but the chord/section context must match the drill.
-    const chordData = getChordAtStep(state, musicalStep);
+    const chordData = getChordAtStep(state, chartStep);
     if (chordData) {
         if (chordData.chord.key && chordData.chord.key !== playback.currentKey) {
             (playback as Mutable<typeof playback>).currentKey = chordData.chord.key; // @direct-mutation
@@ -1567,20 +1628,20 @@ export function scheduleGlobalEvent(
             );
         }
         scheduleChordVisuals(state, chordData, t);
-        if (bass.enabled) {
+        if (bassActive) {
             // S5: bass migrated to per-note `humanizeNote` inside `scheduleBass`,
             // so it takes the un-jittered `swungTime` (riding the shared `t`
             // would double up). Chords/harmonies/soloist still ride `t` until
             // their respective humanize stories migrate them.
             scheduleBass(state, chordData, step, swungTime);
         }
-        if (soloist.enabled) {
+        if (soloistActive) {
             scheduleSoloist(state, chordData, step, soloistTime);
         }
-        if (chords.enabled) {
+        if (chordsActive) {
             scheduleChords(state, chordData, step, t);
         }
-        if (harmony.enabled) {
+        if (harmonyActive) {
             scheduleHarmonies(state, chordData, step, t);
         }
     }

@@ -56,6 +56,8 @@ describe('Bossa Nova Drummer Critique', () => {
                         groove: mockState.groove,
                         isDownbeat: info.isMeasureStart,
                         isBeatStart: info.isBeatStart,
+                        isPulse: info.isPulse,
+                        isPulseStart: info.isPulseStart,
                         isBackbeat: info.isBackbeat,
                         isGroupStart: info.isGroupStart,
                         beatIndex: info.beatIndex,
@@ -63,9 +65,14 @@ describe('Bossa Nova Drummer Critique', () => {
                         isEOfBeat: info.isEOfBeat,
                         isAOfBeat: info.isAOfBeat,
                         tsConfig: info.tsConfig,
+                        mStep: info.mStep,
+                        isCompound: info.isCompound,
+                        stepInGroup: info.stepInGroup,
+                        groupIndex: info.groupIndex,
                         isTurnaround: false,
                         stepsPerBar: 16,
-                        loopStep: step,
+                        loopStep: info.mStep,
+                        sectionStep: bar * 16 + step,
                     };
                     const result = applyGrooveOverrides(getState(), params);
                     if (result.shouldPlay) {

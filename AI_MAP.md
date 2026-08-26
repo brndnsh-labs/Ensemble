@@ -213,6 +213,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/ui.ts` | Lazy Proxy-based DOM access layer. |
 | `public/worker-types.ts` | Shared message type definitions for workers. |
 | `public/config.ts` | Global timing and musical constants. |
+| `public/meter.ts` | Validated effective-meter resolution for authored rhythmic grouping. |
 | `public/constants.ts` | Global visual and UI state constants. |
 | `public/visualizer/visualizer-utils.ts` | Shared canvas math and drawing utilities. |
 

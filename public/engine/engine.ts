@@ -16,6 +16,7 @@ import { audioWatchdog } from './audio-recovery.js';
 import { MODULE_BUS_KEY, packIdFromVoice } from './instrument-registry.js';
 import { ensurePacksForVoices } from './pack-runtime.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
+import { isInstrumentEverActive } from './section-overrides.js';
 import { killBassNote, playBassNote } from './synth-bass.js';
 // Facade: Re-export synthesis logic from specialized modules
 import { killAllPianoNotes, playNote, updateSustain } from './synth-chords.js';
@@ -200,11 +201,36 @@ export function initAudio(
         }
 
         const modules = [
-            { name: MODULES.CHORDS, state: chords, mult: MIXER_GAIN_MULTIPLIERS.chords },
-            { name: MODULES.BASS, state: bass, mult: MIXER_GAIN_MULTIPLIERS.bass },
-            { name: MODULES.SOLOIST, state: soloist, mult: MIXER_GAIN_MULTIPLIERS.soloist },
-            { name: MODULES.HARMONIES, state: harmony, mult: MIXER_GAIN_MULTIPLIERS.harmonies },
-            { name: 'drums', state: groove, mult: MIXER_GAIN_MULTIPLIERS.drums },
+            {
+                name: MODULES.CHORDS,
+                key: 'chords' as const,
+                state: chords,
+                mult: MIXER_GAIN_MULTIPLIERS.chords,
+            },
+            {
+                name: MODULES.BASS,
+                key: 'bass' as const,
+                state: bass,
+                mult: MIXER_GAIN_MULTIPLIERS.bass,
+            },
+            {
+                name: MODULES.SOLOIST,
+                key: 'soloist' as const,
+                state: soloist,
+                mult: MIXER_GAIN_MULTIPLIERS.soloist,
+            },
+            {
+                name: MODULES.HARMONIES,
+                key: 'harmony' as const,
+                state: harmony,
+                mult: MIXER_GAIN_MULTIPLIERS.harmonies,
+            },
+            {
+                name: 'drums',
+                key: 'groove' as const,
+                state: groove,
+                mult: MIXER_GAIN_MULTIPLIERS.drums,
+            },
         ];
 
         modules.forEach((m) => {
@@ -214,7 +240,7 @@ export function initAudio(
             const gainNode = playback.audio.createGain();
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
-            const isMuted = !m.state.enabled;
+            const isMuted = !isInstrumentEverActive(state, m.key);
 
             const targetGain =
                 !isMuted && !isLocalMuted ? Math.max(0.0001, m.state.volume * m.mult) : 0.0001;
@@ -565,37 +591,42 @@ export function restoreGains(state: EnsembleState) {
             state: chords,
             mult: MIXER_GAIN_MULTIPLIERS.chords,
             name: 'chords',
+            key: 'chords' as const,
         },
         {
             node: graph?.bass.gain ?? null,
             state: bass,
             mult: MIXER_GAIN_MULTIPLIERS.bass,
             name: 'bass',
+            key: 'bass' as const,
         },
         {
             node: graph?.soloist.gain ?? null,
             state: soloist,
             mult: MIXER_GAIN_MULTIPLIERS.soloist,
             name: 'soloist',
+            key: 'soloist' as const,
         },
         {
             node: graph?.harmonies.gain ?? null,
             state: harmony,
             mult: MIXER_GAIN_MULTIPLIERS.harmonies,
             name: 'harmonies',
+            key: 'harmony' as const,
         },
         {
             node: graph?.drums.gain ?? null,
             state: groove,
             mult: MIXER_GAIN_MULTIPLIERS.drums,
             name: 'drums',
+            key: 'groove' as const,
         },
     ];
     modules.forEach((m) => {
         if (m.node && playback.audio) {
             const isLocalMuted = midi.enabled && midi.muteLocal;
 
-            const isMuted = !m.state.enabled;
+            const isMuted = !isInstrumentEverActive(state, m.key);
 
             const target = !isMuted && !isLocalMuted ? m.state.volume * m.mult : 0.0001;
             m.node.gain.cancelScheduledValues(t);
@@ -650,7 +681,7 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
     const bus = graph[busKey];
     const mult = MIXER_GAIN_MULTIPLIERS[busKey];
     const isLocalMuted = midi.enabled && midi.muteLocal;
-    const isMuted = !inst.enabled;
+    const isMuted = !isInstrumentEverActive(state, module);
     const target = !isMuted && !isLocalMuted ? Math.max(0.0001, inst.volume * mult) : 0.0001;
     const t = playback.audio.currentTime;
     bus.gain.gain.cancelScheduledValues(t);

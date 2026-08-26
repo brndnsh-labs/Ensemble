@@ -160,6 +160,38 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         });
     });
 
+    it('keeps section force-on authorship inside the selected stem sink only', async () => {
+        const live = makeLiveState();
+        live.arranger.sections[0].instruments = { bass: true, chords: true };
+        vi.doMock('../../public/state.js', () => ({ getState: () => live }));
+        const { renderStemsToWav } = await import('../../public/export/audio-export.js');
+
+        await renderStemsToWav(['bass']);
+
+        const [clonedState] = initAudioMock.mock.calls[0];
+        expect(clonedState.arranger.sections[0].instruments).toMatchObject({
+            bass: true,
+            chords: false,
+            soloist: false,
+            harmony: false,
+            groove: false,
+        });
+        expect(live.arranger.sections[0].instruments).toEqual({ bass: true, chords: true });
+    });
+
+    it('lets a full export generate a globally muted lane that a section forces on', async () => {
+        const live = makeLiveState();
+        live.bass.enabled = false;
+        live.arranger.sections[0].instruments = { bass: true };
+        vi.doMock('../../public/state.js', () => ({ getState: () => live }));
+        const { renderCurrentSessionToWav } = await import('../../public/export/audio-export.js');
+
+        await renderCurrentSessionToWav();
+
+        expect(generateNotesForStepMock).toHaveBeenCalled();
+        expect(generateNotesForStepMock.mock.calls[0][3].includeBass).toBe(true);
+    });
+
     it('renders non-silent audio for every stem', async () => {
         vi.doMock('../../public/state.js', () => ({
             getState: () => makeLiveState(),

@@ -1,4 +1,5 @@
 import type { TimeSignatureConfig } from '../config.js';
+import { getMeterGroupStarts } from '../meter.js';
 import type { Chord, EnsembleState, SoloistQaHang, StepInfo } from '../types.js';
 import { getFrequency, getMidi } from '../utils.js';
 import type { CompingState } from './comping-state.js';
@@ -51,6 +52,8 @@ export interface CCEvent {
 
 export interface AccompanimentCoordination {
     soloistBusy?: boolean;
+    /** Effective per-section soloist gate for this musical step. */
+    soloistEffectiveEnabled?: boolean;
     soloistActive?: boolean;
     soloistMidi?: number;
     // writer: tick-logic soloist producer (digested from the session seed by
@@ -68,6 +71,10 @@ export interface AccompanimentCoordination {
     sharedCatch?: SharedCatch | null;
     bassHit?: boolean;
     bassMidi?: number;
+    /** Effective per-section bass gate for register-space decisions. */
+    bassEffectiveEnabled?: boolean;
+    /** Effective per-section harmony gate for comp interlocking. */
+    harmonyEffectiveEnabled?: boolean;
     kickHit?: boolean;
     snareHit?: boolean;
     // writer: tick-logic chord-preamble (readable by any producer)
@@ -76,6 +83,8 @@ export interface AccompanimentCoordination {
     upcomingSectionFirstChord?: any;
     // why: needed to compute the anticipation step offset from the section boundary.
     sectionEnd?: number;
+    /** Current section's chart start; rhythmic cells reset their bar phase here. */
+    sectionStart?: number;
     // why: epic-form-arrangement S3 — published by runDrumTick's chord-data
     // preamble (via getSectionContext). When ≥ 2, the accompaniment rotates one voicing
     // inversion per phrase, seeded by (sectionId, occurrence, barIndex), so
@@ -305,6 +314,8 @@ interface CompEmitArgs {
     ccEvents: CCEvent[];
     isBeatStart: boolean;
     intBeat: number;
+    /** Zero-based bar within the section, normalized to the current form loop. */
+    compBarIndex: number;
     /** Loop-stable per-step draw — seed derivation stays in getAccompanimentNotes. */
     compDraw: (n: number) => number;
     /** Imperfect-Symmetry rotation (epic-form-arrangement S3) — seed stays with the entry point. */
@@ -328,6 +339,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         ccEvents,
         isBeatStart,
         intBeat,
+        compBarIndex,
         compDraw,
         rotateVoicingFreqs,
     } = args;
@@ -387,7 +399,9 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
 
     // --- NEW: Harmony Interlocking ---
     // If backgrounds are busy, the main accompanist should find gaps.
-    if (isHit && harmony.enabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
+    const harmonyEffectiveEnabled =
+        coordination.harmonyEffectiveEnabled ?? Boolean(harmony.enabled);
+    if (isHit && harmonyEffectiveEnabled && harmony.rhythmicMask > 0 && chords.style === 'smart') {
         // Assume rhythmic mask maps up to 16 steps, gracefully wrap for different meters
         const stepInMask = (stepInfo?.mStep ?? measureStep) % 16;
         const hasHarmonyHit = (harmony.rhythmicMask >> stepInMask) & 1;
@@ -409,15 +423,9 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
     // PULSE_ANCHOR_GENRES — Bossa/Disco/Ska/Hip-Hop excluded by design); the
     // percussive lanes early-return before this overlay.
     //
-    // note: `groupStride` matches the engine's own isGroupStart definition
-    // (grouping[0]*stepsPerBeat); exact for symmetric meters (4/4, 3/4, 6/8,
-    // 12/8). In asymmetric meters (5/4, 7/8) it can scan a non-group-start step
-    // and UNDER-fire (skip the floor) — benign: it never forces the One onto a
-    // non-pulse position, it just occasionally misses the guarantee.
     if (measureStep === 0 && !isHit && PULSE_ANCHOR_GENRES.has(genre)) {
-        const groupStride = Math.max(1, (ts.grouping?.[0] || 1) * ts.stepsPerBeat);
         let barHasStrongAnchor = false;
-        for (let s = 0; s < spm; s += groupStride) {
+        for (const s of getMeterGroupStarts(ts)) {
             if (compingState.currentCell[s] === 1) {
                 barHasStrongAnchor = true;
                 break;
@@ -537,8 +545,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
         // the audit-doc sketch is "brief half-bar silence" so ~2/3 thin on
         // each eligible step compounds into substantial silence across a
         // multi-tick phrase-end window.
-        const barIndex = Math.floor(step / spm);
-        const phraseEndHash = (barIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
+        const phraseEndHash = (compBarIndex * 7 + intBeat * 11 + (measureStep % spm)) | 0;
         if (phraseEndHash % 20 < 13) {
             isHit = false;
         }
@@ -662,7 +669,10 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
             ? stepInfo.isGroupStart
             : measureStep % (ts.grouping[0] * ts.stepsPerBeat) === 0;
         const intensity = playback.bandIntensity;
-        const reserveBassSpace = shouldReserveBassSpace(state);
+        const reserveBassSpace = shouldReserveBassSpace(
+            state,
+            coordination.bassEffectiveEnabled ?? Boolean(state.bass?.enabled),
+        );
         const bassMidi = coordination.bassMidi || getMidi(bass.lastFreq || 0) || 0;
         const previousVoicingMidis = compingState.lastVoicingMidis;
         const nextChord =
@@ -833,7 +843,9 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
 
         // --- Frequency Slotting & Soloist Pocket ---
         const lastSolFreq = soloist.audio.lastFreq || 0;
-        const soloistMidi = soloist.enabled ? getMidi(lastSolFreq) : 0;
+        const soloistEffectiveEnabled =
+            coordination.soloistEffectiveEnabled ?? Boolean(soloist.enabled);
+        const soloistMidi = soloistEffectiveEnabled ? getMidi(lastSolFreq) : 0;
         const useClarity = (soloistMidi || 0) > 72;
         if (chords.style === 'smart') {
             // Jazz Shell Lesson: If things are hot and harmony is complex, stick to shells (3 & 7)
@@ -1069,7 +1081,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                 compDraw(377) < 0.25
             ) {
                 const spb = ts.stepsPerBeat;
-                const groupStride = (ts.grouping?.[0] || ts.beats) * spb;
+                const groupStarts = getMeterGroupStarts(ts);
                 const isArp = chords.style === 'arp';
                 // Steps left in THIS chord — never scan into the next chord (whose
                 // downbeat must not be suppressed).
@@ -1091,7 +1103,7 @@ export function emitCompNotes(args: CompEmitArgs): any[] {
                         // through a strong-beat (group-start) hit — only an offbeat
                         // answer. Arp is pluck-per-beat, so a held pluck through the
                         // next beat IS the idiom there; allow it.
-                        if (!isArp && ms % groupStride === 0) {
+                        if (!isArp && groupStarts.has(ms)) {
                             break;
                         }
                         suppressOff = d;

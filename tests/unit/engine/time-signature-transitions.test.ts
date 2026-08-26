@@ -162,4 +162,46 @@ describe('Time Signature Transitions', () => {
         expect(conductor.formIteration).toBe(1);
         expect(conductor.targetIntensity).not.toBe(0.5);
     });
+
+    it('honors a mixed-meter measure start that is off the local meter modulus', () => {
+        arranger.totalSteps = 44;
+        arranger.stepMap = [
+            { start: 0, end: 12, chord: { sectionId: 'three' } },
+            { start: 12, end: 44, chord: { sectionId: 'four' } },
+        ];
+        groove.fillActive = false;
+        groove.seedTimelineStartStep = 0;
+        groove.fillMap = {
+            12: { steps: { 0: [{ name: 'Snare', vel: 1 }] }, length: 16, crash: false },
+        };
+        groove.orchestrationMap = [{ start: 0, end: 44, energyLevel: 0.5 }];
+
+        checkSectionTransition(getState(), 12, 16, dispatch, true);
+
+        expect(dispatch).toHaveBeenCalledWith(
+            'TRIGGER_FILL',
+            expect.objectContaining({ startStep: 12, length: 16 }),
+        );
+    });
+
+    it('keeps the seeded conductor timeline monotonic on loop two', () => {
+        arranger.totalSteps = 32;
+        arranger.stepMap = [
+            { start: 0, end: 32, chord: { sectionId: 'main', sectionLabel: 'Main' } },
+        ];
+        arranger.sectionMap = [{ id: 'main', start: 0, end: 32, label: 'Main' }];
+        groove.fillActive = false;
+        groove.seedTimelineStartStep = 0;
+        groove.fillMap = {
+            32: { steps: { 0: [{ name: 'Snare', vel: 1 }] }, length: 16, crash: false },
+        };
+        groove.orchestrationMap = [{ start: 0, end: 64, energyLevel: 0.5 }];
+
+        checkSectionTransition(getState(), 32, 16, dispatch, true, 4);
+
+        expect(dispatch).toHaveBeenCalledWith(
+            'TRIGGER_FILL',
+            expect.objectContaining({ startStep: 32, length: 16 }),
+        );
+    });
 });

@@ -1,7 +1,7 @@
-import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js';
 import { analyzeForm } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
-import { binarySearchMap, getStepInfo, secondsPerStepFor } from '../utils.js';
+import { binarySearchMap, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
 import { compingState, resetCompingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
@@ -131,6 +131,7 @@ export class ExportProcessor {
     // constructor rather than a direct field write (#1013 one-home reset ritual).
     lastActiveSoloistMidi!: number;
     lastActiveSoloistStep!: number;
+    lastMetaTimeSignature: string;
 
     constructor(state: EnsembleState, options: ExportOptions) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
@@ -150,7 +151,7 @@ export class ExportProcessor {
         this.CHUNK_MS = 12; // Allow execution for ~12ms per frame
 
         // Initialize Export State
-        this.ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+        this.ts = getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
         this.totalStepsOneLoop = arranger.totalSteps;
         this.stepsPerMeasure = this.ts.beats * this.ts.stepsPerBeat;
         // why: loop-duration estimate must match the step accumulation used by
@@ -183,20 +184,12 @@ export class ExportProcessor {
 
         let accumulatedSeconds = 0;
 
-        const signatures: any = TIME_SIGNATURES;
-
         for (let i = 0; i < this.stepTimes.length; i++) {
             this.stepTimes[i] = accumulatedSeconds;
 
-            const sInfo = getStepInfo(
-                i,
-                signatures[arranger.timeSignature] || signatures['4/4'],
-                arranger.measureMap,
-                signatures,
-            );
-            const ts = signatures[sInfo.tsName || '4/4'] || signatures['4/4'];
+            const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, i);
 
-            const duration = calculateStepDuration(i, playback.bpm, ts, groove);
+            const duration = calculateStepDuration(stepInfo.mStep, playback.bpm, ts, groove);
             accumulatedSeconds += duration;
         }
 
@@ -213,8 +206,12 @@ export class ExportProcessor {
         // tempo convention — write it straight through with no conversion.
         this.metaTrack.setTempo(0, playback.bpm || 120);
         this.metaTrack.setKeySig(0, arranger.key || 'C', arranger.isMinor || false);
-        const [tsNum, tsDenom] = (arranger.timeSignature || '4/4').split('/').map(Number);
+        const initialMeter = getEffectiveMeterAtStep(arranger, 0);
+        const initialTimeSignature =
+            initialMeter.stepInfo.tsName || arranger.timeSignature || '4/4';
+        const [tsNum, tsDenom] = initialTimeSignature.split('/').map(Number);
         this.metaTrack.setTimeSig(0, tsNum, tsDenom);
+        this.lastMetaTimeSignature = initialTimeSignature;
 
         this.chordTrack.setName(0, 'Chords');
         this.chordTrack.programChange(0, this.state.midi.chordsChannel - 1, 4);
@@ -708,12 +705,13 @@ export class ExportProcessor {
             this.lastActiveSoloistStep = tickResult.coordination.lastActiveSoloistStep;
         }
 
-        const stepInfo = getStepInfo(
-            globalStep,
-            TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'],
-            arranger.measureMap,
-            TIME_SIGNATURES,
-        );
+        const { stepInfo } = getEffectiveMeterAtStep(arranger, globalStep);
+        const currentTimeSignature = stepInfo.tsName || arranger.timeSignature || '4/4';
+        if (currentTimeSignature !== this.lastMetaTimeSignature) {
+            const [num, denom] = currentTimeSignature.split('/').map(Number);
+            this.metaTrack.setTimeSig(this.toPulses(stepTimeS), num, denom);
+            this.lastMetaTimeSignature = currentTimeSignature;
+        }
 
         // Write CC Automation (Expression/Intensity and Tension)
         this._writeAutomationToTracks(globalStep, stepTimeS, stepInfo);

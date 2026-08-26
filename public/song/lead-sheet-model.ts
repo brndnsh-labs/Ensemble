@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '../config.js';
 import type { Chord, Section } from '../types.js';
 
 const LEAD_SHEET_MEASURES_PER_ROW = 4;
@@ -329,11 +330,23 @@ export function buildLeadSheetSections(
     let currentMeasure: LeadSheetMeasure | null = null;
     let currentMeasureBeats = 0;
     let currentStep = 0;
+    let currentMeterConfig = timeSignatureConfig;
 
     progression.forEach((chord, index) => {
         const sectionData = sectionsState.find((section) => section.id === chord.sectionId);
+        // validateProgression stamps every placed chord with its section-local meter.
+        // The fallback preserves the model's small test/legacy-input surface, whose
+        // chord fixtures predate that required runtime field. Grouping does not change
+        // either value used here (beats or stepsPerBeat), so the canonical table is the
+        // right authority for a section override while the caller's effective config
+        // remains the authority for the global meter.
+        const localMeterConfig =
+            (chord.timeSignature && TIME_SIGNATURES[chord.timeSignature]) ||
+            (sectionData?.timeSignature && TIME_SIGNATURES[sectionData.timeSignature]) ||
+            timeSignatureConfig;
         const isSeamless = Boolean(sectionData?.seamless);
         const isNewSection = !currentBlock || currentBlock.lastSectionId !== chord.sectionId;
+        const meterChanged = localMeterConfig !== currentMeterConfig;
 
         if (isNewSection) {
             if (!currentBlock || !isSeamless) {
@@ -351,10 +364,11 @@ export function buildLeadSheetSections(
             }
         }
 
-        if (isNewSection && currentMeasureBeats > 0) {
+        if ((isNewSection || meterChanged) && currentMeasureBeats > 0) {
             currentMeasure = null;
             currentMeasureBeats = 0;
         }
+        currentMeterConfig = localMeterConfig;
 
         // By here a block always exists: when `isNewSection` is false, the
         // truthiness check at line ~327 proves `currentBlock` was already set;
@@ -366,7 +380,7 @@ export function buildLeadSheetSections(
 
         if (
             !currentMeasure ||
-            currentMeasureBeats >= timeSignatureConfig.beats - MEASURE_BEATS_EPSILON
+            currentMeasureBeats >= localMeterConfig.beats - MEASURE_BEATS_EPSILON
         ) {
             currentMeasure = {
                 chords: [],
@@ -379,7 +393,7 @@ export function buildLeadSheetSections(
             currentMeasureBeats = 0;
         }
 
-        const durationSteps = Math.round(chord.beats * timeSignatureConfig.stepsPerBeat);
+        const durationSteps = Math.round(chord.beats * localMeterConfig.stepsPerBeat);
         currentMeasure.chords.push({
             ...chord,
             globalIndex: index,

@@ -6,6 +6,7 @@ import {
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
+    isSecondaryStrongPulse,
     makeMotifSelector,
     roll,
     rollSeed,
@@ -52,9 +53,6 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isBeatStart,
         isOffbeat,
         beatIndex,
-        isPulseStart,
-        isCompound,
-        groupIndex,
         motifCeiling,
     } = context;
 
@@ -65,15 +63,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         motifCeiling ?? Number.POSITIVE_INFINITY,
     );
 
-    // why: epic-2 S8 — "beat 3 presence" is the bar's single secondary strong beat.
-    // In 4/4 that's beat 3 (beatIndex 2). In compound (6/8/12/8, stepsPerBeat=2)
-    // beatIndex 2 is mStep 4 — a mid-group weak position, NOT a dotted-quarter pulse.
-    // Read it meter-relative as the middle group's pulse so the kick anchors the felt
-    // secondary pulse: 6/8 [3,3] → group 1 (mStep 6); 12/8 [3,3,3,3] → group 2 (mStep 12).
-    const midGroup = Math.floor((context.tsConfig?.grouping?.length ?? 2) / 2);
-    const isSecondStrongBeat = isCompound
-        ? isPulseStart && groupIndex === midGroup
-        : isBeatStart && beatIndex === 2;
+    // why: "beat 3 presence" means the bar's single secondary felt anchor.
+    // Authored grouping owns that anchor in both compound and simple odd meters:
+    // 5/4 [3,2] -> mStep 12 while [2,3] -> 8. The shared predicate preserves
+    // legacy beat 3 only when the meter has no nontrivial group structure.
+    const isSecondStrongBeat = isSecondaryStrongPulse(context);
 
     // --- Lay-back: Acoustic is relaxed ---
     instTimeOffset += 0.004 + intensity * 0.004;

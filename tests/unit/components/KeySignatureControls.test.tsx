@@ -194,6 +194,21 @@ describe('KeySignatureControls Component', () => {
         expect(refreshArrangerUI).toHaveBeenCalled();
     });
 
+    it('leaves custom grouping intact when the active meter chip is clicked', () => {
+        mockArranger.timeSignature = '4/4';
+        act(() => {
+            render(<KeySignatureControls />, container);
+        });
+
+        const activeMeterChip = document.body.querySelector('[data-meter="4/4"]');
+        act(() => {
+            activeMeterChip.dispatchEvent(new Event('click', { bubbles: true }));
+        });
+
+        expect(mockDispatch).not.toHaveBeenCalledWith('SET_GROUPING', null);
+        expect(refreshArrangerUI).not.toHaveBeenCalled();
+    });
+
     it('handles time signature change with lastDrumPreset', async () => {
         mockUseEnsembleState.mockImplementation((selector) => {
             return selector({

@@ -1,5 +1,10 @@
-import { TIME_SIGNATURES } from '../config.js';
+import {
+    getEffectiveMeterAtStep,
+    getEffectiveTimeSignature,
+    getMeterGroupStarts,
+} from '../meter.js';
 import { getSectionEnergy } from '../song/form-analysis.js';
+import type { ArrangerState } from '../state/arranger.js';
 import type {
     Chord,
     EnsembleState,
@@ -45,7 +50,7 @@ import { chordTargetTones } from './soloist-pitch-engine.js';
  * the long stretch between peaks left clean so the flurries have space (§10).
  *
  * **Build 3 (voice-leading — the keystone, §5):** the body of the line now plays
- * THROUGH the changes. Strong beats (downbeat + bar midpoint) are TARGETS — a
+ * THROUGH the changes. Strong beats (authored meter-group starts) are TARGETS — a
  * non-chord-tone there is pulled onto a guide tone (3rd/7th), while a note already
  * on a chord tone is left as the melody states it; the weak step before a target
  * steps diatonically INTO it (a leading tone), and a chord change on that beat is
@@ -89,8 +94,9 @@ interface QaWindowInLoop {
     resolutionBarEnd: number;
 }
 
-// Cache the O(notes²) pairing scan per seed. Validity is (seedId, stepsPerBeat,
-// stepsPerMeasure, totalSteps) — recomputed on any mismatch.
+// Cache the O(notes²) pairing scan per seed. Legacy callers key validity on the
+// scalar meter tuple; arranger-aware callers key on the arranger plus the map/
+// grouping references that define mixed-meter measure bounds.
 //
 // `seedId` is NOT redundant with the WeakMap's identity key: on the WORKER a
 // regenerated seed arrives through `recursiveSafeSync`, which deep-merges a
@@ -104,14 +110,72 @@ interface QaWindowInLoop {
 // identity-only caching, which is correct for immutable fixtures.)
 const qaWindowCache = new WeakMap<
     object,
-    { seedId: number; spb: number; spm: number; total: number; windows: QaWindowInLoop[] }
+    {
+        seedId: number;
+        spb: number;
+        spm: number;
+        total: number;
+        arranger: ArrangerState | null;
+        measureMap: ArrangerState['measureMap'] | null;
+        grouping: ArrangerState['grouping'] | null;
+        timeSignature: string | null;
+        windows: QaWindowInLoop[];
+    }
 >();
+
+function qaMeterAtStep(
+    step: number,
+    arranger: ArrangerState | undefined,
+    fallbackSpb: number,
+    fallbackSpm: number,
+): { mStep: number; spb: number; spm: number } {
+    if (arranger) {
+        const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, step);
+        return {
+            mStep: stepInfo.mStep,
+            spb: ts.stepsPerBeat,
+            spm: ts.beats * ts.stepsPerBeat,
+        };
+    }
+    return {
+        mStep: ((step % fallbackSpm) + fallbackSpm) % fallbackSpm,
+        spb: fallbackSpb,
+        spm: fallbackSpm,
+    };
+}
+
+function qaMeasureBounds(
+    step: number,
+    arranger: ArrangerState | undefined,
+    fallbackSpb: number,
+    fallbackSpm: number,
+): { start: number; end: number; spb: number } {
+    const meter = qaMeterAtStep(step, arranger, fallbackSpb, fallbackSpm);
+    const start = step - meter.mStep;
+    return { start, end: start + meter.spm, spb: meter.spb };
+}
+
+function qaMeasureHorizon(
+    step: number,
+    count: number,
+    arranger: ArrangerState | undefined,
+    fallbackSpb: number,
+    fallbackSpm: number,
+): number {
+    let end = qaMeasureBounds(step, arranger, fallbackSpb, fallbackSpm).end;
+    for (let i = 1; i < count; i++) {
+        const next = qaMeasureBounds(end, arranger, fallbackSpb, fallbackSpm).end;
+        end = next > end ? next : end + fallbackSpm;
+    }
+    return end;
+}
 
 function computeQaWindows(
     seed: SoloistSessionSeed,
     spb: number,
     spm: number,
     totalSteps: number,
+    arranger?: ArrangerState,
 ): QaWindowInLoop[] {
     const loopLen = seed.loopLengthSteps || 64;
     const windows: QaWindowInLoop[] = [];
@@ -166,8 +230,9 @@ function computeQaWindows(
         // (distance 0) and the dovetail into it (within 2 bars ahead).
         const apex = apexByCycle.get(Math.floor(qIL / cycleLen));
         if (apex) {
-            const stepsToApex = (((apex.step - qIL) % loopLen) + loopLen) % loopLen;
-            if (stepsToApex <= spm * 2) {
+            const apexForward = apex.step >= qIL ? apex.step : apex.step + loopLen;
+            const apexHorizon = qaMeasureHorizon(qIL, 2, arranger, spb, spm);
+            if (apexForward <= apexHorizon) {
                 continue;
             }
         }
@@ -178,12 +243,13 @@ function computeQaWindows(
         // skip rather than guess.
         let answerIL = -1;
         let entryIL = -1;
+        const answerHorizon = qaMeasureHorizon(qIL, 4, arranger, spb, spm);
         for (const m of seed.notes) {
             if (m.step < 0) {
                 continue;
             }
             const mIL = inLoop(m.step);
-            if (m.qaRole === 'answer' && mIL > qIL && mIL - qIL <= 4 * spm) {
+            if (m.qaRole === 'answer' && mIL > qIL && mIL <= answerHorizon) {
                 if (answerIL < 0 || mIL < answerIL) {
                     answerIL = mIL;
                 }
@@ -202,11 +268,13 @@ function computeQaWindows(
         }
         // Echo one beat into the hang — the comper lets the question breathe
         // before the nod — and always strictly inside the soloist's silence.
-        const echo = Math.min(qIL + spb, entryIL - 1);
+        const questionSpb = qaMeterAtStep(qIL, arranger, spb, spm).spb;
+        const echo = Math.min(qIL + questionSpb, entryIL - 1);
         if (echo <= qIL) {
             continue; // no room to interject — skip the window entirely
         }
-        const resolutionBarStart = Math.floor(answerIL / spm) * spm;
+        const resolutionBar = qaMeasureBounds(answerIL, arranger, spb, spm);
+        const resolutionBarStart = resolutionBar.start;
         windows.push({
             pc: ((q.midi % 12) + 12) % 12,
             drawSalt,
@@ -214,7 +282,7 @@ function computeQaWindows(
             echo,
             answerEntry: entryIL,
             resolutionBarStart,
-            resolutionBarEnd: resolutionBarStart + spm,
+            resolutionBarEnd: resolutionBar.end,
         });
     }
     windows.sort((a, b) => a.hangStart - b.hangStart);
@@ -232,6 +300,7 @@ export function getQaHangAt(
     stepsPerBeat: number,
     stepsPerMeasure: number,
     totalSteps: number,
+    arranger?: ArrangerState,
 ): SoloistQaHang | null {
     if (!seed || stepsPerBeat <= 0 || stepsPerMeasure <= 0) {
         return null;
@@ -241,16 +310,23 @@ export function getQaHangAt(
     if (
         !cached ||
         cached.seedId !== seedId ||
-        cached.spb !== stepsPerBeat ||
-        cached.spm !== stepsPerMeasure ||
-        cached.total !== totalSteps
+        (!arranger && (cached.spb !== stepsPerBeat || cached.spm !== stepsPerMeasure)) ||
+        cached.total !== totalSteps ||
+        cached.arranger !== (arranger ?? null) ||
+        cached.measureMap !== (arranger?.measureMap ?? null) ||
+        cached.grouping !== (arranger?.grouping ?? null) ||
+        cached.timeSignature !== (arranger?.timeSignature ?? null)
     ) {
         cached = {
             seedId,
             spb: stepsPerBeat,
             spm: stepsPerMeasure,
             total: totalSteps,
-            windows: computeQaWindows(seed, stepsPerBeat, stepsPerMeasure, totalSteps),
+            arranger: arranger ?? null,
+            measureMap: arranger?.measureMap ?? null,
+            grouping: arranger?.grouping ?? null,
+            timeSignature: arranger?.timeSignature ?? null,
+            windows: computeQaWindows(seed, stepsPerBeat, stepsPerMeasure, totalSteps, arranger),
         };
         qaWindowCache.set(seed, cached);
     }
@@ -500,7 +576,7 @@ export function getSoloistNotePhraseFirst(
     // after a rising one). Still tolerant of `{}` from callers that don't supply it
     // (partial mocks, the pre-seed fallback path) — every read below guards.
     coordination: any = {},
-    _stepInfo: any = null,
+    stepInfo: any = null,
 ): any {
     const { playback, soloist, arranger } = state;
 
@@ -695,7 +771,8 @@ export function getSoloistNotePhraseFirst(
     // Bar math is hoisted here (it was defined below for the pitch grammar) so the
     // seam terms can live inside `activityAt`; the pitch-grammar block below reuses
     // these same locals.
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const ts =
+        stepInfo?.tsConfig || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
     const stepsPerBeat = ts.stepsPerBeat;
     const stepsPerBar = ts.beats * stepsPerBeat;
     const secStart = Number(coordination?.sectionStart) || 0;
@@ -915,16 +992,25 @@ export function getSoloistNotePhraseFirst(
     // chromatic enclosures / bebop passing scales are a later slice — §8.)
     // `ts`/`stepsPerBeat`/`stepsPerBar` are hoisted above `activityAt` (#1020 seam
     // phrasing); reused here for the pitch grammar.
-    const stepInBar = ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
-    // Strong beats = the downbeat and the bar's midpoint (beat 3 in 4/4): the two
-    // metrically strong points a phrase resolves onto.
-    const midBeatStep = Math.floor(ts.beats / 2) * stepsPerBeat;
-    const isStrongBeat = stepInBar === 0 || stepInBar === midBeatStep;
-    // The next strong beat ahead (beat 3 this bar, else the next downbeat).
+    const stepInBar = stepInfo?.mStep ?? ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
+    // Strong beats follow the authored meter groups. In 4/4 [2,2] this preserves
+    // downbeat + beat 3; in 5/4 [3,2] it moves the second target to beat 4, and a
+    // custom [2,3] moves it back to beat 3. Single-group meters retain the legacy
+    // midpoint as a secondary target so 2/4 and 3/4 do not lose their inner contour.
+    const groupedStrongSteps = [...getMeterGroupStarts(ts)];
+    const legacyMidpoint = Math.floor(ts.beats / 2) * stepsPerBeat;
+    const strongSteps =
+        groupedStrongSteps.length > 1
+            ? groupedStrongSteps
+            : [...new Set([0, legacyMidpoint])].sort((a, b) => a - b);
+    const isStrongBeat = strongSteps.includes(stepInBar);
+    const nextStrongInBar = strongSteps.find((strongStep) => strongStep > stepInBar);
     const nextStrongStep =
-        stepInBar < midBeatStep
-            ? step + (midBeatStep - stepInBar)
+        nextStrongInBar !== undefined
+            ? step + (nextStrongInBar - stepInBar)
             : step + (stepsPerBar - stepInBar);
+    const previousStrongInBar =
+        [...strongSteps].reverse().find((strongStep) => strongStep <= stepInBar) ?? 0;
 
     // The pitch a strong beat WILL land on — its developed contour note pulled onto
     // a guide tone (or the apex's money note) — so an approach can lead into it.
@@ -1123,8 +1209,7 @@ export function getSoloistNotePhraseFirst(
             velocityEnvelope = 1.06; // why: metric accent — lean into the downbeat / bar midpoint
         } else {
             const toStrong = nextStrongStep - step; // ≥1 for any non-strong step
-            const lastStrongInBar = stepInBar >= midBeatStep ? midBeatStep : 0;
-            const sinceStrong = stepInBar - lastStrongInBar;
+            const sinceStrong = stepInBar - previousStrongInBar;
             if (toStrong <= approachWindow) {
                 // why: swell across the pickup INTO the beat — louder the closer it is
                 // (an eighth out ≈ +1%, the 16th right before the beat ≈ +6%).

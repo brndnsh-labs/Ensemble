@@ -237,19 +237,19 @@ describe('Visualizer System', () => {
     describe('reducedMotionStepIndex (event-stepped quantization)', () => {
         // 120 bpm, 4 steps/beat -> stepDur = 60/120/4 = 0.125s.
         it('holds the same step index within a step and advances at the boundary', () => {
-            expect(reducedMotionStepIndex(0.0, 120, 4)).toBe(0);
-            expect(reducedMotionStepIndex(0.124, 120, 4)).toBe(0); // still step 0 (frozen)
-            expect(reducedMotionStepIndex(0.125, 120, 4)).toBe(1); // boundary -> advance
-            expect(reducedMotionStepIndex(0.249, 120, 4)).toBe(1);
-            expect(reducedMotionStepIndex(0.25, 120, 4)).toBe(2);
+            expect(reducedMotionStepIndex(0.0, 120)).toBe(0);
+            expect(reducedMotionStepIndex(0.124, 120)).toBe(0); // still step 0 (frozen)
+            expect(reducedMotionStepIndex(0.125, 120)).toBe(1); // boundary -> advance
+            expect(reducedMotionStepIndex(0.249, 120)).toBe(1);
+            expect(reducedMotionStepIndex(0.25, 120)).toBe(2);
         });
 
-        it('scales with tempo and step resolution', () => {
-            // 60 bpm, 1 step/beat -> stepDur = 1s; a whole second is one step.
-            expect(reducedMotionStepIndex(0.99, 60, 1)).toBe(0);
-            expect(reducedMotionStepIndex(1.0, 60, 1)).toBe(1);
-            // falsy stepsPerBeat falls back to 4 rather than dividing by zero.
-            expect(Number.isFinite(reducedMotionStepIndex(1.0, 120, 0))).toBe(true);
+        it('keeps sixteenth-note visual steps in an eighth-denominator meter', () => {
+            // A 7/8 denominator beat spans two transport steps, but each rendered
+            // step remains a 120-BPM sixteenth (0.125s), not a 0.25s eighth.
+            expect(reducedMotionStepIndex(0.124, 120)).toBe(0);
+            expect(reducedMotionStepIndex(0.125, 120)).toBe(1);
+            expect(reducedMotionStepIndex(0.25, 120)).toBe(2);
         });
     });
 });

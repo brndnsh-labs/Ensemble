@@ -209,6 +209,10 @@ export function checkBassActiveStyle(
     playback: EnsembleState['playback'],
     groove: EnsembleState['groove'],
 ) {
+    const stepInMeasure =
+        stepInfo?.mStep ??
+        ((step % (ts.beats * ts.stepsPerBeat)) + ts.beats * ts.stepsPerBeat) %
+            (ts.beats * ts.stepsPerBeat);
     // why: several per-step density gates below (jazz/quarter eighth-skip, funk
     // ghost, metal gallop, blues shuffle, walking-ska skip) used raw Math.random,
     // so the bass re-rolled which offbeats it played every bar AND every loop —
@@ -375,7 +379,7 @@ export function checkBassActiveStyle(
             return true;
         }
 
-        const isEighthSkip = step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5); // The 'and'
+        const isEighthSkip = stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat * 0.5); // The 'and'
 
         // Probabilistic eighth-note "skips" for walking bass feel
         let skipProb = 0.1 + playback.bandIntensity * 0.25 + playback.complexity * 0.2;
@@ -417,7 +421,7 @@ export function checkBassActiveStyle(
             return stepInChord % (ts.stepsPerBeat * 2) === 0;
         }
         // Higher intensity = Standard foundations (1, 2&, 3, 4&)
-        return isQuarter || step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
+        return isQuarter || stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2);
     }
 
     if (style === 'acoustic') {
@@ -469,7 +473,7 @@ export function checkBassActiveStyle(
                 return true;
             }
         }
-        return step % (stepsPerBeat * 2) === 0; // Two-Step half-notes on beats 1 and 3
+        return stepInMeasure % (stepsPerBeat * 2) === 0; // Two-Step half-notes on beats 1 and 3
     }
     if (style === 'metal') {
         if (isEighthBoundary) {
@@ -618,7 +622,7 @@ export function getBassNoteStyle(
     scale: number[],
     playback: EnsembleState['playback'],
     groove: EnsembleState['groove'],
-    soloist: EnsembleState['soloist'],
+    _soloist: EnsembleState['soloist'],
     intensity: number,
     velocity: number,
     isSoloistBusy: boolean,
@@ -643,6 +647,7 @@ export function getBassNoteStyle(
     _hasKickTrigger: boolean,
     _kickInst: { steps: number[] } | null,
     barsUntilSectionChange?: number,
+    sectionBarIndex = Math.floor(step / stepsPerMeasure),
 ) {
     // why: #1256 — `isSameAsPrev` is no longer read here; the only call site was
     // the now-deleted dead chromatic-approach block. Left off the destructure
@@ -834,7 +839,7 @@ export function getBassNoteStyle(
             // slide *down* from +2 into the new root. ±2 (whole-step) is the
             // canonical 808 slide interval; smaller (±1) reads as a passing
             // chromatic, larger (±3) reads as a melodic walk-up.
-            const stepInBeat = step % ts.stepsPerBeat;
+            const stepInBeat = stepInMeasure % ts.stepsPerBeat;
             const isLastActiveStepBeforeChange =
                 stepInBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === ts.beats - 1;
             if (
@@ -930,7 +935,7 @@ export function getBassNoteStyle(
         return res;
     }
     if (style === 'metal') {
-        const stepInBeat = step % ts.stepsPerBeat;
+        const stepInBeat = stepInMeasure % ts.stepsPerBeat;
         const isEighth = stepInBeat % 2 === 0;
 
         // 1. The "One" (and Beat 3) - Heavy Anchor
@@ -1132,9 +1137,9 @@ export function getBassNoteStyle(
         const isOne = isBeatStart && intBeat === 0;
         const isThree = isBeatStart && intBeat === 2;
         const isOffbeatTwo =
-            step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 1;
+            stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 1;
         const isOffbeatFour =
-            step % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 3;
+            stepInMeasure % ts.stepsPerBeat === Math.floor(ts.stepsPerBeat / 2) && intBeat === 3;
 
         // Bossa Timing: Subtle lay-back
         const lag = 0.01 + intensity * 0.005;
@@ -1167,8 +1172,7 @@ export function getBassNoteStyle(
         // every few bars even on a static chord, so the line breathes rather than looping.
         // Deterministic from barIndex per CLAUDE.md (no raw Math.random) so loops stay coherent
         // and critique tests don't depend on RNG. Pitch classes are preserved, only octave shifts.
-        const barIndex = Math.floor(step / stepsPerMeasure);
-        const variationSeed = ((barIndex * 37 + 13) % 100) / 100;
+        const variationSeed = ((sectionBarIndex * 37 + 13) % 100) / 100;
         const useOctaveUpOnThree = variationSeed < 0.2; // ~20% of bars: beat-3 root jumps up an octave
         const useDeepFifthOnTwoAnd = variationSeed >= 0.35 && variationSeed < 0.5; // ~15%: deeper pedal "& of 2"
         const useDeepFifthOnFourAnd = variationSeed >= 0.7 && variationSeed < 0.85; // ~15%: deeper pedal "& of 4"
@@ -1246,7 +1250,7 @@ export function getBassNoteStyle(
     // chorus (i=0.9), all at the critique harness's complexity 0.8. Guarded by the
     // #947 spread assertion in `tests/standards/funk-bass-critique.test.ts`.
     if (style === 'funk') {
-        const stepInBeat = step % ts.stepsPerBeat;
+        const stepInBeat = stepInMeasure % ts.stepsPerBeat;
         const isOne = stepInChord === 0;
         const isSecondarySlap = isBeatStart && intBeat === 2; // Beat 3
 
@@ -1367,9 +1371,6 @@ export function getBassNoteStyle(
 
         // 3. Syncopated "Pushes" & "Gallops" (16ths)
         if (stepInBeat % 2 !== 0) {
-            const isSoloistBusyLocal =
-                soloist.enabled && (soloist.session.phrasing.busySteps || 0) > 0;
-
             // High complexity "Pop" on the 'a'
             if (
                 stepInBeat === 3 &&
@@ -1381,7 +1382,7 @@ export function getBassNoteStyle(
                 // is high (>0.7) so it's absent on straightforward grooves.
                 // Source: bass.md P2 #17.
                 scrambleHash((slapSeedBase + 2) | 0) < 0.3 + intensity * 0.3 &&
-                !isSoloistBusyLocal
+                !isSoloistBusy
             ) {
                 const note = baseRoot + 12;
                 const finalNote = note > absMax ? baseRoot : note;
@@ -1407,8 +1408,8 @@ export function getBassNoteStyle(
             // enough to leave space at low intensity. Reduced to 0.1 base when the
             // soloist is busy — yield some 16th space so the two don't clutter.
             // Source: bass.md P2 #17.
-            const chuckProb = (isSoloistBusyLocal ? 0.1 : 0.2) + intensity * 0.4;
-            if (scrambleHash((slapSeedBase + 3) | 0) < chuckProb && !isSoloistBusyLocal) {
+            const chuckProb = (isSoloistBusy ? 0.1 : 0.2) + intensity * 0.4;
+            if (scrambleHash((slapSeedBase + 3) | 0) < chuckProb && !isSoloistBusy) {
                 // Usually repeat root or previous note as a ghost
                 return result(getFrequency(prevMidi || baseRoot), 0.2, 0.5, 1);
             }
@@ -1426,7 +1427,7 @@ export function getBassNoteStyle(
                 // on scale content — both idiomatic hammer-on destinations.
                 // Source: bass.md P2 #17.
                 scrambleHash((slapSeedBase + 4) | 0) < 0.3 &&
-                !isSoloistBusyLocal
+                !isSoloistBusy
             ) {
                 const hammerNote = scale.includes(2) ? baseRoot + 2 : baseRoot + 1;
                 // why 0.90 (#947): was 1.10 — louder than a fretted lead-in and

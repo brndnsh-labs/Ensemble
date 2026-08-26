@@ -1,7 +1,7 @@
 import { memo } from 'preact/compat';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { TIME_SIGNATURES } from '../config.js';
 import { replaceChordInSection } from '../controllers/arranger-controller.js';
+import { getEffectiveTimeSignature } from '../meter.js';
 import { formatUnicodeSymbols } from '../sanitize.js';
 import {
     buildLeadSheetRows,
@@ -157,6 +157,7 @@ export function ChordVisualizer() {
     const {
         progression,
         timeSignature,
+        grouping,
         lastActiveChordIndex,
         sectionsState,
         notation,
@@ -168,6 +169,7 @@ export function ChordVisualizer() {
     } = useEnsembleState((state) => ({
         progression: state.arranger.progression,
         timeSignature: state.arranger.timeSignature,
+        grouping: state.arranger.grouping,
         lastActiveChordIndex: state.chords.lastActiveChordIndex,
         sectionsState: state.arranger.sections,
         notation: state.arranger.notation || 'roman',
@@ -198,7 +200,10 @@ export function ChordVisualizer() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
     const [containerSize, setContainerSize] = useState({ height: 0, width: 0 });
-    const timeSignatureConfig = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
+    const timeSignatureConfig = useMemo(
+        () => getEffectiveTimeSignature(timeSignature, grouping),
+        [grouping, timeSignature],
+    );
 
     useEffect(() => {
         if (typeof window === 'undefined') {

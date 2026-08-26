@@ -640,7 +640,10 @@ export class VisualizerEngine {
                       stepsPerBeat: 4,
                   };
         const beatsPerMeasure = ts.beats;
-        const beatLen = 60 / bpm;
+        // `ts.beats` counts denominator-native beats. A 7/8 beat is an eighth
+        // note (two scheduler steps), not the quarter-note BPM unit; scale by
+        // stepsPerBeat/4 to stay aligned with scheduler/count-in timing.
+        const beatLen = (60 / bpm) * (ts.stepsPerBeat / 4);
         const startBeat = Math.floor((minTime - this.beatReferenceTime) / beatLen);
 
         ctx.lineWidth = 1;

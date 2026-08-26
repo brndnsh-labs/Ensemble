@@ -87,30 +87,34 @@ vi.mock('../../public/config.js', async (_importOriginal) => {
     };
 });
 
-vi.mock('../../public/utils.js', () => ({
-    normalizeKey: (k) => {
-        if (!k) {
-            return 'C';
-        }
-        const map = {
-            Bb: 'Bb',
-            G: 'G',
-            C: 'C',
-            A: 'A',
-            D: 'D',
-            'F#': 'Gb',
-            F: 'F',
-            Eb: 'Eb',
-            Ab: 'Ab',
-        };
-        // Handle lower case as well
-        const norm = k.charAt(0).toUpperCase() + k.slice(1);
-        return map[norm] || norm;
-    },
-    getFrequency: (m) => 440 * 2 ** ((m - 69) / 12),
-    applyBluesBends: vi.fn(),
-    getMidi: (f) => Math.round(12 * Math.log2(f / 440) + 69),
-}));
+vi.mock('../../public/utils.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        normalizeKey: (k) => {
+            if (!k) {
+                return 'C';
+            }
+            const map = {
+                Bb: 'Bb',
+                G: 'G',
+                C: 'C',
+                A: 'A',
+                D: 'D',
+                'F#': 'Gb',
+                F: 'F',
+                Eb: 'Eb',
+                Ab: 'Ab',
+            };
+            // Handle lower case as well
+            const norm = k.charAt(0).toUpperCase() + k.slice(1);
+            return map[norm] || norm;
+        },
+        getFrequency: (m) => 440 * 2 ** ((m - 69) / 12),
+        applyBluesBends: vi.fn(),
+        getMidi: (f) => Math.round(12 * Math.log2(f / 440) + 69),
+    };
+});
 
 vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 vi.mock('../../public/ui.js', () => ({ ui: { updateProgressionDisplay: vi.fn() } }));

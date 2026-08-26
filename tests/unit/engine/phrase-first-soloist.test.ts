@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { TIME_SIGNATURES } from '../../../public/config.js';
 import { getSoloistNotePhraseFirst } from '../../../public/engine/soloist-phrase-first.js';
+import { getEffectiveTimeSignature, getEffectiveTimeSignatures } from '../../../public/meter.js';
+import { getStepInfo } from '../../../public/utils.js';
 
 // Structural guard for the parallel phrase-first soloist engine (Slice 1,
 // Build 2a). The real definition-of-done is the by-ear listening gate; these
@@ -20,11 +23,13 @@ function makeState(
         loopLengthSteps = 64,
         bpm = 120,
         phrasingIntensity = 0.5,
+        timeSignature = '4/4',
+        grouping = null,
     } = {},
 ): any {
     return {
         playback: { currentLoopCount: loopCount, bpm },
-        arranger: { totalSteps, key: 'C', isMinor: false },
+        arranger: { totalSteps, key: 'C', isMinor: false, timeSignature, grouping },
         soloist: {
             phrasingIntensity,
             session: {
@@ -125,6 +130,48 @@ describe('phrase-first soloist (Build 2a)', () => {
         ];
         const { emitted } = run(makeState(seed, { loopLengthSteps: 16, totalSteps: 16 }), 16);
         expect(emitted.find((e) => e.step === 0).midi % 12).toBe(7); // G — left as stated
+    });
+
+    it('moves guide-tone landings with the authored 5/4 grouping', () => {
+        const seed = [
+            { step: 0, midi: 84, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+            { step: 8, midi: 66, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+            { step: 12, midi: 66, isAnchor: true, durationSteps: 1, velocity: 0.8 },
+        ];
+        const perform = (grouping: number[]) => {
+            const state = makeState(seed, {
+                loopLengthSteps: 20,
+                totalSteps: 20,
+                timeSignature: '5/4',
+                grouping,
+            });
+            const ts = getEffectiveTimeSignature('5/4', grouping);
+            const signatures = getEffectiveTimeSignatures('5/4', grouping);
+            return new Map(
+                [8, 12].map((step) => {
+                    const note = getSoloistNotePhraseFirst(
+                        state,
+                        CMAJ7,
+                        null,
+                        step,
+                        null,
+                        72,
+                        'smart',
+                        step,
+                        {},
+                        getStepInfo(step, ts, [], signatures),
+                    );
+                    return [step, note?.midi];
+                }),
+            );
+        };
+
+        const threeTwo = perform(TIME_SIGNATURES['5/4'].grouping);
+        const twoThree = perform([2, 3]);
+        expect(threeTwo.get(12) % 12).toBe(4);
+        expect(threeTwo.get(8) % 12).toBe(6);
+        expect(twoThree.get(8) % 12).toBe(4);
+        expect(twoThree.get(12) % 12).toBe(6);
     });
 
     it('approaches a chromatic guide tone (the dominant ♭7) BY STEP, not a leap', () => {

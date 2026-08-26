@@ -67,11 +67,10 @@ function runFrame() {
             // Event-stepped: quantize to the current step boundary and only
             // repaint when the step changes — no smooth interpolation between
             // steps (the /unblock 2026-06-18 decision for reduced-motion).
-            const stepsPerBeat = currentTS.stepsPerBeat || 4;
-            const stepIndex = reducedMotionStepIndex(now, currentBpm, stepsPerBeat);
+            const stepIndex = reducedMotionStepIndex(now, currentBpm);
             if (stepIndex !== lastReducedStepIndex) {
                 lastReducedStepIndex = stepIndex;
-                const stepDur = 60 / currentBpm / stepsPerBeat;
+                const stepDur = 60 / currentBpm / 4;
                 engine.render(stepIndex * stepDur, currentBpm, currentTS);
             }
         } else {
@@ -88,8 +87,10 @@ function runFrame() {
  * index of the step it falls in, so the renderer can advance in discrete event
  * steps instead of scrolling smoothly. Pure + exported for unit testing.
  */
-export function reducedMotionStepIndex(time: number, bpm: number, stepsPerBeat: number): number {
-    const stepDur = 60 / bpm / (stepsPerBeat || 4);
+export function reducedMotionStepIndex(time: number, bpm: number): number {
+    // Ensemble's transport grid is always sixteenth-note resolution; denominator
+    // beats change meter semantics, not scheduler-step duration.
+    const stepDur = 60 / bpm / 4;
     return stepDur > 0 ? Math.floor(time / stepDur) : 0;
 }
 

@@ -1,4 +1,4 @@
-import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js';
 import type { ArrangerState } from '../state/arranger.js';
 import type {
     EnsembleState,
@@ -213,16 +213,24 @@ interface BuildSeedSupportHintsOptions {
     isPickup: boolean;
     stepsPerMeasure: number;
     stepsPerBeat: number;
+    measureStep: number;
 }
 
 /**
  * Build optional support metadata so phrasing modes can reinforce the melody without rewriting it.
  */
 function buildSeedSupportHints(options: BuildSeedSupportHintsOptions): SeedSupportHints {
-    const { style, step, durationSteps, isAnchor, isPickup, stepsPerMeasure, stepsPerBeat } =
-        options;
+    const {
+        style,
+        step,
+        durationSteps,
+        isAnchor,
+        isPickup,
+        stepsPerMeasure,
+        stepsPerBeat,
+        measureStep,
+    } = options;
     const isLineStyle = ['jazz', 'bird', 'bossa'].includes(style);
-    const measureStep = ((step % stepsPerMeasure) + stepsPerMeasure) % stepsPerMeasure;
     const isCadenceZone = measureStep >= Math.max(0, stepsPerMeasure - stepsPerBeat);
     const isBeatAttack = measureStep % stepsPerBeat === 0;
 
@@ -291,6 +299,7 @@ interface CreateSeedNoteOptions {
     isPickup?: boolean;
     stepsPerMeasure: number;
     stepsPerBeat: number;
+    measureStep: number;
     qaRole?: 'question' | 'answer';
     hookRole?: boolean;
 }
@@ -308,6 +317,7 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
         isPickup = false,
         stepsPerMeasure,
         stepsPerBeat,
+        measureStep,
         qaRole = undefined,
         hookRole = undefined,
     } = options;
@@ -326,6 +336,7 @@ function createSeedNote(options: CreateSeedNoteOptions): SeedNote {
             isPickup,
             stepsPerMeasure,
             stepsPerBeat,
+            measureStep,
         }),
     };
 
@@ -555,12 +566,14 @@ function polishCadenceLandings(
     stepMap: any[],
     sectionMap: any[],
     actualTotalSteps: number,
-    stepsPerMeasure: number,
+    arranger: ArrangerState,
     style: string,
 ): SeedNote[] {
     const polishedNotes = [...notes].sort((a, b) => a.step - b.step);
 
-    for (let measureStart = 0; measureStart < actualTotalSteps; measureStart += stepsPerMeasure) {
+    for (let measureStart = 0; measureStart < actualTotalSteps; ) {
+        const { ts } = getEffectiveMeterAtStep(arranger, measureStart);
+        const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
         const measureEnd = measureStart + stepsPerMeasure;
         const noteIndexes: number[] = [];
 
@@ -572,6 +585,7 @@ function polishCadenceLandings(
         }
 
         if (noteIndexes.length === 0) {
+            measureStart = measureEnd;
             continue;
         }
 
@@ -580,6 +594,7 @@ function polishCadenceLandings(
         const stepEntry = binarySearchMap(stepMap, Math.min(note.step, actualTotalSteps - 1));
 
         if (!stepEntry?.chord) {
+            measureStart = measureEnd;
             continue;
         }
 
@@ -597,6 +612,7 @@ function polishCadenceLandings(
         const shouldTightenStatementEnding = !isDeparture && isSectionEnding && !isStable;
 
         if (!shouldRepairHarshLanding && !shouldTightenStatementEnding) {
+            measureStart = measureEnd;
             continue;
         }
 
@@ -611,6 +627,7 @@ function polishCadenceLandings(
         if (replacementMidi !== note.midi) {
             polishedNotes[lastIndex] = { ...note, midi: replacementMidi };
         }
+        measureStart = measureEnd;
     }
 
     return polishedNotes;
@@ -701,19 +718,7 @@ export function generateSessionSeed(
 
     const prng = createPRNG(seedStr || generateRandomSeed());
 
-    const tsConfig: any = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerBeat = tsConfig.stepsPerBeat;
-    const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
     const styleConfig: any = STYLE_CONFIG[style] || STYLE_CONFIG.scalar;
-    const tripletProfile = styleConfig.seedTriplets || {};
-    const tripletEnabled = Boolean(
-        tripletProfile.enabled && !tsConfig.isCompound && tsConfig.beats === 4 && stepsPerBeat >= 4,
-    );
-    const tripletCellBias = tripletEnabled ? tripletProfile.cellBias || 0 : 0;
-    const tripletPickupBias = tripletEnabled ? tripletProfile.pickupBias || 0 : 0;
-    const tripletMutationBias = tripletEnabled ? tripletProfile.mutationBias || 0 : 0;
-    const tripletCadenceBias = tripletEnabled ? tripletProfile.cadenceBias || 0 : 0;
-    const tripletTimingStrength = tripletEnabled ? tripletProfile.timingStrength || 0 : 0;
     const playbackBpm = state?.playback?.bpm || 100;
 
     const notes: SeedNote[] = [];
@@ -732,8 +737,11 @@ export function generateSessionSeed(
         };
     }
 
-    // To ensure repetition across identical sections (e.g. AABA form),
-    // we'll memorize the target note sequence for each section label.
+    // To ensure repetition across compatible sections (e.g. AABA form),
+    // memorize the target note sequence for each section label + meter identity.
+    // A beat-offset motif is not portable across meters: interpreting a 7/8 motif
+    // with 4/4's stepsPerBeat stretches the phrase beyond its section and drops
+    // events at the seam.
     // For even more musicality, we'll store the 'motif' of steps and intervals relative to chords.
     const sectionMotifs = new Map<string, MotifEntry>();
 
@@ -750,7 +758,8 @@ export function generateSessionSeed(
     // Real multi-section charts are NOT unrolled, so they keep composer freedom
     // and their existing restatement behavior.
     const isUnrolledForm = unrolled.totalSteps !== unrolled.originalSteps;
-    const headCategory = getSectionCategory(sectionMap[0]?.label, style);
+    let headMeterIdentity: string | null = null;
+    let headMotifKey: string | null = null;
 
     // Find macro turnaround index
     const turnaroundIndex = sectionMap.length - 1;
@@ -762,12 +771,42 @@ export function generateSessionSeed(
     );
 
     sectionMap.forEach((sectionRange, index) => {
+        const sectionTsName = sectionRange.timeSignature || arranger.timeSignature;
+        const tsConfig: any = getEffectiveTimeSignature(
+            sectionTsName,
+            sectionTsName === arranger.timeSignature ? arranger.grouping : null,
+        );
+        const stepsPerBeat = tsConfig.stepsPerBeat;
+        const stepsPerMeasure = tsConfig.beats * stepsPerBeat;
+        const tripletProfile = styleConfig.seedTriplets || {};
+        const tripletEnabled = Boolean(
+            tripletProfile.enabled &&
+                !tsConfig.isCompound &&
+                tsConfig.beats === 4 &&
+                stepsPerBeat >= 4,
+        );
+        const tripletCellBias = tripletEnabled ? tripletProfile.cellBias || 0 : 0;
+        const tripletPickupBias = tripletEnabled ? tripletProfile.pickupBias || 0 : 0;
+        const tripletMutationBias = tripletEnabled ? tripletProfile.mutationBias || 0 : 0;
+        const tripletCadenceBias = tripletEnabled ? tripletProfile.cadenceBias || 0 : 0;
+        const tripletTimingStrength = tripletEnabled ? tripletProfile.timingStrength || 0 : 0;
         const label = (sectionRange.label || 'Main').toLowerCase();
 
         const category = getSectionCategory(label, style);
+        const meterIdentity = `${sectionTsName}:${tsConfig.beats}/${stepsPerBeat}:${(
+            tsConfig.grouping || [tsConfig.beats]
+        ).join('+')}`;
+        const motifKeyFor = (candidateCategory: string) => `${candidateCategory}:${meterIdentity}`;
+        const motifKey = motifKeyFor(category);
+        if (index === 0) {
+            headMeterIdentity = meterIdentity;
+            headMotifKey = motifKey;
+        }
 
-        const sectionStartMeasure = Math.floor(sectionRange.start / stepsPerMeasure);
-        const sectionEndMeasure = Math.ceil(sectionRange.end / stepsPerMeasure);
+        const sectionStartMeasure = 0;
+        const sectionEndMeasure = Math.ceil(
+            (sectionRange.end - sectionRange.start) / stepsPerMeasure,
+        );
 
         logSeed(
             `[Seeder Debug] Section ${label}: start measure ${sectionStartMeasure}, end measure ${sectionEndMeasure}. Applying motif.`,
@@ -776,8 +815,8 @@ export function generateSessionSeed(
         const isDeparture = isDepartureCategory(category);
 
         // Track iterations to apply restatement mutations
-        const iteration = sectionIterationCount.get(category) || 0;
-        sectionIterationCount.set(category, iteration + 1);
+        const iteration = sectionIterationCount.get(motifKey) || 0;
+        sectionIterationCount.set(motifKey, iteration + 1);
 
         const config = styleConfig;
         const registerProfile = getSoloistRegisterProfile(style);
@@ -1088,17 +1127,23 @@ export function generateSessionSeed(
         if (
             isUnrolledForm &&
             index > 0 &&
-            !sectionMotifs.has(category) &&
+            !sectionMotifs.has(motifKey) &&
             category in UNROLLED_INHERIT_OPS
         ) {
-            const headEntry = sectionMotifs.get(headCategory);
+            // Inheritance is rhythmic reuse too, so it is valid only inside the
+            // head's meter identity. A role in a different meter composes its own
+            // motif instead of reinterpreting head beat offsets on another grid.
+            const headEntry =
+                meterIdentity === headMeterIdentity && headMotifKey
+                    ? sectionMotifs.get(headMotifKey)
+                    : undefined;
             if (headEntry) {
                 const inherited = headEntry.motif.map((n) => ({ ...n }));
                 const inTailMeasures = (n: MotifEvent) => n.beatOffset >= tsConfig.beats;
                 for (let op = 0; op < UNROLLED_INHERIT_OPS[category]; op++) {
                     applyRestatementOp(inherited, inTailMeasures);
                 }
-                sectionMotifs.set(category, {
+                sectionMotifs.set(motifKey, {
                     motif: inherited,
                     phraseLength: headEntry.phraseLength,
                     contourType: headEntry.contourType,
@@ -1110,7 +1155,7 @@ export function generateSessionSeed(
 
         // Generate or retrieve the motif for this section category
         // A motif is a 2-measure rhythmic/melodic contour template
-        if (!sectionMotifs.has(category)) {
+        if (!sectionMotifs.has(motifKey)) {
             const stationaryProb = Math.max(
                 isSmoothSyncStyle && !isDeparture ? 0.01 : 0.02,
                 (config.stationaryProb || 0.05) *
@@ -1131,10 +1176,12 @@ export function generateSessionSeed(
                 // macro-form the head is the true primary (#1058) — jazz styles file
                 // their verse under the 'jazz' category, so the label chain misses.
                 const primaryMetrics =
-                    sectionMotifs.get('verse')?.metrics ||
-                    sectionMotifs.get('main')?.metrics ||
-                    sectionMotifs.get('a')?.metrics ||
-                    (isUnrolledForm ? sectionMotifs.get(headCategory)?.metrics : undefined);
+                    sectionMotifs.get(motifKeyFor('verse'))?.metrics ||
+                    sectionMotifs.get(motifKeyFor('main'))?.metrics ||
+                    sectionMotifs.get(motifKeyFor('a'))?.metrics ||
+                    (isUnrolledForm && meterIdentity === headMeterIdentity && headMotifKey
+                        ? sectionMotifs.get(headMotifKey)?.metrics
+                        : undefined);
                 if (primaryMetrics) {
                     if (primaryMetrics.density > 4 && primaryMetrics.syncopationRatio > 0.4) {
                         forceSparse = true;
@@ -1539,7 +1586,7 @@ export function generateSessionSeed(
                 }
             }
 
-            sectionMotifs.set(category, {
+            sectionMotifs.set(motifKey, {
                 motif,
                 phraseLength,
                 contourType,
@@ -1549,7 +1596,7 @@ export function generateSessionSeed(
         }
 
         let { motif, phraseLength, isStationaryMotif, contourType } = sectionMotifs.get(
-            category,
+            motifKey,
         ) || {
             motif: [],
             phraseLength: 2,
@@ -1602,7 +1649,7 @@ export function generateSessionSeed(
 
         // Apply motifs in phraseLength-measure blocks across the entire section range
         for (let m = sectionStartMeasure; m < sectionEndMeasure; m += phraseLength) {
-            const baseStep = m * stepsPerMeasure;
+            const baseStep = sectionRange.start + m * stepsPerMeasure;
 
             // --- Sectional Turnaround Logic (A-A-A-B) ---
             // If this is the last phraseLength measures of a >= 8 measure section,
@@ -2319,6 +2366,10 @@ export function generateSessionSeed(
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
+                            measureStep:
+                                (((exactStep - sectionRange.start) % stepsPerMeasure) +
+                                    stepsPerMeasure) %
+                                stepsPerMeasure,
                             qaRole: qaRoleForNote,
                             hookRole: isHookNote || undefined,
                         });
@@ -2337,6 +2388,10 @@ export function generateSessionSeed(
                             isPickup: Boolean(motifNote.isPickup),
                             stepsPerMeasure,
                             stepsPerBeat,
+                            measureStep:
+                                (((exactStep - sectionRange.start) % stepsPerMeasure) +
+                                    stepsPerMeasure) %
+                                stepsPerMeasure,
                             qaRole: qaRoleForNote,
                             hookRole: isHookNote || undefined,
                         }),
@@ -2358,6 +2413,11 @@ export function generateSessionSeed(
     for (let i = 0; i < notes.length; i++) {
         const currentNote = notes[i];
         const nextNote = notes[i + 1];
+        const { stepInfo: currentStepInfo, ts: tsConfig } = getEffectiveMeterAtStep(
+            arranger,
+            currentNote.step,
+        );
+        const stepsPerBeat = tsConfig.stepsPerBeat;
         const tripletProtected =
             isTripletSeedNote(currentNote) ||
             isTripletSeedNote(nextNote) ||
@@ -2488,7 +2548,7 @@ export function generateSessionSeed(
 
             // Device 2: Syncopated Anticipations (Pushes)
             // If the note lands squarely on a beat, push it early by an eighth and tie it
-            if (!mutationApplied && !tripletProtected && currentNote.step % stepsPerBeat === 0) {
+            if (!mutationApplied && !tripletProtected && currentStepInfo.isBeatStart) {
                 // Only push if there's room before this note (i.e. it doesn't overlap the previous note)
                 const prevNote = processedNotes[processedNotes.length - 1];
                 // why: epic-1-compound-meter S6 — an eighth-note push is
@@ -2601,29 +2661,42 @@ export function generateSessionSeed(
 
     // Reinforce sparse late-entry statement bars with a lead-in attack so
     // non-jazz heads speak earlier in the measure instead of waiting until beat 4.
-    if (!['jazz', 'bird', 'bossa'].includes(style) && !tripletEnabled) {
+    if (!['jazz', 'bird', 'bossa'].includes(style)) {
         const reinforcedNotes: SeedNote[] = [];
         const sortedSeedNotes = [...processedNotes].sort((a, b) => a.step - b.step);
 
         for (let i = 0; i < sortedSeedNotes.length; i++) {
             const note = sortedSeedNotes[i];
-            const measureStart =
-                Math.floor(Math.max(0, note.step) / stepsPerMeasure) * stepsPerMeasure;
-            const measureEnd = measureStart + stepsPerMeasure;
+            const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, note.step);
+            const noteTripletProfile = styleConfig.seedTriplets || {};
+            const noteTripletEnabled = Boolean(
+                noteTripletProfile.enabled &&
+                    !ts.isCompound &&
+                    ts.beats === 4 &&
+                    ts.stepsPerBeat >= 4,
+            );
+            if (ts.isCompound || noteTripletEnabled) {
+                reinforcedNotes.push(note);
+                continue;
+            }
+            const localStepsPerBeat = ts.stepsPerBeat;
+            const measureStart = note.step - stepInfo.mStep;
+            const localStepsPerMeasure = ts.beats * localStepsPerBeat;
+            const measureEnd = measureStart + localStepsPerMeasure;
             const measureNotes = sortedSeedNotes.filter(
                 (candidate) => candidate.step >= measureStart && candidate.step < measureEnd,
             );
             const isLateSingleAttack =
-                note.step >= measureStart + stepsPerBeat * 2 &&
+                note.step >= measureStart + localStepsPerBeat * 2 &&
                 measureNotes.length === 1 &&
-                note.durationSteps >= stepsPerBeat;
+                note.durationSteps >= localStepsPerBeat;
 
             if (isLateSingleAttack) {
-                const pickupStep = note.step - stepsPerBeat;
+                const pickupStep = note.step - localStepsPerBeat;
                 const pickupDuration = note.step - pickupStep;
                 const hasLeadInSpace =
                     pickupStep >= measureStart &&
-                    pickupDuration >= stepsPerBeat / 2 &&
+                    pickupDuration >= localStepsPerBeat / 2 &&
                     !sortedSeedNotes.some(
                         (candidate) =>
                             candidate !== note &&
@@ -2660,7 +2733,7 @@ export function generateSessionSeed(
         stepMap,
         sectionMap,
         actualTotalSteps,
-        stepsPerMeasure,
+        arranger,
         style,
     );
     polishedNotes.sort((a: SeedNote, b: SeedNote) => a.step - b.step);

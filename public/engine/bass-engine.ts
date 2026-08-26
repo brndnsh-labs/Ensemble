@@ -3,6 +3,7 @@ import { getFrequency, getMidi } from '../utils.js';
 import { createBassPump } from './bass-pump.js';
 import { getBandPocket } from './coordination-engine.js';
 import { scrambleHash, stringHash33 } from './hash-utils.js';
+import { isSoloistBusyAtStep } from './section-overrides.js';
 import { getScaleForChord } from './theory-scales.js';
 import { BASS_AUTHORING_CEILING, BASS_VELOCITY_DOMAIN_MAX } from './velocity-shaping.js';
 
@@ -33,7 +34,8 @@ export const BASS_VELOCITY_ENVELOPE = { enabled: true };
  */
 
 // (Old getScaleForBass removed, using imported version)
-import { resolveMappedStyle, SMART_BASS_STYLE_MAP, TIME_SIGNATURES } from '../config.js';
+import { resolveMappedStyle, SMART_BASS_STYLE_MAP } from '../config.js';
+import { getEffectiveTimeSignature, getMeterGroupStarts, getSectionPhaseStep } from '../meter.js';
 import { INTRO_MUTES, OUTRO_MUTES } from './arrangement-layering.js';
 import {
     approachBend,
@@ -117,8 +119,12 @@ export function isBassActive(
         return true;
     }
 
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const ts =
+        stepInfo?.tsConfig || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
+    const chartStep =
+        arranger.totalSteps > 0
+            ? ((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps
+            : step;
 
     // Section-transition anticipation: force-activate on the half-beat before a
     // section boundary so getBassNote's chromatic-approach gate (~line 407) can
@@ -132,7 +138,7 @@ export function isBassActive(
     if (
         upcomingForActivation &&
         coordSectionEnd !== null &&
-        step === coordSectionEnd - Math.floor(ts.stepsPerBeat / 2) &&
+        chartStep === coordSectionEnd - Math.floor(ts.stepsPerBeat / 2) &&
         ANTICIPATION_STYLES.has(style)
     ) {
         return true;
@@ -159,12 +165,13 @@ export function isBassActive(
     // fire.
     const isReggaeStyle = style === 'dub' || (groove.genreFeel || '') === 'Reggae';
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
+    const measureStep = stepInfo?.mStep ?? ((step % stepsPerBar) + stepsPerBar) % stepsPerBar;
     // why: in 6/8 the natural anticipation is the final eighth before the downbeat
     // (step 11 of 12, "and of 6"); in 4/4 it is the "and of 4" (step 14 of 16,
     // stepsPerBar - 2). Compound meters use stepsPerBar - 1; simple meters keep
     // stepsPerBar - 2 (unchanged behavior).
     const anticipationOffset = ts.isCompound ? 1 : 2;
-    const isAnticipation = step % stepsPerBar === stepsPerBar - anticipationOffset;
+    const isAnticipation = measureStep === stepsPerBar - anticipationOffset;
     const soloistRestingForFill = coordination?.soloistResting === true;
     const notesInPhraseForFill = coordination?.soloistNotesInPhrase ?? 0;
     if (isReggaeStyle && isAnticipation && soloistRestingForFill && notesInPhraseForFill >= 3) {
@@ -268,8 +275,8 @@ export function getBassNote(
         style = resolveMappedStyle(SMART_BASS_STYLE_MAP, groove.genreFeel, groove.lastDrumPreset);
     }
 
-    const signatures: any = TIME_SIGNATURES;
-    const ts = signatures[arranger.timeSignature] || signatures['4/4'];
+    const ts =
+        stepInfo?.tsConfig || getEffectiveTimeSignature(arranger.timeSignature, arranger.grouping);
     const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
     const stepInMeasure = stepInfo ? stepInfo.mStep : step % stepsPerMeasure;
     const intBeat = Math.floor(stepInMeasure / ts.stepsPerBeat);
@@ -325,8 +332,16 @@ export function getBassNote(
     // doesn't zero playback.step). Comparing them unwrapped means this only
     // ever matches during the very first lap of playback — wrap `step` first,
     // same pattern #921/#922 applied to barIndex.
-    const wrappedStepForSectionStart = arranger.totalSteps > 0 ? step % arranger.totalSteps : step;
-    const isSectionStart = context && wrappedStepForSectionStart === context.sectionStart;
+    const chartStep =
+        arranger.totalSteps > 0
+            ? ((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps
+            : step;
+    const isSectionStart = context && chartStep === context.sectionStart;
+    const groovePatternStep = getSectionPhaseStep(
+        chartStep,
+        context?.sectionStart ?? 0,
+        groove.measures * stepsPerMeasure,
+    );
     const allowSubRange = isDownbeat || isSectionStart;
 
     const clampAndNormalize = (
@@ -537,9 +552,15 @@ export function getBassNote(
         arranger.totalSteps > 0
             ? (((step % arranger.totalSteps) + arranger.totalSteps) % arranger.totalSteps) | 0
             : step;
-    const barIndexEarly = Math.floor(inLoopStepForBarIndex / stepsPerMeasure);
+    const barIndexEarly = Math.floor(
+        Math.max(0, inLoopStepForBarIndex - (context?.sectionStart ?? 0)) / stepsPerMeasure,
+    );
     const isBeatStartEarly = stepInfo?.isBeatStart ?? step % ts.stepsPerBeat === 0;
-    const isSoloistBusyEarly = (soloist.session.phrasing.busySteps || 0) > 0;
+    const isSoloistBusyEarly = isSoloistBusyAtStep(
+        state,
+        step,
+        context?.stepCoordination?.soloistBusy === true,
+    );
     const sectionOccurrence: number = context?.stepCoordination?.sectionOccurrence ?? 1;
     const isRepeatPass = sectionOccurrence >= 2;
     // Hash the sectionId (string) into a 32-bit int so different sections of the
@@ -567,7 +588,7 @@ export function getBassNote(
         barInPhrase,
         phraseIndex,
         stepInChord,
-        wrappedStep: wrappedStepForSectionStart,
+        wrappedStep: chartStep,
         sectionStartStep: typeof context?.sectionStart === 'number' ? context.sectionStart : null,
         sectionIdHash,
         sectionOccurrence,
@@ -770,15 +791,15 @@ export function getBassNote(
         // #1006 — WITHIN-PHRASE velocity envelope (design §4.6). The bass had NO
         // note-to-note dynamic shape: `velocity` (odd-beat accent) × a slow macro
         // term left every note in a bar at essentially one weight. A
-        // real bassist swells INTO the metric anchors (the downbeat and the bar
-        // midpoint) and eases off the step right after. This is a distance-to-target
+        // real bassist swells INTO the metric anchors (the authored meter-group
+        // starts) and eases off the step right after. This is a distance-to-target
         // shaping term applied FINAL-STAGE — a `* envelope` AFTER the accent × token
         // product — per the final-stage-multiplier rule; folded into the accent it would
         // wash out against the other factors. Genre-neutral first pass (no per-genre
         // contour tables yet). `stepInMeasure` is already measure-relative, so no #923
         // wrap is needed. KNOWN LIMITATION (#1006): multiplicative-then-clamped, so the
         // swell fades when the base is already hot — same tradeoff as the soloist envelope.
-        // Note the envelope anchors beats 1 & 3 (metric). For styles still carrying
+        // In 4/4 [2,2], the envelope anchors beats 1 & 3. For styles still carrying
         // the generic backbeat accent (2 & 4) the combined per-beat weight reads
         // 1.05 / 1.15 / 1.05 / 1.15 — a coherent metric-under-backbeat interplay,
         // intentional for the genre-neutral pass. For the accent-exempt styles
@@ -788,22 +809,32 @@ export function getBassNote(
         // same-token "and" pop at all.
         const spb = ts.stepsPerBeat;
         const spBar = ts.beats * spb;
-        const midBeatStepB = Math.floor(ts.beats / 2) * spb;
-        const isStrongBeatB = stepInMeasure === 0 || stepInMeasure === midBeatStepB;
+        const groupedStrongStepsB = [...getMeterGroupStarts(ts)];
+        const legacyMidpointB = Math.floor(ts.beats / 2) * spb;
+        const strongStepsB =
+            groupedStrongStepsB.length > 1
+                ? groupedStrongStepsB
+                : [...new Set([0, legacyMidpointB])].sort((a, b) => a - b);
+        const isStrongBeatB = strongStepsB.includes(stepInMeasure);
         const approachWindowB = Math.max(1, Math.floor(spb / 2)); // last eighth into a beat
         let bassEnvelope = 1.0;
         if (BASS_VELOCITY_ENVELOPE.enabled) {
             if (isStrongBeatB) {
                 bassEnvelope = 1.05; // why: lean into the downbeat / bar midpoint — the pocket anchors
             } else {
-                // Distance to the next strong beat (bar midpoint if before it, else the
-                // next downbeat), and steps since the last one.
+                // Distance to the next authored group start (or next downbeat),
+                // and steps since the preceding group start.
+                const nextStrongInBarB = strongStepsB.find(
+                    (strongStep) => strongStep > stepInMeasure,
+                );
                 const toStrongB =
-                    stepInMeasure < midBeatStepB
-                        ? midBeatStepB - stepInMeasure
+                    nextStrongInBarB !== undefined
+                        ? nextStrongInBarB - stepInMeasure
                         : spBar - stepInMeasure;
-                const lastStrongB = stepInMeasure >= midBeatStepB ? midBeatStepB : 0;
-                const sinceStrongB = stepInMeasure - lastStrongB;
+                const previousStrongInBarB =
+                    [...strongStepsB].reverse().find((strongStep) => strongStep <= stepInMeasure) ??
+                    0;
+                const sinceStrongB = stepInMeasure - previousStrongInBarB;
                 if (toStrongB <= approachWindowB) {
                     // why: a pickup/passing note swells INTO the coming strong beat —
                     // louder the closer it is (an eighth out ≈ +1%, right before ≈ +5%).
@@ -872,7 +903,11 @@ export function getBassNote(
         };
     };
 
-    const isSoloistBusy = (soloist.session.phrasing.busySteps || 0) > 0;
+    const isSoloistBusy = isSoloistBusyAtStep(
+        state,
+        step,
+        context?.stepCoordination?.soloistBusy === true,
+    );
 
     // --- Structural gate for withOctaveJump ---
     // why: bass.md P2 #12 / epic-deterministic-phrasing S4 — replace bare
@@ -1132,9 +1167,7 @@ export function getBassNote(
     }
 
     const kickInst = (groove.instruments || []).find((i: any) => i.name === 'Kick');
-    const hasKickTrigger = !!(
-        kickInst?.steps && kickInst.steps[step % (groove.measures * stepsPerMeasure)] > 0
-    );
+    const hasKickTrigger = !!(kickInst?.steps && kickInst.steps[groovePatternStep] > 0);
 
     // --- Kick-lock: a FLOOR under the authored gesture, not an interceptor (#948) ---
     //
@@ -1174,8 +1207,7 @@ export function getBassNote(
     // real behavior change.
     let kickLockFloorVel: number | null = null;
     if ((style === 'rock' || style === 'funk') && hasKickTrigger) {
-        const kickVel =
-            kickInst.steps[step % (groove.measures * stepsPerMeasure)] === 2 ? 1.25 : 1.15;
+        const kickVel = kickInst.steps[groovePatternStep] === 2 ? 1.25 : 1.15;
         // why (#941): was `kickVel * (0.7 + intensity * 0.3)`. The `0.7` survives as
         // the articulation offset — a kick-locked note DOUBLES the drummer, it
         // doesn't lead, so it sits a fixed notch under the authored downbeat tokens
@@ -1253,7 +1285,7 @@ export function getBassNote(
     if (
         upcomingSectionChord &&
         bassAnticipationSectionEnd !== null &&
-        step === anticipationStep &&
+        chartStep === anticipationStep &&
         ANTICIPATION_STYLES.has(style)
     ) {
         // Normalize the upcoming root into bass register using the same register
@@ -1322,7 +1354,7 @@ export function getBassNote(
     }
 
     if (style === 'neo' || groove.genreFeel === 'Neo-Soul') {
-        const isUpbeat = step % ts.stepsPerBeat !== 0;
+        const isUpbeat = !stepInfo?.isBeatStart;
         const isSecondaryAnchor = stepInMeasure / ts.stepsPerBeat === 2;
         if (isDownbeat || isSecondaryAnchor) {
             // why (#941): was `1.15 + intensity * 0.1`. The intensity term was macro
@@ -1414,7 +1446,7 @@ export function getBassNote(
     if (style === 'blues') {
         const isUpbeat = stepInfo?.isOffbeat;
         if (hasKickTrigger) {
-            const kickStepVal = kickInst.steps[step % (groove.measures * stepsPerMeasure)];
+            const kickStepVal = kickInst.steps[groovePatternStep];
             const kickVel = kickStepVal === 2 ? 1.25 : 1.15;
             // why (#941): same de-stacking as the generic kick-lock above — the
             // `0.7` is the "doubling the drummer" articulation offset, the
@@ -1727,11 +1759,11 @@ export function getBassNote(
         ts,
         stepsPerMeasure,
         intBeat,
-        step % ts.stepsPerBeat === 0,
-        stepInMeasure % ts.stepsPerBeat === 0,
+        stepInfo?.isBeatStart ?? stepInMeasure % ts.stepsPerBeat === 0,
+        stepInfo?.isBeatStart ?? stepInMeasure % ts.stepsPerBeat === 0,
         isDownbeat,
         stepInMeasure,
-        step % ts.stepsPerBeat,
+        stepInMeasure % ts.stepsPerBeat,
         baseRoot,
         prevFreq || 0,
         prevMidi || baseRoot,
@@ -1757,6 +1789,7 @@ export function getBassNote(
         // (e.g. test mocks that don't supply stepCoordination); the rock branch
         // treats undefined identically to -1 (no boundary known → 0.15× residual).
         context?.stepCoordination?.barsUntilSectionChange,
+        barIndexEarly,
     );
     if (styleResult !== undefined) {
         // #948: this exit's own floor application. Once a rock/funk step reaches
@@ -1785,7 +1818,7 @@ export function getBassNote(
         isEighthSkip ||
         // why: compound-meter S5 — meter-aware anticipation slot (final eighth
         // in compound = step 11 of 12, "and of 4" in simple = step 14 of 16).
-        step % stepsPerMeasure === stepsPerMeasure - (ts.isCompound ? 1 : 2);
+        stepInMeasure === stepsPerMeasure - (ts.isCompound ? 1 : 2);
 
     if (isApproachPoint && isChordChangeApproach(nextChord, chord)) {
         const nextTarget = nextChord.bassMidi ?? nextChord.rootMidi;

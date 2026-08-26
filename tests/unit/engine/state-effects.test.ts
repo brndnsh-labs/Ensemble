@@ -4,6 +4,11 @@ import { setBpm } from '../../../public/controllers/app-controller.js';
 import { loadDrumPreset } from '../../../public/controllers/instrument-controller.js';
 import { validateProgression } from '../../../public/engine/chords-engine.js';
 import {
+    generateDrumFills,
+    generateDrumOrchestration,
+    generateSoloistAccents,
+} from '../../../public/engine/drum-seeder.js';
+import {
     initAudio,
     restoreGains,
     syncBusReverbSend,
@@ -14,6 +19,7 @@ import {
     markPackInstalled,
 } from '../../../public/engine/instrument-registry.js';
 import { togglePlay } from '../../../public/engine/scheduler-core.js';
+import { generateSessionSeed } from '../../../public/engine/soloist-seeder.js';
 import { handleEffects, reconcileUrlGenreOnBoot } from '../../../public/state/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
@@ -35,6 +41,14 @@ vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     syncBusReverbSend: vi.fn(),
     syncBusVolume: vi.fn(),
+}));
+vi.mock('../../../public/engine/soloist-seeder.js', () => ({
+    generateSessionSeed: vi.fn(() => ({ notes: [], loopLengthSteps: 64 })),
+}));
+vi.mock('../../../public/engine/drum-seeder.js', () => ({
+    generateDrumOrchestration: vi.fn(() => [{ start: 0, end: 64 }]),
+    generateDrumFills: vi.fn(() => ({ 0: { steps: {} } })),
+    generateSoloistAccents: vi.fn(() => ({ 6: { type: 'snare-stab' } })),
 }));
 
 describe('State Effects Handler', () => {
@@ -58,6 +72,55 @@ describe('State Effects Handler', () => {
     it('should call validateProgression on section-related actions', () => {
         handleEffects(ACTIONS.SET_SECTIONS, {}, stateMap, { dispatch });
         expect(validateProgression).toHaveBeenCalledWith(stateMap, dispatch);
+    });
+
+    it('revalidates and regenerates live seeds when authored grouping changes', () => {
+        stateMap = {
+            playback: { isPlaying: true, step: 42, bandIntensity: 0.7, toasts: [] },
+            arranger: { seed: 'GROUPED', timeSignature: '7/8', grouping: [3, 2, 2] },
+            soloist: { enabled: true, style: 'smart' },
+            groove: { enabled: true, genreFeel: 'Rock' },
+        };
+
+        handleEffects(ACTIONS.SET_GROUPING, [3, 2, 2], stateMap, { dispatch });
+
+        expect(validateProgression).toHaveBeenCalledWith(stateMap, dispatch);
+        expect(generateSessionSeed).toHaveBeenCalledWith(
+            stateMap,
+            stateMap.arranger,
+            'smart',
+            0.7,
+            'GROUPED',
+        );
+        expect(generateDrumOrchestration).toHaveBeenCalled();
+        expect(generateDrumFills).toHaveBeenCalled();
+        expect(generateSoloistAccents).toHaveBeenCalled();
+        expect(dispatch).toHaveBeenCalledWith(
+            ACTIONS.UPDATE_GB,
+            expect.objectContaining({ seedTimelineStartStep: 42 }),
+        );
+    });
+
+    it('builds chart-wide drum seeds when a section force-enables a globally muted kit', () => {
+        stateMap = {
+            playback: { isPlaying: true, step: 0, bandIntensity: 0.6, toasts: [] },
+            arranger: {
+                seed: 'FORCED-KIT',
+                sections: [{ id: 'chorus', instruments: { groove: true } }],
+            },
+            soloist: { enabled: false, style: 'smart' },
+            groove: { enabled: false, genreFeel: 'Rock' },
+        };
+
+        handleEffects(ACTIONS.SET_SECTIONS, stateMap.arranger.sections, stateMap, { dispatch });
+
+        expect(generateDrumOrchestration).toHaveBeenCalled();
+        expect(generateDrumFills).toHaveBeenCalled();
+        expect(generateSoloistAccents).toHaveBeenCalled();
+        expect(dispatch).toHaveBeenCalledWith(
+            ACTIONS.UPDATE_GB,
+            expect.objectContaining({ seedTimelineStartStep: 0 }),
+        );
     });
 
     it('should call setBpm on SET_BPM action', () => {
