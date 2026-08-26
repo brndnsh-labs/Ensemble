@@ -127,6 +127,47 @@ test.describe('Section practice @ui', () => {
         await expect(page.locator('.chord-picker')).toHaveCount(0);
     });
 
+    test('keeps the chord picker above the action bar on a short phone @mobile', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 393, height: 659 });
+
+        // The shipped chart entrance animation creates a containing block for
+        // fixed descendants. Keep that production condition deterministic even
+        // though the E2E harness disables animations globally.
+        await page.locator('.chart-surface__chart').evaluate((chart) => {
+            chart.style.transform = 'translateY(0)';
+        });
+
+        await page.locator('.chord-card').first().click();
+        const picker = page.locator('.chord-picker');
+        const actionBar = page.locator('.mobile-action-bar');
+        await expect(picker).toBeVisible();
+        await expect(actionBar).toBeVisible();
+
+        const [pickerBox, actionBarBox, buttonBoxes] = await Promise.all([
+            picker.boundingBox(),
+            actionBar.boundingBox(),
+            picker
+                .locator('button')
+                .evaluateAll((buttons) =>
+                    buttons.map((button) => button.getBoundingClientRect().toJSON()),
+                ),
+        ]);
+        expect(pickerBox).not.toBeNull();
+        expect(actionBarBox).not.toBeNull();
+        expect(pickerBox!.y).toBeGreaterThanOrEqual(8);
+        expect(pickerBox!.y + pickerBox!.height).toBeLessThanOrEqual(actionBarBox!.y - 8);
+        for (const box of buttonBoxes) {
+            expect(box.top).toBeGreaterThanOrEqual(pickerBox!.y);
+            expect(box.bottom).toBeLessThanOrEqual(actionBarBox!.y - 8);
+        }
+
+        const lastQuality = picker.locator('.chord-picker__quality').last();
+        await lastQuality.click();
+        await expect(lastQuality).toHaveClass(/is-active/);
+    });
+
     test('popover works on mobile @mobile', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
 
