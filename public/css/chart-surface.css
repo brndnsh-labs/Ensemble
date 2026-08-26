@@ -176,10 +176,45 @@
         grid-template-columns: 1fr auto;
         row-gap: var(--space-1);
         column-gap: var(--space-2);
+        min-width: 0;
+    }
+
+    .chart-surface__chart,
+    .chart-surface__zone {
+        min-width: 0;
     }
 
     .chart-surface__zone--play {
         grid-area: play;
+    }
+
+    /* These scoped rules land after the base transport styles in the bundle.
+       Keep the compact transport's intended sizing from forcing the shared-link
+       output controls beyond a phone viewport. */
+    .chart-surface__zone--play .main-controls {
+        gap: 0;
+        flex-shrink: 1;
+    }
+
+    .chart-surface__zone--play #playBtn {
+        width: auto;
+        min-width: 80px;
+    }
+
+    .chart-surface__zone--play input[type="number"] {
+        width: 28px;
+        padding: 0;
+        font-size: 0.75rem;
+    }
+
+    .chart-surface__zone--play .control-group {
+        gap: 0.05rem;
+        padding: 0.1rem;
+    }
+
+    .chart-surface__zone--play #tapBtn {
+        padding: 0.2rem 0.25rem;
+        font-size: 0.65rem;
     }
 
     .chart-surface__zone--shape {

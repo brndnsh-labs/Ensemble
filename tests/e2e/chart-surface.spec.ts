@@ -291,6 +291,35 @@ test.describe('ChartSurface @ui', () => {
             await expect(page.locator('.chart-surface__shared-pill')).toHaveCount(0);
         });
 
+        test('keeps shared-link chrome inside a short phone viewport @mobile', async ({ page }) => {
+            await page.setViewportSize({ width: 393, height: 659 });
+            await gotoHydrated(page, `/?prog=${encodeURIComponent('C | Am | F | G')}`);
+
+            const topbar = page.locator('.chart-surface__topbar');
+            const chart = page.locator('.chart-surface__chart');
+            await expectLocatorFitsViewport(page, topbar);
+            await expectLocatorFitsViewport(page, chart);
+            await expectLocatorFitsViewport(
+                page,
+                page.getByRole('button', { name: 'More options' }),
+            );
+
+            // The chart can scroll vertically on a short phone; this regression
+            // is specifically that its final chord was clipped horizontally.
+            const lastChordBox = await page.locator('.chord-card').last().boundingBox();
+            const viewport = page.viewportSize();
+            expect(lastChordBox).not.toBeNull();
+            expect(viewport).not.toBeNull();
+            expect(lastChordBox!.x).toBeGreaterThanOrEqual(0);
+            expect(lastChordBox!.x + lastChordBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
+
+            const viewportWidths = await page.evaluate(() => ({
+                inner: window.innerWidth,
+                document: document.documentElement.scrollWidth,
+            }));
+            expect(viewportWidths.document).toBeLessThanOrEqual(viewportWidths.inner + 1);
+        });
+
         test('Share button is visible at mobile breakpoint @mobile', async ({ page }) => {
             await page.setViewportSize({ width: 390, height: 844 });
             const shareBtn = page.locator('.mobile-action-bar__btn', { hasText: 'Share' });
