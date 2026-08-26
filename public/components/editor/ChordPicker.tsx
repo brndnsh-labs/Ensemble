@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { KEY_ORDER } from '../../config.js';
 import { spellPitchClass } from '../../engine/note-spelling.js';
+import type { StyleObject } from '../../ui-types.js';
 
 /**
  * Tap-a-chord picker. Pops up when a chord cell is tapped in the locked
@@ -185,6 +187,7 @@ export function ChordPicker({
     const [accidental, setAccidental] = useState<'' | 'b' | '#'>(initialAccidental);
     const [qualityId, setQualityId] = useState(initialQualityId);
     const rootRef = useRef<HTMLDivElement | null>(null);
+    const [popoverStyle, setPopoverStyle] = useState<StyleObject>({ visibility: 'hidden' });
 
     // Click-outside dismiss + Escape key.
     useEffect(() => {
@@ -242,6 +245,66 @@ export function ChordPicker({
         };
     }, []);
 
+    useLayoutEffect(() => {
+        const updatePosition = () => {
+            const popover = rootRef.current;
+            if (!popover || typeof window === 'undefined') {
+                return;
+            }
+            if (!anchorRect) {
+                setPopoverStyle({
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    visibility: 'visible',
+                });
+                return;
+            }
+
+            const padding = 8;
+            const gap = 6;
+            const width = popover.offsetWidth || 280;
+            const height = popover.offsetHeight;
+            const left = Math.min(
+                Math.max(padding, anchorRect.left + anchorRect.width / 2 - width / 2),
+                window.innerWidth - width - padding,
+            );
+
+            const actionBar = document.querySelector<HTMLElement>('.mobile-action-bar');
+            const actionBarRect = actionBar?.getBoundingClientRect();
+            const actionBarTop =
+                actionBar &&
+                actionBarRect &&
+                actionBarRect.height > 0 &&
+                window.getComputedStyle(actionBar).display !== 'none'
+                    ? actionBarRect.top
+                    : window.innerHeight;
+            const usableBottom = Math.min(window.innerHeight, actionBarTop) - padding;
+            const belowTop = anchorRect.bottom + gap;
+            const aboveTop = anchorRect.top - gap - height;
+            const top =
+                belowTop + height <= usableBottom
+                    ? belowTop
+                    : aboveTop >= padding
+                      ? aboveTop
+                      : Math.max(padding, usableBottom - height);
+
+            setPopoverStyle({
+                top: `${top}px`,
+                left: `${left}px`,
+                visibility: 'visible',
+            });
+        };
+
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.visualViewport?.addEventListener('resize', updatePosition);
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.visualViewport?.removeEventListener('resize', updatePosition);
+        };
+    }, [anchorRect]);
+
     const quality = QUALITIES.find((q) => q.id === qualityId) || QUALITIES[0];
 
     const apply = (next: { degree?: number; accidental?: '' | 'b' | '#'; qualityId?: string }) => {
@@ -263,25 +326,7 @@ export function ChordPicker({
         onSelect(text);
     };
 
-    // Position above/below the anchor with viewport-edge clamping.
-    const popoverStyle = (() => {
-        if (!anchorRect || typeof window === 'undefined') {
-            return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
-        }
-        const PAD = 8;
-        const POPOVER_W = 280;
-        const left = Math.min(
-            Math.max(PAD, anchorRect.left + anchorRect.width / 2 - POPOVER_W / 2),
-            window.innerWidth - POPOVER_W - PAD,
-        );
-        // Prefer below; fall back above when there's no room.
-        const spaceBelow = window.innerHeight - anchorRect.bottom;
-        const placeBelow = spaceBelow > 220;
-        const top = placeBelow ? anchorRect.bottom + 6 : Math.max(PAD, anchorRect.top - 220);
-        return { top: `${top}px`, left: `${left}px` };
-    })();
-
-    return (
+    const picker = (
         <div
             ref={rootRef}
             class="chord-picker"
@@ -326,4 +371,11 @@ export function ChordPicker({
             </div>
         </div>
     );
+
+    // The chart surface has an entrance transform, which creates a containing
+    // block for fixed descendants even after the animation settles. Portal the
+    // picker so its measured viewport coordinates stay viewport-relative.
+    return typeof document !== 'undefined' && document.body
+        ? createPortal(picker, document.body)
+        : picker;
 }
