@@ -10,6 +10,7 @@ import {
     resolveInstrumentSource,
 } from './instrument-registry.js';
 import { pickRoundRobin, playSampledStrike, type SampleVoiceHandle } from './sample-voice.js';
+import { foldPracticeStep, isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     createSimplePanner,
     duckGain,
@@ -747,18 +748,19 @@ function noiseOffset(): number {
     return Math.random() * NOISE_BUFFER_SECONDS;
 }
 
-function getBandLayerCount(state: EnsembleState): number {
+function getBandLayerCount(state: EnsembleState, step: number): number {
+    const musicalStep = foldPracticeStep(step, state.playback);
     let layers = 0;
-    if (state.bass?.enabled) {
+    if (isInstrumentActiveAtStep(state, 'bass', musicalStep)) {
         layers++;
     }
-    if (state.chords?.enabled) {
+    if (isInstrumentActiveAtStep(state, 'chords', musicalStep)) {
         layers++;
     }
-    if (state.harmony?.enabled) {
+    if (isInstrumentActiveAtStep(state, 'harmony', musicalStep)) {
         layers++;
     }
-    if (state.soloist?.enabled) {
+    if (isInstrumentActiveAtStep(state, 'soloist', musicalStep)) {
         layers++;
     }
     return layers;
@@ -767,9 +769,13 @@ function getBandLayerCount(state: EnsembleState): number {
 /**
  * Keep cymbals supportive when the full arrangement is active.
  */
-export function getCymbalMixScale(state: EnsembleState, name: CymbalName): number {
+export function getCymbalMixScale(
+    state: EnsembleState,
+    name: CymbalName,
+    step = state.playback?.step ?? 0,
+): number {
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
-    const crowding = getBandLayerCount(state) / 4;
+    const crowding = getBandLayerCount(state, step) / 4;
     const genreFeel = state.groove?.genreFeel;
     const instrumentBase =
         name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;

@@ -63,8 +63,11 @@ function isBassSpaceFeel(feel: string | undefined | null): boolean {
     return BASS_SPACE_FEELS.has(feel || '');
 }
 
-export function shouldReserveBassSpace(state: EnsembleState): boolean {
-    return Boolean(state.playback.practiceMode || state.bass?.enabled);
+export function shouldReserveBassSpace(
+    state: EnsembleState,
+    bassActive = Boolean(state.bass?.enabled),
+): boolean {
+    return Boolean(state.playback.practiceMode || bassActive);
 }
 
 /**
@@ -92,8 +95,9 @@ export function shouldUseRootlessVoicing(
     quality: string,
     is7th: boolean,
     feel: string | undefined | null,
+    bassActive = Boolean(state.bass?.enabled),
 ): boolean {
-    if (!shouldReserveBassSpace(state) || !isBassSpaceFeel(feel)) {
+    if (!shouldReserveBassSpace(state, bassActive) || !isBassSpaceFeel(feel)) {
         return false;
     }
     if (shouldPreferGroundedPracticeVoicing(state, quality, feel)) {
@@ -112,8 +116,11 @@ export function shouldUseRootlessVoicing(
     return isMinor || isDominant || isMajor7;
 }
 
-export function getBassSpaceFloor(state: EnsembleState): number {
-    return shouldReserveBassSpace(state) ? 52 : 43;
+export function getBassSpaceFloor(
+    state: EnsembleState,
+    bassActive = Boolean(state.bass?.enabled),
+): number {
+    return shouldReserveBassSpace(state, bassActive) ? 52 : 43;
 }
 
 /**

@@ -80,6 +80,77 @@ describe('MIDI Worker Logic Deep Dive', () => {
         });
     });
 
+    it('uses the section meter for timing on the first and second chart loop', () => {
+        state.arranger.totalSteps = 30;
+        state.arranger.measureMap = [
+            { start: 0, end: 16, ts: '4/4' },
+            { start: 16, end: 30, ts: '7/8' },
+        ];
+        state.groove.swing = 100;
+        state.groove.swingSub = '16th';
+
+        const mixed = new ExportProcessor(state, {
+            includedTracks: ['drums'],
+            loopMode: 'once',
+        });
+        const durationAt = (step) => mixed.stepTimes[step + 1] - mixed.stepTimes[step];
+
+        expect(durationAt(0)).toBeGreaterThan(0.125);
+        expect(durationAt(16)).toBeCloseTo(0.125);
+        expect(durationAt(30)).toBeCloseTo(durationAt(0));
+        expect(durationAt(46)).toBeCloseTo(durationAt(16));
+    });
+
+    it('restarts eighth-note swing phase at an offset mixed-meter bar line', () => {
+        state.arranger.totalSteps = 30;
+        state.arranger.timeSignature = '7/8';
+        state.arranger.measureMap = [
+            { start: 0, end: 14, ts: '7/8' },
+            { start: 14, end: 30, ts: '4/4' },
+        ];
+        state.groove.swing = 100;
+        state.groove.swingSub = '8th';
+
+        const mixed = new ExportProcessor(state, {
+            includedTracks: ['drums'],
+            loopMode: 'once',
+        });
+        const durationAt = (step) => mixed.stepTimes[step + 1] - mixed.stepTimes[step];
+
+        expect(durationAt(14)).toBeCloseTo(0.1875);
+        expect(durationAt(44)).toBeCloseTo(durationAt(14));
+    });
+
+    it('writes mixed-meter metadata at both first- and second-loop seams', () => {
+        state.arranger.totalSteps = 30;
+        state.arranger.timeSignature = '7/8';
+        state.arranger.measureMap = [
+            { start: 0, end: 14, ts: '7/8' },
+            { start: 14, end: 30, ts: '4/4' },
+        ];
+        const mixed = new ExportProcessor(state, {
+            includedTracks: [],
+            loopMode: 'once',
+        });
+
+        for (const step of [0, 14, 30, 44]) {
+            mixed.processStep(step);
+        }
+
+        const signatures = mixed.metaTrack.events
+            .filter((event) => event.data[0] === 0xff && event.data[1] === 0x58)
+            .map((event) => [event.time, event.data[3], 2 ** event.data[4]]);
+        expect(signatures.map(([, num, denom]) => [num, denom])).toEqual([
+            [7, 8],
+            [4, 4],
+            [7, 8],
+            [4, 4],
+        ]);
+        expect(signatures.map(([time]) => time)).toEqual(
+            [...signatures.map(([time]) => time)].sort((a, b) => a - b),
+        );
+    });
+
     it('should exercise drum fill end and pending crash (Lines 668-676)', () => {
         processor.state.groove.fillActive = true;
         processor.state.groove.fillLength = 4;

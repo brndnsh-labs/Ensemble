@@ -239,7 +239,14 @@ export function generateResolutionNotes(
             quality.includes('9') ||
             quality.includes('6') ||
             quality.includes('minor');
-        const intervals = getIntervals(state, quality, is7th, density, genre);
+        const intervals = getIntervals(
+            state,
+            quality,
+            is7th,
+            density,
+            genre,
+            Boolean(enabled.bass),
+        );
 
         let playRoot = anchor - (anchor % 12) + targetPC;
         if (playRoot > anchor + 6) {

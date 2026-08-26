@@ -176,6 +176,7 @@ vi.mock('../../../public/engine/conductor.js', () => ({
     checkSectionTransition: vi.fn(),
 }));
 
+import { runDrumTick } from '../../../public/engine/drums-tick.js';
 import * as Engine from '../../../public/engine/engine.js';
 import {
     scheduleChordVisuals,
@@ -204,15 +205,26 @@ describe('Scheduler Core System', () => {
         playback.countInBeat = 0;
         playback.step = 0;
         playback.bpm = 120;
+        playback.nextNoteTime = 0;
+        playback.unswungNextNoteTime = 0;
         playback.audio.currentTime = 10.0;
         playback.conductorVelocity = 1.0;
         midi.enabled = false;
         midi.selectedOutputId = null;
         groove.enabled = true;
+        groove.genreFeel = 'Rock';
+        groove.measures = 1;
+        groove.swing = 0;
+        groove.swingSub = '8th';
         groove.instruments = [
             { name: 'Snare', steps: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0] },
         ];
         groove.pendingGenreFeel = null;
+        groove.sectionSeedMap = {};
+        groove.fillActive = false;
+        groove.fillStartStep = 0;
+        groove.fillLength = 0;
+        groove.pendingCrash = false;
         groove.buffer = new Map();
         bass.buffer = new Map();
         bass.enabled = true;
@@ -227,6 +239,9 @@ describe('Scheduler Core System', () => {
         // Bar 1 (Step 0): Key A
         // Bar 2 (Step 16): Key B
         arranger.totalSteps = 32;
+        arranger.timeSignature = '4/4';
+        arranger.grouping = null;
+        arranger.measureMap = [];
         arranger.stepMap = [
             {
                 start: 0,
@@ -257,7 +272,10 @@ describe('Scheduler Core System', () => {
             { id: 's1', key: 'A' },
             { id: 's2', key: 'B' },
         ];
-        arranger.sectionMap = arranger.stepMap;
+        arranger.sectionMap = [
+            { id: 's1', start: 0, end: 16 },
+            { id: 's2', start: 16, end: 32 },
+        ];
     });
 
     describe('Playback Control (togglePlay)', () => {
@@ -332,6 +350,51 @@ describe('Scheduler Core System', () => {
 
             expect(state.groove.pendingGenreFeel).toBe(null);
             expect(state.playback.isScheduling).toBe(false);
+        });
+
+        it('applies a pending genre at a mixed-meter bar line', () => {
+            const state = getState();
+            state.arranger.totalSteps = 40;
+            state.arranger.measureMap = [
+                { start: 0, end: 16, ts: '4/4' },
+                { start: 16, end: 28, ts: '3/4' },
+                { start: 28, end: 40, ts: '3/4' },
+            ];
+            state.playback.isPlaying = true;
+            state.playback.step = 28;
+            state.playback.scheduleAheadTime = 0.2;
+            state.playback.nextNoteTime = 10.0;
+            state.playback.audio.currentTime = 10.0;
+            state.groove.pendingGenreFeel = { feel: 'Jazz' };
+
+            scheduler(state);
+
+            expect(state.groove.genreFeel).toBe('Jazz');
+            expect(state.groove.pendingGenreFeel).toBe(null);
+            expect(state.playback.isScheduling).toBe(false);
+        });
+
+        it('restarts eighth-note swing phase at an offset mixed-meter bar line', () => {
+            const state = getState();
+            state.arranger.totalSteps = 30;
+            state.arranger.timeSignature = '7/8';
+            state.arranger.measureMap = [
+                { start: 0, end: 14, ts: '7/8' },
+                { start: 14, end: 30, ts: '4/4' },
+            ];
+            state.playback.isPlaying = true;
+            state.playback.step = 14;
+            state.playback.scheduleAheadTime = 0.01;
+            state.playback.nextNoteTime = 10.0;
+            state.playback.unswungNextNoteTime = 10.0;
+            state.playback.audio.currentTime = 10.0;
+            state.groove.swing = 100;
+            state.groove.swingSub = '8th';
+
+            scheduler(state);
+
+            expect(state.playback.step).toBe(15);
+            expect(state.playback.nextNoteTime - 10.0).toBeCloseTo(0.1875);
         });
     });
 
@@ -481,6 +544,253 @@ describe('Scheduler Core System', () => {
             if (osc.onended) {
                 osc.onended();
             }
+        });
+
+        it('accents the authored meter grouping', () => {
+            playback.metronome = true;
+            arranger.timeSignature = '5/4';
+            arranger.grouping = [2, 3];
+
+            scheduleGlobalEvent(getState(), 8, 2.0);
+
+            const osc = playback.audio.createOscillator();
+            expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(800, 2.0);
+        });
+
+        it('expires an old fill at a drum-muted seam before the next audible section', () => {
+            arranger.totalSteps = 48;
+            arranger.sections = [
+                { id: 'audible-a', key: 'A' },
+                { id: 'muted', key: 'B', instruments: { groove: false } },
+                { id: 'audible-b', key: 'C', instruments: { groove: true } },
+            ];
+            arranger.sectionMap = [
+                { id: 'audible-a', start: 0, end: 16 },
+                { id: 'muted', start: 16, end: 32 },
+                { id: 'audible-b', start: 32, end: 48 },
+            ];
+            arranger.stepMap = [
+                {
+                    start: 0,
+                    end: 16,
+                    chord: {
+                        sectionId: 'audible-a',
+                        key: 'A',
+                        rootMidi: 60,
+                        beats: 4,
+                        freqs: [261.63, 329.63, 392],
+                    },
+                },
+                {
+                    start: 16,
+                    end: 32,
+                    chord: {
+                        sectionId: 'muted',
+                        key: 'B',
+                        rootMidi: 62,
+                        beats: 4,
+                        freqs: [293.66, 369.99, 440],
+                    },
+                },
+                {
+                    start: 32,
+                    end: 48,
+                    chord: {
+                        sectionId: 'audible-b',
+                        key: 'C',
+                        rootMidi: 64,
+                        beats: 4,
+                        freqs: [329.63, 415.3, 493.88],
+                    },
+                },
+            ];
+            groove.enabled = true;
+            groove.fillActive = true;
+            groove.fillStartStep = 0;
+            groove.fillLength = 16;
+            groove.pendingCrash = true;
+
+            scheduleGlobalEvent(getState(), 16, 1.0);
+
+            expect(groove.fillActive).toBe(false);
+            expect(groove.pendingCrash).toBe(false);
+        });
+
+        it('keeps main and worker drum phase aligned at a mixed-meter seam and loop two', () => {
+            arranger.totalSteps = 28;
+            arranger.timeSignature = '3/4';
+            arranger.grouping = null;
+            arranger.sections = [
+                { id: 'waltz', key: 'A', timeSignature: '3/4' },
+                { id: 'straight', key: 'B', timeSignature: '4/4' },
+            ];
+            arranger.sectionMap = [
+                { id: 'waltz', start: 0, end: 12, timeSignature: '3/4' },
+                { id: 'straight', start: 12, end: 28, timeSignature: '4/4' },
+            ];
+            arranger.measureMap = [
+                { start: 0, end: 12, ts: '3/4' },
+                { start: 12, end: 28, ts: '4/4' },
+            ];
+            arranger.stepMap = [
+                {
+                    start: 0,
+                    end: 12,
+                    chord: {
+                        sectionId: 'waltz',
+                        key: 'A',
+                        timeSignature: '3/4',
+                        freqs: [],
+                        rootMidi: 60,
+                        intervals: [0, 4, 7],
+                        beats: 3,
+                    },
+                },
+                {
+                    start: 12,
+                    end: 28,
+                    chord: {
+                        sectionId: 'straight',
+                        key: 'B',
+                        timeSignature: '4/4',
+                        freqs: [],
+                        rootMidi: 62,
+                        intervals: [0, 4, 7],
+                        beats: 4,
+                    },
+                },
+            ];
+            vizState.enabled = true;
+
+            for (const step of [12, 40]) {
+                const workerTick = runDrumTick(getState(), step, {
+                    mainCursor: { index: 0, sectionIndex: 0 },
+                    lookaheadCursor: { index: 0, sectionIndex: 0 },
+                });
+                expect(workerTick.ts.beats).toBe(4);
+                expect(workerTick.stepInfo.mStep).toBe(0);
+                expect(workerTick.drumStep).toBe(0);
+
+                playback.drawQueue.length = 0;
+                scheduleGlobalEvent(getState(), step, 10);
+                expect(playback.drawQueue).toContainEqual(
+                    expect.objectContaining({
+                        type: 'step',
+                        step: 0,
+                        chartStep: 12,
+                    }),
+                );
+            }
+
+            groove.enabled = false;
+            playback.drawQueue.length = 0;
+            scheduleGlobalEvent(getState(), 12, 10);
+            expect(playback.drawQueue).toContainEqual(
+                expect.objectContaining({ type: 'step', step: 0, chartStep: 12 }),
+            );
+        });
+
+        it('keeps two-measure drum patterns bar-local at an offset seam and later loop', () => {
+            arranger.totalSteps = 46;
+            arranger.timeSignature = '7/8';
+            arranger.sections = [
+                { id: 'odd', key: 'A', timeSignature: '7/8' },
+                { id: 'disco', key: 'B', timeSignature: '4/4' },
+            ];
+            arranger.sectionMap = [
+                { id: 'odd', start: 0, end: 14, timeSignature: '7/8' },
+                { id: 'disco', start: 14, end: 46, timeSignature: '4/4' },
+            ];
+            arranger.measureMap = [
+                { start: 0, end: 14, ts: '7/8' },
+                { start: 14, end: 30, ts: '4/4' },
+                { start: 30, end: 46, ts: '4/4' },
+            ];
+            arranger.stepMap = [
+                {
+                    start: 0,
+                    end: 14,
+                    chord: {
+                        sectionId: 'odd',
+                        key: 'A',
+                        timeSignature: '7/8',
+                        freqs: [],
+                        rootMidi: 60,
+                        intervals: [0, 4, 7],
+                        beats: 7,
+                    },
+                },
+                {
+                    start: 14,
+                    end: 30,
+                    chord: {
+                        sectionId: 'disco',
+                        key: 'B',
+                        timeSignature: '4/4',
+                        freqs: [],
+                        rootMidi: 62,
+                        intervals: [0, 4, 7],
+                        beats: 4,
+                    },
+                },
+                {
+                    start: 30,
+                    end: 46,
+                    chord: {
+                        sectionId: 'disco',
+                        key: 'B',
+                        timeSignature: '4/4',
+                        freqs: [],
+                        rootMidi: 62,
+                        intervals: [0, 4, 7],
+                        beats: 4,
+                    },
+                },
+            ];
+            groove.genreFeel = 'Disco';
+            groove.measures = 2;
+            groove.sectionSeedMap = { disco: 0.1 }; // foundation motif: no ghost-snare fallback
+            groove.instruments = [
+                { name: 'Snare', steps: Array.from({ length: 32 }, () => 0), muted: false },
+            ];
+            playback.bandIntensity = 0.8;
+
+            // The final step of bar 2 is drumStep 31 but bar-local loopStep 15.
+            // Disco's turnaround crack keys on the latter and must recur on loop 2.
+            for (const step of [45, 91]) {
+                const tick = runDrumTick(getState(), step, {
+                    mainCursor: { index: 0, sectionIndex: 0 },
+                    lookaheadCursor: { index: 0, sectionIndex: 0 },
+                });
+                expect(tick.drumStep).toBe(31);
+                expect(tick.drumHits).toContainEqual(
+                    expect.objectContaining({
+                        shouldPlay: true,
+                        soundName: 'Snare',
+                    }),
+                );
+                expect(tick.drumHits[0].velocity).toBeGreaterThan(1.2);
+            }
+        });
+
+        it('schedules a globally disabled lane when its section forces it on', () => {
+            bass.enabled = false;
+            arranger.sections[0].instruments = { bass: true };
+            bass.buffer.set(0, [{ freq: 110, durationSteps: 4, velocity: 0.8 }]);
+
+            scheduleGlobalEvent(getState(), 0, 10.0);
+
+            expect(Engine.playBassNote).toHaveBeenCalled();
+        });
+
+        it('does not schedule a globally enabled lane when its section forces it off', () => {
+            bass.enabled = true;
+            arranger.sections[0].instruments = { bass: false };
+            bass.buffer.set(0, [{ freq: 110, durationSteps: 4, velocity: 0.8 }]);
+
+            scheduleGlobalEvent(getState(), 0, 10.0);
+
+            expect(Engine.playBassNote).not.toHaveBeenCalled();
         });
 
         it('should calculate rhythm section mask (lines 1118-1140)', () => {

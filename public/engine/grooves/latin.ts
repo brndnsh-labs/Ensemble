@@ -108,9 +108,9 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         soundName = 'Sidestick';
 
         // 2-Bar Clave Logic
-        const barIndex = Math.floor(step / context.stepsPerBar);
+        const barIndex = context.barIndex;
         const isBar1 = barIndex % 2 === 0;
-        const stepInBar = step % context.stepsPerBar;
+        const stepInBar = context.mStep;
 
         if (isCompound) {
             // why: epic-3-followup S10 — the latin feel has NO clave/bell

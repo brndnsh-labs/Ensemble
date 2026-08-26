@@ -1,6 +1,10 @@
 import type { EnsembleState } from '../types.js';
 import { WORKER_RESP } from '../worker-types.js';
-import { foldPracticeStep, isInstrumentActiveAtStep } from './section-overrides.js';
+import {
+    foldPracticeStep,
+    isInstrumentActiveAtStep,
+    isInstrumentEverActive,
+} from './section-overrides.js';
 import { generateNotesForStep } from './tick-logic.js';
 import { workerContext } from './worker-orchestrator.js';
 
@@ -30,31 +34,16 @@ export function fillBuffers(
     // instrument doesn't drag the loop start back to its stale head. We still need
     // the per-step gate below to honor section overrides — this top-level test
     // just asks "is this instrument *ever* active in this chart?"
-    const { chords, bass, soloist, harmony, arranger } = state;
-    const couldBeActive = (
-        key: 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist',
-        globalEnabled: boolean,
-    ): boolean => {
-        if (globalEnabled) {
-            return true;
-        }
-        const sections = arranger?.sections;
-        if (!sections) {
-            return false;
-        }
-        for (const s of sections) {
-            if (s.instruments?.[key] === true) {
-                return true;
-            }
-        }
-        return false;
-    };
+    const soloistCouldBeActive = isInstrumentEverActive(state, 'soloist');
+    const bassCouldBeActive = isInstrumentEverActive(state, 'bass');
+    const chordsCouldBeActive = isInstrumentEverActive(state, 'chords');
+    const harmonyCouldBeActive = isInstrumentEverActive(state, 'harmony');
     const SENTINEL = Number.POSITIVE_INFINITY;
     let head = Math.min(
-        couldBeActive('bass', bass.enabled) ? workerContext.bbBufferHead : SENTINEL,
-        couldBeActive('soloist', soloist.enabled) ? workerContext.sbBufferHead : SENTINEL,
-        couldBeActive('chords', chords.enabled) ? workerContext.cbBufferHead : SENTINEL,
-        couldBeActive('harmony', harmony.enabled) ? workerContext.hbBufferHead : SENTINEL,
+        bassCouldBeActive ? workerContext.bbBufferHead : SENTINEL,
+        soloistCouldBeActive ? workerContext.sbBufferHead : SENTINEL,
+        chordsCouldBeActive ? workerContext.cbBufferHead : SENTINEL,
+        harmonyCouldBeActive ? workerContext.hbBufferHead : SENTINEL,
     );
     if (!Number.isFinite(head)) {
         head = currentStep;
@@ -126,24 +115,22 @@ export function fillBuffers(
             notesToMain.push(note);
         }
 
-        // why: advance each buffer head only when the instrument was active at
-        // this step. Advancing unconditionally would burn past steps for a
-        // currently-muted instrument, so when it later re-enables (global toggle
-        // OR a section override flipping on) the next REQUEST_BUFFER would have
-        // nothing to fill from the missed window. Per-instrument tracking keeps
-        // the buffer head as the "last step we considered for this instrument"
-        // — inactive steps simply leave the head pinned, ready to resume.
-        if (soloistActive && step >= workerContext.sbBufferHead) {
-            workerContext.sbBufferHead++;
+        // A head records the next step to *consider*, not the next active step.
+        // Pinning it through a force-off section makes the next fill regenerate
+        // that entire gap and can replay stale notes when the lane turns on. Lanes
+        // that can never sound are excluded from `head` above; every other lane
+        // advances across both active and inactive steps.
+        if (soloistCouldBeActive && step >= workerContext.sbBufferHead) {
+            workerContext.sbBufferHead = step + 1;
         }
-        if (bassActive && step >= workerContext.bbBufferHead) {
-            workerContext.bbBufferHead++;
+        if (bassCouldBeActive && step >= workerContext.bbBufferHead) {
+            workerContext.bbBufferHead = step + 1;
         }
-        if (chordsActive && step >= workerContext.cbBufferHead) {
-            workerContext.cbBufferHead++;
+        if (chordsCouldBeActive && step >= workerContext.cbBufferHead) {
+            workerContext.cbBufferHead = step + 1;
         }
-        if (harmonyActive && step >= workerContext.hbBufferHead) {
-            workerContext.hbBufferHead++;
+        if (harmonyCouldBeActive && step >= workerContext.hbBufferHead) {
+            workerContext.hbBufferHead = step + 1;
         }
 
         head++;

@@ -17,10 +17,10 @@ vi.mock('../../../public/state.js', () => {
         },
         groove: { genreFeel: 'Rock', lastDrumPreset: 'Basic Rock' },
         chords: { enabled: true, style: 'smart', density: 'standard', octave: 60 },
-        bass: { enabled: true },
+        bass: { enabled: true, lastFreq: null },
         soloist: makeSoloistMock({ enabled: false, busySteps: 0 }),
         arranger: { timeSignature: '4/4', progression: [] },
-        harmony: {},
+        harmony: { enabled: false, rhythmicMask: 0 },
         vizState: {},
         midi: {},
         storage: {},
@@ -53,7 +53,7 @@ import {
 } from '../../../public/engine/accompaniment.js';
 import { getState } from '../../../public/state.js';
 
-const { arranger, playback, chords, bass, groove } = getState();
+const { arranger, playback, chords, bass, soloist, harmony, groove } = getState();
 
 describe('Accompaniment Engine Logic', () => {
     const mockChord = {
@@ -75,6 +75,11 @@ describe('Accompaniment Engine Logic', () => {
         chords.style = 'smart';
         groove.genreFeel = 'Rock';
         bass.enabled = false;
+        bass.lastFreq = null;
+        soloist.enabled = false;
+        soloist.audio.lastFreq = null;
+        harmony.enabled = false;
+        harmony.rhythmicMask = 0;
         playback.bandIntensity = 0.5;
         playback.complexity = 0.5;
         playback.practiceMode = false;
@@ -152,6 +157,90 @@ describe('Accompaniment Engine Logic', () => {
                 isGroupStart: true,
             });
             expect(notesRootless.length).toBeLessThan(notesNormal.length);
+        });
+
+        it('uses the effective harmony lane in both override directions when interlocking comp hits', () => {
+            const render = (harmonyEffectiveEnabled) => {
+                compingState.currentCell = new Array(16).fill(0);
+                compingState.currentCell[3] = 1;
+                compingState.lockedUntil = 100;
+                compingState.lastVoicingMidis = [];
+                compingState.statementChordKey = null;
+                compingState.statementVoicingMidis = [];
+                return getAccompanimentNotes(
+                    getState(),
+                    mockChord,
+                    3,
+                    3,
+                    3,
+                    { isBeatStart: false, isGroupStart: false, mStep: 3, beatIndex: 0 },
+                    { harmonyEffectiveEnabled },
+                ).filter((note) => note.midi > 0);
+            };
+
+            harmony.rhythmicMask = 1 << 3;
+            harmony.enabled = false;
+            expect(render(true)).toHaveLength(0);
+
+            harmony.enabled = true;
+            expect(render(false).length).toBeGreaterThan(0);
+        });
+
+        it('ignores stale high soloist pitch when the effective lane is off', () => {
+            const render = (soloistEffectiveEnabled) => {
+                compingState.currentCell = new Array(16).fill(0);
+                compingState.currentCell[2] = 1;
+                compingState.lockedUntil = 100;
+                compingState.lastVoicingMidis = [];
+                compingState.statementChordKey = null;
+                compingState.statementVoicingMidis = [];
+                return getAccompanimentNotes(
+                    getState(),
+                    mockChord,
+                    2,
+                    2,
+                    2,
+                    { isBeatStart: false, isGroupStart: false, mStep: 2, beatIndex: 0 },
+                    { soloistEffectiveEnabled, harmonyEffectiveEnabled: false },
+                ).filter((note) => note.midi > 0);
+            };
+
+            soloist.audio.lastFreq = 1046.5;
+            soloist.enabled = false;
+            const forcedOn = render(true);
+
+            soloist.enabled = true;
+            const forcedOff = render(false);
+
+            expect(forcedOn).toHaveLength(3);
+            expect(forcedOff).toHaveLength(4);
+        });
+
+        it('ignores stale bass register when a Country strum section force-mutes bass', () => {
+            chords.style = 'strum-country';
+            groove.genreFeel = 'Country';
+            bass.lastFreq = 261.63;
+
+            const render = (bassEffectiveEnabled) => {
+                compingState.lastVoicingMidis = [];
+                return getAccompanimentNotes(
+                    getState(),
+                    mockChord,
+                    4,
+                    4,
+                    4,
+                    { isBeatStart: true, isGroupStart: false, mStep: 4, beatIndex: 1 },
+                    { bassEffectiveEnabled, bassMidi: 60 },
+                ).filter((note) => note.midi > 0);
+            };
+
+            bass.enabled = false;
+            const forcedOn = render(true);
+            bass.enabled = true;
+            const forcedOff = render(false);
+
+            expect(Math.min(...forcedOn.map((note) => note.midi))).toBeGreaterThanOrEqual(67);
+            expect(Math.min(...forcedOff.map((note) => note.midi))).toBe(60);
         });
 
         it('should preserve guide tones when thinning rootless jazz turnaround dominants', () => {
@@ -362,6 +451,32 @@ describe('Accompaniment Engine Logic', () => {
                 }
             }
             expect(foundCharleston).toBe(true);
+        });
+
+        it('anchors an empty Jazz continuity cache at an offset section downbeat', () => {
+            groove.genreFeel = 'Jazz';
+            arranger.totalSteps = 30;
+            compingState.lastVoicingMidis = [];
+            compingState.currentCell = new Array(16).fill(0);
+            const ts44 = TIME_SIGNATURES['4/4'];
+
+            getAccompanimentNotes(
+                getState(),
+                { ...mockChord, sectionId: 'offset-four' },
+                14,
+                0,
+                0,
+                {
+                    mStep: 0,
+                    isMeasureStart: true,
+                    isBeatStart: true,
+                    isGroupStart: true,
+                    tsConfig: ts44,
+                },
+                { sectionStart: 14 },
+            );
+
+            expect(compingState.currentCell[0]).toBe(1);
         });
 
         it('should offer multiple balanced Rock patterns across phrases at medium settings', () => {

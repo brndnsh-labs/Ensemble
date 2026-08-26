@@ -154,6 +154,7 @@ export function getIntervals(
     is7th: boolean,
     density: string,
     genre = 'Rock',
+    bassActive = Boolean(state.bass?.enabled),
 ): number[] {
     const { playback } = state;
     const isRich = density === 'rich';
@@ -167,7 +168,7 @@ export function getIntervals(
     const isAug = quality.includes('aug') || quality.includes('+');
 
     // 1. JAZZ & SOUL: ROOTLESS VOICINGS
-    const shouldBeRootless = shouldUseRootlessVoicing(state, quality, is7th, genre);
+    const shouldBeRootless = shouldUseRootlessVoicing(state, quality, is7th, genre, bassActive);
     if (shouldBeRootless) {
         const rootless = getRootlessVoicing(state, quality, is7th, isRich || intensity > 0.6);
         if (rootless) {

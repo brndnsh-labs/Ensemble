@@ -114,6 +114,17 @@ export async function renderStemsToWav(
             const sliceKey = STEM_ENABLE_SLICE[stem];
             state[sliceKey].enabled = stem === instrument; // @direct-mutation — throwaway clone
         }
+        // Section force-on is musical authorship, while a stem choice is a sink
+        // mask. Force every excluded lane off at the section layer too; preserve
+        // target-lane overrides so its authored rests still render.
+        for (const section of state.arranger.sections) {
+            section.instruments = { ...(section.instruments || {}) };
+            for (const stem of STEM_INSTRUMENTS) {
+                if (stem !== instrument) {
+                    section.instruments[STEM_ENABLE_SLICE[stem]] = false;
+                }
+            }
+        }
         if (!state.soloist.enabled) {
             // A solo stem is a sound-source isolation, not permission to render
             // gestures driven by a lane that is absent from that stem.
@@ -261,7 +272,10 @@ function cloneStateForRender(liveState: any): any {
         },
         arranger: {
             ...liveState.arranger,
-            sections: liveState.arranger.sections.map((section: any) => ({ ...section })),
+            sections: liveState.arranger.sections.map((section: any) => ({
+                ...section,
+                instruments: section.instruments ? { ...section.instruments } : undefined,
+            })),
             progression: [],
             stepMap: [],
             sectionMap: [],
@@ -350,10 +364,10 @@ function fillBuffersForExport(state: any, timelineStartStep: number): void {
     for (let step = 0; step < state.arranger.totalSteps; step++) {
         const absoluteStep = timelineStartStep + step;
         const result = generateNotesForStep(state, absoluteStep, cursors, {
-            includeBass: state.bass.enabled,
-            includeChords: state.chords.enabled,
-            includeSoloist: state.soloist.enabled,
-            includeHarmony: state.harmony.enabled,
+            includeBass: true,
+            includeChords: true,
+            includeSoloist: true,
+            includeHarmony: true,
             includeDrums: false,
         });
 

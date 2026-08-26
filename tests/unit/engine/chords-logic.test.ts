@@ -332,6 +332,32 @@ describe('Chords & Voicing Logic', () => {
             expect(voicedPitchClasses).toContain(2); // D retained above the bass
             expect(voicedPitchClasses).toContain(5); // F retained above the bass
         });
+
+        it('voices each section for its effective bass override', () => {
+            bass.enabled = false;
+            groove.genreFeel = 'Jazz';
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            arranger.sections = [
+                {
+                    id: 'with-bass',
+                    label: 'With Bass',
+                    value: 'Cmaj7',
+                    instruments: { bass: true },
+                },
+                {
+                    id: 'without-bass',
+                    label: 'Without Bass',
+                    value: 'Cmaj7',
+                    instruments: { bass: false },
+                },
+            ];
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].intervals).not.toContain(0);
+            expect(arranger.progression[1].intervals).toContain(0);
+        });
     });
 
     // -----------------------------------------------------------------------

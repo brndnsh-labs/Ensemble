@@ -462,12 +462,13 @@ export interface GrooveOverrideOptions {
     sectionId?: string | null;
     sectionOccurrence: number;
     isFinalMeasure: boolean;
-    // tick-logic.ts builds the bag with a few extras (`isTurnaround`,
-    // `stepsPerBar`, `loopStep`) that this function recomputes internally
-    // and ignores; declared optional so the call site typechecks.
+    // Resolved by drums-tick from the section-aware meter/phase authority.
+    // Optional so isolated legacy fixtures still exercise the canonical fallback.
     isTurnaround?: boolean;
     stepsPerBar?: number;
     loopStep?: number;
+    sectionStep?: number;
+    chartStep?: number;
 }
 
 export function applyGrooveOverrides(
@@ -496,12 +497,23 @@ export function applyGrooveOverrides(
         sectionId: sectionIdFromTick,
         sectionOccurrence,
         isFinalMeasure,
+        isTurnaround: resolvedTurnaround,
+        stepsPerBar: resolvedStepsPerBar,
+        loopStep: resolvedLoopStep,
+        sectionStep: resolvedSectionStep,
+        chartStep: resolvedChartStep,
     }: GrooveOverrideOptions,
 ) {
     const { soloist, arranger } = state;
     const arrangerState = { timeSignature: '4/4', ...(arranger || {}) };
-    const stepsPerBar = getStepsPerMeasure(arrangerState.timeSignature);
-    const loopStep = step % stepsPerBar;
+    const stepsPerBar = resolvedStepsPerBar ?? getStepsPerMeasure(arrangerState.timeSignature);
+    // `loopStep` is the strategy's BAR-local rhythmic phase. The drum pattern
+    // cursor may span multiple measures, so a caller-provided cursor still has
+    // to normalize here before downbeat/final-step/backbeat-adjacency rules read it.
+    const loopStepSource = resolvedLoopStep ?? step;
+    const loopStep = ((loopStepSource % stepsPerBar) + stepsPerBar) % stepsPerBar;
+    const chartStep = resolvedChartStep ?? step;
+    const sectionStep = resolvedSectionStep ?? chartStep;
 
     let currentState = {
         shouldPlay: stepVal > 0,
@@ -534,8 +546,8 @@ export function applyGrooveOverrides(
     // toggle; 0.8 was the toggle-on value.)
     const drumComplexity = 0.8;
 
-    const barIndex = Math.floor(step / stepsPerBar);
-    const prevBarIndex = Math.floor((step - 1) / stepsPerBar);
+    const barIndex = Math.floor(sectionStep / stepsPerBar);
+    const prevBarIndex = Math.floor((sectionStep - 1) / stepsPerBar);
     const isFirstStepOfNewBar = loopStep === 0 && barIndex !== prevBarIndex;
     const seedTimelineStartStep = groove.seedTimelineStartStep || 0;
     const timelineStep = step - seedTimelineStartStep;
@@ -559,10 +571,12 @@ export function applyGrooveOverrides(
             : drumComplexity;
 
     // Calculate current section length to determine turnarounds dynamically instead of hardcoded 4 bars
-    const isTurnaround = isSectionTurnaround(step, arrangerState.sectionMap, stepsPerBar, 1);
+    const isTurnaround =
+        resolvedTurnaround ??
+        isSectionTurnaround(chartStep, arrangerState.sectionMap, stepsPerBar, 1);
 
     // Check if the PREVIOUS bar was a turnaround to determine if we should crash now
-    const prevStep = step - stepsPerBar;
+    const prevStep = chartStep - 1;
     const prevWasTurnaround = isSectionTurnaround(
         prevStep,
         arrangerState.sectionMap,
@@ -572,7 +586,7 @@ export function applyGrooveOverrides(
 
     const justFinishedTurnaround = prevWasTurnaround && isFirstStepOfNewBar;
 
-    const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], step);
+    const chordEntry: any = binarySearchMap(arrangerState.stepMap || [], chartStep);
     const sectionId = chordEntry?.chord?.sectionId;
     let sectionSeed = groove.sectionSeedMap?.[sectionId];
     // #1266 — `typeof !== 'number'`, not `=== undefined`. `sectionSeedMap` is always a
@@ -827,7 +841,7 @@ export function applyGrooveOverrides(
                 (config.blockAdjacentSnare && groove.genreFeel !== 'Rock' ? 0.7 : 1.0)
     ) {
         const isSyncopated = loopStep % 2 === 1;
-        const subdivision = stepsPerBar / (arrangerState.timeSignature.includes('/8') ? 2 : 4);
+        const subdivision = stepsPerBar / (tsConfig.stepsPerBeat === 2 ? 2 : 4);
         const isHeavySync = loopStep % subdivision === Math.floor(subdivision / 2);
 
         // why: share the backbeat-crowding definition with the soloist accent
@@ -914,7 +928,8 @@ export function applyGrooveOverrides(
         !isFinalMeasureDrums &&
         isRepeatPassDrums &&
         isGhostLane &&
-        arrangerState.timeSignature === '4/4'
+        tsConfig.beats === 4 &&
+        tsConfig.stepsPerBeat === 4
     ) {
         // why: skip foundational positions — downbeat (step 0) and backbeats
         // (steps 4, 12 in 4/4) define the genre's groove skeleton; permuting

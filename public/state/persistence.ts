@@ -13,6 +13,7 @@ export function saveCurrentState(): void {
         sections: arranger.sections,
         key: arranger.key,
         timeSignature: arranger.timeSignature,
+        grouping: arranger.grouping,
         isMinor: arranger.isMinor,
         notation: arranger.notation,
         lastChordPreset: arranger.lastChordPreset,
@@ -30,6 +31,7 @@ export function saveCurrentState(): void {
         // 1s debounce, or main.ts's visibilitychange flush firing mid-climb —
         // where a normal stop never ran to do the restore.
         bpm: playback.rampBpmTarget > 0 ? playback.rampBpmTarget : playback.bpm,
+        complexity: playback.complexity,
         metronome: playback.metronome,
         visualFlash: playback.visualFlash,
         qualityColors: playback.qualityColors,

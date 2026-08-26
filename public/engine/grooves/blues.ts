@@ -194,7 +194,7 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
             }
         } else if (activeMotif >= 2 && !isOffbeat && !isBeatStart) {
             // Very occasional 16th ghost notes at high intensity.
-            const stepInMeasure = context.step % context.stepsPerBar;
+            const stepInMeasure = context.mStep;
             // Skip the "e" of beats 1 & 3 (steps 1, 9) — those flam against the
             // kick — AND any 16th flanking a backbeat (3, 5, 11, 13), which would
             // crowd the beat-2/4 snare and read as "two snares in a row". That

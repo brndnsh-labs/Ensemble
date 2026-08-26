@@ -1,4 +1,4 @@
-import { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js';
 import { getSectionEnergy } from '../song/form-analysis.js';
 import type { ArrangerState } from '../state/arranger.js';
 import type { EnsembleState } from '../types.js';
@@ -46,6 +46,8 @@ interface ChorusRange {
     end: number;
     label: string;
     normalizedLabel: string;
+    timeSignature: string;
+    stepsPerBar: number;
 }
 
 /**
@@ -80,22 +82,24 @@ function seedRockSectionReturns(
     arranger: ArrangerState,
     soloistSeed: { notes: any[]; loopLengthSteps?: number },
 ): void {
-    if (arranger.timeSignature !== '4/4') {
-        return;
-    }
-
     const totalSteps = arranger.totalSteps || 0;
     if (totalSteps <= 0 || !Array.isArray(arranger.sectionMap)) {
         return;
     }
 
     const chorusRanges: ChorusRange[] = arranger.sectionMap
-        .map((section: any) => ({
-            start: Number(section?.start),
-            end: Number(section?.end),
-            label: String(section?.label || ''),
-            normalizedLabel: normalizeRepeatedChorusLabel(section?.label) || '',
-        }))
+        .map((section: any) => {
+            const start = Number(section?.start);
+            const meter = getEffectiveMeterAtStep(arranger, start);
+            return {
+                start,
+                end: Number(section?.end),
+                label: String(section?.label || ''),
+                normalizedLabel: normalizeRepeatedChorusLabel(section?.label) || '',
+                timeSignature: meter.stepInfo.tsName || arranger.timeSignature || '4/4',
+                stepsPerBar: meter.ts.beats * meter.ts.stepsPerBeat,
+            };
+        })
         .filter(
             (section) =>
                 section.normalizedLabel.length > 0 &&
@@ -125,10 +129,23 @@ function seedRockSectionReturns(
     // after the protected Head. An ineligible catch is skipped within that
     // Chorus, but an empty source Chorus never falls through to a later one.
     const sourceSection = repeatedChoruses[0];
+    const matchingSections = repeatedChoruses.filter(
+        (section) => section.normalizedLabel === sourceSection.normalizedLabel,
+    );
+    // The gesture's eligibility/backbeat rules are intentionally a 4/4 Rock
+    // critique. A global 4/4 chart can still contain local odd-meter Choruses;
+    // decline the memory whenever either the source or any target uses a meter
+    // this feature has not musically specified.
+    if (
+        sourceSection.timeSignature !== '4/4' ||
+        matchingSections.some((section) => section.timeSignature !== '4/4')
+    ) {
+        return;
+    }
     const sourceCycle = 1;
     const sourceSectionStart = sourceCycle * totalSteps + sourceSection.start;
     const sourceSectionEnd = sourceCycle * totalSteps + sourceSection.end;
-    const stepsPerBar = 16;
+    const stepsPerBar = sourceSection.stepsPerBar;
     const nextSection = arranger.sectionMap
         .map((section: any) => ({
             start: Number(section?.start),
@@ -160,8 +177,8 @@ function seedRockSectionReturns(
                 step < sourceSectionEnd &&
                 accent.type === 'snare-stab' &&
                 accent.role !== 'section-return' &&
-                step % stepsPerBar !== 0 &&
-                !isBackbeatAdjacentStep(step % stepsPerBar, stepsPerBar) &&
+                (step - sourceSectionStart) % stepsPerBar !== 0 &&
+                !isBackbeatAdjacentStep((step - sourceSectionStart) % stepsPerBar, stepsPerBar) &&
                 !sourceDropMuted(step),
         )
         .sort((a, b) => a.step - b.step)
@@ -171,14 +188,17 @@ function seedRockSectionReturns(
     }
 
     const sectionOffset = sourceEntry.step - sourceSectionStart;
-    const matchingSections = repeatedChoruses.filter(
-        (section) => section.normalizedLabel === sourceSection.normalizedLabel,
-    );
     const maxNoteStep = soloistSeed.notes.reduce(
         (max, note) => Math.max(max, Number.isFinite(note?.step) ? note.step + 1 : 0),
         0,
     );
     const horizon = Math.max(soloistSeed.loopLengthSteps || 0, maxNoteStep);
+    const finalMeasureStart =
+        arranger.measureMap
+            ?.map((measure) => Number(measure.start))
+            .filter((start) => Number.isFinite(start) && start >= 0 && start < totalSteps)
+            .sort((a, b) => a - b)
+            .at(-1) ?? totalSteps - stepsPerBar;
     const addReturn = (targetStep: number, section: ChorusRange): void => {
         if (sectionOffset >= section.end - section.start || targetStep >= horizon) {
             return;
@@ -186,7 +206,7 @@ function seedRockSectionReturns(
         const targetInForm = ((targetStep % totalSteps) + totalSteps) % totalSteps;
         // The form's last measure belongs to the established cadence gesture;
         // never layer the remembered catch into that protected cell.
-        if (targetInForm >= totalSteps - stepsPerBar) {
+        if (targetInForm >= finalMeasureStart) {
             return;
         }
         accentMap[targetStep] = {
@@ -389,9 +409,6 @@ export function generateDrumFills(
     const fillMap: Record<number, FillMapEntry> = {};
     const isVirtualMacroForm = unrolled.totalSteps !== unrolled.originalSteps;
 
-    const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerMeasure = tsConfig.beats * tsConfig.stepsPerBeat;
-
     // Orchestration is needed to check energy levels for the "Crash Contract"
     const orchestrationMap = generateDrumOrchestration(state, arranger, genre, intensity, seedStr);
 
@@ -415,12 +432,12 @@ export function generateDrumFills(
     const soloNotes = soloistSeed?.notes ?? [];
     const foldToSoloLoop = (s: number) =>
         soloLoopLen ? ((s % soloLoopLen) + soloLoopLen) % soloLoopLen : s;
-    const countSoloistOnsetsInBar = (barStart: number): number => {
+    const countSoloistOnsetsInBar = (barStart: number, barLength: number): number => {
         if (soloNotes.length === 0) {
             return 0;
         }
         const start = foldToSoloLoop(barStart);
-        const end = start + stepsPerMeasure;
+        const end = start + barLength;
         let onsets = 0;
         for (const note of soloNotes) {
             const s = foldToSoloLoop(note.step);
@@ -432,8 +449,17 @@ export function generateDrumFills(
     };
 
     sectionMap.forEach((sectionRange: any, index: number) => {
-        // Keep the generated "Outro" quiet at the end of virtual macro form.
-        if (isVirtualMacroForm && index === sectionMap.length - 1) {
+        const sectionTs = getEffectiveTimeSignature(
+            sectionRange.timeSignature || arranger.timeSignature,
+            (sectionRange.timeSignature || arranger.timeSignature) === arranger.timeSignature
+                ? arranger.grouping
+                : null,
+        );
+        const stepsPerMeasure = sectionTs.beats * sectionTs.stepsPerBeat;
+        // Keep every meter segment of the generated virtual Outro quiet. Mixed
+        // meters split one role into several ranges, so "last range only" leaks
+        // fills into the preceding Outro meter segment.
+        if (isVirtualMacroForm && String(sectionRange.label || '').toLowerCase() === 'outro') {
             return;
         }
 
@@ -493,7 +519,10 @@ export function generateDrumFills(
         // complement to the snare-stab accent discipline — the drummer both catches
         // the soloist's peaks AND gets out of the way of their phrases.
         const isStructural = fillProb > baseFillProb;
-        if (!isStructural && countSoloistOnsetsInBar(fillStartStep) >= SOLOIST_BUSY_ONSETS) {
+        if (
+            !isStructural &&
+            countSoloistOnsetsInBar(fillStartStep, stepsPerMeasure) >= SOLOIST_BUSY_ONSETS
+        ) {
             return;
         }
 
@@ -544,13 +573,12 @@ export function generateSoloistAccents(
     const prng = createPRNG(seedStr || generateRandomSeed());
     const accentMap: Record<number, AccentCatch> = {};
 
-    const tsConfig = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
-    const stepsPerBeat = tsConfig.stepsPerBeat;
-
     let lastCatchStep = -100;
-    const catchCooldown = stepsPerBeat * 4; // Max 1 catch every 4 beats (1 bar in 4/4)
 
     soloistSeed.notes.forEach((note) => {
+        const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, note.step);
+        const stepsPerBeat = ts.stepsPerBeat;
+        const catchCooldown = stepsPerBeat * 4; // Max 1 catch every 4 beats (1 bar in 4/4)
         // --- POCKET DISCIPLINE ---
         // Skip accents during the first iteration (The Head) to keep the initial groove metronomic.
         if (note.step < (arranger.totalSteps || 0)) {
@@ -560,7 +588,7 @@ export function generateSoloistAccents(
         // 1. Filter for valid accents
         // - Peak velocity (> 0.85)
         // - OR Highly syncopated (not on a main beat start)
-        const isOffbeat = note.step % stepsPerBeat !== 0;
+        const isOffbeat = !stepInfo.isBeatStart;
         const isStrongAccent = note.velocity > 0.85;
 
         if (isStrongAccent || (isOffbeat && note.velocity > 0.75 && intensity > 0.6)) {

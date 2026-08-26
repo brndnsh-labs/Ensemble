@@ -90,6 +90,36 @@ describe('lead-sheet-model', () => {
         expect(rows[1].measures[1].isSeamlessStart).toBe(true);
     });
 
+    it('builds measure bounds and chord timing from each section-local meter', () => {
+        const sections = buildLeadSheetSections(
+            [
+                {
+                    sectionId: 'odd',
+                    sectionLabel: 'Odd',
+                    beats: 7,
+                    timeSignature: '7/8',
+                    absName: 'Dm',
+                },
+                {
+                    sectionId: 'four',
+                    sectionLabel: 'Four',
+                    beats: 4,
+                    timeSignature: '4/4',
+                    absName: 'G',
+                },
+            ],
+            [
+                { id: 'odd', seamless: false, timeSignature: '7/8' },
+                { id: 'four', seamless: false, timeSignature: '4/4' },
+            ],
+            { beats: 7, stepsPerBeat: 2 },
+        );
+
+        expect(sections).toHaveLength(2);
+        expect(sections[0].measures[0].chords[0]).toMatchObject({ start: 0, end: 14 });
+        expect(sections[1].measures[0].chords[0]).toMatchObject({ start: 14, end: 30 });
+    });
+
     it('reports lead-sheet density from total measure count', () => {
         expect(getLeadSheetDensity(8)).toBe('comfortable');
         expect(getLeadSheetDensity(24)).toBe('compact');

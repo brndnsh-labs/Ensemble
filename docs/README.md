@@ -15,7 +15,7 @@ This folder groups the living documentation for Ensemble.
 
 ## Active references
 
-- [`docs/design/`](design/) — living design docs for load-bearing engine models: [`design/soloist-phrase-first.md`](design/soloist-phrase-first.md) (the soloist engine) and [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof).
+- [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents, migration, and rollback), [`design/soloist-phrase-first.md`](design/soloist-phrase-first.md) (the soloist engine), and [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof).
 - [`docs/guides/`](guides/) — implementation notes and reference guides.
 - [`docs/guides/PERFORMANCE_GUIDELINES.md`](guides/PERFORMANCE_GUIDELINES.md) — hot-loop performance notes.
 - [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.

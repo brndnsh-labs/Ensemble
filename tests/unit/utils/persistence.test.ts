@@ -65,7 +65,10 @@ describe('Persistence Integrity', () => {
         // Setup a complex state
         arranger.sections = [{ id: 's1', label: 'Verse', value: 'I' }];
         arranger.key = 'Gb';
+        arranger.timeSignature = '5/4';
+        arranger.grouping = [2, 3];
         playback.bpm = 115;
+        playback.complexity = 0.64;
         groove.genreFeel = 'Bossa Nova';
         groove.instruments[0].steps[0] = 1; // Kick on 1
 
@@ -76,6 +79,8 @@ describe('Persistence Integrity', () => {
 
         expect(savedData.key).toBe('Gb');
         expect(savedData.bpm).toBe(115);
+        expect(savedData.complexity).toBe(0.64);
+        expect(savedData.grouping).toEqual([2, 3]);
         expect(savedData.groove.genreFeel).toBe('Bossa Nova');
         expect(savedData.sections[0].label).toBe('Verse');
         expect(savedData.mixerVersion).toBe(2);

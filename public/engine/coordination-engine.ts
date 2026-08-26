@@ -350,6 +350,15 @@ export function createCoordinationContext(
         // writer: tick-logic.ts updateCoordinationContext('soloist')
         // readable-after: soloist producer (bass, chords, harmony can read this)
         soloistBusy: false,
+        // writer: drums-tick.ts from the effective per-section lane gate
+        // readable-after: creation (bass/chords/harmony coordination policy)
+        soloistEffectiveEnabled: false,
+        // writer: drums-tick.ts from the effective per-section lane gate
+        // readable-after: creation (chord/harmony register-space policy)
+        bassEffectiveEnabled: false,
+        // writer: drums-tick.ts from the effective per-section lane gate
+        // readable-after: creation (comp interlocking policy)
+        harmonyEffectiveEnabled: false,
         // writer: updateCoordinationContext('soloist') — set true whenever the
         // soloist's main result has midi > 0 on this tick. Read by harmony
         // (spectral-gap branch, yield-when-active) and accompaniment

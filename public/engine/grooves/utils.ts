@@ -79,6 +79,51 @@ export interface DrumStepExtended extends DrumStepBase {
     halfBarStep: number;
 }
 
+/**
+ * The later felt anchor used by half-time and One Drop patterns.
+ *
+ * A nontrivial grouping makes the middle group boundary the musical equivalent
+ * of beat 3: 4/4 [2,2] -> mStep 8, 5/4 [3,2] -> 12, and 7/8 [3,2,2] -> 6.
+ * Single-group simple meters retain the legacy beat-3 reading because they have
+ * no authored group boundary capable of expressing that secondary accent.
+ */
+export function isSecondaryStrongPulse(
+    context: Pick<
+        GrooveContext,
+        | 'beatIndex'
+        | 'groupIndex'
+        | 'isBeatStart'
+        | 'isCompound'
+        | 'isGroupStart'
+        | 'isPulseStart'
+        | 'tsConfig'
+    >,
+): boolean {
+    const grouping = context.tsConfig?.grouping;
+    const groupCount = grouping?.length ?? (context.isCompound === true ? 2 : 1);
+    if (groupCount > 1) {
+        let groupIndex = context.groupIndex;
+        // Legacy direct-strategy fixtures predate groupIndex/isPulseStart but do
+        // provide beatIndex + isGroupStart. Derive the same semantic group instead
+        // of silently dropping their accent; production still takes the resolved
+        // StepInfo fields above.
+        if (!Number.isInteger(groupIndex) && grouping) {
+            let firstBeat = 0;
+            groupIndex = grouping.findIndex((groupBeats) => {
+                const containsBeat =
+                    context.beatIndex >= firstBeat && context.beatIndex < firstBeat + groupBeats;
+                firstBeat += groupBeats;
+                return containsBeat;
+            });
+        }
+        return (
+            (context.isPulseStart === true || context.isGroupStart === true) &&
+            groupIndex === Math.floor(groupCount / 2)
+        );
+    }
+    return context.isBeatStart && context.beatIndex === 2;
+}
+
 type MotifTier = { maxIntensity?: number; picks: ([number, number] | number)[] };
 
 /**

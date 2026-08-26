@@ -110,13 +110,18 @@ export function generateNotesForStep(
         options.allowSharedCatch !== false,
     );
     const { coordination, chordData, stepInfo, ts, dropMuteActive, drumHits } = drumTick;
+    // `includeDrums` selects which sink owns drum emission; it does not remove the
+    // drummer from this shared ensemble result. The live pitched-note worker ignores
+    // these hits, and selective MIDI export gates its drum-track write separately.
+    // Keeping the generated events here also preserves section-return coordination
+    // for split-head callers that intentionally pass `includeDrums: false`.
 
     // The drum-only path honors `isInstrumentActiveAtStep` gating internally; the
     // lane include-flags here can still be overridden per-call via `options`.
-    const includeSoloist = options.includeSoloist ?? drumTick.includeSoloist;
-    const includeBass = options.includeBass ?? drumTick.includeBass;
-    const includeChords = options.includeChords ?? drumTick.includeChords;
-    const includeHarmony = options.includeHarmony ?? drumTick.includeHarmony;
+    const includeSoloist = (options.includeSoloist ?? true) && drumTick.includeSoloist;
+    const includeBass = (options.includeBass ?? true) && drumTick.includeBass;
+    const includeChords = (options.includeChords ?? true) && drumTick.includeChords;
+    const includeHarmony = (options.includeHarmony ?? true) && drumTick.includeHarmony;
 
     const notesToMain: NoteResult[] = [];
 
@@ -209,6 +214,7 @@ export function generateNotesForStep(
                 ts.stepsPerBeat,
                 ts.beats * ts.stepsPerBeat,
                 arranger.totalSteps,
+                arranger,
             );
         }
     }
@@ -232,6 +238,7 @@ export function generateNotesForStep(
                 ts.stepsPerBeat,
                 ts.beats * ts.stepsPerBeat,
                 arranger.totalSteps,
+                arranger,
             );
         coordination.soloistQaHang = qaHang;
         // #1010: comping-emit.ts's qaStyleLive gate only emits the chord

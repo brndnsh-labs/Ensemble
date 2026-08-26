@@ -52,6 +52,22 @@ describe('Drum Seeder', () => {
         expect(keys).toContain(112);
     });
 
+    it('places a structural fill in the final local-meter bar', () => {
+        const mixedArranger = {
+            timeSignature: '4/4',
+            sectionMap: [
+                { id: 'verse', start: 0, end: 24, label: 'Verse', timeSignature: '3/4' },
+                { id: 'chorus', start: 24, end: 56, label: 'Chorus', timeSignature: '4/4' },
+            ],
+        };
+
+        const map = generateDrumFills({}, mixedArranger, 'Rock', 1, 'MIXED-FILL');
+
+        expect(map[12]).toBeDefined();
+        expect(map[8]).toBeUndefined();
+        expect(map[12].length).toBe(12);
+    });
+
     it('should respect the Crash Contract on energy rises', () => {
         const map = generateDrumFills(mockState, mockArranger, 'Rock', 0.5, 'TRANSITION');
 
@@ -153,6 +169,34 @@ describe('Drum Seeder', () => {
         expect(offbeat[10]?.type).toBe('snare-stab');
         expect(onBeat[20]?.type).toBe('crash-catch');
         expect(metalOffbeat[10]?.type).toBe('crash-catch');
+    });
+
+    it('treats an offset mixed-meter section downbeat as on-grid on later loops', () => {
+        const mixedArranger = {
+            timeSignature: '7/8',
+            totalSteps: 46,
+            measureMap: [
+                { start: 0, end: 14, ts: '7/8' },
+                { start: 14, end: 30, ts: '4/4' },
+                { start: 30, end: 46, ts: '4/4' },
+            ],
+            sectionMap: [
+                { id: 'odd', start: 0, end: 14, label: 'Odd' },
+                { id: 'four', start: 14, end: 46, label: 'Four' },
+            ],
+        };
+        // Third-pass chart step 14 is absolute step 106, which is not divisible
+        // by four even though it is the 4/4 section's measure downbeat.
+        const map = generateSoloistAccents(
+            mockState,
+            mixedArranger,
+            { notes: [{ step: 106, velocity: 0.9, midi: 60 }] },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(map[106]?.type).toBe('crash-catch');
     });
 
     it('should respect cooldown for accent catching', () => {
@@ -455,6 +499,41 @@ describe('Drum Seeder — Rock section-return memory (#996)', () => {
         expect(Object.values(threeFour).some((accent) => accent.role === 'section-return')).toBe(
             false,
         );
+    });
+
+    it('does not apply the 4/4 memory gesture to local odd-meter Choruses', () => {
+        const arranger = {
+            timeSignature: '4/4',
+            totalSteps: 104,
+            measureMap: [
+                { start: 0, end: 14, ts: '7/8' },
+                { start: 14, end: 28, ts: '7/8' },
+                { start: 28, end: 44, ts: '4/4' },
+                { start: 44, end: 58, ts: '7/8' },
+                { start: 58, end: 72, ts: '7/8' },
+                { start: 72, end: 88, ts: '4/4' },
+                { start: 88, end: 104, ts: '4/4' },
+            ],
+            sectionMap: [
+                { id: 'chorus-1', start: 0, end: 28, label: 'Chorus 1' },
+                { id: 'verse', start: 28, end: 44, label: 'Verse' },
+                { id: 'chorus-2', start: 44, end: 72, label: 'Chorus II' },
+                { id: 'outro', start: 72, end: 104, label: 'Outro' },
+            ],
+        };
+        const map = generateSoloistAccents(
+            {},
+            arranger,
+            {
+                loopLengthSteps: 312,
+                notes: [{ step: 104 + 6, velocity: 0.9, midi: 72 }],
+            },
+            'Rock',
+            0.8,
+            'TYPE_0',
+        );
+
+        expect(Object.values(map).some((accent) => accent.role === 'section-return')).toBe(false);
     });
 
     it('leaves the form-final cadence measure to the established ending gesture', () => {

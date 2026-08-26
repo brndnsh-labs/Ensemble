@@ -58,7 +58,10 @@ export interface VisualizerChordEvent {
 export interface VisualizerStepEvent {
     type: 'step';
     time: number;
+    /** Section-relative drum-pattern position used by the groove UI. */
     step: number;
+    /** Absolute one-pass chart position used for section/meter resolution. */
+    chartStep: number;
 }
 
 export interface VisualizerFillEvent {
@@ -293,17 +296,22 @@ export function queueVisualizerChordEvent(
     return queueVisualizerEvent(playback, createVisualizerChordEvent(payload));
 }
 
-function createVisualizerStepEvent(time: number, step: number): VisualizerStepEvent {
+function createVisualizerStepEvent(
+    time: number,
+    step: number,
+    chartStep: number,
+): VisualizerStepEvent {
     assertValidTime(time, 'step');
-    return { type: 'step', time, step };
+    return { type: 'step', time, step, chartStep };
 }
 
 export function queueVisualizerStepEvent(
     playback: { drawQueue: VisualizerQueuedEvent[] },
     time: number,
     step: number,
+    chartStep: number,
 ): VisualizerStepEvent {
-    return queueVisualizerEvent(playback, createVisualizerStepEvent(time, step));
+    return queueVisualizerEvent(playback, createVisualizerStepEvent(time, step, chartStep));
 }
 
 function createVisualizerFillEvent(time: number, active: boolean): VisualizerFillEvent {

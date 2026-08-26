@@ -8,6 +8,7 @@ import {
 import { GENRE_FEELS, resolveGenre, SMART_GENRES } from '../data/smart-genres.js';
 import { hydrateVoice } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
+import { isValidTimeSignatureGrouping } from '../meter.js';
 import { escapeHTML, normalizeSongSeed, stripDangerousChars } from '../sanitize.js';
 import { dispatch, getState, storage } from '../state.js';
 import type {
@@ -18,6 +19,8 @@ import type {
     InstrumentVoice,
     Mutable,
     Palette,
+    Section,
+    SectionInstrumentKey,
     SharedBandPayload,
     SoloistState,
     SwingSub,
@@ -295,6 +298,31 @@ function validateSections(sections: any[]): any[] {
             }
         }
 
+        const safeInstruments: NonNullable<Section['instruments']> = {};
+        if (s.instruments && typeof s.instruments === 'object' && !Array.isArray(s.instruments)) {
+            const rawInstruments = s.instruments as Record<string, unknown>;
+            const instrumentKeys: readonly SectionInstrumentKey[] = [
+                'groove',
+                'bass',
+                'chords',
+                'harmony',
+                'soloist',
+            ];
+            for (const instrument of instrumentKeys) {
+                if (
+                    Object.hasOwn(rawInstruments, instrument) &&
+                    typeof rawInstruments[instrument] === 'boolean'
+                ) {
+                    safeInstruments[instrument] = rawInstruments[instrument];
+                }
+            }
+        }
+
+        const targetIntensity =
+            typeof s.targetIntensity === 'number' && Number.isFinite(s.targetIntensity)
+                ? Math.max(0, Math.min(1, s.targetIntensity))
+                : undefined;
+
         return {
             // why (#1258): type-check, don't just truthiness-check. Section ids key
             // `sectionSeedMap` in groove-engine; an object-valued id stringifies to
@@ -322,8 +350,26 @@ function validateSections(sections: any[]): any[] {
                     ? s.timeSignature
                     : '',
             seamless: !!s.seamless,
+            ...(targetIntensity === undefined ? {} : { targetIntensity }),
+            ...(Object.keys(safeInstruments).length === 0 ? {} : { instruments: safeInstruments }),
         };
     });
+}
+
+/**
+ * A custom grouping is a positive-integer partition of the selected meter.
+ *
+ * The UI currently exposes only a few idiomatic alternatives, but the engine contract is
+ * broader and future-safe: any bounded partition is meaningful. Rejecting malformed input
+ * to `null` delegates to TIME_SIGNATURES' default grouping without persisting poisoned meter
+ * math. The length bound runs before iteration so an untrusted array cannot make hydration do
+ * unbounded work.
+ */
+function validateGrouping(grouping: unknown, timeSignature: string): number[] | null {
+    if (!isValidTimeSignatureGrouping(grouping, timeSignature)) {
+        return null;
+    }
+    return [...grouping];
 }
 
 /**
@@ -396,6 +442,7 @@ function hydrateSavedState(): void {
             sections: validatedSections,
             key: validatedKey,
             timeSignature: validatedTS,
+            grouping: validateGrouping(savedState.grouping, validatedTS),
             isMinor: !!savedState.isMinor,
             notation: validatedNotation,
             lastChordPreset: sanitizeDisplayString(savedState.lastChordPreset, 'Pop (Standard)'),
@@ -747,6 +794,11 @@ export function loadFromUrl(): UrlHydrationResult {
     if (tsParam) {
         if (TIME_SIGNATURES[tsParam]) {
             (arranger as Mutable<typeof arranger>).timeSignature = tsParam; // @direct-mutation
+            // Why (#1029): URL charts do not encode custom grouping. Boot hydration runs
+            // first, so retaining the recipient's persisted grouping here could attach a
+            // 5/4 partition to a shared 7/4 chart. Match the interactive meter-change path:
+            // the URL owns the meter and the configured default owns its grouping.
+            (arranger as Mutable<typeof arranger>).grouping = null; // @direct-mutation
         }
     }
 

@@ -13,6 +13,7 @@ vi.mock('../../../public/state.js', () => {
         groove: {
             genreFeel: 'Rock',
             lastDrumPreset: 'Basic Rock',
+            measures: 1,
             instruments: [{ name: 'Kick', steps: [] }],
         },
         bass: { style: 'smart', octave: 38, lastFreq: null, enabled: true },
@@ -82,11 +83,17 @@ describe('Bass Engine Logic', () => {
 
     beforeEach(() => {
         bass.busySteps = 0;
+        soloist.enabled = true;
         soloist.session.phrasing.busySteps = 0;
         soloist.session.tension = 0;
         playback.bandIntensity = 0.5;
+        playback.complexity = 0.5;
+        playback.currentLoopCount = 0;
         groove.genreFeel = 'Rock';
         groove.instruments[0].steps.fill(0);
+        arranger.totalSteps = 64;
+        arranger.sections = [];
+        arranger.sectionMap = [];
     });
 
     describe('Style Mapping & Activation', () => {
@@ -125,6 +132,78 @@ describe('Bass Engine Logic', () => {
                 expect(result.midi).toBeGreaterThanOrEqual(center - 15);
                 expect(result.midi).toBeLessThanOrEqual(center + 15);
             }
+        });
+
+        it('uses measure-local phase for an offset-section reggae anticipation', () => {
+            groove.genreFeel = 'Reggae';
+            const info = getStepInfo(14, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+
+            expect(
+                isBassActive(getState(), 'dub', 28, 14, info, {
+                    soloistResting: true,
+                    soloistNotesInPhrase: 3,
+                }),
+            ).toBe(true);
+        });
+
+        it('force-activates a section anticipation on a later transport loop', () => {
+            groove.genreFeel = 'Jazz';
+            const info = getStepInfo(62, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+
+            expect(
+                isBassActive(getState(), 'jazz', 64 + 62, 14, info, {
+                    upcomingSectionFirstChord: chordF,
+                    sectionEnd: 64,
+                }),
+            ).toBe(true);
+        });
+
+        it('samples the kick pattern from the current section origin', () => {
+            groove.instruments[0].steps = new Array(16).fill(0);
+            groove.instruments[0].steps[1] = 2;
+            const info = getStepInfo(1, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+
+            const note = getBassNote(
+                getState(),
+                chordC,
+                null,
+                0,
+                null,
+                38,
+                'rock',
+                0,
+                15,
+                1,
+                { sectionStart: 14, sectionEnd: 30, stepCoordination: {} },
+                info,
+            );
+
+            expect(note).not.toBeNull();
+        });
+
+        it('plays the chromatic section approach on a later transport loop', () => {
+            groove.genreFeel = 'Jazz';
+            const info = getStepInfo(62, TIME_SIGNATURES['4/4'], [], TIME_SIGNATURES);
+            const note = getBassNote(
+                getState(),
+                chordC,
+                null,
+                3.5,
+                null,
+                38,
+                'jazz',
+                0,
+                64 + 62,
+                14,
+                {
+                    sectionStart: 0,
+                    sectionEnd: 64,
+                    stepCoordination: { upcomingSectionFirstChord: chordF },
+                },
+                info,
+            );
+
+            expect([4, 6]).toContain(note.midi % 12);
         });
     });
 
@@ -183,6 +262,50 @@ describe('Bass Engine Logic', () => {
                 }
             }
             expect(rootOrFifthCount / totalNotes).toBeGreaterThan(0.7);
+        });
+
+        it('lets the Funk ornament lane breathe when this section force-mutes a stale busy soloist', () => {
+            groove.genreFeel = 'Funk';
+            soloist.enabled = true;
+            soloist.session.phrasing.busySteps = 4;
+            arranger.totalSteps = 16;
+            arranger.sectionMap = [{ id: 'verse', start: 0, end: 16 }];
+            arranger.sections = [{ id: 'verse', instruments: { soloist: false } }];
+            const info = getStepInfo(7, '4/4', [], TIME_SIGNATURES);
+
+            const forceMuted = getBassNote(
+                getState(),
+                chordC,
+                null,
+                0.25,
+                110,
+                38,
+                'funk',
+                0,
+                7,
+                7,
+                {},
+                info,
+            );
+
+            arranger.sections = [{ id: 'verse', instruments: { soloist: true } }];
+            const forceActive = getBassNote(
+                getState(),
+                chordC,
+                null,
+                0.25,
+                110,
+                38,
+                'funk',
+                0,
+                7,
+                7,
+                {},
+                info,
+            );
+
+            expect(forceMuted).toMatchObject({ muted: 1 });
+            expect(forceActive).toBeNull();
         });
 
         it('should boost velocity for "Pop" articulation in funk at high intensity', () => {

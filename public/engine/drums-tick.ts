@@ -1,7 +1,8 @@
-import { TIME_SIGNATURES } from '../config.js';
+import type { TIME_SIGNATURES } from '../config.js';
+import { getEffectiveMeterAtStep, getSectionPhaseStep } from '../meter.js';
 import { getSectionEnergy } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable } from '../types.js';
-import { getStepInfo, isSectionTurnaround } from '../utils.js';
+import { type getStepInfo, isSectionTurnaround } from '../utils.js';
 import {
     getSubtractionMutes,
     isIntroSectionLabel,
@@ -40,6 +41,7 @@ export interface DrumTickResult {
     stepInfo: ReturnType<typeof getStepInfo>;
     ts: (typeof TIME_SIGNATURES)[keyof typeof TIME_SIGNATURES];
     stepsPerBar: number;
+    drumStep: number;
     dropMuteActive: boolean;
     drumHits: DrumHitInfo[];
     includeSoloist: boolean;
@@ -85,11 +87,10 @@ export function runDrumTick(
 
     const drumHits: DrumHitInfo[] = [];
 
-    const ts = TIME_SIGNATURES[arranger.timeSignature] || TIME_SIGNATURES['4/4'];
+    const { chartStep, stepInfo, ts } = getEffectiveMeterAtStep(arranger, step);
     const stepsPerBar = ts.beats * ts.stepsPerBeat;
 
     const chordData = getChordAtStep(step, arranger, cursors.mainCursor);
-    const stepInfo = getStepInfo(step, ts, arranger.measureMap, TIME_SIGNATURES);
 
     // #842: bar-latch the motif-selection intensity on the CONDUCTOR-LESS paths
     // (MIDI export + logic worker). `motifSelectionIntensity` keeps the drum motif
@@ -110,10 +111,13 @@ export function runDrumTick(
 
     // 1. Context Assembly (Anchor: Groove)
     const coordination = createCoordinationContext(step, stepInfo as any, carryover);
+    coordination.soloistEffectiveEnabled = includeSoloist;
+    coordination.bassEffectiveEnabled = includeBass;
+    coordination.harmonyEffectiveEnabled = includeHarmony;
 
     if (chordData) {
         const { sectionEnd, sectionStart } = chordData;
-        const remainingSteps = sectionEnd - step;
+        const remainingSteps = sectionEnd - chartStep;
         const stepsPerMeasure = ts.beats * ts.stepsPerBeat;
 
         // why: section boundaries on the coordination context directly so consumers
@@ -380,7 +384,9 @@ export function runDrumTick(
             // lookup contract, but floor() handles the boundary cleanly.
             // Bar 0 spans `sectionStart .. sectionStart + spm - 1`; bar 1
             // spans `sectionStart + spm .. + 2spm - 1`; etc.
-            coordination.introBarsElapsed = Math.floor((step - sectionStart) / stepsPerMeasure);
+            coordination.introBarsElapsed = Math.floor(
+                (chartStep - sectionStart) / stepsPerMeasure,
+            );
         } else if (isOutroSectionLabel(currentLabel)) {
             // why: `Math.ceil` ensures the LAST step of the last bar still
             // reports `1` (not `0`) — so engines whose mute is `OUTRO_MUTES
@@ -388,14 +394,15 @@ export function runDrumTick(
             // E.g. sectionEnd=64, step=63, spm=16 → ceil((64-63)/16)=1.
             // E.g. sectionEnd=64, step=48, spm=16 → ceil((64-48)/16)=1
             //   (the LAST bar). step=47 → ceil(17/16)=2 (the second-to-last).
-            const remaining = sectionEnd - step;
+            const remaining = sectionEnd - chartStep;
             coordination.outroBarsRemaining =
                 remaining > 0 ? Math.ceil(remaining / stepsPerMeasure) : 0;
         }
     }
 
     // Pre-calculate Drum Hits for Coordination
-    const drumStep = step % (groove.measures * stepsPerBar);
+    const sectionStart = chordData?.sectionStart ?? 0;
+    const drumStep = getSectionPhaseStep(chartStep, sectionStart, groove.measures * stepsPerBar);
     const sectionId = chordData?.chord?.sectionId || null;
     // #1266 — type-checked, not `|| 0`: see the matching note in `groove-engine.ts`.
     // This map is plain/prototype-bearing on the worker (`toRaw` rebuilds it), so a
@@ -407,7 +414,7 @@ export function runDrumTick(
         typeof rawSectionSeed === 'number' && Number.isFinite(rawSectionSeed) ? rawSectionSeed : 0;
 
     // --- Calculate Turnaround State ---
-    const isTurnaround = isSectionTurnaround(step, arranger.sectionMap, stepsPerBar, 1);
+    const isTurnaround = isSectionTurnaround(chartStep, arranger.sectionMap, stepsPerBar, 1);
 
     let fillPlayed = false;
 
@@ -567,7 +574,12 @@ export function runDrumTick(
                 isPulseStart: stepInfo.isPulseStart,
                 isTurnaround,
                 stepsPerBar,
-                loopStep: drumStep,
+                // `drumStep` is the multi-measure pattern-array cursor. Strategy
+                // `loopStep` is deliberately bar-local: passing the pattern cursor
+                // made bar 2 expose 16..31 in 4/4 and miss downbeat/final-step rules.
+                loopStep: stepInfo.mStep,
+                sectionStep: chartStep - sectionStart,
+                chartStep,
                 // why: epic-form-arrangement S3 — Imperfect Symmetry for drums on
                 // repeat passes. Published per-tick on the coordination context by
                 // the chord-data preamble (see line ~162); pass it down so
@@ -643,6 +655,7 @@ export function runDrumTick(
         stepInfo,
         ts,
         stepsPerBar,
+        drumStep,
         dropMuteActive,
         drumHits,
         includeSoloist,

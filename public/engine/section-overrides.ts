@@ -127,7 +127,12 @@ export function sectionAtStep(
     if (!map || map.length === 0) {
         return null;
     }
-    const entry = binarySearchMap(map, step);
+    // sectionMap is one chart pass while transport steps are monotonic. Normalize
+    // here so every section-aware consumer (worker generation, live scheduling,
+    // conductor, and practice playback) gets the same override on later loops.
+    const totalSteps = arranger.totalSteps || 0;
+    const chartStep = totalSteps > 0 ? ((step % totalSteps) + totalSteps) % totalSteps : step;
+    const entry = binarySearchMap(map, chartStep);
     if (!entry) {
         return null;
     }
@@ -146,7 +151,11 @@ export function sectionAtStep(
  * the main thread.
  */
 export function effectiveTargetIntensity(state: EnsembleState, step: number): number {
-    const sec = sectionAtStep(state?.arranger, step);
+    // Transport remains monotonic during a section-practice drill. Resolve the
+    // authored section from the folded musical position so pass two does not
+    // accidentally fall through to another section's intensity override.
+    const musicalStep = foldPracticeStep(step, state?.playback);
+    const sec = sectionAtStep(state?.arranger, musicalStep);
     const override = sec?.targetIntensity;
     return typeof override === 'number' ? override : (state?.conductor?.targetIntensity ?? 0.35);
 }
@@ -264,4 +273,42 @@ export function isInstrumentActiveAtStep(
     }
     const slice = (state as any)?.[instrument];
     return Boolean(slice?.enabled);
+}
+
+/**
+ * Whether the soloist should make the other lanes yield at this step.
+ *
+ * `busySteps` is session memory and intentionally survives across ticks. When a
+ * section force-mutes the soloist its producer stops advancing that memory, so
+ * the effective lane gate must win over a stale positive value.
+ */
+export function isSoloistBusyAtStep(
+    state: EnsembleState,
+    step: number,
+    coordinationBusy = false,
+): boolean {
+    if (!isInstrumentActiveAtStep(state, 'soloist', step)) {
+        return false;
+    }
+    return Boolean(coordinationBusy || (state?.soloist?.session?.phrasing?.busySteps ?? 0) > 0);
+}
+
+/**
+ * True when a lane can sound anywhere in this chart.
+ *
+ * Audio buses and worker heads are chart-wide resources: a globally-muted lane
+ * still needs a live bus/head when a later section explicitly forces it on.
+ * Per-step emission remains governed by `isInstrumentActiveAtStep` above.
+ */
+export function isInstrumentEverActive(
+    state: EnsembleState,
+    instrument: SectionInstrumentKey,
+): boolean {
+    const slice = (state as any)?.[instrument];
+    if (slice?.enabled) {
+        return true;
+    }
+    return Boolean(
+        state?.arranger?.sections?.some((section) => section.instruments?.[instrument] === true),
+    );
 }

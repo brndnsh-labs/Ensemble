@@ -2,7 +2,10 @@
  * @vitest-environment happy-dom
  */
 import { describe, expect, it } from 'vitest';
-import { partitionDrawQueue } from '../../../public/components/Visualizer.jsx';
+import {
+    getVisualizerMeterFrame,
+    partitionDrawQueue,
+} from '../../../public/components/Visualizer.jsx';
 import type {
     VisualizerChordEvent,
     VisualizerQueuedEvent,
@@ -74,5 +77,27 @@ describe('partitionDrawQueue', () => {
 
         expect(readyEvents).toEqual([]);
         expect(remainingEvents).toBe(queue);
+    });
+});
+
+describe('getVisualizerMeterFrame', () => {
+    it('uses the absolute chart step at a mixed-meter seam and on loop two', () => {
+        const arranger = {
+            timeSignature: '3/4',
+            grouping: null,
+            totalSteps: 26,
+            measureMap: [
+                { start: 0, end: 12, ts: '3/4' },
+                { start: 12, end: 26, ts: '7/8' },
+            ],
+        } as any;
+
+        const first = getVisualizerMeterFrame(arranger, 12, 5, 120);
+        const loopTwo = getVisualizerMeterFrame(arranger, 38, 15, 120);
+
+        expect(first.key).toBe('7/8:2+2+3');
+        expect(first.referenceTime).toBe(5);
+        expect(loopTwo.key).toBe(first.key);
+        expect(loopTwo.referenceTime).toBe(15);
     });
 });

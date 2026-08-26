@@ -236,6 +236,63 @@ describe('Comper Phrase-End Critique', () => {
         });
     }
 
+    it.each(['Jazz', 'Funk'])(
+        '%s keeps an offset-section breath pattern stable on a later loop',
+        (genre) => {
+            groove.genreFeel = genre;
+            arranger.totalSteps = 64;
+            const mockChord = {
+                rootMidi: 60,
+                freqs: [261.63, 329.63, 392, 493.88],
+                quality: 'maj7',
+                intervals: [0, 4, 7, 11],
+                is7th: true,
+                beats: 4,
+                sectionId: 'offset',
+            };
+            const denseCell = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+            const renderBar = (transportStart) => {
+                compingState.currentCell = [...denseCell];
+                compingState.lockedUntil = 1_000_000;
+                compingState.lastSectionId = 'offset';
+                compingState.lastVoicingMidis = [];
+                return Array.from({ length: 16 }, (_, localStep) => {
+                    compingState.currentCell = [...denseCell];
+                    const notes = getAccompanimentNotes(
+                        getState(),
+                        mockChord,
+                        transportStart + localStep,
+                        localStep,
+                        localStep,
+                        {
+                            isBeatStart: localStep % 4 === 0,
+                            isGroupStart: localStep === 0 || localStep === 8,
+                            mStep: localStep,
+                            beatIndex: Math.floor(localStep / 4),
+                            tsConfig: {
+                                beats: 4,
+                                stepsPerBeat: 4,
+                                grouping: [2, 2],
+                            },
+                        },
+                        {
+                            sectionStart: 14,
+                            soloistResting: true,
+                            soloistNotesInPhrase: 5,
+                            bassHit: false,
+                            soloistActive: false,
+                            soloistBusy: false,
+                            accompanimentHit: false,
+                        },
+                    );
+                    return notes.some((note) => note.midi > 0 && !note.muted);
+                });
+            };
+
+            expect(renderBar(14)).toEqual(renderBar(64 + 14));
+        },
+    );
+
     it('Bossa: NOT thinned (own partido-alto idiom is S5.c work, not S2.a)', () => {
         // why: confirm we didn't accidentally include Bossa in the gate.
         // `PHRASE_END_THIN_GENRES` (comping-emit.ts) is `Jazz`/`Blues`/`Funk`

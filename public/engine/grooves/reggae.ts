@@ -6,6 +6,7 @@ import {
     DEFAULT_CONFIG,
     type DrumStepBase,
     type GrooveContext,
+    isSecondaryStrongPulse,
     makeMotifSelector,
     roll,
     rollSeed,
@@ -50,8 +51,6 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         isPulseStart,
         isBeatStart,
         isBackbeat,
-        beatIndex,
-        isCompound,
         isOffbeat,
         isEOfBeat,
         isAOfBeat,
@@ -64,6 +63,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         getMotif(sectionSeed, drumComplexity, context.motifIntensity ?? intensity),
         motifCeiling ?? Number.POSITIVE_INFINITY,
     );
+    // why: One Drop's kick and rim are one gesture, so they must share one
+    // meter-relative predicate. Custom grouping moves the drop with the felt
+    // secondary anchor even in simple odd meters; ungrouped simple meters keep
+    // the traditional beat-3 fallback.
+    const oneDropHere = isSecondaryStrongPulse(context);
 
     // --- Lay-back: Reggae is consistently behind the beat ---
     // why: scope lay-back to Kick + Snare only. The One Drop feel depends on the
@@ -82,16 +86,11 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         if (activeMotif === 0) {
             // True One Drop: a single kick on the felt secondary pulse, in unison with
             // the rim — beats 1, 2 & 4 carry NO kick. This is the genre-defining
-            // "drop": the bass roots here too (One Drop riddim = step 8), so kick +
-            // bass + rim land together. In 4/4 that pulse is beat 3 (beatIndex===2);
-            // previously this fired on beats 2 & 4 (a generic backbeat), neither
-            // sparse nor authentic (#794). In compound/odd meters the felt-2 is the
-            // backbeat group (e.g. 6/8 mStep 6) — keep the existing `isBackbeat` drop.
-            if (isCompound) {
-                if (isBackbeat) {
-                    shouldPlay = true;
-                }
-            } else if (beatIndex === 2 && isBeatStart) {
+            // "drop": the bass roots here too, so kick + bass + rim land together.
+            // In 4/4 the shared secondary anchor is beat 3; custom odd-meter
+            // grouping moves it to the authored later group instead of leaving it
+            // on a hard-coded quarter-note index.
+            if (oneDropHere) {
                 shouldPlay = true;
             }
         } else if (activeMotif === 1) {
@@ -136,12 +135,10 @@ export function applyOverrides(context: GrooveContext, state: DrumStepBase): Dru
         // Reggae backbeat — motif-aware. The true One Drop (motif 0) places a single
         // cross-stick rim on the felt-2 pulse in unison with the kick (the "drop"),
         // leaving beats 2 & 4 empty — the hat and bass carry the pulse. In 4/4 that's
-        // beat 3 (beatIndex===2); in compound/odd meters it's the backbeat group, so
-        // reuse `isBackbeat` there. Every other riddim keeps the 2 & 4 cross-stick
-        // backbeat (#794).
-        const oneDropRimHere = isCompound ? isBackbeat : beatIndex === 2 && isBeatStart;
+        // beat 3; in grouped meters it follows the same authored secondary anchor
+        // as the kick. Every other riddim keeps the ordinary cross-stick backbeat.
         if (activeMotif === 0) {
-            if (oneDropRimHere) {
+            if (oneDropHere) {
                 shouldPlay = true;
                 soundName = 'Sidestick'; // rim — a one drop is a soft cross-stick, not a full snare
                 velocity = scaleVelocity(1.2, intensity, 0.1);

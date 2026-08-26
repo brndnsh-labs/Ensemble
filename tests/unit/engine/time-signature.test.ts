@@ -2,6 +2,12 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
+import {
+    getEffectiveMeterAtStep,
+    getEffectiveTimeSignature,
+    getEffectiveTimeSignatures,
+    getMeterGroupStarts,
+} from '../../../public/meter.js';
 import { getStepInfo, getStepsPerMeasure } from '../../../public/utils.js';
 
 describe('Time Signature Logic', () => {
@@ -61,6 +67,62 @@ describe('Time Signature Logic', () => {
             expect(getStepInfo(12, config54).isGroupStart).toBe(true);
             expect(getStepInfo(12, config54).groupIndex).toBe(1);
             expect(getStepInfo(16, config54).groupIndex).toBe(1); // Beat 5
+        });
+
+        it('uses the authored grouping across measure-map resolution', () => {
+            const config54 = getEffectiveTimeSignature('5/4', [2, 3]);
+            const signatures = getEffectiveTimeSignatures('5/4', [2, 3]);
+            const measureMap = [{ start: 0, end: 20, ts: '5/4' }];
+
+            expect(getStepInfo(8, config54, measureMap, signatures).isGroupStart).toBe(true);
+            expect(getStepInfo(8, config54, measureMap, signatures).groupIndex).toBe(1);
+            expect(getStepInfo(12, config54, measureMap, signatures).isGroupStart).toBe(false);
+        });
+
+        it('enumerates cumulative group starts for asymmetric authored groupings', () => {
+            expect([...getMeterGroupStarts(getEffectiveTimeSignature('5/4', [2, 3]))]).toEqual([
+                0, 8,
+            ]);
+            expect([...getMeterGroupStarts(getEffectiveTimeSignature('7/8', [3, 2, 2]))]).toEqual([
+                0, 6, 10,
+            ]);
+        });
+
+        it('moves grouping-derived pulses but preserves independent quarter-note pulses', () => {
+            const customSeven = getEffectiveTimeSignature('7/8', [3, 2, 2]);
+            const customSevenRegistry = getEffectiveTimeSignatures('7/8', [3, 2, 2]);
+            const sevenPulses = Array.from({ length: 14 }, (_, step) => step).filter(
+                (step) => getStepInfo(step, customSeven, [], customSevenRegistry).isPulse,
+            );
+            expect(sevenPulses).toEqual([0, 6, 10]);
+
+            const customFive = getEffectiveTimeSignature('5/4', [2, 3]);
+            expect(customFive.pulse).toEqual(TIME_SIGNATURES['5/4'].pulse);
+            expect([...getMeterGroupStarts(customFive)]).toEqual([0, 8]);
+        });
+
+        it('falls back to the canonical grouping when an override is invalid', () => {
+            expect(getEffectiveTimeSignature('5/4', [4, 4])).toBe(TIME_SIGNATURES['5/4']);
+        });
+
+        it('resolves a mixed-meter section seam identically on later loops', () => {
+            const arranger = {
+                timeSignature: '3/4',
+                grouping: null,
+                totalSteps: 28,
+                measureMap: [
+                    { start: 0, end: 12, ts: '3/4' },
+                    { start: 12, end: 28, ts: '4/4' },
+                ],
+            };
+
+            for (const step of [12, 40]) {
+                const meter = getEffectiveMeterAtStep(arranger, step);
+                expect(meter.chartStep).toBe(12);
+                expect(meter.ts).toBe(TIME_SIGNATURES['4/4']);
+                expect(meter.stepInfo.mStep).toBe(0);
+                expect(meter.stepInfo.isMeasureStart).toBe(true);
+            }
         });
 
         it('should correctly handle 7/8 with 2+2+3 grouping', () => {

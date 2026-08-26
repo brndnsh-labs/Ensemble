@@ -177,6 +177,19 @@ describe('VisualizerEngine Rendering Deep Dive', () => {
         expect(mockCtx.stroke).toHaveBeenCalled();
     });
 
+    it('spaces 7/8 grid beats as eighth notes rather than quarter notes', () => {
+        engine.setBeatReference(0);
+        const getX = vi.spyOn(engine, 'getX');
+
+        engine.drawVerticalGrid(3.5, 120, {
+            beats: 7,
+            grouping: [3, 2, 2],
+            stepsPerBeat: 2,
+        });
+
+        expect(getX).toHaveBeenCalledWith(1.75, 3.5);
+    });
+
     it('should handle wrapped RingBuffer during rendering', () => {
         engine.addTrack('bass', 'red', 'red');
         for (let i = 0; i < 150; i++) {
