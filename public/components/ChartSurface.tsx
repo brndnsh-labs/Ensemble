@@ -3,6 +3,7 @@ import { useCallback, useState } from 'preact/hooks';
 import { COMPACT_MQ } from '../breakpoints.js';
 import { dispatch } from '../state.js';
 import { track } from '../telemetry.js';
+import type { ModalsState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useEnsembleState, useMediaQuery } from '../ui-bridge.js';
 import { ChordVisualizer } from './ChordVisualizer.jsx';
@@ -37,7 +38,8 @@ export function ChartSurface({ getVisualTime }: ChartSurfaceProps) {
         chartLocked: s.playback.chartLocked,
     }));
 
-    const openModal = (modal: string) => dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
+    const openModal = (modal: keyof ModalsState) =>
+        dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: true });
 
     // Unlock-while-playing pauses the band (the music-stand metaphor:
     // you don't rewrite the chart mid-take). Lock-while-stopped just locks.

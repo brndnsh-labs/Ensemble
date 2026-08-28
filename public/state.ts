@@ -12,6 +12,7 @@ import type {
     ArrangerState,
     BassState,
     ChordState,
+    Dispatch,
     EnsembleState,
     GlobalContext,
     GrooveState,
@@ -247,17 +248,12 @@ type StateListener = (
 
 const listeners = new Set<StateListener>();
 
-export function dispatch<T extends keyof ActionPayloadMap>(
-    action: T,
-    payload: ActionPayloadMap[T],
-): void;
-export function dispatch(action: string, payload?: any): void;
-export function dispatch(action: any, payload?: any): void {
+export const dispatch: Dispatch = (action, ...args) => {
+    const payload = args[0] as ActionPayloadMap[typeof action];
     // Accessing deepSignal property directly works like a getter
     const oldBpm = playback.bpm;
 
     // Bundle into a discriminated Action; reducers switch on action.type.
-    // Unmapped string actions still flow through — they hit each reducer's default arm.
     const a = { type: action, payload } as Action;
 
     // Delegate to Reducers
@@ -271,7 +267,7 @@ export function dispatch(action: any, payload?: any): void {
 
     // Notify listeners (legacy two-arg shape preserved)
     listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));
-}
+};
 
 /**
  * Subscribe to state changes.

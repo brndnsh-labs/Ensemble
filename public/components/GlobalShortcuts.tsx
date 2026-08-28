@@ -47,8 +47,9 @@ export function GlobalShortcuts() {
                 e.preventDefault();
                 let closedAny = false;
                 Object.keys(playback.modals).forEach((key) => {
-                    if (playback.modals[key as keyof typeof playback.modals]) {
-                        dispatch(ACTIONS.SET_MODAL_OPEN, { modal: key, open: false });
+                    const modal = key as keyof typeof playback.modals;
+                    if (playback.modals[modal]) {
+                        dispatch(ACTIONS.SET_MODAL_OPEN, { modal, open: false });
                         closedAny = true;
                     }
                 });

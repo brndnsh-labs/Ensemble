@@ -46,7 +46,7 @@ const isHandlerFile = (f) => isSlice(f) || HANDLER_FILES.some((h) => f.path.ends
 
 // Extract ACTIONS keys from public/types.js
 const typesContent = fs.readFileSync(TYPES_FILE, 'utf8');
-const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const;/);
+const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const/);
 const actionKeys = actionKeysMatch[1]
     .split('\n')
     .map((line) => line.trim().split(':')[0])

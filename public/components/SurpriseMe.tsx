@@ -17,7 +17,7 @@ import { chordsFromSectionValue, parseSeedText } from '../song/song-generator-se
 import { pushHistory, undo } from '../state/history.js';
 import { generateId } from '../state/share-codec.js';
 import { dispatch } from '../state.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, type ActionPayloadLoadTemplate } from '../types.js';
 import { showToast } from '../ui.js';
 import { useEnsembleState } from '../ui-bridge.js';
 import { Icon } from './Icon.jsx';
@@ -71,7 +71,7 @@ function applyRoll(
     pushHistory();
     // Single atomic dispatch so the worker sees one consistent snapshot.
     const first = sections[0];
-    const payload: Record<string, unknown> = {
+    const payload: ActionPayloadLoadTemplate = {
         sections,
         isMinor,
     };
