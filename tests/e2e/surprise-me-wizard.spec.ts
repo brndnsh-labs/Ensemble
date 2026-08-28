@@ -57,12 +57,16 @@ test.describe('Surprise Me wizard @ui', () => {
         await modal.getByRole('button', { name: /Roll/ }).click();
         await modal.locator('.surprise-me-dice').click();
 
-        const toast = page.locator('.notification-box');
+        const toast = page.locator('.notification-box', {
+            hasText: 'Rolled a new arrangement',
+        });
         await expect(toast).toBeVisible();
         await toast.getByRole('button', { name: /Reroll/ }).click();
 
         // After reroll, a new toast (still with actions) should appear.
-        await expect(page.locator('.notification-box')).toBeVisible();
+        const rerolledToast = page.locator('.notification-box', { hasText: 'Rerolled' });
+        await expect(rerolledToast).toBeVisible();
+        await expect(rerolledToast.locator('.notification-actions')).toBeVisible();
     });
 
     test('Seed suggestion chip populates the seed and Role selector appears', async ({ page }) => {
