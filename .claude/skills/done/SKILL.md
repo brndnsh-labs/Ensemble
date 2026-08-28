@@ -2,7 +2,7 @@
 name: done
 description: Ship a Ensemble story — commit the reviewed work, push, open a PR that Closes #<n>, and (for a safe story) queue server-side auto-merge; a judgment-call story's PR is left for Brandon's manual merge. Done = the issue closes on merge. Plan-first. Usage `/done #<n>`. Use after /review (+ /patch) pass clean.
 ---
-<!-- cycle:rendered template=skills/done.md.tmpl hash=fa91a5a7473b — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/done.md.tmpl hash=de525e51f24b — managed by the-cycle; edit the template, not this file -->
 
 # /done #<n> — ship a story
 
@@ -14,6 +14,9 @@ judgment-call PR for Brandon.
 leans on §4 Gates, §5 Judgment calls (the safe-vs-brake split; the fast path's receipt), §6 Merge
 guard, §7 Tracker mechanics, §8 Commit & PR conventions, §9 Branch policy. The procedure below is
 just the ordering.
+
+**If `.claude/skills/DELIVERY.md` is not already in context, read it before acting.** It contains
+the exact commit, PR, CI, and merge commands governed by §6/§8.
 
 **Done = the issue closes.** `Closes #<n>` closes it on merge (§1).
 

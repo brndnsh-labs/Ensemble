@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=e51d333c0b1c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=b43824623f71 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -14,6 +14,9 @@ the orchestrator of the others, so it leans on nearly all of it: §1 readiness, 
 Gates, **§5 Judgment calls & autonomy (the governing rule below IS §5)**, §6 Merge guard, §8/§9
 commit and branch policy. The phases invoke `/implement`, `/review`, `/patch`, `/done` — run their
 workflows inline; don't re-derive them.
+
+**Before the `/done` phase, ensure `.claude/skills/DELIVERY.md` is in context; read it only if
+absent.** It expands §6/§8's delivery mechanics without displacing DOCTRINE's safety authority.
 
 ## The governing rule (= §5)
 
