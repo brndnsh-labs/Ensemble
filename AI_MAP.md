@@ -46,6 +46,15 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/state/persistence.ts` | LocalStorage session saving. | `saveCurrentState`, `debounceSaveState` |
 | `public/state/history.ts` | Session history and undo/redo logic. | `pushHistory`, `undo` |
 
+## Songbook Document Boundary
+
+| Path | Responsibility | Key Exports / Symbols |
+| :--- | :--- | :--- |
+| `public/songbook/types.ts` | Version-1 portable chart and workspace-preference schemas, kept independent of live state slices. | `ChartDocument`, `ChartContent`, `WorkspacePreferences` |
+| `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument` |
+| `public/songbook/structural-limits.ts` | Pre-schema input ceilings for byte size, nesting depth, visited nodes, and section count. | `inspectSongbookStructure`, `SONGBOOK_MAX_INPUT_BYTES` |
+| `public/songbook/state-ownership.ts` | Exhaustive document/preferences/runtime ownership for every top-level state field, plus the legacy-writer reachability manifest. | `STATE_OWNERSHIP_MANIFEST`, `LEGACY_PERSISTED_FIELD_OWNERSHIP` |
+
 ## Generative Engines (Worker Thread)
 
 | Path | Responsibility | Key Logic |
