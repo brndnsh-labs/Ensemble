@@ -1,4 +1,5 @@
 import { validateProgression } from '../engine/chords-engine.js';
+import type { CoordinationCarryover } from '../engine/coordination-engine.js';
 import { initAudio } from '../engine/engine.js';
 import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
 import { generateNotesForStep } from '../engine/tick-logic.js';
@@ -173,10 +174,17 @@ async function renderClonedStateToWav(
         enableWatchdog: false,
     });
 
+    // Sticky coordination belongs to this detached render only. Keep it alive
+    // across loop refills, but never reuse it for a later full-session or stem render.
+    const carryover: CoordinationCarryover = {
+        lastActiveSoloistMidi: 0,
+        lastActiveSoloistStep: 0,
+    };
+
     for (let loopIndex = 0; loopIndex < loops; loopIndex++) {
         const timelineStartStep = loopIndex * stepsPerLoop;
         state.playback.currentLoopCount = loopIndex; // @direct-mutation — throwaway clone
-        fillBuffersForExport(state, timelineStartStep);
+        fillBuffersForExport(state, timelineStartStep, carryover);
 
         for (let step = 0; step < stepsPerLoop; step++) {
             const absoluteStep = timelineStartStep + step;
@@ -355,7 +363,11 @@ function cloneStateForRender(liveState: any): any {
     };
 }
 
-function fillBuffersForExport(state: any, timelineStartStep: number): void {
+function fillBuffersForExport(
+    state: any,
+    timelineStartStep: number,
+    carryover: CoordinationCarryover,
+): void {
     const cursors = {
         mainCursor: { index: 0, sectionIndex: 0 },
         lookaheadCursor: { index: 0, sectionIndex: 0 },
@@ -363,13 +375,24 @@ function fillBuffersForExport(state: any, timelineStartStep: number): void {
 
     for (let step = 0; step < state.arranger.totalSteps; step++) {
         const absoluteStep = timelineStartStep + step;
-        const result = generateNotesForStep(state, absoluteStep, cursors, {
-            includeBass: true,
-            includeChords: true,
-            includeSoloist: true,
-            includeHarmony: true,
-            includeDrums: false,
-        });
+        const result = generateNotesForStep(
+            state,
+            absoluteStep,
+            cursors,
+            {
+                includeBass: true,
+                includeChords: true,
+                includeSoloist: true,
+                includeHarmony: true,
+                includeDrums: false,
+            },
+            carryover,
+        );
+
+        if (result.coordination.lastActiveSoloistMidi) {
+            carryover.lastActiveSoloistMidi = result.coordination.lastActiveSoloistMidi;
+            carryover.lastActiveSoloistStep = result.coordination.lastActiveSoloistStep;
+        }
 
         for (const note of result.notes) {
             if (note.module === 'bass') {

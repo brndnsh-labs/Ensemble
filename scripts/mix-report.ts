@@ -674,6 +674,7 @@ async function renderSceneReports({
                     function fillBuffers(
                         state,
                         timelineStartStep,
+                        carryover,
                         captureSharedCatchEvents = false,
                     ) {
                         const cursors = {
@@ -684,13 +685,26 @@ async function renderSceneReports({
 
                         for (let step = 0; step < state.arranger.totalSteps; step++) {
                             const absoluteStep = timelineStartStep + step;
-                            const result = generateNotesForStep(state, absoluteStep, cursors, {
-                                includeBass: state.bass.enabled,
-                                includeChords: state.chords.enabled,
-                                includeSoloist: state.soloist.enabled,
-                                includeHarmony: state.harmony.enabled,
-                                includeDrums: false,
-                            });
+                            const result = generateNotesForStep(
+                                state,
+                                absoluteStep,
+                                cursors,
+                                {
+                                    includeBass: state.bass.enabled,
+                                    includeChords: state.chords.enabled,
+                                    includeSoloist: state.soloist.enabled,
+                                    includeHarmony: state.harmony.enabled,
+                                    includeDrums: false,
+                                },
+                                carryover,
+                            );
+
+                            if (result.coordination.lastActiveSoloistMidi) {
+                                carryover.lastActiveSoloistMidi =
+                                    result.coordination.lastActiveSoloistMidi;
+                                carryover.lastActiveSoloistStep =
+                                    result.coordination.lastActiveSoloistStep;
+                            }
 
                             if (captureSharedCatchEvents && result.coordination?.sharedCatch) {
                                 sharedCatchEvents.push({
@@ -1220,6 +1234,10 @@ async function renderSceneReports({
 
                             const intentEvents = [];
                             const sharedCatchEvents = [];
+                            const carryover = {
+                                lastActiveSoloistMidi: 0,
+                                lastActiveSoloistStep: 0,
+                            };
 
                             for (let loopIndex = 0; loopIndex < loopCount; loopIndex++) {
                                 const timelineStartStep = loopIndex * stepsPerLoop;
@@ -1246,6 +1264,7 @@ async function renderSceneReports({
                                     ...fillBuffers(
                                         state,
                                         timelineStartStep,
+                                        carryover,
                                         Boolean(writeEvents && !voiceOverride),
                                     ),
                                 );
