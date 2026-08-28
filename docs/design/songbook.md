@@ -74,18 +74,21 @@ Settings that should follow the musician rather than the song: palette/mode, vis
 count-in and practice defaults, the output master volume, MIDI device IDs and latency, local
 audio muting, and similar browser/device choices. Preferences have their own versioned record.
 
-The first extraction story must turn this ownership table into an exhaustive manifest. Pending
-fields must be decided with a behavior test rather than duplicated into both models.
+The canonical ownership table is enforced by `public/songbook/state-ownership.ts`. It is typed
+against every top-level live-state field, so adding a state field without choosing exactly one
+owner fails typecheck. The legacy writer has a separate behavioral reachability guard; this keeps
+its compatibility payload unchanged without making the new codecs depend on that old shape.
 
-| Owner | Settled and pending fields |
+| Owner | Canonical fields |
 | :--- | :--- |
-| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; tempo; complexity; song seed and policy; genre/feel; authored groove pattern; lane enablement, source choice, style, octave, density, and phrasing. |
-| `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; MIDI device IDs and latency; local audio muting. |
-| `RuntimeState` / derived | Transport and practice progress; current auto-conductor `bandIntensity`; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. |
-| Decide before schema freeze | Notation; the authored starting-intensity/manual-vs-auto policy; lane volume/reverb ownership; session timer; song mode; MIDI channel mappings. |
+| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; complexity; song seed and policy; genre/feel; authored groove pattern; lane enablement, source choice, style, octave, density, phrasing, **volume, and reverb**. |
+| `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; **session timer and song mode**; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
+| `RuntimeState` / derived | Transport and practice progress; current `bandIntensity`; the current forced-on-at-boot `autoIntensity` behavior; `sectionSeedMap`; generated arranger/worker maps; audio handles; undo and transient UI. Version 1 has no authored starting-intensity or manual-vs-auto field. |
 
-Until that manifest lands, #1029 preserves the legacy storage contract and adds only the
-reviewed lossless fields; it does not infer document ownership from the current slice layout.
+`public/songbook/types.ts` owns the semantic version-1 shapes. `public/songbook/codec.ts` validates
+the complete untrusted candidate before returning a detached typed value; unknown future versions
+remain recoverable source data rather than being coerced into version-1 defaults. Structural
+limits run first: 1 MiB serialized input, depth 32, 100,000 visited nodes, and 500 sections.
 
 ### `DocumentSession`
 
@@ -321,8 +324,9 @@ implementation detail of the other, though both may reuse field-level validators
 
 1. **Foundation (#1029):** document this contract and repair additive loss in the existing
    `currentState` round-trip. No key migration, deletion, or multi-record UI.
-2. **Canonical codecs:** extract typed document/preferences codecs and a field-ownership
-   manifest with behavioral round-trip tests.
+2. **Canonical codecs (#1044):** typed document/preferences codecs and a field-ownership
+   manifest with behavioral round-trip and exact-boundary tests. This stage is pure: it writes no
+   records and never reads or mutates live state.
 3. **Repository + compatibility bridge:** write self-contained records behind the repository,
    keep/read-back the legacy recovery journal, detect divergent old-client writes, and prove
    retry/rollback behavior.
@@ -342,8 +346,8 @@ create.
 
 ## 10. Foundation invariant
 
-Until the canonical codecs land, the current persistence writer and hydrator remain parallel
-lists. The temporary guardrail is therefore behavioral:
+The current persistence writer and hydrator remain parallel compatibility lists until the later
+repository/bridge story replaces their authority. Their guardrail is therefore behavioral:
 
 > Every valid field covered by the foundation contract survives
 > `save -> JSON serialization -> hydrate`, malformed fields are bounded or rejected according to
