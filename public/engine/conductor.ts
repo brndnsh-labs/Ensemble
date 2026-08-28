@@ -1,7 +1,7 @@
 import { getEffectiveTimeSignature } from '../meter.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../song/form-analysis.js';
 import { saveCurrentState } from '../state/persistence.js';
-import type { ChordDensity, EnsembleState } from '../types.js';
+import type { ActionPayloadUpdateSB, ChordDensity, Dispatch, EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import { binarySearchMap, binarySearchMapIndex } from '../utils.js';
@@ -39,8 +39,6 @@ export const HALL_GENRES = new Set(['Jazz', 'Blues', 'Bossa Nova', 'Neo-Soul', '
  * minus Country/Blues (whose train-beat/shuffle phrasing DOES want the pickup).
  */
 const PICKUP_SUPPRESSED_GENRES = new Set(['Jazz', 'Bossa Nova', 'Reggae', 'Acoustic']);
-
-type Dispatch = (action: any, payload?: any) => void;
 
 /**
  * Per-genre `targetEnergy` floors for the auto-intensity macro-arc.
@@ -411,22 +409,20 @@ export function checkSectionTransition(
                     (soloistState.tradeMode === 'loops' && isLoopEnd))
             ) {
                 const nextSoloState = !soloistState.enabled;
-                const sbUpdate: Record<string, unknown> = { enabled: nextSoloState };
-
-                if (nextSoloState) {
-                    Object.assign(sbUpdate, {
-                        isWaitingForEntry: true,
-                        isResting: true,
-                        isYielding: false,
-                        activeSteps: 0,
-                        restSteps: 0,
-                    });
-                } else {
-                    Object.assign(sbUpdate, {
-                        isYielding: true,
-                        isWaitingForEntry: false,
-                    });
-                }
+                const sbUpdate: ActionPayloadUpdateSB = nextSoloState
+                    ? {
+                          enabled: nextSoloState,
+                          isWaitingForEntry: true,
+                          isResting: true,
+                          isYielding: false,
+                          activeSteps: 0,
+                          restSteps: 0,
+                      }
+                    : {
+                          enabled: nextSoloState,
+                          isYielding: true,
+                          isWaitingForEntry: false,
+                      };
 
                 dispatch(ACTIONS.UPDATE_SB, sbUpdate);
                 saveCurrentState();

@@ -14,7 +14,7 @@ import {
     buildPlaybackSyncPayload,
     buildSoloistSyncPayload,
 } from '../state.js';
-import type { ArrangerState, EnsembleState, GlobalContext, Mutable } from '../types.js';
+import type { ArrangerState, Dispatch, EnsembleState, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS, isSwingSub } from '../types.js';
 import { triggerFlash } from '../ui.js';
 import {
@@ -85,8 +85,6 @@ import { isSoloistMonophonicMode } from './soloist-mode-policy.js';
 import { HUMANIZE_PROFILES, humanizeNote, humanizeSeed } from './synth-utils.js';
 import { bassMacroGain, soloistIntensityGain } from './velocity-shaping.js';
 import { getChordAtStep as _getChordAtStep, type ChordAtStep } from './worker-utils.js';
-
-type Dispatch = (action: any, payload?: any) => void;
 
 // Persistent cursor for scheduleDrums' section lookup. The scheduler ticks
 // strictly forward through `absoluteStep`, so most calls land in the same

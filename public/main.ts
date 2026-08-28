@@ -101,7 +101,7 @@ async function init() {
 
         applyThemeToDom(playback.palette, playback.mode);
 
-        validateProgression(getState(), (a: any, p: any) => dispatch(a, p));
+        validateProgression(getState(), dispatch);
 
         if (!urlHydration.genreName) {
             // --- ASSEMBLE UI ---
@@ -110,7 +110,7 @@ async function init() {
 
         // --- WORKER INIT ---
         initWorker(
-            () => scheduler(getState(), (a: any, p: any) => dispatch(a, p)),
+            () => scheduler(getState(), dispatch),
             (
                 notes: any[],
                 requestTimestamp: number,
@@ -177,14 +177,12 @@ async function init() {
                     }
                 });
                 if (playback.isPlaying) {
-                    scheduler(getState(), (a: any, p: any) => dispatch(a, p));
+                    scheduler(getState(), dispatch);
                 }
             },
         );
 
-        setInstrumentControllerRefs(() =>
-            scheduler(getState(), (a: any, p: any) => dispatch(a, p)),
-        );
+        setInstrumentControllerRefs(() => scheduler(getState(), dispatch));
 
         if (!urlHydration.genreName) {
             const hasDrumPattern = groove.instruments.some((inst: any) =>

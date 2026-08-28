@@ -1482,11 +1482,14 @@ export interface ActionPayloadUpdateConductorState {
     targetIntensity?: number;
     stepSize?: number;
     form?: object | null;
-    loopCount?: number;
     formIteration?: number;
 }
 
 export type ActionPayloadUpdateHB = Partial<HarmonyState>;
+
+type AtLeastOne<T> = {
+    [K in keyof T]-?: Pick<T, K> & Partial<Omit<T, K>>;
+}[keyof T];
 
 /**
  * UPDATE_SB payload — flat-keyed for worker-wire and conductor compatibility.
@@ -1504,12 +1507,12 @@ export type ActionPayloadUpdateHB = Partial<HarmonyState>;
  *   `lastFreq`, `lastMidiPlayed`, `lastRenderedFreq`, `lastPlayedFreq`,
  *   `lastNoteEnd`.
  *
- * The full alias union is left as a loose `Record` to keep the contract simple.
- * Unknown keys fall through to a top-level write on the slice (preserves the
- * pre-restructure `instrumentStateMap[mod][param] = v` semantics that a handful
- * of ad-hoc scripts and the `instrument-reducer` test rely on).
+ * At least one known field is required so a broad `Record<string, unknown>`
+ * cannot bypass the dispatcher contract. Runtime hydration and legacy JS still
+ * reach the reducer's fallback path, preserving compatibility outside typed
+ * production callers.
  */
-export type ActionPayloadUpdateSB = Partial<{
+export type ActionPayloadUpdateSB = AtLeastOne<{
     enabled: boolean;
     preset: string;
     mode: string;
@@ -1581,7 +1584,7 @@ export interface ActionPayloadMap {
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;
-    SET_SOLOIST_AUTO_MODE: string;
+    SET_SOLOIST_AUTO_MODE: boolean;
     SET_SONG_SEED: string;
     SET_SEED_RANDOMIZE: boolean;
     SET_INSTRUMENT_VOICE: ActionPayloadSetInstrumentVoice;
@@ -1630,7 +1633,7 @@ export interface ActionPayloadMap {
     RESTORE_GAINS: undefined;
     INIT_AUDIO: undefined;
     HYDRATE?: undefined;
-    TOAST_EXPIRED?: undefined;
+    TOAST_EXPIRED: string;
     FLASH_EXPIRED?: undefined;
     VIS_RESET?: undefined;
     VIS_UPDATE?: unknown;
@@ -1639,10 +1642,21 @@ export interface ActionPayloadMap {
 }
 
 /**
+ * Canonical public dispatcher. The conditional tuple keeps payload-less
+ * actions ergonomic while requiring the matching payload everywhere else.
+ */
+export type Dispatch = <K extends keyof ActionPayloadMap>(
+    ...args: K extends keyof ActionPayloadMap
+        ? undefined extends ActionPayloadMap[K]
+            ? [action: K, payload?: ActionPayloadMap[K]]
+            : [action: K, payload: ActionPayloadMap[K]]
+        : never
+) => void;
+
+/**
  * Discriminated union over all known actions. Each reducer's switch on
  * `action.type` narrows `action.payload` to the matching payload type.
- * Loose `dispatch(action: string, payload?: any)` calls still flow through
- * the same shape — unmapped strings fall to each reducer's default arm.
+ * `Dispatch`, `ACTIONS`, and this union all derive from the same payload map.
  */
 export type Action = {
     [K in keyof ActionPayloadMap]-?: { type: K; payload: ActionPayloadMap[K] };
@@ -1726,7 +1740,7 @@ export const ACTIONS = {
     VIS_UPDATE: 'VIS_UPDATE',
     PROG_VALIDATED: 'PROG_VALIDATED',
     DRUM_PRESET_LOADED: 'DRUM_PRESET_LOADED',
-} as const;
+} as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };
 
 /**
  * E2E + preview helpers installed on `window` by `installE2EGlobals()` and
@@ -1741,15 +1755,14 @@ declare global {
 
     interface Window {
         // The signatures here mirror the runtime helpers installed by
-        // installE2EGlobals(); callers consume them via Playwright tooling
-        // and devtools, not from typed app code, so the public surface is
-        // intentionally permissive. The typed action map for `dispatch` is
-        // parked in CODEBASE_HYGIENE_2026-05-26 multi-session followups.
+        // installE2EGlobals(). The dispatch surface stays on the same canonical
+        // action contract as production callers; Playwright specs may remain
+        // runtime-oriented, but typed app/devtools consumers cannot escape it.
         ensemble?: {
-            dispatch: (action: any, payload?: any) => void;
+            dispatch: Dispatch;
             getState: () => EnsembleState;
             ACTIONS: typeof ACTIONS;
-            validateProgression: (state: EnsembleState, dispatch: any) => unknown;
+            validateProgression: (state: EnsembleState, dispatch?: Dispatch) => unknown;
             scheduleGlobalEvent: (...args: any[]) => any;
             initAudio: (state: EnsembleState) => unknown;
             loadDrumPreset: (name: string) => unknown;

@@ -9,6 +9,7 @@ import { loadDrumPreset } from '../controllers/instrument-controller.js';
 import { getCanonicalMeters } from '../data/smart-genres.js';
 import { formatUnicodeSymbols } from '../sanitize.js';
 import { arranger } from '../state.js';
+import type { Dispatch } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { useDispatch, useEnsembleState } from '../ui-bridge.js';
 import { ToolbarPopover } from './ToolbarPopover.jsx';
@@ -43,7 +44,7 @@ function getRelativeKeyActionLabel(isMinor: boolean) {
 function updateTimeSignature(
     timeSignature: string,
     lastDrumPreset: string | null,
-    dispatch: (action: any, ...args: any[]) => void,
+    dispatch: Dispatch,
 ) {
     if (arranger.timeSignature === timeSignature) {
         return;
@@ -61,7 +62,7 @@ function updateTimeSignature(
     refreshArrangerUI();
 }
 
-function cycleGrouping(timeSignature: string, dispatch: (action: any, ...args: any[]) => void) {
+function cycleGrouping(timeSignature: string, dispatch: Dispatch) {
     const options = GROUPING_OPTIONS[timeSignature];
     if (!options) {
         return;

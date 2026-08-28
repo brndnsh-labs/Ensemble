@@ -6,7 +6,7 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
-import type { Chord, FormattedChordNames, Mutable } from '../types.js';
+import type { Chord, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
@@ -1089,7 +1089,7 @@ function parseProgressionPart(
  */
 export function validateProgression(
     state: any,
-    dispatch?: (...args: any[]) => any,
+    dispatch?: Dispatch,
     renderCallback?: () => any,
 ): void {
     const { arranger } = state;

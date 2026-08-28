@@ -21,7 +21,13 @@ import { togglePlay } from '../engine/scheduler-core.js';
 import { isInstrumentEverActive } from '../engine/section-overrides.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { generateSessionSeed } from '../engine/soloist-seeder.js';
-import type { EnsembleState, GrooveState, InstrumentModule, InstrumentVoice } from '../types.js';
+import type {
+    Dispatch,
+    EnsembleState,
+    GrooveState,
+    InstrumentModule,
+    InstrumentVoice,
+} from '../types.js';
 import { ACTIONS } from '../types.js';
 import { clearToastActions } from '../ui.js';
 import { debounceSaveState } from './persistence.js';
@@ -53,7 +59,7 @@ const TRANSIENT_PERSIST_ACTIONS = new Set<string>([
 ]);
 
 interface HandleEffectsContext {
-    dispatch: (action: string, payload?: any) => void;
+    dispatch: Dispatch;
     viz?: any;
     oldBpm?: number;
 }

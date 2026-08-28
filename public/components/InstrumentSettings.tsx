@@ -1,7 +1,7 @@
 import { Fragment } from 'preact';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { packsForInstrument } from '../data/sound-packs.js';
-import { isPackInstalled } from '../engine/instrument-registry.js';
+import { hydrateVoice, isPackInstalled } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
 import type { GrooveState } from '../state/groove.js';
 import { dispatch } from '../state.js';
@@ -181,7 +181,11 @@ function InstrumentSoundSource({ module }: { module: InstrumentModule }) {
                 auto: true,
             });
         } else {
-            dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice: val, auto: false });
+            dispatch(ACTIONS.SET_INSTRUMENT_VOICE, {
+                module,
+                voice: hydrateVoice(val),
+                auto: false,
+            });
         }
     };
 
