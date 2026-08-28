@@ -228,9 +228,9 @@ export function isTensionChordForSoloist(quality: string | undefined | null): bo
 /**
  * Carryover values that survive across ticks. Producers of the per-tick context
  * (currently only `tick-logic.ts → generateNotesForStep`) thread this in via the
- * caller (`worker-buffer-manager`, `midi-worker-logic`) so consumers that need
- * "what did the soloist do recently?" can read a sticky value instead of the
- * current-tick-only `soloistMidi` (which is ~0 on most harmony stab steps
+ * caller (`worker-buffer-manager`, `midi-worker-logic`, `audio-export`) so consumers
+ * that need "what did the soloist do recently?" can read a sticky value instead
+ * of the current-tick-only `soloistMidi` (which is ~0 on most harmony stab steps
  * because harmony explicitly yields away from soloist-active steps).
  *
  * writer: tick-logic.ts (copies out after each generated step)
@@ -245,8 +245,9 @@ export interface CoordinationCarryover {
 }
 
 /**
- * Zero the cross-tick soloist-sticky carryover. Both hosts (the live workerContext
- * and the offline ExportProcessor) reset these on song/export start — one home (#1013).
+ * Zero the cross-tick soloist-sticky carryover for the long-lived live workerContext
+ * and MIDI ExportProcessor hosts. Detached WAV renders construct the same typed zero
+ * value per render so one full-session/stem pass cannot leak into another.
  */
 export function resetCoordinationCarryover(target: CoordinationCarryover): void {
     target.lastActiveSoloistMidi = 0;

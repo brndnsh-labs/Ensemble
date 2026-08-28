@@ -22,7 +22,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initAudioMock = vi.fn();
 const scheduleGlobalEventMock = vi.fn();
-const generateNotesForStepMock = vi.fn(() => ({ notes: [] }));
+const emptyGeneratedStep = () => ({
+    notes: [],
+    coordination: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+});
+const generateNotesForStepMock = vi.fn(emptyGeneratedStep);
 const validateProgressionMock = vi.fn();
 
 vi.mock('../../public/engine/engine.js', () => ({
@@ -119,6 +123,7 @@ async function wavHasNonSilentSamples(blob: Blob): Promise<boolean> {
 describe('renderStemsToWav (#1018 stem export)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        generateNotesForStepMock.mockImplementation(emptyGeneratedStep);
         vi.resetModules();
         vi.stubGlobal('OfflineAudioContext', makeFakeOfflineAudioContext());
     });
@@ -281,5 +286,73 @@ describe('renderStemsToWav (#1018 stem export)', () => {
         expect(scheduleGlobalEventMock.mock.calls.map((call) => call[1])).toEqual(
             Array.from({ length: 32 }, (_, step) => step),
         );
+    });
+
+    it('carries soloist coordination across ticks and loops without leaking between renders', async () => {
+        const observedCarryovers: Array<{
+            step: number;
+            carryover: { lastActiveSoloistMidi: number; lastActiveSoloistStep: number } | null;
+        }> = [];
+
+        generateNotesForStepMock.mockImplementation((...args: any[]) => {
+            const step = args[1] as number;
+            const carryover = args[4] as
+                | { lastActiveSoloistMidi: number; lastActiveSoloistStep: number }
+                | null
+                | undefined;
+            observedCarryovers.push({
+                step,
+                carryover: carryover ? { ...carryover } : null,
+            });
+
+            // Model the production contract: the soloist publishes after the
+            // sentinel step, then rests while harmony keeps reading the sticky pair.
+            return {
+                notes: [],
+                coordination:
+                    step === 1
+                        ? { lastActiveSoloistMidi: 85, lastActiveSoloistStep: 1 }
+                        : { ...carryover },
+            };
+        });
+        vi.doMock('../../public/state.js', () => ({
+            getState: () => makeLiveState(),
+        }));
+        const { renderCurrentSessionToWav, renderStemsToWav } = await import(
+            '../../public/export/audio-export.js'
+        );
+
+        await renderCurrentSessionToWav({ loops: 2 });
+        await renderCurrentSessionToWav();
+        await renderStemsToWav(['soloist', 'harmony']);
+
+        expect(observedCarryovers[0]).toEqual({
+            step: 0,
+            carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+        });
+        expect(observedCarryovers[1]).toEqual({
+            step: 1,
+            carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+        });
+        expect(observedCarryovers[2]).toEqual({
+            step: 2,
+            carryover: { lastActiveSoloistMidi: 85, lastActiveSoloistStep: 1 },
+        });
+        expect(observedCarryovers[16]).toEqual({
+            step: 16,
+            carryover: { lastActiveSoloistMidi: 85, lastActiveSoloistStep: 1 },
+        });
+        expect(observedCarryovers[32]).toEqual({
+            step: 0,
+            carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+        });
+        expect(observedCarryovers[48]).toEqual({
+            step: 0,
+            carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+        });
+        expect(observedCarryovers[64]).toEqual({
+            step: 0,
+            carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
+        });
     });
 });

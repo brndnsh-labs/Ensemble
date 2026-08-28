@@ -3,6 +3,7 @@ import { TIME_SIGNATURES } from '../public/config.js';
 import { loadDrumPreset } from '../public/controllers/instrument-controller.js';
 import { DRUM_PRESETS } from '../public/data/drum-presets.js';
 import { SMART_GENRES } from '../public/data/smart-genres.js';
+import type { CoordinationCarryover } from '../public/engine/coordination-engine.js';
 import { generateDrumFills, generateDrumOrchestration } from '../public/engine/drum-seeder.js';
 import { createPRNG } from '../public/engine/hash-utils.js';
 import { resolveSoloistStyle } from '../public/engine/soloist-config.js';
@@ -489,6 +490,10 @@ export function simulateEnsembleLoops({
             formIteration: 0,
             totalLoops: loops,
         };
+        const carryover: CoordinationCarryover = {
+            lastActiveSoloistMidi: 0,
+            lastActiveSoloistStep: 0,
+        };
 
         for (let absoluteStep = 0; absoluteStep < arrangement.totalSteps * loops; absoluteStep++) {
             applyWorkerTransition(state, absoluteStep, conductorState);
@@ -506,13 +511,24 @@ export function simulateEnsembleLoops({
                 state.arranger.measureMap,
                 TIME_SIGNATURES,
             );
-            const tickResult = generateNotesForStep(state, absoluteStep, cursors, {
-                includeBass,
-                includeChords,
-                includeSoloist,
-                includeHarmony,
-                includeDrums,
-            });
+            const tickResult = generateNotesForStep(
+                state,
+                absoluteStep,
+                cursors,
+                {
+                    includeBass,
+                    includeChords,
+                    includeSoloist,
+                    includeHarmony,
+                    includeDrums,
+                },
+                carryover,
+            );
+
+            if (tickResult.coordination.lastActiveSoloistMidi) {
+                carryover.lastActiveSoloistMidi = tickResult.coordination.lastActiveSoloistMidi;
+                carryover.lastActiveSoloistStep = tickResult.coordination.lastActiveSoloistStep;
+            }
 
             steps.push({
                 loop: conductorState.loopCount,

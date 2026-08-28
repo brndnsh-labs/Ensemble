@@ -77,7 +77,7 @@ Source of truth: `public/engine/coordination-engine.ts`. When a consumer engine 
 
 1. **Producer writes to the coordination context.** Never have a consumer read another engine's `state.x.session.*` directly — that's a contract violation that breaks test mocks (see [[feedback-tests-passing-wrong-path]]) and couples engines to each other's internals.
 
-2. **Sticky-across-ticks state goes in `CoordinationCarryover`.** Per-tick context is recreated; if the consumer needs the producer's value from N ticks ago (because the producer doesn't run every tick), use the Carryover struct threaded through `generateNotesForStep`. Always age-cap sticky values so single-shot events don't permanently steer downstream behavior. See [[reference-coordination-carryover]] for the two hosts that must initialize it.
+2. **Sticky-across-ticks state goes in `CoordinationCarryover`.** Per-tick context is recreated; if the consumer needs the producer's value from N ticks ago (because the producer doesn't run every tick), use the Carryover struct threaded through `generateNotesForStep`. Always age-cap sticky values so single-shot events don't permanently steer downstream behavior. See [[reference-coordination-carryover]] for the three production hosts that must initialize it.
 
 3. **Annotate producer order in code.** Every field on the coordination context gets a `// writer: <producer-name>` and `// readable-after: <producer-name>` comment in `createCoordinationContext()`. Guard with `tests/unit/engine/producer-order.test.ts` — mock the producer's output to a sentinel value (e.g. MIDI 72) and spy on a later consumer to assert it sees that value. If anyone reorders the producers, the positive test fails.
 

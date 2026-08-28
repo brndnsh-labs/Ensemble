@@ -83,15 +83,16 @@ export interface GenerateNotesResult {
  *
  * `carryover` carries sticky cross-tick coordination state (e.g.
  * lastActiveSoloistMidi) — callers should store the post-tick value from
- * `result.coordination` and feed it back in on the next tick. Stateless
- * callers (drum-only paths, isolated tests) can omit it.
+ * `result.coordination` and feed it back in on the next tick. Typechecked
+ * production orchestration hosts must supply it explicitly; isolated stateless
+ * callers use `null` when they participate in typechecking.
  */
 export function generateNotesForStep(
     state: EnsembleState,
     step: number,
     cursors: TickCursors,
     options: GenerateNotesOptions = {},
-    carryover: CoordinationCarryover | null = null,
+    carryover: CoordinationCarryover | null,
 ): GenerateNotesResult {
     const { arranger, bass, groove, soloist, harmony } = state;
 
