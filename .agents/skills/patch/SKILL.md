@@ -2,7 +2,7 @@
 name: patch
 description: Address /review findings on the uncommitted Ensemble diff. Reads the most-recent review output from context, triages (fix-now is the DEFAULT for any finding about this diff — P0/P1/bounded-P2; escalate to Brandon if it needs a decision or is too big), presents a fix plan, then patches inline — no agent spawn, the orchestrator already holds the diff + findings. Re-runs the gates after. Use after /review, before /done. Plan-first.
 ---
-<!-- cycle:rendered template=skills/patch.md.tmpl hash=3f7396fb1f6e — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/patch.md.tmpl hash=7109b7d9c2de — managed by the-cycle; edit the template, not this file -->
 
 # /patch — address reviewer findings
 
@@ -30,7 +30,8 @@ stays in progress.
    open `finding` issues should trend to *empty* (§2). A fix that's genuinely too big to do
    in-cycle is an **escalation** (with Brandon's nod), not a silent defer.
 3. **Present the patch plan** (Fix-now / Escalate, each with
-   `file:line` + a fix sketch + the §4 gates) — a status update, not a gate (§5).
+   `file:line` + a fix sketch + any directly required companion file and why + the §4 gates) — a
+   status update, not a gate (§5).
 4. **Patch inline immediately** in the same turn, with Edit/Write — no "Apply?" wait, unless a
    finding needed escalation (§5). **No spawn**: the orchestrator's context already holds the diff
    and the findings; a subagent would re-derive both and get them subtly wrong. Add a `**Why:**`
@@ -52,7 +53,10 @@ stays in progress.
 
 ## Safety
 
-- Never patch a file the most-recent `/review` didn't flag — that's scope creep.
+- Never patch an unrelated file. A file not cited by the most-recent `/review` may be changed only
+  when it is directly required to resolve a cited finding (for example a regression test, fixture,
+  shared type, or generated artifact), and that additional file + reason must appear in the patch
+  plan before editing. This exception never permits opportunistic cleanup or new ideas.
 - Never silently downgrade a P0 to avoid escalation; if you think it's overblown, say so and let
   Brandon decide.
 - Don't run reviewers here — that's `/review`'s job.

@@ -2,7 +2,7 @@
 name: scout
 description: Discovery-driven finder for Ensemble — fans out read-only agents across security · performance · hygiene · context · a11y lenses, verifies each finding against the real code, dedupes against open issues, and files the worth-keeping candidates as actionable issues. Read-only over code: it FINDS and FILES, it never fixes, branches, or merges. Usage `/scout` (all lenses, tightly capped) or `/scout <lens>` (one focused lens, higher cap).
 ---
-<!-- cycle:rendered template=skills/scout.md.tmpl hash=35080a9526a0 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/scout.md.tmpl hash=289def7810b7 — managed by the-cycle; edit the template, not this file -->
 
 # /scout — find Ensemble's next work, on demand
 
@@ -16,6 +16,10 @@ issues, so the filing mechanics are **§10** — dedup, the actionable bar, the 
 budget. Don't restate them; apply them. Also leans on §1 (Status), §2 (the `scout` provenance
 stamp), §5 (a finding that touches an always-brake surface still gets filed, just clearly flagged),
 and §7 (the batch-write rule).
+
+**If `.agents/skills/FILING.md` is not already in context, read it before presenting or filing
+the slate.** It expands §10's filing procedure without displacing DOCTRINE's certainty and safety
+authority.
 
 ## The cardinal rule: scout finds and files. It never fixes, branches, or merges.
 
@@ -145,6 +149,29 @@ Within §10.6's budget: **all-lenses run** — ~2 findings per lens, single digi
 **Filing zero because a lens is clean is a success, not a failure** — say so and stop. A flood of
 marginal issues is worse than a missed one: it burns trust in the whole queue.
 
+## Broader threads are a handoff, not an implicit wider sweep
+
+A verified finding can expose a shared pattern that may support distinct actionable issues across
+other parts of the codebase. That is useful Scout output, but it is **not** permission to exceed
+the current run's named lens or §10.6 filing budget.
+
+Inspect only enough adjacent, representative evidence to establish that the thread is credible.
+Cite what is confirmed, distinguish likely surfaces from verified ones, and stop before the
+current pass turns into the broader investigation. Finish the original sweep and slate normally.
+
+In the final report, add a **broader thread** handoff that includes:
+
+- the shared pattern and the evidence that makes it credible;
+- confirmed and likely affected surfaces, clearly distinguished;
+- whether one issue is sufficient or several independent issues are warranted — one issue when
+  the fix and acceptance are shared, several when the surfaces need independently shippable fixes
+  or proof — plus the proposed split; and
+- the focused follow-up `/scout <lens>` pass that would investigate and draft those issues.
+
+Do **not** automatically broaden the current sweep, file speculative related issues, or create an
+umbrella issue. The broader investigation and its filings begin only when that focused follow-up
+is requested.
+
 ## Verify before filing (non-negotiable)
 
 Every finding is a **hypothesis with a citation** until you've read the cited code. Open the file,
@@ -193,7 +220,8 @@ never pickable.
    and there is nothing to batch around. Tracker unreachable → say so and stop; don't pretend it
    filed.
 8. **Report.** What was filed (links, labels, which ones flag a §5 brake for later), what was found
-   but not filed (dups, below-the-cut, "clean on this lens"), and point at `/next`.
+   but not filed (dups, below-the-cut, "clean on this lens"), any credible **broader thread**
+   handoff from above, and point at `/next`.
 
 ## Guardrails
 

@@ -2,7 +2,7 @@
 name: unblock
 description: Batch up everything waiting on Brandon and clear it in one pass. Two lanes — `desk` (decisions answerable from a menu) and `hands-on` (things that have to be looked at or tried, verified live first). Restates each item in plain English with a recommendation, asks via plain chat, and applies every answer in a single batched write. Read-only until they answer. Usage `/unblock` · `/unblock desk` · `/unblock hands-on`.
 ---
-<!-- cycle:rendered template=skills/unblock.md.tmpl hash=8863ee984be4 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/unblock.md.tmpl hash=70b4f0f2b528 — managed by the-cycle; edit the template, not this file -->
 
 # /unblock — clear the decisions you owe
 
@@ -60,7 +60,8 @@ both and presents desk first, then hands-on.
 8. **Apply the answers** (§7) — `gh issue edit "<n>" --remove-label "status:ready,status:in-progress,status:in-review,status:needs-decision,status:needs-ear,status:blocked" && gh issue edit "<n>" --add-label "<status:label>"` per issue, in a plain
    loop. Apply them together, after all the answers are in, so a half-answered session never
    leaves the queue half-moved.
-   - **Works** → unblock it: merge via §6's guard, or close it.
+   - **Works** → unblock it: before merging, ensure `.agents/skills/DELIVERY.md` is in context,
+     reading it only if absent, and use §6's configured guard; otherwise close it.
    - **Doesn't work** → capture the description **verbatim** as a `finding`. Their raw words are the
      evidence; don't paraphrase them into your own diagnosis.
    - **Not now** → leave it exactly as it was. No penalty, no nag.

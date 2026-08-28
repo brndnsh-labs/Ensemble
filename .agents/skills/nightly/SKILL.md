@@ -2,7 +2,7 @@
 name: nightly
 description: The unattended overnight composition for Ensemble — timestamp, grind the safe queue via /burndown, then when it's dry run ONE /scout lens by day-of-week rotation, deploy what merged to test, and leave a morning report with a smoke-test checklist derived from the night's diff. Runs under a standing go. Usage `/nightly`.
 ---
-<!-- cycle:rendered template=skills/nightly.md.tmpl hash=a4f9011d08a2 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/nightly.md.tmpl hash=b58a47824bdd — managed by the-cycle; edit the template, not this file -->
 
 # /nightly — the unattended overnight run
 
@@ -12,6 +12,9 @@ Brandon can act on over coffee.
 **Shared rules in `.agents/skills/DOCTRINE.md` — read it if not already in context.** This skill
 composes `/burndown` and `/scout`; it adds no new autonomy of its own. Every §5 brake still applies
 exactly as written.
+
+Before the `/scout` phase, ensure `.agents/skills/FILING.md` is in context; read it only if
+absent. The invoked filing workflow depends on that procedural reference.
 
 ## The standing go
 

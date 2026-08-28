@@ -2,7 +2,7 @@
 name: intake
 description: The front door to the backlog — turn a plain-English idea into an actionable Ensemble issue. Interviews Brandon ONE question at a time until the issue is genuinely implementable, then drafts it, classifies it, and files it. Plan-first — always shows the shaped issue before writing. Shares /scout's filing mechanics (DOCTRINE §10). Usage `/intake <the idea>` (or bare, and it'll ask).
 ---
-<!-- cycle:rendered template=skills/intake.md.tmpl hash=908bb43881d5 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/intake.md.tmpl hash=fe863719fbfa — managed by the-cycle; edit the template, not this file -->
 
 # /intake — turn an idea into an actionable issue
 
@@ -13,6 +13,10 @@ grinds); this one *writes* a well-formed issue into it from a plain-English idea
 **Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** The filing
 mechanics — dedup, the actionable bar, body format, budget — are **§10**; don't restate them,
 apply them. Classification maps onto §2 (Labels) and §1 (Status). The write step uses §7.
+
+**If `.claude/skills/FILING.md` is not already in context, read it before shaping or writing an
+issue.** It expands §10's filing procedure without displacing DOCTRINE's certainty and safety
+authority.
 
 **The bar is "actionable"** (§10). A filed issue must be implementable from its own text —
 `/implement` or `/cycle` should know exactly what "done" looks like without asking again. If the
