@@ -3,16 +3,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockStartExport, mockSyncWorker } = vi.hoisted(() => {
+const { mockStartExport } = vi.hoisted(() => {
     return {
         mockStartExport: vi.fn(),
-        mockSyncWorker: vi.fn(),
     };
 });
 
 vi.mock('../../../public/worker-client.js', () => ({
     startExport: mockStartExport,
-    syncWorker: mockSyncWorker,
 }));
 
 vi.mock('../../../public/ui.js', () => ({
@@ -24,16 +22,16 @@ import { exportToMidi } from '../../../public/export/midi-export.js';
 describe('MIDI Export Logic', () => {
     beforeEach(() => {
         mockStartExport.mockClear();
-        mockSyncWorker.mockClear();
+        mockStartExport.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('should sanitize filename passed to startExport', () => {
+    it('should sanitize filename passed to startExport', async () => {
         const dirtyFilename = 'My Song/../<script>';
-        exportToMidi({ filename: dirtyFilename });
+        await exportToMidi({ filename: dirtyFilename });
 
         expect(mockStartExport).toHaveBeenCalled();
         const options = mockStartExport.mock.calls[0][0];
@@ -44,13 +42,33 @@ describe('MIDI Export Logic', () => {
         expect(options.filename).toMatch(/^[a-zA-Z0-9\s\-_()]+$/);
     });
 
-    it('should truncate extremely long filenames', () => {
+    it('should truncate extremely long filenames', async () => {
         const longFilename = 'a'.repeat(100);
-        exportToMidi({ filename: longFilename });
+        await exportToMidi({ filename: longFilename });
 
         expect(mockStartExport).toHaveBeenCalled();
         const options = mockStartExport.mock.calls[0][0];
 
         expect(options.filename.length).toBeLessThanOrEqual(64);
+    });
+
+    it('keeps the caller pending until the worker export settles', async () => {
+        let finishExport;
+        mockStartExport.mockReturnValue(
+            new Promise((resolve) => {
+                finishExport = resolve;
+            }),
+        );
+
+        let settled = false;
+        const exportPromise = exportToMidi({ filename: 'pending' }).then(() => {
+            settled = true;
+        });
+        await Promise.resolve();
+        expect(settled).toBe(false);
+
+        finishExport();
+        await exportPromise;
+        expect(settled).toBe(true);
     });
 });

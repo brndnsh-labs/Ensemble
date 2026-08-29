@@ -29,18 +29,6 @@ vi.stubGlobal(
 );
 vi.stubGlobal('clearInterval', vi.fn());
 
-vi.mock('../../../public/engine/midi-worker-logic.js', () => {
-    let exporting = false;
-    return {
-        handleExport: vi.fn(),
-        isExporting: vi.fn(() => exporting),
-        setOnExportEnd: vi.fn(),
-        _setExporting: (val) => (exporting = val),
-    };
-});
-
-import { _setExporting } from '../../../public/engine/midi-worker-logic.js';
-
 vi.mock('../../../public/state.js', async (importOriginal) => {
     const actual = await importOriginal();
     const mockChord = {
@@ -94,7 +82,6 @@ describe('Logic Worker Messaging', () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        _setExporting(false);
         _LogicWorker = await import('../../../public/logic-worker.js');
     });
 
@@ -153,12 +140,11 @@ describe('Logic Worker Messaging', () => {
         expect(errorCalls.length).toBe(0);
     });
 
-    it('should queue messages during export', () => {
-        _setExporting(true);
+    it('should process sync messages immediately while the live timer is active', () => {
+        self.onmessage({ data: { type: WORKER_MSG.START } });
         self.onmessage({ data: { type: WORKER_MSG.SYNC_STATE, data: { playback: { bpm: 200 } } } });
 
-        // State should NOT be updated yet
-        expect(getState().playback.bpm).not.toBe(200);
+        expect(getState().playback.bpm).toBe(200);
     });
 
     it('should handle RESOLUTION messages', () => {

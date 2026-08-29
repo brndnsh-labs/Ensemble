@@ -1,7 +1,7 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WORKER_RESP } from '../../../public/worker-types.js';
+import { MIDI_EXPORT_RESP } from '../../../public/worker-types.js';
 
 // Mock the Worker
 class MockWorker {
@@ -25,14 +25,18 @@ vi.mock('../../../public/state.js', () => ({
     dispatch: vi.fn(),
     storage: { get: vi.fn(), save: vi.fn() },
 }));
+vi.mock('../../../public/export/detached-generation-state.js', () => ({
+    cloneStateForDetachedGeneration: vi.fn(() => ({})),
+}));
 
 // We need to import the module under test AFTER mocking
-import { getTimerWorker, initWorker } from '../../../public/worker-client.js';
+import { getMidiExportWorker, initWorker, startExport } from '../../../public/worker-client.js';
 
 describe('Security: Worker Boundary', () => {
     let worker;
     let createElementSpy;
     let clickSpy;
+    let exportPromise;
 
     beforeEach(() => {
         // Reset DOM mocks
@@ -53,7 +57,8 @@ describe('Security: Worker Boundary', () => {
             () => {},
             () => {},
         );
-        worker = getTimerWorker();
+        exportPromise = startExport({});
+        worker = getMidiExportWorker();
     });
 
     afterEach(() => {
@@ -61,20 +66,21 @@ describe('Security: Worker Boundary', () => {
         vi.restoreAllMocks();
     });
 
-    it('should sanitize filename from worker before download (Path Traversal Prevention)', () => {
+    it('should sanitize filename from worker before download (Path Traversal Prevention)', async () => {
         const maliciousFilename = '../../etc/passwd.exe';
 
         // Simulate message from worker
         const event = {
             data: {
-                type: WORKER_RESP.EXPORT_COMPLETE,
-                blob: new Blob(['test'], { type: 'audio/midi' }),
+                type: MIDI_EXPORT_RESP.COMPLETE,
+                blob: new Uint8Array([1, 2, 3]),
                 filename: maliciousFilename,
             },
         };
 
         // Trigger the handler
         worker.onmessage(event);
+        await exportPromise;
 
         expect(createElementSpy).toHaveBeenCalledWith('a');
         expect(clickSpy).toHaveBeenCalled();
@@ -86,18 +92,19 @@ describe('Security: Worker Boundary', () => {
         expect(anchor.download).toMatch(/^[a-zA-Z0-9\s\-_()]+\.mid$/);
     });
 
-    it('should handle legitimate filenames correctly', () => {
+    it('should handle legitimate filenames correctly', async () => {
         const validFilename = 'my-song.mid';
 
         const event = {
             data: {
-                type: WORKER_RESP.EXPORT_COMPLETE,
-                blob: new Blob(['test'], { type: 'audio/midi' }),
+                type: MIDI_EXPORT_RESP.COMPLETE,
+                blob: new Uint8Array([1, 2, 3]),
                 filename: validFilename,
             },
         };
 
         worker.onmessage(event);
+        await exportPromise;
 
         const anchor = createElementSpy.mock.results[0].value;
         expect(anchor.download).toBe(validFilename);

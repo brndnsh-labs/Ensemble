@@ -6,6 +6,8 @@ import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
 import { generateNotesForStep } from '../engine/tick-logic.js';
 import { encodeWav } from '../engine/wav-encoder.js';
 import { getState } from '../state.js';
+import type { EnsembleState } from '../types.js';
+import { cloneStateForDetachedGeneration } from './detached-generation-state.js';
 
 export interface AudioExportOptions {
     /** How many times to repeat the current chord progression. Defaults to 1. */
@@ -243,126 +245,28 @@ function sanitizeFilename(input: string): string {
 }
 
 /**
- * Mirrors the cloneState helper inlined in `scripts/mix-report.ts`. Strips
- * the audio context and per-instrument runtime buffers so the offline render
- * starts from a clean slate; preserves every user-facing setting from the
- * live session (styles, volumes, intensity, etc.) so the export sounds like
- * what's on screen.
+ * Adds WAV/stem-specific full-form resets to the shared detached generation
+ * snapshot. Musical settings remain intact while derived arrangement data is
+ * rebuilt by the offline renderer.
  */
-// The clone temporarily carries legacy soloist fields (motifBuffer,
-// pitchHistory) and a `ui` slot that the offline-render pipeline still
-// reaches for; those fields are not on the typed EnsembleState. Until that
-// scratch surface is migrated, this helper stays loosely typed.
-function cloneStateForRender(liveState: any): any {
-    return {
-        playback: {
-            ...liveState.playback,
-            modals: { ...(liveState.playback.modals || {}) },
-            drawQueue: [],
-            audio: null,
-            audioGraph: null,
-            // #691 — these hold live-context sampled-voice handles; null them so
-            // the offline render doesn't poke live nodes on its first chord change
-            // (the lastSampledHatVoice clone-parity lesson, on the playback slice).
-            activeChordVoices: [],
-            lastChordKey: null,
-            isPlaying: false,
-            isScheduling: false,
-            nextNoteTime: 0,
-            unswungNextNoteTime: 0,
-            // #1016 — always render the FULL song form, never a live section-
-            // practice drill. If an export fired while a loop was active the
-            // clone would inherit it and `foldPracticeStep` would confine the
-            // whole render to the drilled section (and inconsistently, since the
-            // direct generateNotesForStep path uses the raw step). Same
-            // clone-host parity discipline as the #691 live-voice handles.
-            startStep: 0,
-            loopStartStep: -1,
-            loopEndStep: -1,
-        },
-        arranger: {
-            ...liveState.arranger,
-            sections: liveState.arranger.sections.map((section: any) => ({
-                ...section,
-                instruments: section.instruments ? { ...section.instruments } : undefined,
-            })),
-            progression: [],
-            stepMap: [],
-            sectionMap: [],
-            measureMap: [],
-        },
-        groove: {
-            ...liveState.groove,
-            instruments: liveState.groove.instruments.map((inst: any) => ({
-                ...inst,
-                steps: [...inst.steps],
-            })),
-            audioBuffers: {},
-            buffer: new Map(),
-            fillSteps: null,
-            fillMap: null,
-            accentMap: liveState.groove.accentMap
-                ? Object.fromEntries(
-                      Object.entries(liveState.groove.accentMap).map(([step, accent]) => [
-                          step,
-                          { ...(accent as object) },
-                      ]),
-                  )
-                : null,
-            // Export starts the current plan at the beginning of its own
-            // detached timeline, even when the live map was reseeded mid-play.
-            seedTimelineStartStep: 0,
-            lastHatGain: null,
-            lastSampledHatVoice: null,
-            lastRideGain: null,
-            lastCrashGain: null,
-        },
-        chords: {
-            ...liveState.chords,
-            buffer: new Map(),
-            held: {},
-            activeNotes: {},
-            activeInstrument: {},
-        },
-        bass: {
-            ...liveState.bass,
-            buffer: new Map(),
-            activeNotes: [],
-            lastFreq: null,
-            lastPlayedFreq: null,
-        },
-        soloist: {
-            ...liveState.soloist,
-            session: JSON.parse(JSON.stringify(liveState.soloist.session)),
-            audio: {
-                ...(liveState.soloist.audio || {}),
-                activeVoices: [],
-                buffer: new Map(),
-                lastFreq: null,
-                lastMidiPlayed: null,
-                lastRenderedFreq: null,
-                lastPlayedFreq: null,
-                lastNoteEnd: 0,
-            },
-            motifBuffer: [...(liveState.soloist.motifBuffer || [])],
-            pitchHistory: [...(liveState.soloist.pitchHistory || [])],
-            phraseContext: { ...(liveState.soloist.session.currentPhrase.context || {}) },
-        },
-        harmony: {
-            ...liveState.harmony,
-            buffer: new Map(),
-            activeVoices: [],
-        },
-        vizState: { ...liveState.vizState, enabled: false },
-        midi: { ...liveState.midi, enabled: false, muteLocal: true },
-        conductor: {
-            ...liveState.conductor,
-            form: liveState.conductor.form
-                ? JSON.parse(JSON.stringify(liveState.conductor.form))
-                : null,
-        },
-        ui: { ...(liveState.ui || {}) },
-    };
+function cloneStateForRender(liveState: EnsembleState): any {
+    const state: any = cloneStateForDetachedGeneration(liveState);
+
+    // WAV/stem export always renders the full authored form and rebuilds its
+    // derived maps. MIDI export deliberately keeps those snapshot values so its
+    // existing paused/live semantics do not change.
+    state.playback.startStep = 0; // @direct-mutation — throwaway clone
+    state.playback.loopStartStep = -1; // @direct-mutation — throwaway clone
+    state.playback.loopEndStep = -1; // @direct-mutation — throwaway clone
+    state.arranger.progression = []; // @direct-mutation — throwaway clone
+    state.arranger.stepMap = []; // @direct-mutation — throwaway clone
+    state.arranger.sectionMap = []; // @direct-mutation — throwaway clone
+    state.arranger.measureMap = []; // @direct-mutation — throwaway clone
+    state.groove.fillSteps = null; // @direct-mutation — throwaway clone
+    state.groove.fillMap = null; // @direct-mutation — throwaway clone
+    state.groove.seedTimelineStartStep = 0; // @direct-mutation — throwaway clone
+
+    return state;
 }
 
 function fillBuffersForExport(

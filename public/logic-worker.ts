@@ -3,7 +3,6 @@
 import { resetBassState } from './engine/bass-engine.js';
 import { createCoordinationContext } from './engine/coordination-engine.js';
 import { resetHiddenGenerationMemory } from './engine/generation-run.js';
-import { handleExport, isExporting, setOnExportEnd } from './engine/midi-worker-logic.js';
 import { generateResolutionNotes } from './engine/resolution.js';
 import { resetSoloistState } from './engine/soloist-session.js';
 import { fillBuffers } from './engine/worker-buffer-manager.js';
@@ -15,9 +14,6 @@ import { getState } from './state.js';
 import type { EnsembleState } from './types.js';
 import { getStepInfo } from './utils.js';
 import { postWorkerResponse, WORKER_MSG, WORKER_RESP, type WorkerRequest } from './worker-types.js';
-
-// Ensure we resume processing messages after an export completes
-setOnExportEnd(() => processMessageQueue());
 
 /**
  * Process incoming messages from the main thread.
@@ -105,9 +101,6 @@ function processMessage(message: WorkerRequest, startTime: number): void {
                     startTime,
                 );
                 break;
-            case WORKER_MSG.EXPORT:
-                handleExport(state, message.data);
-                break;
             default: {
                 // Preserve the existing runtime policy of ignoring unknown messages while
                 // making every known WorkerRequest variant exhaustive at compile time.
@@ -121,28 +114,12 @@ function processMessage(message: WorkerRequest, startTime: number): void {
     }
 }
 
-function processMessageQueue(): void {
-    while (workerContext.messageQueue.length > 0) {
-        const msg = workerContext.messageQueue.shift();
-        if (msg) {
-            processMessage(msg.request, msg.startTime);
-        }
-        if (isExporting()) {
-            break;
-        }
-    }
-}
-
 if (typeof self !== 'undefined') {
     const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
     workerSelf.onmessage = (e: MessageEvent<WorkerRequest>) => {
         const request = e.data;
         const startTime = performance.now();
-        if (isExporting()) {
-            workerContext.messageQueue.push({ request, startTime });
-        } else {
-            processMessage(request, startTime);
-        }
+        processMessage(request, startTime);
     };
 }
 

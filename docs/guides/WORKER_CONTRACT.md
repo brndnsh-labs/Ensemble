@@ -1,13 +1,14 @@
 # Ensemble: Worker-Client Communication Contract
 
-Ensemble offloads heavy musical generation and MIDI processing to a background Web Worker (`logic-worker.ts`). This document defines the message schema and synchronization logic between the Main Thread and the Worker.
+Ensemble offloads live musical generation to `logic-worker.ts` and gives every MIDI export a fresh one-shot `midi-export-worker.ts` realm. This document defines both worker boundaries.
 
 Source of truth: message constants and TypeScript envelopes live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.ts`.
 
 ## Architectural Overview
 
-*   **Main Thread (`worker-client.ts`)**: Orchestrates the worker lifecycle, dispatches state updates, and requests note generation.
-*   **Worker (`logic-worker.ts`)**: Maintains a partial mirror of the application state and generates musical events (Bass, Soloist, Accompaniment) ahead of time.
+*   **Main Thread (`worker-client.ts`)**: Orchestrates the live worker lifecycle and creates/terminates one-shot MIDI export workers.
+*   **Live Worker (`logic-worker.ts`)**: Maintains a partial mirror of application state and generates musical events (Bass, Soloist, Accompaniment) ahead of time.
+*   **MIDI Export Worker (`midi-export-worker.ts`)**: Receives one detached generation snapshot, owns `ExportProcessor` in a fresh module realm, and terminates after completion or error. It never shares live worker queues or singleton engine memory.
 
 ## Message Types (Main → Worker)
 
@@ -80,19 +81,28 @@ Requests a generated ending or resolution figure for the given step.
 }
 ```
 
-### `export`
-Triggers a MIDI file generation process.
+## Dedicated MIDI Export Protocol
+
+`startExport()` does not post to the live logic worker. It snapshots the current session with
+`cloneStateForDetachedGeneration()`, creates a fresh module worker, and sends one request:
+
 ```json
 {
-  "type": "export",
+  "type": "startExport",
   "data": {
-    "includedTracks": ["chords", "bass", "soloist", "harmonies", "drums"],
-    "targetDuration": 3,
-    "loopMode": "time",
-    "filename": "my-song"
+    "state": { "playback": { ... }, "arranger": { ... } },
+    "options": {
+      "includedTracks": ["chords", "bass", "soloist", "harmonies", "drums"],
+      "targetDuration": 3,
+      "loopMode": "time",
+      "filename": "my-song"
+    }
   }
 }
 ```
+
+A repeat request terminates the prior export worker before creating the next one. Completion,
+reported export errors, and uncaught worker errors all terminate and release the active worker.
 
 ## Message Types (Worker → Main)
 
@@ -120,7 +130,7 @@ Returns a list of generated notes to be scheduled by the audio engine.
 ### `tick`
 Heartbeat message sent periodically by the worker's timer.
 
-### `exportProgress`
+### `exportProgress` (MIDI export worker only)
 Reports export progress as a normalized `0.0-1.0` value.
 ```json
 {
@@ -129,7 +139,7 @@ Reports export progress as a normalized `0.0-1.0` value.
 }
 ```
 
-### `exportComplete`
+### `exportComplete` (MIDI export worker only)
 Returns the generated MIDI file as a `Uint8Array`.
 ```json
 {
@@ -158,8 +168,9 @@ Reports an internal worker error.
 
 ## Responsibility Split
 
-- `public/worker-client.ts` posts `WORKER_MSG.*` messages and routes `WORKER_RESP.*` back to the main thread.
-- `public/logic-worker.ts` translates those messages into sync, reset, buffer-fill, resolution, and export work.
+- `public/worker-client.ts` posts live `WORKER_MSG.*` messages, routes `WORKER_RESP.*`, and separately owns the `MIDI_EXPORT_MSG.*` lifecycle.
+- `public/logic-worker.ts` translates live messages into sync, reset, buffer-fill, and resolution work.
+- `public/midi-export-worker.ts` translates one detached export request into progress/completion/error responses.
 - `public/engine/worker-buffer-manager.ts` handles lookahead fill orchestration.
 - `public/engine/tick-logic.ts` generates per-step musical data and applies coordination/register slotting before notes leave the worker.
 - `public/engine/scheduler-core.ts` is deliberately main-thread only: it consumes generated note events and schedules playback, but it is not the worker's source of truth for note generation.

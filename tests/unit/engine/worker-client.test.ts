@@ -11,9 +11,12 @@ const { makeSoloistMock } = await vi.hoisted(
 // Mock Worker
 const mockPostMessage = vi.fn();
 global.Worker = class MockWorker {
-    constructor() {
-        this.postMessage = mockPostMessage;
+    constructor(path) {
+        this.path = path;
+        this.postMessage = vi.fn((message) => mockPostMessage(message));
         this.onmessage = null;
+        this.onerror = null;
+        this.terminate = vi.fn();
     }
 };
 
@@ -29,6 +32,7 @@ global.document.createElement = vi.fn(() => ({
 
 import {
     flushWorker,
+    getMidiExportWorker,
     getTimerWorker,
     initWorker,
     requestBuffer,
@@ -39,7 +43,12 @@ import {
     stopWorker,
     syncWorker,
 } from '../../../public/worker-client.js';
-import { WORKER_MSG, WORKER_RESP } from '../../../public/worker-types.js';
+import {
+    MIDI_EXPORT_MSG,
+    MIDI_EXPORT_RESP,
+    WORKER_MSG,
+    WORKER_RESP,
+} from '../../../public/worker-types.js';
 
 // Mock State
 vi.mock('../../../public/state.js', () => {
@@ -53,6 +62,7 @@ vi.mock('../../../public/state.js', () => {
             isMinor: false,
             timeSignature: '4/4',
             grouping: [2, 2],
+            sections: [],
         },
         chords: { style: 'smart', octave: 65, density: 'standard', enabled: true, volume: 0.5 },
         bass: { style: 'smart', octave: 38, enabled: true, volume: 0.5, lastFreq: 40 },
@@ -84,6 +94,9 @@ vi.mock('../../../public/state.js', () => {
             songMode: false,
         },
         midi: {
+            enabled: false,
+            outputs: [],
+            selectedOutputId: null,
             chordsChannel: 1,
             bassChannel: 2,
             soloistChannel: 3,
@@ -95,7 +108,13 @@ vi.mock('../../../public/state.js', () => {
             harmonyOctave: 0,
             drumsOctave: 0,
             velocitySensitivity: 1.0,
+            inputs: [],
+            selectedInputId: null,
+            inputEnabled: false,
+            muteLocal: true,
         },
+        vizState: { enabled: false },
+        conductor: { form: null },
     };
     return {
         stateMap: mockState,
@@ -137,12 +156,24 @@ describe('Worker Client', () => {
             expect(notesSpy).toHaveBeenCalledWith([], 123, 5, true);
         });
 
-        it('should handle EXPORT_PROGRESS messages', () => {
+        it('should route progress through the dedicated export worker', async () => {
             const progressSpy = vi.fn();
             setExportProgressHandler(progressSpy);
+            const exportPromise = startExport({});
+            const exportWorker = getMidiExportWorker();
 
-            worker.onmessage({ data: { type: WORKER_RESP.EXPORT_PROGRESS, progress: 0.5 } });
+            exportWorker.onmessage({
+                data: { type: MIDI_EXPORT_RESP.PROGRESS, progress: 0.5 },
+            });
             expect(progressSpy).toHaveBeenCalledWith(0.5);
+            exportWorker.onmessage({
+                data: {
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array(),
+                    filename: 'progress.mid',
+                },
+            });
+            await exportPromise;
         });
 
         it('should handle ERROR messages without crashing', () => {
@@ -152,33 +183,100 @@ describe('Worker Client', () => {
             consoleSpy.mockRestore();
         });
 
-        it('should handle EXPORT_COMPLETE messages, trigger download, and sanitize filenames', () => {
+        it('should handle export completion, trigger download, and sanitize filenames', async () => {
             const progressSpy = vi.fn();
             setExportProgressHandler(progressSpy);
+            const exportPromise = startExport({});
+            const exportWorker = getMidiExportWorker();
 
             // Test with a dirty filename
             const completeEvent = {
                 data: {
-                    type: WORKER_RESP.EXPORT_COMPLETE,
-                    blob: new Blob(['test'], { type: 'audio/midi' }),
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array([1, 2, 3]),
                     filename: 'dirty_name!@#$.mid',
                 },
             };
-            worker.onmessage(completeEvent);
+            exportWorker.onmessage(completeEvent);
+            await exportPromise;
 
             expect(progressSpy).toHaveBeenCalledWith(1.0);
             expect(global.URL.createObjectURL).toHaveBeenCalled();
             expect(mockClick).toHaveBeenCalled();
+            expect(exportWorker.terminate).toHaveBeenCalledOnce();
+            expect(getMidiExportWorker()).toBeNull();
             // Should clean up 'dirty_name!@#$.mid' to 'dirty_name.mid'
             // The DOM mock element stores the properties
             const linkElement = global.document.createElement.mock.results[0].value;
             expect(linkElement.download).toBe('dirty_name.mid');
         });
 
-        it('should handle EXPORT_COMPLETE with default name if filename is empty', () => {
-            worker.onmessage({ data: { type: WORKER_RESP.EXPORT_COMPLETE, blob: new Blob() } });
+        it('should handle export completion with a default name', async () => {
+            const exportPromise = startExport({});
+            const exportWorker = getMidiExportWorker();
+            exportWorker.onmessage({
+                data: {
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array(),
+                    filename: '',
+                },
+            });
+            await exportPromise;
             const linkElement = global.document.createElement.mock.results[0].value;
             expect(linkElement.download).toBe('ensemble-export.mid');
+        });
+
+        it('keeps live scheduler ticks flowing while export is active', async () => {
+            const exportPromise = startExport({});
+            const exportWorker = getMidiExportWorker();
+
+            worker.onmessage({ data: { type: WORKER_RESP.TICK } });
+            expect(schedulerSpy).toHaveBeenCalledOnce();
+
+            exportWorker.onmessage({
+                data: {
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array(),
+                    filename: 'ticks.mid',
+                },
+            });
+            await exportPromise;
+        });
+
+        it('terminates and rejects a superseded export before starting the next one', async () => {
+            const firstPromise = startExport({ filename: 'first' });
+            const firstWorker = getMidiExportWorker();
+            const secondPromise = startExport({ filename: 'second' });
+            const secondWorker = getMidiExportWorker();
+
+            await expect(firstPromise).rejects.toThrow('superseded');
+            expect(firstWorker.terminate).toHaveBeenCalledOnce();
+            expect(secondWorker).not.toBe(firstWorker);
+
+            secondWorker.onmessage({
+                data: {
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array(),
+                    filename: 'second.mid',
+                },
+            });
+            await secondPromise;
+        });
+
+        it('rejects export errors and releases the worker', async () => {
+            const progressSpy = vi.fn();
+            setExportProgressHandler(progressSpy);
+            const exportPromise = startExport({});
+            const exportWorker = getMidiExportWorker();
+
+            exportWorker.onmessage({
+                data: { type: MIDI_EXPORT_RESP.ERROR, data: 'generation failed' },
+            });
+
+            await expect(exportPromise).rejects.toThrow('generation failed');
+            expect(progressSpy).toHaveBeenLastCalledWith(0);
+            expect(exportWorker.terminate).toHaveBeenCalledOnce();
+            expect(getMidiExportWorker()).toBeNull();
         });
     });
 
@@ -193,12 +291,32 @@ describe('Worker Client', () => {
             expect(mockPostMessage).toHaveBeenCalledWith({ type: WORKER_MSG.STOP });
         });
 
-        it('should send export message', () => {
-            startExport({ bars: 4 });
-            expect(mockPostMessage).toHaveBeenCalledWith({
-                type: WORKER_MSG.EXPORT,
-                data: { bars: 4 },
+        it('should start export in a dedicated worker with a detached snapshot', async () => {
+            const exportPromise = startExport({ bars: 4 });
+            const exportWorker = getMidiExportWorker();
+            expect(String(exportWorker.path)).toContain('midi-export-worker.ts');
+            expect(exportWorker.postMessage).toHaveBeenCalledWith({
+                type: MIDI_EXPORT_MSG.START,
+                data: {
+                    state: expect.objectContaining({
+                        playback: expect.objectContaining({ audio: null, isPlaying: false }),
+                        arranger: expect.objectContaining({ totalSteps: 16 }),
+                    }),
+                    options: { bars: 4 },
+                },
             });
+            expect(worker.postMessage).not.toHaveBeenCalledWith(
+                expect.objectContaining({ type: MIDI_EXPORT_MSG.START }),
+            );
+
+            exportWorker.onmessage({
+                data: {
+                    type: MIDI_EXPORT_RESP.COMPLETE,
+                    blob: new Uint8Array(),
+                    filename: 'worker.mid',
+                },
+            });
+            await exportPromise;
         });
 
         it('should send request buffer message', () => {

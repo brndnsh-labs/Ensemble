@@ -25,7 +25,8 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/breakpoints.ts` | Shared viewport breakpoint constants for the compact/narrow UI experience. | `COMPACT_MQ` |
 | `public/ui-bridge.ts` | Preact <-> Engine synchronization hook. | `useEnsembleState` |
 | `public/controllers/app-controller.ts` | Top-level playback and session control. | `togglePlay`, `resetSession` |
-| `public/worker-client.ts` | Main-thread orchestrator for worker messaging. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
+| `public/worker-client.ts` | Main-thread orchestrator for the live logic worker plus one-shot MIDI export workers. | `initWorker`, `startWorker`, `syncWorker`, `flushWorker`, `requestBuffer`, `startExport` |
+| `public/midi-export-worker.ts` | One-shot MIDI export worker entry; owns a fresh module realm and detached generation state for each export. | worker message handler |
 | `public/e2e-tools.ts` | Boot-time install of `window.ensemble` for E2E tests and scripts. | `installE2EGlobals` |
 | `public/telemetry.ts` | Production-only, privacy-safe Umami analytics boundary. | `initializeTelemetry`, `track` |
 
@@ -130,8 +131,9 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 ## Live vs Worker Responsibilities
 
-- `public/worker-client.ts` owns main-thread worker lifecycle, delta sync, flush, resolution, and export requests.
-- `public/logic-worker.ts` is the worker-side message dispatcher and reset coordinator.
+- `public/worker-client.ts` owns main-thread live-worker lifecycle, delta sync, flush, resolution, and one-shot export-worker lifecycle.
+- `public/logic-worker.ts` is the live worker's message dispatcher and reset coordinator; it never owns MIDI export work.
+- `public/midi-export-worker.ts` owns one detached MIDI export per fresh module realm.
 - `public/engine/worker-buffer-manager.ts` and `public/engine/tick-logic.ts` own lookahead note generation inside the worker.
 - `public/engine/worker-utils.ts` holds shared worker-side helpers such as `getChordAtStep`.
 - `public/engine/scheduler-core.ts` stays on the main thread and schedules already-generated note events into WebAudio/MIDI time.
@@ -202,6 +204,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | `public/controllers/midi-controller.ts` | WebMIDI bridging and DAW sync. |
 | `public/export/midi-export.ts` | Main-thread MIDI file triggers. |
 | `public/export/audio-export.ts` | In-browser audio render: clones live state, drives `OfflineAudioContext` through the same engine path as playback, encodes to WAV. Powers the Share modal's "Download .wav". |
+| `public/export/detached-generation-state.ts` | Shared worker-safe/offline-render state clone: preserves generation settings while stripping live handles and runtime buffers. |
 | `public/song/song-generator.ts` | Algorithmic song structure generation. |
 | `public/song/song-generator-seed.ts` | Thin chord-text parser used by the Roll-the-Dice wizard: turns free-form Roman or letter notation into a chord-token array. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |

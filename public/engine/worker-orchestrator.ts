@@ -1,15 +1,9 @@
 import type { EnsembleState } from '../types.js';
-import type { WorkerRequest } from '../worker-types.js';
 import { resetCoordinationCarryover } from './coordination-engine.js';
 
 interface WorkerCursor {
     index: number;
     sectionIndex: number;
-}
-
-interface WorkerMessageQueueItem {
-    request: WorkerRequest;
-    startTime: number;
 }
 
 export interface WorkerContext {
@@ -22,7 +16,6 @@ export interface WorkerContext {
     mainCursor: WorkerCursor;
     lookaheadCursor: WorkerCursor;
     LOOKAHEAD: number;
-    messageQueue: WorkerMessageQueueItem[];
     state: EnsembleState | null;
     // why: sticky cross-tick coordination state (soloist's most recent non-rest MIDI
     // + the absolute step at which it was written). Lives here because the per-tick
@@ -43,7 +36,6 @@ export const workerContext: WorkerContext = {
     mainCursor: { index: 0, sectionIndex: 0 },
     lookaheadCursor: { index: 0, sectionIndex: 0 },
     LOOKAHEAD: 64,
-    messageQueue: [],
     state: null,
     lastActiveSoloistMidi: 0,
     lastActiveSoloistStep: 0,
