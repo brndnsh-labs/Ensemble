@@ -1,6 +1,5 @@
 import { getEffectiveTimeSignature } from '../meter.js';
 import { analyzeForm, getJamMacroArc, getSectionEnergy } from '../song/form-analysis.js';
-import { saveCurrentState } from '../state/persistence.js';
 import type { ActionPayloadUpdateSB, ChordDensity, Dispatch, EnsembleState } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { triggerFlash } from '../ui.js';
@@ -401,31 +400,41 @@ export function checkSectionTransition(
 
         if (nextEntry && (isLoopEnd || nextEntry.chord.sectionId !== entry.chord.sectionId)) {
             // --- 1. THE SOLOIST TRADE ---
-            // Real musicians trade even if there isn't a drum fill!
+            // Real musicians trade even if there isn't a drum fill! #1062: this
+            // toggles the RUNTIME-DERIVED `tradeSilenced` layer, never the
+            // user's own `enabled` field — `enabled` is `document`-owned
+            // (persisted, shareable; see state-ownership.ts) and must reflect
+            // only the user's manual toggle. `isInstrumentActiveAtStep`
+            // (section-overrides.ts) composes `tradeSilenced` with `enabled`
+            // at READ time, mirroring how `playback.conductorVelocity` combines
+            // with a lane's own volume without ever being assigned onto it. No
+            // saveCurrentState() here anymore: nothing this block writes is a
+            // persisted field, so there's nothing new to flush.
             const { soloist: soloistState } = state;
             if (
                 soloistState &&
                 (soloistState.tradeMode === 'sections' ||
                     (soloistState.tradeMode === 'loops' && isLoopEnd))
             ) {
-                const nextSoloState = !soloistState.enabled;
-                const sbUpdate: ActionPayloadUpdateSB = nextSoloState
+                const nextSilenced = !soloistState.tradeSilenced;
+                const sbUpdate: ActionPayloadUpdateSB = nextSilenced
                     ? {
-                          enabled: nextSoloState,
+                          // Trading OUT: silence the lane, yield to the band.
+                          tradeSilenced: true,
+                          isYielding: true,
+                          isWaitingForEntry: false,
+                      }
+                    : {
+                          // Trading IN: lift the silence, force a clean entry.
+                          tradeSilenced: false,
                           isWaitingForEntry: true,
                           isResting: true,
                           isYielding: false,
                           activeSteps: 0,
                           restSteps: 0,
-                      }
-                    : {
-                          enabled: nextSoloState,
-                          isYielding: true,
-                          isWaitingForEntry: false,
                       };
 
                 dispatch(ACTIONS.UPDATE_SB, sbUpdate);
-                saveCurrentState();
             }
 
             let shouldFill = true;

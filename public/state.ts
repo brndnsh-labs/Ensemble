@@ -128,6 +128,11 @@ export function buildSoloistSyncPayload(soloist: SoloistState) {
         mode: soloist.mode,
         phrasingIntensity: soloist.phrasingIntensity,
         tradeMode: soloist.tradeMode,
+        // #1062 — the worker's own generation gate (drums-tick.ts's
+        // `includeSoloist`, harmonies.ts's `resolveSoloistEffectiveEnabled`,
+        // etc.) all route through `isInstrumentActiveAtStep`, which now reads
+        // this field, so it must cross like any other live-changing scalar.
+        tradeSilenced: soloist.tradeSilenced,
         session: {
             sessionSteps: soloist.session.sessionSteps,
             seed: soloist.session.seed,

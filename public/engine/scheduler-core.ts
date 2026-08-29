@@ -231,6 +231,11 @@ export function togglePlay(
         if (dispatch) {
             dispatch(ACTIONS.VIS_RESET);
         }
+        if (dispatch) {
+            // #1062 — clear the runtime trade-silence layer on stop so a fresh
+            // play starts unsilenced; never touches the user's own `enabled`.
+            dispatch(ACTIONS.UPDATE_SB, { tradeSilenced: false });
+        }
         killAllNotes(state);
         stopMidiTransport(state, playback.audio?.currentTime || 0);
         flushBuffers();

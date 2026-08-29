@@ -949,6 +949,17 @@ export interface SoloistState {
     /** Probability of playing double stops. */
     /** Mode for trading fours ('manual', 'auto'). */
     readonly tradeMode: string;
+    /**
+     * #1062 — RUNTIME-DERIVED trade-silencing layer, never the user's own
+     * setting. The soloist-trade block in `conductor.ts` toggles this (not
+     * `enabled`) at each section/loop boundary while `tradeMode` is active;
+     * `isInstrumentActiveAtStep` (`section-overrides.ts`) composes it with
+     * `enabled` at READ time, mirroring how `playback.conductorVelocity`
+     * combines with a lane's own volume without ever being assigned onto it.
+     * Classified `runtime-derived` in `songbook/state-ownership.ts` — never
+     * persisted, never encoded into share URLs.
+     */
+    readonly tradeSilenced: boolean;
     // `motifTracking` and `pinnedProfile` were removed in #866 — both were inert
     // after the legacy soloist engine's retirement (epic #10). Old persisted /
     // share-URL payloads carrying them are dropped on load via the deprecated-key
@@ -1523,6 +1534,7 @@ export type ActionPayloadUpdateSB = AtLeastOne<{
     complexity: number;
     phrasingIntensity: number;
     tradeMode: string;
+    tradeSilenced: boolean;
     sessionSeed: SoloistSessionSeed | null;
     sessionSteps: number;
     phraseCount: number;

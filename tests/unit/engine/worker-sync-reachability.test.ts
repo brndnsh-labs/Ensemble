@@ -106,6 +106,7 @@ function makePopulatedState() {
             mode: str,
             phrasingIntensity: num,
             tradeMode: str,
+            tradeSilenced: true,
             session: { sessionSteps: num, seed: num },
             audio: { lastFreq: num },
         },
@@ -297,6 +298,10 @@ const WORKER_SYNC_MANIFEST: Record<
     'soloist.mode': { delta: 'SET_SOLOIST_MODE' },
     'soloist.phrasingIntensity': { delta: 'SET_PARAM' },
     'soloist.tradeMode': { delta: 'SET_PARAM' },
+    // #1062 — the trade block (conductor.ts) dispatches UPDATE_SB directly
+    // (mirroring how it already updates isYielding/isWaitingForEntry there),
+    // never SET_PARAM, so this is tagged on its own real live producer.
+    'soloist.tradeSilenced': { delta: 'UPDATE_SB' },
     // Reaches the worker only nested via the full snapshot/flush, which is exactly how
     // its worker consumer reads it (`soloist.session.sessionSteps`, midi-worker-logic.ts).
     // (The `SET_SESSION_STEPS` case in syncWorker() is dead — never dispatched, not in
@@ -406,6 +411,8 @@ function driveFor(path: string, action: string): [string, any] {
         case 'SET_INSTRUMENT_VOICE':
             return [action, { module, voice: 'x' }];
         case 'SET_MIDI_CONFIG':
+            return [action, { [leaf]: 1 }];
+        case 'UPDATE_SB':
             return [action, { [leaf]: 1 }];
         case 'SET_SWING':
             return [action, 1];

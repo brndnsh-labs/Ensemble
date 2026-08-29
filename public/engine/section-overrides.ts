@@ -271,6 +271,14 @@ export function isInstrumentActiveAtStep(
     if (typeof override === 'boolean') {
         return override;
     }
+    // #1062 — the soloist trade's runtime on/off decision layers over the
+    // user's own `enabled` flag here, at READ time, rather than the trade
+    // block (conductor.ts) ever assigning onto `enabled` itself. A section
+    // that explicitly forces the soloist on (the `typeof override === 'boolean'`
+    // branch above) still wins over an in-flight trade silence.
+    if (instrument === 'soloist' && state?.soloist?.tradeSilenced) {
+        return false;
+    }
     const slice = (state as any)?.[instrument];
     return Boolean(slice?.enabled);
 }

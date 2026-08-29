@@ -179,6 +179,11 @@ export const STATE_OWNERSHIP_MANIFEST = {
         complexity: 'runtime-derived',
         phrasingIntensity: 'document',
         tradeMode: 'document',
+        // #1062 — the trade block's runtime on/off decision. Must never be
+        // 'document'/'preferences': it is derived at each section/loop
+        // boundary while tradeMode is active, not a user setting, and must
+        // not persist or ride share URLs (mirrors playback.conductorVelocity).
+        tradeSilenced: 'runtime-derived',
         session: 'runtime-derived',
         audio: 'runtime-derived',
     },
