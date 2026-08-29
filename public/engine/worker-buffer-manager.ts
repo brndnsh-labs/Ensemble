@@ -1,5 +1,5 @@
 import type { EnsembleState } from '../types.js';
-import { WORKER_RESP } from '../worker-types.js';
+import { postWorkerResponse, WORKER_RESP } from '../worker-types.js';
 import {
     foldPracticeStep,
     isInstrumentActiveAtStep,
@@ -138,7 +138,7 @@ export function fillBuffers(
 
     const workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
     if (notesToMain.length > 0) {
-        postMessage({
+        postWorkerResponse({
             type: WORKER_RESP.NOTES,
             notes: notesToMain,
             requestTimestamp,
