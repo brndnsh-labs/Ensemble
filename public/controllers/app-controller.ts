@@ -1,7 +1,6 @@
 import { dispatch, getState } from '../state.js';
 import type { Mutable, Palette, ThemeMode } from '../types.js';
 import { ACTIONS } from '../types.js';
-import { getStepsPerMeasure } from '../utils.js';
 import { syncWorker } from '../worker-client.js';
 
 /** Resolve a light/dark preference to a concrete mode. 'auto' follows the OS. */
@@ -44,11 +43,10 @@ export function setMode(mode: ThemeMode): void {
 
 export function setBpm(
     val: string | number,
-    viz?: any,
     fromDispatch = false,
     oldBpmParam: number | null = null,
 ): void {
-    const { playback, arranger } = getState();
+    const { playback } = getState();
     const newBpm = Math.max(40, Math.min(240, parseInt(val.toString(), 10)));
     const currentBpm = fromDispatch ? oldBpmParam || playback.bpm : playback.bpm;
 
@@ -81,12 +79,4 @@ export function setBpm(
     // case in state-effects.ts's handleEffects, so the dispatch that reached
     // this call already schedules the #1127 chokepoint's debounced save once
     // this function returns and the switch falls through.
-    if (viz && playback.isPlaying && playback.audio) {
-        const secondsPerBeat = 60.0 / playback.bpm;
-        const sixteenth = 0.25 * secondsPerBeat;
-        const stepsPerMeasure = getStepsPerMeasure(arranger.timeSignature);
-        const measureTime =
-            playback.unswungNextNoteTime - (playback.step % stepsPerMeasure) * sixteenth;
-        viz.setBeatReference(measureTime);
-    }
 }
