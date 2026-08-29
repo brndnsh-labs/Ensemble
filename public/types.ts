@@ -1764,6 +1764,8 @@ declare global {
             ACTIONS: typeof ACTIONS;
             validateProgression: (state: EnsembleState, dispatch?: Dispatch) => unknown;
             scheduleGlobalEvent: (...args: any[]) => any;
+            calculateStepDuration: (step: number, bpm: number, ts: any, groove: any) => number;
+            getEffectiveMeterAtStep: (arranger: any, step: number) => any;
             initAudio: (state: EnsembleState) => unknown;
             loadDrumPreset: (name: string) => unknown;
             generateNotesForStep: (...args: any[]) => any;
