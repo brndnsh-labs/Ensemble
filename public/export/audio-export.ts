@@ -1,6 +1,7 @@
 import { validateProgression } from '../engine/chords-engine.js';
 import type { CoordinationCarryover } from '../engine/coordination-engine.js';
 import { initAudio } from '../engine/engine.js';
+import { resetHiddenGenerationMemory } from '../engine/generation-run.js';
 import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
 import { generateNotesForStep } from '../engine/tick-logic.js';
 import { encodeWav } from '../engine/wav-encoder.js';
@@ -153,6 +154,7 @@ async function renderClonedStateToWav(
     sampleRate: number,
     filename: string,
 ): Promise<AudioExportResult> {
+    resetHiddenGenerationMemory(state);
     validateProgression(state);
 
     const sixteenth = 60 / state.playback.bpm / 4;

@@ -5,6 +5,7 @@ import {
     macroArcLadder,
     resetCoordinationCarryover,
 } from '../../../public/engine/coordination-engine.js';
+import { resetHiddenGenerationMemory } from '../../../public/engine/generation-run.js';
 
 /**
  * Parity guard for the shared "reset ritual" helpers (#1013). The live worker
@@ -14,9 +15,11 @@ import {
  * single reset site.
  */
 describe('reset-ritual parity (#1013)', () => {
-    describe('resetCompingState', () => {
-        it('resets exactly the 6 per-song comp keys to their defaults', () => {
-            // Dirty every one of the 6 target keys to a non-default value.
+    describe('resetHiddenGenerationMemory (#1043)', () => {
+        it('clears harmony and comping memory through one fresh-run boundary', () => {
+            const state = {
+                harmony: { lastMidis: [60, 64, 67] },
+            } as any;
             compingState.lastChordIndex = 7;
             compingState.lockedUntil = 42;
             compingState.grooveRetentionCount = 3;
@@ -24,8 +27,9 @@ describe('reset-ritual parity (#1013)', () => {
             compingState.statementChordKey = 'Cmaj7';
             compingState.statementVoicingMidis = [60, 64, 67, 71];
 
-            resetCompingState(compingState);
+            resetHiddenGenerationMemory(state);
 
+            expect(state.harmony.lastMidis).toEqual([]);
             expect(compingState.lastChordIndex).toBe(-1);
             expect(compingState.lockedUntil).toBe(0);
             expect(compingState.grooveRetentionCount).toBe(0);
@@ -33,12 +37,47 @@ describe('reset-ritual parity (#1013)', () => {
             expect(compingState.statementChordKey).toBeNull();
             expect(compingState.statementVoicingMidis).toEqual([]);
         });
+    });
 
-        it('does not touch a non-target sentinel field', () => {
-            // currentVibe is NOT part of the ritual — neither host clears it.
+    describe('resetCompingState', () => {
+        it('resets every comp-memory field to its fresh-run default', () => {
             compingState.currentVibe = 'dirty';
+            compingState.currentCell = new Array(16).fill(1);
+            compingState.soloistActivity = 1;
+            compingState.lastChordIndex = 7;
+            compingState.lastChordQuality = '7alt';
+            compingState.lockedUntil = 42;
+            compingState.grooveRetentionCount = 3;
+            compingState.maxGrooveLength = 8;
+            compingState.lastSectionId = 'dirty-section';
+            compingState.lastVoicingMidis = [60, 64, 67];
+            compingState.statementChordKey = 'Cmaj7';
+            compingState.statementVoicingMidis = [60, 64, 67, 71];
+            compingState.ringSuppressStep = 14;
+            compingState.ringSuppressChordKey = '60:maj7';
+            compingState.funkRotationIndex = 5;
+            compingState.bossaRotationIndex = 6;
+
             resetCompingState(compingState);
-            expect(compingState.currentVibe).toBe('dirty');
+
+            expect(compingState).toEqual({
+                currentVibe: 'balanced',
+                currentCell: new Array(16).fill(0),
+                lockedUntil: 0,
+                soloistActivity: 0,
+                lastChordIndex: -1,
+                lastChordQuality: null,
+                grooveRetentionCount: 0,
+                maxGrooveLength: 4,
+                lastSectionId: null,
+                lastVoicingMidis: [],
+                statementVoicingMidis: [],
+                statementChordKey: null,
+                ringSuppressStep: -1,
+                ringSuppressChordKey: null,
+                funkRotationIndex: 0,
+                bossaRotationIndex: 0,
+            });
         });
     });
 

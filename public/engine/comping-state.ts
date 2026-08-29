@@ -46,38 +46,34 @@ export interface CompingState {
  * Survives across calls to {@link getAccompanimentNotes} to provide groove memory,
  * voice-leading continuity, and soloist-aware density adjustment.
  */
-export const compingState: CompingState = {
-    currentVibe: 'balanced',
-    currentCell: new Array(16).fill(0),
-    lockedUntil: 0,
-    soloistActivity: 0,
-    lastChordIndex: -1,
-    lastChordQuality: null, // Track quality for tension resolution
-    grooveRetentionCount: 0,
-    maxGrooveLength: 4,
-    lastSectionId: null,
-    lastVoicingMidis: [],
-    statementVoicingMidis: [],
-    statementChordKey: null,
-    ringSuppressStep: -1,
-    ringSuppressChordKey: null,
-    funkRotationIndex: 0,
-    bossaRotationIndex: 0,
-};
+function createInitialCompingState(): CompingState {
+    return {
+        currentVibe: 'balanced',
+        currentCell: new Array(16).fill(0),
+        lockedUntil: 0,
+        soloistActivity: 0,
+        lastChordIndex: -1,
+        lastChordQuality: null, // Track quality for tension resolution
+        grooveRetentionCount: 0,
+        maxGrooveLength: 4,
+        lastSectionId: null,
+        lastVoicingMidis: [],
+        statementVoicingMidis: [],
+        statementChordKey: null,
+        ringSuppressStep: -1,
+        ringSuppressChordKey: null,
+        funkRotationIndex: 0,
+        bossaRotationIndex: 0,
+    };
+}
+
+export const compingState: CompingState = createInitialCompingState();
 
 /**
- * Reset the per-song comp memory both worker hosts clear on NEW_SONG / export start.
- * One home for the ritual — the live worker (logic-worker.ts) and the offline export
- * (midi-worker-logic.ts) both call this so they can never drift (#1013).
+ * Reset every field of the module-level comp memory at a fresh generation boundary.
+ * Building the singleton and resetting it share the same initializer, so adding a
+ * new CompingState field cannot silently create cross-run memory (#1013, #1043).
  */
 export function resetCompingState(compingState: CompingState): void {
-    compingState.lastChordIndex = -1;
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastVoicingMidis = [];
-    // #715 — clear the per-hit-economy statement memory too, or a new song that opens
-    // on the same chord the last one ended on treats its first downbeat as an "answer"
-    // (thin shell) instead of a statement (full voicing).
-    compingState.statementChordKey = null;
-    compingState.statementVoicingMidis = [];
+    Object.assign(compingState, createInitialCompingState());
 }

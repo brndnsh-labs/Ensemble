@@ -1,9 +1,8 @@
 /// <reference lib="webworker" />
 
-import { compingState, resetCompingState } from './engine/accompaniment.js';
 import { resetBassState } from './engine/bass-engine.js';
 import { createCoordinationContext } from './engine/coordination-engine.js';
-import { clearHarmonyMemory } from './engine/harmonies.js';
+import { resetHiddenGenerationMemory } from './engine/generation-run.js';
 import { handleExport, isExporting, setOnExportEnd } from './engine/midi-worker-logic.js';
 import { generateResolutionNotes } from './engine/resolution.js';
 import { resetSoloistState } from './engine/soloist-session.js';
@@ -91,9 +90,7 @@ function processMessage(type: string, data: any, startTime: number): void {
                 // Centralized Reset Phase
                 resetSoloistState(state);
                 resetBassState(state);
-                clearHarmonyMemory(state);
-
-                resetCompingState(compingState);
+                resetHiddenGenerationMemory(state);
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
             case WORKER_MSG.RESOLUTION:

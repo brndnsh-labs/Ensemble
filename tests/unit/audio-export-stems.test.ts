@@ -28,6 +28,12 @@ const emptyGeneratedStep = () => ({
 });
 const generateNotesForStepMock = vi.fn(emptyGeneratedStep);
 const validateProgressionMock = vi.fn();
+let hiddenGenerationPhase = 0;
+const resetHiddenGenerationMemoryMock = vi.fn(() => {
+    hiddenGenerationPhase = 0;
+});
+const resetSoloistStateMock = vi.fn();
+const resetBassStateMock = vi.fn();
 
 vi.mock('../../public/engine/engine.js', () => ({
     initAudio: initAudioMock,
@@ -40,6 +46,15 @@ vi.mock('../../public/engine/tick-logic.js', () => ({
 }));
 vi.mock('../../public/engine/chords-engine.js', () => ({
     validateProgression: validateProgressionMock,
+}));
+vi.mock('../../public/engine/generation-run.js', () => ({
+    resetHiddenGenerationMemory: resetHiddenGenerationMemoryMock,
+}));
+vi.mock('../../public/engine/soloist-session.js', () => ({
+    resetSoloistState: resetSoloistStateMock,
+}));
+vi.mock('../../public/engine/bass-engine.js', () => ({
+    resetBassState: resetBassStateMock,
 }));
 
 function makeLiveState() {
@@ -123,6 +138,7 @@ async function wavHasNonSilentSamples(blob: Blob): Promise<boolean> {
 describe('renderStemsToWav (#1018 stem export)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        hiddenGenerationPhase = 0;
         generateNotesForStepMock.mockImplementation(emptyGeneratedStep);
         vi.resetModules();
         vi.stubGlobal('OfflineAudioContext', makeFakeOfflineAudioContext());
@@ -354,5 +370,47 @@ describe('renderStemsToWav (#1018 stem export)', () => {
             step: 0,
             carryover: { lastActiveSoloistMidi: 0, lastActiveSoloistStep: 0 },
         });
+    });
+
+    it('resets hidden generation memory before every full render and sequential stem', async () => {
+        const traces: number[][] = [];
+        const liveState = makeLiveState();
+        resetHiddenGenerationMemoryMock.mockImplementation(() => {
+            hiddenGenerationPhase = 0;
+            traces.push([]);
+        });
+        generateNotesForStepMock.mockImplementation(() => {
+            const event = 60 + hiddenGenerationPhase++;
+            traces.at(-1)?.push(event);
+            return emptyGeneratedStep();
+        });
+        vi.doMock('../../public/state.js', () => ({
+            getState: () => liveState,
+        }));
+        const { renderCurrentSessionToWav, renderStemsToWav } = await import(
+            '../../public/export/audio-export.js'
+        );
+
+        await renderCurrentSessionToWav({ loops: 2 });
+        hiddenGenerationPhase = 99;
+        await renderStemsToWav(['chords', 'harmony'], { loops: 2 });
+        hiddenGenerationPhase = 47;
+        await renderCurrentSessionToWav({ loops: 2 });
+
+        expect(resetHiddenGenerationMemoryMock).toHaveBeenCalledTimes(4);
+        expect(traces).toHaveLength(4);
+        expect(traces.every((trace) => trace.length === 32)).toBe(true);
+        expect(traces[0]).toEqual(traces[1]);
+        expect(traces[1]).toEqual(traces[2]);
+        expect(traces[2]).toEqual(traces[3]);
+        expect(resetHiddenGenerationMemoryMock.mock.invocationCallOrder[0]).toBeLessThan(
+            generateNotesForStepMock.mock.invocationCallOrder[0],
+        );
+        resetHiddenGenerationMemoryMock.mock.calls.forEach(([resetState], index) => {
+            expect(resetState).toBe(initAudioMock.mock.calls[index][0]);
+            expect(resetState).not.toBe(liveState);
+        });
+        expect(resetSoloistStateMock).not.toHaveBeenCalled();
+        expect(resetBassStateMock).not.toHaveBeenCalled();
     });
 });
