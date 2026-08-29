@@ -1,6 +1,12 @@
 import { getState, getSyncState } from './state.js';
-import type { EnsembleState } from './types.js';
-import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
+import {
+    WORKER_MSG,
+    WORKER_RESP,
+    type WorkerExportOptions,
+    type WorkerRequest,
+    type WorkerResponse,
+    type WorkerSyncData,
+} from './worker-types.js';
 
 const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
@@ -10,14 +16,18 @@ let schedulerRequestHandler: (() => void) | null = null;
 let notesReceivedHandler:
     | ((
           notes: unknown[],
-          requestTimestamp: number,
+          requestTimestamp: number | null,
           workerProcessTime: number,
-          isResolution: boolean,
+          isResolution: true | undefined,
       ) => void)
     | null = null;
 let exportProgressHandler: ((progress: number) => void) | null = null;
 
 export const getTimerWorker = (): Worker | null => timerWorker;
+
+function postWorkerRequest(message: WorkerRequest): void {
+    timerWorker?.postMessage(message);
+}
 
 export function setExportProgressHandler(handler: (progress: number) => void): void {
     exportProgressHandler = handler;
@@ -27,9 +37,9 @@ export function initWorker(
     onSchedulerRequest: () => void,
     onNotesReceived: (
         notes: unknown[],
-        requestTimestamp: number,
+        requestTimestamp: number | null,
         workerProcessTime: number,
-        isResolution: boolean,
+        isResolution: true | undefined,
     ) => void,
 ): void {
     if (timerWorker) {
@@ -43,65 +53,78 @@ export function initWorker(
 
     timerWorker = new Worker(new URL('./logic-worker.ts', import.meta.url), { type: 'module' });
 
-    timerWorker.onmessage = (e) => {
-        const { type, notes, data, requestTimestamp, workerProcessTime } = e.data;
-        if (type === WORKER_RESP.TICK) {
-            if (typeof schedulerRequestHandler === 'function') {
-                schedulerRequestHandler();
-            }
-        } else if (type === WORKER_RESP.NOTES) {
-            if (typeof notesReceivedHandler === 'function') {
-                notesReceivedHandler(
-                    notes,
-                    requestTimestamp,
-                    workerProcessTime,
-                    e.data.isResolution,
+    timerWorker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        const message = e.data;
+        switch (message.type) {
+            case WORKER_RESP.TICK:
+                if (typeof schedulerRequestHandler === 'function') {
+                    schedulerRequestHandler();
+                }
+                break;
+            case WORKER_RESP.NOTES:
+                if (typeof notesReceivedHandler === 'function') {
+                    notesReceivedHandler(
+                        message.notes,
+                        message.requestTimestamp,
+                        message.workerProcessTime,
+                        message.isResolution,
+                    );
+                }
+                break;
+            case WORKER_RESP.EXPORT_PROGRESS:
+                if (typeof exportProgressHandler === 'function') {
+                    exportProgressHandler(message.progress);
+                }
+                break;
+            case WORKER_RESP.ERROR:
+                console.error('[Worker Error]', message.data);
+                break;
+            case WORKER_RESP.EXPORT_COMPLETE: {
+                if (typeof exportProgressHandler === 'function') {
+                    exportProgressHandler(1.0); // Ensure 100%
+                }
+                const url = URL.createObjectURL(new Blob([message.blob], { type: 'audio/midi' }));
+                const a = document.createElement('a');
+                a.href = url;
+
+                // Sanitize filename (Defense in Depth)
+                // Optimization: Use module constants for filename cleanup to reduce regex recompilation overhead
+                let safeName = (message.filename || 'ensemble-export').replace(
+                    MIDI_EXTENSION_PATTERN,
+                    '',
                 );
-            }
-        } else if (type === WORKER_RESP.EXPORT_PROGRESS) {
-            if (typeof exportProgressHandler === 'function') {
-                exportProgressHandler(e.data.progress);
-            }
-        } else if (type === WORKER_RESP.ERROR) {
-            console.error('[Worker Error]', data);
-        } else if (type === WORKER_RESP.EXPORT_COMPLETE) {
-            if (typeof exportProgressHandler === 'function') {
-                exportProgressHandler(1.0); // Ensure 100%
-            }
-            const { blob, filename } = e.data;
-            const url = URL.createObjectURL(new Blob([blob], { type: 'audio/midi' }));
-            const a = document.createElement('a');
-            a.href = url;
+                safeName =
+                    safeName.replace(FILENAME_CLEANUP_PATTERN, '').substring(0, 64).trim() ||
+                    'ensemble-export';
 
-            // Sanitize filename (Defense in Depth)
-            // Optimization: Use module constants for filename cleanup to reduce regex recompilation overhead
-            let safeName = (filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '');
-            safeName =
-                safeName.replace(FILENAME_CLEANUP_PATTERN, '').substring(0, 64).trim() ||
-                'ensemble-export';
-
-            a.download = `${safeName}.mid`;
-            a.click();
-            URL.revokeObjectURL(url);
+                a.download = `${safeName}.mid`;
+                a.click();
+                URL.revokeObjectURL(url);
+                break;
+            }
+            default: {
+                const exhaustive: never = message;
+                void exhaustive;
+            }
         }
     };
 }
 
-export function startExport(options: Record<string, unknown>): void {
+export function startExport(options: WorkerExportOptions): void {
     if (timerWorker) {
-        timerWorker.postMessage({ type: WORKER_MSG.EXPORT, data: options });
+        postWorkerRequest({ type: WORKER_MSG.EXPORT, data: options });
     }
 }
 
 export function startWorker(): void {
     if (timerWorker) {
-        timerWorker.postMessage({ type: WORKER_MSG.START });
+        postWorkerRequest({ type: WORKER_MSG.START });
     }
 }
 
 export function stopWorker(): void {
     if (timerWorker) {
-        timerWorker.postMessage({ type: WORKER_MSG.STOP });
+        postWorkerRequest({ type: WORKER_MSG.STOP });
     }
 }
 
@@ -109,7 +132,7 @@ export function stopWorker(): void {
  * Deeply unwrap proxy/signal objects into plain objects.
  * Much faster than JSON.parse(JSON.stringify(val)).
  */
-function toRaw(val: unknown): unknown {
+function toRaw<T>(val: T): T {
     if (val === null || typeof val !== 'object') {
         return val;
     }
@@ -120,13 +143,13 @@ function toRaw(val: unknown): unknown {
             // JSON.stringify converts undefined in arrays to null
             arr[i] = rawVal === undefined ? null : rawVal;
         }
-        return arr;
+        return arr as T;
     }
     if (val instanceof Set) {
-        return new Set(Array.from(val).map(toRaw));
+        return new Set(Array.from(val).map(toRaw)) as T;
     }
     if (val instanceof Map) {
-        return new Map(Array.from(val.entries()).map(([k, v]) => [k, toRaw(v)]));
+        return new Map(Array.from(val.entries()).map(([k, v]) => [k, toRaw(v)])) as T;
     }
     const raw: Record<string, unknown> = {};
     const obj = val as Record<string, unknown>;
@@ -139,12 +162,12 @@ function toRaw(val: unknown): unknown {
             }
         }
     }
-    return raw;
+    return raw as T;
 }
 
-export function flushWorker(step: number, syncData: unknown = null): void {
+export function flushWorker(step: number, syncData: WorkerSyncData | null = null): void {
     if (timerWorker) {
-        timerWorker.postMessage({
+        postWorkerRequest({
             type: WORKER_MSG.FLUSH,
             data: {
                 step,
@@ -157,7 +180,7 @@ export function flushWorker(step: number, syncData: unknown = null): void {
 
 export function requestBuffer(step: number): void {
     if (timerWorker) {
-        timerWorker.postMessage({
+        postWorkerRequest({
             type: WORKER_MSG.REQUEST_BUFFER,
             data: { step, requestTimestamp: performance.now() },
         });
@@ -166,7 +189,7 @@ export function requestBuffer(step: number): void {
 
 export function requestResolution(step: number): void {
     if (timerWorker) {
-        timerWorker.postMessage({
+        postWorkerRequest({
             type: WORKER_MSG.RESOLUTION,
             data: { step, requestTimestamp: performance.now() },
         });
@@ -176,15 +199,15 @@ export function requestResolution(step: number): void {
 // The SET_PARAM / SET_STYLE / SET_VOLUME / SET_OCTAVE deltas all write a *partial*
 // of one module's slice, keyed by a runtime module name carried on the payload.
 // Funnel that one unavoidable dynamic-key write through here so the call sites stay
-// cast-free and the key is narrowed to the synced module set (`keyof EnsembleState`)
+// cast-free and the key is narrowed to the worker-safe snapshot's slice set
 // in a single place. The written object is identical to the old inline assignment —
 // worker delta payloads are byte-for-byte unchanged (#816).
 function setModuleDelta(
-    data: Partial<Record<keyof EnsembleState, unknown>>,
-    module: keyof EnsembleState,
-    patch: Record<string, unknown>,
+    data: WorkerSyncData,
+    module: keyof WorkerSyncData,
+    patch: WorkerSyncData[keyof WorkerSyncData],
 ): void {
-    data[module] = patch;
+    Object.assign(data, { [module]: patch });
 }
 
 export function syncWorker(action?: string, payload?: any): void {
@@ -193,11 +216,11 @@ export function syncWorker(action?: string, payload?: any): void {
     }
     const { arranger, chords, harmony, groove, playback } = getState();
 
-    const data: Partial<Record<keyof EnsembleState, any>> = {};
+    const data: WorkerSyncData = {};
 
     if (!action) {
         // Full Sync
-        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: toRaw(getSyncState()) });
+        postWorkerRequest({ type: WORKER_MSG.SYNC_STATE, data: toRaw(getSyncState()) });
         return;
     }
 
@@ -339,6 +362,6 @@ export function syncWorker(action?: string, payload?: any): void {
     if (Object.keys(data).length > 0) {
         // DeepSignal proxies cannot be cloned by structuredClone (postMessage).
         // We strip them by converting to a plain JSON object.
-        timerWorker.postMessage({ type: WORKER_MSG.SYNC_STATE, data: toRaw(data) });
+        postWorkerRequest({ type: WORKER_MSG.SYNC_STATE, data: toRaw(data) });
     }
 }

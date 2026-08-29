@@ -2,7 +2,7 @@
 
 Ensemble offloads heavy musical generation and MIDI processing to a background Web Worker (`logic-worker.ts`). This document defines the message schema and synchronization logic between the Main Thread and the Worker.
 
-Source of truth: message constants live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.ts`.
+Source of truth: message constants and TypeScript envelopes live in `public/worker-types.ts`, and register slotting lives in `public/engine/coordination-engine.ts`.
 
 ## Architectural Overview
 
@@ -48,8 +48,10 @@ Explicitly requests the worker to fill the musical buffers for a specific step.
 ```json
 {
   "type": "requestBuffer",
-  "data": { "step": 128 },
-  "requestTimestamp": 123456789.0
+  "data": {
+    "step": 128,
+    "requestTimestamp": 123456789.0
+  }
 }
 ```
 

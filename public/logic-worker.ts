@@ -14,7 +14,7 @@ import { getEffectiveTimeSignatures } from './meter.js';
 import { getState } from './state.js';
 import type { EnsembleState } from './types.js';
 import { getStepInfo } from './utils.js';
-import { WORKER_MSG, WORKER_RESP } from './worker-types.js';
+import { postWorkerResponse, WORKER_MSG, WORKER_RESP, type WorkerRequest } from './worker-types.js';
 
 // Ensure we resume processing messages after an export completes
 setOnExportEnd(() => processMessageQueue());
@@ -22,7 +22,7 @@ setOnExportEnd(() => processMessageQueue());
 /**
  * Process incoming messages from the main thread.
  */
-function processMessage(type: string, data: any, startTime: number): void {
+function processMessage(message: WorkerRequest, startTime: number): void {
     const state: EnsembleState = getState();
     // Initialize the workerContext state for engine functions
     if (!workerContext.state) {
@@ -30,12 +30,12 @@ function processMessage(type: string, data: any, startTime: number): void {
     }
     const { arranger, chords, bass, soloist, harmony, groove, playback, midi } = state;
     try {
-        switch (type) {
+        switch (message.type) {
             case WORKER_MSG.START:
                 if (!workerContext.timerID) {
                     workerContext.timerID = setInterval(() => {
                         const startTime = performance.now();
-                        postMessage({ type: WORKER_RESP.TICK });
+                        postWorkerResponse({ type: WORKER_RESP.TICK });
                         const s = playback.step;
                         fillBuffers(state, s, null, startTime);
                     }, workerContext.interval);
@@ -47,7 +47,8 @@ function processMessage(type: string, data: any, startTime: number): void {
                     workerContext.timerID = null;
                 }
                 break;
-            case WORKER_MSG.SYNC_STATE:
+            case WORKER_MSG.SYNC_STATE: {
+                const { data } = message;
                 if (data.arranger) {
                     recursiveSafeSync(arranger, data.arranger, 'arranger');
                 }
@@ -61,10 +62,12 @@ function processMessage(type: string, data: any, startTime: number): void {
                     Object.assign(playback, data.playback);
                 }
                 break;
+            }
             case WORKER_MSG.REQUEST_BUFFER:
-                fillBuffers(state, data.step, data.requestTimestamp, startTime);
+                fillBuffers(state, message.data.step, message.data.requestTimestamp, startTime);
                 break;
-            case WORKER_MSG.FLUSH:
+            case WORKER_MSG.FLUSH: {
+                const { data } = message;
                 if (data.syncData) {
                     const syncData = data.syncData;
                     if (syncData.arranger) {
@@ -93,16 +96,28 @@ function processMessage(type: string, data: any, startTime: number): void {
                 resetHiddenGenerationMemory(state);
                 fillBuffers(state, data.step, data.requestTimestamp, startTime);
                 break;
+            }
             case WORKER_MSG.RESOLUTION:
-                handleResolution(state, data.step, data.requestTimestamp, startTime);
+                handleResolution(
+                    state,
+                    message.data.step,
+                    message.data.requestTimestamp,
+                    startTime,
+                );
                 break;
             case WORKER_MSG.EXPORT:
-                handleExport(state, data);
+                handleExport(state, message.data);
                 break;
+            default: {
+                // Preserve the existing runtime policy of ignoring unknown messages while
+                // making every known WorkerRequest variant exhaustive at compile time.
+                const exhaustive: never = message;
+                void exhaustive;
+            }
         }
     } catch (err) {
         const e = err as Error;
-        postMessage({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
+        postWorkerResponse({ type: WORKER_RESP.ERROR, data: e.message, stack: e.stack });
     }
 }
 
@@ -110,8 +125,7 @@ function processMessageQueue(): void {
     while (workerContext.messageQueue.length > 0) {
         const msg = workerContext.messageQueue.shift();
         if (msg) {
-            const { type, data, startTime } = msg;
-            processMessage(type, data, startTime);
+            processMessage(msg.request, msg.startTime);
         }
         if (isExporting()) {
             break;
@@ -121,13 +135,13 @@ function processMessageQueue(): void {
 
 if (typeof self !== 'undefined') {
     const workerSelf = self as unknown as DedicatedWorkerGlobalScope;
-    workerSelf.onmessage = (e: MessageEvent) => {
-        const { type, data } = e.data;
+    workerSelf.onmessage = (e: MessageEvent<WorkerRequest>) => {
+        const request = e.data;
         const startTime = performance.now();
         if (isExporting()) {
-            workerContext.messageQueue.push({ type, data, startTime });
+            workerContext.messageQueue.push({ request, startTime });
         } else {
-            processMessage(type, data, startTime);
+            processMessage(request, startTime);
         }
     };
 }
@@ -173,7 +187,7 @@ export function handleResolution(
         soloist,
     );
     var workerProcessTime = processStartTime ? performance.now() - processStartTime : 0;
-    postMessage({
+    postWorkerResponse({
         type: WORKER_RESP.NOTES,
         notes: resolutionNotes,
         isResolution: true,

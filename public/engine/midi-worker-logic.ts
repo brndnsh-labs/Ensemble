@@ -2,7 +2,7 @@ import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js'
 import { analyzeForm } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, secondsPerStepFor } from '../utils.js';
-import { WORKER_RESP } from '../worker-types.js';
+import { postWorkerResponse, WORKER_RESP, type WorkerExportOptions } from '../worker-types.js';
 import { resetBassState } from './bass-engine.js';
 import {
     type CoordinationContext,
@@ -55,14 +55,6 @@ export function resolveExportDrumMidi(
     return midi;
 }
 
-export interface ExportOptions {
-    includedTracks?: string[];
-    targetDuration?: number;
-    loopMode?: string;
-    filename?: string;
-    [key: string]: any;
-}
-
 export interface ExportCursor {
     index: number;
     sectionIndex: number;
@@ -98,7 +90,7 @@ export const setOnExportEnd = (fn: (() => void) | null): (() => void) | null => 
 
 export class ExportProcessor {
     state: EnsembleState;
-    options: ExportOptions;
+    options: WorkerExportOptions;
     includedTracks: string[];
     targetDuration: number;
     loopMode: string;
@@ -133,7 +125,7 @@ export class ExportProcessor {
     lastActiveSoloistStep!: number;
     lastMetaTimeSignature: string;
 
-    constructor(state: EnsembleState, options: ExportOptions) {
+    constructor(state: EnsembleState, options: WorkerExportOptions) {
         const { arranger, groove, playback, chords, bass, soloist, harmony } = state;
         this.state = state;
         this.options = options;
@@ -277,7 +269,7 @@ export class ExportProcessor {
     start(): void {
         const { arranger } = this.state;
         if (arranger.progression.length === 0) {
-            postMessage({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
+            postWorkerResponse({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
             this.cleanup();
             return;
         }
@@ -629,7 +621,7 @@ export class ExportProcessor {
                 // Check time budget
                 if (performance.now() - chunkStart > this.CHUNK_MS) {
                     const progress = Math.min(0.99, this.globalStep / this.totalStepsExport);
-                    postMessage({ type: WORKER_RESP.EXPORT_PROGRESS, progress });
+                    postWorkerResponse({ type: WORKER_RESP.EXPORT_PROGRESS, progress });
                     setTimeout(() => this.processChunk(), 0);
                     return;
                 }
@@ -640,7 +632,7 @@ export class ExportProcessor {
 
             this.finish();
         } catch (e) {
-            postMessage({
+            postWorkerResponse({
                 type: WORKER_RESP.ERROR,
                 data: (e as Error).message,
                 stack: (e as Error).stack,
@@ -893,7 +885,7 @@ export class ExportProcessor {
             soloist,
         );
 
-        resolutionNotes.forEach((n: any) => {
+        resolutionNotes.forEach((n) => {
             let track: MidiTrack | undefined;
             let channel = 0;
             if (n.module === 'bass') {
@@ -1047,7 +1039,11 @@ export class ExportProcessor {
         }
 
         const finalFilename = `${(this.filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '')}.mid`;
-        postMessage({ type: WORKER_RESP.EXPORT_COMPLETE, blob: result, filename: finalFilename });
+        postWorkerResponse({
+            type: WORKER_RESP.EXPORT_COMPLETE,
+            blob: result,
+            filename: finalFilename,
+        });
     }
 
     cleanup(): void {
@@ -1081,12 +1077,12 @@ export class ExportProcessor {
 /**
  * Handles the offline MIDI export process.
  */
-export function handleExport(state: EnsembleState, options: ExportOptions): void {
+export function handleExport(state: EnsembleState, options: WorkerExportOptions): void {
     try {
         const processor = new ExportProcessor(state, options);
         processor.start();
     } catch (e) {
-        postMessage({
+        postWorkerResponse({
             type: WORKER_RESP.ERROR,
             data: (e as Error).message,
             stack: (e as Error).stack,

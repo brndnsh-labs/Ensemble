@@ -3,6 +3,7 @@ import type { ArrangerState } from '../state/arranger.js';
 import type { EnsembleState } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { getBestInversion, getIntervals } from './chords-engine.js';
+import type { NoteResult } from './tick-logic.js';
 
 /**
  * PUBLIC/RESOLUTION.JS
@@ -25,6 +26,14 @@ interface CadenceStep {
 interface GenreConfig {
     profile: string;
     ritardando: number;
+}
+
+/** Exact note additions emitted only by the final-resolution generator. */
+export interface ResolutionNote extends NoteResult {
+    midiVelocity?: number;
+    name?: string;
+    vibrato?: { delay: number; depth: number } | null;
+    style?: string;
 }
 
 const CADENCE_PROFILES: Record<string, CadenceStep[]> = {
@@ -170,8 +179,8 @@ export function generateResolutionNotes(
     bpm = 100,
     groove: any = {},
     soloist: any = {},
-): any[] {
-    const notes: any[] = [];
+): ResolutionNote[] {
+    const notes: ResolutionNote[] = [];
     const { playback } = state;
     const genre = groove.genreFeel || 'Rock';
     const config = GENRE_MAP[genre] || GENRE_MAP.Rock;

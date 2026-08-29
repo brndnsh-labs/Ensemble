@@ -1,4 +1,5 @@
 import type { EnsembleState } from '../types.js';
+import type { WorkerRequest } from '../worker-types.js';
 import { resetCoordinationCarryover } from './coordination-engine.js';
 
 interface WorkerCursor {
@@ -7,8 +8,7 @@ interface WorkerCursor {
 }
 
 interface WorkerMessageQueueItem {
-    type: string;
-    data: any;
+    request: WorkerRequest;
     startTime: number;
 }
 

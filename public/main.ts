@@ -113,9 +113,9 @@ async function init() {
             () => scheduler(getState(), dispatch),
             (
                 notes: any[],
-                requestTimestamp: number,
+                requestTimestamp: number | null,
                 workerProcessTime: number,
-                isResolution: boolean,
+                isResolution: true | undefined,
             ) => {
                 const { playback, soloist, bass, harmony, chords, groove } = getState();
 
