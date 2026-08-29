@@ -1,5 +1,10 @@
+import { cloneStateForDetachedGeneration } from './export/detached-generation-state.js';
 import { getState, getSyncState } from './state.js';
 import {
+    MIDI_EXPORT_MSG,
+    MIDI_EXPORT_RESP,
+    type MidiExportRequest,
+    type MidiExportResponse,
     WORKER_MSG,
     WORKER_RESP,
     type WorkerExportOptions,
@@ -12,6 +17,8 @@ const FILENAME_CLEANUP_PATTERN = /[^a-zA-Z0-9\s\-_()]/g;
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 
 let timerWorker: Worker | null = null;
+let midiExportWorker: Worker | null = null;
+let rejectMidiExport: ((reason: Error) => void) | null = null;
 let schedulerRequestHandler: (() => void) | null = null;
 let notesReceivedHandler:
     | ((
@@ -24,6 +31,7 @@ let notesReceivedHandler:
 let exportProgressHandler: ((progress: number) => void) | null = null;
 
 export const getTimerWorker = (): Worker | null => timerWorker;
+export const getMidiExportWorker = (): Worker | null => midiExportWorker;
 
 function postWorkerRequest(message: WorkerRequest): void {
     timerWorker?.postMessage(message);
@@ -71,37 +79,9 @@ export function initWorker(
                     );
                 }
                 break;
-            case WORKER_RESP.EXPORT_PROGRESS:
-                if (typeof exportProgressHandler === 'function') {
-                    exportProgressHandler(message.progress);
-                }
-                break;
             case WORKER_RESP.ERROR:
                 console.error('[Worker Error]', message.data);
                 break;
-            case WORKER_RESP.EXPORT_COMPLETE: {
-                if (typeof exportProgressHandler === 'function') {
-                    exportProgressHandler(1.0); // Ensure 100%
-                }
-                const url = URL.createObjectURL(new Blob([message.blob], { type: 'audio/midi' }));
-                const a = document.createElement('a');
-                a.href = url;
-
-                // Sanitize filename (Defense in Depth)
-                // Optimization: Use module constants for filename cleanup to reduce regex recompilation overhead
-                let safeName = (message.filename || 'ensemble-export').replace(
-                    MIDI_EXTENSION_PATTERN,
-                    '',
-                );
-                safeName =
-                    safeName.replace(FILENAME_CLEANUP_PATTERN, '').substring(0, 64).trim() ||
-                    'ensemble-export';
-
-                a.download = `${safeName}.mid`;
-                a.click();
-                URL.revokeObjectURL(url);
-                break;
-            }
             default: {
                 const exhaustive: never = message;
                 void exhaustive;
@@ -110,10 +90,105 @@ export function initWorker(
     };
 }
 
-export function startExport(options: WorkerExportOptions): void {
-    if (timerWorker) {
-        postWorkerRequest({ type: WORKER_MSG.EXPORT, data: options });
+function releaseMidiExportWorker(worker: Worker): void {
+    worker.terminate();
+    if (midiExportWorker === worker) {
+        midiExportWorker = null;
+        rejectMidiExport = null;
     }
+}
+
+function downloadMidiExport(message: Extract<MidiExportResponse, { type: 'exportComplete' }>) {
+    const url = URL.createObjectURL(new Blob([message.blob], { type: 'audio/midi' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+
+    let safeName = (message.filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '');
+    safeName =
+        safeName.replace(FILENAME_CLEANUP_PATTERN, '').substring(0, 64).trim() || 'ensemble-export';
+
+    anchor.download = `${safeName}.mid`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+}
+
+export function startExport(options: WorkerExportOptions): Promise<void> {
+    if (midiExportWorker) {
+        const rejectPrevious = rejectMidiExport;
+        releaseMidiExportWorker(midiExportWorker);
+        rejectPrevious?.(new Error('MIDI export superseded by a new request'));
+    }
+    exportProgressHandler?.(0);
+
+    return new Promise((resolve, reject) => {
+        try {
+            const state = cloneStateForDetachedGeneration(getState());
+            const worker = new Worker(new URL('./midi-export-worker.ts', import.meta.url), {
+                type: 'module',
+            });
+            midiExportWorker = worker;
+            rejectMidiExport = reject;
+
+            worker.onmessage = (event: MessageEvent<MidiExportResponse>) => {
+                if (midiExportWorker !== worker) {
+                    return;
+                }
+                const message = event.data;
+                switch (message.type) {
+                    case MIDI_EXPORT_RESP.PROGRESS:
+                        exportProgressHandler?.(message.progress);
+                        break;
+                    case MIDI_EXPORT_RESP.COMPLETE:
+                        try {
+                            downloadMidiExport(message);
+                            exportProgressHandler?.(1);
+                            resolve();
+                        } catch (error) {
+                            exportProgressHandler?.(0);
+                            reject(error as Error);
+                        } finally {
+                            releaseMidiExportWorker(worker);
+                        }
+                        break;
+                    case MIDI_EXPORT_RESP.ERROR: {
+                        const error = new Error(message.data);
+                        console.error('[MIDI Export Worker Error]', message.data);
+                        exportProgressHandler?.(0);
+                        releaseMidiExportWorker(worker);
+                        reject(error);
+                        break;
+                    }
+                    default: {
+                        const exhaustive: never = message;
+                        void exhaustive;
+                    }
+                }
+            };
+            worker.onerror = (event: ErrorEvent) => {
+                if (midiExportWorker !== worker) {
+                    return;
+                }
+                const error = new Error(event.message || 'MIDI export worker failed');
+                console.error('[MIDI Export Worker Error]', error.message);
+                exportProgressHandler?.(0);
+                releaseMidiExportWorker(worker);
+                reject(error);
+            };
+
+            const request: MidiExportRequest = {
+                type: MIDI_EXPORT_MSG.START,
+                data: { state, options: { ...options } },
+            };
+            worker.postMessage(request);
+        } catch (error) {
+            if (midiExportWorker) {
+                releaseMidiExportWorker(midiExportWorker);
+            }
+            console.error('[MIDI Export Worker Error]', (error as Error).message);
+            exportProgressHandler?.(0);
+            reject(error as Error);
+        }
+    });
 }
 
 export function startWorker(): void {

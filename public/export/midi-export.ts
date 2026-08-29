@@ -1,8 +1,8 @@
 import { showToast } from '../ui.js';
-import { startExport, syncWorker } from '../worker-client.js';
+import { startExport } from '../worker-client.js';
 import type { WorkerExportOptions } from '../worker-types.js';
 
-export function exportToMidi(options: WorkerExportOptions = {}) {
+export function exportToMidi(options: WorkerExportOptions = {}): Promise<void> {
     showToast('Starting MIDI Export...');
 
     // Validate and sanitize filename (Defense in Depth)
@@ -14,7 +14,5 @@ export function exportToMidi(options: WorkerExportOptions = {}) {
                 .trim() || 'ensemble-export';
     }
 
-    // Ensure worker has latest state
-    syncWorker();
-    startExport(options);
+    return startExport(options);
 }

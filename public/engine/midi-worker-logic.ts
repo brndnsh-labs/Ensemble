@@ -2,7 +2,11 @@ import { getEffectiveMeterAtStep, getEffectiveTimeSignature } from '../meter.js'
 import { analyzeForm } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, secondsPerStepFor } from '../utils.js';
-import { postWorkerResponse, WORKER_RESP, type WorkerExportOptions } from '../worker-types.js';
+import {
+    MIDI_EXPORT_RESP,
+    postMidiExportResponse,
+    type WorkerExportOptions,
+} from '../worker-types.js';
 import { resetBassState } from './bass-engine.js';
 import {
     type CoordinationContext,
@@ -81,12 +85,6 @@ export interface ExportConductor {
     loopMode: string;
     totalLoops: number;
 }
-
-// Internal variable tracking export state for message queueing in logic-worker
-let _isExporting = false;
-export const isExporting = (): boolean => _isExporting;
-let _onExportEnd: (() => void) | null = null;
-export const setOnExportEnd = (fn: (() => void) | null): (() => void) | null => (_onExportEnd = fn);
 
 export class ExportProcessor {
     state: EnsembleState;
@@ -269,12 +267,14 @@ export class ExportProcessor {
     start(): void {
         const { arranger } = this.state;
         if (arranger.progression.length === 0) {
-            postWorkerResponse({ type: WORKER_RESP.ERROR, data: 'No progression to export' });
+            postMidiExportResponse({
+                type: MIDI_EXPORT_RESP.ERROR,
+                data: 'No progression to export',
+            });
             this.cleanup();
             return;
         }
 
-        _isExporting = true;
         this.processChunk();
     }
 
@@ -621,7 +621,7 @@ export class ExportProcessor {
                 // Check time budget
                 if (performance.now() - chunkStart > this.CHUNK_MS) {
                     const progress = Math.min(0.99, this.globalStep / this.totalStepsExport);
-                    postWorkerResponse({ type: WORKER_RESP.EXPORT_PROGRESS, progress });
+                    postMidiExportResponse({ type: MIDI_EXPORT_RESP.PROGRESS, progress });
                     setTimeout(() => this.processChunk(), 0);
                     return;
                 }
@@ -632,8 +632,8 @@ export class ExportProcessor {
 
             this.finish();
         } catch (e) {
-            postWorkerResponse({
-                type: WORKER_RESP.ERROR,
+            postMidiExportResponse({
+                type: MIDI_EXPORT_RESP.ERROR,
                 data: (e as Error).message,
                 stack: (e as Error).stack,
             });
@@ -1039,8 +1039,8 @@ export class ExportProcessor {
         }
 
         const finalFilename = `${(this.filename || 'ensemble-export').replace(MIDI_EXTENSION_PATTERN, '')}.mid`;
-        postWorkerResponse({
-            type: WORKER_RESP.EXPORT_COMPLETE,
+        postMidiExportResponse({
+            type: MIDI_EXPORT_RESP.COMPLETE,
             blob: result,
             filename: finalFilename,
         });
@@ -1055,21 +1055,15 @@ export class ExportProcessor {
             (harmony as Mutable<typeof harmony>).enabled = this.prevStates.harmony; // @worker-mutation
             (groove as Mutable<typeof groove>).enabled = this.prevStates.groove; // @worker-mutation
             (playback as Mutable<typeof playback>).bandIntensity = this.prevStates.intensity; // @worker-mutation
-            // #842: the export shares this worker `state`, so clear the bar-latched
-            // motif intensity too — symmetric with the bandIntensity restore above.
-            // Otherwise a live fill resuming mid-bar after an export would read the
-            // export's last-bar latch as authoritative until the next bar line.
+            // #842: direct ExportProcessor callers may inspect or reuse the detached
+            // state after cleanup, so clear the bar-latched motif intensity alongside
+            // the restored bandIntensity. Production exports discard this worker realm.
             (playback as Mutable<typeof playback>).motifBarIntensity = undefined; // @worker-mutation
             (soloist as Mutable<typeof soloist>).mode = this.prevStates.mode; // @worker-mutation
             (soloist.session as Mutable<typeof soloist.session>).sessionSteps =
                 this.prevStates.sessionSteps; // @worker-mutation
             (playback as Mutable<typeof playback>).currentLoopCount =
                 this.prevStates.currentLoopCount; // @worker-mutation
-        }
-
-        _isExporting = false;
-        if (_onExportEnd) {
-            _onExportEnd();
         }
     }
 }
@@ -1082,8 +1076,8 @@ export function handleExport(state: EnsembleState, options: WorkerExportOptions)
         const processor = new ExportProcessor(state, options);
         processor.start();
     } catch (e) {
-        postWorkerResponse({
-            type: WORKER_RESP.ERROR,
+        postMidiExportResponse({
+            type: MIDI_EXPORT_RESP.ERROR,
             data: (e as Error).message,
             stack: (e as Error).stack,
         });

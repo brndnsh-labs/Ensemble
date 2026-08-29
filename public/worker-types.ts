@@ -4,6 +4,7 @@
 
 import type { NoteResult } from './engine/tick-logic.js';
 import type { getSyncState } from './state.js';
+import type { EnsembleState } from './types.js';
 
 /** Message types sent from Main Thread to Worker. */
 export const WORKER_MSG = {
@@ -12,7 +13,6 @@ export const WORKER_MSG = {
     SYNC_STATE: 'syncState',
     REQUEST_BUFFER: 'requestBuffer',
     FLUSH: 'flush',
-    EXPORT: 'export',
     RESOLUTION: 'resolution',
 } as const;
 
@@ -20,8 +20,18 @@ export const WORKER_MSG = {
 export const WORKER_RESP = {
     NOTES: 'notes',
     TICK: 'tick',
-    EXPORT_COMPLETE: 'exportComplete',
-    EXPORT_PROGRESS: 'exportProgress',
+    ERROR: 'error',
+} as const;
+
+/** Message types owned by the one-shot MIDI export worker. */
+export const MIDI_EXPORT_MSG = {
+    START: 'startExport',
+} as const;
+
+/** Responses emitted only by the one-shot MIDI export worker. */
+export const MIDI_EXPORT_RESP = {
+    COMPLETE: 'exportComplete',
+    PROGRESS: 'exportProgress',
     ERROR: 'error',
 } as const;
 
@@ -77,7 +87,6 @@ export type WorkerRequest =
               requestTimestamp: number;
           };
       }
-    | { type: typeof WORKER_MSG.EXPORT; data: WorkerExportOptions }
     | {
           type: typeof WORKER_MSG.RESOLUTION;
           data: { step: number; requestTimestamp: number };
@@ -93,15 +102,33 @@ export type WorkerResponse =
           isResolution?: true;
       }
     | { type: typeof WORKER_RESP.TICK }
-    | { type: typeof WORKER_RESP.EXPORT_PROGRESS; progress: number }
+    | { type: typeof WORKER_RESP.ERROR; data: string; stack?: string };
+
+/** Fresh-worker request carrying a detached state snapshot plus export options. */
+export type MidiExportRequest = {
+    type: typeof MIDI_EXPORT_MSG.START;
+    data: {
+        state: EnsembleState;
+        options: WorkerExportOptions;
+    };
+};
+
+/** Messages sent from the dedicated MIDI export worker to the main thread. */
+export type MidiExportResponse =
+    | { type: typeof MIDI_EXPORT_RESP.PROGRESS; progress: number }
     | {
-          type: typeof WORKER_RESP.EXPORT_COMPLETE;
+          type: typeof MIDI_EXPORT_RESP.COMPLETE;
           blob: Uint8Array<ArrayBuffer>;
           filename: string;
       }
-    | { type: typeof WORKER_RESP.ERROR; data: string; stack?: string };
+    | { type: typeof MIDI_EXPORT_RESP.ERROR; data: string; stack?: string };
 
 /** Typed worker-side chokepoint; native `postMessage` does not relate type to payload. */
 export function postWorkerResponse(message: WorkerResponse): void {
+    postMessage(message);
+}
+
+/** Dedicated export-worker chokepoint; export responses cannot enter the live protocol. */
+export function postMidiExportResponse(message: MidiExportResponse): void {
     postMessage(message);
 }
