@@ -72,6 +72,9 @@ export const soloist = deepSignal<SoloistState>({
     complexity: 0.5,
     phrasingIntensity: 0.5,
     tradeMode: 'manual',
+    // #1062 — runtime-derived trade-silencing layer; see the SoloistState
+    // field doc in types.ts. Never the user's `enabled` setting.
+    tradeSilenced: false,
 
     // === Engine runtime ===
     session: {
@@ -184,6 +187,7 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     complexity: { kind: 'config', key: 'complexity' },
     phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
+    tradeSilenced: { kind: 'config', key: 'tradeSilenced' },
 
     // --- Session (top-level) ---
     sessionSeed: { kind: 'session', key: 'seed' },
@@ -312,6 +316,14 @@ export function instrumentReducer(action: Action): boolean {
             // Soloist params are flat at the wire but nested in state — route them.
             if (modKey === 'soloist' || modKey === 'sb') {
                 applySoloistPayload(soloist, { [action.payload.param]: action.payload.value });
+                // #1062 — leaving an active trade mode (either the user picking
+                // "Manual" in SoloistControls.tsx, or togglePower's turn-OFF
+                // reset in instrument-controller.ts) always clears the runtime
+                // silencing layer too, so a later manual re-enable isn't left
+                // muted by a stale trade decision.
+                if (action.payload.param === 'tradeMode' && action.payload.value === 'manual') {
+                    s.tradeSilenced = false;
+                }
                 return true;
             }
             // grooveReducer owns the groove lane for this action (#1182).
@@ -363,6 +375,8 @@ export function instrumentReducer(action: Action): boolean {
             s.autoMode = true;
             s.complexity = 0.5;
             s.tradeMode = 'manual';
+            // #1062 — runtime-derived; a fresh session starts unsilenced.
+            s.tradeSilenced = false;
             s.phrasingIntensity = 0.5;
             // Reset engine runtime to a fresh session.
             const session = s.session as Mutable<typeof s.session>;

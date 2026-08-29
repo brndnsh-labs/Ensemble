@@ -10,7 +10,10 @@
  * boundary).
  */
 export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
-    const out: any = {};
+    const out: any = {
+        // #1062 — runtime-derived; defaults unsilenced unless a test overrides it.
+        tradeSilenced: false,
+    };
 
     // Config (flat at the top)
     const CONFIG = new Set([
@@ -25,6 +28,7 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         'phrasingIntensity',
         'doubleStopProb',
         'tradeMode',
+        'tradeSilenced',
         'seed',
     ]);
 

@@ -117,9 +117,13 @@ describe('Soloist Trading Logic', () => {
         const state = getState();
         state.soloist.enabled = true;
         state.soloist.tradeMode = 'sections';
+        state.soloist.tradeSilenced = false;
     });
 
-    it('should toggle soloist OFF at the first transition', () => {
+    // #1062 regression: trading must never write the user's own `enabled`
+    // field — it's `document`-owned (persisted, shareable). Only the
+    // runtime-derived `tradeSilenced` layer may move.
+    it('should silence the soloist at the first transition WITHOUT touching enabled', () => {
         const stepsPerMeasure = 16;
         // Step 31 is the last step of the first measure of the first section?
         // No, checkSectionTransition triggers at the START of a measure if it LEADS into a transition.
@@ -132,10 +136,11 @@ describe('Soloist Trading Logic', () => {
 
         checkSectionTransition(getState(), 16, stepsPerMeasure, getState().dispatch);
 
-        expect(getState().soloist.enabled).toBe(false);
+        expect(getState().soloist.enabled).toBe(true);
+        expect(getState().soloist.tradeSilenced).toBe(true);
     });
 
-    it('should trade across 3 sections correctly', () => {
+    it('should trade across 3 sections correctly, leaving enabled untouched', () => {
         const state = getState();
         const stepsPerMeasure = 16;
 
@@ -148,18 +153,75 @@ describe('Soloist Trading Logic', () => {
 
         // Transition 1: A -> B (at step 16 triggers for end at 32)
         checkSectionTransition(state, 16, stepsPerMeasure, state.dispatch);
-        expect(state.soloist.enabled).toBe(false);
+        expect(state.soloist.enabled).toBe(true);
+        expect(state.soloist.tradeSilenced).toBe(true);
         expect(state.soloist.session.phrasing.isYielding).toBe(true);
 
         // Transition 2: B -> C (at step 48 triggers for end at 64)
         checkSectionTransition(state, 48, stepsPerMeasure, state.dispatch);
         expect(state.soloist.enabled).toBe(true);
+        expect(state.soloist.tradeSilenced).toBe(false);
         expect(state.soloist.session.phrasing.isYielding).toBe(false);
         expect(state.soloist.session.phrasing.isWaitingForEntry).toBe(true);
 
         // Transition 3: C -> A (at step 80 triggers for end at 96)
         checkSectionTransition(state, 80, stepsPerMeasure, state.dispatch);
-        expect(state.soloist.enabled).toBe(false);
+        expect(state.soloist.enabled).toBe(true);
+        expect(state.soloist.tradeSilenced).toBe(true);
         expect(state.soloist.session.phrasing.isYielding).toBe(true);
+
+        // #1062 acceptance: across every transition in this run, no dispatched
+        // payload ever carried an `enabled` key for the soloist lane.
+        const writesEnabled = state.dispatch.mock.calls.some(([action, payload]: [string, any]) => {
+            if (!payload || typeof payload !== 'object') {
+                return false;
+            }
+            if (action === 'UPDATE_SB') {
+                return Object.hasOwn(payload, 'enabled');
+            }
+            if (action === 'SET_PARAM') {
+                return (
+                    (payload.module === 'soloist' || payload.module === 'sb') &&
+                    payload.param === 'enabled'
+                );
+            }
+            return false;
+        });
+        expect(writesEnabled).toBe(false);
+    });
+
+    it('is silent (isInstrumentActiveAtStep) during a silenced window and active otherwise', async () => {
+        const { isInstrumentActiveAtStep } = await import(
+            '../../public/engine/section-overrides.js'
+        );
+        const state = getState();
+        const stepsPerMeasure = 16;
+
+        state.arranger.totalSteps = 96;
+        state.arranger.stepMap = [
+            { start: 0, end: 32, chord: { sectionId: 's1', sectionLabel: 'A' } },
+            { start: 32, end: 64, chord: { sectionId: 's2', sectionLabel: 'B' } },
+            { start: 64, end: 96, chord: { sectionId: 's3', sectionLabel: 'C' } },
+        ];
+        state.arranger.sectionMap = [
+            { start: 0, end: 32, id: 's1' },
+            { start: 32, end: 64, id: 's2' },
+            { start: 64, end: 96, id: 's3' },
+        ];
+        state.arranger.sections = [
+            { id: 's1', label: 'A' },
+            { id: 's2', label: 'B' },
+            { id: 's3', label: 'C' },
+        ];
+
+        expect(isInstrumentActiveAtStep(state, 'soloist', 0)).toBe(true);
+
+        checkSectionTransition(state, 16, stepsPerMeasure, state.dispatch);
+        expect(state.soloist.enabled).toBe(true);
+        expect(isInstrumentActiveAtStep(state, 'soloist', 40)).toBe(false);
+
+        checkSectionTransition(state, 48, stepsPerMeasure, state.dispatch);
+        expect(state.soloist.enabled).toBe(true);
+        expect(isInstrumentActiveAtStep(state, 'soloist', 70)).toBe(true);
     });
 });
