@@ -1,5 +1,6 @@
 import { cloneStateForDetachedGeneration } from './export/detached-generation-state.js';
 import { getState, getSyncState } from './state.js';
+import type { ActionPayloadMap, SwingSub } from './types.js';
 import {
     MIDI_EXPORT_MSG,
     MIDI_EXPORT_RESP,
@@ -285,7 +286,30 @@ function setModuleDelta(
     Object.assign(data, { [module]: patch });
 }
 
-export function syncWorker(action?: string, payload?: any): void {
+// syncWorker's own contract is a superset of the dispatch Action union: some
+// call sites (scheduler-core.ts, the reachability test) drive it directly
+// with worker-sync-only pseudo-actions that are never real dispatched
+// ActionPayloadMap keys. `ARRANGER_UPDATE` and `SET_SESSION_STEPS` are
+// legacy/unreachable cases (see tests/unit/engine/worker-sync-reachability.
+// test.ts) and `SET_OCTAVE` has no live dispatcher either — all three are
+// kept typed rather than removed, since deleting dead worker-sync cases is a
+// separate cleanup from typing this contract.
+//
+// `action`/`payload` stay two loose parameters (not a single discriminated
+// object) because the reachability test's DELTA PLUMBING assertion calls
+// `syncWorker(action, payload)` directly with a driven pair per manifest
+// entry — folding them into one `{ type, payload }` object would be a
+// breaking call-site change, not just a type change. TS can't correlate two
+// sibling parameters through a switch, so `payload` stays `unknown` and each
+// branch below casts to that action's real payload shape.
+type WorkerSyncActionName =
+    | keyof ActionPayloadMap
+    | 'LOOP_BOUNDARY'
+    | 'ARRANGER_UPDATE'
+    | 'SET_OCTAVE'
+    | 'SET_SESSION_STEPS';
+
+export function syncWorker(action?: WorkerSyncActionName, payload?: unknown): void {
     if (!timerWorker) {
         return;
     }
@@ -312,23 +336,33 @@ export function syncWorker(action?: string, payload?: any): void {
             data.playback = { autoIntensity: playback.autoIntensity };
             break;
         case 'UPDATE_HB':
-            data.harmony = payload;
+            data.harmony = payload as ActionPayloadMap['UPDATE_HB'];
             break;
         case 'UPDATE_SB':
             // NOTE: this delta forwards the flat payload as-is; the nested session
             // seed (`session.seed`) is NOT re-routed here and rides the full
             // snapshot/flush (getSyncState) at play-start instead, not this delta.
             // See getSyncState() + recursiveSafeSync.
-            data.soloist = payload;
+            data.soloist = payload as ActionPayloadMap['UPDATE_SB'];
             break;
         case 'UPDATE_GB':
-            data.groove = payload;
+            data.groove = payload as ActionPayloadMap['UPDATE_GB'];
             break;
-        case 'SET_PARAM':
-            if (payload.module) {
-                setModuleDelta(data, payload.module, { [payload.param]: payload.value });
+        case 'SET_PARAM': {
+            const setParamPayload = payload as ActionPayloadMap['SET_PARAM'];
+            if (setParamPayload.module) {
+                // Cast: ActionPayloadSetParam types module as a plain string
+                // (SET_PARAM is shared across every lane, including 'vizState',
+                // which isn't a WorkerSyncData key — logic-worker.ts's SYNC_STATE
+                // handler only reads the 8 named slices, so an unsynced module
+                // name is silently dropped worker-side, not misapplied). Same
+                // trust boundary setModuleDelta's own contract already relies on.
+                setModuleDelta(data, setParamPayload.module as keyof WorkerSyncData, {
+                    [setParamPayload.param]: setParamPayload.value,
+                });
             }
             break;
+        }
         case 'UPDATE_CONDUCTOR_DECISION':
             data.chords = { density: chords.density };
             data.playback = {
@@ -336,32 +370,50 @@ export function syncWorker(action?: string, payload?: any): void {
                 intent: playback.intent,
             };
             break;
-        case 'SET_STYLE':
-            if (payload.module) {
-                setModuleDelta(data, payload.module, { style: payload.style });
+        case 'SET_STYLE': {
+            const setStylePayload = payload as ActionPayloadMap['SET_STYLE'];
+            if (setStylePayload.module) {
+                setModuleDelta(data, setStylePayload.module as keyof WorkerSyncData, {
+                    style: setStylePayload.style,
+                });
             }
             break;
-        case 'SET_VOLUME':
-            if (payload.module) {
-                setModuleDelta(data, payload.module, { volume: payload.value });
+        }
+        case 'SET_VOLUME': {
+            const setVolumePayload = payload as ActionPayloadMap['SET_VOLUME'];
+            if (setVolumePayload.module) {
+                setModuleDelta(data, setVolumePayload.module as keyof WorkerSyncData, {
+                    volume: setVolumePayload.value,
+                });
             }
             break;
-        case 'SET_INSTRUMENT_VOICE':
+        }
+        case 'SET_INSTRUMENT_VOICE': {
             // #698 — the chords voice drives NOTE GENERATION now (power-chord
             // voicing for the crunch rhythm guitar), so forward the changed lane's
             // voice to the worker live. The genre auto-follow effect dispatches
             // this per-lane on a genre change too, so this covers manual + auto.
-            if (payload?.module) {
-                setModuleDelta(data, payload.module, { voice: payload.voice });
+            const setVoicePayload = payload as ActionPayloadMap['SET_INSTRUMENT_VOICE'];
+            if (setVoicePayload?.module) {
+                setModuleDelta(data, setVoicePayload.module as keyof WorkerSyncData, {
+                    voice: setVoicePayload.voice,
+                });
             }
             break;
-        case 'SET_OCTAVE':
-            if (payload.module) {
-                setModuleDelta(data, payload.module, { octave: payload.value });
+        }
+        case 'SET_OCTAVE': {
+            // Dead today (no live dispatcher — see WorkerSyncActionName above);
+            // shape mirrors the SET_PARAM/SET_VOLUME sibling cases above it.
+            const setOctavePayload = payload as { module?: string; value?: number };
+            if (setOctavePayload.module) {
+                setModuleDelta(data, setOctavePayload.module as keyof WorkerSyncData, {
+                    octave: setOctavePayload.value,
+                });
             }
             break;
+        }
         case 'SET_MIDI_CONFIG':
-            data.midi = payload;
+            data.midi = payload as ActionPayloadMap['SET_MIDI_CONFIG'];
             break;
         case 'SET_GENRE_FEEL':
             data.groove = {
@@ -372,22 +424,25 @@ export function syncWorker(action?: string, payload?: any): void {
             };
             break;
         case 'SET_SWING':
-            data.groove = { swing: payload };
+            data.groove = { swing: payload as ActionPayloadMap['SET_SWING'] };
             break;
         case 'SET_SWING_SUB':
-            data.groove = { swingSub: payload };
+            // Cast: ActionPayloadMap types this as plain string (Select's onChange
+            // is generic); runtime callers only ever dispatch a real SwingSub value.
+            data.groove = { swingSub: payload as SwingSub };
             break;
         case 'SET_SESSION_STEPS':
-            data.soloist = { sessionSteps: payload };
+            // Dead today — see WorkerSyncActionName above.
+            data.soloist = { sessionSteps: payload as number };
             break;
         case 'SET_SOLOIST_MODE':
-            data.soloist = { mode: payload };
+            data.soloist = { mode: payload as ActionPayloadMap['SET_SOLOIST_MODE'] };
             break;
         case 'SET_BPM':
             data.playback = { bpm: playback.bpm };
             break;
         case 'SET_SESSION_TIMER':
-            data.playback = { sessionTimer: payload };
+            data.playback = { sessionTimer: payload as ActionPayloadMap['SET_SESSION_TIMER'] };
             break;
         case 'TOGGLE_PLAY':
             // Ensure session start time is synced when play starts
@@ -419,7 +474,7 @@ export function syncWorker(action?: string, payload?: any): void {
         case 'SET_SONG_MODE':
             data.playback = { songMode: playback.songMode };
             break;
-        case 'ARRANGER_UPDATE': // Custom action for large structural changes
+        case 'ARRANGER_UPDATE': // Custom action for large structural changes — dead today
             data.arranger = {
                 progression: arranger.progression,
                 stepMap: arranger.stepMap,

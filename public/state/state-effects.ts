@@ -22,6 +22,7 @@ import { isInstrumentEverActive } from '../engine/section-overrides.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
 import { generateSessionSeed } from '../engine/soloist-seeder.js';
 import type {
+    Action,
     Dispatch,
     EnsembleState,
     GrooveState,
@@ -245,16 +246,16 @@ function regenerateSessionSeeds(
 }
 
 export function handleEffects(
-    action: string,
-    payload: any,
+    action: Action,
     stateMap: EnsembleState,
     context: HandleEffectsContext,
 ): void {
     const { dispatch } = context;
     // No HYDRATE case: this subscriber isn't attached until after boot hydration
     // already dispatched it, so boot-time effects (theme, etc.) run directly from main.ts.
-    switch (action) {
+    switch (action.type) {
         case ACTIONS.SET_INSTRUMENT_VOICE: {
+            const payload = action.payload;
             // Epic 6 — selecting a `pack:<id>` voice lazily loads that pack's
             // samples (decode needs the live AudioContext from initAudio).
             const audio = stateMap.playback.audio;
@@ -282,8 +283,11 @@ export function handleEffects(
             // initAudio / voice change (SET_INSTRUMENT_VOICE, #686). Re-send now so
             // moving the slider alone is live (= slider × reverbSendForPack(voice)).
             // The helper no-ops before the audio graph exists.
-            if (payload?.module) {
-                syncBusReverbSend(stateMap, payload.module);
+            if (action.payload?.module) {
+                // Cast: SET_REVERB is shared across every lane, so its payload
+                // types `module` as a plain string; runtime callers only ever
+                // dispatch a real InstrumentModule name.
+                syncBusReverbSend(stateMap, action.payload.module as InstrumentModule);
             }
             break;
         }
@@ -292,8 +296,8 @@ export function handleEffects(
             // but (unlike SET_REVERB above) had no live-ramp effect at all: the bus
             // gain node was otherwise only re-trimmed at initAudio/restoreGains (a
             // mute toggle, transport start). Re-trim now, mirroring SET_REVERB.
-            if (payload?.module) {
-                syncBusVolume(stateMap, payload.module);
+            if (action.payload?.module) {
+                syncBusVolume(stateMap, action.payload.module as InstrumentModule);
             }
             break;
         }
@@ -302,7 +306,7 @@ export function handleEffects(
             // not a dedicated action; ramp the master bus here instead of in
             // Settings.tsx so any non-slider writer (preset apply, restore) also
             // gets the live ramp — mirrors SET_VOLUME above for the per-bus case.
-            if (payload?.module === 'playback' && payload?.param === 'masterVolume') {
+            if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
             break;
@@ -350,7 +354,7 @@ export function handleEffects(
             // because isPlaying is already false by the time its effect runs.
             // `!payload` (not `=== false`) tracks the reducer's own `!!` coercion,
             // so any falsy unlock pauses in lock-step with what it wrote.
-            if (!payload && stateMap.playback.isPlaying) {
+            if (!action.payload && stateMap.playback.isPlaying) {
                 dispatch(ACTIONS.TOGGLE_PLAY, undefined);
             }
             break;
@@ -376,13 +380,17 @@ export function handleEffects(
             break;
         }
         case ACTIONS.SET_BPM: {
-            setBpm(payload, payload?.viz, true, context.oldBpm);
+            // No live caller ever passes a viz object through this action's
+            // payload (it's always `number | string`) — the old `payload?.viz`
+            // read was permanently undefined; setBpm's viz-beat-reference branch
+            // is dead along this call path (out of scope for this refactor).
+            setBpm(action.payload, undefined, true, context.oldBpm);
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
             // #675 — Auto voices + soloist mode, and the async drum preset. URL
             // boot awaits this same helper through reconcileUrlGenreOnBoot (#1000).
-            void applyGenreEffects(stateMap, payload, dispatch);
+            void applyGenreEffects(stateMap, action.payload, dispatch);
             break;
         }
         case ACTIONS.SET_SOLOIST_AUTO_MODE: {
@@ -405,8 +413,8 @@ export function handleEffects(
         }
         case ACTIONS.TOAST_EXPIRED: {
             // Free any registered action callbacks for the dismissed toast.
-            if (typeof payload === 'string') {
-                clearToastActions(payload);
+            if (typeof action.payload === 'string') {
+                clearToastActions(action.payload);
             }
             break;
         }
@@ -433,7 +441,7 @@ export function handleEffects(
     // dispatch-then-saveCurrentState() rituals: every non-transient dispatch
     // schedules one debounced save. main.ts flushes immediately on tab-hide so
     // the 1s debounce window can't lose a change on close.
-    if (!TRANSIENT_PERSIST_ACTIONS.has(action)) {
+    if (!TRANSIENT_PERSIST_ACTIONS.has(action.type)) {
         debounceSaveState();
     }
 }

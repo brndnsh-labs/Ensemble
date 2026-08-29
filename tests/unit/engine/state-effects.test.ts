@@ -65,12 +65,12 @@ describe('State Effects Handler', () => {
 
     it('should call togglePlay on TOGGLE_PLAY action', () => {
         const payload = {};
-        handleEffects(ACTIONS.TOGGLE_PLAY, payload, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.TOGGLE_PLAY, payload: payload }, stateMap, { dispatch });
         expect(togglePlay).toHaveBeenCalledWith(stateMap, true, dispatch);
     });
 
     it('should call validateProgression on section-related actions', () => {
-        handleEffects(ACTIONS.SET_SECTIONS, {}, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_SECTIONS, payload: {} }, stateMap, { dispatch });
         expect(validateProgression).toHaveBeenCalledWith(stateMap, dispatch);
     });
 
@@ -82,7 +82,7 @@ describe('State Effects Handler', () => {
             groove: { enabled: true, genreFeel: 'Rock' },
         };
 
-        handleEffects(ACTIONS.SET_GROUPING, [3, 2, 2], stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_GROUPING, payload: [3, 2, 2] }, stateMap, { dispatch });
 
         expect(validateProgression).toHaveBeenCalledWith(stateMap, dispatch);
         expect(generateSessionSeed).toHaveBeenCalledWith(
@@ -112,7 +112,11 @@ describe('State Effects Handler', () => {
             groove: { enabled: false, genreFeel: 'Rock' },
         };
 
-        handleEffects(ACTIONS.SET_SECTIONS, stateMap.arranger.sections, stateMap, { dispatch });
+        handleEffects(
+            { type: ACTIONS.SET_SECTIONS, payload: stateMap.arranger.sections },
+            stateMap,
+            { dispatch },
+        );
 
         expect(generateDrumOrchestration).toHaveBeenCalled();
         expect(generateDrumFills).toHaveBeenCalled();
@@ -126,21 +130,21 @@ describe('State Effects Handler', () => {
     it('should call setBpm on SET_BPM action', () => {
         const payload = 120;
         const context = { dispatch, oldBpm: 100 };
-        handleEffects(ACTIONS.SET_BPM, payload, stateMap, context);
+        handleEffects({ type: ACTIONS.SET_BPM, payload: payload }, stateMap, context);
         expect(setBpm).toHaveBeenCalledWith(payload, undefined, true, 100);
     });
 
     it('should call loadDrumPreset on SET_GENRE_FEEL if not playing', () => {
         const payload = { drum: 'rock' };
         stateMap.playback.isPlaying = false;
-        handleEffects(ACTIONS.SET_GENRE_FEEL, payload, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_GENRE_FEEL, payload: payload }, stateMap, { dispatch });
         expect(loadDrumPreset).toHaveBeenCalledWith('rock');
     });
 
     it('should NOT call loadDrumPreset on SET_GENRE_FEEL if playing', () => {
         const payload = { drum: 'rock' };
         stateMap.playback.isPlaying = true;
-        handleEffects(ACTIONS.SET_GENRE_FEEL, payload, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_GENRE_FEEL, payload: payload }, stateMap, { dispatch });
         expect(loadDrumPreset).not.toHaveBeenCalled();
     });
 
@@ -204,7 +208,11 @@ describe('State Effects Handler', () => {
 
         it('switches an Auto lane to the genre-mapped pack when installed', () => {
             markPackInstalled('horns-section', true);
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                stateMap,
+                { dispatch },
+            );
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'harmony',
                 voice: 'pack:horns-section',
@@ -215,14 +223,22 @@ describe('State Effects Handler', () => {
         it('leaves a pinned lane (autoSound:false) untouched', () => {
             stateMap.harmony = { autoSound: false, voice: 'synth' };
             markPackInstalled('horns-section', true);
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                stateMap,
+                { dispatch },
+            );
             expect(dispatch).not.toHaveBeenCalled();
         });
 
         it('does not write when the mapped sound already matches (no churn)', () => {
             markPackInstalled('horns-section', true);
             stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                stateMap,
+                { dispatch },
+            );
             expect(dispatch).not.toHaveBeenCalled();
         });
 
@@ -230,7 +246,11 @@ describe('State Effects Handler', () => {
             // Auto lane currently pinned-by-prior-state to the horns pack, but it
             // is no longer installed → auto-follow recovers it to synth.
             stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk' }, stateMap, { dispatch });
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
+                stateMap,
+                { dispatch },
+            );
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'harmony',
                 voice: 'synth',
@@ -241,7 +261,11 @@ describe('State Effects Handler', () => {
         it('uses synth for a genre with no harmony mapping', () => {
             markPackInstalled('horns-section', true);
             stateMap.harmony = { autoSound: true, voice: 'pack:horns-section' };
-            handleEffects(ACTIONS.SET_GENRE_FEEL, { genreName: 'Hip Hop' }, stateMap, { dispatch });
+            handleEffects(
+                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Hip Hop' } },
+                stateMap,
+                { dispatch },
+            );
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'harmony',
                 voice: 'synth',
@@ -252,40 +276,44 @@ describe('State Effects Handler', () => {
 
     it('should re-send the bus reverb on SET_REVERB action (#688)', () => {
         const payload = { module: 'chords', value: 0.6 };
-        handleEffects(ACTIONS.SET_REVERB, payload, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_REVERB, payload: payload }, stateMap, { dispatch });
         expect(syncBusReverbSend).toHaveBeenCalledWith(stateMap, 'chords');
     });
 
     it('should NOT re-send the bus reverb on SET_REVERB with no module', () => {
-        handleEffects(ACTIONS.SET_REVERB, { value: 0.6 }, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_REVERB, payload: { value: 0.6 } }, stateMap, {
+            dispatch,
+        });
         expect(syncBusReverbSend).not.toHaveBeenCalled();
     });
 
     it('should re-trim the bus gain on SET_VOLUME action (#1111)', () => {
         const payload = { module: 'chords', value: 0.6 };
-        handleEffects(ACTIONS.SET_VOLUME, payload, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_VOLUME, payload: payload }, stateMap, { dispatch });
         expect(syncBusVolume).toHaveBeenCalledWith(stateMap, 'chords');
     });
 
     it('should NOT re-trim the bus gain on SET_VOLUME with no module', () => {
-        handleEffects(ACTIONS.SET_VOLUME, { value: 0.6 }, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SET_VOLUME, payload: { value: 0.6 } }, stateMap, {
+            dispatch,
+        });
         expect(syncBusVolume).not.toHaveBeenCalled();
     });
 
     it('should call restoreGains on RESTORE_GAINS action', () => {
-        handleEffects(ACTIONS.RESTORE_GAINS, {}, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.RESTORE_GAINS, payload: {} }, stateMap, { dispatch });
         expect(restoreGains).toHaveBeenCalledWith(stateMap);
     });
 
     it('should call initAudio on INIT_AUDIO action', () => {
-        handleEffects(ACTIONS.INIT_AUDIO, {}, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.INIT_AUDIO, payload: {} }, stateMap, { dispatch });
         expect(initAudio).toHaveBeenCalledWith(stateMap);
     });
 
     it('should set toast expiration on SHOW_TOAST', () => {
         vi.useFakeTimers();
         stateMap.playback.toasts = [{ id: 'toast1' }];
-        handleEffects(ACTIONS.SHOW_TOAST, 'msg', stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.SHOW_TOAST, payload: 'msg' }, stateMap, { dispatch });
 
         vi.advanceTimersByTime(2000);
         expect(dispatch).toHaveBeenCalledWith('TOAST_EXPIRED', 'toast1');
@@ -294,7 +322,7 @@ describe('State Effects Handler', () => {
 
     it('should set flash expiration on TRIGGER_FLASH', () => {
         vi.useFakeTimers();
-        handleEffects(ACTIONS.TRIGGER_FLASH, 0.5, stateMap, { dispatch });
+        handleEffects({ type: ACTIONS.TRIGGER_FLASH, payload: 0.5 }, stateMap, { dispatch });
 
         vi.advanceTimersByTime(50);
         expect(dispatch).toHaveBeenCalledWith('FLASH_EXPIRED');
