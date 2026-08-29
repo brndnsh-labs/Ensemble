@@ -17,6 +17,11 @@ vi.stubGlobal('performance', { now: vi.fn(() => 1000) });
 const mockSelf = { onmessage: null };
 vi.stubGlobal('self', mockSelf);
 
+const resetHiddenGenerationMemoryMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../public/engine/generation-run.js', () => ({
+    resetHiddenGenerationMemory: resetHiddenGenerationMemoryMock,
+}));
+
 // Mock intervals/timers
 vi.stubGlobal(
     'setInterval',
@@ -140,6 +145,8 @@ describe('Logic Worker Messaging', () => {
         self.onmessage({ data: { type: WORKER_MSG.FLUSH, data: flushData } });
 
         expect(getState().arranger.totalSteps).toBe(32);
+        expect(resetHiddenGenerationMemoryMock).toHaveBeenCalledOnce();
+        expect(resetHiddenGenerationMemoryMock).toHaveBeenCalledWith(getState());
         const errorCalls = mockPostMessage.mock.calls.filter(
             (c) => c[0].type === WORKER_RESP.ERROR,
         );

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearHarmonyMemory, getHarmonyNotes } from '../../public/engine/harmonies.js';
+import { resetHiddenGenerationMemory } from '../../public/engine/generation-run.js';
+import { getHarmonyNotes } from '../../public/engine/harmonies.js';
 import { getState } from '../../public/state.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -40,7 +41,7 @@ describe('Harmony Determinism (S5)', () => {
             chords: { style: 'smart' },
         };
         getState.mockReturnValue(mockState);
-        clearHarmonyMemory(mockState);
+        resetHiddenGenerationMemory(mockState);
     });
 
     // why: stubbing Math.random() to the same value across both runs would make
@@ -59,7 +60,7 @@ describe('Harmony Determinism (S5)', () => {
         const spy = vi.spyOn(Math, 'random').mockReturnValue(stubValue);
         try {
             mockState.harmony.lastMidis = [];
-            clearHarmonyMemory(mockState);
+            resetHiddenGenerationMemory(mockState);
             const events: Array<{ step: number; midis: number[] }> = [];
             for (let i = 0; i < totalSteps; i++) {
                 const stepInMeasure = i % 16;

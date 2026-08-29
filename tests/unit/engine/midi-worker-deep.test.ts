@@ -6,6 +6,11 @@ import { generateResolutionNotes } from '../../../public/engine/resolution.js';
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
+const resetHiddenGenerationMemoryMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../public/engine/generation-run.js', () => ({
+    resetHiddenGenerationMemory: resetHiddenGenerationMemoryMock,
+}));
 
 // We need to mock worker-utils because getChordAtStep is used in processStep
 vi.mock('../../../public/engine/worker-utils.js', () => ({
@@ -24,6 +29,7 @@ describe('MIDI Worker Logic Deep Dive', () => {
     let state;
 
     beforeEach(() => {
+        vi.clearAllMocks();
         vi.stubGlobal('postMessage', vi.fn());
         state = {
             playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, intent: {} },
@@ -78,6 +84,11 @@ describe('MIDI Worker Logic Deep Dive', () => {
         processor = new ExportProcessor(state, {
             includedTracks: ['drums', 'soloist', 'chords', 'bass', 'harmonies'],
         });
+    });
+
+    it('starts each MIDI export at the shared hidden-memory boundary', () => {
+        expect(resetHiddenGenerationMemoryMock).toHaveBeenCalledOnce();
+        expect(resetHiddenGenerationMemoryMock).toHaveBeenCalledWith(state);
     });
 
     it('uses the section meter for timing on the first and second chart loop', () => {

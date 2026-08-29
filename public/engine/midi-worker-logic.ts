@@ -3,13 +3,13 @@ import { analyzeForm } from '../song/form-analysis.js';
 import type { EnsembleState, Mutable, StepInfo } from '../types.js';
 import { binarySearchMap, secondsPerStepFor } from '../utils.js';
 import { WORKER_RESP } from '../worker-types.js';
-import { compingState, resetCompingState } from './accompaniment.js';
 import { resetBassState } from './bass-engine.js';
 import {
     type CoordinationContext,
     resetCoordinationCarryover,
     updateCoordinationContext,
 } from './coordination-engine.js';
+import { resetHiddenGenerationMemory } from './generation-run.js';
 import { calculateStepDuration } from './groove-engine.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
@@ -255,11 +255,9 @@ export class ExportProcessor {
 
         resetSoloistState(this.state);
         resetBassState(this.state);
-        (harmony as Mutable<typeof harmony>).lastMidis = []; // @worker-mutation
+        resetHiddenGenerationMemory(this.state);
         (groove as Mutable<typeof groove>).fillActive = false; // @worker-mutation
         (groove as Mutable<typeof groove>).pendingCrash = false; // @worker-mutation
-
-        resetCompingState(compingState); // @worker-mutation
 
         // Conductor State
         this.exportConductor = {
