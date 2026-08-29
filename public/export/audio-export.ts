@@ -6,7 +6,7 @@ import { scheduleGlobalEvent } from '../engine/scheduler-core.js';
 import { generateNotesForStep } from '../engine/tick-logic.js';
 import { encodeWav } from '../engine/wav-encoder.js';
 import { getState } from '../state.js';
-import type { EnsembleState } from '../types.js';
+import type { EnsembleState, Mutable } from '../types.js';
 import { cloneStateForDetachedGeneration } from './detached-generation-state.js';
 
 export interface AudioExportOptions {
@@ -116,7 +116,8 @@ export async function renderStemsToWav(
         // if it happens to be muted in the current mix.
         for (const stem of STEM_INSTRUMENTS) {
             const sliceKey = STEM_ENABLE_SLICE[stem];
-            state[sliceKey].enabled = stem === instrument; // @direct-mutation — throwaway clone
+            (state[sliceKey] as Mutable<(typeof state)[typeof sliceKey]>).enabled =
+                stem === instrument; // @direct-mutation — throwaway clone
         }
         // Section force-on is musical authorship, while a stem choice is a sink
         // mask. Force every excluded lane off at the section layer too; preserve
@@ -132,7 +133,7 @@ export async function renderStemsToWav(
         if (!state.soloist.enabled) {
             // A solo stem is a sound-source isolation, not permission to render
             // gestures driven by a lane that is absent from that stem.
-            state.groove.accentMap = null; // @direct-mutation — throwaway clone
+            (state.groove as Mutable<typeof state.groove>).accentMap = null; // @direct-mutation — throwaway clone
         }
 
         const filename = `${baseFilename}-stem-${instrument}`;
@@ -249,22 +250,27 @@ function sanitizeFilename(input: string): string {
  * snapshot. Musical settings remain intact while derived arrangement data is
  * rebuilt by the offline renderer.
  */
-function cloneStateForRender(liveState: EnsembleState): any {
-    const state: any = cloneStateForDetachedGeneration(liveState);
+function cloneStateForRender(liveState: EnsembleState): EnsembleState {
+    const state = cloneStateForDetachedGeneration(liveState);
 
     // WAV/stem export always renders the full authored form and rebuilds its
     // derived maps. MIDI export deliberately keeps those snapshot values so its
     // existing paused/live semantics do not change.
-    state.playback.startStep = 0; // @direct-mutation — throwaway clone
-    state.playback.loopStartStep = -1; // @direct-mutation — throwaway clone
-    state.playback.loopEndStep = -1; // @direct-mutation — throwaway clone
-    state.arranger.progression = []; // @direct-mutation — throwaway clone
-    state.arranger.stepMap = []; // @direct-mutation — throwaway clone
-    state.arranger.sectionMap = []; // @direct-mutation — throwaway clone
-    state.arranger.measureMap = []; // @direct-mutation — throwaway clone
-    state.groove.fillSteps = null; // @direct-mutation — throwaway clone
-    state.groove.fillMap = null; // @direct-mutation — throwaway clone
-    state.groove.seedTimelineStartStep = 0; // @direct-mutation — throwaway clone
+    const playback = state.playback as Mutable<typeof state.playback>;
+    playback.startStep = 0; // @direct-mutation — throwaway clone
+    playback.loopStartStep = -1; // @direct-mutation — throwaway clone
+    playback.loopEndStep = -1; // @direct-mutation — throwaway clone
+
+    const arranger = state.arranger as Mutable<typeof state.arranger>;
+    arranger.progression = []; // @direct-mutation — throwaway clone
+    arranger.stepMap = []; // @direct-mutation — throwaway clone
+    arranger.sectionMap = []; // @direct-mutation — throwaway clone
+    arranger.measureMap = []; // @direct-mutation — throwaway clone
+
+    const groove = state.groove as Mutable<typeof state.groove>;
+    groove.fillSteps = {}; // @direct-mutation — throwaway clone; matches groove.ts's default, not nullable
+    groove.fillMap = null; // @direct-mutation — throwaway clone
+    groove.seedTimelineStartStep = 0; // @direct-mutation — throwaway clone
 
     return state;
 }
