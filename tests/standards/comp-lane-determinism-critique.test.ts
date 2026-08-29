@@ -25,6 +25,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { getStepInfo } from '../../public/utils.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -57,18 +58,51 @@ function resetCompingState() {
     // (isHit is always false), so guard (2) directly exercises the gate the fix
     // touched. Persistent groove-memory fields reset for clean pass-to-pass
     // determinism (soloistActivity is a converging smoother).
-    compingState.currentCell = new Array(16).fill(0);
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastSectionId = null;
-    compingState.lastVoicingMidis = [];
-    compingState.lastChordIndex = -1;
-    compingState.lastChordQuality = null;
-    compingState.funkRotationIndex = 0;
-    compingState.bossaRotationIndex = 0;
-    compingState.currentVibe = 'balanced';
-    compingState.soloistActivity = 0;
-    compingState.maxGrooveLength = 4;
+    resetCanonicalCompingState(compingState);
+}
+
+function dirtyCompingMemory() {
+    compingState.currentCell = new Array(16).fill(1);
+    compingState.lockedUntil = 999;
+    compingState.statementVoicingMidis = [72, 76, 79];
+    compingState.statementChordKey = 'stale-statement';
+    compingState.ringSuppressStep = 7;
+    compingState.ringSuppressChordKey = 'stale-ring';
+    compingState.lastSectionId = 'stale-section';
+    compingState.funkRotationIndex = 11;
+    compingState.bossaRotationIndex = 13;
+}
+
+function runPrimedStep(dirty: boolean) {
+    resetCanonicalCompingState(compingState);
+    const state = buildState('Rock', 'smart', 0);
+    const chord = makeC7();
+    const firstInfo = getStepInfo(0, FOUR_FOUR, [], TIME_SIGNATURES);
+    getAccompanimentNotes(state, chord, 0, 0, 0, firstInfo, COORD);
+    if (dirty) {
+        dirtyCompingMemory();
+    }
+    resetCompingState();
+    const resetDefaults = {
+        currentCell: [...compingState.currentCell],
+        statementVoicingMidis: [...compingState.statementVoicingMidis],
+        ringSuppressStep: compingState.ringSuppressStep,
+        lastSectionId: compingState.lastSectionId,
+        funkRotationIndex: compingState.funkRotationIndex,
+        bossaRotationIndex: compingState.bossaRotationIndex,
+    };
+    const info = getStepInfo(0, FOUR_FOUR, [], TIME_SIGNATURES);
+    const notes = getAccompanimentNotes(state, chord, 0, 0, 0, info, COORD);
+    const trace = notes.map((note: any) => ({
+        midi: note.midi,
+        muted: note.muted,
+        timingOffset: note.timingOffset,
+    }));
+    return {
+        trace,
+        hitCount: trace.filter((note: any) => note.midi > 0 && !note.muted).length,
+        resetDefaults,
+    };
 }
 
 function buildState(genreFeel: string, chordStyle: string, currentLoopCount: number) {
@@ -223,6 +257,23 @@ function runPassNLoops(genreFeel: string, chordStyle: string, numLoops: number):
 const barsEqual = (a: boolean[], b: boolean[]) => a.every((v, i) => v === b[i]);
 
 describe('Comp genre lanes lock (determinism + non-tautology)', () => {
+    it('isolates fixture order: dirty statement/ring/section/rotation memory is cleared', () => {
+        const baseline = runPrimedStep(false);
+        const rerun = runPrimedStep(true);
+        expect(baseline.trace.length).toBeGreaterThan(0);
+        expect(baseline.hitCount).toBeGreaterThan(0);
+        expect(rerun.trace).toEqual(baseline.trace);
+        expect(rerun.hitCount).toBe(baseline.hitCount);
+        expect(rerun.resetDefaults).toEqual({
+            currentCell: new Array(16).fill(0),
+            statementVoicingMidis: [],
+            ringSuppressStep: -1,
+            lastSectionId: null,
+            funkRotationIndex: 0,
+            bossaRotationIndex: 0,
+        });
+    });
+
     for (const lane of LANES) {
         describe(lane.name, () => {
             it('(1) is deterministic loop-to-loop: identical (step, loop) → identical onsets', () => {

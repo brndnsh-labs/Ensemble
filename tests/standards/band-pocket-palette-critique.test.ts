@@ -46,6 +46,7 @@ import { CHORD_PRESETS } from '../../public/data/chord-presets.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote } from '../../public/engine/bass-engine.js';
 import { validateProgression } from '../../public/engine/chords-engine.js';
+import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { getBandPocket } from '../../public/engine/coordination-engine.js';
 import { getSoloistNotePhraseFirst } from '../../public/engine/soloist-phrase-first.js';
 import { generateSessionSeed } from '../../public/engine/soloist-seeder.js';
@@ -111,24 +112,10 @@ function makeC7(sectionLabel: string | null = null) {
 }
 
 function resetCompingState() {
+    resetCanonicalCompingState(compingState);
+    // Deliberate fixture override: palette tests force an all-hit current cell
+    // so the downbeat onset timing is measured for every genre.
     compingState.currentCell = new Array(16).fill(1);
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastSectionId = null;
-    compingState.lastVoicingMidis = [];
-    compingState.lastChordIndex = -1;
-    compingState.lastChordQuality = null;
-    compingState.funkRotationIndex = 0;
-    compingState.bossaRotationIndex = 0;
-    compingState.currentVibe = 'balanced';
-    compingState.soloistActivity = 0;
-    compingState.maxGrooveLength = 4;
-    // Statement / ring-suppress memory — must clear too, or a prior genre's call
-    // at this step suppresses the next genre's onset (the comp mutes it).
-    compingState.statementVoicingMidis = [];
-    compingState.statementChordKey = null;
-    compingState.ringSuppressStep = -1;
-    compingState.ringSuppressChordKey = null;
 }
 
 function makeState(genre: string) {

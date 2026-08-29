@@ -81,6 +81,7 @@ vi.mock('../../public/worker-client.js', () => ({ syncWorker: vi.fn() }));
 
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { getState } from '../../public/state.js';
 import { getStepInfo } from '../../public/utils.js';
 
@@ -95,16 +96,7 @@ const STEPS_PER_BAR = SIX_EIGHT.beats * SIX_EIGHT.stepsPerBeat; // 12
 const PULSE_ALIGNED_STEPS = new Set([0, 4, 6, 10]);
 
 function resetCompingState() {
-    compingState.currentCell = new Array(16).fill(0);
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastSectionId = null;
-    compingState.lastVoicingMidis = [];
-    compingState.lastChordIndex = -1;
-    compingState.lastChordQuality = null;
-    compingState.funkRotationIndex = 0;
-    compingState.bossaRotationIndex = 0;
-    compingState.currentVibe = 'balanced';
+    resetCanonicalCompingState(compingState);
 }
 
 /**
