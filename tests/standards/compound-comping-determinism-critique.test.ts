@@ -19,6 +19,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
+import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { getStepInfo } from '../../public/utils.js';
 
 const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
@@ -47,21 +48,7 @@ function makeG7() {
 }
 
 function resetCompingState() {
-    compingState.currentCell = new Array(16).fill(0);
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastSectionId = null;
-    compingState.lastVoicingMidis = [];
-    compingState.lastChordIndex = -1;
-    compingState.lastChordQuality = null;
-    compingState.funkRotationIndex = 0;
-    compingState.bossaRotationIndex = 0;
-    compingState.currentVibe = 'balanced';
-    // why: persistent groove-memory fields — must reset for a clean
-    // pass-to-pass determinism comparison (soloistActivity is a converging
-    // smoother, so omitting it makes the first pass differ from later passes).
-    compingState.soloistActivity = 0;
-    compingState.maxGrooveLength = 4;
+    resetCanonicalCompingState(compingState);
 }
 
 function buildState(currentLoopCount: number) {

@@ -43,6 +43,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIME_SIGNATURES } from '../../public/config.js';
 import { compingState, getAccompanimentNotes } from '../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../public/engine/bass-engine.js';
+import { resetCompingState as resetCanonicalCompingState } from '../../public/engine/comping-state.js';
 import { applyGrooveOverrides } from '../../public/engine/groove-engine.js';
 // The live phrase-first soloist requires a non-empty soloist.session.seed,
 // reads its loopLengthSteps/notes, applies apex/theme/density logic, and
@@ -197,16 +198,7 @@ function buildAllBluesState(currentLoopCount: number, sessionSeed: any) {
 }
 
 function resetCompingState() {
-    compingState.currentCell = new Array(16).fill(0);
-    compingState.lockedUntil = 0;
-    compingState.grooveRetentionCount = 0;
-    compingState.lastSectionId = null;
-    compingState.lastVoicingMidis = [];
-    compingState.lastChordIndex = -1;
-    compingState.lastChordQuality = null;
-    compingState.funkRotationIndex = 0;
-    compingState.bossaRotationIndex = 0;
-    compingState.currentVibe = 'balanced';
+    resetCanonicalCompingState(compingState);
 }
 
 /**
