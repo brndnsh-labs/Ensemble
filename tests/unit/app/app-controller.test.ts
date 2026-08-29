@@ -121,7 +121,7 @@ describe('App Controller', () => {
         });
 
         it('should not dispatch if fromDispatch is true', () => {
-            setBpm(140, null, true);
+            setBpm(140, true);
             expect(dispatch).not.toHaveBeenCalled();
         });
 
@@ -129,18 +129,6 @@ describe('App Controller', () => {
             state.playback.bpm = 120;
             setBpm(120);
             expect(syncWorker).not.toHaveBeenCalled();
-        });
-
-        it('should update viz reference if playing and viz provided', () => {
-            state.playback.isPlaying = true;
-            state.playback.audio = { currentTime: 100 };
-            state.playback.unswungNextNoteTime = 100.5;
-            state.playback.step = 0;
-
-            const viz = { setBeatReference: vi.fn() };
-            setBpm(140, viz);
-
-            expect(viz.setBeatReference).toHaveBeenCalled();
         });
     });
 });

@@ -131,7 +131,7 @@ describe('State Effects Handler', () => {
         const payload = 120;
         const context = { dispatch, oldBpm: 100 };
         handleEffects({ type: ACTIONS.SET_BPM, payload: payload }, stateMap, context);
-        expect(setBpm).toHaveBeenCalledWith(payload, undefined, true, 100);
+        expect(setBpm).toHaveBeenCalledWith(payload, true, 100);
     });
 
     it('should call loadDrumPreset on SET_GENRE_FEEL if not playing', () => {

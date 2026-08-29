@@ -61,7 +61,6 @@ const TRANSIENT_PERSIST_ACTIONS = new Set<string>([
 
 interface HandleEffectsContext {
     dispatch: Dispatch;
-    viz?: any;
     oldBpm?: number;
 }
 
@@ -380,11 +379,7 @@ export function handleEffects(
             break;
         }
         case ACTIONS.SET_BPM: {
-            // No live caller ever passes a viz object through this action's
-            // payload (it's always `number | string`) — the old `payload?.viz`
-            // read was permanently undefined; setBpm's viz-beat-reference branch
-            // is dead along this call path (out of scope for this refactor).
-            setBpm(action.payload, undefined, true, context.oldBpm);
+            setBpm(action.payload, true, context.oldBpm);
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
