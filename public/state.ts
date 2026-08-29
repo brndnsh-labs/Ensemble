@@ -240,8 +240,7 @@ export const storage = {
 // --- Event Bus / State Manager ---
 
 type StateListener = (
-    action: string,
-    payload: any,
+    action: Action,
     state: EnsembleState,
     meta: { oldBpm: number; dispatch: typeof dispatch },
 ) => void;
@@ -265,8 +264,8 @@ export const dispatch: Dispatch = (action, ...args) => {
     midiReducer(a);
     vizReducer(a);
 
-    // Notify listeners (legacy two-arg shape preserved)
-    listeners.forEach((listener) => listener(action, payload, stateMap, { oldBpm, dispatch }));
+    // Notify listeners with the same discriminated Action reducers already switch on.
+    listeners.forEach((listener) => listener(a, stateMap, { oldBpm, dispatch }));
 };
 
 /**

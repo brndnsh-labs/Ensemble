@@ -53,8 +53,7 @@ describe('State Core Manager', () => {
             dispatch(action, payload);
 
             expect(listener).toHaveBeenCalledWith(
-                action,
-                payload,
+                { type: action, payload },
                 expect.any(Object),
                 expect.objectContaining({
                     dispatch: expect.any(Function),

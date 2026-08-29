@@ -212,12 +212,12 @@ async function init() {
             analyzeFormUI(getState().arranger);
         }
 
-        subscribe((action: any, payload: any, stateMap: any, context: any) => {
-            syncWorker(action, payload);
-            handleEffects(action, payload, stateMap, context);
+        subscribe((action, stateMap, context) => {
+            syncWorker(action.type, action.payload);
+            handleEffects(action, stateMap, context);
             // One post-reducer chokepoint covers the button, keyboard shortcut,
             // audition overlay, and practice flows without double-counting stops.
-            trackPlaybackTransition(action, stateMap.playback.isPlaying);
+            trackPlaybackTransition(action.type, stateMap.playback.isPlaying);
         });
 
         // #1000 — pack detection, genre side effects, and the async drum preset
