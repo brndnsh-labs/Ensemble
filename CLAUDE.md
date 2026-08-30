@@ -16,7 +16,7 @@ If any guide drifts from live code/config, prefer live and update the docs.
 
 ## Mandatory Checklist (before any change)
 
-1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code).
+1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-owned field (`public/songbook/state-ownership.ts`) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
 2. **UI updates** belong in `public/components/`. Use Preact functional components and `useEnsembleState()` for reactivity.
 3. **Tests:** `npm test` (unit/integration) AND `npm run test:e2e` (Playwright) before concluding.
 4. **Refactors:** grep the whole repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
@@ -79,6 +79,7 @@ Orchestration entrypoint. Hydrates persisted/URL state **before** mounting the P
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - `useEnsembleState()` in `public/ui-bridge.ts` — reading a property inside the selector establishes reactivity.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
+- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`, which governs persistence) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field (e.g. `playback.conductorVelocity`, `soloist.tradeSilenced`) and is composed at the read site. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 #### `@direct-mutation` policy
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:

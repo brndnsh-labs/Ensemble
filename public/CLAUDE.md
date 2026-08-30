@@ -11,6 +11,14 @@ plumbing dispatches like any other consumer. For the worker's
 message *schema*, see `docs/guides/WORKER_CONTRACT.md`; for the generative engines
 themselves, see `public/engine/CLAUDE.md`. This file is the traps that don't fit either.
 
+**Write ownership:** `songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` classifies every
+top-level field as `document`/`preferences`/`runtime-derived` for persistence — and, per
+`docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
+`preferences` field is written only by UI dispatch or hydration, never by a runtime system
+(conductor, trade block, worker). See that doc's precedent list (`conductorVelocity`,
+`tradeSilenced`, `isInstrumentActiveAtStep`) before adding a new dispatch site that touches an
+existing document field from an engine/conductor path.
+
 ## Worker sync
 
 1. **A `syncWorker(ACTION, payload)` call is only real if `ACTION` has a `case` in the
