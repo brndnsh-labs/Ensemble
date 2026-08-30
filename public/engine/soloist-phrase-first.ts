@@ -1434,10 +1434,15 @@ export function getSoloistNotePhraseFirst(
     phr.isResting = false; // @worker-mutation
     // #1005/#1025: the soloist joins the single band-wide pocket — the same per-genre
     // band lean (getBandPocket) every other melodic lane (bass/comp/harmony) sums, so
-    // the lead locks to the rhythm section instead of floating on its own
-    // straightened-swing time (see docs/design/timing-model.md, tier 2). It layers on
-    // top of any seed-authored per-note micro-offset (primary.timingOffset).
-    // #1064: the current section's label keys the energy modulation of the lean.
+    // the lead locks to the rhythm section (see docs/design/timing-model.md, tier 2).
+    // It layers on top of any seed-authored per-note micro-offset
+    // (primary.timingOffset). #1064: the current section's label keys the energy
+    // modulation of the lean. #1066: the BASE onset this offset is added to
+    // (`scheduleGlobalEvent`'s `swungTime` in `scheduler-core.ts`) used to be pulled
+    // back toward the unswung grid by a `straightness` blend (as high as 0.75 for
+    // Bossa, 0.65 default — Jazz wasn't even a named case), so the lead floated ahead
+    // of the ride instead of locking with it; that blend is gone and the soloist now
+    // takes the same swung grid time as every other lane, this pocket on top.
     const bandPocket = getBandPocket(state.groove?.genreFeel, currentChord?.sectionLabel ?? null);
     const lead = {
         midi,
