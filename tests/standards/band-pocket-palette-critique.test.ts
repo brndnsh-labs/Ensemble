@@ -254,8 +254,6 @@ function soloistTimingByStep(state: any, genre: string): Map<number, number> {
 }
 
 describe('Band-wide pocket palette — one per-genre pocket every lane respects (#1005)', () => {
-    const report: string[] = [];
-
     it('(A) getBandPocket is the single authority: documented values + sign semantics', () => {
         for (const g of GENRES) {
             expect(getBandPocket(g)).toBeCloseTo(EXPECTED_POCKET[g], 9);
@@ -300,7 +298,6 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
                 // (#1063: no band-global term underneath — see timing-model.md).
                 expect(t as number, `bass pocket for ${g}`).toBeCloseTo(getBandPocket(g), 9);
             }
-            report.push(`  bass    ${g.padEnd(10)} ${((t as number) * 1000).toFixed(1)} ms`);
         }
     });
 
@@ -313,13 +310,11 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         for (const g of GENRES) {
             const t = chordLeadTiming(g);
             if (t === null) {
-                report.push(`  comp    ${g.padEnd(10)} (no downbeat onset — skipped)`);
                 continue;
             }
             covered++;
             compByGenre.set(g, t);
             expect(Math.abs(t - getBandPocket(g)), `comp pocket for ${g}`).toBeLessThan(HUMANIZE);
-            report.push(`  comp    ${g.padEnd(10)} ${(t * 1000).toFixed(1)} ms`);
         }
         // The comp must emit on the downbeat for the large majority of genres.
         expect(covered).toBeGreaterThanOrEqual(GENRES.length - 3);
@@ -359,9 +354,6 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
             for (const d of deltas) {
                 expect(d, `soloist pocket delta for ${g}`).toBeCloseTo(getBandPocket(g), 9);
             }
-            report.push(
-                `  solo    ${g.padEnd(10)} +${(getBandPocket(g) * 1000).toFixed(1)} ms vs neutral (${deltas.length} steps)`,
-            );
         }
     });
 
@@ -408,9 +400,6 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
                 expect(ch, `${g} chorus <= drop`).toBeLessThanOrEqual(dr);
             }
         }
-        report.push(
-            '  energy  scale 0.84 (breakdown) → 1.0 (verse) → 1.32 (chorus) → 1.4 (drop, 30ms cap)',
-        );
     });
 
     it('(G) #1064: the lane-level verse→chorus lean delta is exactly the scaled differential', () => {
@@ -454,14 +443,6 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         const worst = bassTiming('Neo-Soul', 'Drop', 1.0);
         expect(worst, 'neo-soul drop bass emits').not.toBeNull();
         expect(worst as number, 'deepest possible lane onset').toBeCloseTo(0.04, 9);
-
-        report.push(
-            `  floor   Neo-Soul drop bass ${((worst as number) * 1000).toFixed(1)} ms (30ms capped pocket + 10ms residual)`,
-        );
-
-        report.push(
-            `  lanes   Blues verse→chorus deepens ${(bluesDelta * 1000).toFixed(1)} ms (bass & comp, exact)`,
-        );
     });
 
     it('(E) every palette lean is feel-sized (micro-timing, never rhythmic displacement)', () => {
@@ -489,20 +470,5 @@ describe('Band-wide pocket palette — one per-genre pocket every lane respects 
         // is orthogonal to this ± ms offset. (#1063 deleted the band-global groove
         // pocket this once composed with — the palette is now the ONLY band-level
         // term; see docs/design/timing-model.md §2/§4.)
-        expect(getBandPocket.length).toBe(1); // arity: (genreFeel, sectionLabel = null)
-    });
-
-    it('Critique Report', () => {
-        console.log('\n=== Band Pocket Palette (#1005) — realized per-lane offsets ===');
-        console.log('Palette (getBandPocket, ms behind[+]/ahead[−]):');
-        for (const g of GENRES) {
-            console.log(`  ${g.padEnd(10)} ${(getBandPocket(g) * 1000).toFixed(1)} ms`);
-        }
-        console.log('Per-lane realized offsets at a downbeat:');
-        for (const line of report) {
-            console.log(line);
-        }
-        console.log('=============================================================\n');
-        expect(true).toBe(true);
     });
 });

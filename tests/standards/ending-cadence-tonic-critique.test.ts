@@ -101,24 +101,6 @@ const CASES: Array<[string, string, boolean, string, number, string | null]> = [
 ];
 
 describe('Ending-cadence tonic critique (#830)', () => {
-    it('prints the per-preset Critique Report', () => {
-        const rows = CASES.map(([name, key, isMin, genre, ,]) => {
-            const r = resolveLanding(name, key, isMin, genre);
-            const pcName = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-            const mode = r.pickupInterval === 3 ? 'min' : r.pickupInterval === 4 ? 'maj' : '—';
-            return `  ${name.padEnd(16)} bass=${pcName[r.bassPC].padEnd(2)} solo=${pcName[r.soloPC].padEnd(2)} mode=${mode}`;
-        });
-        console.log(
-            [
-                '\n===== [#830] Ending-cadence Critique Report =====',
-                ...rows,
-                '  --- targets: Autumn Leaves→A/min (the fix) · Blues→C · All Blues→G · Plagal/Pop/AltLoop→C · Metal/Andalusian→C/min ---',
-                '================================================\n',
-            ].join('\n'),
-        );
-        expect(true).toBe(true);
-    });
-
     it.each(CASES)(
         '%s (key %s) lands on the true tonal center',
         (name, key, isMin, genre, expectedPC, expectedMode) => {

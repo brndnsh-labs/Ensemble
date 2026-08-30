@@ -85,7 +85,6 @@ function simulate(genreFeel: string) {
     return { notes, bars };
 }
 
-// The 13-genre canon (CLAUDE.md). Phantom routing keys Minimal/Shred dropped.
 const GENRES = [
     'Rock',
     'Jazz',
