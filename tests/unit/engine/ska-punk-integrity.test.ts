@@ -5,10 +5,6 @@ import { getAccompanimentNotes } from '../../../public/engine/accompaniment.js';
 import { getBassNote, isBassActive } from '../../../public/engine/bass-engine.js';
 import { applyGrooveOverrides } from '../../../public/engine/groove-engine.js';
 import { getHarmonyNotes } from '../../../public/engine/harmonies.js';
-// THE live soloist engine (epic #10 — legacy getSoloistNote retired). The ska
-// soloist checks below are no-crash / co-activity smokes; the genre's real soloist
-// idiom is guarded by tests/standards/ska-punk-soloist-critique + shared-hook.
-import { getSoloistNotePhraseFirst as getSoloistNote } from '../../../public/engine/soloist-phrase-first.js';
 import { getState } from '../../../public/state.js';
 import { getStepInfo } from '../../../public/utils.js';
 
@@ -95,13 +91,6 @@ describe('Ska-Punk Genre Integrity', () => {
         expect(result.velocity).toBeGreaterThan(1.0);
     });
 
-    it('map Ska-Punk to ska soloist style', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
-        // Just verify it doesn't crash and returns something or null
-        const note = getSoloistNote(getState(), chord, null, 0, null, 5, 'smart', 0);
-        expect(note).toBeDefined();
-    });
-
     it('handle high tempos (195 BPM) without logic failure', () => {
         playback.bpm = 195;
         const chord = {
@@ -121,25 +110,6 @@ describe('Ska-Punk Genre Integrity', () => {
         if (accNotes.length > 0 && accNotes[0].midi > 0) {
             expect(accNotes[0].durationSteps).toBeLessThanOrEqual(1.0); // Staccato
         }
-    });
-
-    it('NOT strictly alternate activity between Soloist and Harmony (Antiphony removed)', () => {
-        const chord = { rootMidi: 60, intervals: [0, 4, 7], beats: 4 };
-        playback.bandIntensity = 0.5; // Medium intensity where antiphony used to happen
-
-        // Measure 0 (Step 0)
-        const soloistM0 = getSoloistNote(getState(), chord, null, 0, null, 5, 'ska', 0);
-        const _harmM0 = getHarmonyNotes(getState(), chord, null, 0, 0, 'horns', 0);
-
-        // Previous behavior forced soloistM0 to be null here.
-        // We just ensure it doesn't crash and we aren't enforcing a strict null check.
-        expect(soloistM0 !== undefined).toBe(true);
-
-        // Measure 1 (Step 16)
-        const soloistM1 = getSoloistNote(getState(), chord, null, 16, null, 5, 'ska', 0);
-        const _harmonyM1 = getHarmonyNotes(getState(), chord, null, 16, 0, 'horns', 0);
-
-        expect(soloistM1 !== undefined).toBe(true);
     });
 
     it('should reinforce soloist hooks in harmony section', () => {
