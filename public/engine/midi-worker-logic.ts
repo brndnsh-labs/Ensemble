@@ -15,6 +15,16 @@ import {
 } from './coordination-engine.js';
 import { resetHiddenGenerationMemory } from './generation-run.js';
 import { calculateStepDuration } from './groove-engine.js';
+import { stringHash31 } from './hash-utils.js';
+import {
+    HUMANIZE_PROFILES,
+    type HumanizeProfile,
+    humanizeColor,
+    humanizePlacement,
+    humanizeScale,
+    humanizeSeed,
+    placementWeight,
+} from './humanize.js';
 import { DRUM_MAP } from './midi-constants.js';
 import {
     entryBendToPitchWheel,
@@ -34,6 +44,20 @@ import { getChordAtStep } from './worker-utils.js';
 
 const MIDI_EXTENSION_PATTERN = /\.midi?$/i;
 const PPQ = 480;
+
+/**
+ * #1068 — `_writeNotesToTrack`'s `moduleName` → humanize profile. Null-prototype
+ * because the lane name is a plain string key into a lookup table (CLAUDE.md's
+ * `TABLE[untrusted]` rule) and because the export's `'harmony'` does not match
+ * the profile table's `'harmonies'` — the mapping has to be explicit rather than
+ * an index that silently returns `undefined` for one lane out of four.
+ */
+const EXPORT_LANE_PROFILES: Record<string, HumanizeProfile> = Object.assign(Object.create(null), {
+    soloist: HUMANIZE_PROFILES.soloist,
+    bass: HUMANIZE_PROFILES.bass,
+    chords: HUMANIZE_PROFILES.chords,
+    harmony: HUMANIZE_PROFILES.harmonies,
+});
 
 /**
  * Resolves a drum hit's GM note for `.mid` export: `soundName` first, falling
@@ -417,14 +441,39 @@ export class ExportProcessor {
         moduleName: string,
         coordination: CoordinationContext,
         globalStep: number,
+        stepInfo?: StepInfo,
     ): void {
         const polyphonyComp = 1 / Math.sqrt(Math.max(1, notes.length));
         const midiState = this.state.midi;
-        const humanizeFactor = (this.state.groove.humanize || 0) / 100;
+        // #1068 — the same seeded humanization live playback applies, so a `.mid`
+        // is a truthful transcription of what the band plays rather than a
+        // separately-randomized take. Two renders of one chart at one knob value
+        // are now byte-identical (the old velocity jitter here was raw
+        // `Math.random()`, so they never were).
+        const humanizeAmt = humanizeScale(this.state.groove.humanize);
+        const barStep = stepInfo?.mStep ?? globalStep % Math.max(1, this.stepsPerMeasure);
+        const posWeight = placementWeight(stepInfo);
+        const profile = EXPORT_LANE_PROFILES[moduleName] ?? HUMANIZE_PROFILES.chords;
+        // Harmony humanizes ITSELF, entirely, inside `finalizeHarmonyNotes` —
+        // both its placement (baked into `res.timingOffset`) and its velocity
+        // (baked into `res.velocity`). It is the one lane that does, which is why
+        // it is also the one lane whose humanization reaches the `.mid` by that
+        // route. Applying either term again here would double it, and the live
+        // scheduler likewise hands harmony the grid time and its raw velocity.
+        const laneOwnsItsHumanize = moduleName === 'harmony';
+        const laneScale = laneOwnsItsHumanize ? 0 : humanizeAmt;
+        const lanePlacement = humanizePlacement(
+            barStep,
+            moduleName,
+            0,
+            profile.timeSpread,
+            laneScale,
+            posWeight,
+        );
 
-        notes.forEach((res) => {
+        notes.forEach((res, voiceIndex) => {
             if (res.midi && res.midi > 0 && !isSilentSentinel(res.muted)) {
-                const noteTimeS = stepTimeS + (res.timingOffset || 0);
+                const noteTimeS = stepTimeS + (res.timingOffset || 0) + lanePlacement;
                 const notePulse = Math.max(0, this.toPulses(noteTimeS));
 
                 let octaveShift = 0;
@@ -530,11 +579,14 @@ export class ExportProcessor {
                     finalVel *= muteGain(res.muted);
                 }
 
-                // Apply global humanization to velocity
-                if (humanizeFactor > 0) {
-                    const velJitter = 1.0 + (Math.random() - 0.5) * (humanizeFactor * 0.2);
-                    finalVel *= velJitter;
-                }
+                // Apply global humanization to velocity — seeded on
+                // `(globalStep, lane, voice)`, so it varies bar to bar (dynamics
+                // do) while being perfectly reproducible across exports.
+                finalVel *= humanizeColor(
+                    humanizeSeed(globalStep, moduleName, voiceIndex),
+                    profile,
+                    laneScale,
+                ).velocityMult;
 
                 const midiVel = normalizeMidiVelocity(finalVel);
 
@@ -736,6 +788,7 @@ export class ExportProcessor {
                 'soloist',
                 tickResult.coordination,
                 globalStep,
+                stepInfo,
             );
         }
 
@@ -749,6 +802,7 @@ export class ExportProcessor {
                 'bass',
                 tickResult.coordination,
                 globalStep,
+                stepInfo,
             );
         }
 
@@ -762,6 +816,7 @@ export class ExportProcessor {
                 'chords',
                 tickResult.coordination,
                 globalStep,
+                stepInfo,
             );
         }
 
@@ -775,6 +830,7 @@ export class ExportProcessor {
                 'harmony',
                 tickResult.coordination,
                 globalStep,
+                stepInfo,
             );
         }
 
@@ -782,6 +838,13 @@ export class ExportProcessor {
             // #1063: drums export exactly on the grid, matching the realtime
             // scheduler (playback/export parity) — see docs/design/timing-model.md.
             const drumTimeS = stepTimeS;
+            // #1068: per-piece seeded placement/colour, the same draws
+            // `scheduleDrums` makes live, so the exported kit is the kit you
+            // heard. Bar-independent placement + position weight; exactly 0 at
+            // `humanize: 0`.
+            const drumHumanizeAmt = humanizeScale(groove.humanize);
+            const drumBarStep = stepInfo.mStep;
+            const drumPosWeight = placementWeight(stepInfo);
 
             const nextStepTimeS = this.stepTimes[globalStep + 1] || stepTimeS + this.sixteenthSec;
             const tightDurationS = (nextStepTimeS - stepTimeS) * 0.75;
@@ -807,7 +870,18 @@ export class ExportProcessor {
                 if (midi) {
                     const durS =
                         name === 'Open' || name === 'Crash' ? this.secondsPerBeat : tightDurationS;
-                    const finalTimeS = drumTimeS + hit.instTimeOffset;
+                    const pieceIndex = stringHash31(name);
+                    const finalTimeS =
+                        drumTimeS +
+                        hit.instTimeOffset +
+                        humanizePlacement(
+                            drumBarStep,
+                            'drums',
+                            pieceIndex,
+                            HUMANIZE_PROFILES.drums.timeSpread,
+                            drumHumanizeAmt,
+                            drumPosWeight,
+                        );
 
                     // Match live engine velocity scaling multipliers
                     let volMultiplier = 1.0;
@@ -842,7 +916,14 @@ export class ExportProcessor {
                         volMultiplier = 0.5;
                     }
 
-                    const scaledVelocity = hit.velocity * volMultiplier;
+                    const scaledVelocity =
+                        hit.velocity *
+                        volMultiplier *
+                        humanizeColor(
+                            humanizeSeed(globalStep, 'drums', pieceIndex),
+                            HUMANIZE_PROFILES.drums,
+                            drumHumanizeAmt,
+                        ).velocityMult;
                     const midiVel = normalizeMidiVelocity(scaledVelocity);
 
                     this.drumTrack.noteOn(

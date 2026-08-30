@@ -1689,7 +1689,7 @@ function setupNewCymbalHit(
  * `partialDecay` does the choking, exactly as the discovery report prescribed.
  *
  * Per `epic-4-drums.md`, the `new` drum voice does NOT carry `playDrumSoundCurrent`'s
- * un-seeded `Math.random()` `velJitter`: the scheduler's seeded `humanizeNote`
+ * un-seeded `Math.random()` `velJitter`: the scheduler's seeded `humanizeColor`
  * (Epic 0 S6) already humanizes the incoming velocity, and dropping the second,
  * un-seeded layer keeps the `new` voice reproducible.
  */
@@ -1813,7 +1813,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
  * The decay curve is steep (`openness²`) on purpose: a linear map bunches the
  * quarter/half hats together near the long-decay end and they stop reading as
  * distinct articulations. Like the closed hat this carries no `velJitter` —
- * the scheduler's seeded `humanizeNote` already humanized `velocity`.
+ * the scheduler's seeded `humanizeColor` already humanized `velocity`.
  *
  * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
  * to retune them at the listening gate.
@@ -1998,7 +1998,7 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
  * the Epic 4 S4 variation pool — the first `new` ride voice can finally honor
  * S4's "fast ride patterns" clause), same bandpass/highpass chain, same gain
  * envelope and `lastRideGain` choke. Per the epic note the `new` drum voice
- * carries no un-seeded `velJitter` — the scheduler's seeded `humanizeNote`
+ * carries no un-seeded `velJitter` — the scheduler's seeded `humanizeColor`
  * already humanized `velocity`.
  *
  * NOTE: `pingScale`'s curve constants are by-ear starting points; expect to
@@ -2097,11 +2097,18 @@ function playDrumSoundCurrent(
 
     // Add a tiny 2ms buffer to ensure scheduling always happens slightly in the future
     const playTime = Math.max(time, now + 0.002);
-    const humanizeFactor = (groove.humanize || 0) / 100;
-    const velJitter = 1.0 + (Math.random() - 0.5) * (humanizeFactor * 0.4);
 
+    // #1068: the un-seeded `velJitter = 1 + (Math.random() - 0.5) * humanize * 0.4`
+    // that used to sit here is gone. It was the largest humanize term in the
+    // engine (±20% at knob 100 — 2.5× the seeded scheduler path that three
+    // separate comments in this file already claimed had replaced it), it made
+    // every drum hit irreproducible, and it survived `humanize: 0` only by
+    // accident of multiplying to zero. Velocity humanization for the kit is now
+    // seeded and lives in exactly two places: `humanizeVelocity` in
+    // `groove-engine.ts` (baked into the note, so it reaches the `.mid` export
+    // too) and `humanizeColor` in `scheduleDrums` (`scheduler-core.ts`).
     // Apply the density ducking factor to the master drum volume
-    const masterVol = velocity * 1.3 * velJitter * densityDuck;
+    const masterVol = velocity * 1.3 * densityDuck;
 
     // --- Mix Separation: Stereo Panning ---
     let panValue = 0;

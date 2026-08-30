@@ -2,14 +2,12 @@ import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
+import { HUMANIZE_PROFILES, humanizePlacement, humanizeScale } from './humanize.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
 import {
     createSimplePanner,
-    HUMANIZE_PROFILES,
-    humanizeNote,
-    humanizeSeed,
     playPercussiveStrike,
     playResonantTone,
     rampGain,
@@ -259,7 +257,33 @@ export function playNote(...args: Parameters<typeof playNoteCurrent>): ChordVoic
 // `freq` is assumed finite here — `playNoteCurrent` is the guarding layer,
 // and the scheduler's `.filter(n => n.freq)` keeps non-finite notes out.
 const CHORD_STRUM_STEP = 0.004; // seconds of roll per chord-voice index
-const CHORD_STRUM_JITTER = 0.15; // humanize scale — keeps jitter well under one step
+// Fraction of the chords lane's timing spread the strum jitter may use. Kept
+// small so the roll stays a roll — the jitter shapes it, never reorders it.
+const CHORD_STRUM_JITTER = 0.15;
+
+/**
+ * #1068 — the per-voice wobble on a chord roll, seeded and knob-gated.
+ *
+ * Was `Math.random()` in `playNoteCurrent` and an un-gated fixed-scale
+ * `humanizeNote` in `playNoteNew` (a constant 0.15 that ignored `groove.humanize`
+ * entirely, so a chart with the knob at 0 still got ±2.4 ms of strum jitter).
+ * Now: deterministic in `(index, freq)` — the same voice of the same voicing
+ * rolls the same way every time — and exactly 0 when the knob is off.
+ *
+ * The DETERMINISTIC part of the roll (`index * CHORD_STRUM_STEP`) is not
+ * humanization and deliberately survives `humanize: 0`: it is the strum
+ * articulation itself, and it only ever applies to a strummed voice
+ * (`isStrummedChordVoice` — a keyboard is handed `index: 0` for every note).
+ */
+function chordStrumJitter(index: number, freq: number, humanize: number | undefined): number {
+    return humanizePlacement(
+        index,
+        'chords-strum',
+        Math.round(freq),
+        HUMANIZE_PROFILES.chords.timeSpread * CHORD_STRUM_JITTER,
+        humanizeScale(humanize),
+    );
+}
 
 function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
@@ -284,9 +308,7 @@ function playNoteNew(...args: Parameters<typeof playNoteCurrent>): ChordVoiceHan
     // lands exactly on each note's onset, including the index-0 anchor.
     let strum = 0;
     if (index > 0) {
-        const seed = humanizeSeed(index, 'chords', Math.round(freq));
-        const { timeOffset } = humanizeNote(seed, HUMANIZE_PROFILES.chords, CHORD_STRUM_JITTER);
-        strum = index * CHORD_STRUM_STEP + timeOffset;
+        strum = index * CHORD_STRUM_STEP + chordStrumJitter(index, freq, groove?.humanize);
     }
     const startTime = Math.max(time + strum, playback.audio.currentTime);
 
@@ -624,7 +646,14 @@ function playNoteCurrent(
         }
 
         const staggerMult = muted ? 0.4 : 1.0;
-        const stagger = index * (0.005 + Math.random() * 0.01) * staggerMult;
+        // #1068: was `index * (0.005 + Math.random() * 0.01)` — unseeded AND
+        // not gated by the humanize knob. Same split as `playNoteNew`: a
+        // deterministic 5 ms/voice roll (the strum articulation, and `index` is
+        // 0 for every keyboard voicing so this is inert unless a strummed voice
+        // is selected) plus a seeded, knob-gated wobble that is exactly 0 at
+        // `humanize: 0`.
+        const stagger =
+            (index * 0.005 + chordStrumJitter(index, freq, groove?.humanize)) * staggerMult;
         const startTime = baseTime + stagger;
 
         const intensity = playback.bandIntensity;
