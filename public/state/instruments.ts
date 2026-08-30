@@ -69,7 +69,6 @@ export const soloist = deepSignal<SoloistState>({
     octave: 72,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
-    complexity: 0.5,
     phrasingIntensity: 0.5,
     tradeMode: 'manual',
     // #1062 — runtime-derived trade-silencing layer; see the SoloistState
@@ -184,7 +183,6 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
     octave: { kind: 'config', key: 'octave' },
     volume: { kind: 'config', key: 'volume' },
     reverb: { kind: 'config', key: 'reverb' },
-    complexity: { kind: 'config', key: 'complexity' },
     phrasingIntensity: { kind: 'config', key: 'phrasingIntensity' },
     tradeMode: { kind: 'config', key: 'tradeMode' },
     tradeSilenced: { kind: 'config', key: 'tradeSilenced' },
@@ -239,13 +237,16 @@ const SOLOIST_FIELD_ROUTES: Record<string, SoloistFieldRoute> = {
 };
 
 /**
- * Soloist payload keys that were removed in #866 after the legacy engine's
- * retirement (epic #10). Old persisted sessions / share-URLs may still carry
+ * Soloist payload keys that were removed after the field behind them went away:
+ * `motifTracking` / `pinnedProfile` in #866 (the legacy engine's retirement, epic
+ * #10), and `complexity` in #1070 (dead since #1167 rewired the slider to
+ * `phrasingIntensity` — zero writers, zero readers, absent from
+ * `buildSoloistSyncPayload`). Old persisted sessions / share-URLs may still carry
  * them; we drop them on load rather than letting the unknown-key fall-through
  * resurrect them as stray top-level fields. Compat shim — keep entries here so
  * stale payloads load cleanly.
  */
-const DEPRECATED_SOLOIST_KEYS = new Set(['motifTracking', 'pinnedProfile']);
+const DEPRECATED_SOLOIST_KEYS = new Set(['motifTracking', 'pinnedProfile', 'complexity']);
 
 /**
  * Apply a flat-keyed soloist payload to the nested state shape. Unknown keys
@@ -373,7 +374,6 @@ export function instrumentReducer(action: Action): boolean {
             // just set back to 'monophonic' would stay manually pinned instead of
             // re-deriving from the voice on the next fresh session.
             s.autoMode = true;
-            s.complexity = 0.5;
             s.tradeMode = 'manual';
             // #1062 — runtime-derived; a fresh session starts unsilenced.
             s.tradeSilenced = false;

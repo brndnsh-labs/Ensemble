@@ -11,7 +11,7 @@ test.describe('UI polish consistency @ui', () => {
     });
 
     test('genre picker is a labeled toggle group, not an invalid list (#812)', async ({ page }) => {
-        await page.getByRole('button', { name: 'Choose genre' }).click();
+        await page.getByRole('button', { name: 'Band settings' }).click();
 
         // The grid is a single-select toggle group (aria-pressed buttons), so it
         // must be role="group" with a label — never role="list" (whose required

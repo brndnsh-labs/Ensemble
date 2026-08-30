@@ -83,11 +83,32 @@ test.describe('Instrument settings — desktop @ui', () => {
         }
     });
 
-    test('Drum settings popover exposes swing and swing-base', async ({ page }) => {
-        const surface = await openInstrumentSettings(page, 'Drums');
+    // #1070 — Swing (grid geometry) and Humanize (scheduler-wide) are band
+    // controls, so they live in the rail's band-settings surface, one tap away
+    // and NOT behind any instrument's gear.
+    test('band settings surface exposes swing, swing-base and humanize', async ({ page }) => {
+        await page.getByRole('button', { name: 'Band settings' }).click();
+        const surface = page.locator('.workspace-studio-surface--band-feel.is-open');
+        await expect(surface).toBeVisible();
 
         await expect(surface.locator('#swingSlider')).toBeVisible();
         await expect(surface.locator('#swingBaseSelect')).toBeVisible();
+        await expect(surface.locator('#humanizeSlider')).toBeVisible();
+
+        await expectWithinViewport(page, surface);
+    });
+
+    test('band settings surface exposes the harmonic-color choice', async ({ page }) => {
+        await page.getByRole('button', { name: 'Band settings' }).click();
+        const surface = page.locator('.workspace-studio-surface--band-feel.is-open');
+        await expect(surface.locator('#harmonyColorSelect')).toBeVisible();
+    });
+
+    test('Drum settings popover no longer hosts the band-wide swing controls', async ({ page }) => {
+        const surface = await openInstrumentSettings(page, 'Drums');
+
+        await expect(surface.locator('#swingSlider')).toHaveCount(0);
+        await expect(surface.locator('#humanizeSlider')).toHaveCount(0);
 
         await expectWithinViewport(page, surface);
     });
@@ -98,16 +119,18 @@ test.describe('Instrument settings — desktop @ui', () => {
         await expectWithinViewport(page, surface);
     });
 
-    test('Harmony settings popover exposes complexity slider', async ({ page }) => {
+    test('Harmony settings popover no longer hosts a per-lane complexity dial', async ({
+        page,
+    }) => {
         const surface = await openInstrumentSettings(page, 'Harmony');
-        await expect(surface.locator('#harmonyComplexity')).toBeVisible();
+        await expect(surface.locator('#harmonyComplexity')).toHaveCount(0);
         await expectWithinViewport(page, surface);
     });
 
-    test('Soloist settings popover exposes complexity and trading controls', async ({ page }) => {
+    test('Soloist settings popover exposes phrasing and trading controls', async ({ page }) => {
         const surface = await openInstrumentSettings(page, 'Soloist');
 
-        await expect(surface.locator('#soloistComplexity')).toBeVisible();
+        await expect(surface.locator('#soloistPhrasingIntensity')).toBeVisible();
         const soloistCard = surface.locator('.workspace-studio-surface-card--soloist');
         await expect(soloistCard).toBeVisible();
         await expect(soloistCard.getByText('Trading')).toBeVisible();

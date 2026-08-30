@@ -75,10 +75,11 @@ export function saveCurrentState(): void {
             reverb: soloist.reverb,
             mode: soloist.mode,
             autoMode: soloist.autoMode,
-            // #1167 — the "Complexity" slider writes this. Before #1167 it wrote
-            // the inert `soloist.complexity`, so nothing user-visible was lost by
-            // omitting it here. Now the control is live, and leaving it unsaved
-            // would silently discard the setting on reload.
+            // #1167 — the soloist's "Phrasing Intensity" slider writes this.
+            // Before #1167 it wrote the inert `soloist.complexity` (deleted in
+            // #1070), so nothing user-visible was lost by omitting it here. Now
+            // the control is live, and leaving it unsaved would silently discard
+            // the setting on reload.
             phrasingIntensity: soloist.phrasingIntensity,
         },
         harmony: {

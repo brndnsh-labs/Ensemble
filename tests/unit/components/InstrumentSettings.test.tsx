@@ -106,8 +106,14 @@ describe('InstrumentSettings Component', () => {
         expect(reverbSlider.getAttribute('aria-valuetext')).toBe('20%');
     });
 
-    it('should render Swing and Humanize sliders for groove module', () => {
-        // Mock state for groove
+    // --- #1070 regression -----------------------------------------------------
+    //
+    // Swing (grid geometry, read by every lane via calculateStepDuration) and
+    // Humanize (read by the scheduler for all lanes and by the MIDI export) are
+    // band-wide, so they moved out of the Drums gear and into the rail's
+    // band-settings surface (see InstrumentRail.test.tsx for their new home).
+    // The Drums panel must not resurrect them.
+    it('does not render band-wide Swing/Humanize in the Drums instrument panel', () => {
         mockUseEnsembleState.mockImplementation((cb) => {
             const fullState = {
                 groove: {
@@ -116,9 +122,8 @@ describe('InstrumentSettings Component', () => {
                     humanize: 40,
                     swing: 30,
                     swingSub: '8th',
+                    lastSmartGenre: 'Jazz',
                 },
-                // GrooveControls reads arranger.timeSignature (#1065) to gate the
-                // Swing control disabled in 6/8 and 12/8.
                 arranger: { timeSignature: '4/4' },
                 playback: {},
             };
@@ -129,41 +134,52 @@ describe('InstrumentSettings Component', () => {
             render(<InstrumentSpecificSettings module="groove" />, container);
         });
 
-        const swingSlider = container.querySelector('#swingSlider');
-        const humanizeSlider = container.querySelector('#humanizeSlider');
+        expect(container.querySelector('#swingSlider')).toBeNull();
+        expect(container.querySelector('#swingBaseSelect')).toBeNull();
+        expect(container.querySelector('#humanizeSlider')).toBeNull();
+    });
 
-        expect(swingSlider).not.toBeNull();
-        expect(humanizeSlider).not.toBeNull();
-        expect(swingSlider.value).toBe('30');
-        expect(humanizeSlider.value).toBe('40');
+    // #1070 — the per-lane Harmony "Complexity" dial is gone. Its only two
+    // consumers are `< 0.4` branches in harmonies.ts, so it is now the band-level
+    // two-state "Harmonic color" control in the rail.
+    it('does not render a per-lane Harmony complexity dial', () => {
+        mockUseEnsembleState.mockImplementation((cb) =>
+            cb({
+                harmony: {
+                    volume: 0.8,
+                    reverb: 0.2,
+                    complexity: 0.5,
+                    voice: 'synth',
+                    autoSound: true,
+                },
+                groove: { lastSmartGenre: 'Jazz' },
+                playback: {},
+            }),
+        );
 
-        // Verify value display is present
-        const spans = container.querySelectorAll('span');
-        const spanTexts = Array.from(spans).map((s) => s.textContent);
+        act(() => {
+            render(<InstrumentSpecificSettings module="harmony" />, container);
+        });
 
-        expect(spanTexts).toContain('30%');
-        expect(spanTexts).toContain('40%');
-
-        // Verify accessibility attributes
-        expect(swingSlider.hasAttribute('aria-valuetext')).toBe(true);
-        expect(swingSlider.getAttribute('aria-valuetext')).toBe('30%');
-
-        expect(humanizeSlider.hasAttribute('aria-valuetext')).toBe(true);
-        expect(humanizeSlider.getAttribute('aria-valuetext')).toBe('40%');
+        expect(container.querySelector('#harmonyComplexity')).toBeNull();
+        expect(container.textContent).not.toContain('Complexity');
     });
 
     // --- #1167 regression -----------------------------------------------------
     //
-    // The soloist "Complexity" slider used to dispatch SET_PARAM `complexity`, but
-    // `soloist.complexity` is absent from `buildSoloistSyncPayload` and read by no
+    // The soloist slider used to dispatch SET_PARAM `complexity`, but
+    // `soloist.complexity` was absent from `buildSoloistSyncPayload` and read by no
     // engine — the control was inert. It now writes `phrasingIntensity`, which IS
     // synced to the worker and drives `intensityLift` in the phrase-first soloist.
-    it('soloist Complexity slider reads and writes phrasingIntensity, not the dead complexity field', () => {
+    // #1070 renamed the label and the element id to match the field it writes and
+    // deleted `soloist.complexity` from state outright.
+    it('soloist Phrasing Intensity slider reads and writes phrasingIntensity', () => {
         mockUseEnsembleState.mockImplementation((cb) =>
             cb({
                 soloist: {
-                    // Deliberately divergent so a read of the wrong field is visible:
-                    // the slider must show 70%, never 20%.
+                    // A stale `complexity` is deliberately left on the mock (the
+                    // shape an old payload would carry) so a read of the wrong
+                    // field is visible: the slider must show 70%, never 20%.
                     phrasingIntensity: 0.7,
                     complexity: 0.2,
                     mode: 'monophonic',
@@ -184,8 +200,11 @@ describe('InstrumentSettings Component', () => {
             render(<InstrumentSpecificSettings module="soloist" />, container);
         });
 
-        const slider = container.querySelector('#soloistComplexity');
+        const slider = container.querySelector('#soloistPhrasingIntensity');
         expect(slider).not.toBeNull();
+        // #1070 — exactly one control in the UI may be labelled "Complexity"
+        // (Settings' Global Complexity); the soloist's is not it.
+        expect(container.textContent).not.toContain('Complexity');
         expect(slider.value).toBe('0.7');
         expect(slider.getAttribute('aria-valuetext')).toBe('70%');
 
@@ -201,10 +220,10 @@ describe('InstrumentSettings Component', () => {
         expect(call, 'slider should dispatch SET_PARAM soloist.phrasingIntensity').toBeTruthy();
         expect(call[1].value).toBeCloseTo(0.45);
 
-        // ...and must no longer write the inert field.
+        // ...and must no longer write the deleted field.
         const stale = mockDispatch.mock.calls.find(
             ([, payload]) => payload?.module === 'soloist' && payload?.param === 'complexity',
         );
-        expect(stale, 'slider must not write the dead soloist.complexity').toBeUndefined();
+        expect(stale, 'slider must not write the deleted soloist.complexity').toBeUndefined();
     });
 });
