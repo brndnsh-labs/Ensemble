@@ -2,7 +2,7 @@
 name: cycle
 description: Run the full Ensemble story loop on one issue or a chain — composes /implement → /review → /patch → /done (→ optional /deploy-test), interrupting only on a judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle next --until-blocked` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=b43824623f71 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=633435aa8e68 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — full loop on one story or a chain
 
@@ -46,7 +46,7 @@ unattended.
    **Issue:** #<n> — <title>   **Milestone:** <…>
    **Executor:** orchestrator-inline (default — parallel agents only for independent mechanical work, §3)
    **Reviewer:** inline pass<, + /security-review if the diff lands on an always-brake surface (§3)>
-   **Chain:** /implement → /review → /patch (if findings) → /done (PR + Closes #<n> → §6 merge) <→ /deploy-test if --deploy>
+   **Chain:** /implement → /review → [/patch → /review (finding closure)]* → /done (PR + Closes #<n> → §6 merge) <→ /deploy-test if --deploy>
    **Auto-pause points:** judgment call (§5) · gates/CI red · (--until-blocked) blocked-on-Brandon / milestone boundary
    ```
 
@@ -59,7 +59,8 @@ unattended.
    |---|---|---|
    | implement | gates green when **the orchestrator re-runs them itself** (§4) | gates red, agent Blocked, a spawned "green" that doesn't reproduce (§3), **or the diff lands on a §5 always-brake surface** |
    | review | findings all mechanical, no design call | any P0, a finding that needs a design decision, or one that contradicts a memory note (§5) |
-   | patch | gates green | gates red, a fix needs a design call |
+   | patch | gates green → `/review` in finding-closure mode | gates red, a fix needs a design call |
+   | finding closure | every ID fixed or explicitly escalated, no new finding → `/done`; remaining mechanical finding → `/patch` again; scope expansion / new behavior / a new finding → normal full `/review` | any §5 judgment call |
    | done | safe story: §6 server-side merge queued; issue closes when the forge lands it | CI red / conflict / a hook failure that isn't a trivial retry · **judgment-call class → PR left open** (not a failure — stop the chain there and report) |
    | deploy-test | deploy + verify green | deploy non-zero, or the external check fails after retries |
 
@@ -98,7 +99,9 @@ Runaway detectors, not cost throttles:
 
 A cycle isn't done while a real finding from its own review sits unactioned (§5): `/patch` fix-now
 is the default; a fix too big is an *escalation* (a `finding` issue, with Brandon's nod),
-never a silent park. The open `finding` issues must not grow as a cycle side effect (§2).
+never a silent park. After any patch, `/review` must close every finding ID against the latest tree
+before `/done`; a patch report is not its own proof. The open `finding` issues must not grow as a
+cycle side effect (§2).
 
 ## Safety
 

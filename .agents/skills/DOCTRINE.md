@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=c328a19a4985 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=f78f54f24f84 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 Single source of truth for the rules the Ensemble work-loop skills share. A skill that says
@@ -204,6 +204,14 @@ When the work is well-specified, run it. When in doubt about a *decision*, surfa
 = *escalate* to a `finding` issue with Brandon's nod, never a silent defer. An implementer's
 own "out of scope, defer to follow-up" tag does **not** override this — if the deferred item would
 falsify the story's stated `Acceptance:` criterion, it's in scope regardless of the tag.
+
+**A patch needs closure, not self-attestation.** `/review` gives every actionable finding a stable
+in-context ID; `/patch` accounts for each ID as fixed, remaining, or escalated. If `/patch` changes
+the tree, `/done` requires a clean review outcome from *after* that latest patch. `/review` may make
+that a targeted finding-closure pass over the original findings and the direct patch delta. Missing
+original context, scope expansion, behavior beyond the cited findings, or a new finding falls back
+to a normal full review. These IDs and outcomes are conversational evidence, not a persistent
+receipt or a second tracker.
 
 **Plans are status updates, not confirmation gates.** Every pipeline skill presents its plan
 (`## Plan` / `## Cycle plan` / `## Review plan` / `## Patch plan`) before acting — that's for
