@@ -36,20 +36,21 @@ npm run format       # Biome write fixes
 npm run lint:docs    # repo-specific docs validation
 npm run typecheck    # tsc over public/**/*.{ts,tsx}
 npm test             # mutation check + Biome + docs lint + Vitest (node/happy-dom)
+npm run test:vitest  # Vitest only — fast targeted iteration, not the full gate
 npm run test:browser # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
 npm run test:e2e     # run Playwright against a `vite preview` build of the shipped bundle
 npm run validate     # typecheck + knip + jscpd + format + npm test
 npm run depcheck     # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 ```
 
-`npm run depcheck` is the circular-import gate (`biome lint --only=suspicious/noImportCycles`). It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
+`npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`). The same configured rule runs as part of `npm run lint` and therefore `npm test`; CI does not run the focused command a second time. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
 
 Targeted tests:
 
 ```bash
-npm test -- visualizer                              # Vitest filename/name filter
-npm test -- standards/                              # critique-only Vitest files
-npx vitest run tests/standards/funk-bass-critique.test.ts
+npm run test:vitest -- visualizer                   # Vitest filename/name filter
+npm run test:vitest -- standards/                   # critique-only Vitest files
+npm run test:vitest -- tests/standards/funk-bass-critique.test.ts
 npx vitest run tests/unit/engine/worker-client.test.ts -t "specific test name"
 
 npx playwright test tests/e2e/chart-surface.spec.ts

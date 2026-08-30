@@ -62,7 +62,7 @@ This emits an optimized bundle into `dist/`, including the service worker (via `
 npm test            # mutation check + lint + docs lint + Vitest
 npm run test:e2e    # Playwright smoke suite (Desktop + Mobile)
 npm run typecheck   # tsc over public/ and scripts/
-npm run validate    # full pipeline: format + jscpd + typecheck + depcheck + knip + npm test + size-limit
+npm run validate    # full pipeline: format + jscpd + typecheck + knip + npm test + size-limit
 ```
 
 Run `npm run validate` before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
