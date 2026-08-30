@@ -83,6 +83,11 @@ export const STATE_OWNERSHIP_MANIFEST = {
         suspendTimeout: 'runtime-derived',
         currentKey: 'runtime-derived',
         conductorVelocity: 'runtime-derived',
+        // #1064 — runtime-derived mirrors composed at read time with
+        // chords.density/harmony.complexity; never written onto those
+        // document-owned fields directly.
+        conductorDensity: 'runtime-derived',
+        conductorHarmonyComplexity: 'runtime-derived',
         masterVolume: 'preferences',
         countIn: 'preferences',
         visualFlash: 'preferences',

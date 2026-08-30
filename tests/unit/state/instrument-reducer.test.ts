@@ -103,12 +103,16 @@ describe('Instrument Reducer', () => {
         expect(soloist.session.sessionSteps).toBe(0);
     });
 
-    it('should update conductor decisions', () => {
+    it('#1064 — UPDATE_CONDUCTOR_DECISION never writes chords.density', () => {
+        // The conductor's computed density now lands only on the runtime-derived
+        // playback.conductorDensity mirror (see playback-reducer.test.ts); the
+        // instrument reducer must leave the user's own document field alone.
+        chords.density = 'standard';
         instrumentReducer({
             type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
             payload: { density: 'thin' },
         });
-        expect(chords.density).toBe('thin');
+        expect(chords.density).toBe('standard');
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {
@@ -125,6 +129,22 @@ describe('Instrument Reducer', () => {
         expect(harmony.style).toBe('horns');
         instrumentReducer({ type: ACTIONS.UPDATE_SB, payload: { tension: 0.5 } });
         expect(soloist.session.tension).toBe(0.5);
+    });
+
+    it('#1064 — UPDATE_HB never writes harmony.complexity', () => {
+        // The conductor's only historical caller of UPDATE_HB with `complexity`
+        // was applyConductor, which now targets playback.conductorHarmonyComplexity
+        // instead. The reducer itself excludes `complexity` from its generic
+        // key pass-through so a future caller can't silently resurrect the bug
+        // (harmony.complexity is document-owned — persisted, shareable).
+        harmony.complexity = 0.2;
+        instrumentReducer({
+            type: ACTIONS.UPDATE_HB,
+            payload: { complexity: 0.9, style: 'horns' },
+        });
+        expect(harmony.complexity).toBe(0.2);
+        // Sibling keys in the same payload still apply — only `complexity` is excluded.
+        expect(harmony.style).toBe('horns');
     });
 
     it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {

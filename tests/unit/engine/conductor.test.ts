@@ -153,12 +153,17 @@ describe('Conductor Logic', () => {
 
             applyConductor(getState(), dispatch);
 
+            // #1064 — the conductor's harmony-complexity target now rides
+            // UPDATE_CONDUCTOR_DECISION's `harmonyComplexity` field (into the
+            // runtime-derived playback.conductorHarmonyComplexity mirror),
+            // never a separate UPDATE_HB dispatch onto the document field.
             expect(dispatch).toHaveBeenCalledWith(
-                'UPDATE_HB',
+                'UPDATE_CONDUCTOR_DECISION',
                 expect.objectContaining({
-                    complexity: expect.any(Number), // Should be pushed to max(complexity, 0.85)
+                    harmonyComplexity: expect.any(Number), // Should be pushed to max(complexity, 0.85)
                 }),
             );
+            expect(dispatch).not.toHaveBeenCalledWith('UPDATE_HB', expect.anything());
         });
 
         it('does not write the retired bass.pocketOffset mirror param (#1063)', () => {

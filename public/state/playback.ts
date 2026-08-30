@@ -55,6 +55,8 @@ export const playback = deepSignal<GlobalContext>({
     suspendTimeout: null,
     currentKey: null,
     conductorVelocity: 1.0,
+    conductorDensity: null,
+    conductorHarmonyComplexity: null,
     masterVolume: 0.4,
     countIn: true,
     visualFlash: false,
@@ -95,6 +97,8 @@ export function playbackReducer(action: Action): boolean {
             p.sessionTimer = 5;
             p.applyPresetSettings = false;
             p.conductorVelocity = 1.0;
+            p.conductorDensity = null;
+            p.conductorHarmonyComplexity = null;
             p.updateAvailable = false;
             // #1259 — hydrated fields that RESET_STATE used to skip. `masterVolume` is
             // the one with teeth: it is clamped to [0,1], so a persisted `0` survived
@@ -276,6 +280,15 @@ export function playbackReducer(action: Action): boolean {
         case ACTIONS.UPDATE_CONDUCTOR_DECISION:
             if (action.payload.velocity) {
                 p.conductorVelocity = action.payload.velocity;
+            }
+            // #1064 — runtime-derived mirrors of chords.density/harmony.complexity.
+            // Never written onto the document fields themselves; readers compose
+            // them at READ time (`playback.conductorDensity ?? chords.density`).
+            if (action.payload.density !== undefined) {
+                p.conductorDensity = action.payload.density;
+            }
+            if (action.payload.harmonyComplexity !== undefined) {
+                p.conductorHarmonyComplexity = action.payload.harmonyComplexity;
             }
             if (action.payload.intent) {
                 if (action.payload.intent.anticipation !== undefined) {

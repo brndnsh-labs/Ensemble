@@ -292,6 +292,33 @@ describe('Playback Reducer', () => {
         expect(playback.intent.anticipation).toBe(0.8);
     });
 
+    it('#1064 — UPDATE_CONDUCTOR_DECISION writes the runtime-derived density/complexity mirrors', () => {
+        expect(playback.conductorDensity).toBeNull();
+        expect(playback.conductorHarmonyComplexity).toBeNull();
+
+        playbackReducer({
+            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
+            payload: { density: 'rich', harmonyComplexity: 0.9 },
+        });
+
+        expect(playback.conductorDensity).toBe('rich');
+        expect(playback.conductorHarmonyComplexity).toBe(0.9);
+    });
+
+    it('#1064 — RESET_STATE clears the conductor density/complexity mirrors', () => {
+        playbackReducer({
+            type: ACTIONS.UPDATE_CONDUCTOR_DECISION,
+            payload: { density: 'thin', harmonyComplexity: 0.1 },
+        });
+        expect(playback.conductorDensity).toBe('thin');
+        expect(playback.conductorHarmonyComplexity).toBe(0.1);
+
+        playbackReducer({ type: ACTIONS.RESET_STATE, payload: undefined });
+
+        expect(playback.conductorDensity).toBeNull();
+        expect(playback.conductorHarmonyComplexity).toBeNull();
+    });
+
     describe('setPlaybackParam via reducer', () => {
         it('should update ALL supported parameters', () => {
             const allParams = {

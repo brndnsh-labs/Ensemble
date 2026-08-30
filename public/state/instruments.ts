@@ -519,13 +519,18 @@ export function instrumentReducer(action: Action): boolean {
                 h.style = action.payload.harmony;
             }
             return true;
-        case ACTIONS.UPDATE_CONDUCTOR_DECISION:
-            if (isChordDensity(action.payload.density)) {
-                c.density = action.payload.density;
-            }
-            return true;
         case ACTIONS.UPDATE_HB:
+            // #1064 — `complexity` is excluded from this generic pass-through:
+            // it's `document`-owned (persisted, shareable — state-ownership.ts),
+            // and the auto-conductor's runtime-derived equivalent now lives at
+            // `playback.conductorHarmonyComplexity`, composed at READ time by
+            // consumers (harmonies.ts). The only historical caller of UPDATE_HB
+            // with `complexity` was `applyConductor`, which no longer sends it;
+            // this guard keeps a future caller from silently resurrecting the bug.
             for (const key in action.payload) {
+                if (key === 'complexity') {
+                    continue;
+                }
                 if (Object.hasOwn(harmony, key)) {
                     (harmony as Record<string, unknown>)[key] = (
                         action.payload as Record<string, unknown>

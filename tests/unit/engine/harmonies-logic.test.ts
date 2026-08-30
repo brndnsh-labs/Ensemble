@@ -162,6 +162,39 @@ describe('Harmony Engine Logic', () => {
             expect(requested).not.toContain(14);
         });
 
+        it('#1064 — complexity resolves from playback.conductorHarmonyComplexity when set, else falls back to harmony.complexity', () => {
+            // bandIntensity held >= 0.4 (unlike the test above) so its own OR-term
+            // can't trigger the guide-tone branch on its own — isolating the
+            // complexity signal specifically. Every STYLE_CONFIGS density caps
+            // polyphony to <=3 downstream, so the 9th (14) never survives either
+            // way — the b7 (10) is what distinguishes "guide tones only" ([4, 10],
+            // b7 survives the cap) from "no reduction" (root-first [0, 4, ...],
+            // the cap keeps 0/4 and drops 10 before it's ever reached).
+            _playback.bandIntensity = 0.8;
+            _groove.genreFeel = 'Pop';
+            const chord = { rootMidi: 60, intervals: [0, 4, 7, 10, 14], sectionId: 's1', beats: 4 };
+            const coordination = { soloistResting: true, soloistNotesInPhrase: 0 };
+
+            // Document field alone: high complexity → no guide-tone reduction.
+            _harmony.complexity = 0.9;
+            _playback.conductorHarmonyComplexity = null;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, coordination);
+            expect(getLastRequestedIntervals()).not.toContain(10);
+
+            // The conductor's runtime-derived mirror wins over the document field:
+            // a LOW conductor value still triggers the reduction even though the
+            // document field is high (#1064: the conductor must never write
+            // harmony.complexity itself, only this separate runtime field).
+            _playback.conductorHarmonyComplexity = 0.1;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, coordination);
+            expect(getLastRequestedIntervals()).toContain(10);
+
+            // Clearing the conductor mirror falls back to the document field again.
+            _playback.conductorHarmonyComplexity = null;
+            getHarmonyNotes(getState(), chord, null, 0, 60, 'smart', 0, null, coordination);
+            expect(getLastRequestedIntervals()).not.toContain(10);
+        });
+
         it('should restrict to safe voicings when soloist is active', () => {
             _playback.bandIntensity = 0.8;
             _soloist.enabled = true;

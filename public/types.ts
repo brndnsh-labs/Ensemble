@@ -1277,6 +1277,26 @@ export interface GlobalContext {
     readonly currentKey: string | null;
     /** Dynamic velocity modifier (0.0-1.0) applied by Conductor. */
     readonly conductorVelocity: number;
+    /**
+     * Auto-conductor's computed chord density for the current band intensity,
+     * or `null` before the conductor has ever run. `chords.density` is the
+     * user's own `document`-owned field (persisted, shareable — see
+     * `songbook/state-ownership.ts`); the conductor must never write it
+     * directly (#1064 — it used to, and clobbered/persisted the user's own
+     * choice). Generation readers compose at READ time —
+     * `playback.conductorDensity ?? chords.density` — mirroring how
+     * `conductorVelocity` above combines with a lane's own value without ever
+     * being assigned onto it.
+     */
+    readonly conductorDensity: ChordDensity | null;
+    /**
+     * Auto-conductor's computed harmony complexity for the current band
+     * intensity/ending state, or `null` before the conductor has ever run.
+     * `harmony.complexity` is the user's own `document`-owned field — same
+     * READ-time composition and same #1064 rationale as `conductorDensity`
+     * above.
+     */
+    readonly conductorHarmonyComplexity: number | null;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */
@@ -1439,7 +1459,10 @@ export interface ActionPayloadSetGenreFeel {
 export interface ActionPayloadUpdateConductorDecision {
     velocity?: number;
     intent?: Partial<PlaybackIntent>;
-    density?: string;
+    /** Written into `playback.conductorDensity`, never `chords.density` (#1064). */
+    density?: ChordDensity | null;
+    /** Written into `playback.conductorHarmonyComplexity`, never `harmony.complexity` (#1064). */
+    harmonyComplexity?: number | null;
     feel?: string;
     genreName?: string;
     swing?: number;

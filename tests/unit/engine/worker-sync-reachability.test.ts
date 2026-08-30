@@ -69,6 +69,7 @@ function makePopulatedState() {
             sessionStartTime: num,
             intent: str,
             conductorVelocity: num,
+            conductorHarmonyComplexity: num,
             songMode: true,
             isEndingPending: true,
             currentLoopCount: num,
@@ -218,6 +219,8 @@ const WORKER_SYNC_MANIFEST: Record<
     'playback.modals': { snapshotOnly: 'always {} — vestigial stub; no worker read' },
     'playback.intent': { delta: 'UPDATE_CONDUCTOR_DECISION' },
     'playback.conductorVelocity': { delta: 'UPDATE_CONDUCTOR_DECISION' },
+    // #1064 — live worker-side read (harmonies.ts `finalizeHarmonyNotes`).
+    'playback.conductorHarmonyComplexity': { delta: 'UPDATE_CONDUCTOR_DECISION' },
     'playback.songMode': { delta: 'SET_SONG_MODE' },
     'playback.isEndingPending': { delta: 'SET_ENDING_PENDING' },
     'playback.currentLoopCount': { delta: 'LOOP_BOUNDARY' },

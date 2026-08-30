@@ -852,6 +852,11 @@ function parseProgressionPart(
     bassActive = Boolean(state.bass?.enabled),
 ): { chords: Chord[]; finalMidis: number[] } {
     const { chords, groove } = state;
+    // #1064 — the auto-conductor's runtime-derived density mirror wins when
+    // present; it is never assigned onto `chords.density` (the user's own
+    // document-owned field) directly. Composed here at READ time, mirroring
+    // how `playback.conductorVelocity` combines with a lane's own value.
+    const effectiveDensity: string = state.playback?.conductorDensity ?? chords.density;
     const parsed: Chord[] = [];
     const baseOctave = Math.floor(chords.octave / 12) * 12;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
@@ -959,7 +964,7 @@ function parseProgressionPart(
                     state,
                     quality,
                     is7th,
-                    chords.density,
+                    effectiveDensity,
                     groove.genreFeel,
                     bassActive,
                 );
