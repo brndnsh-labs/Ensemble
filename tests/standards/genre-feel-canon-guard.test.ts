@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
-import { SMART_BASS_STYLE_MAP, SMART_SCALE_STYLE_MAP } from '../../public/config.js';
+import { SMART_SCALE_STYLE_MAP } from '../../public/config.js';
 import { GENRE_FEELS } from '../../public/data/smart-genres.js';
 import { STICKY_GENRES } from '../../public/engine/accompaniment.js';
 import { SUBTRACTION_PILOT_GENRES } from '../../public/engine/arrangement-layering.js';
@@ -11,7 +11,7 @@ import {
     DROP_FRIENDLY_GENRES,
     PITCHED_ONLY_DROP_GENRES,
 } from '../../public/engine/drop-mechanic.js';
-import { HAT_SPINE_GENRES, strategies } from '../../public/engine/groove-engine.js';
+import { HAT_SPINE_GENRES } from '../../public/engine/groove-engine.js';
 import { HARMONY_GENRE_PROFILES } from '../../public/engine/harmony-styles.js';
 import { GENRE_STYLE_MAPPING } from '../../public/engine/soloist-config.js';
 import { BASS_SPACE_FEELS } from '../../public/engine/voicing-policy.js';
@@ -35,11 +35,9 @@ import { BASS_SPACE_FEELS } from '../../public/engine/voicing-policy.js';
 /*
  * #1177 NOTE — coverage moved, read this before counting on it.
  *
- * `strategies` (groove-engine) and `SMART_BASS_STYLE_MAP` (config) are now
- * DERIVED from the genre table, so this file's "maps every canonical feel",
- * "carries no dead non-feel keys", and phantom-key assertions can no longer
- * fail for those two. That is the point of #1177 — it eliminates the
- * hand-keyed dead-key bug class (#1130's `'Ska-Punk'`) rather than guarding it.
+ * `strategies` (groove-engine) and `SMART_BASS_STYLE_MAP` (config) are derived
+ * from the genre table, so testing their completeness here would only reassert
+ * their construction. They are intentionally absent from the tables below.
  *
  * The hand-maintained surface that DOES still need guarding moved to
  * `GROOVE_STRATEGY_BY_GENRE` in `data/smart-genres.ts`, pinned by
@@ -51,8 +49,6 @@ describe('genreFeel routing canon (#1130)', () => {
     // Every table keyed by groove.genreFeel. A missing feel here does NOT crash —
     // it silently routes to a genre-specific fallback, which is the bug.
     const FEEL_KEYED: Record<string, Record<string, unknown>> = {
-        'groove strategies': strategies,
-        SMART_BASS_STYLE_MAP,
         SMART_SCALE_STYLE_MAP,
         'soloist GENRE_STYLE_MAPPING': GENRE_STYLE_MAPPING,
         GENRE_POCKET,
@@ -68,10 +64,7 @@ describe('genreFeel routing canon (#1130)', () => {
 
     // Pure feel-keyed tables use a single-key lookup (no secondary preset key), so
     // any key that isn't a feel is dead weight that never matches at runtime.
-    // SMART_BASS_STYLE_MAP is excluded: its resolver also accepts a drum-preset
-    // name as a secondary key, so preset-name keys are legitimate there.
     const PURE_FEEL_KEYED: Record<string, Record<string, unknown>> = {
-        'groove strategies': strategies,
         SMART_SCALE_STYLE_MAP,
         'soloist GENRE_STYLE_MAPPING': GENRE_STYLE_MAPPING,
         GENRE_POCKET,
@@ -552,9 +545,12 @@ describe('genreFeel routing canon (#1130)', () => {
         ).toBe(13);
     });
 
-    // Belt-and-suspenders across every table (including the bass map): the exact
-    // retired phantom/alias keys must never reappear. Matches the phantom list in
-    // genre-canon-guard (#544) plus the genre-name aliases removed in #1130.
+    // Belt-and-suspenders across the hand-maintained tables and subset sets: the
+    // exact retired phantom/alias keys must never reappear. Matches the phantom
+    // list in genre-canon-guard (#544) plus the genre-name aliases removed in
+    // #1130. The derived SMART_BASS_STYLE_MAP and groove `strategies` belong to
+    // genre-naming-authority.test.ts instead: its stronger contract pins their
+    // derivation, full keyspace, intended bass styles, and groove modules.
     it('no routing table resurrects a retired phantom / alias key', () => {
         const PHANTOMS = [
             'Ska-Punk',

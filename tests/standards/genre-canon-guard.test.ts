@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { describe, expect, it } from 'vitest';
-import { GENRE_NAMES, SMART_GENRES } from '../../public/data/smart-genres.js';
+import { GENRE_NAMES } from '../../public/data/smart-genres.js';
 
 // #544 — the supported-genre canon. The 13 genres below are the column axis of
 // the instrument×genre matrix and the EXACT set the UI exposes: the genre picker
@@ -36,18 +36,5 @@ describe('Supported-genre canon (#544)', () => {
         // or an off-by-one addition fails loudly rather than silently passing.
         expect(GENRE_NAMES).toHaveLength(CANON.length);
         expect([...GENRE_NAMES].sort()).toEqual([...CANON].sort());
-    });
-
-    it('every canonical genre has a SMART_GENRES entry (no name without a config)', () => {
-        for (const genre of CANON) {
-            expect(SMART_GENRES[genre]).toBeDefined();
-        }
-    });
-
-    it('no non-canonical / phantom genre leaks into the selectable set', () => {
-        const PHANTOMS = ['Minimal', 'Shred', 'Latin', 'Afrobeat', 'Soul', 'Ska', 'Bossa Nova'];
-        for (const phantom of PHANTOMS) {
-            expect(GENRE_NAMES).not.toContain(phantom);
-        }
     });
 });

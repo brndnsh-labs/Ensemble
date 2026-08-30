@@ -133,7 +133,7 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
             '\n--- REGGAE HARMONY ORGAN-BUBBLE CRITIQUE REPORT ---\n' +
                 `[Bubble Hit Share]      ${(bubbleScore * 100).toFixed(1)}% (Target: 100%)\n` +
                 `[Skank Bleed]           ${(skankRate * 100).toFixed(1)}% (Target: 0%)\n` +
-                `[Bubble Density]        ${bubbleDensity.toFixed(2)} hits/bar (Target: dominant lane)\n` +
+                `[Bubble Density]        ${bubbleDensity.toFixed(2)} hits/bar (Target: > 3.5 hits/bar)\n` +
                 '----------------------------------------------------\n',
         );
 
@@ -143,8 +143,9 @@ describe('Reggae Harmony Organ-Bubble Critique', () => {
         // Zero skank bleed — the chord channel handles those beats.
         expect(skankRate).toBe(0);
         expect(otherHits).toBe(0);
-        // Bubble density: organ plays multiple offbeats per bar even
-        // factoring in coordination yields. Conservative floor.
-        expect(bubbleDensity).toBeGreaterThan(2.0);
+        // Bubble density guards against a near-empty pattern retaining perfect
+        // positional precision. Steady state is ~4 hits/bar; 3.5 leaves room for
+        // coordination yields while retaining the stricter former integration guard.
+        expect(bubbleDensity).toBeGreaterThan(3.5);
     });
 });

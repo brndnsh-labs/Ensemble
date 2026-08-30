@@ -41,8 +41,8 @@ describe('Security Ledger Verification: DOM Injection', () => {
         );
     });
 
-    it('should NOT contain direct innerHTML or dangerouslySetInnerHTML assignments for musical content', () => {
-        const forbiddenPatterns = [/\.innerHTML\s*=/, /dangerouslySetInnerHTML/];
+    it('should NOT contain direct innerHTML or dangerouslySetInnerHTML use for musical content', () => {
+        const forbiddenPatterns = [/\.innerHTML\b/, /dangerouslySetInnerHTML/];
 
         const violations = [];
 
@@ -57,24 +57,5 @@ describe('Security Ledger Verification: DOM Injection', () => {
         });
 
         expect(violations).toEqual([]);
-    });
-
-    it('should use textContent or JSX interpolation for dynamic string injection', () => {
-        // This is a stylistic/structural check.
-        // We verify that ChordVisualizer, Arranger, and Modals rely on Preact's safe rendering.
-        const filesToCheck = [
-            'public/components/ChordVisualizer.tsx',
-            'public/components/SectionCard.tsx',
-            'public/components/NotificationLayer.tsx',
-        ];
-
-        filesToCheck.forEach((file) => {
-            const fullPath = path.join(projectRoot, file);
-            const content = readFileSync(fullPath, 'utf8');
-
-            // Should not have any direct DOM manipulation that could bypass Preact's escaping
-            expect(content).not.toMatch(/\.innerHTML/);
-            expect(content).not.toMatch(/dangerouslySetInnerHTML/);
-        });
     });
 });
