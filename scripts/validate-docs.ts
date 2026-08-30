@@ -99,6 +99,7 @@ const CORE_DIRECTORIES = [
     'public/export', // #1178 phase 1
     'public/controllers', // #1178 phase 2
     'public/visualizer', // #1178 phase 4
+    'public/songbook',
 ];
 
 const IGNORE_EXTENSIONS = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
@@ -414,28 +415,51 @@ function validateDocs() {
 
     console.log('🔍 Phase 2: Detecting Unmapped Shadow Files...');
 
+    /**
+     * Files directly inside `dir`, plus (when `recurse`) files nested inside its
+     * subdirectories. `public` itself stays shallow — its subdirectories are each
+     * already their own CORE_DIRECTORIES entry, so recursing it too would just
+     * re-walk them (and pull in non-code dirs like `public/css`, `public/packs`).
+     * @param {string} dir
+     * @param {boolean} recurse
+     * @returns {string[]}
+     */
+    function collectFiles(dir, recurse) {
+        const results = [];
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+                if (recurse) {
+                    results.push(...collectFiles(fullPath, recurse));
+                }
+                continue;
+            }
+            results.push(fullPath);
+        }
+        return results;
+    }
+
     for (const dir of CORE_DIRECTORIES) {
         if (!fs.existsSync(dir)) {
             continue;
         }
 
-        const files = fs.readdirSync(dir);
-        for (const file of files) {
-            const fullPath = path.join(dir, file).replace(/\\/g, '/');
-
-            if (fs.statSync(fullPath).isDirectory()) {
-                continue;
-            }
+        for (const fullPath of collectFiles(dir, dir !== 'public')) {
+            const file = path.basename(fullPath);
 
             if (IGNORE_FILES.includes(file) || IGNORE_EXTENSIONS.includes(path.extname(file))) {
                 continue;
             }
 
             // Check if this file is mentioned in AI_MAP.md
-            // Support either direct file mapping or directory-level mapping for components
+            // Support either direct file mapping or directory-level mapping for
+            // components — but only for files directly in public/components/,
+            // not its subdirectories (e.g. public/components/editor/), so a new
+            // subdirectory file must still be individually mapped or fall to the
+            // grooves-style warn-only path below.
             const isMapped =
                 aiMapContent.includes(`\`${fullPath}\``) ||
-                (fullPath.startsWith('public/components/') &&
+                (path.dirname(fullPath) === 'public/components' &&
                     aiMapContent.includes('`public/components/`'));
 
             if (!isMapped) {
