@@ -45,9 +45,13 @@ function simulate(genreFeel: string) {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
     const notes: any[] = [];

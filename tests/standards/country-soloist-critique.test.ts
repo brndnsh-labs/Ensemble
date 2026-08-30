@@ -55,9 +55,13 @@ function simulate(presetName = 'Country Standard', genreFeel = 'Country') {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
     const notes: any[] = [];
@@ -103,9 +107,20 @@ function simulate(presetName = 'Country Standard', genreFeel = 'Country') {
     return notes;
 }
 
+const simulations = new Map<string, ReturnType<typeof simulate>>();
+function simulationFor(presetName: string, genreFeel = 'Country') {
+    const key = `${genreFeel}\u0000${presetName}`;
+    let notes = simulations.get(key);
+    if (!notes) {
+        notes = simulate(presetName, genreFeel);
+        simulations.set(key, notes);
+    }
+    return notes;
+}
+
 describe('Soloist Country Critique (phrase-first)', () => {
     it('keeps the country lead on its major-pentatonic / diatonic palette', () => {
-        const notes = simulate('Country Standard');
+        const notes = simulationFor('Country Standard');
         expect(notes.length).toBeGreaterThan(50);
 
         // Hard-coded target sets (NOT the engine's own scale lookup, so the
@@ -175,8 +190,8 @@ describe('Soloist Country Critique (phrase-first)', () => {
     });
 
     it('fires the chicken-pick snap, the countryBend oblique bend, and the grace-slide, country-gated', () => {
-        const country = simulate('Country Standard', 'Country');
-        const rock = simulate('Country Standard', 'Rock');
+        const country = simulationFor('Country Standard', 'Country');
+        const rock = simulationFor('Country Standard', 'Rock');
 
         // --- All country double-stops are a chord-aware 3rd ABOVE the lead. ---
         const ds = country.filter((n) => n.isDoubleStop);

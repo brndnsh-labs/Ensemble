@@ -67,7 +67,9 @@ function buildState(genreFeel: string) {
 // (lead always last; the harmony voice carries no expression by contract) — so the
 // lead is arr[arr.length - 1] and the denominator counts one lead per emitting tick,
 // the melodic line the listener actually hears.
-function collect(genreFeel: string, seedStr: string) {
+type ExpressionNote = { bsi: number; vib: boolean; cry: boolean };
+
+function collect(genreFeel: string, seedStr: string): ExpressionNote[] {
     const state = buildState(genreFeel);
     const seed = generateSessionSeed(state, state.arranger, 'smart', 0.6, seedStr);
     state.soloist.session.seed = seed;
@@ -76,12 +78,16 @@ function collect(genreFeel: string, seedStr: string) {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
-    const notes: Array<{ bsi: number; vib: boolean; cry: boolean }> = [];
+    const notes: ExpressionNote[] = [];
     for (let abs = 0; abs < loopLen * 3 + 64; abs++) {
         state.playback.currentLoopCount = Math.floor(abs / total);
         const chord = chordAt(abs);
@@ -111,7 +117,7 @@ function collect(genreFeel: string, seedStr: string) {
     return notes;
 }
 
-function rates(notes: Array<{ bsi: number; vib: boolean; cry: boolean }>) {
+function rates(notes: ExpressionNote[]) {
     const N = notes.length;
     const count = (f: (n: any) => boolean) => notes.filter(f).length;
     const apex = count((n) => n.bsi === -2);
@@ -130,37 +136,29 @@ const SEEDS: Record<string, string> = {
     Country: 'EXPR_771_COUNTRY',
     Funk: 'EXPR_771_FUNK',
 };
-const _memo: Record<string, ReturnType<typeof rates>> = {};
-function measure(genre: string) {
-    if (!_memo[genre]) {
-        _memo[genre] = rates(collect(genre, SEEDS[genre]));
+const notesMemo = new Map<string, ExpressionNote[]>();
+const ratesMemo = new Map<string, ReturnType<typeof rates>>();
+function firstCapture(genre: string, seedStr = SEEDS[genre]) {
+    const key = `${genre}\u0000${seedStr}`;
+    let notes = notesMemo.get(key);
+    if (!notes) {
+        notes = collect(genre, seedStr);
+        notesMemo.set(key, notes);
     }
-    return _memo[genre];
+    return notes;
+}
+function measure(genre: string) {
+    const seedStr = SEEDS[genre];
+    const key = `${genre}\u0000${seedStr}`;
+    let measured = ratesMemo.get(key);
+    if (!measured) {
+        measured = rates(firstCapture(genre, seedStr));
+        ratesMemo.set(key, measured);
+    }
+    return measured;
 }
 
 describe('Soloist Expression Rate Critique (#771)', () => {
-    it('prints the per-genre Critique Report', () => {
-        const rows = ['Jazz', 'Blues', 'Country', 'Funk'].map((g) => {
-            const r = measure(g);
-            return `  ${g.padEnd(8)} N=${String(r.N).padStart(4)}  apex=${String(r.apex).padStart(3)}  scoop=${String(r.scoop).padStart(3)}  slide=${String(r.slide).padStart(3)}  vib=${String(r.vib).padStart(3)}  cry=${String(r.cry).padStart(3)}  exprNotes=${String(r.expr).padStart(3)}  exprRate=${(r.exprRate * 100).toFixed(1)}%`;
-        });
-        console.log(
-            [
-                '\n===== [expr-rate #771] Critique Report (12-Bar Blues, macro-form) =====',
-                ...rows,
-                '  --- Genre-idiomatic targets ---',
-                '  cry (expression.bend):  Blues >=8  |  Jazz ==0  Funk ==0  Country ==0',
-                '  grace-slide (bsi==+1):  Country >=30  |  Jazz ==0  Blues ==0  Funk ==0',
-                '  --- §10 restraint (upper bound) ---',
-                '  exprRate < 30% for EVERY genre (measured max ~21%, minority guard)',
-                '  --- presence (non-vacuous, every genre) ---',
-                '  apex(bsi==-2) >=5  AND  scoop(bsi==-1) >=15',
-                '=======================================================================\n',
-            ].join('\n'),
-        );
-        expect(true).toBe(true);
-    });
-
     // --- CORE GUARD: the cry is BLUES/ROCK-idiomatic, not sprayed everywhere -----
     // Measured (production): Blues cry=49, Jazz=0, Funk=0, Country=0. This is the
     // differentiation that makes the metadata "genre-idiomatic": the emitted
@@ -235,7 +233,7 @@ describe('Soloist Expression Rate Critique (#771)', () => {
     // rates, so any nondeterminism (a stray Math.random) is caught.
     it('is fully deterministic across runs (identical expression sequence)', () => {
         for (const g of ['Blues', 'Country']) {
-            const a = collect(g, SEEDS[g]);
+            const a = firstCapture(g);
             const b = collect(g, SEEDS[g]);
             expect(a.length).toBe(b.length);
             const key = (n: any) => `${n.bsi}|${n.vib ? 1 : 0}|${n.cry ? 1 : 0}`;
