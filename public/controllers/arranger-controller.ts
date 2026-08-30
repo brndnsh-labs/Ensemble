@@ -356,13 +356,6 @@ export function switchToRelativeKey(): void {
 }
 
 /**
- * Set or clear a section's intensity override. `value === undefined` removes the
- * override so the section follows the global conductor target again.
- *
- * @staged Wired to the engine + persistence; awaits the Phase B SectionHeaderStrip
- * UI to expose it to users.
- */
-/**
  * Look up a section by id, hand its current value + a mutable copy of the
  * sections array to `mutate` (which replaces `newSections[index]`), then
  * commit + refresh. No-ops if `id` isn't found. Shared by the per-section
@@ -384,6 +377,11 @@ function withSection(
     refreshArrangerUI();
 }
 
+/**
+ * Set or clear a section's intensity override. `value === undefined` removes the
+ * override so the section follows the global conductor target again. Exposed by
+ * `SectionHeaderStrip`'s tri-state follow/override control.
+ */
 export function setSectionIntensity(id: string, value: number | undefined): void {
     withSection(id, (current, newSections, index) => {
         if (value === undefined) {
@@ -398,9 +396,7 @@ export function setSectionIntensity(id: string, value: number | undefined): void
 /**
  * Set or clear a per-instrument override on a section. Tri-state: `true` (force on),
  * `false` (force off), `undefined` (follow the global instrument enabled flag).
- *
- * @staged Wired to the engine + persistence; awaits the Phase B SectionHeaderStrip
- * UI to expose it to users.
+ * Exposed by `SectionHeaderStrip`'s per-instrument override row.
  */
 export function setSectionInstrumentEnabled(
     id: string,

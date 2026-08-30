@@ -177,7 +177,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Surface** | `public/components/InlineEditor.tsx` | Inline section-card editor mounted on ChartSurface when unlocked. Hosts the Arranger + slim toolbar (Add Section, Tools menu, inspiration drawer). Replaces the deleted EditorModal. |
 | **Controls** | `public/components/editor/SectionHeaderStrip.tsx` | Per-section direction strip — intensity slider + 5 tri-state instrument dots (D/B/C/H/S). Mounted above each section in both ChordVisualizer (locked) and SectionCard (unlocked). |
 | **Controls** | `public/components/editor/ChordPicker.tsx` | Tap-a-chord popover for locked-mode chart edits. Diatonic + borrowed roots × 8 qualities; emits notation-aware text (`roman`/`nns`/`name`) via `onSelect`. Anchored to the tapped cell, dismisses on Esc / outside-tap. |
-| **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) with Mixer and Band feel popovers. Accepts `orientation: 'vertical' | 'horizontal'`. |
+| **Workspaces** | `public/components/InstrumentRail.tsx` | Instrument rows (Drums · Bass · Chords · Harmony · Soloist) plus the Mixer accordion and the band-settings popover — every band-wide control, grouped by musical function: Genre · Feel (swing + base, humanize) · Energy (auto intensity, intensity) · Color (harmonic color). |
 | **Visuals** | `public/components/VisualizerOverlay.tsx` | Full-screen visualizer portal rendered on demand. Mounts into `document.body` via `createPortal`. |
 | **Shared** | `public/components/UIControls.tsx` | Reusable UI toolkit. |
 | **Shared** | `public/components/use-modal-a11y.ts` | `useModalA11y(ref, isOpen, onClose, ariaLabel?)` — applies `role="dialog"` + `aria-modal`, Esc-to-close, focus trap, and focus restoration to a modal container. |
@@ -191,7 +191,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 | **Icons** | `public/components/icons.tsx` | The Ensemble icon set — `IconName` union + 24×24 path registry (controls + instrument glyphs). |
 | **Visuals** | `public/components/Visualizer.tsx` | Canvas rendering container. |
 | **Library** | `public/components/PresetLibrary.tsx` | Chord progression library modal. |
-| **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio. |
+| **Settings** | `public/components/InstrumentSettings.tsx` | Reusable per-instrument settings surface used from Studio — sound source for every lane, plus the lane-local knobs (chords voicing density, soloist phrasing). Band-wide controls live in `InstrumentRail.tsx`'s band-settings popover, not here. |
 | **Others** | `public/components/` | Functional modals and settings panels. |
 
 ## High-Level Controllers & Integration

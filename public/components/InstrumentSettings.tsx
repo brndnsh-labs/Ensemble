@@ -3,13 +3,11 @@ import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { packsForInstrument } from '../data/sound-packs.js';
 import { hydrateVoice, isPackInstalled } from '../engine/instrument-registry.js';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import type { GrooveState } from '../state/groove.js';
 import { dispatch } from '../state.js';
 import {
     ACTIONS,
     type ChordState,
     type EnsembleState,
-    type HarmonyState,
     type InstrumentModule,
     type SoloistState,
 } from '../types.js';
@@ -33,12 +31,17 @@ function getModuleName(module: InstrumentModule) {
             : module;
 }
 
+/**
+ * The lanes that still own a generative knob of their own. #1070 moved the
+ * band-wide controls out of here — Swing/Humanize (grid geometry and scheduler
+ * timing, read by every lane) and the harmony color choice now live in the
+ * rail's band-settings surface, so Drums and Harmony are left with just their
+ * Sound source, and Bass never had one.
+ */
+const MODULES_WITH_SPECIFIC_CONTROLS = new Set<InstrumentModule>(['chords', 'soloist']);
+
 function getInstrumentSpecificTitle(module: InstrumentModule) {
-    return module === 'groove'
-        ? 'Feel & Actions'
-        : module === 'chords' || module === 'harmony'
-          ? 'Voicing'
-          : 'Instrument';
+    return module === 'chords' ? 'Voicing' : 'Phrasing';
 }
 
 function updateInstrumentAudio(
@@ -218,9 +221,10 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
         return null;
     }
 
-    // Bass has no generative knobs of its own yet — only the Sound source — so
-    // skip the specific-settings group rather than render a bare, empty title box.
-    const hasSpecificControls = module !== 'bass';
+    // Bass, Drums and Harmony have no generative knobs of their own — only the
+    // Sound source — so skip the specific-settings group rather than render a
+    // bare, empty title box.
+    const hasSpecificControls = MODULES_WITH_SPECIFIC_CONTROLS.has(module);
 
     return (
         <Fragment>
@@ -228,9 +232,7 @@ export function InstrumentSpecificSettings({ module }: InstrumentSpecificSetting
             {hasSpecificControls && (
                 <SettingGroup title={getInstrumentSpecificTitle(module)}>
                     {module === 'chords' && <ChordsControls state={state as ChordState} />}
-                    {module === 'harmony' && <HarmonyControls state={state as HarmonyState} />}
                     {module === 'soloist' && <SoloistControls state={state as SoloistState} />}
-                    {module === 'groove' && <GrooveControls state={state as GrooveState} />}
                 </SettingGroup>
             )}
         </Fragment>
@@ -264,37 +266,6 @@ function ChordsControls({ state }: ChordsControlsProps) {
     );
 }
 
-interface HarmonyControlsProps {
-    state: HarmonyState;
-}
-
-function HarmonyControls({ state }: HarmonyControlsProps) {
-    return (
-        <SettingRow
-            label="Complexity"
-            id="harmonyComplexity"
-            description="Higher adds extensions and inner-voice movement."
-            valueDisplay={`${Math.round((state.complexity || 0.5) * 100)}%`}
-        >
-            <Slider
-                id="harmonyComplexity"
-                min="0"
-                max="1"
-                step="0.05"
-                value={state.complexity || 0.5}
-                onInput={(val) => {
-                    dispatch(ACTIONS.SET_PARAM, {
-                        module: 'harmony',
-                        param: 'complexity',
-                        value: parseFloat(val),
-                    });
-                }}
-                ariaValueText={`${Math.round((state.complexity || 0.5) * 100)}%`}
-            />
-        </SettingRow>
-    );
-}
-
 interface SoloistControlsProps {
     state: SoloistState;
 }
@@ -304,23 +275,23 @@ function SoloistControls({ state }: SoloistControlsProps) {
         <Fragment>
             {/*
              * #1167 — this slider writes `phrasingIntensity`, NOT `complexity`.
-             * `soloist.complexity` is absent from `buildSoloistSyncPayload`
-             * (state.ts) and read by no engine, so the control was inert.
              * `phrasingIntensity` IS synced, is manifest-classified
              * `{ delta: 'SET_PARAM' }`, and feeds `intensityLift` in
              * `getSoloistNotePhraseFirst` — i.e. the worker contract was already
              * expecting a UI writer that did not exist.
-             * The HarmonyControls slider above still writes `complexity`; that one
-             * is live (harmony.complexity is worker-synced and persisted).
+             * #1070 — the label and id now say `phrasingIntensity` too. Calling it
+             * "Complexity" made three unrelated fields share one word; the field it
+             * actually writes is the soloist's phrasing intensity, and the dead
+             * `soloist.complexity` it used to name is gone from state entirely.
              */}
             <SettingRow
-                label="Complexity"
-                id="soloistComplexity"
-                description="Higher plays busier, more adventurous lines."
+                label="Phrasing Intensity"
+                id="soloistPhrasingIntensity"
+                description="Higher plays busier, more articulated lines."
                 valueDisplay={`${Math.round((state.phrasingIntensity ?? 0.5) * 100)}%`}
             >
                 <Slider
-                    id="soloistComplexity"
+                    id="soloistPhrasingIntensity"
                     min="0"
                     max="1"
                     step="0.05"
@@ -364,83 +335,6 @@ function SoloistControls({ state }: SoloistControlsProps) {
                         { value: 'monophonic', label: 'Monophonic' },
                         { value: 'guitar', label: 'Guitar' },
                     ]}
-                />
-            </SettingRow>
-        </Fragment>
-    );
-}
-
-interface GrooveControlsProps {
-    state: GrooveState;
-}
-
-// Meters whose own notation already carries the shuffle feel — see #1065. Both are
-// stepsPerBeat:2, same as 7/8, but calculateStepDuration (groove-engine.ts) only
-// swings 7/8; keep this list and that engine gate in sync.
-const SWING_DISABLED_METERS = new Set(['6/8', '12/8']);
-
-function GrooveControls({ state }: GrooveControlsProps) {
-    const { swing, swingSub, timeSignature } = useEnsembleState((s) => ({
-        swing: s.groove.swing,
-        swingSub: s.groove.swingSub,
-        timeSignature: s.arranger.timeSignature,
-    }));
-    const swingDisabled = SWING_DISABLED_METERS.has(timeSignature);
-
-    return (
-        <Fragment>
-            <SettingRow
-                label="Swing"
-                id="swingSlider"
-                description={
-                    swingDisabled
-                        ? `${timeSignature} already notates the shuffle feel, so Swing is disabled here.`
-                        : 'Delays the off-beats for a triplet shuffle.'
-                }
-                valueDisplay={`${swing || 0}%`}
-            >
-                <div class="flex-row instrument-settings-swing-controls">
-                    <Slider
-                        id="swingSlider"
-                        min="0"
-                        max="100"
-                        value={swing || 0}
-                        disabled={swingDisabled}
-                        onInput={(val) => {
-                            dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
-                        }}
-                        ariaValueText={`${swing || 0}%`}
-                    />
-                    <Select
-                        id="swingBaseSelect"
-                        value={swingSub || '8th'}
-                        disabled={swingDisabled}
-                        onChange={(val) => {
-                            dispatch(ACTIONS.SET_SWING_SUB, val);
-                        }}
-                        options={[
-                            { value: '16th', label: '1/16' },
-                            { value: '8th', label: '1/8' },
-                        ]}
-                    />
-                </div>
-            </SettingRow>
-
-            <SettingRow
-                label="Humanize"
-                id="humanizeSlider"
-                description="Subtle timing and velocity variation for a looser feel."
-                valueDisplay={`${state.humanize || 0}%`}
-            >
-                <Slider
-                    id="humanizeSlider"
-                    min="0"
-                    max="100"
-                    value={state.humanize || 0}
-                    onInput={(val) => {
-                        dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
-                    }}
-                    ariaValueText={`${state.humanize || 0}%`}
                 />
             </SettingRow>
         </Fragment>

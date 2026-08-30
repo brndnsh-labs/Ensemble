@@ -942,8 +942,6 @@ export interface SoloistState {
     readonly volume: number;
     /** Reverb level. */
     readonly reverb: number;
-    /** Local complexity level. */
-    readonly complexity: number;
     /** Slider for how dynamic/articulated the phrasing is. */
     readonly phrasingIntensity: number;
     /** Probability of playing double stops. */
@@ -961,9 +959,11 @@ export interface SoloistState {
      */
     readonly tradeSilenced: boolean;
     // `motifTracking` and `pinnedProfile` were removed in #866 — both were inert
-    // after the legacy soloist engine's retirement (epic #10). Old persisted /
-    // share-URL payloads carrying them are dropped on load via the deprecated-key
-    // skip in `applySoloistPayload` (state/instruments.ts).
+    // after the legacy soloist engine's retirement (epic #10). `complexity` went
+    // the same way in #1070: #1167 rewired its slider to `phrasingIntensity` and
+    // left the field behind with zero writers and zero readers. Old persisted /
+    // share-URL payloads carrying any of them are dropped on load via the
+    // deprecated-key skip in `applySoloistPayload` (state/instruments.ts).
 
     // === Engine runtime (per-playback, transient) ===
     readonly session: SoloistSession;
@@ -1554,7 +1554,6 @@ export type ActionPayloadUpdateSB = AtLeastOne<{
     octave: number;
     volume: number;
     reverb: number;
-    complexity: number;
     phrasingIntensity: number;
     tradeMode: string;
     tradeSilenced: boolean;

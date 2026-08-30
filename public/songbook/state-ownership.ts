@@ -181,7 +181,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         octave: 'document',
         volume: 'document',
         reverb: 'document',
-        complexity: 'runtime-derived',
         phrasingIntensity: 'document',
         tradeMode: 'document',
         // #1062 — the trade block's runtime on/off decision. Must never be

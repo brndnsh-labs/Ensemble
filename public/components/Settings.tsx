@@ -343,9 +343,21 @@ export function Settings() {
                         )}
                         {tab === 'playback' && (
                             <SettingGroup title="Performance Engine">
+                                {/*
+                                 * #1070 — a control's description may only name
+                                 * engines that actually read its field.
+                                 * `playback.complexity` is read by Bass
+                                 * (`bass-engine.ts`, `bass-styles.ts`) and by the
+                                 * chord comping (`accompaniment.ts`,
+                                 * `comping-emit.ts`). The soloist reads its own
+                                 * `phrasingIntensity`, never this; harmony only sees
+                                 * it second-hand, as the starting value for
+                                 * `applyConductor`'s runtime harmony target — and
+                                 * only while Auto intensity is on.
+                                 */}
                                 <SettingRow
                                     label="Global Complexity"
-                                    description="Adjusts syncopation and harmonic density for Soloist, Bass, and Harmony engines."
+                                    description="Adjusts syncopation and harmonic density for the Bass and Chords engines. With Auto intensity on, the conductor starts its harmony target from it too."
                                     id="complexitySlider"
                                     valueDisplay={complexityLabel}
                                 >

@@ -12,7 +12,7 @@ import type { StyleObject } from '../ui-types.js';
 import { Icon, type IconName } from './Icon.jsx';
 import { InstrumentMixerStrip, InstrumentSpecificSettings } from './InstrumentSettings.jsx';
 import { SoloistControls } from './SoloistControls.jsx';
-import { SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
+import { Select, SettingGroup, SettingRow, Slider, Toggle } from './UIControls.jsx';
 import { useModalA11y } from './use-modal-a11y.js';
 
 interface StudioInstrumentConfig {
@@ -96,6 +96,35 @@ function setGenre(genreName: string) {
 
 function formatBandIntensity(bandIntensity: number) {
     return `${Math.round(bandIntensity * 100)}%`;
+}
+
+// Meters whose own notation already carries the shuffle feel — see #1065. Both are
+// stepsPerBeat:2, same as 7/8, but calculateStepDuration (groove-engine.ts) only
+// swings 7/8; keep this list and that engine gate in sync.
+const SWING_DISABLED_METERS = new Set(['6/8', '12/8']);
+
+/**
+ * #1070 — `harmony.complexity` is a two-state field in practice. Its only
+ * consumers are the two `effectiveComplexity < 0.4` branches in
+ * `buildHarmonyNotes` (`harmonies.ts`): below the threshold the pad collapses to
+ * guide tones, at or above it the full voicing is kept, and every value inside
+ * either band behaves identically. Presenting it as a percentage slider meant the
+ * upper 60% of the track was inert (45% and 100% were the same sound), so the
+ * control is now the choice it really is. The field itself stays a 0–1 number —
+ * it is persisted, share-URL encoded and worker-synced under that shape — so the
+ * two states map onto values well clear of the threshold, and any pre-existing
+ * value reads back as whichever branch it was already taking.
+ *
+ * Note the conductor still layers `playback.conductorHarmonyComplexity` over this
+ * at read time while Auto intensity ramps (#1064); the user's choice here is the
+ * baseline it falls back to, exactly as `chords.density` works.
+ */
+const HARMONY_GUIDE_TONE_MAX = 0.4;
+const HARMONY_COLOR_GUIDE = 0.2;
+const HARMONY_COLOR_FULL = 0.8;
+
+function harmonyColorOf(complexity: number | undefined) {
+    return (complexity ?? 0.5) < HARMONY_GUIDE_TONE_MAX ? 'guide' : 'full';
 }
 
 function getBandFeelValue(activeGenre: string, autoIntensity: boolean, bandIntensity: number) {
@@ -294,17 +323,34 @@ function StudioBandFeelChooser({
     onClose,
     onToggle,
 }: StudioBandFeelChooserProps) {
+    // #1070 — the band's own settings, grouped by musical function: Genre (the
+    // language), Feel (band-wide time), Energy (band-wide dynamics), Color
+    // (band-wide harmony). Swing/Humanize used to live inside the Drums gear even
+    // though swing is the grid geometry every lane is scheduled against and
+    // humanize is read by the scheduler for all lanes and by the MIDI export.
+    const { swing, swingSub, humanize, timeSignature, harmonyComplexity } = useEnsembleState(
+        (s) => ({
+            swing: s.groove.swing,
+            swingSub: s.groove.swingSub,
+            humanize: s.groove.humanize,
+            timeSignature: s.arranger.timeSignature,
+            harmonyComplexity: s.harmony.complexity,
+        }),
+    );
+    const swingDisabled = SWING_DISABLED_METERS.has(timeSignature);
+    const harmonyColor = harmonyColorOf(harmonyComplexity);
+
     return (
         <div class="workspace-studio-surface-root workspace-studio-genre-chooser">
             <button
                 type="button"
                 class={`workspace-studio-genre-button ${isOpen ? 'is-open' : ''}`}
-                aria-label="Choose genre"
+                aria-label="Band settings"
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
                 onClick={onToggle}
             >
-                <span class="workspace-studio-genre-button-label">Genre</span>
+                <span class="workspace-studio-genre-button-label">Band</span>
                 <span class="workspace-studio-genre-button-right">
                     <span class="workspace-studio-genre-button-value">
                         {getBandFeelValue(activeGenre, autoIntensity, bandIntensity)}
@@ -318,12 +364,12 @@ function StudioBandFeelChooser({
                 accent="chords"
                 anchorElement={anchorElement}
                 className="workspace-studio-surface--genre workspace-studio-surface--band-feel"
-                closeLabel="Close genre"
+                closeLabel="Close band settings"
                 isCompactViewport={isCompactViewport}
                 isOpen={isOpen}
                 onClose={onClose}
-                subtitle="Choose the groove language and shared energy for the whole band."
-                title="Choose genre"
+                subtitle="The groove language, time feel, energy and harmonic color the whole band shares."
+                title="Band settings"
             >
                 <SettingGroup title="Genre">
                     {/* Single-select toggle group (each option is an aria-pressed
@@ -360,6 +406,61 @@ function StudioBandFeelChooser({
                         })}
                     </div>
                 </SettingGroup>
+                <SettingGroup title="Feel">
+                    <SettingRow
+                        label="Swing"
+                        id="swingSlider"
+                        description={
+                            swingDisabled
+                                ? `${timeSignature} already notates the shuffle feel, so Swing is disabled here.`
+                                : 'Delays the off-beats for a triplet shuffle — every lane, not just drums.'
+                        }
+                        valueDisplay={`${swing || 0}%`}
+                    >
+                        <div class="flex-row instrument-settings-swing-controls">
+                            <Slider
+                                id="swingSlider"
+                                min="0"
+                                max="100"
+                                value={swing || 0}
+                                disabled={swingDisabled}
+                                onInput={(val) => {
+                                    dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
+                                }}
+                                ariaValueText={`${swing || 0}%`}
+                            />
+                            <Select
+                                id="swingBaseSelect"
+                                value={swingSub || '8th'}
+                                disabled={swingDisabled}
+                                onChange={(val) => {
+                                    dispatch(ACTIONS.SET_SWING_SUB, val);
+                                }}
+                                options={[
+                                    { value: '16th', label: '1/16' },
+                                    { value: '8th', label: '1/8' },
+                                ]}
+                            />
+                        </div>
+                    </SettingRow>
+                    <SettingRow
+                        label="Humanize"
+                        id="humanizeSlider"
+                        description="Subtle timing and velocity variation across the whole band."
+                        valueDisplay={`${humanize || 0}%`}
+                    >
+                        <Slider
+                            id="humanizeSlider"
+                            min="0"
+                            max="100"
+                            value={humanize || 0}
+                            onInput={(val) => {
+                                dispatch(ACTIONS.SET_HUMANIZE, parseInt(val, 10));
+                            }}
+                            ariaValueText={`${humanize || 0}%`}
+                        />
+                    </SettingRow>
+                </SettingGroup>
                 <SettingGroup title="Energy">
                     <SettingRow
                         label="Auto intensity"
@@ -395,6 +496,30 @@ function StudioBandFeelChooser({
                                 dispatch(ACTIONS.SET_BAND_INTENSITY, parseInt(value, 10) / 100);
                             }}
                             ariaValueText={formatBandIntensity(bandIntensity)}
+                        />
+                    </SettingRow>
+                </SettingGroup>
+                <SettingGroup title="Color">
+                    <SettingRow
+                        label="Harmonic color"
+                        id="harmonyColorSelect"
+                        description="Guide tones keep the Harmony lane to thirds and sevenths; Full lets it play the whole voicing."
+                    >
+                        <Select
+                            id="harmonyColorSelect"
+                            value={harmonyColor}
+                            onChange={(val) => {
+                                dispatch(ACTIONS.SET_PARAM, {
+                                    module: 'harmony',
+                                    param: 'complexity',
+                                    value:
+                                        val === 'guide' ? HARMONY_COLOR_GUIDE : HARMONY_COLOR_FULL,
+                                });
+                            }}
+                            options={[
+                                { value: 'guide', label: 'Guide tones' },
+                                { value: 'full', label: 'Full voicings' },
+                            ]}
                         />
                     </SettingRow>
                 </SettingGroup>

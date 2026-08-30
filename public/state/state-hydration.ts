@@ -595,8 +595,11 @@ function hydrateSavedState(): void {
                         ? savedState.soloist.autoMode
                         : true,
                 // #1167 — pre-#1167 saves have no `phrasingIntensity` (and may carry
-                // a stale, always-inert `complexity`); clamp() falls back to the 0.5
-                // default when the key is missing or out of range.
+                // a stale `complexity`, always inert and deleted from state in
+                // #1070); clamp() falls back to the 0.5 default when the key is
+                // missing or out of range. This allow-listed Object.assign is also
+                // what silently drops the retired key — see
+                // tests/unit/state/soloist-complexity-removal.test.ts.
                 phrasingIntensity: clamp(savedState.soloist.phrasingIntensity, 0, 1, 0.5),
             });
         }
