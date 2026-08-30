@@ -55,9 +55,13 @@ function simulate(presetName = '12-Bar Blues') {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
     const notes: any[] = [];
@@ -88,9 +92,19 @@ function simulate(presetName = '12-Bar Blues') {
     return notes;
 }
 
+const simulations = new Map<string, ReturnType<typeof simulate>>();
+function simulationFor(presetName: string) {
+    let notes = simulations.get(presetName);
+    if (!notes) {
+        notes = simulate(presetName);
+        simulations.set(presetName, notes);
+    }
+    return notes;
+}
+
 describe('Blues Soloist Authenticity (phrase-first)', () => {
     it('keeps the blues lead on its blues/pentatonic palette over a dom7 progression', () => {
-        const notes = simulate('12-Bar Blues');
+        const notes = simulationFor('12-Bar Blues');
         expect(notes.length).toBeGreaterThan(50);
 
         // Blues scale {0,3,5,6,7,10} (minor pentatonic + the blue b5). PENT_BLUES
@@ -138,7 +152,7 @@ describe('Blues Soloist Authenticity (phrase-first)', () => {
     });
 
     it('keeps the blues lead in a singable mid register', () => {
-        const notes = simulate('12-Bar Blues');
+        const notes = simulationFor('12-Bar Blues');
         const midis = notes.map((n) => n.midi);
         const lo = Math.min(...midis);
         const hi = Math.max(...midis);

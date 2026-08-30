@@ -46,9 +46,13 @@ function simulate(genre: string, presetName: string) {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
     // Recurring signature peaks: the form is divided into development-cycle
@@ -101,6 +105,17 @@ function simulate(genre: string, presetName: string) {
     return { emitted, apexByWindow, apexSteps, cycleLen, loopLen, total, seed };
 }
 
+const simulations = new Map<string, ReturnType<typeof simulate>>();
+function simulationFor(genre: string, presetName: string) {
+    const key = `${genre}\u0000${presetName}`;
+    let simulation = simulations.get(key);
+    if (!simulation) {
+        simulation = simulate(genre, presetName);
+        simulations.set(key, simulation);
+    }
+    return simulation;
+}
+
 const GENRES = [
     { genre: 'Jazz', preset: 'Pop (Standard)' },
     { genre: 'Neo-Soul', preset: 'Pop (Standard)' },
@@ -115,7 +130,7 @@ const GENRES = [
 describe('phrase-first soloist · musical critique', () => {
     for (const { genre, preset } of GENRES) {
         it(`${genre}: every cycle peak lands a strong tone, line breathes, no self-overlap`, () => {
-            const sim = simulate(genre, preset);
+            const sim = simulationFor(genre, preset);
 
             // --- Each development-cycle window's local peak lands on a STRONG key
             // tone (tonic/5th), not a tension tone — the regression the review
@@ -171,7 +186,7 @@ describe('phrase-first soloist · musical critique', () => {
         });
 
         it(`${genre}: strong beats land chord tones, with guide tones outlining the changes`, () => {
-            const sim = simulate(genre, preset);
+            const sim = simulationFor(genre, preset);
             // Voice-leading (§5): strong beats (downbeat + bar midpoint) are
             // TARGETS — they should land functional chord tones, and a healthy
             // share should be GUIDE tones (3rd/7th) that actually define the

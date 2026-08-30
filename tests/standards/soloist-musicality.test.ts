@@ -50,9 +50,13 @@ function simulate(presetName = 'Jazz Blues') {
     const loopLen = seed.loopLengthSteps || state.arranger.totalSteps;
     const total = state.arranger.totalSteps;
     const stepMap = state.arranger.stepMap;
+    const chordByStep = Array.from(
+        { length: total },
+        (_, step) => stepMap.find((entry: any) => step >= entry.start && step < entry.end)?.chord,
+    );
     const chordAt = (s: number) => {
         const w = ((s % total) + total) % total;
-        return stepMap.find((e: any) => w >= e.start && w < e.end)?.chord || null;
+        return chordByStep[w] || null;
     };
 
     const notes: any[] = [];
@@ -87,6 +91,16 @@ function simulate(presetName = 'Jazz Blues') {
     return notes;
 }
 
+const simulations = new Map<string, ReturnType<typeof simulate>>();
+function simulationFor(presetName: string) {
+    let notes = simulations.get(presetName);
+    if (!notes) {
+        notes = simulate(presetName);
+        simulations.set(presetName, notes);
+    }
+    return notes;
+}
+
 const isChordTone = (n: any) => {
     const rel = (((n.midi - n.chord.rootMidi) % 12) + 12) % 12;
     return (n.chord.intervals ?? []).some((iv: number) => ((iv % 12) + 12) % 12 === rel);
@@ -94,7 +108,7 @@ const isChordTone = (n: any) => {
 
 describe('Soloist Musicality & Thematic Integrity (phrase-first)', () => {
     it('resolves the line onto chord tones, hardest on strong beats (voice-leading)', () => {
-        const notes = simulate('Jazz Blues');
+        const notes = simulationFor('Jazz Blues');
         expect(notes.length).toBeGreaterThan(80);
 
         const strong = notes.filter((n) => n.isStrongBeat);
@@ -125,7 +139,7 @@ describe('Soloist Musicality & Thematic Integrity (phrase-first)', () => {
     });
 
     it('keeps every note inside the soloist register', () => {
-        const notes = simulate('Jazz Blues');
+        const notes = simulationFor('Jazz Blues');
         // Register contract (coordination-engine): soloist priority 60-90, clamp
         // only below MIDI 52; the engine caps the apex money note at 90 and folds
         // the developed body under 88. Live range is min=55 max=87 — assert the
