@@ -491,10 +491,11 @@ describe('renderStemsToWav (#1018 stem export)', () => {
                 expectedUnswungTime += stepSec;
             }
 
-            // Swing > 0 must make the swung and unswung clocks genuinely diverge
-            // — this is what keeps the soloist's `straightness` blend
-            // (scheduler-core.ts) from silently collapsing to a no-op on this
-            // export path.
+            // Swing > 0 must make the swung and unswung clocks genuinely diverge —
+            // regression guard for the export path's swing application matching the
+            // live scheduler. (#1066 removed the soloist's `straightness` blend that
+            // used to read both clocks here; `unswungNextNoteTime` is still
+            // maintained for the visualizer and the BPM-reschedule ratio.)
             expect(observed.some((o) => Math.abs(o.time - o.unswung) > 1e-9)).toBe(true);
         });
     });

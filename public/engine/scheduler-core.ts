@@ -596,9 +596,12 @@ function advanceGlobalStep(state: EnsembleState, dispatch?: Dispatch): void {
     const musicalStep = foldPracticeStep(playback.step, playback);
     const { stepInfo, ts } = getEffectiveMeterAtStep(arranger, musicalStep);
 
-    // the "unswung" grid clock advances by one plain step (a 16th) so the
-    // soloistTime blend in `scheduleGlobalEvent` stays aligned with the swung
-    // `nextNoteTime`.
+    // the "unswung" grid clock advances by one plain step (a 16th), staying
+    // aligned with the swung `nextNoteTime`. #1066: the soloist no longer reads
+    // this clock (the straightening blend that used to pull its onset toward it
+    // is gone — the soloist now takes `nextNoteTime`'s swung time directly, same
+    // as every other lane); `unswungNextNoteTime` remains for the visualizer and
+    // the BPM-reschedule ratio in `app-controller.ts`.
     const stepSec = secondsPerStepFor(effectiveBpm);
     const duration = calculateStepDuration(stepInfo.mStep, effectiveBpm, ts, groove);
 
@@ -1470,7 +1473,7 @@ export function scheduleGlobalEvent(
     swungTime: number,
     dispatch: Dispatch | undefined = undefined,
 ): void {
-    const { arranger, playback, groove, soloist, vizState } = state;
+    const { arranger, playback, groove, vizState } = state;
     // #1016 — section practice. `step` stays monotonic for buffer-key lookups
     // (the lane schedulers `.get(step)` the worker notes keyed by monotonic
     // step). `musicalStep` folds into the drill window for chart-position work:
@@ -1565,20 +1568,6 @@ export function scheduleGlobalEvent(
         };
     }
 
-    const feel = groove.genreFeel;
-    const straightness =
-        feel === 'Reggae'
-            ? 0.5
-            : soloist.style === 'neo'
-              ? 0.65
-              : soloist.style === 'blues'
-                ? 0.55
-                : soloist.style === 'bossa'
-                  ? 0.75
-                  : 0.65;
-    const soloistTime =
-        playback.unswungNextNoteTime * straightness + swungTime * (1.0 - straightness);
-
     // The step event carries the visual grid's chart meter as well as the drum
     // pattern cursor. Pitched-only playback still needs meter seam events when
     // the drum lane is disabled.
@@ -1639,7 +1628,14 @@ export function scheduleGlobalEvent(
             scheduleBass(state, chordData, step, swungTime);
         }
         if (soloistActive) {
-            scheduleSoloist(state, chordData, step, soloistTime);
+            // #1066: the soloist takes the same swung grid time as bass — no
+            // residual straightening blend. It used to be pulled back toward
+            // `playback.unswungNextNoteTime` (a `straightness` factor as high as
+            // 0.75 for Bossa), which floated the lead away from the ride/comp
+            // instead of locking with it. The soloist's own lane pocket
+            // (`bandPocket` in `soloist-phrase-first.ts`) still layers on top via
+            // its per-note `timingOffset`, exactly like every other melodic lane.
+            scheduleSoloist(state, chordData, step, swungTime);
         }
         if (chordsActive) {
             scheduleChords(state, chordData, step, t);
