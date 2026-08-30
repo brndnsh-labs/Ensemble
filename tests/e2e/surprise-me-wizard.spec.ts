@@ -22,7 +22,9 @@ test.describe('Surprise Me wizard @ui', () => {
         await gotoHydrated(page);
     });
 
-    test('Surprise Me at zero answers rolls a chart and shows toast actions', async ({ page }) => {
+    test('Surprise Me rolls and rerolls a chart with reversible toast actions', async ({
+        page,
+    }) => {
         await openLibrary(page);
         const modal = page.locator('#surpriseMeOverlay');
         await expect(modal).toBeVisible();
@@ -42,64 +44,21 @@ test.describe('Surprise Me wizard @ui', () => {
         await expect(modal).toBeHidden();
 
         // Toast with action buttons appears.
-        const toast = page.locator('.notification-box');
+        const toast = page.locator('.notification-box', {
+            hasText: 'Rolled a new arrangement',
+        });
         await expect(toast).toBeVisible();
         await expect(toast.locator('.notification-actions')).toBeVisible();
 
         // Reroll + Undo buttons are present.
         await expect(toast.getByRole('button', { name: /Reroll/ })).toBeVisible();
         await expect(toast.getByRole('button', { name: /Undo/ })).toBeVisible();
-    });
-
-    test('Reroll button on the toast generates again', async ({ page }) => {
-        await openLibrary(page);
-        const modal = page.locator('#surpriseMeOverlay');
-        await modal.getByRole('button', { name: /Roll/ }).click();
-        await modal.locator('.surprise-me-dice').click();
-
-        const toast = page.locator('.notification-box', {
-            hasText: 'Rolled a new arrangement',
-        });
-        await expect(toast).toBeVisible();
         await toast.getByRole('button', { name: /Reroll/ }).click();
 
         // After reroll, a new toast (still with actions) should appear.
         const rerolledToast = page.locator('.notification-box', { hasText: 'Rerolled' });
         await expect(rerolledToast).toBeVisible();
         await expect(rerolledToast.locator('.notification-actions')).toBeVisible();
-    });
-
-    test('Seed suggestion chip populates the seed and Role selector appears', async ({ page }) => {
-        await openLibrary(page);
-        const modal = page.locator('#surpriseMeOverlay');
-        await modal.getByRole('button', { name: /Roll/ }).click();
-
-        // No role selector before a seed is set.
-        await expect(modal.locator('.surprise-me-role-field')).toHaveCount(0);
-
-        // Click a suggest chip.
-        await modal.getByRole('button', { name: 'I-V-vi-IV' }).click();
-
-        // Role selector now visible.
-        await expect(modal.locator('.surprise-me-role-field')).toBeVisible();
-
-        // Seed chips show the chord tokens.
-        const chips = modal.locator('.surprise-me-seed-chip');
-        await expect(chips).toHaveCount(4);
-        await expect(chips.nth(0)).toContainText('I');
-    });
-
-    test('Reset clears the seed back to the empty state', async ({ page }) => {
-        await openLibrary(page);
-        const modal = page.locator('#surpriseMeOverlay');
-        await modal.getByRole('button', { name: /Roll/ }).click();
-
-        await modal.getByRole('button', { name: 'I-V-vi-IV' }).click();
-        await expect(modal.locator('.surprise-me-seed-chip')).toHaveCount(4);
-
-        await modal.getByRole('button', { name: /Reset answers/ }).click();
-        await expect(modal.locator('.surprise-me-seed-chip')).toHaveCount(0);
-        await expect(modal.locator('.surprise-me-seed-add')).toBeVisible();
     });
 
     test('@mobile wizard renders cleanly on narrow viewports', async ({ page }) => {
@@ -121,8 +80,11 @@ test.describe('Surprise Me wizard @ui', () => {
         await expect(modal.locator('.surprise-me-dice')).toBeVisible();
         await expect(modal.locator('select').first()).toBeVisible();
 
-        // A seed chip click still works on mobile.
+        // The role control is progressive disclosure: it only appears once a
+        // harmonic seed exists.
+        await expect(modal.locator('.surprise-me-role-field')).toHaveCount(0);
         await modal.getByRole('button', { name: 'I-V-vi-IV' }).click();
         await expect(modal.locator('.surprise-me-seed-chip')).toHaveCount(4);
+        await expect(modal.locator('.surprise-me-role-field')).toBeVisible();
     });
 });

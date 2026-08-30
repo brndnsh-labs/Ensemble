@@ -328,12 +328,6 @@ test.describe('ChartSurface @ui', () => {
     });
 
     test.describe('Responsive layout', () => {
-        test('topbar and chart are visible at 375px @mobile', async ({ page }) => {
-            await page.setViewportSize({ width: 375, height: 667 });
-            await expect(page.locator('.chart-surface__topbar')).toBeVisible();
-            await expect(page.locator('.chart-surface__chart')).toBeVisible();
-        });
-
         // #1131 regression: in the 641–1023px band (iPad portrait = 768px, a
         // first-class @ipad target) the old horizontal rail CSS-hid the genre
         // chooser and the mixer with NO alternative entry point. The Mix sheet

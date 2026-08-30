@@ -49,11 +49,13 @@ vi.mock('../../../public/components/SymbolMenu.jsx', () => ({
 }));
 
 import { SectionCard } from '../../../public/components/SectionCard.jsx';
+import { onSectionUpdate } from '../../../public/controllers/arranger-controller.js';
 
 describe('SectionCard Security', () => {
     let container;
 
     beforeEach(() => {
+        onSectionUpdate.mockClear();
         container = document.createElement('div');
         document.body.appendChild(container);
     });
@@ -107,5 +109,34 @@ describe('SectionCard Security', () => {
         const textarea = container.querySelector('.section-prog-input');
         expect(textarea).toBeTruthy();
         expect(textarea.getAttribute('maxLength')).toBe('1000');
+    });
+
+    it('keeps the pointer drag handle out of the accessibility tree', () => {
+        const section = {
+            id: 'test-1',
+            label: 'Verse 1',
+            value: 'C G Am F',
+            repeat: 1,
+            seamless: false,
+        };
+        mockUseEnsembleState.mockReturnValue({ isMinor: false, arrangerKey: 'C' });
+
+        act(() => {
+            render(<SectionCard section={section} index={0} totalSections={2} />, container);
+        });
+
+        const handle = container.querySelector('.section-drag-handle');
+        expect(handle).not.toBeNull();
+        expect(handle.getAttribute('aria-hidden')).toBe('true');
+        expect(handle.hasAttribute('role')).toBe(false);
+        expect(handle.hasAttribute('tabindex')).toBe(false);
+
+        const moveDown = container.querySelector('button[aria-label="Move Section Down"]');
+        expect(moveDown).not.toBeNull();
+        expect(moveDown.disabled).toBe(false);
+        act(() => {
+            moveDown.click();
+        });
+        expect(onSectionUpdate).toHaveBeenCalledWith('test-1', 'move', 1);
     });
 });

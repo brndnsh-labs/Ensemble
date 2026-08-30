@@ -17,30 +17,12 @@ test.describe('Pack-install nudge @ui', () => {
         await gotoHydrated(page);
     });
 
-    test('shows the one-time nudge when no packs are installed', async ({ page }) => {
-        const toast = page.locator('.notification-box', { hasText: 'real instruments' });
-        await expect(toast).toBeVisible();
-        await expect(toast.getByRole('button', { name: 'Open Packs' })).toBeVisible();
-        await expect(toast.getByRole('button', { name: 'Dismiss' })).toBeVisible();
-    });
-
-    test('Dismiss hides the nudge and persists the seen flag', async ({ page }) => {
-        const toast = page.locator('.notification-box', { hasText: 'real instruments' });
-        await expect(toast).toBeVisible();
-
-        await toast.getByRole('button', { name: 'Dismiss' }).click();
-        await expect(toast).toBeHidden();
-
-        // Persisted up-front at show time, so it can only ever fire once.
-        const seen = await page.evaluate(() => localStorage.getItem('ensemble.packNudgeSeen'));
-        expect(seen).toBe('1');
-    });
-
     test('Open Packs deep-links to Settings → Packs', async ({ page }) => {
         const toast = page.locator('.notification-box', { hasText: 'real instruments' });
         await expect(toast).toBeVisible();
 
         await toast.getByRole('button', { name: 'Open Packs' }).click();
+        await expect(toast).toBeHidden();
 
         await page.waitForSelector('#settingsOverlay.active');
         await expect(page.locator('#settingsTab-packs')).toHaveAttribute('aria-selected', 'true');

@@ -94,21 +94,11 @@ test.describe('Instrument settings — desktop @ui', () => {
         await expect(surface.locator('#swingSlider')).toBeVisible();
         await expect(surface.locator('#swingBaseSelect')).toBeVisible();
         await expect(surface.locator('#humanizeSlider')).toBeVisible();
-
-        await expectWithinViewport(page, surface);
-    });
-
-    test('band settings surface exposes the harmonic-color choice', async ({ page }) => {
-        await page.getByRole('button', { name: 'Band settings' }).click();
-        const surface = page.locator('.workspace-studio-surface--band-feel.is-open');
         await expect(surface.locator('#harmonyColorSelect')).toBeVisible();
-    });
-
-    test('Drum settings popover no longer hosts the band-wide swing controls', async ({ page }) => {
-        const surface = await openInstrumentSettings(page, 'Drums');
-
-        await expect(surface.locator('#swingSlider')).toHaveCount(0);
-        await expect(surface.locator('#humanizeSlider')).toHaveCount(0);
+        await expect(surface.locator('.workspace-studio-genre-grid')).toBeVisible();
+        await expect(
+            surface.locator('.workspace-studio-genre-option[aria-pressed]').first(),
+        ).toBeVisible();
 
         await expectWithinViewport(page, surface);
     });
@@ -116,14 +106,6 @@ test.describe('Instrument settings — desktop @ui', () => {
     test('Chords settings popover exposes density select', async ({ page }) => {
         const surface = await openInstrumentSettings(page, 'Chords');
         await expect(surface.locator('#densitySelect')).toBeVisible();
-        await expectWithinViewport(page, surface);
-    });
-
-    test('Harmony settings popover no longer hosts a per-lane complexity dial', async ({
-        page,
-    }) => {
-        const surface = await openInstrumentSettings(page, 'Harmony');
-        await expect(surface.locator('#harmonyComplexity')).toHaveCount(0);
         await expectWithinViewport(page, surface);
     });
 

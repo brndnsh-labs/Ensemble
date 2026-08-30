@@ -36,32 +36,10 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await gotoHydrated(page);
     });
 
-    test('Chord Visualizer - Default Layout', async ({ page }) => {
-        const visualizer = page.locator('#chordVisualizer');
-        await expect(visualizer).toBeVisible();
-
-        await expect(visualizer.locator('.lead-sheet-row').first()).toBeVisible();
-        await expect(visualizer.locator('.chord-card').first()).toBeVisible();
-    });
-
     // Removed: "Arranger toolbar stretches across the header" — referenced #panel-arranger,
     // .workspace-arranger-controls-panel, #arrangerLibraryInlineBtn and other workspace-tab
     // selectors that no longer exist after the ChartSurface redesign (commit 3c5527ee).
     // Key-panel and seed-panel reachability are covered by the tests below.
-
-    test('Chord Visualizer - Continuous lead-sheet rows', async ({ page }) => {
-        await openLibrary(page);
-        await choosePresetFromLibrary(page, 'Autumn Leaves');
-
-        const visualizer = page.locator('#chordVisualizer');
-        // Verify structural elements are present
-        await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
-        await expect(visualizer.locator('.section-strip--compact')).toHaveCount(4);
-        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
-        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
-        await expect(visualizer.locator('.measure-box').first()).toBeVisible();
-        await expect(visualizer.locator('.chord-card').first()).toBeVisible();
-    });
 
     test('Time signature picker highlights genre-idiomatic meters (S10)', async ({ page }) => {
         // The meters are one-click chips inside the time-signature popover.
@@ -209,6 +187,8 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
         await expect(firstChord).toBeVisible();
         await expect(visualizer.locator('.lead-sheet-row')).toHaveCount(8);
         await expect(visualizer.locator('.section-strip--compact')).toHaveCount(4);
+        await expect(visualizer).toHaveAttribute('data-measures-per-row', '4');
+        await expect(visualizer).toHaveAttribute('data-scroll-mode', 'fit');
         await expect(visualizer).toHaveAttribute('data-vertical-fill', 'paper-fit');
         await expect
             .poll(async () =>
@@ -304,7 +284,6 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
 
         for (const viewport of viewports) {
             await page.setViewportSize(viewport);
-            await gotoHydrated(page);
 
             const keyTrigger = page.locator('#keyMenuBtn');
             const keyPanel = page.locator('#arrangerKeyPanel');
@@ -316,6 +295,7 @@ test.describe('Arranger & Chord Visualizer @visual', () => {
             await expectWithinSurface(keyPanel, page.locator('#transDownBtn'));
 
             await page.mouse.click(5, 5);
+            await expect(keyPanel).toBeHidden();
         }
     });
 
