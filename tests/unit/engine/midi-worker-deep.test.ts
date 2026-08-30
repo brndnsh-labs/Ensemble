@@ -131,7 +131,10 @@ describe('MIDI Worker Logic Deep Dive', () => {
         });
         const durationAt = (step) => mixed.stepTimes[step + 1] - mixed.stepTimes[step];
 
-        expect(durationAt(14)).toBeCloseTo(0.1875);
+        // #1067: 8th-swing subIndex 0 ("1") weight is 1 (was 1.5 pre-fix), so at
+        // swing:100 duration is stepSec*(4/3), matching the corrected weight vector
+        // — see the 7/8 16th-swing case above for the same shape of assertion.
+        expect(durationAt(14)).toBeCloseTo(0.125 * (4 / 3), 10);
         expect(durationAt(44)).toBeCloseTo(durationAt(14));
     });
 

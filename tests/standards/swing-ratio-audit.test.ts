@@ -153,6 +153,31 @@ describe('Swing ratio audit (per-genre oracle)', () => {
             );
         }
     });
+
+    it('8th swing keeps each inner 16th evenly spaced within its own swung eighth (#1067)', () => {
+        // The beat's two swung EIGHTH-note pulses are subIndex {0,1} (the "1"+"e")
+        // and {2,3} (the "&"+"a"). Each pulse's own two 16ths must split evenly —
+        // the "e"/"a" sits at the true midpoint of its swung eighth, not skewed
+        // toward either end. Regression guard for the old [1.5, 0.5, -0.5, -1.5]
+        // weights, which gave each pulse a 3:1 internal split (over-displacing the
+        // inner 16th by an extra 50%) and sounded like a dotted-eighth + sixteenth
+        // rather than a genuine shuffle, even though the OUTER 2:1 pulse-to-pulse
+        // ratio (asserted above) happened to come out correct either way.
+        const ts = { stepsPerBeat: 4 };
+        for (const swing of [10, 30, 60, 100]) {
+            const d = [0, 1, 2, 3].map((s) =>
+                calculateStepDuration(s, 120, ts, { swing, swingSub: '8th' }),
+            );
+            expect(d[0], `swing ${swing}: "1"/"e" (first pulse) should split evenly`).toBeCloseTo(
+                d[1],
+                10,
+            );
+            expect(d[2], `swing ${swing}: "&"/"a" (second pulse) should split evenly`).toBeCloseTo(
+                d[3],
+                10,
+            );
+        }
+    });
 });
 
 describe('Compound/odd meter swing (#1065)', () => {
