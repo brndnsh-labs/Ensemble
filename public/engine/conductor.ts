@@ -127,10 +127,11 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     const complexity = playback.complexity; // 0.0 - 1.0
 
     // --- 1. Master Dynamics ---
-    // #1264 — annotated so a new tier added here is a compile error at the SOURCE
-    // rather than a value the `UPDATE_CONDUCTOR_DECISION` reducer's guard silently
-    // drops on the floor. Inferred, this was `string`, and the reducer was the only
-    // thing standing between it and the slice.
+    // #1264 — annotated so a new tier added here is a compile error at the SOURCE.
+    // #1064 — this is the conductor's OWN runtime-derived value, published as
+    // `playback.conductorDensity` below; it never writes `chords.density` (the
+    // user's document-owned field) directly. Generation readers compose the two
+    // at READ time (`playback.conductorDensity ?? chords.density`).
     let targetDensity: ChordDensity = 'standard';
     if (intensity < 0.4) {
         targetDensity = 'thin';
@@ -146,7 +147,11 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
     const targetVelocity = conductorVelocityFor(intensity);
 
     // --- 4. Harmony Evolution ---
-    // Harmonies follow the complexity signal for activity level.
+    // Harmonies follow the complexity signal for activity level. #1064 — this
+    // target is the conductor's own runtime-derived value too; it never writes
+    // `harmony.complexity` (the user's document-owned field) directly. Published
+    // below as `playback.conductorHarmonyComplexity`, composed at READ time by
+    // consumers (harmonies.ts) via `?? harmony.complexity`.
     let targetHbComplexity = complexity;
 
     // Song Mode ending: in the last 30s, floor harmony complexity high so the
@@ -159,11 +164,8 @@ export function applyConductor(state: EnsembleState, dispatch: Dispatch) {
 
     dispatch(ACTIONS.UPDATE_CONDUCTOR_DECISION, {
         density: targetDensity,
+        harmonyComplexity: targetHbComplexity,
         velocity: targetVelocity,
-    });
-
-    dispatch(ACTIONS.UPDATE_HB, {
-        complexity: targetHbComplexity,
     });
 
     // #1063: the old "mirror getBandPocket onto bass.pocketOffset" write was

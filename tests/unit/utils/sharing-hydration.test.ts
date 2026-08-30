@@ -564,6 +564,30 @@ describe('band.c share round-trip — the same mismatch class (#1257)', () => {
         expect(typeof chords.density).toBe('string');
     });
 
+    // #1064 — the auto-conductor's runtime-derived mirrors (playback.conductorDensity /
+    // playback.conductorHarmonyComplexity) must never leak into a share URL: only
+    // the user's own document-owned chords.density/harmony.complexity are read by
+    // sharing.ts. Diverge the mirrors from the document fields to prove the share
+    // carries the latter, not the former.
+    it('shares the user-authored density/complexity, never the conductor runtime mirrors', () => {
+        chords.density = 'rich';
+        harmony.complexity = 0.2;
+        playback.conductorDensity = 'thin';
+        playback.conductorHarmonyComplexity = 0.9;
+
+        const url = roundTripUrl();
+
+        // Clobber both document fields with something else before hydrating, so a
+        // successful restore proves the URL actually carried the right values.
+        chords.density = 'standard';
+        harmony.complexity = 0.5;
+        vi.stubGlobal('location', new URL(url));
+        loadFromUrl();
+
+        expect(chords.density).toBe('rich');
+        expect(harmony.complexity).toBe(0.2);
+    });
+
     it('falls back to the string standard — never a number — for an out-of-keyspace density', () => {
         chords.density = 'rich';
         const bnd = encodeBase64Unicode(

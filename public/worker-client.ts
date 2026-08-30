@@ -364,9 +364,17 @@ export function syncWorker(action?: WorkerSyncActionName, payload?: unknown): vo
             break;
         }
         case 'UPDATE_CONDUCTOR_DECISION':
+            // #1064 — `chords.density` here is the user's own document field
+            // (unaffected by this action now); it just rides along on the
+            // conductor's frequent tick so the worker's mirror stays current
+            // even though nothing worker-side reads it. `conductorHarmonyComplexity`
+            // IS read worker-side (harmonies.ts, live inside logic-worker.ts) and
+            // must cross like `conductorVelocity` — `conductorDensity` does NOT
+            // need to cross: its only reader (chords-engine.ts) runs main-thread.
             data.chords = { density: chords.density };
             data.playback = {
                 conductorVelocity: playback.conductorVelocity,
+                conductorHarmonyComplexity: playback.conductorHarmonyComplexity,
                 intent: playback.intent,
             };
             break;

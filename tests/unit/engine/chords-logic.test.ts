@@ -501,5 +501,33 @@ describe('Chords & Voicing Logic', () => {
             // 1 3 5 6 9 — five distinct voiced pitches, no dropped/orphaned bass.
             expect(arranger.progression[0].freqs.length).toBe(5);
         });
+
+        it('#1064 — voicing density resolves from playback.conductorDensity when set, else falls back to chords.density', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'I', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            groove.genreFeel = 'Rock';
+            playback.bandIntensity = 0.5; // below every intensity-based extension tier
+            chords.density = 'thin';
+            playback.conductorDensity = null;
+
+            // No conductor value yet: falls back to the document field. Rock major
+            // standard is [0, 7, 16, 19] (getIntervals unit above); thin strips the 5th.
+            validateProgression(getState());
+            expect(arranger.progression[0].intervals).toEqual([0, 16, 19]);
+
+            // The conductor's runtime-derived mirror wins over the document field —
+            // never the other way around (#1064: the conductor must never write
+            // chords.density itself, only this separate runtime field).
+            playback.conductorDensity = 'rich';
+            validateProgression(getState());
+            expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19, 14]);
+
+            // Clearing the conductor mirror falls back to the document field again.
+            playback.conductorDensity = null;
+            chords.density = 'standard';
+            validateProgression(getState());
+            expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19]);
+        });
     });
 });

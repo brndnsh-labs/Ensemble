@@ -530,6 +530,12 @@ async function renderSceneReports({
                         state.playback.isScheduling = false;
                         state.playback.currentKey = scene.key;
                         state.playback.conductorVelocity = 1;
+                        // #1064 — neutralize any stale conductor mirror from the
+                        // live tab (autoIntensity is forced off above, so
+                        // applyConductor never runs to refresh these); null falls
+                        // back to the scene's own chords.density/harmony.complexity.
+                        state.playback.conductorDensity = null;
+                        state.playback.conductorHarmonyComplexity = null;
                         state.playback.nextNoteTime = 0;
                         state.playback.unswungNextNoteTime = 0;
                         state.playback.modals.performance = false;

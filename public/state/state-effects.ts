@@ -38,9 +38,12 @@ import { debounceSaveState } from './persistence.js';
 //   • pure UI ephemera (toasts, flashes)
 //   • worker runtime seed/buffer state (UPDATE_SB/UPDATE_GB)
 //   • the auto-conductor's per-STEP dispatches (SET_BAND_INTENSITY,
-//     UPDATE_CONDUCTOR_DECISION, UPDATE_HB) — bandIntensity/conductor decision/
-//     harmony-buffer are NOT persisted; autoIntensity defaults ON, so these fire
-//     ~every step during an intensity ramp.
+//     UPDATE_CONDUCTOR_DECISION, UPDATE_HB) — bandIntensity/conductorVelocity/
+//     conductorDensity/conductorHarmonyComplexity are all runtime-derived, NOT
+//     persisted (#1064 fixed UPDATE_CONDUCTOR_DECISION/UPDATE_HB writing onto
+//     the persisted chords.density/harmony.complexity fields directly — this
+//     claim is accurate again now that they don't); autoIntensity defaults ON,
+//     so these fire ~every step during an intensity ramp.
 // Excluding the high-frequency ones is what lets the 1s debounce actually settle
 // during playback instead of being perpetually reset (a real save gets written
 // ~1s after the last genuine change; a periodic loop-boundary saveCurrentState()

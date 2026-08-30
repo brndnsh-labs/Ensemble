@@ -832,6 +832,11 @@ function finalizeHarmonyNotes(
     const { playback, harmony, groove, chords } = activeState;
     const { duration: baseDuration, isLatched, isBloom, isGhost, anchorMidi } = behavior;
     let duration = baseDuration;
+    // #1064 — the auto-conductor's runtime-derived complexity mirror wins when
+    // present; it is never assigned onto `harmony.complexity` (the user's own
+    // document-owned field) directly. Composed here at READ time, mirroring how
+    // `playback.conductorVelocity` combines with a lane's own value.
+    const effectiveComplexity = playback.conductorHarmonyComplexity ?? harmony.complexity;
 
     let intervals: number[] =
         chord.intervals && chord.intervals.length > 0 ? chord.intervals : [0, 4, 7];
@@ -874,7 +879,7 @@ function finalizeHarmonyNotes(
             // why: soloistNotesInPhrase published via coordination context (S4).
             coordination.soloistNotesInPhrase > 3 ||
             coordination.accompanimentHit ||
-            harmony.complexity < 0.4
+            effectiveComplexity < 0.4
         ) {
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
@@ -891,7 +896,7 @@ function finalizeHarmonyNotes(
             intervals = getGuideTones(intervals);
         }
     } else if (!groundingRequired) {
-        if (harmony.complexity < 0.4 || playback.bandIntensity < 0.4 || feel === 'Jazz') {
+        if (effectiveComplexity < 0.4 || playback.bandIntensity < 0.4 || feel === 'Jazz') {
             const guides = getGuideTones(intervals);
             if (guides.length > 0) {
                 intervals = guides;

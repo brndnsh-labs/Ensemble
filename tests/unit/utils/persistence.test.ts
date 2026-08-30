@@ -138,4 +138,20 @@ describe('Persistence Integrity', () => {
         const savedData = vi.mocked(storage.save).mock.calls[0][1];
         expect(savedData.bpm).toBe(132);
     });
+
+    it('#1064 — persists the user-authored chords.density/harmony.complexity, never the conductor runtime mirrors', () => {
+        const state = getState();
+        state.chords.density = 'rich';
+        state.harmony.complexity = 0.2;
+        // Diverge the conductor's runtime-derived mirrors from the document
+        // fields to prove the save reads the latter, not the former.
+        playback.conductorDensity = 'thin';
+        playback.conductorHarmonyComplexity = 0.9;
+
+        saveCurrentState();
+
+        const savedData = vi.mocked(storage.save).mock.calls[0][1];
+        expect(savedData.chords.density).toBe('rich');
+        expect(savedData.harmony.complexity).toBe(0.2);
+    });
 });

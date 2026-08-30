@@ -64,6 +64,10 @@ export function buildPlaybackSyncPayload(playback: GlobalContext) {
         modals: {},
         intent: playback.intent,
         conductorVelocity: playback.conductorVelocity,
+        // #1064 — read worker-side by harmonies.ts (`finalizeHarmonyNotes`, live
+        // inside logic-worker.ts). `conductorDensity` is NOT synced: its only
+        // reader (chords-engine.ts's `getIntervals` call) runs main-thread only.
+        conductorHarmonyComplexity: playback.conductorHarmonyComplexity,
         songMode: playback.songMode,
         isEndingPending: playback.isEndingPending,
         currentLoopCount: playback.currentLoopCount,
