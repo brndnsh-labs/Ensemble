@@ -374,18 +374,29 @@ interface GrooveControlsProps {
     state: GrooveState;
 }
 
+// Meters whose own notation already carries the shuffle feel — see #1065. Both are
+// stepsPerBeat:2, same as 7/8, but calculateStepDuration (groove-engine.ts) only
+// swings 7/8; keep this list and that engine gate in sync.
+const SWING_DISABLED_METERS = new Set(['6/8', '12/8']);
+
 function GrooveControls({ state }: GrooveControlsProps) {
-    const { swing, swingSub } = useEnsembleState((s) => ({
+    const { swing, swingSub, timeSignature } = useEnsembleState((s) => ({
         swing: s.groove.swing,
         swingSub: s.groove.swingSub,
+        timeSignature: s.arranger.timeSignature,
     }));
+    const swingDisabled = SWING_DISABLED_METERS.has(timeSignature);
 
     return (
         <Fragment>
             <SettingRow
                 label="Swing"
                 id="swingSlider"
-                description="Delays the off-beats for a triplet shuffle."
+                description={
+                    swingDisabled
+                        ? `${timeSignature} already notates the shuffle feel, so Swing is disabled here.`
+                        : 'Delays the off-beats for a triplet shuffle.'
+                }
                 valueDisplay={`${swing || 0}%`}
             >
                 <div class="flex-row instrument-settings-swing-controls">
@@ -394,6 +405,7 @@ function GrooveControls({ state }: GrooveControlsProps) {
                         min="0"
                         max="100"
                         value={swing || 0}
+                        disabled={swingDisabled}
                         onInput={(val) => {
                             dispatch(ACTIONS.SET_SWING, parseInt(val, 10));
                         }}
@@ -402,6 +414,7 @@ function GrooveControls({ state }: GrooveControlsProps) {
                     <Select
                         id="swingBaseSelect"
                         value={swingSub || '8th'}
+                        disabled={swingDisabled}
                         onChange={(val) => {
                             dispatch(ACTIONS.SET_SWING_SUB, val);
                         }}

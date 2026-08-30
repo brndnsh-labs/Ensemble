@@ -15,15 +15,22 @@
 // idiomatic band and this fails. Bands carry headroom (the values are deterministic
 // functions of swing/sub), not a flake margin.
 //
-// SCOPE: the engine also has a compound-meter (stepsPerBeat===3, e.g. 6/8 / 12/8)
-// swing branch that is self-flagged approximate in groove-engine.ts ("simple offset
-// for now"). Blues/Jazz advertise those meters, so their swing there runs an
-// untested, rougher redistribution. Validating/​improving the compound-meter swing
-// feel is tracked separately (#877 swing follow-ups), not asserted here.
+// SCOPE (#1065): every live meter in TIME_SIGNATURES (config.ts) is stepsPerBeat 4
+// (2/4, 3/4, 4/4, 5/4, 7/4) or stepsPerBeat 2 (6/8, 7/8, 12/8) — there is no
+// stepsPerBeat===3 meter, so the old "===3" branch here was dead code that never
+// matched anything, and 6/8/7/8/12/8 all silently ran ZERO swing (the branching
+// matched neither `=== 4` nor the dead `=== 3`). The fix splits the stepsPerBeat:2
+// group by `ts.isCompound`: 7/8 (not flagged compound) gets real swing — asserted
+// below to hit the same 2:1 ratio as the working stepsPerBeat===4 case — while 6/8
+// and 12/8 (`isCompound: true`) deliberately stay straight at any swing value,
+// because their dotted-quarter pulse already notates the shuffle feel; a second
+// swing interpretation on top would double it up. The Swing UI control is disabled
+// for 6/8/12/8 (InstrumentSettings.tsx `GrooveControls`) to match.
 //
 // Ratio reference: 1.000 straight · ~1.1 light lilt · ~1.2 laid-back pocket ·
 // ~1.5 medium swing · ~1.86 hard shuffle · 2.000 triplet (the swing=100 limit).
 import { describe, expect, it } from 'vitest';
+import { TIME_SIGNATURES } from '../../public/config.js';
 import { GENRE_NAMES, SMART_GENRES } from '../../public/data/smart-genres.js';
 import { calculateStepDuration } from '../../public/engine/groove-engine.js';
 
@@ -144,6 +151,53 @@ describe('Swing ratio audit (per-genre oracle)', () => {
                 4 * straight[0],
                 8,
             );
+        }
+    });
+});
+
+describe('Compound/odd meter swing (#1065)', () => {
+    it('every live TIME_SIGNATURES entry has a stepsPerBeat calculateStepDuration actually handles', () => {
+        // calculateStepDuration's swing switch is exhaustive over exactly stepsPerBeat
+        // 4 and 2 — the only two values the real config table produces. If a future
+        // meter introduces a third value without a new case, this fails loudly here
+        // instead of the meter silently getting zero swing in production.
+        for (const [name, ts] of Object.entries(TIME_SIGNATURES)) {
+            expect([2, 4], `${name} has an unhandled stepsPerBeat: ${ts.stepsPerBeat}`).toContain(
+                ts.stepsPerBeat,
+            );
+        }
+    });
+
+    it('7/8 swings — swing:100 produces the same 2:1 ratio as the working stepsPerBeat===4 case', () => {
+        const ts = TIME_SIGNATURES['7/8'];
+        expect(ts.isCompound).toBeFalsy(); // the signal calculateStepDuration branches on
+        const d = [0, 1].map((s) =>
+            calculateStepDuration(s, 120, ts, { swing: 100, swingSub: '16th' }),
+        );
+        expect(d[0] / d[1]).toBeCloseTo(2.0, 6);
+
+        // Tempo preservation holds here too: a beat (2 steps at stepsPerBeat:2) sums
+        // to 2× the straight step.
+        const straightStep = calculateStepDuration(0, 120, ts, { swing: 0, swingSub: '16th' });
+        expect(d[0] + d[1]).toBeCloseTo(2 * straightStep, 8);
+    });
+
+    it('6/8 and 12/8 stay straight (no swing) at any swing value — the meter already notates the shuffle', () => {
+        for (const name of ['6/8', '12/8']) {
+            const ts = TIME_SIGNATURES[name];
+            expect(ts.isCompound, `${name} should be flagged isCompound`).toBe(true);
+            const straightStep = calculateStepDuration(0, 120, ts, { swing: 0, swingSub: '16th' });
+            for (const swing of [1, 25, 50, 75, 100]) {
+                for (const swingSub of ['8th', '16th']) {
+                    for (const step of [0, 1, 2, 3]) {
+                        const d = calculateStepDuration(step, 120, ts, { swing, swingSub });
+                        expect(
+                            d,
+                            `${name} step ${step} swing ${swing}/${swingSub} should stay straight`,
+                        ).toBeCloseTo(straightStep, 10);
+                    }
+                }
+            }
         }
     });
 });

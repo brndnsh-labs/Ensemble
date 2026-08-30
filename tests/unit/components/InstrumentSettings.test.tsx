@@ -117,6 +117,9 @@ describe('InstrumentSettings Component', () => {
                     swing: 30,
                     swingSub: '8th',
                 },
+                // GrooveControls reads arranger.timeSignature (#1065) to gate the
+                // Swing control disabled in 6/8 and 12/8.
+                arranger: { timeSignature: '4/4' },
                 playback: {},
             };
             return cb(fullState);
