@@ -176,14 +176,22 @@ describe('Chord Synthesis', () => {
 
     it('should release held notes when sustain is deactivated', () => {
         playback.sustainActive = true;
-        playNote(getState(), 440, 10, 1.0, { instrument: 'Piano' });
+        for (let i = 0; i < 3; i++) {
+            playNote(getState(), 440 + i, 10, 1.0, { instrument: 'Piano' });
+        }
 
-        expect(playback.heldNotes.size).toBe(1);
+        expect(playback.heldNotes.size).toBe(3);
 
         updateSustain(getState(), false, 11);
 
         expect(playback.sustainActive).toBe(false);
         expect(playback.heldNotes.size).toBe(0);
+        const releasedBodies = playback.audio.createGain.mock.results.filter(({ value: gain }) =>
+            gain.gain.setTargetAtTime.mock.calls.some(
+                ([target, time, damping]) => target === 0 && time === 11 && damping === 0.12,
+            ),
+        );
+        expect(releasedBodies).toHaveLength(3);
     });
 
     it('should kill all piano notes immediately', () => {

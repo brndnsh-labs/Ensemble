@@ -3,6 +3,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateShareUrl, shareProgression } from '../../../public/export/sharing.js';
+import { encodeBase64Unicode } from '../../../public/state/share-codec.js';
 import { getState } from '../../../public/state.js';
 import { showToast } from '../../../public/ui.js';
 
@@ -59,16 +60,19 @@ describe('Sharing Deep Dive', () => {
     });
 
     it('should respect include toggles in compressed settings', () => {
-        const url = generateShareUrl({
+        generateShareUrl({
             includeSolo: false,
             includeBass: false,
             includeChords: false,
             includeHarmony: false,
             includeDrums: false,
         });
-        // We can't easily decode the Base64 here but we verify it doesn't crash
-        // and exercise those branches.
-        expect(url).toContain('bnd=');
+        const payload = JSON.parse(vi.mocked(encodeBase64Unicode).mock.calls[0][0]);
+        expect(payload.s.e).toBe(0);
+        expect(payload.b.e).toBe(0);
+        expect(payload.c.e).toBe(0);
+        expect(payload.h.e).toBe(0);
+        expect(payload.g.e).toBe(0);
     });
 
     it('should handle clipboard errors', async () => {

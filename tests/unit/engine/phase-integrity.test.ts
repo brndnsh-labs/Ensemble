@@ -218,14 +218,4 @@ describe('Phase Integrity (Audio/Visual Sync)', () => {
         const expectedStep1Time = startTime + sixteenth + shift;
         expect(stepEvents[1].time).toBeCloseTo(expectedStep1Time, 5);
     });
-
-    it('should clear the drawQueue when playback is stopped to prevent ghost visuals', () => {
-        // Mocking a few items in the queue
-        playback.drawQueue.push({ type: 'flash', time: 1.0 });
-
-        // We can't easily call togglePlay because it's a complex export,
-        // but we can verify the logic that scheduler-core.js uses
-        playback.drawQueue = [];
-        expect(playback.drawQueue).toHaveLength(0);
-    });
 });

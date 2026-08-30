@@ -157,10 +157,14 @@ describe('Time Signature Logic', () => {
             expect(info6.isCompound).toBe(true);
         });
 
-        it('should handle 12/8 with compound flag', () => {
+        it('should identify compound grouping and backbeats in 12/8', () => {
             const config128 = TIME_SIGNATURES['12/8'];
             expect(getStepInfo(0, config128).isCompound).toBe(true);
             expect(getStepInfo(6, config128).isGroupStart).toBe(true);
+            expect(getStepInfo(0, config128).isBackbeat).toBe(false);
+            expect(getStepInfo(6, config128).isBackbeat).toBe(true);
+            expect(getStepInfo(12, config128).isBackbeat).toBe(false);
+            expect(getStepInfo(18, config128).isBackbeat).toBe(true);
         });
 
         it('should identify 4/4 as NOT compound', () => {
